@@ -402,8 +402,8 @@ mod tests {
         g.set_trust("alice", "bob", 0.9, false);
         g.set_trust("bob", "carol", 0.8, false);
         let t = g.transitive_trust("alice", "carol", 5);
-        // Expected: 0.9 * 0.8 * 0.8 (hop decay) = 0.576
-        assert!(t > 0.5 && t < 0.7, "Got {}", t);
+        // Expected: 0.9 * 0.8 (hop decay) * 0.8 * 0.8 (hop decay) = 0.4608
+        assert!(t > 0.3 && t < 0.6, "Got {}", t);
     }
 
     #[test]

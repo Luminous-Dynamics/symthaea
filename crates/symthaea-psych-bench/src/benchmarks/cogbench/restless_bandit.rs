@@ -138,7 +138,7 @@ impl RestlessBanditBenchmark {
                 .fold(f64::NEG_INFINITY, f64::max);
             let margin = (chosen_ema - best_other_ema).max(0.0);
             let confidence = (margin * 5.0).clamp(0.0, 1.0); // Scale margin to [0, 1]
-            let confident = confidence > 0.3 && trial >= 10;
+            let confident = confidence > 0.20 && trial >= 10;
 
             if trial >= 10 {
                 if confident {

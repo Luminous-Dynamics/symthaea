@@ -767,7 +767,7 @@ fn score_samples(
 }
 
 /// Classify predictions at a given threshold and return a ConfusionMatrix.
-fn classify_at_threshold(scored: &[(f64, bool)], threshold: f64) -> ConfusionMatrix {
+pub fn classify_at_threshold(scored: &[(f64, bool)], threshold: f64) -> ConfusionMatrix {
     let mut tp = 0u64;
     let mut fp = 0u64;
     let mut tn = 0u64;

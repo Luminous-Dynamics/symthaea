@@ -44,11 +44,9 @@ pub fn lempel_ziv_76(sequence: &[bool]) -> usize {
         let mut found = false;
         if search_end > 0 {
             for start in 0..search_end {
-                if start + k <= search_end {
-                    if &sequence[start..start + k] == sub {
-                        found = true;
-                        break;
-                    }
+                if start + k <= search_end && &sequence[start..start + k] == sub {
+                    found = true;
+                    break;
                 }
             }
         }

@@ -176,17 +176,13 @@ impl PsychBenchmark for CollectiveAggregationBenchmark {
                     .map(|p| {
                         // Use aggregate as context: bundle(proto, aggregate) to test if
                         // aggregate quality affects downstream classification
-                        let combined_hvs = vec![*p, plaintext_bundle];
-                        BinaryHV::bundle(&combined_hvs)
+                        BinaryHV::bundle(&[*p, plaintext_bundle])
                     })
                     .collect();
 
                 let agg_enriched: Vec<BinaryHV> = class_protos
                     .iter()
-                    .map(|p| {
-                        let combined_hvs = vec![*p, decrypted_aggregate];
-                        BinaryHV::bundle(&combined_hvs)
-                    })
+                    .map(|p| BinaryHV::bundle(&[*p, decrypted_aggregate]))
                     .collect();
 
                 // Classify

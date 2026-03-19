@@ -288,11 +288,11 @@ impl PsychBenchmark for ArcFewShotBenchmark {
 
         for k in 1..=MAX_SHOTS {
             result.insert(
-                &format!("accuracy_{}shot", k),
+                format!("accuracy_{}shot", k),
                 MetricValue::from_samples(&accs_per_shot[k - 1]),
             );
             result.insert(
-                &format!("similarity_{}shot", k),
+                format!("similarity_{}shot", k),
                 MetricValue::from_samples(&sims_per_shot[k - 1]),
             );
         }

@@ -121,3 +121,5 @@ pulse.html
 benchmarks/external/**/helm-repo/
 benchmarks/external/**/.git/
 symthaea/
+crates/symthaea-spore/www/broca-pipeline.bin
+crates/symthaea-spore/www/broca-pipeline.bin

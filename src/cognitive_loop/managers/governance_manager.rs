@@ -137,6 +137,9 @@ pub struct GovernanceManager {
     /// Preferred radio tier for governance traffic (from SpectrumManager).
     #[cfg(feature = "mesh")]
     preferred_tier: Option<super::radio_dispatcher::RadioTier>,
+    /// Cached financial health signals from Mycelix finance cluster.
+    /// Updated periodically via `update_finance_health()`, not every cycle.
+    finance_health: crate::consciousness::mycelix_bridge::FinanceHealthSignals,
 }
 
 impl Default for GovernanceManager {
@@ -162,6 +165,7 @@ impl Default for GovernanceManager {
             last_lr_boost: 1.0,
             #[cfg(feature = "mesh")]
             preferred_tier: None,
+            finance_health: crate::consciousness::mycelix_bridge::FinanceHealthSignals::default(),
         }
     }
 }
@@ -322,6 +326,31 @@ impl GovernanceManager {
         self.last_lr_boost
     }
 
+    /// Update cached financial health signals from Mycelix finance cluster.
+    ///
+    /// Called periodically (not every cycle) when fresh data arrives from
+    /// the finance bridge. The `stress_index` is recomputed on update.
+    pub fn update_finance_health(
+        &mut self,
+        signals: crate::consciousness::mycelix_bridge::FinanceHealthSignals,
+    ) {
+        let mut s = signals;
+        s.stress_index = s.compute_stress_index();
+        self.finance_health = s;
+    }
+
+    /// Current financial health signals (read-only snapshot).
+    pub fn finance_health(&self) -> &crate::consciousness::mycelix_bridge::FinanceHealthSignals {
+        &self.finance_health
+    }
+
+    /// Financial engagement modulation (0.0 = no effect, negative = dampening).
+    ///
+    /// Delegates to [`FinanceHealthSignals::engagement_modulation`].
+    pub fn finance_engagement_modulation(&self) -> f32 {
+        self.finance_health.engagement_modulation()
+    }
+
     /// Set the preferred radio tier for governance traffic (from SpectrumManager).
     #[cfg(feature = "mesh")]
     pub fn set_preferred_tier(&mut self, tier: super::radio_dispatcher::RadioTier) {
@@ -402,20 +431,25 @@ impl GovernanceManager {
 
         // 2. Confidence delta from alignment
         match outcome.my_vote_aligned {
-            Some(true) => output.confidence_delta += 0.02,
-            Some(false) => output.confidence_delta -= 0.03,
+            Some(true) => output.confidence_delta += thresholds::GOV_ALIGNED_VOTE_CONFIDENCE,
+            Some(false) => output.confidence_delta += thresholds::GOV_MISALIGNED_VOTE_CONFIDENCE,
             None => {}
         }
 
         // 3. LR modulation from governance PE (high PE → boost learning)
-        let lr_boost = 1.0 + (prediction_error * 0.3).min(0.5);
+        let lr_boost = 1.0
+            + (prediction_error * thresholds::GOV_PE_LR_SCALE).min(thresholds::GOV_PE_LR_MAX_BOOST);
         output.lr_modulation = output.lr_modulation.max(1.0) * lr_boost;
         self.last_lr_boost = lr_boost;
 
         // 4. Accumulate harmonic deltas from harmonic_resonance
         // Distribute resonance across all harmonies proportionally
         let per_harmony = outcome.harmonic_resonance / 8.0;
-        let sign = if outcome.passed { 1.0 } else { -0.5 };
+        let sign = if outcome.passed {
+            1.0
+        } else {
+            thresholds::GOV_FAILED_OUTCOME_SIGN
+        };
         for delta in &mut self.harmonic_deltas {
             *delta += per_harmony * sign;
         }
@@ -424,8 +458,14 @@ impl GovernanceManager {
         // (checked via TallyCompleted events, but outcomes can also flag it)
 
         // 6. Compute reward signal
-        let reward = outcome.value_alignment_score * if outcome.passed { 1.0 } else { -0.5 };
-        self.reward_ema = self.reward_ema * 0.9 + reward * 0.1;
+        let reward = outcome.value_alignment_score
+            * if outcome.passed {
+                1.0
+            } else {
+                thresholds::GOV_FAILED_OUTCOME_SIGN
+            };
+        self.reward_ema = self.reward_ema * thresholds::GOV_REWARD_EMA_DECAY
+            + reward * (1.0 - thresholds::GOV_REWARD_EMA_DECAY);
         self.latest_reward = Some(reward as f32);
 
         // 7. Store for episodic recording with governance PE
@@ -491,7 +531,7 @@ impl GovernanceManager {
                 self.last_collective_phi = *collective_phi;
 
                 // High collective phi → ECB baseline nudge (group coherence)
-                if *collective_phi > 0.5 {
+                if *collective_phi > thresholds::GOV_COLLECTIVE_PHI_HIGH {
                     self.queue_baseline("endocannabinoid", thresholds::GOV_COLLECTIVE_PHI_ECB);
                 }
 
@@ -592,21 +632,21 @@ impl CognitiveSubsystem for GovernanceManager {
             match &event.kind {
                 GovernanceEventKind::EmergencyDeclared => {
                     has_emergency = true;
-                    output.arousal_delta += 0.1;
+                    output.arousal_delta += thresholds::GOV_EMERGENCY_AROUSAL;
                     output.flags |= output_flags::ESCALATE_URGENCY;
                 }
                 GovernanceEventKind::TallyCompleted { collective_phi, .. } => {
                     tally_count += 1;
                     // Fragile consensus → boost exploration
-                    if *collective_phi < 0.3 {
-                        output.exploration_delta += 0.05;
+                    if *collective_phi < thresholds::GOV_FRAGILE_CONSENSUS_PHI {
+                        output.exploration_delta += thresholds::GOV_FRAGILE_CONSENSUS_EXPLORE;
                         output.flags |= output_flags::REQUEST_EXPLORATION;
                     }
                 }
                 GovernanceEventKind::VoteCast { voter_phi, .. } => {
                     // High-phi voters boost confidence slightly
-                    if *voter_phi > 0.5 {
-                        output.confidence_delta += 0.005;
+                    if *voter_phi > thresholds::GOV_COLLECTIVE_PHI_HIGH {
+                        output.confidence_delta += thresholds::GOV_HIGH_PHI_VOTER_CONFIDENCE;
                     }
                 }
                 _ => {}
@@ -621,13 +661,15 @@ impl CognitiveSubsystem for GovernanceManager {
 
         // Emergency raises arousal, suppresses exploration
         if has_emergency {
-            output.exploration_delta -= 0.1;
+            output.exploration_delta -= thresholds::GOV_EMERGENCY_EXPLORE_SUPPRESS;
         }
 
         // Multiple tallies in one cycle → governance is active, mild LR boost
         if tally_count > 0 {
-            output.lr_modulation =
-                output.lr_modulation.max(1.0) * (1.0 + (tally_count as f64 * 0.02).min(0.1));
+            output.lr_modulation = output.lr_modulation.max(1.0)
+                * (1.0
+                    + (tally_count as f64 * thresholds::GOV_TALLY_LR_SCALE)
+                        .min(thresholds::GOV_TALLY_LR_MAX_BOOST));
         }
 
         // ── Epistemic mesh: blind spots → exploration boost ─────────────
@@ -639,7 +681,7 @@ impl CognitiveSubsystem for GovernanceManager {
                     .iter()
                     .map(|bs| bs.severity)
                     .fold(0.0f64, f64::max);
-                output.exploration_delta += max_severity * 0.05; // up to +0.05
+                output.exploration_delta += max_severity * thresholds::GOV_BLIND_SPOT_EXPLORE_SCALE;
                 output.flags |= output_flags::REQUEST_EXPLORATION;
             }
         }
@@ -647,7 +689,7 @@ impl CognitiveSubsystem for GovernanceManager {
         // ── Community mode: influence harmony weight deltas ─────────────
         if let Some(mode) = self.community_mode {
             // Community mode gently biases harmonic emphasis (±0.005 per cycle)
-            let bias = 0.005;
+            let bias = thresholds::GOV_COMMUNITY_HARMONIC_BIAS;
             match mode {
                 CommunityMode::Exploratory => {
                     self.harmonic_deltas[3] += bias; // InfinitePlay

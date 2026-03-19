@@ -161,7 +161,7 @@ impl SemanticPrimingBenchmark {
             let base_noise = 0.55 + config.encoding_noise as f32 * 0.20;
             let fep_scale = if config.enable_fep { 1.0 } else { 0.4 };
             let prime_benefit = if is_related {
-                priming_boost as f32 * fep_scale * 0.70
+                priming_boost * fep_scale * 0.70
             } else {
                 0.0
             };

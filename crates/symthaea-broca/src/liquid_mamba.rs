@@ -2229,7 +2229,9 @@ mod tests {
         let mut gen = LiquidMambaGenerator::with_mock(&genesis, config);
 
         let channels = ThoughtChannels::with_intent(1);
-        let weights_before = gen.projection().flatten_weights();
+        // Default config has temporal_projection=true, so distill_step updates
+        // the temporal projection weights (not the spatial projection).
+        let weights_before = gen.temporal_proj().unwrap().flatten_weights();
 
         // Generate and distill multiple times to trigger gradient application
         for _ in 0..4 {
@@ -2237,7 +2239,7 @@ mod tests {
             gen.distill_step(&channels, &result);
         }
 
-        let weights_after = gen.projection().flatten_weights();
+        let weights_after = gen.temporal_proj().unwrap().flatten_weights();
         assert_eq!(gen.generation_count(), 4);
 
         // Weights should have changed after distillation
@@ -2245,7 +2247,10 @@ mod tests {
             .iter()
             .zip(weights_after.iter())
             .any(|(a, b)| (a - b).abs() > 1e-10);
-        assert!(changed, "Distillation should modify projection weights");
+        assert!(
+            changed,
+            "Distillation should modify temporal projection weights"
+        );
     }
 
     #[test]

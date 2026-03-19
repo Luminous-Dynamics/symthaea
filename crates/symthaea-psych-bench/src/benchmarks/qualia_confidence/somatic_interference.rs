@@ -247,8 +247,8 @@ impl PsychBenchmark for SomaticInterferenceBenchmark {
 
         // ── Dynamic bath condition ──
         let mut dynamic_bath = Bath::new();
-        let mut dynamic_correct = vec![0usize; 4]; // 4 windows of 50 trials
-        let mut dynamic_total = vec![0usize; 4];
+        let mut dynamic_correct = [0usize; 4]; // 4 windows of 50 trials
+        let mut dynamic_total = [0usize; 4];
 
         for trial in 0..NUM_TRIALS {
             let trial_seed = config
@@ -293,8 +293,8 @@ impl PsychBenchmark for SomaticInterferenceBenchmark {
 
         // ── Static bath condition (control) ──
         let mut static_bath = StaticBath::new();
-        let mut static_correct = vec![0usize; 4];
-        let mut static_total = vec![0usize; 4];
+        let mut static_correct = [0usize; 4];
+        let mut static_total = [0usize; 4];
 
         for trial in 0..NUM_TRIALS {
             let trial_seed = config
@@ -345,11 +345,11 @@ impl PsychBenchmark for SomaticInterferenceBenchmark {
         ];
         for (w, name) in window_names.iter().enumerate() {
             result.insert(
-                &format!("dynamic_{name}_accuracy"),
+                format!("dynamic_{name}_accuracy"),
                 MetricValue::from_samples(&[dynamic_accuracies[w]]),
             );
             result.insert(
-                &format!("static_{name}_accuracy"),
+                format!("static_{name}_accuracy"),
                 MetricValue::from_samples(&[static_accuracies[w]]),
             );
         }

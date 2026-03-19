@@ -265,6 +265,9 @@ fn main() {
     );
 
     let mut all_epoch_metrics = Vec::new();
+    let mut best_pe = f32::MAX;
+    let mut patience_counter = 0usize;
+    let patience = opts.patience;
 
     for epoch in 0..opts.epochs {
         // Pos enc curriculum: unfreeze learned pos_enc after N epochs
@@ -399,7 +402,79 @@ fn main() {
         );
         std::io::stderr().flush().ok();
 
+        // Save best-PE checkpoint (prevents training regression from losing best weights)
+        if avg_pe < best_pe - 1e-4 {
+            best_pe = avg_pe;
+            patience_counter = 0;
+            let best_path = format!("{}.best", opts.output_path);
+            let weights = gen.projection().flatten_weights();
+            let mut ckpt = if let Some(tp) = gen.temporal_proj() {
+                let num_groups = tp.num_groups();
+                let has_adapter = tp.has_adapter();
+                if num_groups > 1 || has_adapter {
+                    ProjectionCheckpoint::new_temporal_with_groups(
+                        weights,
+                        tp.flatten_weights(),
+                        gen.config().hdc_dim,
+                        gen.config().bottleneck_dim,
+                        gen.config().ssm_dim,
+                        epoch,
+                        tp.chunk_size(),
+                        tp.num_chunks(),
+                        num_groups,
+                        has_adapter,
+                    )
+                } else {
+                    ProjectionCheckpoint::new_temporal(
+                        weights,
+                        tp.flatten_weights(),
+                        gen.config().hdc_dim,
+                        gen.config().bottleneck_dim,
+                        gen.config().ssm_dim,
+                        epoch,
+                        tp.chunk_size(),
+                        tp.num_chunks(),
+                    )
+                }
+            } else {
+                ProjectionCheckpoint::new(
+                    weights,
+                    gen.config().hdc_dim,
+                    gen.config().bottleneck_dim,
+                    gen.config().ssm_dim,
+                    epoch,
+                    gen.projection().is_deep(),
+                    gen.projection().inner_dim(),
+                )
+            };
+            if let Some(diag) = gen.projection_diagnostics() {
+                ckpt.diagnostics_snapshot = Some(diag.snapshot());
+            }
+            if let Err(e) = ckpt.save_to_file(&best_path) {
+                eprintln!("Warning: failed to save best checkpoint: {e}");
+            } else {
+                let _ = writeln!(
+                    std::io::stderr(),
+                    "[best] New best PE={avg_pe:.4} at epoch {epoch}, saved to {best_path}"
+                );
+                std::io::stderr().flush().ok();
+            }
+        }
+
         all_epoch_metrics.push(metrics);
+
+        // Early stopping: if PE hasn't improved for `patience` epochs, stop
+        if avg_pe >= best_pe - 1e-4 {
+            patience_counter += 1;
+        }
+        if patience > 0 && patience_counter >= patience {
+            let _ = writeln!(
+                std::io::stderr(),
+                "[early-stop] No PE improvement for {patience} epochs (best={best_pe:.4}), stopping"
+            );
+            std::io::stderr().flush().ok();
+            break;
+        }
     }
 
     // Print training summary
@@ -476,6 +551,12 @@ fn main() {
         process::exit(1);
     }
     println!("\nProjection checkpoint saved to: {}", opts.output_path);
+
+    // Note best checkpoint
+    let best_path = format!("{}.best", opts.output_path);
+    if std::path::Path::new(&best_path).exists() {
+        println!("Best checkpoint (PE={best_pe:.4}): {best_path}");
+    }
 
     // Run evaluation if --eval provided
     if let Some(ref eval_path) = opts.eval_path {
@@ -568,6 +649,8 @@ struct ProjectionTrainOpts {
     hedging_boost: Option<f32>,
     temperature: Option<f32>,
     top_k: Option<usize>,
+    /// Early stopping patience: stop if PE doesn't improve for this many epochs (0=disabled).
+    patience: usize,
 }
 
 fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
@@ -613,6 +696,7 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
         hedging_boost: None,
         temperature: None,
         top_k: None,
+        patience: 3,
     };
 
     let mut i = 1;
@@ -870,6 +954,14 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
                         .map_err(|_| "--top-k must be a positive integer")?,
                 );
             }
+            "--patience" => {
+                i += 1;
+                opts.patience = args
+                    .get(i)
+                    .ok_or("--patience requires a number")?
+                    .parse()
+                    .map_err(|_| "--patience must be a non-negative integer")?;
+            }
             "--help" | "-h" => {
                 print_usage();
                 process::exit(0);
@@ -950,6 +1042,7 @@ fn print_usage() {
     eprintln!("  --hedging-boost N      Override epistemic hedging boost (default: 5.0, Unknown=N, Uncertain=N/2)");
     eprintln!("  --temperature T        Sampling temperature (default: 0.8)");
     eprintln!("  --top-k K              Top-k sampling (default: 40)");
+    eprintln!("  --patience N           Early stopping: stop if PE doesn't improve for N epochs (default: 3, 0=disabled)");
     eprintln!();
     eprintln!("Evaluation options:");
     eprintln!("  --eval PATH            Held-out JSONL for post-training evaluation");

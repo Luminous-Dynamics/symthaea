@@ -285,7 +285,7 @@ impl ReliabilityBattery {
                                                                       // 0% (perfect attention) to 20% (high lapse rate), creating stable
                                                                       // individual differences that persist across sessions.
                 let subject_lapse = t * 0.25; // 0.0 to 0.25
-                for s in 0..n_sessions {
+                for (s, session) in session_data.iter_mut().enumerate().take(n_sessions) {
                     let config = BenchmarkConfig {
                         seed: family_base + s as u64 * 100,
                         encoding_noise: subject_noise,
@@ -296,7 +296,7 @@ impl ReliabilityBattery {
                     };
                     let result = bench.run(&config);
                     if let Some(mv) = result.metrics.get(metric_name) {
-                        session_data[s].push(mv.mean);
+                        session.push(mv.mean);
                     }
                 }
             }

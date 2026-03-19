@@ -167,8 +167,7 @@ impl ChangeBlindnessBenchmark {
                     let change_signal = 1.0 - scene_similarity;
 
                     // Detection decision: softmax of change signal vs threshold
-                    // The threshold represents the criterion for reporting "change"
-                    let threshold = 0.10; // Base detection threshold
+                    let threshold = 0.10;
                     let signal_ev = change_signal / temperature;
                     let threshold_ev = threshold / temperature;
                     let max_ev = signal_ev.max(threshold_ev);

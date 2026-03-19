@@ -271,6 +271,7 @@ fn blend_binary(primary: &BinaryHV, secondary: &BinaryHV, gap: f64, seed: u64) -
     // Probability of choosing primary's bit (range: 0.5 at gap=0, 1.0 at gap=1)
     let p_primary = 0.5 + 0.5 * gap;
 
+    #[allow(clippy::needless_range_loop)]
     for byte_idx in 0..2048 {
         let mut byte_val = 0u8;
         for bit in 0..8 {

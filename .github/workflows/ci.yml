@@ -251,9 +251,9 @@ jobs:
       matrix:
         include:
           - name: core
-            cmd: cargo test -p symthaea
+            cmd: cargo test -p symthaea --lib
           - name: web_research
-            cmd: cargo test -p symthaea --features "web_research_module school_learning"
+            cmd: cargo test -p symthaea --lib --features "web_research_module school_learning"
           - name: pathology_resilience
             cmd: cargo test --test pathology_resilience -- --nocapture
     steps:
@@ -470,8 +470,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-combo-${{ matrix.features }}-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-combo-${{ hashFiles('**/Cargo.lock') }}-${{ strategy.job-index }}
           restore-keys: |
+            ${{ runner.os }}-cargo-combo-${{ hashFiles('**/Cargo.lock') }}-${{ strategy.job-index }}
             ${{ runner.os }}-cargo-combo-
 
       - name: Install system dependencies

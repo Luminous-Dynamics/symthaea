@@ -139,7 +139,7 @@ impl InterventionEffectBenchmark {
 
             // Score: how much adjustment improves recovery of the cause
             let improvement = (adjusted_to_cause - unadjusted_to_cause) as f64;
-            backdoor_scores.push(improvement.max(0.0).min(1.0));
+            backdoor_scores.push(improvement.clamp(0.0, 1.0));
         }
         let backdoor_accuracy = backdoor_scores.iter().sum::<f64>() / backdoor_scores.len() as f64;
 

@@ -4,7 +4,7 @@
     "type": "AAPT_FRIENDLY_MERGED_MANIFESTS",
     "kind": "Directory"
   },
-  "applicationId": "io.symthaea.spore",
+  "applicationId": "io.symthaea.soma",
   "variantName": "debug",
   "elements": [
     {

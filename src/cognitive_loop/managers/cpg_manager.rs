@@ -589,12 +589,28 @@ impl CognitiveSubsystem for CpgManager {
             self.sim_time,
             &self.config,
         );
-        serde_json::to_vec(&data).unwrap_or_default()
+        serde_json::to_vec(&data).unwrap_or_else(|e| {
+            tracing::warn!("CpgManager checkpoint serialization failed: {e}");
+            Vec::new()
+        })
     }
 
-    fn restore(&mut self, _data: &[u8]) -> Result<(), String> {
-        // Minimal restore — re-derive coupling from config
-        Err("CPG restore not yet implemented".into())
+    fn restore(&mut self, data: &[u8]) -> Result<(), String> {
+        let (oscillators, sync_index, sim_time, config): (Vec<CpgOscillator>, f64, f64, CpgConfig) =
+            serde_json::from_slice(data).map_err(|e| format!("CpgManager restore failed: {e}"))?;
+        self.oscillators = oscillators;
+        self.sync_index = sync_index;
+        self.sim_time = sim_time;
+        // Re-derive coupling from restored config
+        let gait = config.gait;
+        let n = config.n_oscillators;
+        self.coupling = gait.coupling_matrix(n);
+        self.config = config;
+        tracing::debug!(
+            "CpgManager restored: {} oscillators, sim_time={sim_time:.2}s",
+            n
+        );
+        Ok(())
     }
 }
 

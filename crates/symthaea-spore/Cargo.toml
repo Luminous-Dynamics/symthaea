@@ -6,7 +6,7 @@ description = "Symthaea Spore: WASM consciousness kernel (~500KB) for browser, e
 license = "MIT"
 
 [lib]
-crate-type = ["rlib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 symthaea-core = { path = "../../symthaea-core", default-features = false }
@@ -56,3 +56,13 @@ path = "src/bin/train_broca_lite.rs"
 [[bin]]
 name = "gen-spore-training-data"
 path = "src/bin/gen_spore_training_data.rs"
+
+[[bin]]
+name = "eval-api"
+path = "src/bin/eval_api.rs"
+required-features = []
+
+[[bin]]
+name = "ssh-relay"
+path = "src/bin/ssh_relay.rs"
+required-features = []

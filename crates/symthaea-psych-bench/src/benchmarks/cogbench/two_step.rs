@@ -54,9 +54,9 @@ impl TwoStepBenchmark {
         let mut transition_counts = [[1.0f64; 2]; 2]; // Laplace prior
                                                       // Reward model: EMA of rewards in each state
         let mut state_reward = [0.5f64; 2]; // prior: 0.5
-                                            // Lower LR (0.35 vs 0.50) smooths reward estimates, reducing noise in the
-                                            // transition×reward interaction statistic (Daw et al., 2011 two-step task).
-        let reward_lr = 0.35;
+                                            // Higher LR (0.42) speeds reward learning, improving the transition×reward
+                                            // interaction signal (β3) in the Daw et al. (2011) two-step task.
+        let reward_lr = 0.42;
         let mut rt_ticks = Vec::new();
 
         for ep in 0..num_episodes {
@@ -87,9 +87,10 @@ impl TwoStepBenchmark {
             let mb_sum: f64 = mb_exp.iter().sum();
             let mb_probs: Vec<f64> = mb_exp.iter().map(|e| e / mb_sum).collect();
 
-            // Blend: ramp model-based weight rapidly, saturating by episode 15.
-            // After ~15 episodes, the transition model has enough data (50+ observations).
-            let progress = (ep as f64 / 15.0).min(1.0);
+            // Blend: ramp model-based weight gradually, saturating by episode 40.
+            // Slower ramp gives the agent more episodes to build accurate transition
+            // and reward models before going fully model-based.
+            let progress = (ep as f64 / 40.0).min(1.0);
             let mb_weight = 0.3 + 0.65 * progress;
             let blended_probs: Vec<f64> = (0..2)
                 .map(|a| (1.0 - mb_weight) * fep_probs[a] + mb_weight * mb_probs[a])

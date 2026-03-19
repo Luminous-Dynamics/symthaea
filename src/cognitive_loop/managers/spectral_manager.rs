@@ -393,11 +393,25 @@ impl CognitiveSubsystem for SpectralManager {
 
     fn checkpoint(&self) -> Vec<u8> {
         // Serialize config + telemetry (history is transient, not checkpointed)
-        serde_json::to_vec(&(&self.config, &self.telemetry)).unwrap_or_default()
+        serde_json::to_vec(&(&self.config, &self.telemetry)).unwrap_or_else(|e| {
+            tracing::warn!("SpectralManager checkpoint serialization failed: {e}");
+            Vec::new()
+        })
     }
 
-    fn restore(&mut self, _data: &[u8]) -> Result<(), String> {
-        Err("SpectralManager restore not yet implemented".into())
+    fn restore(&mut self, data: &[u8]) -> Result<(), String> {
+        let (config, telemetry): (SpectralManagerConfig, SpectralTelemetry) =
+            serde_json::from_slice(data)
+                .map_err(|e| format!("SpectralManager restore failed: {e}"))?;
+        self.config = config;
+        self.telemetry = telemetry;
+        // History is transient (ring buffer rebuilt from live data); analyzer stays as-is.
+        tracing::debug!(
+            "SpectralManager restored: dims={}, cycle_count={}",
+            self.config.analysis_dims,
+            self.cycle_count
+        );
+        Ok(())
     }
 }
 

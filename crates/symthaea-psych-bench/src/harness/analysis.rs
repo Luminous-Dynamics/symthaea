@@ -923,7 +923,7 @@ fn inv_normal_cdf(p: f64) -> f64 {
         -3.969683028665376e+01,
         2.209460984245205e+02,
         -2.759285104469687e+02,
-        1.383577518672690e+02,
+        1.38357751867269e+02,
         -3.066479806614716e+01,
         2.506628277459239e+00,
     ];
@@ -1665,12 +1665,13 @@ pub fn reasoning_validity_single_run(
 
 /// Format reasoning validity result as a Markdown table.
 pub fn format_reasoning_validity(result: &ReasoningValidityResult) -> String {
-    let mut lines = Vec::new();
-    lines.push("## Reasoning Domain Validity".to_string());
-    lines.push(String::new());
-    lines.push("### Reasoning Cluster Scores".to_string());
-    lines.push("| Benchmark | Key Metric |".to_string());
-    lines.push("|-----------|-----------|".to_string());
+    let mut lines = vec![
+        "## Reasoning Domain Validity".to_string(),
+        String::new(),
+        "### Reasoning Cluster Scores".to_string(),
+        "| Benchmark | Key Metric |".to_string(),
+        "|-----------|-----------|".to_string(),
+    ];
     for (name, val) in &result.reasoning_scores {
         let short = name.split("::").last().unwrap_or(name);
         lines.push(format!("| {} | {:.3} |", short, val));
@@ -1763,7 +1764,7 @@ pub fn arc_split_half_reliability(report: &super::report::BenchmarkReport) -> Ve
             };
             let total = 2 * n;
             let mut samples = Vec::with_capacity(total);
-            for _ in 0..((total + 1) / 2) {
+            for _ in 0..total.div_ceil(2) {
                 xor_shift(&mut seed);
                 let u1 = (seed % 100_000) as f64 / 100_000.0;
                 xor_shift(&mut seed);
@@ -1801,11 +1802,12 @@ pub fn arc_split_half_reliability(report: &super::report::BenchmarkReport) -> Ve
 
 /// Format split-half reliability results.
 pub fn format_arc_reliability(results: &[SplitHalfResult]) -> String {
-    let mut lines = Vec::new();
-    lines.push("## ARC Benchmark Split-Half Reliability".to_string());
-    lines.push(String::new());
-    lines.push("| Benchmark | Metric | r_raw | r_SB | N | Verdict |".to_string());
-    lines.push("|-----------|--------|-------|------|---|---------|".to_string());
+    let mut lines = vec![
+        "## ARC Benchmark Split-Half Reliability".to_string(),
+        String::new(),
+        "| Benchmark | Metric | r_raw | r_SB | N | Verdict |".to_string(),
+        "|-----------|--------|-------|------|---|---------|".to_string(),
+    ];
     for r in results {
         let verdict = if r.corrected_reliability >= 0.80 {
             "Excellent"
@@ -1829,9 +1831,10 @@ pub fn format_arc_reliability(results: &[SplitHalfResult]) -> String {
 
 /// Comprehensive ARC analysis report combining all ARC benchmark results.
 pub fn format_arc_report(report: &super::report::BenchmarkReport) -> String {
-    let mut lines = Vec::new();
-    lines.push("# ARC Reasoning Suite — Comprehensive Report".to_string());
-    lines.push(String::new());
+    let mut lines = vec![
+        "# ARC Reasoning Suite — Comprehensive Report".to_string(),
+        String::new(),
+    ];
 
     // 1. Overview table: benchmark name, key metric, value
     lines.push("## 1. Overview".to_string());

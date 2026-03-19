@@ -116,8 +116,8 @@ impl SrttBenchmark {
                 let noise_degrade = config.effective_noise() as f32 * 0.4;
                 let mut sim = stimulus.similarity(pos) * (1.0 - noise_degrade);
                 // Prediction boost: learned transitions speed response to expected position
-                if prev_pos.is_some() {
-                    let pred = transition_memory.bind(&positions[prev_pos.unwrap()]);
+                if let Some(pp) = prev_pos {
+                    let pred = transition_memory.bind(&positions[pp]);
                     let pred_sim = pred.similarity(pos).max(0.0);
                     sim += pred_sim * 0.4;
                 }

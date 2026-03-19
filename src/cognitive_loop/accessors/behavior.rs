@@ -543,6 +543,21 @@ impl CognitiveLoopService {
         self.governance_mgr.pending_event_count()
     }
 
+    /// Current financial health signals from the Mycelix finance cluster.
+    #[cfg(feature = "mycelix")]
+    pub fn finance_health(&self) -> &crate::consciousness::mycelix_bridge::FinanceHealthSignals {
+        self.governance_mgr.finance_health()
+    }
+
+    /// Update cached financial health signals from the Mycelix finance cluster.
+    #[cfg(feature = "mycelix")]
+    pub fn update_finance_health(
+        &mut self,
+        signals: crate::consciousness::mycelix_bridge::FinanceHealthSignals,
+    ) {
+        self.governance_mgr.update_finance_health(signals);
+    }
+
     /// Process governance learning signals: reward, harmonic deltas, episodic memory.
     ///
     /// Called after governance processing. Feeds reward to the FEP learning loop,
@@ -762,6 +777,17 @@ impl CognitiveLoopService {
         &self,
     ) -> std::sync::mpsc::Sender<super::super::managers::swarm_manager::SwarmEvent> {
         self.swarm_event_tx.clone()
+    }
+
+    /// Take the mesh outbound receiver (one-shot — returns None after first call).
+    ///
+    /// ContinuousMind calls this once during wiring to drain CLS-generated
+    /// mesh packets (beacons, name responses, content announces) each tick.
+    #[cfg(feature = "mesh")]
+    pub fn take_mesh_outbound_rx(
+        &self,
+    ) -> Option<std::sync::mpsc::Receiver<crate::swarm::mesh::MeshOutbound>> {
+        self.mesh_outbound_rx.lock().ok()?.take()
     }
 
     /// Backwards-compatible alias for `swarm_event_sender()`.

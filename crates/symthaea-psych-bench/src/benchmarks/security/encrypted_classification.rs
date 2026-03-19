@@ -143,13 +143,13 @@ impl PsychBenchmark for EncryptedClassificationBenchmark {
             let mut test_items = Vec::with_capacity(NUM_CLASSES * items_per_class);
             let mut true_labels = Vec::with_capacity(NUM_CLASSES * items_per_class);
 
-            for class_id in 0..NUM_CLASSES {
+            for (class_id, prototype) in prototypes.iter().enumerate() {
                 for item in 0..items_per_class {
                     let noise_seed = trial_seed
                         .wrapping_add(50_000)
                         .wrapping_add(class_id as u64 * 100)
                         .wrapping_add(item as u64);
-                    let noisy = prototypes[class_id].add_noise(TEST_NOISE as f32, noise_seed);
+                    let noisy = prototype.add_noise(TEST_NOISE as f32, noise_seed);
                     test_items.push(noisy);
                     true_labels.push(class_id);
                 }

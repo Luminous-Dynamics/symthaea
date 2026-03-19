@@ -160,7 +160,13 @@ impl RestorationTracker {
         let total: f64 = self
             .entries
             .values()
-            .map(|e| (e.corrective_cycles as f64 / e.required_corrections as f64).min(1.0))
+            .map(|e| {
+                if e.required_corrections > 0 {
+                    (e.corrective_cycles as f64 / e.required_corrections as f64).min(1.0)
+                } else {
+                    0.0
+                }
+            })
             .sum();
         total / self.entries.len() as f64
     }

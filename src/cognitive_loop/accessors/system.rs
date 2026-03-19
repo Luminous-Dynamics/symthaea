@@ -401,6 +401,26 @@ impl CognitiveLoopService {
         result
     }
 
+    // ── FHE Collective Wisdom accessors ──────────────────────────────
+
+    /// Total encrypted contributions made to the FHE collective wisdom pool.
+    #[cfg(feature = "fhe-wisdom")]
+    pub fn fhe_contributions_total(&self) -> usize {
+        self.swarm_manager.fhe_contributions_total()
+    }
+
+    /// Total aggregations completed this session.
+    #[cfg(feature = "fhe-wisdom")]
+    pub fn fhe_aggregations_total(&self) -> usize {
+        self.swarm_manager.fhe_aggregations_total()
+    }
+
+    /// Current pending contributions in the wisdom pool.
+    #[cfg(feature = "fhe-wisdom")]
+    pub fn fhe_pool_count(&self) -> usize {
+        self.swarm_manager.wisdom_pool_count()
+    }
+
     /// Inject Pareto context from a GuidedDesignExplorer into the physics bridge.
     /// The context is drained into telemetry on the next cycle.
     #[cfg(feature = "physics-bridge")]

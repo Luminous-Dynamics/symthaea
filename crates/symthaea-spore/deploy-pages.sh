@@ -29,13 +29,24 @@ fi
 
 echo "[deploy] WASM binary: $(du -h "$PKG_DIR/symthaea_spore_bg.wasm" | cut -f1)"
 
+# Pre-deploy: build portal from modules and validate
+echo "[deploy] Building portal from modules..."
+bash "$WWW_DIR/build-portal.sh"
+
+echo "[deploy] Running portal validation..."
+node "$WWW_DIR/test-portal.js" || exit 1
+
 # Create temp deploy directory
 DEPLOY_DIR=$(mktemp -d)
 trap "rm -rf $DEPLOY_DIR" EXIT
 
 # Copy demo files
 cp "$WWW_DIR/index.html" "$DEPLOY_DIR/"
+cp "$WWW_DIR/portal.html" "$DEPLOY_DIR/"
 cp "$WWW_DIR/spore-worker.js" "$DEPLOY_DIR/"
+cp "$WWW_DIR/sonic.js" "$DEPLOY_DIR/" 2>/dev/null || true
+cp "$WWW_DIR/glyphs.js" "$DEPLOY_DIR/" 2>/dev/null || true
+cp "$WWW_DIR/sw.js" "$DEPLOY_DIR/" 2>/dev/null || true
 cp "$WWW_DIR/smoke-test.mjs" "$DEPLOY_DIR/"
 mkdir -p "$DEPLOY_DIR/pkg"
 cp "$PKG_DIR/symthaea_spore_bg.wasm" "$DEPLOY_DIR/pkg/"

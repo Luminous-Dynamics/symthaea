@@ -312,6 +312,171 @@ pub const PERCEPTION_SENSITIVITY_MIN: f32 = 0.5;
 pub const PERCEPTION_SENSITIVITY_MAX: f32 = 2.0;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// OUTPUT PHASE — EPISTEMIC & STABILITY THRESHOLDS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// EMA prior weight for epistemic uncertainty smoothing (1 - alpha).
+/// Basis: Standard EMA with alpha=0.2 — balances responsiveness with stability.
+pub const EPISTEMIC_UNCERTAINTY_EMA_PRIOR: f32 = 0.8;
+
+/// EMA current weight for epistemic uncertainty smoothing (alpha).
+pub const EPISTEMIC_UNCERTAINTY_EMA_CURRENT: f32 = 0.2;
+
+/// Cross-module agreement threshold below which compound instability is flagged.
+/// Basis: Friston (2010) — low agreement indicates prediction model fragmentation.
+pub const COMPOUND_INSTABILITY_AGREEMENT: f32 = 0.5;
+
+/// Proposal conflict ratio above which epistemic exploration is boosted.
+/// Basis: Berlyne (1960) — conceptual conflict drives curiosity/exploration.
+pub const PROPOSAL_CONFLICT_EXPLORATION: f32 = 0.3;
+
+/// Flow intensity threshold above which feedback relaxation is applied.
+/// Basis: Csikszentmihalyi (1990) — strong flow states should not be disrupted.
+pub const FLOW_INTENSITY_FEEDBACK: f32 = 0.5;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// THALAMIC ROUTER — COGNITIVE DEPTH ROUTING
+// ═══════════════════════════════════════════════════════════════════════════════
+// Factor graph belief-propagation routing: inputs → {Reflex, Cortical, DeepThought}.
+// Basis: Sherman & Guillery (2006) — thalamic relay gating of cortical processing.
+
+/// Novelty threshold above which deep thought routing is preferred.
+pub const THALAMIC_NOVELTY_THRESHOLD: f32 = 0.7;
+
+/// Urgency threshold above which deep thought routing is triggered.
+pub const THALAMIC_URGENCY_THRESHOLD: f32 = 0.8;
+
+/// Familiarity threshold below which input is considered novel.
+pub const THALAMIC_FAMILIARITY_THRESHOLD: f32 = 0.3;
+
+/// Cortical base rate in factor tables (uniform prior for middle depth).
+pub const THALAMIC_CORTICAL_BASE_RATE: f64 = 0.3;
+
+/// Complexity cortical factor — slightly higher than novelty/urgency base rate.
+/// Basis: Moderate complexity biases toward cortical (neither reflex nor deep).
+pub const THALAMIC_COMPLEXITY_CORTICAL: f64 = 0.4;
+
+/// Emotional dampening scale — how much emotional intensity suppresses reflex.
+pub const THALAMIC_EMOTIONAL_DAMPENING: f64 = 0.5;
+
+/// Emotional boost base for deep thought routing.
+pub const THALAMIC_EMOTIONAL_BOOST_BASE: f64 = 0.3;
+
+/// Emotional boost scale — how much emotional intensity promotes deep thought.
+pub const THALAMIC_EMOTIONAL_BOOST_SCALE: f64 = 0.7;
+
+/// Factor table floor — minimum probability to prevent zero messages in BP.
+pub const THALAMIC_FACTOR_FLOOR: f64 = 0.01;
+
+/// Factor table input offset — prevents zero probability at low input values.
+pub const THALAMIC_INPUT_OFFSET: f64 = 0.1;
+
+/// Belief propagation maximum iterations for factor graph inference.
+pub const THALAMIC_BP_MAX_ITERATIONS: usize = 5;
+
+/// Belief propagation convergence tolerance.
+pub const THALAMIC_BP_TOLERANCE: f64 = 1e-4;
+
+/// Belief propagation message damping factor (stability vs speed tradeoff).
+pub const THALAMIC_BP_DAMPING: f64 = 0.5;
+
+/// Pairwise agreement table: diagonal (same-state) preference.
+pub const THALAMIC_AGREEMENT_DIAGONAL: f64 = 1.0;
+
+/// Pairwise agreement table: adjacent-state moderate preference.
+pub const THALAMIC_AGREEMENT_ADJACENT: f64 = 0.3;
+
+/// Pairwise agreement table: distant-state weak preference.
+pub const THALAMIC_AGREEMENT_DISTANT: f64 = 0.1;
+
+// ── Pattern → complexity/urgency mappings ──
+// Basis: Sherman & Guillery (2006) — thalamic relay complexity estimation.
+
+/// Complexity: Uncertain pattern requires deepest processing.
+pub const PATTERN_COMPLEXITY_UNCERTAIN: f32 = 0.8;
+/// Complexity: Transitioning pattern — moderate-high.
+pub const PATTERN_COMPLEXITY_TRANSITIONING: f32 = 0.7;
+/// Complexity: Exploratory pattern — moderate.
+pub const PATTERN_COMPLEXITY_EXPLORATORY: f32 = 0.6;
+/// Complexity: Contemplative pattern — medium.
+pub const PATTERN_COMPLEXITY_CONTEMPLATIVE: f32 = 0.5;
+/// Complexity: Focused pattern — low-moderate.
+pub const PATTERN_COMPLEXITY_FOCUSED: f32 = 0.4;
+/// Complexity: Excited pattern — low-moderate (fast, not complex).
+pub const PATTERN_COMPLEXITY_EXCITED: f32 = 0.4;
+/// Complexity: Resting pattern — low.
+pub const PATTERN_COMPLEXITY_RESTING: f32 = 0.2;
+
+/// Urgency: Uncertain pattern — high (needs resolution).
+pub const PATTERN_URGENCY_UNCERTAIN: f32 = 0.8;
+/// Urgency: Transitioning pattern — moderate-high.
+pub const PATTERN_URGENCY_TRANSITIONING: f32 = 0.6;
+/// Urgency: Excited pattern — moderate.
+pub const PATTERN_URGENCY_EXCITED: f32 = 0.5;
+/// Urgency: Default for all other patterns.
+pub const PATTERN_URGENCY_DEFAULT: f32 = 0.3;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NEUROMOD PHASE — BATH MODULATION PARAMETERS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// D2 flexibility baseline for exploration responsiveness scaling.
+/// Basis: Frank (2005) — D2 receptor modulation of behavioral flexibility.
+pub const NEUROMOD_D2_FLEXIBILITY_BASELINE: f64 = 0.5;
+
+/// Attention sensitivity floor — minimum multiplicative sensitivity.
+/// Basis: Sarter et al. (2005) — cholinergic modulation bounds.
+pub const NEUROMOD_ATTENTION_SENSITIVITY_MIN: f32 = 0.5;
+
+/// Attention sensitivity ceiling — maximum multiplicative sensitivity.
+pub const NEUROMOD_ATTENTION_SENSITIVITY_MAX: f32 = 2.0;
+
+/// NE phasic burst threshold for attentional reorienting.
+/// Basis: Corbetta & Shulman (2002) — stimulus-driven attention shift.
+pub const NEUROMOD_NE_PHASIC_THRESHOLD: f32 = 0.3;
+
+/// NE phasic attention gain — sensitivity boost per unit above threshold.
+pub const NEUROMOD_NE_PHASIC_ATTENTION_GAIN: f32 = 0.5;
+
+/// NE phasic exploration scale — exploration delta per unit above threshold.
+pub const NEUROMOD_NE_PHASIC_EXPLORATION_SCALE: f32 = 0.15;
+
+/// Arousal EMA decay weight (prior cycle contribution).
+/// Basis: Berridge & Waterhouse (2003) — NE-arousal bidirectional coupling.
+pub const NEUROMOD_AROUSAL_EMA_DECAY: f32 = 0.9;
+
+/// Arousal EMA input weight (current NE contribution).
+pub const NEUROMOD_AROUSAL_EMA_INPUT: f32 = 0.1;
+
+/// NE phasic threshold for transient arousal spike.
+pub const NEUROMOD_AROUSAL_PHASIC_THRESHOLD: f32 = 0.2;
+
+/// Arousal phasic spike scale — arousal boost per unit of phasic NE.
+pub const NEUROMOD_AROUSAL_PHASIC_SPIKE: f32 = 0.05;
+
+/// Confidence crash velocity threshold — triggers 5-HT emergency dip.
+/// Basis: Cools et al. (2008) — serotonergic response to prediction failure.
+pub const NEUROMOD_CONFIDENCE_CRASH_VELOCITY: f64 = -0.15;
+
+/// Serotonin emergency production during confidence crash.
+pub const NEUROMOD_SEROTONIN_CRASH_PRODUCTION: f32 = -0.1;
+
+/// Exploration baseline above which 5-HT drain occurs.
+/// Basis: Tops et al. (2009) — serotonin depletion from sustained exploration.
+pub const NEUROMOD_EXPLORATION_DRAIN_BASELINE: f64 = 0.5;
+
+/// Exploration 5-HT drain factor per unit above baseline.
+pub const NEUROMOD_EXPLORATION_DRAIN_FACTOR: f64 = 0.03;
+
+/// GABA inhibition threshold — below this, learning/exploration are suppressed.
+/// Basis: Olsen & Sieghart (2009) — GABAergic global inhibition.
+pub const NEUROMOD_GABA_INHIBITION_THRESHOLD: f32 = 0.95;
+
+/// Seizure protection: exploration freeze factor during E/I recovery.
+/// Basis: Turrigiano (2012) — homeostatic plasticity during E/I imbalance.
+pub const NEUROMOD_SEIZURE_EXPLORATION_FREEZE: f32 = 0.1;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // PSI SYNTHESIS WEIGHTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1255,6 +1420,48 @@ pub const SUBSYSTEM_LR_FACTOR_MIN: f32 = 0.7;
 /// Maximum subsystem LR factor (shared across all subsystem feedback loops).
 /// Basis: bounds amplification to prevent runaway learning.
 pub const SUBSYSTEM_LR_FACTOR_MAX: f32 = 1.3;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FEEDBACK PHASE — CONSCIOUSNESS LIMITING & PIPELINE GATES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Consciousness gradient magnitude threshold for limiting-component boost.
+/// Below this, gradient is too small to warrant targeted intervention.
+/// Basis: Dehaene (2014) — minimal gradient for workspace ignition.
+pub const LIMITING_COMPONENT_GRADIENT_THRESHOLD: f64 = 0.01;
+
+/// Confidence delta applied when binding is the limiting consciousness component.
+pub const LIMITING_BINDING_CONFIDENCE_DELTA: f32 = 0.01;
+
+/// Social learning rate change threshold — below this, skip modulation.
+/// Prevents noise from sub-epsilon trust fluctuations.
+pub const SOCIAL_LR_CHANGE_THRESHOLD: f32 = 0.01;
+
+/// Minimum consecutive interference-free cycles before harmonic all-clear boost.
+/// Basis: Kelso (1995) — stability requires sustained absence of perturbation.
+pub const HARMONIC_INTERFERENCE_FREE_CYCLES: u32 = 3;
+
+/// Pipeline consciousness high threshold — above this, relax epistemic caution.
+/// Basis: Dehaene (2014) — global workspace ignition requires integrated processing.
+pub const PIPELINE_CONSCIOUSNESS_RELAX: f32 = 0.7;
+
+/// Pipeline consciousness low threshold — below this, tighten caution.
+pub const PIPELINE_CONSCIOUSNESS_CAUTION: f32 = 0.3;
+
+/// Threshold scale factor when pipeline consciousness is high (relaxation).
+pub const PIPELINE_CONSCIOUSNESS_RELAX_SCALE: f32 = 0.97;
+
+/// Threshold scale factor when pipeline consciousness is low (tightening).
+pub const PIPELINE_CONSCIOUSNESS_CAUTION_SCALE: f32 = 1.03;
+
+/// Support predictive telemetry interval (cycles). Co-prime with subsystem intervals.
+pub const SUPPORT_TELEMETRY_INTERVAL: u64 = 47;
+
+/// Support graduation check interval (cycles). Co-prime with subsystem intervals.
+pub const SUPPORT_GRADUATION_INTERVAL: u64 = 97;
+
+/// Sacred Stillness harmony index — must match `Harmony::SacredStillness` enum order.
+pub const HARMONY_INDEX_SACRED_STILLNESS: usize = 7;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CROSS-MODULE QUALITY METRICS
@@ -2578,6 +2785,91 @@ pub const CONSEQUENCE_TRACKER_MAX_AGE_CYCLES: u64 = 2000;
 pub const CONSEQUENCE_TRACKER_ACCURACY_ALPHA: f64 = 0.05;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// GOVERNANCE LEARNING — OUTCOME-BASED FEEDBACK
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Confidence boost when agent's vote aligned with outcome.
+/// Basis: Schultz (1997) — reward prediction confirmation → confidence.
+pub const GOV_ALIGNED_VOTE_CONFIDENCE: f64 = 0.02;
+
+/// Confidence penalty when agent's vote misaligned with outcome.
+/// Basis: Schultz (1997) — prediction error → confidence reduction.
+pub const GOV_MISALIGNED_VOTE_CONFIDENCE: f64 = -0.03;
+
+/// Prediction error → LR boost scaling factor.
+/// Higher PE → faster learning about governance dynamics.
+/// Basis: Friston (2010) — precision-weighted free-energy minimization.
+pub const GOV_PE_LR_SCALE: f64 = 0.3;
+
+/// Maximum LR boost from governance prediction error.
+pub const GOV_PE_LR_MAX_BOOST: f64 = 0.5;
+
+/// Outcome sign for failed proposals (asymmetric: losses loom larger).
+/// Basis: Kahneman & Tversky (1979) — loss aversion in prospect theory.
+pub const GOV_FAILED_OUTCOME_SIGN: f64 = -0.5;
+
+/// EMA decay for governance reward tracking (alpha = 1 - decay).
+/// Basis: Sutton & Barto (2018) — exponential recency-weighted average.
+pub const GOV_REWARD_EMA_DECAY: f64 = 0.9;
+
+/// Collective Phi threshold for high-coherence governance actions.
+/// Above this, group is coherent enough to trigger ECB/confidence signals.
+/// Basis: Woolley et al. (2010) — collective intelligence factor.
+pub const GOV_COLLECTIVE_PHI_HIGH: f64 = 0.5;
+
+/// Collective Phi threshold below which consensus is fragile → explore.
+/// Basis: Sunstein (2002) — deliberative polling under low agreement.
+pub const GOV_FRAGILE_CONSENSUS_PHI: f64 = 0.3;
+
+/// Exploration boost per fragile consensus detection.
+pub const GOV_FRAGILE_CONSENSUS_EXPLORE: f64 = 0.05;
+
+/// Confidence boost per high-Phi voter observed.
+pub const GOV_HIGH_PHI_VOTER_CONFIDENCE: f64 = 0.005;
+
+/// Arousal delta on emergency declaration.
+pub const GOV_EMERGENCY_AROUSAL: f32 = 0.1;
+
+/// Exploration suppression during emergency.
+pub const GOV_EMERGENCY_EXPLORE_SUPPRESS: f64 = 0.1;
+
+/// Per-tally LR boost scaling (each tally adds this × tally_count, capped).
+/// Basis: active governance engagement → heightened learning plasticity.
+pub const GOV_TALLY_LR_SCALE: f64 = 0.02;
+
+/// Maximum per-cycle LR boost from tally count.
+pub const GOV_TALLY_LR_MAX_BOOST: f64 = 0.1;
+
+/// Blind spot severity → exploration scaling.
+/// Basis: Friston (2010) — epistemic affordance drives exploration.
+pub const GOV_BLIND_SPOT_EXPLORE_SCALE: f64 = 0.05;
+
+/// Community mode harmonic bias per cycle.
+/// Basis: gentle influence, not override — social context nudges moral weight.
+pub const GOV_COMMUNITY_HARMONIC_BIAS: f64 = 0.005;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MOTOR OUTPUT BRIDGE — PHI-GATED ACTION SAFETY
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Default prediction error for skipped motor actions.
+pub const MOTOR_SKIP_PREDICTION_ERROR: f32 = 0.5;
+
+/// Minimum motor confidence for action execution.
+/// Below this, FEP isn't certain enough to commit.
+pub const MOTOR_CONFIDENCE_MIN: f64 = 0.3;
+
+/// Phi bonus for reversible actions (added to min_phi).
+/// Basis: graduated safety — reversible actions need slightly more consciousness.
+pub const MOTOR_PHI_REVERSIBLE_BONUS: f64 = 0.1;
+
+/// Phi bonus for actions needing confirmation.
+pub const MOTOR_PHI_CONFIRMATION_BONUS: f64 = 0.2;
+
+/// Phi bonus for destructive actions (highest consciousness requirement).
+pub const MOTOR_PHI_DESTRUCTIVE_BONUS: f64 = 0.3;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // GLYPH CODEX — SYMBOLIC CONSCIOUSNESS COUPLING
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -2670,11 +2962,7 @@ pub const PIPELINE_CONSCIOUSNESS_HIGH_THRESHOLD: f32 = 0.7;
 /// Pipeline consciousness below this → tighten caution (subsystems aren't coherent).
 pub const PIPELINE_CONSCIOUSNESS_LOW_THRESHOLD: f32 = 0.3;
 
-/// Threshold scaling for relaxed pipeline consciousness (multiplicative, <1 = relax).
-pub const PIPELINE_CONSCIOUSNESS_RELAX_SCALE: f32 = 0.97;
-
-/// Threshold scaling for cautious pipeline consciousness (multiplicative, >1 = tighten).
-pub const PIPELINE_CONSCIOUSNESS_CAUTION_SCALE: f32 = 1.03;
+// (PIPELINE_CONSCIOUSNESS_RELAX_SCALE and CAUTION_SCALE defined above at line ~1452)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONFIDENCE VELOCITY

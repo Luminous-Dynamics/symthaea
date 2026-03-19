@@ -112,6 +112,18 @@ pub unsafe extern "C" fn soma_engine_cycle_count(engine: *const SomaEngine) -> u
 
 /// # Safety: `engine` must be valid.
 #[no_mangle]
+pub unsafe extern "C" fn soma_engine_substrate_feasibility(engine: *const SomaEngine) -> f32 {
+    unsafe { &*engine }.spore.substrate_feasibility()
+}
+
+/// # Safety: `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn soma_engine_harmony_alignment(engine: *const SomaEngine) -> f32 {
+    unsafe { &*engine }.spore.harmony_alignment()
+}
+
+/// # Safety: `engine` must be valid.
+#[no_mangle]
 pub unsafe extern "C" fn soma_engine_consciousness_report(
     engine: *const SomaEngine,
 ) -> *mut c_char {

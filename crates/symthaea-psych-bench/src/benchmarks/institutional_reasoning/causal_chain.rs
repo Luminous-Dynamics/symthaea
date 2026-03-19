@@ -319,7 +319,7 @@ mod tests {
                 .collect();
             match algebra.query_chain(case.start, &steps, &system) {
                 Ok(results) => {
-                    let mut current = start_hv.clone();
+                    let mut current = start_hv;
                     for (i, r) in results.iter().enumerate() {
                         let comp_hv = algebra.get_encoding(case.removals[i], &system).unwrap();
                         current = current.bind(&comp_hv);

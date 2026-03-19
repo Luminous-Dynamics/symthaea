@@ -77,7 +77,7 @@ pub fn load_arc_tasks(dir: &Path) -> Result<BTreeMap<String, ArcTask>, String> {
     for entry in entries {
         let entry = entry.map_err(|e| format!("Read dir entry error: {}", e))?;
         let path = entry.path();
-        if path.extension().map_or(false, |ext| ext == "json") {
+        if path.extension().is_some_and(|ext| ext == "json") {
             let content = std::fs::read_to_string(&path)
                 .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
             let task: ArcTask = serde_json::from_str(&content)
@@ -240,7 +240,7 @@ pub fn evaluate_arc_tasks(
             entry.2 += sim;
 
             // Similarity histogram
-            let bin = (sim * 10.0).floor().min(9.0).max(0.0) as usize;
+            let bin = (sim * 10.0).floor().clamp(0.0, 9.0) as usize;
             similarity_histogram[bin] += 1;
         }
     }

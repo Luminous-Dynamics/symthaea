@@ -308,11 +308,11 @@ impl PsychBenchmark for ArcNoiseBenchmark {
 
         for (i, name) in level_names.iter().enumerate() {
             result.insert(
-                &format!("accuracy_{}", name),
+                format!("accuracy_{}", name),
                 MetricValue::from_samples(&accs_per_level[i]),
             );
             result.insert(
-                &format!("similarity_{}", name),
+                format!("similarity_{}", name),
                 MetricValue::from_samples(&sims_per_level[i]),
             );
         }

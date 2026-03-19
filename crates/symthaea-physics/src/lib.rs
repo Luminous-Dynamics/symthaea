@@ -31,6 +31,13 @@ pub mod cmod_adapter;
     clippy::needless_range_loop
 )]
 pub mod cmod_evaluation;
+#[allow(
+    clippy::useless_format,
+    clippy::single_char_add_str,
+    clippy::manual_is_multiple_of,
+    clippy::needless_range_loop
+)]
+pub mod cross_machine_evaluation;
 pub mod datacenter;
 pub mod fission;
 pub mod fusion_twin;
@@ -117,6 +124,13 @@ pub use cmod_evaluation::{
     DensityLimitEncoder, DensityLimitEncoderV3, DensityLimitSample, DensityLimitShot,
     EvaluationConfig, EvaluationConfigV2, EvaluationConfigV3, EvaluationReport, LeadTimeStats,
     NormalizationRanges, RocPoint,
+};
+
+pub use cross_machine_evaluation::{
+    evaluate_cross_machine, evaluate_machine, generate_cross_machine_report,
+    generate_synthetic_machine, load_generic_csv, CrossMachineResult, GenericEvalConfig,
+    GenericHdcEncoder, GenericNormRanges, GenericSample, GenericShot, MachineDatasetConfig,
+    MachineEvaluationResult,
 };
 
 pub use cmod_adapter::{

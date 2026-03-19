@@ -270,21 +270,21 @@ impl PsychBenchmark for ArcScalingBenchmark {
 
         for (i, name) in grid_names.iter().enumerate() {
             result.insert(
-                &format!("grid_{}_accuracy", name),
+                format!("grid_{}_accuracy", name),
                 MetricValue::from_samples(&grid_accs[i]),
             );
             result.insert(
-                &format!("grid_{}_similarity", name),
+                format!("grid_{}_similarity", name),
                 MetricValue::from_samples(&grid_sims[i]),
             );
         }
         for (i, name) in dim_names.iter().enumerate() {
             result.insert(
-                &format!("dim_{}_accuracy", name),
+                format!("dim_{}_accuracy", name),
                 MetricValue::from_samples(&dim_accs[i]),
             );
             result.insert(
-                &format!("dim_{}_similarity", name),
+                format!("dim_{}_similarity", name),
                 MetricValue::from_samples(&dim_sims[i]),
             );
         }

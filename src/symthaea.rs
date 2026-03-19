@@ -3342,6 +3342,11 @@ impl Symthaea {
     /// ```
     pub fn wire_swarm_channel(&mut self, cls: &crate::cognitive_loop::CognitiveLoopService) {
         self.mind.set_swarm_channel(cls.swarm_event_sender());
+        // Wire sovereign mesh outbound channel (beacons, name responses, etc.)
+        #[cfg(feature = "mesh")]
+        if let Some(rx) = cls.take_mesh_outbound_rx() {
+            self.mind.set_mesh_outbound_rx(rx);
+        }
     }
 
     /// Install a raw swarm event sender on the ContinuousMind.

@@ -131,7 +131,7 @@ fn main() -> Result<()> {
                 distilled.vocab.tokens.iter().cloned().collect();
             distilled.vocab.merges.retain(|merge| {
                 // A merge "a b" -> "ab" is only valid if "ab" is in our vocabulary
-                let merged = format!("{}{}", merge.a, merge.b);
+                let merged = format!("{}{}", merge.left, merge.right);
                 retained.contains(&merged)
             });
 

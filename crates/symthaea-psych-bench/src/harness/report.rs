@@ -484,6 +484,7 @@ impl BenchmarkReport {
             ("congruence_ratio", "congruence_ratio", &bl.affect),
             ("fluency", "aut_fluency", &bl.creativity),
             ("present_count", "present_count", &bl.butlin),
+            ("mean_quality_score", "mean_quality_score", &bl.butlin),
             ("presence_ratio", "presence_ratio", &bl.butlin),
             // Go/No-Go (Inhibition)
             ("go_accuracy", "go_accuracy", &bl.inhibition),
@@ -916,6 +917,14 @@ impl BenchmarkReport {
             // Security (HDC-FHE)
             ("encrypted_accuracy", "encrypted_accuracy", &bl.security),
             ("aggregation_fidelity", "aggregation_fidelity", &bl.security),
+            ("learning_accuracy", "learning_accuracy", &bl.security),
+            (
+                "cross_session_leakage",
+                "cross_session_leakage",
+                &bl.security,
+            ),
+            ("binding_preservation", "binding_preservation", &bl.security),
+            ("accuracy_at_scale", "accuracy_at_scale", &bl.security),
         ];
 
         for (metric_key, baseline_key, baselines) in &mappings {
@@ -2109,10 +2118,11 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         {
             "perspective_accuracy"
         }
+        b if b.contains("EncryptedBinding") => "binding_preservation",
         b if b.contains("Binding") => "overall_binding_accuracy",
         b if b.contains("DigitSpan") => "forward_span",
-        b if b.contains("EmotionalStroop") => "emotional_interference",
-        b if b.contains("Stroop") && !b.contains("Strange") => "stroop_effect",
+        b if b.contains("EmotionalStroop") => "negative_accuracy",
+        b if b.contains("Stroop") && !b.contains("Strange") => "incongruent_accuracy",
         b if b.contains("FlankerInhibition") => "interference_suppression",
         b if b.contains("Flanker") => "flanker_effect",
         b if b.contains("Wisconsin") || b.contains("WCST") => "categories_completed",
@@ -2137,7 +2147,7 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("LongRange") => "delay_50::retention",
         b if b.contains("ConflictResolution") => "recency_preference",
         b if b.contains("Calibration") => "calibration_error_ece",
-        b if b.contains("Butlin") => "present_count",
+        b if b.contains("Butlin") => "mean_quality_score",
         b if b.contains("ValenceClassification") => "valence_accuracy",
         b if b.contains("MoodCongruent") => "congruence_ratio",
         b if b.contains("RemoteAssociates") => "overall_accuracy",
@@ -2247,6 +2257,10 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("CognitiveDistortion") => "distortion_identification",
         b if b.contains("MotivationalInterviewing") => "mi_spirit_score",
         // Security (HDC-FHE) domain
+        b if b.contains("EncryptedLearning") => "learning_accuracy",
+        b if b.contains("CrossMaskPrivacy") => "cross_session_leakage",
+        // EncryptedBinding handled above (before generic "Binding" arm)
+        b if b.contains("ScalingAnalysis") => "accuracy_at_scale",
         b if b.contains("EncryptedClassification") => "encrypted_accuracy",
         b if b.contains("CollectiveAggregation") => "aggregation_fidelity",
         _ => "overall_accuracy",
@@ -2302,6 +2316,7 @@ pub fn is_lower_better(metric_key: &str) -> bool {
             | "pm_cost"
             | "capacity_ratio"
             | "interference_suppression"
+            | "cross_session_leakage"
     )
 }
 
@@ -2773,7 +2788,10 @@ mod tests {
         r1.insert("forward_span", MetricValue::from_samples(&[6.0, 6.5]));
         report.add(r1);
         let mut r2 = BenchmarkResult::new("Executive::Stroop", None);
-        r2.insert("stroop_effect", MetricValue::from_samples(&[0.08, 0.09]));
+        r2.insert(
+            "incongruent_accuracy",
+            MetricValue::from_samples(&[0.85, 0.88]),
+        );
         report.add(r2);
         let profile = report.cognitive_profile();
         assert!(profile.contains_key("WorM"), "profile: {:?}", profile);
@@ -3217,6 +3235,10 @@ mod tests {
             // Security (HDC-FHE)
             Box::new(EncryptedClassificationBenchmark),
             Box::new(CollectiveAggregationBenchmark),
+            Box::new(EncryptedLearningBenchmark),
+            Box::new(CrossMaskPrivacyBenchmark),
+            Box::new(EncryptedBindingBenchmark),
+            Box::new(ScalingAnalysisBenchmark),
         ];
 
         let mut report = BenchmarkReport::new();

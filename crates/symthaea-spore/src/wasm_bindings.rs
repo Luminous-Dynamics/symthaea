@@ -293,3 +293,153 @@ impl SporeEngine {
         serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
     }
 }
+
+// ======================================================================
+// Standalone WASM exports: NixOS flake generation from hardware probe
+// ======================================================================
+
+/// Generate a complete NixOS flake.nix from hardware probe results.
+///
+/// Takes the hardware profile JSON from the browser probe and returns
+/// a full flake.nix string suitable for `nixos-install`.
+#[wasm_bindgen]
+pub fn generate_flake(hardware_json: &str, path: &str, hostname: &str) -> Result<String, JsError> {
+    let _ = path; // reserved for future mount-point customization
+    let profile: crate::hardware_probe::HardwareProfile =
+        serde_json::from_str(hardware_json).map_err(|e| JsError::new(&e.to_string()))?;
+    let nix_config = crate::hardware_probe::NixHardwareConfig::from_profile(&profile);
+
+    let flake = format!(
+        r#"{{
+  description = "Symthaea Guardian Node — {hostname}";
+
+  inputs = {{
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    disko.url = "github:nix-community/disko";
+    disko.inputs.nixpkgs.follows = "nixpkgs";
+  }};
+
+  outputs = {{ self, nixpkgs, disko, ... }}: {{
+    nixosConfigurations.{hostname} = nixpkgs.lib.nixosSystem {{
+      system = "x86_64-linux";
+      modules = [
+        disko.nixosModules.disko
+        ./disko-config.nix
+        ./hardware-configuration.nix
+        ({{ pkgs, ... }}: {{
+          networking.hostName = "{hostname}";
+
+          # ── Boot ──────────────────────────────────────────────────
+          boot.loader.systemd-boot.enable = true;
+          boot.loader.efi.canTouchEfiVariables = true;
+
+          # ── Symthaea Runtime ──────────────────────────────────────
+          environment.systemPackages = with pkgs; [
+            git
+            curl
+            htop
+            neovim
+          ];
+
+          # ── Consciousness Parameters ──────────────────────────────
+          # HDC Dimension: {hdc_dim}
+          # Recommended Neurons: {neurons}
+          # Substrate: {substrate}
+          # Filesystem: {filesystem}
+
+          # ── Networking ────────────────────────────────────────────
+          networking.firewall.enable = true;
+          networking.firewall.allowedTCPPorts = [ 22 ];
+
+          # ── Users ─────────────────────────────────────────────────
+          users.users.guardian = {{
+            isNormalUser = true;
+            extraGroups = [ "wheel" "networkmanager" ];
+            openssh.authorizedKeys.keys = [
+              # Add your SSH public key here
+            ];
+          }};
+
+          services.openssh.enable = true;
+
+          system.stateVersion = "24.11";
+        }})
+      ];
+    }};
+  }};
+}}"#,
+        hostname = hostname,
+        hdc_dim = nix_config.recommended_hdc_dim,
+        neurons = nix_config.recommended_neurons,
+        substrate = nix_config.recommended_substrate,
+        filesystem = nix_config.filesystem,
+    );
+
+    Ok(flake)
+}
+
+/// Generate disko disk configuration from hardware probe.
+#[wasm_bindgen]
+pub fn generate_disko_config(hardware_json: &str) -> Result<String, JsError> {
+    let profile: crate::hardware_probe::HardwareProfile =
+        serde_json::from_str(hardware_json).map_err(|e| JsError::new(&e.to_string()))?;
+    let nix_config = crate::hardware_probe::NixHardwareConfig::from_profile(&profile);
+
+    let disko = format!(
+        r#"{{ disko.devices.disk.main = {{
+    type = "disk";
+    device = "/dev/sda";  # ← Change to your target disk
+    content = {{
+      type = "gpt";
+      partitions = {{
+        ESP = {{
+          size = "512M";
+          type = "EF00";
+          content = {{
+            type = "filesystem";
+            format = "vfat";
+            mountpoint = "/boot";
+          }};
+        }};
+        luks = {{
+          size = "100%";
+          content = {{
+            type = "luks";
+            name = "cryptroot";
+            settings.allowDiscards = true;
+            content = {{
+              type = "filesystem";
+              format = "{filesystem}";
+              mountpoint = "/";
+              mountOptions = [ "compress=zstd" "noatime" ];
+            }};
+          }};
+        }};
+      }};
+    }};
+  }};
+
+  # Swap
+  disko.devices.disk.main.content.partitions.swap = {{
+    size = "{swap_gb}G";
+    content = {{
+      type = "swap";
+      resumeDevice = true;
+    }};
+  }};
+}}"#,
+        filesystem = nix_config.filesystem,
+        swap_gb = nix_config.swap_size_gb,
+    );
+
+    Ok(disko)
+}
+
+/// Generate hardware-configuration.nix from probe results.
+#[wasm_bindgen]
+pub fn generate_hardware_nix(hardware_json: &str) -> Result<String, JsError> {
+    let profile: crate::hardware_probe::HardwareProfile =
+        serde_json::from_str(hardware_json).map_err(|e| JsError::new(&e.to_string()))?;
+    let nix_config = crate::hardware_probe::NixHardwareConfig::from_profile(&profile);
+    Ok(nix_config.nix_hardware_config.clone())
+}

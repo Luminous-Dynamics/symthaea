@@ -54,7 +54,7 @@ impl DivergentThinkingBenchmark {
             .collect();
 
         // WM capacity influences how many uses can be generated
-        let n_uses = config.working_memory_capacity.min(12).max(3);
+        let n_uses = config.working_memory_capacity.clamp(3, 12);
 
         let noise_scale = 0.3 + config.effective_noise() as f32 * 0.2;
 

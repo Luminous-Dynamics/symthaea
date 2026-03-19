@@ -845,10 +845,26 @@ impl ContinuousMind {
                         }
                     }
                 }
-                // Sovereign Name + Social: handled by CLS managers.
+                // Sovereign Social: decode ContentAnnounce and forward to CLS
+                crate::swarm::mesh::PayloadType::ContentAnnounce => {
+                    if let Some(announce) =
+                        crate::swarm::mesh::content_packet::ContentAnnounce::decode(&packet.wisdom)
+                    {
+                        if let Some(ref tx) = self.swarm_event_tx {
+                            let event = crate::cognitive_loop::SwarmEvent::ContentAnnounced {
+                                peer_id: crate::swarm::mesh::hex_short(&packet.source_id),
+                                content_hash: announce.content_hash,
+                                truncated_hdv: announce.truncated_hdv,
+                                domain: announce.domain,
+                                created_at: announce.created_at,
+                            };
+                            let _ = tx.send(event);
+                        }
+                    }
+                }
+                // Sovereign Name: NameQuery/NameResponse handled at mesh layer (no CLS routing needed)
                 crate::swarm::mesh::PayloadType::NameQuery
-                | crate::swarm::mesh::PayloadType::NameResponse
-                | crate::swarm::mesh::PayloadType::ContentAnnounce => {}
+                | crate::swarm::mesh::PayloadType::NameResponse => {}
             }
         }
 
@@ -890,6 +906,14 @@ impl ContinuousMind {
             Some(b) if b.is_alive() => b,
             _ => return,
         };
+
+        // Drain CLS-generated outbound packets (sovereign beacons, name responses, etc.)
+        #[cfg(feature = "mesh")]
+        if let Some(ref rx) = self.mesh_outbound_rx {
+            while let Ok(outbound) = rx.try_recv() {
+                self.mesh_outbox.push(outbound);
+            }
+        }
 
         // Flush outgoing mesh packets to the network
         let outgoing = std::mem::take(&mut self.mesh_outbox);

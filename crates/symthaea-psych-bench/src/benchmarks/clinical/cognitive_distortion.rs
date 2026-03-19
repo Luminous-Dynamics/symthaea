@@ -59,6 +59,7 @@ impl DistortionType {
         }
     }
 
+    #[allow(dead_code)]
     fn description(&self) -> &'static str {
         match self {
             Self::AllOrNothing => {
@@ -132,7 +133,7 @@ fn text_to_hv(text: &str) -> BinaryHV {
     let word_hvs: Vec<BinaryHV> = text
         .split(|c: char| !c.is_alphanumeric() && c != '\'')
         .filter(|w| w.len() >= 2)
-        .map(|w| word_hv(w))
+        .map(word_hv)
         .collect();
     if word_hvs.is_empty() {
         return BinaryHV::random(0);

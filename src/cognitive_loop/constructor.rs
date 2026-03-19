@@ -489,6 +489,10 @@ impl CognitiveLoopService {
         // Create swarm event channel eagerly so the sender is always available.
         let (swarm_event_tx, swarm_event_rx) = std::sync::mpsc::channel();
 
+        // Create mesh outbound channel for sovereign beacon/name/content emission.
+        #[cfg(feature = "mesh")]
+        let (mesh_outbound_tx, mesh_outbound_rx) = std::sync::mpsc::channel();
+
         // Spawn federated coordinator if enabled.
         let federation_handle = if config.federation_enabled {
             Some(
@@ -996,6 +1000,10 @@ impl CognitiveLoopService {
             ),
             #[cfg(feature = "mesh")]
             time_manager: super::managers::TimeManager::new(enable_mesh_time),
+            #[cfg(feature = "mesh")]
+            mesh_outbound_tx,
+            #[cfg(feature = "mesh")]
+            mesh_outbound_rx: std::sync::Mutex::new(Some(mesh_outbound_rx)),
             #[cfg(feature = "mesh-trust")]
             trust_manager: super::managers::TrustManager::new(
                 format!("node_{:016x}", {

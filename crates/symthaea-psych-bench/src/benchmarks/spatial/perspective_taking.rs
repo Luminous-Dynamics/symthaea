@@ -94,7 +94,7 @@ impl PerspectiveTakingBenchmark {
             // perspective, where each object is still the same but its location HV
             // is rotated to match the new reference frame.
             let scene_k = if shift == 0 {
-                scene_p0.clone()
+                scene_p0
             } else {
                 BinaryHV::bundle_safe(
                     &obj_hvs
@@ -108,13 +108,7 @@ impl PerspectiveTakingBenchmark {
             // Rotated location HVs (for comparison targets).
             let rotated_locs: Vec<BinaryHV> = loc_hvs
                 .iter()
-                .map(|l| {
-                    if shift == 0 {
-                        l.clone()
-                    } else {
-                        l.permute(shift)
-                    }
-                })
+                .map(|l| if shift == 0 { *l } else { l.permute(shift) })
                 .collect();
 
             let n_queries = 25;

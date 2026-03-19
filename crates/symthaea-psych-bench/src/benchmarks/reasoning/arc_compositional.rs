@@ -137,7 +137,8 @@ fn is_v_symmetric(grid: &[Vec<u8>]) -> bool {
 /// Generate a grid with guaranteed horizontal symmetry.
 fn gen_h_symmetric_grid(rng: &mut u64, size: usize, num_colors: u8) -> Vec<Vec<u8>> {
     let mut grid = vec![vec![0u8; size]; size];
-    let half = (size + 1) / 2;
+    let half = size.div_ceil(2);
+    #[allow(clippy::needless_range_loop)]
     for r in 0..size {
         for c in 0..half {
             xor_shift(rng);
@@ -152,7 +153,8 @@ fn gen_h_symmetric_grid(rng: &mut u64, size: usize, num_colors: u8) -> Vec<Vec<u
 /// Generate a grid with guaranteed vertical symmetry.
 fn gen_v_symmetric_grid(rng: &mut u64, size: usize, num_colors: u8) -> Vec<Vec<u8>> {
     let mut grid = vec![vec![0u8; size]; size];
-    let half = (size + 1) / 2;
+    let half = size.div_ceil(2);
+    #[allow(clippy::needless_range_loop)]
     for r in 0..half {
         for c in 0..size {
             xor_shift(rng);
@@ -365,7 +367,8 @@ impl ArcCompositionalBenchmark {
             xor_shift(&mut rng);
             let mut g = gen_h_symmetric_grid(&mut rng, sym_size, num_colors);
             // Force vertical symmetry too
-            let half = (sym_size + 1) / 2;
+            let half = sym_size.div_ceil(2);
+            #[allow(clippy::needless_range_loop)]
             for r in 0..half {
                 for c in 0..sym_size {
                     g[sym_size - 1 - r][c] = g[r][c];
@@ -531,8 +534,8 @@ impl PsychBenchmark for ArcCompositionalBenchmark {
             size_gens.push(r.size_generalization);
             sym_dets.push(r.symmetry_detection);
             rts.push(r.compositional_rt_ticks);
-            for i in 0..4 {
-                per_chain[i].push(r.per_chain_accuracy[i]);
+            for (i, acc) in r.per_chain_accuracy.iter().enumerate() {
+                per_chain[i].push(*acc);
             }
             if config.trial_trace {
                 trace.push(TrialOutcome {
@@ -559,7 +562,7 @@ impl PsychBenchmark for ArcCompositionalBenchmark {
         // Per-chain-type breakdowns
         for (i, name) in chain_names.iter().enumerate() {
             result.insert(
-                &format!("accuracy_{}", name),
+                format!("accuracy_{}", name),
                 MetricValue::from_samples(&per_chain[i]),
             );
         }

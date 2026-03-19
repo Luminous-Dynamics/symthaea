@@ -14,6 +14,16 @@
 //! - Experience bus update (principled signals)
 //! - Guiding question → subsystem priority
 
+use super::thresholds::{
+    NEUROMOD_AROUSAL_EMA_DECAY, NEUROMOD_AROUSAL_EMA_INPUT, NEUROMOD_AROUSAL_PHASIC_SPIKE,
+    NEUROMOD_AROUSAL_PHASIC_THRESHOLD, NEUROMOD_ATTENTION_SENSITIVITY_MAX,
+    NEUROMOD_ATTENTION_SENSITIVITY_MIN, NEUROMOD_CONFIDENCE_CRASH_VELOCITY,
+    NEUROMOD_D2_FLEXIBILITY_BASELINE, NEUROMOD_EXPLORATION_DRAIN_BASELINE,
+    NEUROMOD_EXPLORATION_DRAIN_FACTOR, NEUROMOD_GABA_INHIBITION_THRESHOLD,
+    NEUROMOD_NE_PHASIC_ATTENTION_GAIN, NEUROMOD_NE_PHASIC_EXPLORATION_SCALE,
+    NEUROMOD_NE_PHASIC_THRESHOLD, NEUROMOD_SEIZURE_EXPLORATION_FREEZE,
+    NEUROMOD_SEROTONIN_CRASH_PRODUCTION,
+};
 use super::CognitiveLoopService;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -67,7 +77,9 @@ impl CognitiveLoopService {
         let flex_scale = self.neuromod.bath.behavioral_flexibility();
         self.set_exploration(
             "d2_flexibility",
-            (0.5 + (self.curiosity_drive.exploration_urge - 0.5) * flex_scale as f64) as f32,
+            (NEUROMOD_D2_FLEXIBILITY_BASELINE
+                + (self.curiosity_drive.exploration_urge - NEUROMOD_D2_FLEXIBILITY_BASELINE)
+                    * flex_scale as f64) as f32,
         );
 
         // 5-HT → confidence
@@ -76,17 +88,27 @@ impl CognitiveLoopService {
         // ACh → attention sensitivity + threshold
         self.adaptive_behavior.attention_sensitivity *= self.neuromod.bath.attention_factor();
         self.adaptive_behavior.attention_sensitivity =
-            self.adaptive_behavior.attention_sensitivity.clamp(0.5, 2.0);
+            self.adaptive_behavior.attention_sensitivity.clamp(
+                NEUROMOD_ATTENTION_SENSITIVITY_MIN,
+                NEUROMOD_ATTENTION_SENSITIVITY_MAX,
+            );
         self.scale_threshold("neuromod_threshold", self.neuromod.bath.threshold_factor());
 
         // #3: Phasic NE burst → attentional reorienting (Corbetta & Shulman 2002)
         let ne_ph = self.neuromod.bath.ne_phasic();
-        let ne_reorienting_boost = if ne_ph > 0.3 {
-            self.adaptive_behavior.attention_sensitivity *= 1.0 + (ne_ph - 0.3) * 0.5;
+        let ne_reorienting_boost = if ne_ph > NEUROMOD_NE_PHASIC_THRESHOLD {
+            self.adaptive_behavior.attention_sensitivity *=
+                1.0 + (ne_ph - NEUROMOD_NE_PHASIC_THRESHOLD) * NEUROMOD_NE_PHASIC_ATTENTION_GAIN;
             self.adaptive_behavior.attention_sensitivity =
-                self.adaptive_behavior.attention_sensitivity.clamp(0.5, 2.0);
-            self.adjust_exploration("ne_phasic_reorient", (ne_ph - 0.3) * 0.15);
-            (ne_ph - 0.3) * 0.5
+                self.adaptive_behavior.attention_sensitivity.clamp(
+                    NEUROMOD_ATTENTION_SENSITIVITY_MIN,
+                    NEUROMOD_ATTENTION_SENSITIVITY_MAX,
+                );
+            self.adjust_exploration(
+                "ne_phasic_reorient",
+                (ne_ph - NEUROMOD_NE_PHASIC_THRESHOLD) * NEUROMOD_NE_PHASIC_EXPLORATION_SCALE,
+            );
+            (ne_ph - NEUROMOD_NE_PHASIC_THRESHOLD) * NEUROMOD_NE_PHASIC_ATTENTION_GAIN
         } else {
             0.0
         };
@@ -94,11 +116,12 @@ impl CognitiveLoopService {
         // #6: Arousal ↔ NE bidirectional coupling (Berridge & Waterhouse 2003)
         // EMA: arousal pulled toward NE effective (10% per cycle)
         let ne_arousal_before = self.emotion_contagion.arousal;
-        self.emotion_contagion.arousal = self.emotion_contagion.arousal * 0.9
-            + self.neuromod.bath.noradrenaline.effective() * 0.1;
+        self.emotion_contagion.arousal = self.emotion_contagion.arousal
+            * NEUROMOD_AROUSAL_EMA_DECAY
+            + self.neuromod.bath.noradrenaline.effective() * NEUROMOD_AROUSAL_EMA_INPUT;
         // Phasic NE burst → transient arousal spike
-        if ne_ph > 0.2 {
-            self.emotion_contagion.arousal += ne_ph * 0.05;
+        if ne_ph > NEUROMOD_AROUSAL_PHASIC_THRESHOLD {
+            self.emotion_contagion.arousal += ne_ph * NEUROMOD_AROUSAL_PHASIC_SPIKE;
         }
         self.emotion_contagion.arousal = self.emotion_contagion.arousal.clamp(0.0, 1.0);
         let ne_arousal_feedback = self.emotion_contagion.arousal - ne_arousal_before;
@@ -106,8 +129,11 @@ impl CognitiveLoopService {
         // #7: Confidence crash detection → 5-HT emergency dip (Cools et al. 2008)
         let confidence_velocity =
             self.prediction_confidence - self.carryover.quality.prev_confidence_for_crash;
-        let sht_crash_dip: f32 = if confidence_velocity < -0.15 {
-            self.neuromod.bath.serotonin.produce(-0.1);
+        let sht_crash_dip: f32 = if confidence_velocity < NEUROMOD_CONFIDENCE_CRASH_VELOCITY {
+            self.neuromod
+                .bath
+                .serotonin
+                .produce(NEUROMOD_SEROTONIN_CRASH_PRODUCTION);
             confidence_velocity.abs() as f32
         } else {
             0.0
@@ -115,19 +141,22 @@ impl CognitiveLoopService {
         self.carryover.quality.prev_confidence_for_crash = self.prediction_confidence;
 
         // #8: Exploration cost → 5-HT depletion (Tops et al. 2009)
-        let exploration_sht_drain = if self.curiosity_drive.exploration_urge > 0.5 {
-            let drain = (self.curiosity_drive.exploration_urge - 0.5) * 0.03;
-            self.neuromod
-                .bath
-                .apply_exploration_cost(self.curiosity_drive.exploration_urge as f32);
-            drain as f32
-        } else {
-            0.0
-        };
+        let exploration_sht_drain =
+            if self.curiosity_drive.exploration_urge > NEUROMOD_EXPLORATION_DRAIN_BASELINE {
+                let drain = (self.curiosity_drive.exploration_urge
+                    - NEUROMOD_EXPLORATION_DRAIN_BASELINE)
+                    * NEUROMOD_EXPLORATION_DRAIN_FACTOR;
+                self.neuromod
+                    .bath
+                    .apply_exploration_cost(self.curiosity_drive.exploration_urge as f32);
+                drain as f32
+            } else {
+                0.0
+            };
 
         // #11: GABA global inhibition (Olsen & Sieghart 2009)
         let gaba_inhibition = self.neuromod.bath.global_inhibition();
-        if gaba_inhibition < 0.95 {
+        if gaba_inhibition < NEUROMOD_GABA_INHIBITION_THRESHOLD {
             self.scale_lr("gaba_inhibition", gaba_inhibition);
             self.scale_exploration("gaba_inhibition", gaba_inhibition);
         }
@@ -135,7 +164,7 @@ impl CognitiveLoopService {
         if self.neuromod.bath.exploration_frozen() {
             self.scale_exploration_pri(
                 "seizure_protection",
-                0.1,
+                NEUROMOD_SEIZURE_EXPLORATION_FREEZE,
                 crate::cognitive_loop::feedback_state::Priority::Safety,
             );
         }

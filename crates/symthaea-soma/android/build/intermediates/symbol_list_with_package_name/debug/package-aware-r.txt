@@ -1,1 +1,1 @@
-io.symthaea.spore
+io.symthaea.soma

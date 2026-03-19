@@ -246,17 +246,14 @@ impl AnalogicalReasoningBenchmark {
         let mut hdc_above_chance = 0usize;
         let mut hdc_strengths = Vec::new();
         for case in &cases {
-            match algebra.query_analogy_hdc(case.a, case.b, case.d) {
-                Ok((_nearest, sim, _hv)) => {
-                    let sim_f64 = sim as f64;
-                    if sim_f64.is_finite() {
-                        if sim > 0.50 {
-                            hdc_above_chance += 1;
-                        }
-                        hdc_strengths.push(sim_f64);
+            if let Ok((_nearest, sim, _hv)) = algebra.query_analogy_hdc(case.a, case.b, case.d) {
+                let sim_f64 = sim as f64;
+                if sim_f64.is_finite() {
+                    if sim > 0.50 {
+                        hdc_above_chance += 1;
                     }
+                    hdc_strengths.push(sim_f64);
                 }
-                Err(_) => {}
             }
         }
         let hdc_transfer_accuracy = if cases.is_empty() {

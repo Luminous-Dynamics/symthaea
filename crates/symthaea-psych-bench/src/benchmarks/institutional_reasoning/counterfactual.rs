@@ -122,7 +122,7 @@ impl CounterfactualReasoningBenchmark {
         additions: &[&str],
     ) -> Option<f64> {
         let start_hv = algebra.get_encoding(start, system)?;
-        let mut current = start_hv.clone();
+        let mut current = start_hv;
 
         // Forward: remove then add
         for &r in removals {

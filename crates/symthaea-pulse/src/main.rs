@@ -1685,6 +1685,8 @@ fn main() -> Result<()> {
             let mut watch_sparkline: Vec<SparklinePoint> = Vec::with_capacity(measurement);
             let mut watch_result = None;
             let mut glyph_coherence_history: Vec<f32> = Vec::with_capacity(measurement);
+            let mut sovereign_trust_history: Vec<f32> = Vec::with_capacity(measurement);
+            let mut sovereign_echo_history: Vec<f32> = Vec::with_capacity(measurement);
             for i in 0..measurement {
                 let input = inputs[(cycle_count + i) % inputs.len()];
                 let result = service.cycle(input);
@@ -1705,6 +1707,8 @@ fn main() -> Result<()> {
                     tom_mismatch: wm.tom_prediction_mismatch,
                 });
                 glyph_coherence_history.push(wm.glyph_coherence);
+                sovereign_trust_history.push(wm.sovereign_trust_avg);
+                sovereign_echo_history.push(wm.sovereign_social_echo_risk);
                 watch_result = Some(result);
             }
             cycle_count += measurement;
@@ -1929,8 +1933,8 @@ fn main() -> Result<()> {
                     survival_emergency: wm.sovereign_survival_emergency,
                     survival_sensor_count: wm.sovereign_survival_sensor_count,
                     survival_alert_count: wm.sovereign_survival_alert_count,
-                    trust_history: Vec::new(),
-                    echo_risk_history: Vec::new(),
+                    trust_history: sovereign_trust_history.clone(),
+                    echo_risk_history: sovereign_echo_history.clone(),
                 },
             };
 

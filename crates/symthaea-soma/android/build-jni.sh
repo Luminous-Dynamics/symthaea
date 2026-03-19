@@ -36,7 +36,9 @@ cd "$WORKSPACE"
 export CC_aarch64_linux_android="$CC"
 export AR_aarch64_linux_android="$AR"
 export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$CC"
-cargo build --target "$TARGET" --release -p symthaea-soma --features native-ffi
+# 16KB page alignment required for Android 15+ (Pixel 8 Pro)
+export RUSTFLAGS="-C link-arg=-z -C link-arg=max-page-size=16384"
+cargo build --target "$TARGET" --release -p symthaea-soma --features native-ffi,screen-vision
 
 # Copy Rust .so (soma_jni.c links against -lsymthaea_soma)
 cp "$RUST_SO" "$JNILIBS/libsymthaea_soma.so"
@@ -49,7 +51,8 @@ echo "=== Building JNI glue (soma_jni.c) ==="
     "$SCRIPT_DIR/src/main/cpp/soma_jni.c" \
     -L"$JNILIBS" -lsymthaea_soma \
     -llog \
-    -fPIC -O2 -Wall -Werror
+    -fPIC -O2 -Wall -Werror \
+    -Wl,-z,max-page-size=16384
 
 echo "  Built:  libsoma_jni.so ($(du -h "$JNILIBS/libsoma_jni.so" | cut -f1))"
 

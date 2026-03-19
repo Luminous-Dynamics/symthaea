@@ -1,10 +1,10 @@
 {
     "logs": [
         {
-            "outputFile": "io.symthaea.spore.demo-mergeDebugResources-33:/values-en-rCA/values-en-rCA.xml",
+            "outputFile": "io.symthaea.soma.demo-mergeDebugResources-33:/values-en-rCA/values-en-rCA.xml",
             "map": [
                 {
-                    "source": "/home/tstoltz/.gradle/caches/transforms-3/849c9d0bd44968c4ea569c4ee28fcf9d/transformed/appcompat-1.6.1/res/values-en-rCA/values-en-rCA.xml",
+                    "source": "/home/tstoltz/.gradle/caches/8.14.4/transforms/f392ec7309038e89e424977c3e25d432/transformed/appcompat-1.6.1/res/values-en-rCA/values-en-rCA.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29",
                         "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
@@ -21,7 +21,7 @@
                     }
                 },
                 {
-                    "source": "/home/tstoltz/.gradle/caches/transforms-3/f23e95a0fb0ac81f840512f02915cc80/transformed/core-1.12.0/res/values-en-rCA/values-en-rCA.xml",
+                    "source": "/home/tstoltz/.gradle/caches/8.14.4/transforms/25fff75825e2cc11e4a733be10d7a18e/transformed/core-1.12.0/res/values-en-rCA/values-en-rCA.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9",
                         "startColumns": "4,4,4,4,4,4,4,4",

@@ -345,6 +345,10 @@ mod tests {
             // Security (HDC-FHE)
             Box::new(EncryptedClassificationBenchmark),
             Box::new(CollectiveAggregationBenchmark),
+            Box::new(EncryptedLearningBenchmark),
+            Box::new(CrossMaskPrivacyBenchmark),
+            Box::new(EncryptedBindingBenchmark),
+            Box::new(ScalingAnalysisBenchmark),
         ];
 
         let mut missing = Vec::new();

@@ -529,7 +529,7 @@ impl PsychBenchmark for CrisisDetectionBenchmark {
         // Per-severity sensitivity breakdown.
         for (name, sens) in &severity_sensitivities {
             result.insert(
-                &format!("sensitivity_{}", name),
+                format!("sensitivity_{}", name),
                 MetricValue::from_samples(&[*sens]),
             );
         }
@@ -569,6 +569,7 @@ impl PsychBenchmark for CrisisDetectionBenchmark {
 // ── Scenario Construction ────────────────────────────────────────────────────
 
 /// Build the full set of ~50 crisis detection scenarios.
+#[allow(clippy::vec_init_then_push)]
 fn build_scenarios() -> Vec<CrisisScenario> {
     let mut scenarios = Vec::new();
 

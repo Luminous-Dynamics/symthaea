@@ -168,8 +168,8 @@ impl ArcAlgebraBenchmark {
             let rule_d2 = encoder.encode_rule(&hv_d2, &out_hv_d2);
 
             // bundle(A, B) then apply_rule
-            let bundle_input = BinaryHV::bundle(&[hv_d1.clone(), hv_d2.clone()]);
-            let consensus_rule = encoder.bundle_rules(&[rule_d1.clone(), rule_d2.clone()]);
+            let bundle_input = BinaryHV::bundle(&[hv_d1, hv_d2]);
+            let consensus_rule = encoder.bundle_rules(&[rule_d1, rule_d2]);
             let result_left = encoder.apply_rule(&bundle_input, &consensus_rule);
 
             // apply_rule(A) + apply_rule(B)

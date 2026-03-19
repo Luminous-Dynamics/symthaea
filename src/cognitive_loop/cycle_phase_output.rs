@@ -7,6 +7,11 @@ use std::mem;
 use std::time::Instant;
 
 use super::phase_results::{DynamicsPhaseResult, FeedbackPhaseResult, PerceptionPhaseResult};
+use super::thresholds::{
+    COMPOUND_INSTABILITY_AGREEMENT, COMPOUND_INSTABILITY_ERROR_SLOPE,
+    EPISTEMIC_UNCERTAINTY_EMA_CURRENT, EPISTEMIC_UNCERTAINTY_EMA_PRIOR, FLOW_INTENSITY_FEEDBACK,
+    PROPOSAL_CONFLICT_EXPLORATION,
+};
 use super::{CognitiveLoopService, CycleResult};
 
 impl CognitiveLoopService {
@@ -464,7 +469,7 @@ impl CognitiveLoopService {
                 if prev == 0.0 && self.stats.total_cycles <= 1 {
                     raw // Bootstrap: use raw on first cycle
                 } else {
-                    prev * 0.8 + raw * 0.2
+                    prev * EPISTEMIC_UNCERTAINTY_EMA_PRIOR + raw * EPISTEMIC_UNCERTAINTY_EMA_CURRENT
                 }
             },
             ..Default::default()
@@ -500,11 +505,12 @@ impl CognitiveLoopService {
             v.max(0.0)
         };
         metadata.modulation.feedback_frozen = self.carryover.quality.consecutive_full_dampen >= 3;
-        metadata.modulation.compound_instability = feedback.quality.cross_module_agreement < 0.5
-            && perception.urgency.error_slope > 0.02
+        metadata.modulation.compound_instability = feedback.quality.cross_module_agreement
+            < COMPOUND_INSTABILITY_AGREEMENT
+            && perception.urgency.error_slope > COMPOUND_INSTABILITY_ERROR_SLOPE
             && self.stats.total_cycles > 30;
         metadata.modulation.flow_feedback_relaxed =
-            self.flow_state.in_flow && self.flow_state.intensity > 0.5;
+            self.flow_state.in_flow && self.flow_state.intensity > FLOW_INTENSITY_FEEDBACK;
         metadata.homeostasis_efficiency = self.carryover.quality.homeostasis_efficiency;
         // Session 10 telemetry (Session 11: lr_frozen from dynamics phase)
         metadata.modulation.confidence_crash_detected = dynamics.confidence_crash_detected;
@@ -519,7 +525,7 @@ impl CognitiveLoopService {
         {
             let conflict = self.feedback_state.avg_conflict_ratio();
             metadata.proposal_conflict_ratio = conflict;
-            if conflict > 0.3 && self.stats.total_cycles > 15 {
+            if conflict > PROPOSAL_CONFLICT_EXPLORATION && self.stats.total_cycles > 15 {
                 self.feedback_state.exploration.propose(
                     "high_conflict",
                     super::feedback_state::FeedbackProposal::Add(0.02),
@@ -832,6 +838,19 @@ impl CognitiveLoopService {
             metadata.governance_harmonic_delta_max =
                 self.governance_mgr.last_harmonic_delta_max() as f32;
             metadata.governance_lr_boost = self.governance_mgr.last_lr_boost() as f32;
+
+            // ── Finance health telemetry ──
+            let fh = self.governance_mgr.finance_health();
+            metadata.finance_active_positions = fh.active_positions;
+            metadata.finance_stressed_positions = fh.stressed_positions;
+            metadata.finance_critical_positions = fh.critical_positions;
+            metadata.finance_avg_ltv = fh.avg_ltv;
+            metadata.finance_sap_circulation = fh.sap_circulation;
+            metadata.finance_compost_collected = fh.compost_collected;
+            metadata.finance_active_covenants = fh.active_covenants;
+            metadata.finance_open_breakers = fh.open_breakers;
+            metadata.finance_oracle_confidence = fh.oracle_confidence;
+            metadata.finance_stress_index = fh.stress_index;
         }
 
         // ── CPG Manager telemetry ──
@@ -904,6 +923,16 @@ impl CognitiveLoopService {
             metadata.sovereign_survival_emergency = sv.emergency_active;
             metadata.sovereign_survival_sensor_count = sv.sensor_count;
             metadata.sovereign_survival_alert_count = sv.alert_count;
+        }
+
+        // ── FHE Collective Wisdom telemetry ──
+        #[cfg(feature = "fhe-wisdom")]
+        if self.config.fhe_wisdom_enabled {
+            metadata.fhe_contributions_total = self.swarm_manager.fhe_contributions_total();
+            metadata.fhe_aggregations_total = self.swarm_manager.fhe_aggregations_total();
+            metadata.fhe_pool_count = self.swarm_manager.wisdom_pool_count();
+            metadata.fhe_cycles_since_aggregation =
+                self.swarm_manager.fhe_cycles_since_aggregation();
         }
 
         // ── Causal explanation narrative (every 47 cycles, amortized) ──
@@ -1354,7 +1383,13 @@ impl CognitiveLoopService {
         }
 
         #[cfg(feature = "identity")]
-        let signed_output = self.mfdi_bridge.sign_output(&dynamics.core.output).ok();
+        let signed_output = self
+            .mfdi_bridge
+            .sign_output(&dynamics.core.output)
+            .map_err(
+                |e| tracing::error!(error = ?e, "MFDI output signing failed — output unattested"),
+            )
+            .ok();
         #[cfg(feature = "identity")]
         let assurance_level = self.mfdi_bridge.assurance_level();
 

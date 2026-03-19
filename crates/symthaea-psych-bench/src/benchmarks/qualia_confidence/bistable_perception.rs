@@ -71,7 +71,7 @@ impl PsychBenchmark for BistablePerceptionBenchmark {
         let proto_b = BinaryHV::random(config.seed.wrapping_add(1));
 
         // Create ambiguous stimulus as midpoint (bundle of A and B)
-        let ambiguous = BinaryHV::bundle(&[proto_a.clone(), proto_b.clone()]);
+        let ambiguous = BinaryHV::bundle(&[proto_a, proto_b]);
 
         // Natural similarity between prototypes (should be ~0.5)
         let proto_similarity = proto_a.similarity(&proto_b) as f64;
@@ -99,8 +99,7 @@ impl PsychBenchmark for BistablePerceptionBenchmark {
             let mut ws = GlobalWorkspace::new(ws_config);
 
             // Submit ambiguous stimulus at moderate activation
-            let stim_content =
-                WorkspaceContent::new(vec![ambiguous.clone()], 0.50, "stimulus".to_string());
+            let stim_content = WorkspaceContent::new(vec![ambiguous], 0.50, "stimulus".to_string());
             ws.submit(stim_content);
 
             // Submit interpretation A with activation + jitter + hysteresis

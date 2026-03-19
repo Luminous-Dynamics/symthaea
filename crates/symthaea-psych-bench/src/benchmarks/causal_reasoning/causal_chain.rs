@@ -75,7 +75,7 @@ impl CausalChainBenchmark {
                     .collect();
 
                 // Trace the chain: starting from V0, follow each link
-                let mut current = variables[0].clone();
+                let mut current = variables[0];
                 let mut trace_success = true;
 
                 for (i, link) in links.iter().enumerate() {
@@ -92,7 +92,7 @@ impl CausalChainBenchmark {
                         break;
                     }
 
-                    current = variables[i + 1].clone();
+                    current = variables[i + 1];
                 }
 
                 if trace_success {
@@ -142,7 +142,7 @@ impl CausalChainBenchmark {
 
             // Bundle all links into a single chain representation
             // Using majority vote bundling approximation via XOR
-            let mut chain_composite = links[0].clone();
+            let mut chain_composite = links[0];
             for link in &links[1..] {
                 chain_composite = chain_composite.bind(link);
             }

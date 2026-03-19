@@ -159,7 +159,7 @@ impl ArcStaircaseBenchmark {
         let mut size_acc_pairs: Vec<(f64, f64)> = Vec::new();
 
         for step in 0..max_steps {
-            let gs = (current_size.round() as usize).max(2).min(20);
+            let gs = (current_size.round() as usize).clamp(2, 20);
             xor_shift(&mut rng);
             let (acc, _sim) = probe_accuracy(gs, dim, tasks_per_probe, rng, noise_weight);
             size_acc_pairs.push((gs as f64, acc));
@@ -182,7 +182,7 @@ impl ArcStaircaseBenchmark {
 
             // Adjust grid size
             current_size += direction as f64 * step_size;
-            current_size = current_size.max(min_size).min(max_size);
+            current_size = current_size.clamp(min_size, max_size);
 
             // Stop after 4 reversals (converged)
             if reversals >= 4 {

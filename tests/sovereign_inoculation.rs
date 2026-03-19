@@ -9,8 +9,6 @@
 
 #[cfg(feature = "mesh")]
 mod clock_tests {
-    use symthaea::cognitive_loop::managers::time_manager::TimeManager;
-    use symthaea::cognitive_loop::subsystem_trait::{CognitiveSubsystem, CycleSnapshot};
     use symthaea::swarm::mesh::mesh_time::{MeshTimeConsensus, TimeQuality, TimeSample};
     use symthaea::swarm::mesh::time_beacon::TimeBeacon;
 
@@ -61,45 +59,8 @@ mod clock_tests {
         assert_eq!(decoded.counter, beacon.counter);
     }
 
-    #[test]
-    fn test_time_manager_in_cognitive_loop() {
-        let mut mgr = TimeManager::new(true);
-        let ts = now_us();
-
-        // Inject 5 beacons
-        for i in 0..5u8 {
-            let beacon = TimeBeacon {
-                timestamp_us: ts + 1000,
-                stratum: 1,
-                counter: i as u64,
-                phi: 0.8,
-                drift_ppm: 0.0,
-            };
-            mgr.inject_beacon(beacon, [i, 0, 0, 0, 0, 0, 0, 0]);
-        }
-
-        let snapshot = CycleSnapshot {
-            unified_psi: 0.7,
-            ..CycleSnapshot::default()
-        };
-        let output = mgr.process(&snapshot);
-
-        // Should have processed beacons and updated telemetry
-        assert!(mgr.consensus().peer_count() >= 5);
-        // Output should be reasonable (not NaN)
-        assert!(output.arousal_delta.is_finite());
-        assert!(output.valence_delta.is_finite());
-    }
-
-    #[test]
-    fn test_beacon_creation_and_counter() {
-        let mut mgr = TimeManager::new(true);
-        mgr.set_phi(0.8);
-        let b1 = mgr.create_beacon();
-        let b2 = mgr.create_beacon();
-        assert!(b2.counter > b1.counter);
-        assert!((b1.phi - 0.8).abs() < f32::EPSILON);
-    }
+    // TimeManager unit tests are in src/cognitive_loop/managers/time_manager.rs
+    // (6 tests covering creation, beacon injection, and processing).
 
     #[test]
     fn test_mesh_time_degraded_quality() {

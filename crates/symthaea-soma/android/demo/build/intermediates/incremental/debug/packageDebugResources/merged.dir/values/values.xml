@@ -1,11 +1,51 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Symthaea Spore</string>
-    <style name="Theme.SporeDemo" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <item name="colorPrimary">#6200EE</item>
-        <item name="colorPrimaryVariant">#3700B3</item>
-        <item name="colorOnPrimary">#FFFFFF</item>
-        <item name="colorSecondary">#03DAC5</item>
-        <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
+    <color name="broca_text">#00E5CC</color>
+    <color name="broca_text_glow">#33FFE5</color>
+    <color name="dream_text">#C4B5FD</color>
+    <color name="dream_text_glow">#DDD6FE</color>
+    <color name="epistemic_dim">#4A5558</color>
+    <color name="harmony_coherence">#00E5CC</color>
+    <color name="harmony_compassion">#6BCB77</color>
+    <color name="harmony_embodiment">#FF8C42</color>
+    <color name="harmony_emergence">#9B7DFF</color>
+    <color name="harmony_reciprocity">#FF7EB3</color>
+    <color name="harmony_resonance">#47D4FF</color>
+    <color name="harmony_sacred_stillness">#C4B5FD</color>
+    <color name="harmony_transparency">#FFD166</color>
+    <color name="neuro_dopamine">#FF6B8A</color>
+    <color name="neuro_norepinephrine">#FFBE4F</color>
+    <color name="neuro_oxytocin">#818CF8</color>
+    <color name="neuro_serotonin">#5EEAD4</color>
+    <color name="soma_bioluminescent">#00E5CC</color>
+    <color name="soma_bioluminescent_dim">#007A6D</color>
+    <color name="soma_bioluminescent_glow">#33FFE5</color>
+    <color name="soma_deep_earth">#0D1117</color>
+    <color name="soma_deep_ocean">#0B1622</color>
+    <color name="soma_mycelium_dim">#8B6914</color>
+    <color name="soma_mycelium_glow">#FFB347</color>
+    <color name="soma_starlight">#E8F0F2</color>
+    <color name="soma_starlight_dim">#7A8B8F</color>
+    <color name="soma_surface">#111820</color>
+    <color name="soma_void">#0A0E12</color>
+    <color name="soma_whisper">#4A5558</color>
+    <color name="state_alert">#0B1622</color>
+    <color name="state_drowsy">#3B2D7A</color>
+    <color name="state_focused">#0A1A2E</color>
+    <color name="state_sleep">#2D1B69</color>
+    <string name="app_name">Symthaea Soma</string>
+    <style name="Theme.SomaDemo" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        
+        <item name="colorPrimary">@color/soma_bioluminescent</item>
+        <item name="colorPrimaryVariant">@color/soma_deep_ocean</item>
+        <item name="colorOnPrimary">@color/soma_starlight</item>
+        <item name="colorSecondary">@color/soma_mycelium_glow</item>
+        <item name="colorOnSecondary">@color/soma_deep_earth</item>
+        <item name="android:colorBackground">@color/soma_void</item>
+        <item name="colorSurface">@color/soma_surface</item>
+        <item name="colorOnSurface">@color/soma_starlight</item>
+        <item name="android:statusBarColor">@color/soma_void</item>
+        <item name="android:navigationBarColor">@color/soma_void</item>
+        <item name="android:windowBackground">@color/soma_void</item>
     </style>
 </resources>

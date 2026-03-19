@@ -1,4 +1,4 @@
-io.symthaea.spore.demo
+io.symthaea.soma.demo
 anim abc_fade_in
 anim abc_fade_out
 anim abc_grow_fade_in_from_bottom
@@ -1360,6 +1360,8 @@ color bright_foreground_inverse_material_dark
 color bright_foreground_inverse_material_light
 color bright_foreground_material_dark
 color bright_foreground_material_light
+color broca_text
+color broca_text_glow
 color button_material_dark
 color button_material_light
 color call_notification_answer_color
@@ -1410,10 +1412,21 @@ color dim_foreground_disabled_material_dark
 color dim_foreground_disabled_material_light
 color dim_foreground_material_dark
 color dim_foreground_material_light
+color dream_text
+color dream_text_glow
+color epistemic_dim
 color error_color_material_dark
 color error_color_material_light
 color foreground_material_dark
 color foreground_material_light
+color harmony_coherence
+color harmony_compassion
+color harmony_embodiment
+color harmony_emergence
+color harmony_reciprocity
+color harmony_resonance
+color harmony_sacred_stillness
+color harmony_transparency
 color highlighted_text_material_dark
 color highlighted_text_material_light
 color m3_appbar_overlay_color
@@ -2067,6 +2080,10 @@ color mtrl_textinput_disabled_color
 color mtrl_textinput_filled_box_default_background_color
 color mtrl_textinput_focused_box_stroke_color
 color mtrl_textinput_hovered_box_stroke_color
+color neuro_dopamine
+color neuro_norepinephrine
+color neuro_oxytocin
+color neuro_serotonin
 color notification_action_color_filter
 color notification_icon_bg_color
 color primary_dark_material_dark
@@ -2083,6 +2100,22 @@ color secondary_text_default_material_dark
 color secondary_text_default_material_light
 color secondary_text_disabled_material_dark
 color secondary_text_disabled_material_light
+color soma_bioluminescent
+color soma_bioluminescent_dim
+color soma_bioluminescent_glow
+color soma_deep_earth
+color soma_deep_ocean
+color soma_mycelium_dim
+color soma_mycelium_glow
+color soma_starlight
+color soma_starlight_dim
+color soma_surface
+color soma_void
+color soma_whisper
+color state_alert
+color state_drowsy
+color state_focused
+color state_sleep
 color switch_thumb_disabled_material_dark
 color switch_thumb_disabled_material_light
 color switch_thumb_material_dark
@@ -3001,8 +3034,8 @@ drawable ic_mtrl_chip_checked_black
 drawable ic_mtrl_chip_checked_circle
 drawable ic_mtrl_chip_close_circle
 drawable ic_search_black_24
-drawable ic_spore_background
-drawable ic_spore_foreground
+drawable ic_soma_background
+drawable ic_soma_foreground
 drawable m3_avd_hide_password
 drawable m3_avd_show_password
 drawable m3_bottom_sheet_drag_handle
@@ -3202,9 +3235,8 @@ id closest
 id collapseActionView
 id compress
 id confirm_button
-id consciousnessCircle
 id consciousnessLabel
-id consciousnessValue
+id consciousnessMandala
 id constraint
 id container
 id content
@@ -3240,9 +3272,6 @@ id disablePostScroll
 id disableScroll
 id disclaimerText
 id disjoint
-id dopamineBar
-id dopamineLabel
-id dopamineValue
 id dragAnticlockwise
 id dragClockwise
 id dragDown
@@ -3397,10 +3426,7 @@ id navigation_bar_item_labels_group
 id navigation_bar_item_large_label_view
 id navigation_bar_item_small_label_view
 id navigation_header_container
-id neBar
-id neLabel
-id neValue
-id neuromodLabel
+id neuromodFlows
 id never
 id neverCompleteToEnd
 id neverCompleteToStart
@@ -3432,9 +3458,6 @@ id open_search_view_toolbar_container
 id outline
 id outward
 id overshoot
-id oxytocinBar
-id oxytocinLabel
-id oxytocinValue
 id packed
 id parallax
 id parent
@@ -3487,9 +3510,6 @@ id search_voice_btn
 id select_dialog_listview
 id selected
 id selection_type
-id serotoninBar
-id serotoninLabel
-id serotoninValue
 id sharedValueSet
 id sharedValueUnset
 id shortcut
@@ -4588,7 +4608,7 @@ style Theme_MaterialComponents_Light_NoActionBar
 style Theme_MaterialComponents_Light_NoActionBar_Bridge
 style Theme_MaterialComponents_NoActionBar
 style Theme_MaterialComponents_NoActionBar_Bridge
-style Theme_SporeDemo
+style Theme_SomaDemo
 style ThemeOverlay_AppCompat
 style ThemeOverlay_AppCompat_ActionBar
 style ThemeOverlay_AppCompat_Dark

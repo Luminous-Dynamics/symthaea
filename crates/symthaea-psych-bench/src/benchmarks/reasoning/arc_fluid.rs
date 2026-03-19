@@ -149,14 +149,14 @@ impl ArcFluidBenchmark {
         let mut confusion_counts: [[u32; 4]; 4] = [[0; 4]; 4];
 
         for (type_idx, &task_type) in TASK_TYPES.iter().enumerate() {
-            for task_i in 0..tasks_per_type {
+            for _task_i in 0..tasks_per_type {
                 xor_shift(&mut rng);
                 let task_param = rng;
 
                 // Generate 4 training pairs + 1 test pair (same transform, different inputs)
                 // More examples strengthen the majority-vote consensus (Kanerva 2009).
                 let mut train_rules = Vec::new();
-                for pair_i in 0..4 {
+                for _ in 0..4 {
                     xor_shift(&mut rng);
                     let input = gen_grid(&mut rng);
                     let output = apply_transform(&input, task_type, task_param);
@@ -175,7 +175,6 @@ impl ArcFluidBenchmark {
                     xor_shift(&mut rng);
                     let tick_scale = 1.0 - pressure * 0.4;
                     total_ticks += (4.0 + (rng % 5) as f64) * tick_scale;
-                    let _ = pair_i; // suppress unused warning
                 }
 
                 // Rule consistency: cosine between the 2 training rules
@@ -184,7 +183,7 @@ impl ArcFluidBenchmark {
 
                 // Consensus rule for transfer
                 let consensus = encoder.bundle_rules(&train_rules);
-                all_task_rule_hvs.push(consensus.clone());
+                all_task_rule_hvs.push(consensus);
 
                 // Test pair: apply consensus rule to novel input
                 xor_shift(&mut rng);
@@ -282,7 +281,6 @@ impl ArcFluidBenchmark {
                     });
                     global_task_idx += 1;
                 }
-                let _ = (type_idx, task_i);
             }
         }
 
@@ -358,6 +356,7 @@ impl ArcFluidBenchmark {
 
         // Normalize confusion matrix rows
         let mut confusion_matrix = [[0.0f64; 4]; 4];
+        #[allow(clippy::needless_range_loop)]
         for i in 0..4 {
             let row_sum: u32 = confusion_counts[i].iter().sum();
             if row_sum > 0 {
@@ -417,6 +416,7 @@ impl PsychBenchmark for ArcFluidBenchmark {
             similarities.push(r.transfer_similarity);
             rts.push(r.rt_ticks);
             single_pair_accs.push(r.single_pair_accuracy);
+            #[allow(clippy::needless_range_loop)]
             for i in 0..4 {
                 per_type[i].push(r.per_type_accuracy[i]);
                 for j in 0..4 {
@@ -447,7 +447,7 @@ impl PsychBenchmark for ArcFluidBenchmark {
         // Per-task-type breakdowns
         for (i, name) in type_names.iter().enumerate() {
             result.insert(
-                &format!("accuracy_{}", name),
+                format!("accuracy_{}", name),
                 MetricValue::from_samples(&per_type[i]),
             );
         }
@@ -472,6 +472,7 @@ impl PsychBenchmark for ArcFluidBenchmark {
         if n_trials > 0.0 {
             // Normalize by trial count
             let mut confusion_avg = [[0.0f64; 4]; 4];
+            #[allow(clippy::needless_range_loop)]
             for i in 0..4 {
                 for j in 0..4 {
                     confusion_avg[i][j] = confusion_sum[i][j] / n_trials;
@@ -489,6 +490,7 @@ impl PsychBenchmark for ArcFluidBenchmark {
             );
             // Max off-diagonal: the single largest confusion rate
             let mut max_offdiag = 0.0f64;
+            #[allow(clippy::needless_range_loop)]
             for i in 0..4 {
                 for j in 0..4 {
                     if i != j && confusion_avg[i][j] > max_offdiag {
@@ -502,9 +504,8 @@ impl PsychBenchmark for ArcFluidBenchmark {
             );
             // Confusion entropy: Shannon entropy of each row, averaged
             let mut entropy_sum = 0.0f64;
-            for i in 0..4 {
-                for j in 0..4 {
-                    let p = confusion_avg[i][j];
+            for row in &confusion_avg {
+                for &p in row {
                     if p > 0.0 {
                         entropy_sum -= p * p.log2();
                     }
