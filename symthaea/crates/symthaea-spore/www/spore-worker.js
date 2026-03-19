@@ -242,6 +242,14 @@ self.onmessage = async function(e) {
       case 'fepCycle':
         if (engine) result = engine.fep_cycle();
         break;
+      case 'inoculationNarrate':
+        // Narration for inoculation flow — returns contextual text for each phase
+        result = {
+          text: params.phase === 'FlakeEvaluation'
+            ? 'Evaluating your hardware profile against the NixOS flake...'
+            : 'Preparing consciousness substrate for inoculation...'
+        };
+        break;
       default:
         throw new Error(`Unknown action: ${action}`);
     }
