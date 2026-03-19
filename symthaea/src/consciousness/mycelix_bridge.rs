@@ -374,6 +374,13 @@ pub struct MycelixBridge {
     /// Set via `set_governance_dispatch_tx()`.
     #[cfg(feature = "mycelix")]
     governance_dispatch_tx: Option<std::sync::mpsc::SyncSender<GovernanceDispatchCommand>>,
+    /// Pending dispatch confirmations: correlation_id -> dispatch time.
+    /// Tracked so we can detect when the conductor has not acknowledged a command.
+    #[cfg(feature = "mycelix")]
+    pending_confirmations: HashMap<u64, Instant>,
+    /// Monotonically increasing correlation ID counter.
+    #[cfg(feature = "mycelix")]
+    next_correlation_id: u64,
 }
 
 /// Commands dispatched to an external Holochain conductor process.
@@ -386,6 +393,8 @@ pub struct MycelixBridge {
 pub enum GovernanceDispatchCommand {
     /// Submit a proposal to the governance cluster.
     SubmitProposal {
+        /// Unique correlation ID for matching dispatch to confirmation.
+        correlation_id: u64,
         description: String,
         proposer_did: String,
         consciousness_phi: f64,
@@ -393,6 +402,8 @@ pub enum GovernanceDispatchCommand {
     },
     /// Cast a vote on an existing proposal.
     CastVote {
+        /// Unique correlation ID for matching dispatch to confirmation.
+        correlation_id: u64,
         proposal_id: String,
         voter_did: String,
         approve: bool,
@@ -400,6 +411,30 @@ pub enum GovernanceDispatchCommand {
     },
     /// Query active proposals (response arrives via governance event channel).
     QueryActiveProposals,
+}
+
+/// Outcome received from the conductor confirming or rejecting a dispatched command.
+///
+/// The conductor bridge should send these back via the governance event channel
+/// after processing each `GovernanceDispatchCommand`.
+#[cfg(feature = "mycelix")]
+#[derive(Debug, Clone)]
+pub enum GovernanceDispatchOutcome {
+    /// Proposal was accepted by the conductor and written to the DHT.
+    ProposalAccepted {
+        correlation_id: u64,
+        /// The proposal action hash from Holochain, if available.
+        action_hash: Option<String>,
+    },
+    /// Proposal was rejected by the conductor.
+    ProposalRejected { correlation_id: u64, reason: String },
+    /// Vote was accepted by the conductor and written to the DHT.
+    VoteAccepted {
+        correlation_id: u64,
+        action_hash: Option<String>,
+    },
+    /// Vote was rejected by the conductor.
+    VoteRejected { correlation_id: u64, reason: String },
 }
 
 impl MycelixBridge {
@@ -419,6 +454,10 @@ impl MycelixBridge {
             pending_gov_outcomes: Vec::new(),
             #[cfg(feature = "mycelix")]
             governance_dispatch_tx: None,
+            #[cfg(feature = "mycelix")]
+            pending_confirmations: HashMap::new(),
+            #[cfg(feature = "mycelix")]
+            next_correlation_id: 1,
         }
     }
 
@@ -438,6 +477,10 @@ impl MycelixBridge {
             pending_gov_outcomes: Vec::new(),
             #[cfg(feature = "mycelix")]
             governance_dispatch_tx: None,
+            #[cfg(feature = "mycelix")]
+            pending_confirmations: HashMap::new(),
+            #[cfg(feature = "mycelix")]
+            next_correlation_id: 1,
         }
     }
 
@@ -534,13 +577,18 @@ impl MycelixBridge {
         {
             let mut disconnected = false;
             if let Some(ref tx) = self.governance_dispatch_tx {
+                let cid = self.next_correlation_id;
+                self.next_correlation_id += 1;
                 match tx.try_send(GovernanceDispatchCommand::SubmitProposal {
+                    correlation_id: cid,
                     description: proposal.description.clone(),
                     proposer_did: self.agent_id.clone(),
                     consciousness_phi: consciousness.phi,
                     alignment_score: alignment.overall_score,
                 }) {
-                    Ok(()) => {}
+                    Ok(()) => {
+                        self.pending_confirmations.insert(cid, Instant::now());
+                    }
                     Err(std::sync::mpsc::TrySendError::Full(_)) => {
                         tracing::warn!(
                             "Governance dispatch channel full (64) — proposal queued locally only"
@@ -643,7 +691,10 @@ impl MycelixBridge {
             let mut disconnected = false;
             if let Some(ref tx) = self.governance_dispatch_tx {
                 let approve = matches!(value, VoteValue::Yes | VoteValue::StrongYes);
+                let cid = self.next_correlation_id;
+                self.next_correlation_id += 1;
                 match tx.try_send(GovernanceDispatchCommand::CastVote {
+                    correlation_id: cid,
                     proposal_id: proposal.id.clone(),
                     voter_did: self.agent_id.clone(),
                     approve,
@@ -652,7 +703,9 @@ impl MycelixBridge {
                         alignment.recommendation, alignment.overall_score
                     ),
                 }) {
-                    Ok(()) => {}
+                    Ok(()) => {
+                        self.pending_confirmations.insert(cid, Instant::now());
+                    }
                     Err(std::sync::mpsc::TrySendError::Full(_)) => {
                         tracing::warn!(
                             "Governance dispatch channel full (64) — vote queued locally only"
@@ -1010,6 +1063,53 @@ impl MycelixBridge {
             std::mem::take(&mut self.pending_gov_events),
             std::mem::take(&mut self.pending_gov_outcomes),
         )
+    }
+
+    // ========================================================================
+    // DISPATCH CONFIRMATION TRACKING
+    // ========================================================================
+
+    /// Process a dispatch outcome from the conductor, removing the matching
+    /// correlation ID from pending confirmations.
+    ///
+    /// Should be called when the conductor bridge sends back confirmation
+    /// of a dispatched command. Logs a warning if the oldest unconfirmed
+    /// dispatch exceeds 60 seconds.
+    #[cfg(feature = "mycelix")]
+    pub fn confirm_dispatch(&mut self, outcome: &GovernanceDispatchOutcome) {
+        let cid = match outcome {
+            GovernanceDispatchOutcome::ProposalAccepted { correlation_id, .. }
+            | GovernanceDispatchOutcome::ProposalRejected { correlation_id, .. }
+            | GovernanceDispatchOutcome::VoteAccepted { correlation_id, .. }
+            | GovernanceDispatchOutcome::VoteRejected { correlation_id, .. } => *correlation_id,
+        };
+        self.pending_confirmations.remove(&cid);
+
+        // Check for stale unconfirmed dispatches
+        if let Some(age) = self.oldest_unconfirmed_age() {
+            if age > Duration::from_secs(60) {
+                tracing::warn!(
+                    unconfirmed = self.pending_confirmations.len(),
+                    oldest_secs = age.as_secs(),
+                    "Oldest unconfirmed governance dispatch exceeds 60s — conductor may be unresponsive"
+                );
+            }
+        }
+    }
+
+    /// Number of dispatched commands awaiting conductor confirmation.
+    #[cfg(feature = "mycelix")]
+    pub fn unconfirmed_dispatches(&self) -> usize {
+        self.pending_confirmations.len()
+    }
+
+    /// Age of the oldest unconfirmed dispatch, or `None` if all are confirmed.
+    #[cfg(feature = "mycelix")]
+    pub fn oldest_unconfirmed_age(&self) -> Option<Duration> {
+        self.pending_confirmations
+            .values()
+            .map(|t| t.elapsed())
+            .max()
     }
 
     // ========================================================================
@@ -1472,6 +1572,92 @@ impl ConsciousnessReputation {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// FINANCE HEALTH SIGNALS — received from Mycelix finance cluster
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Financial health signals received from the Mycelix finance cluster.
+///
+/// These are polled periodically (not every cycle) and cached. Financial
+/// stress affects the engagement dimension of the consciousness profile,
+/// ensuring communities under financial duress have reduced governance
+/// weight to prevent stress-driven bad decisions.
+///
+/// # Science
+///
+/// Borio (2014) — financial stress as systemic risk indicator.
+/// Kahneman & Tversky (1979) — loss aversion amplifies under stress.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct FinanceHealthSignals {
+    /// Total active collateral positions.
+    pub active_positions: u32,
+    /// Positions in Warning/MarginCall/Liquidation.
+    pub stressed_positions: u32,
+    /// Positions in MarginCall or Liquidation (critical subset).
+    pub critical_positions: u32,
+    /// Average LTV ratio across active positions.
+    pub avg_ltv: f32,
+    /// Financial stress index (stressed/total, capped at 1.0).
+    pub stress_index: f32,
+    /// Oracle consensus confidence (0.0-1.0).
+    pub oracle_confidence: f32,
+    /// Circuit breaker open count.
+    pub open_breakers: u32,
+    /// Total SAP in circulation (micro-SAP).
+    pub sap_circulation: u64,
+    /// Total compost collected this period (micro-SAP).
+    pub compost_collected: u64,
+    /// Number of active covenants.
+    pub active_covenants: u32,
+    /// When these signals were last updated (cycle number).
+    pub last_updated_cycle: u64,
+}
+
+impl FinanceHealthSignals {
+    /// Compute the financial stress index.
+    ///
+    /// `stress_index = stressed_positions / max(active_positions, 1)`
+    /// Capped at 1.0. Higher = more financial stress in the community.
+    pub fn compute_stress_index(&self) -> f32 {
+        if self.active_positions == 0 {
+            return 0.0;
+        }
+        (self.stressed_positions as f32 / self.active_positions as f32).min(1.0)
+    }
+
+    /// Compute engagement modulation from financial health.
+    ///
+    /// Financial stress dampens the engagement dimension of consciousness:
+    /// - `stress_index < 0.1`: no effect (healthy)
+    /// - `stress_index 0.1–0.5`: −5% to −15% engagement
+    /// - `stress_index > 0.5`: −15% to −30% engagement (crisis)
+    ///
+    /// This ensures communities under financial duress have reduced
+    /// governance weight, preventing stress-driven bad decisions.
+    ///
+    /// # Science
+    ///
+    /// Kahneman & Tversky (1979) — loss aversion amplifies under stress.
+    /// Mani et al. (2013) — poverty impedes cognitive function.
+    pub fn engagement_modulation(&self) -> f32 {
+        let stress = self.compute_stress_index();
+        if stress < 0.1 {
+            0.0 // No modulation
+        } else if stress < 0.5 {
+            // Linear: -5% to -15%
+            -0.05 - (stress - 0.1) * 0.25
+        } else {
+            // Linear: -15% to -30%
+            -0.15 - (stress - 0.5) * 0.30
+        }
+    }
+
+    /// Whether the financial system is in crisis (stress > 0.5 or breakers open).
+    pub fn is_crisis(&self) -> bool {
+        self.compute_stress_index() > 0.5 || self.open_breakers > 0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1711,5 +1897,112 @@ mod tests {
         let (events2, outcomes2) = bridge.drain_pending_governance();
         assert_eq!(events2.len(), 0);
         assert_eq!(outcomes2.len(), 0);
+    }
+
+    // ── FinanceHealthSignals tests ──────────────────────────────────────
+
+    #[test]
+    fn test_finance_stress_index_zero_positions() {
+        let signals = FinanceHealthSignals::default();
+        assert_eq!(signals.compute_stress_index(), 0.0);
+        assert_eq!(signals.engagement_modulation(), 0.0);
+    }
+
+    #[test]
+    fn test_finance_stress_index_some_stressed() {
+        let signals = FinanceHealthSignals {
+            active_positions: 100,
+            stressed_positions: 20,
+            ..Default::default()
+        };
+        let stress = signals.compute_stress_index();
+        assert!((stress - 0.2).abs() < 1e-6, "20/100 = 0.2, got {stress}");
+    }
+
+    #[test]
+    fn test_finance_stress_index_all_stressed() {
+        let signals = FinanceHealthSignals {
+            active_positions: 50,
+            stressed_positions: 80, // more stressed than active (edge case)
+            ..Default::default()
+        };
+        let stress = signals.compute_stress_index();
+        assert!(
+            (stress - 1.0).abs() < 1e-6,
+            "capped at 1.0, got {stress}"
+        );
+    }
+
+    #[test]
+    fn test_finance_engagement_modulation_healthy() {
+        // stress < 0.1 → no modulation
+        let signals = FinanceHealthSignals {
+            active_positions: 100,
+            stressed_positions: 5,
+            ..Default::default()
+        };
+        assert_eq!(signals.engagement_modulation(), 0.0);
+    }
+
+    #[test]
+    fn test_finance_engagement_modulation_moderate() {
+        // stress = 0.3 → between -5% and -15%
+        let signals = FinanceHealthSignals {
+            active_positions: 100,
+            stressed_positions: 30,
+            ..Default::default()
+        };
+        let mod_val = signals.engagement_modulation();
+        assert!(
+            mod_val < -0.05 && mod_val > -0.15,
+            "moderate stress should give -5% to -15%, got {mod_val}"
+        );
+    }
+
+    #[test]
+    fn test_finance_engagement_modulation_crisis() {
+        // stress = 0.8 → between -15% and -30%
+        let signals = FinanceHealthSignals {
+            active_positions: 100,
+            stressed_positions: 80,
+            ..Default::default()
+        };
+        let mod_val = signals.engagement_modulation();
+        assert!(
+            mod_val < -0.15 && mod_val > -0.31,
+            "crisis stress should give -15% to -30%, got {mod_val}"
+        );
+    }
+
+    #[test]
+    fn test_finance_default_no_stress() {
+        let signals = FinanceHealthSignals::default();
+        assert_eq!(signals.active_positions, 0);
+        assert_eq!(signals.stressed_positions, 0);
+        assert_eq!(signals.stress_index, 0.0);
+        assert_eq!(signals.compute_stress_index(), 0.0);
+        assert_eq!(signals.engagement_modulation(), 0.0);
+        assert!(!signals.is_crisis());
+    }
+
+    #[test]
+    fn test_finance_is_crisis_stress() {
+        let signals = FinanceHealthSignals {
+            active_positions: 10,
+            stressed_positions: 8,
+            ..Default::default()
+        };
+        assert!(signals.is_crisis());
+    }
+
+    #[test]
+    fn test_finance_is_crisis_breakers() {
+        let signals = FinanceHealthSignals {
+            active_positions: 10,
+            stressed_positions: 0,
+            open_breakers: 1,
+            ..Default::default()
+        };
+        assert!(signals.is_crisis());
     }
 }

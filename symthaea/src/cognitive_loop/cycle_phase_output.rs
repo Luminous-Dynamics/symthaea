@@ -838,6 +838,19 @@ impl CognitiveLoopService {
             metadata.governance_harmonic_delta_max =
                 self.governance_mgr.last_harmonic_delta_max() as f32;
             metadata.governance_lr_boost = self.governance_mgr.last_lr_boost() as f32;
+
+            // ── Finance health telemetry ──
+            let fh = self.governance_mgr.finance_health();
+            metadata.finance_active_positions = fh.active_positions;
+            metadata.finance_stressed_positions = fh.stressed_positions;
+            metadata.finance_critical_positions = fh.critical_positions;
+            metadata.finance_avg_ltv = fh.avg_ltv;
+            metadata.finance_sap_circulation = fh.sap_circulation;
+            metadata.finance_compost_collected = fh.compost_collected;
+            metadata.finance_active_covenants = fh.active_covenants;
+            metadata.finance_open_breakers = fh.open_breakers;
+            metadata.finance_oracle_confidence = fh.oracle_confidence;
+            metadata.finance_stress_index = fh.stress_index;
         }
 
         // ── CPG Manager telemetry ──
@@ -910,6 +923,16 @@ impl CognitiveLoopService {
             metadata.sovereign_survival_emergency = sv.emergency_active;
             metadata.sovereign_survival_sensor_count = sv.sensor_count;
             metadata.sovereign_survival_alert_count = sv.alert_count;
+        }
+
+        // ── FHE Collective Wisdom telemetry ──
+        #[cfg(feature = "fhe-wisdom")]
+        if self.config.fhe_wisdom_enabled {
+            metadata.fhe_contributions_total = self.swarm_manager.fhe_contributions_total();
+            metadata.fhe_aggregations_total = self.swarm_manager.fhe_aggregations_total();
+            metadata.fhe_pool_count = self.swarm_manager.wisdom_pool_count();
+            metadata.fhe_cycles_since_aggregation =
+                self.swarm_manager.fhe_cycles_since_aggregation();
         }
 
         // ── Causal explanation narrative (every 47 cycles, amortized) ──

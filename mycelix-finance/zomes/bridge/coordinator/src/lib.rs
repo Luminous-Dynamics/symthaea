@@ -1333,11 +1333,12 @@ pub fn update_collateral_health(
         f64::INFINITY
     };
 
+    // Thresholds match canonical CollateralHealthStatus::from_ltv() in mycelix_finance_types
     let status = if !ltv_ratio.is_finite() || ltv_ratio > 0.95 {
         "Liquidation"
-    } else if ltv_ratio > 0.85 {
+    } else if ltv_ratio > 0.90 {
         "MarginCall"
-    } else if ltv_ratio > 0.75 {
+    } else if ltv_ratio > 0.80 {
         "Warning"
     } else {
         "Healthy"
@@ -1739,7 +1740,10 @@ pub fn create_multi_collateral_position(
     // Diversification bonus: 1% per distinct asset type, capped at 5%
     let distinct_types: std::collections::HashSet<&str> =
         components.iter().map(|c| c._type.as_str()).collect();
-    let diversification_bonus = (distinct_types.len() as f64 * 0.01).min(0.05);
+    // Bonus starts from 2nd distinct class: 5% per class, capped at 20%
+    // Matches canonical compute_diversification_bonus() in mycelix_finance_types
+    let bonus_classes = distinct_types.len().saturating_sub(1);
+    let diversification_bonus = (bonus_classes as f64 * 0.05).min(0.20);
 
     let base_ltv = if input.aggregate_value > 0 {
         input.aggregate_obligation as f64 / input.aggregate_value as f64
@@ -1748,11 +1752,12 @@ pub fn create_multi_collateral_position(
     };
     let effective_ltv = (base_ltv - diversification_bonus).max(0.0);
 
+    // Thresholds match canonical CollateralHealthStatus::from_ltv() in mycelix_finance_types
     let status = if !effective_ltv.is_finite() || effective_ltv > 0.95 {
         "Liquidation"
-    } else if effective_ltv > 0.85 {
+    } else if effective_ltv > 0.90 {
         "MarginCall"
-    } else if effective_ltv > 0.75 {
+    } else if effective_ltv > 0.80 {
         "Warning"
     } else {
         "Healthy"

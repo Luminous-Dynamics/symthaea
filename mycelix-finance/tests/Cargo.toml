@@ -126,6 +126,11 @@ path = "sweettest_race_conditions.rs"
 name = "sweettest_price_oracle_accuracy"
 path = "sweettest_price_oracle_accuracy.rs"
 
+# Collateral Lifecycle Sweettest (covenant, health, energy cert, multi-collateral, fiat)
+[[test]]
+name = "sweettest_collateral_lifecycle"
+path = "sweettest_collateral_lifecycle.rs"
+
 # NOTE: economics_stress_test has been moved to types/tests/ where it compiles
 # without the heavy Holochain dependency. Run with:
 #   cargo test -p mycelix_finance_types --test economics_stress_test

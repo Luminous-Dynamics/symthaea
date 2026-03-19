@@ -510,6 +510,19 @@ impl CognitiveLoopService {
         )
     }
 
+    /// Get the lagged consciousness level for governance gating.
+    ///
+    /// Uses a 50-cycle lag (~2.5s at 20Hz) to decorrelate the circular
+    /// dependency: consciousness → governance → neuromod → consciousness.
+    /// Returns the oldest value in the ring buffer, or 0.0 if empty.
+    /// Science: Granger (1969) — temporal decorrelation breaks circular causation.
+    pub fn governance_lagged_consciousness(&self) -> f64 {
+        self.governance_consciousness_lag
+            .front()
+            .copied()
+            .unwrap_or(0.0)
+    }
+
     /// Record a predicted outcome alignment for a governance proposal.
     ///
     /// Call this when casting a vote to enable governance prediction error
@@ -528,6 +541,23 @@ impl CognitiveLoopService {
     #[cfg(feature = "mycelix")]
     pub fn governance_pending_count(&self) -> usize {
         self.governance_mgr.pending_event_count()
+    }
+
+    /// Current financial health signals from the Mycelix finance cluster.
+    #[cfg(feature = "mycelix")]
+    pub fn finance_health(
+        &self,
+    ) -> &crate::consciousness::mycelix_bridge::FinanceHealthSignals {
+        self.governance_mgr.finance_health()
+    }
+
+    /// Update cached financial health signals from the Mycelix finance cluster.
+    #[cfg(feature = "mycelix")]
+    pub fn update_finance_health(
+        &mut self,
+        signals: crate::consciousness::mycelix_bridge::FinanceHealthSignals,
+    ) {
+        self.governance_mgr.update_finance_health(signals);
     }
 
     /// Process governance learning signals: reward, harmonic deltas, episodic memory.
@@ -749,6 +779,17 @@ impl CognitiveLoopService {
         &self,
     ) -> std::sync::mpsc::Sender<super::super::managers::swarm_manager::SwarmEvent> {
         self.swarm_event_tx.clone()
+    }
+
+    /// Take the mesh outbound receiver (one-shot — returns None after first call).
+    ///
+    /// ContinuousMind calls this once during wiring to drain CLS-generated
+    /// mesh packets (beacons, name responses, content announces) each tick.
+    #[cfg(feature = "mesh")]
+    pub fn take_mesh_outbound_rx(
+        &self,
+    ) -> Option<std::sync::mpsc::Receiver<crate::swarm::mesh::MeshOutbound>> {
+        self.mesh_outbound_rx.lock().ok()?.take()
     }
 
     /// Backwards-compatible alias for `swarm_event_sender()`.

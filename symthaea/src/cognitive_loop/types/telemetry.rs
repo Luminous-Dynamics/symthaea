@@ -354,28 +354,29 @@ pub struct TemporalPhenomenalMetrics {
     pub thermodynamic_load: f32,
 }
 
-/// Metadata about internal decision-making during a cycle.
-///
-/// Provides observability into which subsystems influenced the cycle's output,
-/// enabling debugging of "why did the agent do that?" questions.
-///
-/// # Domain Groups
-///
-/// Fields are organized by domain (see section comments). Neuromod fields
-/// are nested via `#[serde(flatten)] pub neuromod: NeuromodTelemetry`; assign
-/// the snapshot directly to `metadata.neuromod`.
-///
-/// # Diagnostic-only fields (serialized for dashboards, not read internally)
-///
-/// These fields are populated in `cycle_phase_output.rs` and serialized via
-/// `#[derive(Serialize)]` for API/dashboard consumers, but no internal code
-/// reads them after population:
-///
-/// `broca`, `calibration_improvements`, `calibration_regressions`,
-/// `convergence_cycle`, `eq_v2_limiting_component`, `feedback_signals_fired`,
-/// `liquid_mamba_effective_rank`, `liquid_mamba_semantic_pe`,
-/// `phi_validation_cached`, `social_strategy_bias_applied`,
-/// `subsystem_integration_contributors`
+// Metadata about internal decision-making during a cycle.
+//
+// Provides observability into which subsystems influenced the cycle's output,
+// enabling debugging of "why did the agent do that?" questions.
+//
+// # Domain Groups
+//
+// Fields are organized by domain (see section comments). Neuromod fields
+// are nested via `#[serde(flatten)] pub neuromod: NeuromodTelemetry`; assign
+// the snapshot directly to `metadata.neuromod`.
+//
+// # Diagnostic-only fields (serialized for dashboards, not read internally)
+//
+// These fields are populated in `cycle_phase_output.rs` and serialized via
+// `#[derive(Serialize)]` for API/dashboard consumers, but no internal code
+// reads them after population:
+//
+// `broca`, `calibration_improvements`, `calibration_regressions`,
+// `convergence_cycle`, `eq_v2_limiting_component`, `feedback_signals_fired`,
+// `liquid_mamba_effective_rank`, `liquid_mamba_semantic_pe`,
+// `phi_validation_cached`, `social_strategy_bias_applied`,
+// `subsystem_integration_contributors`
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // FEEDBACK MODULATION FLAGS — Sessions 9–16 observability booleans
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -565,6 +566,7 @@ pub struct FeedbackModulationFlags {
     pub error_bifurcation_response: bool,
 }
 
+/// Metadata about internal decision-making during a cycle.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CycleMetadata {
     /// Whether the surprise exploration bridge triggered exploration this cycle
@@ -1418,6 +1420,39 @@ pub struct CycleMetadata {
     #[serde(default)]
     pub spectrum_encryption_sessions: usize,
 
+    // ── Finance Health Telemetry ─────────────────────────────────────────
+    /// Number of active collateral positions in the connected Mycelix network.
+    #[serde(default)]
+    pub finance_active_positions: u32,
+    /// Number of positions in Warning or worse LTV status.
+    #[serde(default)]
+    pub finance_stressed_positions: u32,
+    /// Number of positions in MarginCall or Liquidation status.
+    #[serde(default)]
+    pub finance_critical_positions: u32,
+    /// Average LTV ratio across all active positions (0.0-1.0+).
+    #[serde(default)]
+    pub finance_avg_ltv: f32,
+    /// Total SAP in circulation (micro-SAP).
+    #[serde(default)]
+    pub finance_sap_circulation: u64,
+    /// Total compost collected this period (micro-SAP, demurrage redistributed).
+    #[serde(default)]
+    pub finance_compost_collected: u64,
+    /// Number of active covenants.
+    #[serde(default)]
+    pub finance_active_covenants: u32,
+    /// Circuit breaker status: number of open breakers.
+    #[serde(default)]
+    pub finance_open_breakers: u32,
+    /// Oracle consensus confidence (0.0-1.0, signal_integrity from price oracle).
+    #[serde(default)]
+    pub finance_oracle_confidence: f32,
+    /// Financial stress index (0.0-1.0, computed from stressed/total positions ratio).
+    /// Science: Borio (2014) — financial stress as systemic risk indicator.
+    #[serde(default)]
+    pub finance_stress_index: f32,
+
     // ── Causal Explanation Narrative Telemetry ─────────────────────────────
     /// Causal self-explanation narrative summary (generated every 47 cycles).
     /// Science: Wierzbicka (1996) — NSM-grounded causal transparency.
@@ -1589,6 +1624,20 @@ pub struct CycleMetadata {
     /// Number of active resource alerts.
     #[serde(default)]
     pub sovereign_survival_alert_count: usize,
+
+    // ── FHE Collective Wisdom ─────────────────────────────────────────
+    /// Total encrypted contributions made to the collective wisdom pool.
+    #[serde(default)]
+    pub fhe_contributions_total: usize,
+    /// Total aggregations completed this session.
+    #[serde(default)]
+    pub fhe_aggregations_total: usize,
+    /// Current pool size (pending contributions).
+    #[serde(default)]
+    pub fhe_pool_count: usize,
+    /// Cycles since last aggregation.
+    #[serde(default)]
+    pub fhe_cycles_since_aggregation: usize,
 }
 
 /// Therapeutic subsystem telemetry for CycleMetadata.

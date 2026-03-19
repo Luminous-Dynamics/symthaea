@@ -137,6 +137,9 @@ pub struct GovernanceManager {
     /// Preferred radio tier for governance traffic (from SpectrumManager).
     #[cfg(feature = "mesh")]
     preferred_tier: Option<super::radio_dispatcher::RadioTier>,
+    /// Cached financial health signals from Mycelix finance cluster.
+    /// Updated periodically via `update_finance_health()`, not every cycle.
+    finance_health: crate::consciousness::mycelix_bridge::FinanceHealthSignals,
 }
 
 impl Default for GovernanceManager {
@@ -162,6 +165,7 @@ impl Default for GovernanceManager {
             last_lr_boost: 1.0,
             #[cfg(feature = "mesh")]
             preferred_tier: None,
+            finance_health: crate::consciousness::mycelix_bridge::FinanceHealthSignals::default(),
         }
     }
 }
@@ -320,6 +324,31 @@ impl GovernanceManager {
     /// LR boost from governance prediction error (1.0 = no boost).
     pub fn last_lr_boost(&self) -> f64 {
         self.last_lr_boost
+    }
+
+    /// Update cached financial health signals from Mycelix finance cluster.
+    ///
+    /// Called periodically (not every cycle) when fresh data arrives from
+    /// the finance bridge. The `stress_index` is recomputed on update.
+    pub fn update_finance_health(
+        &mut self,
+        signals: crate::consciousness::mycelix_bridge::FinanceHealthSignals,
+    ) {
+        let mut s = signals;
+        s.stress_index = s.compute_stress_index();
+        self.finance_health = s;
+    }
+
+    /// Current financial health signals (read-only snapshot).
+    pub fn finance_health(&self) -> &crate::consciousness::mycelix_bridge::FinanceHealthSignals {
+        &self.finance_health
+    }
+
+    /// Financial engagement modulation (0.0 = no effect, negative = dampening).
+    ///
+    /// Delegates to [`FinanceHealthSignals::engagement_modulation`].
+    pub fn finance_engagement_modulation(&self) -> f32 {
+        self.finance_health.engagement_modulation()
     }
 
     /// Set the preferred radio tier for governance traffic (from SpectrumManager).
