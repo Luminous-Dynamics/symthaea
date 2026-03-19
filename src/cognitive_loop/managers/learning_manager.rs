@@ -18,7 +18,6 @@
 use super::super::subsystem_trait::{
     output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput,
 };
-use super::super::thresholds;
 
 /// Learning Manager — meta-level learning rate gating and plasticity control.
 ///
@@ -153,9 +152,9 @@ impl CognitiveSubsystem for LearningManager {
         // ── 2. Plasticity dynamics (BCM metaplasticity) ───────────────────
         // High surprise → increase plasticity (learn more)
         // Low surprise → decrease plasticity (stabilize)
-        let plasticity_drive = if mean_surprise > thresholds::LEARNING_PLASTICITY_HIGH_SURPRISE {
+        let plasticity_drive = if mean_surprise > 0.3 {
             Self::PLASTICITY_RATE // increase plasticity
-        } else if mean_surprise < thresholds::LEARNING_PLASTICITY_LOW_SURPRISE {
+        } else if mean_surprise < 0.1 {
             -Self::PLASTICITY_RATE * 0.5 // decrease plasticity (slower)
         } else {
             0.0 // neutral zone
@@ -165,7 +164,7 @@ impl CognitiveSubsystem for LearningManager {
 
         // Plasticity → LR modulation
         // High plasticity = higher learning rate
-        output.lr_modulation = thresholds::LEARNING_LR_FLOOR + self.plasticity as f64 * thresholds::LEARNING_LR_PLASTICITY_SCALE;
+        output.lr_modulation = 0.8 + self.plasticity as f64 * 0.4; // range [0.84, 1.18]
 
         // ── 3. Dream consolidation phase ──────────────────────────────────
         if snapshot.arousal < Self::DREAM_AROUSAL_THRESHOLD {
@@ -173,8 +172,8 @@ impl CognitiveSubsystem for LearningManager {
             if self.low_arousal_streak >= Self::DREAM_ONSET_CYCLES {
                 self.in_dream_phase = true;
                 // During dream: boost consolidation, suppress exploration
-                output.exploration_delta -= thresholds::LEARNING_DREAM_EXPLORATION_DAMPEN;
-                output.lr_modulation *= thresholds::LEARNING_DREAM_LR_BOOST;
+                output.exploration_delta -= 0.03;
+                output.lr_modulation *= 1.1; // enhanced consolidation learning
                 output.flags |= output_flags::REQUEST_CONSOLIDATION;
                 output.flags |= output_flags::REQUEST_REST;
             }
@@ -186,24 +185,24 @@ impl CognitiveSubsystem for LearningManager {
         // ── 4. Error trend → adaptive response ───────────────────────────
         if self.error_trend > 0.05 {
             // Errors increasing → need more exploration
-            output.exploration_delta += self.error_trend as f64 * thresholds::LEARNING_ERROR_TREND_EXPLORATION;
+            output.exploration_delta += self.error_trend as f64 * 0.1;
             // Also boost plasticity to learn from errors
-            output.lr_modulation *= thresholds::LEARNING_ERROR_TREND_LR_BOOST;
+            output.lr_modulation *= 1.05;
         } else if self.error_trend < -0.05 {
             // Errors decreasing → stabilize (things are working)
-            output.confidence_delta += (-self.error_trend) as f64 * thresholds::LEARNING_ERROR_TREND_CONFIDENCE;
+            output.confidence_delta += (-self.error_trend) as f64 * 0.01;
         }
 
         // ── 5. Dissipative health → learning gate ─────────────────────────
         // Low dissipative health means the system is stressed, reduce learning
-        if snapshot.dissipative_health < thresholds::LEARNING_DISSIPATIVE_HEALTH_THRESHOLD as f32 {
-            let dampen = 1.0 - (thresholds::LEARNING_DISSIPATIVE_HEALTH_THRESHOLD - snapshot.dissipative_health as f64) * thresholds::LEARNING_DISSIPATIVE_HEALTH_SENSITIVITY;
+        if snapshot.dissipative_health < 0.5 {
+            let dampen = 1.0 - (0.5 - snapshot.dissipative_health) * 0.4;
             output.lr_modulation *= dampen.max(0.7);
         }
 
         // ── 6. Somatic stress → plasticity dampening ──────────────────────
-        if snapshot.somatic_stress > thresholds::LEARNING_SOMATIC_STRESS_THRESHOLD as f32 {
-            output.lr_modulation *= 1.0 - (snapshot.somatic_stress as f64 - thresholds::LEARNING_SOMATIC_STRESS_THRESHOLD) * thresholds::LEARNING_SOMATIC_STRESS_SENSITIVITY;
+        if snapshot.somatic_stress > 0.5 {
+            output.lr_modulation *= 1.0 - (snapshot.somatic_stress - 0.5) * 0.2;
         }
 
         output

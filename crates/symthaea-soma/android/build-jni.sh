@@ -38,7 +38,7 @@ export AR_aarch64_linux_android="$AR"
 export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$CC"
 # 16KB page alignment required for Android 15+ (Pixel 8 Pro)
 export RUSTFLAGS="-C link-arg=-z -C link-arg=max-page-size=16384"
-cargo build --target "$TARGET" --release -p symthaea-soma --features native-ffi,screen-vision,broca-full
+cargo build --target "$TARGET" --release -p symthaea-soma --features native-ffi,screen-vision
 
 # Copy Rust .so (soma_jni.c links against -lsymthaea_soma)
 cp "$RUST_SO" "$JNILIBS/libsymthaea_soma.so"

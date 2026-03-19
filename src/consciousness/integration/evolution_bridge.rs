@@ -139,9 +139,6 @@ pub enum EvolutionSchedule {
 
     /// Only run architecture evolution
     ArchitectureOnly,
-
-    /// CfC-HDC neuroevolution via FEP fitness (feature: neuroevolution)
-    Neuroevolution,
 }
 
 impl Default for EvolutionSchedule {
@@ -191,7 +188,6 @@ impl EvolutionCoordinator {
             EvolutionSchedule::Parallel => true,
             EvolutionSchedule::PrimitiveOnly => true,
             EvolutionSchedule::ArchitectureOnly => false,
-            EvolutionSchedule::Neuroevolution => false, // Handled by NeuroevolutionManager
         };
 
         let mut result = EvolutionStepResult {

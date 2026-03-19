@@ -86,16 +86,10 @@ pub use therapeutic_manager::TherapeuticManager;
 
 #[cfg(feature = "sentinel")]
 pub mod sentinel_manager;
-
-#[cfg(feature = "neuroevolution")]
-pub mod neuroevolution_manager;
 #[cfg(feature = "sentinel")]
 pub use sentinel_manager::{
     SentinelEvent, SentinelManager, SentinelTelemetry, ThreatSignal, ThreatSignalKind,
 };
-
-#[cfg(feature = "neuroevolution")]
-pub use neuroevolution_manager::{NeuroevolutionManager, NeuroevolutionTelemetry};
 
 // Sovereign Inoculation managers
 #[cfg(feature = "mesh")]
