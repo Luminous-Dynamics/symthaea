@@ -312,10 +312,10 @@ impl ProgramNode {
 fn encode_atom(name: &str) -> BinaryHV {
     // Check if it's a known operation
     if let Some(hv) = ops().get(name.to_uppercase().as_str()) {
-        return hv.clone();
+        return *hv;
     }
     if let Some(hv) = types().get(name.to_uppercase().as_str()) {
-        return hv.clone();
+        return *hv;
     }
 
     // N-gram encoding: each character gets a position-shifted base vector,

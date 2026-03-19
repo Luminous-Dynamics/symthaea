@@ -49,7 +49,9 @@ fn main() -> Result<()> {
                 target_vocab_size = Some(args[i].parse().context("--vocab-size must be a number")?);
             }
             "--help" | "-h" => {
-                eprintln!("Usage: distill-for-spore --input <path> --output <path> [--vocab-size <n>]");
+                eprintln!(
+                    "Usage: distill-for-spore --input <path> --output <path> [--vocab-size <n>]"
+                );
                 eprintln!();
                 eprintln!("Distill a Broca checkpoint for WASM/Spore deployment.");
                 eprintln!("Strips optimizer state and optionally reduces vocabulary.");
@@ -78,12 +80,12 @@ fn main() -> Result<()> {
     let original_merge_count = checkpoint.vocab.merges.len();
     eprintln!(
         "  Original: {} tokens, {} merges, epoch {}, loss {:.4}",
-        original_vocab_size, original_merge_count, checkpoint.training_epoch, checkpoint.training_loss
+        original_vocab_size,
+        original_merge_count,
+        checkpoint.training_epoch,
+        checkpoint.training_loss
     );
-    eprintln!(
-        "  Has optimizer state: {}",
-        checkpoint.adam_state.is_some()
-    );
+    eprintln!("  Has optimizer state: {}", checkpoint.adam_state.is_some());
     eprintln!(
         "  Has projection weights: {}",
         checkpoint.projection_weights.is_some()
@@ -112,7 +114,10 @@ fn main() -> Result<()> {
     // Optionally reduce vocabulary
     if let Some(target) = target_vocab_size {
         if target < original_vocab_size {
-            eprintln!("Reducing vocabulary: {} -> {} tokens", original_vocab_size, target);
+            eprintln!(
+                "Reducing vocabulary: {} -> {} tokens",
+                original_vocab_size, target
+            );
 
             // Keep the first `target` tokens (BPE vocabularies are ordered by
             // frequency: byte-level tokens first, then most common merges).

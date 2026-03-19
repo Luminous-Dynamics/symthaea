@@ -28,8 +28,7 @@
 //! - rmp-serde for checkpoint deserialization (same format as symthaea-broca)
 
 use symthaea_broca::{
-    BrocaCheckpoint, BrocaGenerator, GenerationResult as BrocaGenerationResult,
-    ThoughtChannels,
+    BrocaCheckpoint, BrocaGenerator, GenerationResult as BrocaGenerationResult, ThoughtChannels,
 };
 use symthaea_core::genesis::GenesisSeed;
 
@@ -93,22 +92,21 @@ impl BrocaPipeline {
     /// work but are very large (~976MB).
     pub fn load_checkpoint(&mut self, data: &[u8]) -> Result<(), String> {
         // Try MessagePack first (current format), then bincode (legacy)
-        let checkpoint: BrocaCheckpoint = if let Ok(ckpt) = rmp_serde::from_slice::<BrocaCheckpoint>(data) {
-            if !ckpt.verify() {
-                return Err("Checkpoint integrity check failed: checksum mismatch".into());
-            }
-            ckpt
-        } else {
-            bincode::deserialize(data).map_err(|e| {
-                format!("Failed to deserialize BrocaCheckpoint (tried msgpack + bincode): {e}")
-            })?
-        };
+        let checkpoint: BrocaCheckpoint =
+            if let Ok(ckpt) = rmp_serde::from_slice::<BrocaCheckpoint>(data) {
+                if !ckpt.verify() {
+                    return Err("Checkpoint integrity check failed: checksum mismatch".into());
+                }
+                ckpt
+            } else {
+                bincode::deserialize(data).map_err(|e| {
+                    format!("Failed to deserialize BrocaCheckpoint (tried msgpack + bincode): {e}")
+                })?
+            };
 
         // Reconstruct the generator from the checkpoint
-        let tokenizer =
-            symthaea_broca::BpeTokenizer::from_vocab_file(&checkpoint.vocab);
-        let mut gen =
-            BrocaGenerator::with_tokenizer(&self.genesis, checkpoint.config, tokenizer);
+        let tokenizer = symthaea_broca::BpeTokenizer::from_vocab_file(&checkpoint.vocab);
+        let mut gen = BrocaGenerator::with_tokenizer(&self.genesis, checkpoint.config, tokenizer);
 
         // Restore trained weights
         *gen.controller_mut().token_embeddings_mut() = checkpoint.token_embeddings;
@@ -247,8 +245,11 @@ impl BrocaPipeline {
         let c = &mut channels.channels;
 
         // Question detection -> curiosity
-        if input.contains('?') || lower.starts_with("what") || lower.starts_with("how")
-            || lower.starts_with("why") || lower.starts_with("who")
+        if input.contains('?')
+            || lower.starts_with("what")
+            || lower.starts_with("how")
+            || lower.starts_with("why")
+            || lower.starts_with("who")
         {
             c[0] = (c[0] + 0.3).clamp(0.0, 1.0); // curiosity
         }
@@ -264,8 +265,10 @@ impl BrocaPipeline {
         }
 
         // Abstract/philosophical keywords -> abstraction
-        if lower.contains("think") || lower.contains("consciousness")
-            || lower.contains("meaning") || lower.contains("feel")
+        if lower.contains("think")
+            || lower.contains("consciousness")
+            || lower.contains("meaning")
+            || lower.contains("feel")
         {
             c[2] = (c[2] + 0.2).clamp(0.0, 1.0); // abstraction
             c[6] = (c[6] + 0.2).clamp(0.0, 1.0); // meta
@@ -302,8 +305,7 @@ mod tests {
 
     #[test]
     fn test_build_channels_mapping() {
-        let channels =
-            BrocaPipeline::build_channels(0.8, 0.3, 0.9, [0.5, 0.4, 0.6, 0.3]);
+        let channels = BrocaPipeline::build_channels(0.8, 0.3, 0.9, [0.5, 0.4, 0.6, 0.3]);
         let c = &channels.channels;
 
         // Consciousness level
@@ -322,8 +324,7 @@ mod tests {
 
     #[test]
     fn test_build_channels_epistemic_uncertain() {
-        let channels =
-            BrocaPipeline::build_channels(0.5, 0.7, 0.5, [0.5, 0.5, 0.5, 0.5]);
+        let channels = BrocaPipeline::build_channels(0.5, 0.7, 0.5, [0.5, 0.5, 0.5, 0.5]);
         // PE=0.7 -> Uncertain (0.3)
         assert!((channels.channels[9] - 0.3).abs() < 1e-5);
     }

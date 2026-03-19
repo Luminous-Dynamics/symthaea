@@ -395,8 +395,8 @@ mod tests {
         println!("═══════════════════════════════════════════════\n");
 
         // Also run collective aggregation
-        let agg_result = super::super::collective_aggregation::CollectiveAggregationBenchmark
-            .run(&config);
+        let agg_result =
+            super::super::collective_aggregation::CollectiveAggregationBenchmark.run(&config);
 
         println!("═══ HDC-FHE Collective Aggregation Results ═══");
         for (key, val) in &agg_result.metrics {
