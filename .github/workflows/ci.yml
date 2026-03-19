@@ -98,7 +98,7 @@ jobs:
           integrity,semantic-encoder,neural-bridge,webcam,\
           mesh,mesh-encryption,mesh-key-exchange,swarm,notifications,\
           nix-mind,identity,physics,physics-bridge,\
-          flight,humanoid,hal,ssm-power,ssm_language,liquid-mamba,\
+          flight,humanoid,hal,ssm-power,ssm_language,\
           lancedb-backend,multi_agent,full_consciousness,full_perception,\
           full_language,magi_loop,reasoning_engine,code_generation,\
           wasm-sandbox,school_learning,benchmarks,all_benchmarks,\
@@ -228,7 +228,7 @@ jobs:
           integrity,semantic-encoder,neural-bridge,webcam,\
           mesh,mesh-encryption,mesh-key-exchange,swarm,notifications,\
           nix-mind,identity,physics,physics-bridge,\
-          flight,humanoid,hal,ssm-power,ssm_language,liquid-mamba,\
+          flight,humanoid,hal,ssm-power,ssm_language,\
           lancedb-backend,multi_agent,full_consciousness,full_perception,\
           full_language,magi_loop,reasoning_engine,code_generation,\
           wasm-sandbox,school_learning,benchmarks,all_benchmarks,\
