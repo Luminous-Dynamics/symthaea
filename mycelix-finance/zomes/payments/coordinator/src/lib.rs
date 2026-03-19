@@ -283,14 +283,14 @@ fn drain_pending_compost_inner() -> ExternResult<u32> {
             Err(e) => {
                 debug!("Skipping malformed pending compost link: {:?}", e);
                 // Delete the malformed link to prevent infinite retries
-                delete_link(link.create_link_hash.clone())?;
+                delete_link(link.create_link_hash.clone(), GetOptions::default())?;
                 continue;
             }
         };
 
         if try_deliver_compost(&pending.commons_pool_id, pending.amount, &pending.source_member_did) {
             // Success — remove from queue
-            delete_link(link.create_link_hash.clone())?;
+            delete_link(link.create_link_hash.clone(), GetOptions::default())?;
             drained += 1;
             debug!(
                 "Drained pending compost: {} micro-SAP to pool {} from {}",
@@ -708,8 +708,11 @@ fn update_mint_cap_counter(minted_amount: u64, now: Timestamp) -> ExternResult<(
 
     match find_mint_cap_counter_record()? {
         Some((record, existing)) => {
-            let counter: SapMintCapCounter = existing.into();
-            let updated = if counter.is_period_expired(now.as_micros()) {
+            let period_expired = {
+                let year_us: i64 = 365 * 24 * 60 * 60 * 1_000_000;
+                now.as_micros().saturating_sub(existing.period_start_micros) > year_us
+            };
+            let updated = if period_expired {
                 // Period expired — start fresh
                 SapMintCapCounterEntry {
                     period_start_micros: now.as_micros(),
@@ -719,8 +722,8 @@ fn update_mint_cap_counter(minted_amount: u64, now: Timestamp) -> ExternResult<(
                 }
             } else {
                 SapMintCapCounterEntry {
-                    cumulative_minted: counter.cumulative_minted.saturating_add(minted_amount),
-                    mint_count: counter.mint_count.saturating_add(1),
+                    cumulative_minted: existing.cumulative_minted.saturating_add(minted_amount),
+                    mint_count: existing.mint_count.saturating_add(1),
                     last_updated_micros: now.as_micros(),
                     ..existing
                 }

@@ -1057,7 +1057,7 @@ pub struct FinanceBridgeHealth {
 fn verify_oracle_rate_against_consensus(collateral_type: &str, claimed_rate: f64) -> ExternResult<()> {
     use mycelix_finance_types::ORACLE_RATE_TOLERANCE;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, Debug)]
     struct GetConsensusInput {
         item: String,
     }
@@ -1382,7 +1382,7 @@ pub fn update_collateral_health(
 /// Fetch current value for a collateral position from the price oracle.
 /// Falls back to 0 if oracle is unreachable.
 fn fetch_collateral_value(collateral_id: &str) -> u64 {
-    #[derive(Serialize)]
+    #[derive(Serialize, Debug)]
     struct GetValueInput {
         collateral_id: String,
     }
