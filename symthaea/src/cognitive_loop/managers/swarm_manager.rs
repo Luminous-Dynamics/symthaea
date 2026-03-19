@@ -20,6 +20,7 @@
 use super::super::subsystem_trait::{
     output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput,
 };
+use super::super::thresholds;
 use std::collections::VecDeque;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -489,7 +490,7 @@ impl SwarmManager {
                     if self.peer_phi.len() < Self::MAX_TRACKED_PEERS {
                         // Remove old entry if re-joining
                         self.peer_phi.retain(|(id, _)| id != &peer_id);
-                        self.peer_phi.push((peer_id, trust_level * 0.5));
+                        self.peer_phi.push((peer_id, trust_level * thresholds::SWARM_PEER_PHI_TRUST_SCALE));
                     }
                 }
                 SwarmEvent::PeerLeft { peer_id } => {
@@ -530,7 +531,7 @@ impl SwarmManager {
                         0.5
                     };
                     self.affective_valence_acc += valence * intensity;
-                    self.affective_arousal_acc += (arousal - 0.5) * intensity;
+                    self.affective_arousal_acc += (arousal - thresholds::SWARM_AFFECTIVE_AROUSAL_CENTER) * intensity;
                     self.affective_count += 1;
                 }
                 SwarmEvent::FederatedRound {
@@ -564,7 +565,7 @@ impl SwarmManager {
                 } => {
                     // Store shared facts for the cognitive loop to integrate
                     // into the knowledge manager. Corroboration boosts confidence.
-                    let boost = (corroboration_count as f32 * 0.05).min(0.3);
+                    let boost = (corroboration_count as f32 * thresholds::SWARM_CORROBORATION_BOOST).min(thresholds::SWARM_CORROBORATION_CAP);
                     for (text, confidence) in &facts {
                         let effective_confidence = (confidence + boost).min(1.0);
                         self.pending_knowledge_shares
@@ -691,7 +692,7 @@ impl CognitiveSubsystem for SwarmManager {
         // Heinrichs et al. (2003): social support reduces HPA axis reactivity.
         if self.connected_peers > 0 {
             let buffering = (self.connected_peers as f64).sqrt() * Self::SOCIAL_BUFFERING_SCALE;
-            output.confidence_delta += buffering.min(0.05);
+            output.confidence_delta += buffering.min(thresholds::SWARM_SOCIAL_BUFFERING_CAP);
         }
 
         // ── 3. Affective contagion → valence/arousal ────────────────────
@@ -703,15 +704,15 @@ impl CognitiveSubsystem for SwarmManager {
 
         // ── 4. Collective Φ → learning rate modulation ──────────────────
         let mean_phi = self.mean_peer_phi();
-        if mean_phi > 0.3 {
+        if mean_phi > thresholds::SWARM_COLLECTIVE_PHI_THRESHOLD {
             // High collective consciousness → boost learning (collective intelligence).
-            let phi_boost = (mean_phi - 0.3) * 0.2;
-            output.lr_modulation = 1.0 + phi_boost.min(0.1);
+            let phi_boost = (mean_phi - thresholds::SWARM_COLLECTIVE_PHI_THRESHOLD) * thresholds::SWARM_COLLECTIVE_PHI_LR_SCALE;
+            output.lr_modulation = 1.0 + phi_boost.min(thresholds::SWARM_COLLECTIVE_PHI_LR_CAP);
         }
 
         // ── 5. Federated round → learning rate ──────────────────────────
         if self.federated_confidence > 0.5 && self.federated_contributors > 1 {
-            let fed_boost = (self.federated_confidence - 0.5) * Self::FEDERATED_LR_MAX_BOOST * 2.0;
+            let fed_boost = (self.federated_confidence - 0.5) * Self::FEDERATED_LR_MAX_BOOST * thresholds::SWARM_FEDERATED_BOOST_MULTIPLIER;
             output.lr_modulation *= 1.0 + fed_boost.min(Self::FEDERATED_LR_MAX_BOOST);
         }
 
@@ -719,19 +720,19 @@ impl CognitiveSubsystem for SwarmManager {
         if self.anomaly_streak > 0 {
             // Mass disconnect → arousal spike + exploration.
             output.arousal_delta += Self::ANOMALY_AROUSAL_SPIKE as f32;
-            output.exploration_delta += 0.03 * self.anomaly_streak.min(3) as f64;
+            output.exploration_delta += thresholds::SWARM_ANOMALY_EXPLORATION * self.anomaly_streak.min(3) as f64;
             output.flags |= output_flags::ANOMALY_DETECTED;
 
             // Extended anomaly → confidence drop.
             if self.anomaly_streak >= 2 {
-                output.confidence_delta -= 0.02 * self.anomaly_streak.min(5) as f64;
+                output.confidence_delta -= thresholds::SWARM_ANOMALY_CONFIDENCE * self.anomaly_streak.min(5) as f64;
             }
         }
 
         // ── 7. Isolation detection → increased exploration ──────────────
-        if self.connectivity_ema < 0.2 && self.connected_peers == 0 {
+        if self.connectivity_ema < thresholds::SWARM_ISOLATION_THRESHOLD && self.connected_peers == 0 {
             // Complete isolation → explore to find peers.
-            output.exploration_delta += 0.05;
+            output.exploration_delta += thresholds::SWARM_ISOLATION_EXPLORATION_BOOST;
             output.flags |= output_flags::REQUEST_EXPLORATION;
         }
 

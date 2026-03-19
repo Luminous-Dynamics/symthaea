@@ -4993,6 +4993,157 @@ pub const NEUROEVO_SPECIATION_THRESHOLD: f32 = 0.15;
 pub const NEUROEVO_MANAGER_INTERVAL: usize = 71;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// MEMORY MANAGER — Consolidation, retrieval, Phi-weighted encoding
+// Basis: Tulving (2002) — episodic consolidation; Cowan (2001) — capacity limits
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Exploration dampening during active consolidation.
+/// Basis: Wixted (2004) — consolidation benefits from reduced interference.
+pub const MEMORY_CONSOLIDATION_EXPLORATION_DAMPEN: f64 = 0.02;
+
+/// Learning rate boost during consolidation (slight integration bonus).
+/// Basis: McClelland et al. (1995) — complementary learning systems.
+pub const MEMORY_CONSOLIDATION_LR_BOOST: f64 = 1.05;
+
+/// Weight of prediction confidence in retrieval signal blend.
+/// Basis: Cowan (2001) — confidence + coherence jointly index memory quality.
+pub const MEMORY_RETRIEVAL_CONFIDENCE_WEIGHT: f64 = 0.5;
+
+/// Weight of coherence in retrieval signal blend.
+pub const MEMORY_RETRIEVAL_COHERENCE_WEIGHT: f64 = 0.5;
+
+/// Retrieval quality threshold for confidence boost.
+/// Basis: Koriat (2000) — high-confidence retrieval signals reliable encoding.
+pub const MEMORY_RETRIEVAL_HIGH_QUALITY: f32 = 0.7;
+
+/// Confidence gain per unit of above-threshold retrieval quality.
+pub const MEMORY_RETRIEVAL_CONFIDENCE_GAIN: f64 = 0.02;
+
+/// Retrieval quality threshold below which exploration is boosted.
+pub const MEMORY_RETRIEVAL_LOW_QUALITY: f32 = 0.3;
+
+/// Exploration gain per unit of below-threshold retrieval quality.
+pub const MEMORY_RETRIEVAL_EXPLORATION_GAIN: f64 = 0.03;
+
+/// Unified Ψ threshold above which episodic consolidation is prioritized.
+/// Basis: Tononi & Cirelli (2014) — high-consciousness moments deserve priority encoding.
+pub const MEMORY_PSI_CONSOLIDATION_THRESHOLD: f64 = 0.6;
+
+/// LR scale for Ψ-driven consolidation bonus.
+pub const MEMORY_PSI_LR_SCALE: f64 = 0.1;
+
+/// Consolidation pressure threshold for exploration gating.
+/// Basis: Wixted (2004) — "digest before exploring" principle.
+pub const MEMORY_PRESSURE_EXPLORATION_THRESHOLD: f64 = 0.5;
+
+/// Exploration dampening scale per unit of excess consolidation pressure.
+pub const MEMORY_PRESSURE_EXPLORATION_DAMPEN: f64 = 0.1;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SWARM MANAGER — Peer consciousness, social buffering, collective Φ
+// Basis: Heinrichs (2003) — social support; Hatfield (1993) — emotional contagion
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Trust-scaled initial Φ for newly-joined peers.
+/// Basis: Dunbar (1998) — conservative initial assessment.
+pub const SWARM_PEER_PHI_TRUST_SCALE: f64 = 0.5;
+
+/// Arousal center for affective sync (neutral arousal baseline).
+/// Basis: Yerkes-Dodson (1908) — 0.5 as optimal midpoint.
+pub const SWARM_AFFECTIVE_AROUSAL_CENTER: f64 = 0.5;
+
+/// Per-corroboration confidence boost for shared knowledge.
+/// Basis: Surowiecki (2004) — wisdom of crowds via independent confirmation.
+pub const SWARM_CORROBORATION_BOOST: f32 = 0.05;
+
+/// Maximum corroboration confidence bonus.
+pub const SWARM_CORROBORATION_CAP: f32 = 0.3;
+
+/// Maximum confidence delta from social buffering.
+/// Basis: Heinrichs (2003) — social support has diminishing returns.
+pub const SWARM_SOCIAL_BUFFERING_CAP: f64 = 0.05;
+
+/// Collective Φ threshold above which learning rate is boosted.
+/// Basis: Woolley et al. (2010) — collective intelligence emerges above threshold.
+pub const SWARM_COLLECTIVE_PHI_THRESHOLD: f64 = 0.3;
+
+/// Scale for collective Φ → LR boost.
+pub const SWARM_COLLECTIVE_PHI_LR_SCALE: f64 = 0.2;
+
+/// Maximum LR boost from collective Φ.
+pub const SWARM_COLLECTIVE_PHI_LR_CAP: f64 = 0.1;
+
+/// Multiplier for federated boost calculation.
+/// Basis: McMahan et al. (2017) — federated rounds amplify gradient quality.
+pub const SWARM_FEDERATED_BOOST_MULTIPLIER: f64 = 2.0;
+
+/// Per-streak exploration boost from network anomaly.
+/// Basis: Aston-Jones & Cohen (2005) — unexpected events trigger exploration.
+pub const SWARM_ANOMALY_EXPLORATION: f64 = 0.03;
+
+/// Per-streak confidence penalty from sustained anomaly.
+pub const SWARM_ANOMALY_CONFIDENCE: f64 = 0.02;
+
+/// Connectivity EMA threshold for isolation detection.
+pub const SWARM_ISOLATION_THRESHOLD: f64 = 0.2;
+
+/// Exploration boost when isolated (no connected peers).
+pub const SWARM_ISOLATION_EXPLORATION_BOOST: f64 = 0.05;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TRUST MANAGER — Violation response, anomaly detection
+// Basis: Zak (2012) — trust/oxytocin; Dunbar (1998) — social brain
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Trust slashing factor on violation (multiplied against current trust).
+/// Basis: Zak (2012) — betrayal triggers steep trust loss.
+pub const TRUST_VIOLATION_SLASH_FACTOR: f64 = 0.5;
+
+/// Maximum arousal delta from trust violations (NE cap).
+pub const TRUST_VIOLATION_AROUSAL_CAP: f32 = 0.1;
+
+/// Negative valence per violation event (betrayal penalty).
+/// Basis: Zak (2012) — cortisol-mediated aversive response.
+pub const TRUST_BETRAYAL_VALENCE_PENALTY: f32 = 0.02;
+
+/// Arousal spike from trust anomaly detection.
+pub const TRUST_ANOMALY_AROUSAL: f32 = 0.03;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SOCIAL FABRIC MANAGER — Resonance, diversity, echo-chamber detection
+// Basis: Woolley et al. (2010) — collective intelligence factor
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Resonance threshold for oxytocin-mediated valence boost.
+/// Basis: Woolley (2010) — high resonance signals productive collaboration.
+pub const SOCIAL_RESONANCE_HIGH_THRESHOLD: f64 = 0.6;
+
+/// Range denominator for normalizing resonance excess.
+pub const SOCIAL_RESONANCE_RANGE: f64 = 0.4;
+
+/// Maximum arousal from resonance drop (NE cap).
+pub const SOCIAL_RESONANCE_DROP_AROUSAL_CAP: f64 = 0.05;
+
+/// Diversity threshold for dopamine-mediated curiosity boost.
+/// Basis: Page (2007) — cognitive diversity drives innovation.
+pub const SOCIAL_DIVERSITY_THRESHOLD: f64 = 0.3;
+
+/// Echo chamber risk threshold triggering anomaly flag.
+/// Basis: Sunstein (2001) — group polarization above critical homogeneity.
+pub const SOCIAL_ECHO_CHAMBER_THRESHOLD: f64 = 0.85;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TIME MANAGER — Drift surprise, consensus stability
+// Basis: Mills (1985) — NTP; Aston-Jones & Cohen (2005) — temporal alertness
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Maximum arousal delta from drift surprise (NE cap).
+pub const TIME_DRIFT_AROUSAL_CAP: f64 = 0.05;
+
+/// Normalization divisor for drift surprise → arousal conversion.
+pub const TIME_DRIFT_SURPRISE_DIVISOR: f64 = 100.0;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -6568,5 +6719,38 @@ mod tests {
         assert!(NEUROEVO_CONVERGENCE_PATIENCE > 0);
         assert!(NEUROEVO_SPECIATION_THRESHOLD > 0.0 && NEUROEVO_SPECIATION_THRESHOLD < 1.0);
         assert!(NEUROEVO_MANAGER_INTERVAL > 0);
+
+        // Memory manager
+        assert!(MEMORY_CONSOLIDATION_EXPLORATION_DAMPEN > 0.0);
+        assert!(MEMORY_CONSOLIDATION_LR_BOOST >= 1.0);
+        assert!(MEMORY_RETRIEVAL_CONFIDENCE_WEIGHT + MEMORY_RETRIEVAL_COHERENCE_WEIGHT == 1.0);
+        assert!(MEMORY_RETRIEVAL_LOW_QUALITY < MEMORY_RETRIEVAL_HIGH_QUALITY);
+        assert!(MEMORY_PSI_CONSOLIDATION_THRESHOLD > 0.0 && MEMORY_PSI_CONSOLIDATION_THRESHOLD < 1.0);
+        assert!(MEMORY_PRESSURE_EXPLORATION_THRESHOLD > 0.0 && MEMORY_PRESSURE_EXPLORATION_THRESHOLD < 1.0);
+
+        // Swarm manager
+        assert!(SWARM_PEER_PHI_TRUST_SCALE > 0.0 && SWARM_PEER_PHI_TRUST_SCALE <= 1.0);
+        assert!(SWARM_CORROBORATION_BOOST > 0.0);
+        assert!(SWARM_CORROBORATION_CAP >= SWARM_CORROBORATION_BOOST);
+        assert!(SWARM_SOCIAL_BUFFERING_CAP > 0.0);
+        assert!(SWARM_COLLECTIVE_PHI_THRESHOLD > 0.0 && SWARM_COLLECTIVE_PHI_THRESHOLD < 1.0);
+        assert!(SWARM_COLLECTIVE_PHI_LR_CAP > 0.0);
+        assert!(SWARM_ISOLATION_THRESHOLD > 0.0 && SWARM_ISOLATION_THRESHOLD < 1.0);
+
+        // Trust manager
+        assert!(TRUST_VIOLATION_SLASH_FACTOR > 0.0 && TRUST_VIOLATION_SLASH_FACTOR < 1.0);
+        assert!(TRUST_VIOLATION_AROUSAL_CAP > 0.0);
+        assert!(TRUST_BETRAYAL_VALENCE_PENALTY > 0.0);
+        assert!(TRUST_ANOMALY_AROUSAL > 0.0);
+
+        // Social fabric manager
+        assert!(SOCIAL_RESONANCE_HIGH_THRESHOLD > 0.0 && SOCIAL_RESONANCE_HIGH_THRESHOLD < 1.0);
+        assert!(SOCIAL_RESONANCE_RANGE > 0.0);
+        assert!(SOCIAL_DIVERSITY_THRESHOLD > 0.0 && SOCIAL_DIVERSITY_THRESHOLD < 1.0);
+        assert!(SOCIAL_ECHO_CHAMBER_THRESHOLD > 0.0 && SOCIAL_ECHO_CHAMBER_THRESHOLD < 1.0);
+
+        // Time manager
+        assert!(TIME_DRIFT_AROUSAL_CAP > 0.0);
+        assert!(TIME_DRIFT_SURPRISE_DIVISOR > 0.0);
     }
 }

@@ -133,7 +133,7 @@ impl TrustManager {
                     // Slash trust on violation
                     let current = self.graph.direct_trust(&self.our_node_id, &peer_id);
                     self.graph
-                        .set_trust(&self.our_node_id, &peer_id, current * 0.5, false);
+                        .set_trust(&self.our_node_id, &peer_id, current * crate::cognitive_loop::thresholds::TRUST_VIOLATION_SLASH_FACTOR, false);
                     self.violations_this_cycle += 1;
                 }
             }
@@ -170,8 +170,8 @@ impl CognitiveSubsystem for TrustManager {
         // Neuromod: trust violations → arousal (NE)
         if self.violations_this_cycle > 0 {
             output.arousal_delta +=
-                (self.violations_this_cycle as f64 * TRUST_VIOLATION_NE_GAIN).min(0.1) as f32;
-            output.valence_delta -= 0.02; // Negative valence from betrayal
+                (self.violations_this_cycle as f64 * TRUST_VIOLATION_NE_GAIN).min(f64::from(crate::cognitive_loop::thresholds::TRUST_VIOLATION_AROUSAL_CAP)) as f32;
+            output.valence_delta -= crate::cognitive_loop::thresholds::TRUST_BETRAYAL_VALENCE_PENALTY;
         }
 
         // Neuromod: stable healthy trust → positive valence (oxytocin)
@@ -183,7 +183,7 @@ impl CognitiveSubsystem for TrustManager {
 
         // Anomaly detection → escalate
         if self.last_telemetry.anomaly_count > 0 {
-            output.arousal_delta += 0.03;
+            output.arousal_delta += crate::cognitive_loop::thresholds::TRUST_ANOMALY_AROUSAL;
             output.flags |= crate::cognitive_loop::subsystem_trait::output_flags::ANOMALY_DETECTED;
         }
 

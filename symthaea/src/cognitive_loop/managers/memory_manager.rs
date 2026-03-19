@@ -19,6 +19,7 @@
 use super::super::subsystem_trait::{
     output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput,
 };
+use super::super::thresholds;
 
 /// Memory Manager — models meta-level memory dynamics.
 ///
@@ -124,8 +125,8 @@ impl CognitiveSubsystem for MemoryManager {
             self.consolidation_active = true;
             self.cycles_since_consolidation = 0;
             // During consolidation: dampen exploration, boost learning
-            output.exploration_delta -= 0.02;
-            output.lr_modulation = 1.05; // slight learning boost for integration
+            output.exploration_delta -= thresholds::MEMORY_CONSOLIDATION_EXPLORATION_DAMPEN;
+            output.lr_modulation = thresholds::MEMORY_CONSOLIDATION_LR_BOOST;
             output.flags |= output_flags::REQUEST_CONSOLIDATION;
         } else {
             self.consolidation_active = false;
@@ -133,31 +134,31 @@ impl CognitiveSubsystem for MemoryManager {
 
         // ── 3. Retrieval quality → confidence ─────────────────────────────
         // Good retrieval (high coherence + prediction confidence) signals reliable memory
-        let retrieval_signal = (snapshot.prediction_confidence * 0.5
-            + f64::from(snapshot.coherence) * 0.5)
+        let retrieval_signal = (snapshot.prediction_confidence * thresholds::MEMORY_RETRIEVAL_CONFIDENCE_WEIGHT
+            + f64::from(snapshot.coherence) * thresholds::MEMORY_RETRIEVAL_COHERENCE_WEIGHT)
             .clamp(0.0, 1.0) as f32;
         self.push_retrieval(retrieval_signal);
 
         let mean_quality = self.mean_retrieval_quality();
-        if mean_quality > 0.7 {
+        if mean_quality > thresholds::MEMORY_RETRIEVAL_HIGH_QUALITY {
             // Strong retrieval → confidence boost
-            output.confidence_delta += (mean_quality - 0.7) as f64 * 0.02;
-        } else if mean_quality < 0.3 {
+            output.confidence_delta += (mean_quality - thresholds::MEMORY_RETRIEVAL_HIGH_QUALITY) as f64 * thresholds::MEMORY_RETRIEVAL_CONFIDENCE_GAIN;
+        } else if mean_quality < thresholds::MEMORY_RETRIEVAL_LOW_QUALITY {
             // Poor retrieval → signal exploration need
-            output.exploration_delta += (0.3 - mean_quality) as f64 * 0.03;
+            output.exploration_delta += (thresholds::MEMORY_RETRIEVAL_LOW_QUALITY - mean_quality) as f64 * thresholds::MEMORY_RETRIEVAL_EXPLORATION_GAIN;
         }
 
         // ── 4. High consciousness → episodic consolidation boost ──────────
         // Phi-weighted moments deserve priority encoding
-        if snapshot.unified_psi > 0.6 {
+        if snapshot.unified_psi > thresholds::MEMORY_PSI_CONSOLIDATION_THRESHOLD {
             output.flags |= output_flags::REQUEST_CONSOLIDATION;
-            output.lr_modulation *= 1.0 + (snapshot.unified_psi - 0.6) * 0.1;
+            output.lr_modulation *= 1.0 + (snapshot.unified_psi - thresholds::MEMORY_PSI_CONSOLIDATION_THRESHOLD) * thresholds::MEMORY_PSI_LR_SCALE;
         }
 
         // ── 5. Memory load → exploration gate ─────────────────────────────
         // High consolidation pressure means "digest before exploring"
-        if self.consolidation_pressure > 0.5 {
-            let dampen = (self.consolidation_pressure - 0.5) as f64 * 0.1;
+        if self.consolidation_pressure > thresholds::MEMORY_PRESSURE_EXPLORATION_THRESHOLD as f32 {
+            let dampen = (self.consolidation_pressure as f64 - thresholds::MEMORY_PRESSURE_EXPLORATION_THRESHOLD) * thresholds::MEMORY_PRESSURE_EXPLORATION_DAMPEN;
             output.exploration_delta -= dampen;
         }
 
