@@ -4,15 +4,38 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+
+    # Holochain from holonix (needed for sweettest builds)
+    holonix = {
+      url = "github:holochain/holonix/d21b3543";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # Rust overlay (needed by holochain-base module)
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs = { self, nixpkgs, flake-utils, holonix, rust-overlay }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = nixpkgs.legacyPackages.${system};
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [ (import rust-overlay) ];
+        };
+
+        # Holochain packages + base module (for .#holochain shell)
+        holochainPackages = holonix.packages.${system};
+        holochainBase = import ./nix/modules/holochain-base.nix {
+          inherit pkgs system;
+          holochainPackages = holochainPackages;
+        };
       in
       {
-        devShells.default = pkgs.mkShell {
+        devShells = {
+        default = pkgs.mkShell {
           name = "luminous-dynamics-dev";
 
           buildInputs = with pkgs; [
@@ -72,5 +95,17 @@
             export PGDATABASE="luminous"
           '';
         };
+
+        # Holochain development shell (sweettests, zome builds, DNA packing)
+        # Usage: nix develop .#holochain
+        holochain = holochainBase.mkHolochainShell {
+          name = "monorepo-holochain";
+          extraShellHook = ''
+            echo "Holochain shell from monorepo root."
+            echo "Use this for sweettest builds and DNA packing."
+            echo ""
+          '';
+        };
+      };
       });
 }
