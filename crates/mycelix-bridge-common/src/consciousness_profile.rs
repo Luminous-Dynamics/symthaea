@@ -232,8 +232,27 @@ pub struct ConsciousnessCredential {
     pub trajectory_commitment: Option<[u8; 32]>,
     /// Extensible key-value store for future credential features.
     /// Avoids adding new `Option<T>` fields for every feature.
+    /// See [`ExtensionKey`] for the registry of known keys.
     #[serde(default)]
     pub extensions: std::collections::HashMap<String, Vec<u8>>,
+}
+
+/// Registry of known extension keys for [`ConsciousnessCredential::extensions`].
+///
+/// Using these constants prevents typo bugs and ensures consistency across
+/// producers and consumers. Unknown keys are allowed (forward-compatible)
+/// but known keys should always use these constants.
+pub mod ExtensionKey {
+    /// Substrate type identifier (u8-encoded `SubstrateType` variant).
+    pub const SUBSTRATE_TYPE: &str = "substrate_type";
+    /// Per-region substrate feasibility scores (bincode-encoded `Vec<(String, f32)>`).
+    pub const REGION_FEASIBILITY: &str = "region_feasibility";
+    /// Sub-passport DID reference for delegated credentials.
+    pub const SUB_PASSPORT_DID: &str = "sub_passport_did";
+    /// Freshness attestation (bincode-encoded `FreshnessAttestation`).
+    pub const FRESHNESS_ATTESTATION: &str = "freshness_attestation";
+    /// Moral algebra summary score (f32 LE bytes).
+    pub const MORAL_SCORE: &str = "moral_score";
 }
 
 impl ConsciousnessCredential {
@@ -299,7 +318,19 @@ impl ConsciousnessCredential {
         self.extensions.remove(key)
     }
 
-    /// Set the trajectory commitment from a TrajectoryAccumulator's output.
+    /// Set the trajectory commitment from a `TrajectoryAccumulator`'s output.
+    ///
+    /// # Integration point
+    ///
+    /// The bridge adapter (e.g., `symthaea-mycelix-holochain`) should:
+    /// 1. Maintain a `TrajectoryAccumulator` per agent
+    /// 2. Call `accumulator.trajectory_commitment()` to get the BLAKE3 hash
+    /// 3. Chain `.with_trajectory_commitment(hash)` on the issued credential
+    ///
+    /// ```ignore
+    /// let cred = ConsciousnessCredential::from_unified_consciousness(...)
+    ///     .with_trajectory_commitment(accumulator.trajectory_commitment().unwrap());
+    /// ```
     pub fn with_trajectory_commitment(mut self, commitment: [u8; 32]) -> Self {
         self.trajectory_commitment = Some(commitment);
         self

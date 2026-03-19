@@ -14,7 +14,11 @@ use super::phase_results::{
     FbReasoning, FbSelfModel, FbSupport, FeedbackPhaseResult, PerceptionPhaseResult,
 };
 use super::thresholds::{
-    AGREEMENT_COHERENCE_VELOCITY_THRESHOLD, AGREEMENT_CONFIDENCE_COUPLING_SCALE,
+    AGREEMENT_COHERENCE_VELOCITY_THRESHOLD, AGREEMENT_CONFIDENCE_COUPLING_SCALE, HARMONIC_INTERFERENCE_FREE_CYCLES,
+    LIMITING_BINDING_CONFIDENCE_DELTA, LIMITING_COMPONENT_GRADIENT_THRESHOLD,
+    NEUROMOD_ATTENTION_SENSITIVITY_MAX, PIPELINE_CONSCIOUSNESS_CAUTION,
+    PIPELINE_CONSCIOUSNESS_CAUTION_SCALE, PIPELINE_CONSCIOUSNESS_RELAX,
+    PIPELINE_CONSCIOUSNESS_RELAX_SCALE, SOCIAL_LR_CHANGE_THRESHOLD,
     AGREEMENT_CONFIDENCE_COUPLING_THRESHOLD, AGREEMENT_CRITICAL_CAUTION_SCALE,
     AGREEMENT_CRITICAL_THRESHOLD, AGREEMENT_EMA_DECAY, AGREEMENT_HIGH_CONFIDENCE_SCALE,
     AGREEMENT_LOW_CONFIDENCE_SCALE, AGREEMENT_LOW_EXPLORATION_SCALE,
@@ -40,10 +44,12 @@ use super::thresholds::{
     SOCIAL_LR_BASE, SOCIAL_LR_RANGE, SPEECH_RATE_CLAMP_MAX, SPEECH_RATE_CLAMP_MIN,
     STRUCTURAL_BOTTLENECK_LR_SCALE, STRUCTURAL_BOTTLENECK_THRESHOLD,
     STRUCTURAL_EMERGENCE_CONFIDENCE_BOOST, STRUCTURAL_EMERGENCE_CONFIDENCE_THRESHOLD,
-    SUBSYSTEM_LR_FACTOR_MAX, SUBSYSTEM_LR_FACTOR_MIN, TEMPORAL_CHAIN_DEEP_LR_SCALE,
+    SUBSYSTEM_LR_FACTOR_MAX, SUBSYSTEM_LR_FACTOR_MIN, SUPPORT_GRADUATION_INTERVAL,
+    SUPPORT_TELEMETRY_INTERVAL, TEMPORAL_CHAIN_DEEP_LR_SCALE,
     TEMPORAL_CHAIN_DEEP_THRESHOLD, TEMPORAL_CHAIN_SHALLOW_LR_SCALE,
     TEMPORAL_CHAIN_SHALLOW_THRESHOLD, TOM_ACCURACY_HIGH, TOM_ACCURACY_LOW, TOM_ACCURACY_SCALE,
-    TRUST_DECAY_FACTOR, TRUST_SIGNAL_MIDPOINT, TRUST_SIGNAL_RATE, UNIFIED_QUALITY_AGREEMENT_WEIGHT,
+    TRUST_DECAY_FACTOR, TRUST_SIGNAL_MIDPOINT, TRUST_SIGNAL_RATE,
+    UNIFIED_QUALITY_AGREEMENT_WEIGHT,
     UNIFIED_QUALITY_ANOMALY_WEIGHT, UNIFIED_QUALITY_PREDICTION_WEIGHT,
 };
 use super::{CognitiveLoopService, CycleState};
@@ -242,17 +248,18 @@ impl CognitiveLoopService {
 
         // ── Phase 19: Consciousness limiting component → targeted boost ─────
         let limiting_component_boosted = if !consciousness_limiting_component.is_empty()
-            && consciousness_gradient_magnitude > 0.01
+            && consciousness_gradient_magnitude > LIMITING_COMPONENT_GRADIENT_THRESHOLD
         {
             match consciousness_limiting_component.as_str() {
                 "Attention" => {
                     self.adaptive_behavior.attention_sensitivity =
-                        (self.adaptive_behavior.attention_sensitivity * 1.05).min(2.0);
+                        (self.adaptive_behavior.attention_sensitivity * 1.05)
+                            .min(NEUROMOD_ATTENTION_SENSITIVITY_MAX);
                     self.stats.limiting_component_boost_count += 1;
                     "Attention"
                 }
                 "Binding" => {
-                    self.adjust_confidence("limit_binding", 0.01);
+                    self.adjust_confidence("limit_binding", LIMITING_BINDING_CONFIDENCE_DELTA);
                     self.stats.limiting_component_boost_count += 1;
                     "Binding"
                 }
@@ -353,7 +360,9 @@ impl CognitiveLoopService {
                 // Session 13 Item 2: Grace period before harmonic all-clear boost.
                 // Require 3 consecutive interference-free cycles to prevent LR whiplash.
                 // Science: Kelso (1995) — stability requires sustained absence of perturbation.
-                if self.carryover.quality.interference_free_cycles >= 3 {
+                if self.carryover.quality.interference_free_cycles
+                    >= HARMONIC_INTERFERENCE_FREE_CYCLES
+                {
                     self.carryover.learning.subsystem_lr_factor *= 1.0 + HARMONIC_ALL_CLEAR_BOOST;
                     self.carryover.learning.subsystem_lr_factor = self
                         .carryover
@@ -373,7 +382,7 @@ impl CognitiveLoopService {
         // ── Social trust → learning rate modulation (Decety & Chaminade 2003) ──
         let social_learning_rate_factor =
             SOCIAL_LR_BASE + SOCIAL_LR_RANGE * self.social_mgr.social.social_trust; // [0.8, 1.2]
-        if (social_learning_rate_factor - 1.0).abs() > 0.01 {
+        if (social_learning_rate_factor - 1.0).abs() > SOCIAL_LR_CHANGE_THRESHOLD {
             self.scale_lr("social_trust", social_learning_rate_factor);
         }
 
@@ -481,13 +490,13 @@ impl CognitiveLoopService {
         // Low pipeline consciousness → tighten caution (subsystems aren't coherent).
         // Science: Dehaene (2014) — global workspace ignition requires integrated processing.
         self.carryover.quality.last_pipeline_consciousness = pipeline_consciousness;
-        if pipeline_consciousness > 0.7 && self.stats.total_cycles > 15 {
-            self.scale_threshold("pipeline_conscious_relax", 0.97);
-        } else if pipeline_consciousness < 0.3
+        if pipeline_consciousness > PIPELINE_CONSCIOUSNESS_RELAX as f64 && self.stats.total_cycles > 15 {
+            self.scale_threshold("pipeline_conscious_relax", PIPELINE_CONSCIOUSNESS_RELAX_SCALE);
+        } else if pipeline_consciousness < PIPELINE_CONSCIOUSNESS_CAUTION as f64
             && pipeline_consciousness > 0.0
             && self.stats.total_cycles > 15
         {
-            self.scale_threshold("pipeline_conscious_caution", 1.03);
+            self.scale_threshold("pipeline_conscious_caution", PIPELINE_CONSCIOUSNESS_CAUTION_SCALE);
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -561,7 +570,7 @@ impl CognitiveLoopService {
 
             let mut alert_fired = false;
             let mut efe = 0.0_f64;
-            if self.support.cycle_counter % 47 == 0 {
+            if self.support.cycle_counter % SUPPORT_TELEMETRY_INTERVAL == 0 {
                 if let Some(ref engine) = self.support.predictive_engine {
                     let telemetry = symthaea_support::telemetry::collect_telemetry();
                     let prediction = engine.assess_system_state(&telemetry);
@@ -578,7 +587,7 @@ impl CognitiveLoopService {
             }
 
             let mut graduated: usize = 0;
-            if self.support.cycle_counter % 97 == 0 {
+            if self.support.cycle_counter % SUPPORT_GRADUATION_INTERVAL == 0 {
                 let can_share = self
                     .support
                     .privacy_manager
@@ -825,8 +834,7 @@ impl CognitiveLoopService {
                     let size_factor =
                         ((t.graph_size as f64 + 1.0).log2() / log_scale).clamp(0.0, 1.0);
                     let ece_factor = (1.0 - t.calibration_ece).clamp(0.0, 1.0);
-                    let contradiction_factor = 1.0
-                        / (1.0 + t.contradictions_detected as f64 * 0.1);
+                    let contradiction_factor = 1.0 / (1.0 + t.contradictions_detected as f64 * 0.1);
                     let coherence = size_factor * ece_factor * contradiction_factor;
                     if coherence.is_finite() {
                         coherence
@@ -848,7 +856,11 @@ impl CognitiveLoopService {
                     }
                 },
                 // CfC temporal coherence → consciousness (Clark 2013)
-                temporal_coherence_phi: self.language_comm.voice_coherence.bridge.phi_contribution(),
+                temporal_coherence_phi: self
+                    .language_comm
+                    .voice_coherence
+                    .bridge
+                    .phi_contribution(),
             },
         );
         self.consciousness_engine
@@ -1101,22 +1113,29 @@ impl CognitiveLoopService {
         // Science: Stanovich & West (2000) — dual-process theory: System 2
         // reliability calibrates metacognitive confidence.
         #[cfg(feature = "reasoning_engine")]
-        if let Some(ref reasoning_engine) = self.reasoning_engine {
-            if let Some(last_event) = reasoning_engine.last_event() {
+        {
+            // Extract data from reasoning engine (immutable borrow) before mutable calls
+            let reasoning_feedback = self.reasoning_engine.as_ref().and_then(|re| {
+                re.last_event().map(|evt| {
+                    let gate_success = evt
+                        .posthoc_outcome
+                        .as_ref()
+                        .is_some_and(|p| p.gate_passed && p.outcome_good);
+                    (evt.reliability, gate_success)
+                })
+            });
+            if let Some((r, gate_success)) = reasoning_feedback {
                 use crate::cognitive_loop::thresholds::{
                     REASONING_RELIABILITY_CONFIDENCE_SCALE, REASONING_RELIABILITY_THRESHOLD,
                 };
-                let r = last_event.reliability;
                 // High reliability → nudge confidence up
                 if r.is_finite() && r > REASONING_RELIABILITY_THRESHOLD {
                     let boost = ((r - 0.5) * REASONING_RELIABILITY_CONFIDENCE_SCALE) as f32;
                     self.adjust_confidence("reasoning_reliability", boost);
                 }
                 // Gate passed + good outcome → boost LR to reinforce
-                if let Some(ref posthoc) = last_event.posthoc_outcome {
-                    if posthoc.gate_passed && posthoc.outcome_good {
-                        self.scale_lr("reasoning_gate_success", 1.02);
-                    }
+                if gate_success {
+                    self.scale_lr("reasoning_gate_success", 1.02);
                 }
             }
         }
@@ -1453,25 +1472,30 @@ impl CognitiveLoopService {
             // Feed perception HV into Sensory region (not just Integration)
             bundler.add(CorticalRegion::Sensory, perception.encoding.hv16_cached);
 
-            // CfC output → Integration region (threshold continuous → binary)
+            // CfC output → Integration region (threshold continuous → binary).
+            // CfC hidden state is typically 128-256 floats. We tile it across the
+            // full 16384-bit BinaryHV (2048 bytes) so all bits carry signal, rather
+            // than leaving most of the HV zeroed.
             {
                 use symthaea_core::hdc::BinaryHV;
                 let cfc_output = &dynamics.core.output;
-                let mut binary_bytes = [0u8; 2048];
-                for (i, chunk) in cfc_output.chunks(8).enumerate() {
-                    if i >= 2048 {
-                        break;
-                    }
-                    let mut byte = 0u8;
-                    for (j, &val) in chunk.iter().enumerate().take(8) {
-                        if val > 0.0 {
-                            byte |= 1 << j;
+                if !cfc_output.is_empty() {
+                    let mut binary_bytes = [0u8; 2048];
+                    for (byte_idx, byte) in binary_bytes.iter_mut().enumerate() {
+                        let mut val = 0u8;
+                        for bit in 0..8 {
+                            let flat_idx = byte_idx * 8 + bit;
+                            // Tile: wrap around CfC output via modulo
+                            let src_idx = flat_idx % cfc_output.len();
+                            if cfc_output[src_idx] > 0.0 {
+                                val |= 1 << bit;
+                            }
                         }
+                        *byte = val;
                     }
-                    binary_bytes[i] = byte;
+                    let cfc_hv = BinaryHV(binary_bytes);
+                    bundler.add(CorticalRegion::Integration, cfc_hv);
                 }
-                let cfc_hv = BinaryHV(binary_bytes);
-                bundler.add(CorticalRegion::Integration, cfc_hv);
             }
 
             // Once we have enough accumulated vectors, compute aggregate metrics
@@ -1484,7 +1508,9 @@ impl CognitiveLoopService {
                         let mut binding_sum = 0.0f32;
                         let mut count = 0usize;
                         for bundle in &bundles {
-                            if let Some(recovered) = bundler.unbind_region(&aggregate, &bundle.region) {
+                            if let Some(recovered) =
+                                bundler.unbind_region(&aggregate, &bundle.region)
+                            {
                                 binding_sum += recovered.similarity(&bundle.local_bundle);
                                 count += 1;
                             }
@@ -1788,7 +1814,12 @@ mod tests {
         for i in 0..20 {
             let r = svc.cycle(&format!("cycle {}", i));
             let a = r.metadata.cross_module_agreement;
-            assert!(a >= 0.0 && a <= 1.0, "Agreement {} out of [0,1] at cycle {}", a, i);
+            assert!(
+                a >= 0.0 && a <= 1.0,
+                "Agreement {} out of [0,1] at cycle {}",
+                a,
+                i
+            );
         }
     }
 
@@ -1802,7 +1833,11 @@ mod tests {
         let r = svc.cycle("quality composition");
         let q = r.metadata.quality.unified_quality_score;
         assert!(q.is_finite(), "Quality score must be finite");
-        assert!(q >= 0.0 && q <= 1.5, "Quality score {} out of expected range", q);
+        assert!(
+            q >= 0.0 && q <= 1.5,
+            "Quality score {} out of expected range",
+            q
+        );
     }
 
     /// Temporal continuity fields remain finite over many cycles.
@@ -1823,8 +1858,11 @@ mod tests {
         for _ in 0..25 {
             let r = svc.cycle("epistemic stability");
             let c = r.metadata.epistemic_gate_confidence;
-            assert!(c.is_finite() && c >= 0.0 && c <= 1.0,
-                "Epistemic gate confidence {} out of bounds", c);
+            assert!(
+                c.is_finite() && c >= 0.0 && c <= 1.0,
+                "Epistemic gate confidence {} out of bounds",
+                c
+            );
         }
     }
 
@@ -1836,7 +1874,11 @@ mod tests {
             svc.cycle("gradient warmup");
         }
         let r = svc.cycle("gradient recovery");
-        assert!(r.metadata.consciousness.consciousness_gradient_magnitude.is_finite());
+        assert!(r
+            .metadata
+            .consciousness
+            .consciousness_gradient_magnitude
+            .is_finite());
         assert!(r.metadata.prediction_coherence.is_finite());
     }
 
@@ -1846,8 +1888,16 @@ mod tests {
         let mut svc = make_service();
         for i in 0..30 {
             let r = svc.cycle(&format!("vel_{}", i));
-            assert!(r.metadata.cross_module_agreement.is_finite(), "Agreement NaN at {}", i);
-            assert!(r.metadata.quality.coherence_velocity.is_finite(), "Coherence vel NaN at {}", i);
+            assert!(
+                r.metadata.cross_module_agreement.is_finite(),
+                "Agreement NaN at {}",
+                i
+            );
+            assert!(
+                r.metadata.quality.coherence_velocity.is_finite(),
+                "Coherence vel NaN at {}",
+                i
+            );
         }
     }
 }

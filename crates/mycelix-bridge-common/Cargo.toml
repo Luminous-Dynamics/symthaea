@@ -4,9 +4,15 @@ version = "0.1.0"
 edition = "2021"
 description = "Shared bridge dispatch types and utilities for Mycelix cluster DNAs"
 
+[features]
+default = []
+identity = ["ed25519-dalek"]
+
 [dependencies]
 hdk = "0.6.0"
 serde = { version = "1.0", features = ["derive"] }
+blake3 = "1"
+ed25519-dalek = { version = "2", optional = true }
 
 [dev-dependencies]
 serde_json = "1.0"

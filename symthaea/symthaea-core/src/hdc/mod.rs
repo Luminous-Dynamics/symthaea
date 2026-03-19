@@ -309,6 +309,8 @@ pub mod higher_order_thought; // Higher-Order Thought (HOT) theory — meta-repr
 pub mod hdc_crypto;
 // HDC homomorphic computation (encrypted HVs, collective wisdom pool, privacy-preserving aggregation)
 pub mod hdc_fhe;
+// HDC treasury — privacy-preserving community finance (balance encoding, encrypted aggregation, threshold audit)
+pub mod hdc_treasury;
 
 // Consciousness topology and Φ measurement modules
 pub mod binary_hv;
@@ -407,6 +409,7 @@ pub mod hierarchical_bundle; // Per-region bundling with role-based binding for 
 pub mod substrate_composition; // Weighted substrate mixtures for hybrid analysis
 pub mod substrate_independence; // Substrate type definitions // Real-time consciousness monitoring
 pub mod substrate_validation; // Validation framework with evidence levels and feasibility gaps
+pub mod trajectory_accumulator; // Behavioral identity via temporal HDC binding
 
 // Track 6: Language module dependencies
 pub mod full_stack_consciousness; // Full stack: Understanding + ActiveInference + Memory + Counterfactuals

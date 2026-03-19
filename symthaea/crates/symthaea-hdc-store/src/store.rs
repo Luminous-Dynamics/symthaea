@@ -109,11 +109,12 @@ impl HdcStore {
             });
         }
 
-        let header_bytes: [u8; HEADER_SIZE] = mmap[..HEADER_SIZE].try_into().map_err(|_| {
-            HdcStoreError::InvalidHeader {
-                reason: "failed to read header bytes".into(),
-            }
-        })?;
+        let header_bytes: [u8; HEADER_SIZE] =
+            mmap[..HEADER_SIZE]
+                .try_into()
+                .map_err(|_| HdcStoreError::InvalidHeader {
+                    reason: "failed to read header bytes".into(),
+                })?;
         let header = StoreHeader::from_bytes(&header_bytes);
         header.validate()?;
 
@@ -126,11 +127,8 @@ impl HdcStore {
             }
             let status = mmap[offset];
             if status == STATUS_LIVE {
-                let id = u64::from_le_bytes(
-                    mmap[offset + 1..offset + 9]
-                        .try_into()
-                        .unwrap_or([0; 8]),
-                );
+                let id =
+                    u64::from_le_bytes(mmap[offset + 1..offset + 9].try_into().unwrap_or([0; 8]));
                 id_to_index.insert(id, i);
             }
         }
@@ -183,6 +181,11 @@ impl HdcStore {
         let hv_start = offset + ENTRY_HV_OFFSET;
         self.mmap[hv_start..hv_start + 2048].copy_from_slice(&hv.0);
 
+        // Crash safety: flush entry data before updating header count.
+        // On crash between data write and header update, the orphaned entry
+        // is invisible (scanner reads up to `vector_count`).
+        self.mmap.flush_range(offset, ENTRY_SIZE)?;
+
         self.id_to_index.insert(id, index);
         self.header.vector_count += 1;
         self.header.live_count += 1;
@@ -209,12 +212,17 @@ impl HdcStore {
         // 32-aligned, ENTRY_SIZE=2080 is 32-aligned). The mmap base is
         // page-aligned (4096), so all HV pointers are 32-byte aligned.
         // The lifetime is tied to &self which keeps the mmap alive.
-        let ptr = self.mmap[hv_start..hv_end].as_ptr() as *const BinaryHV;
-        debug_assert!(
-            ptr as usize % 32 == 0,
-            "BinaryHV pointer not 32-byte aligned"
+        let ptr = self.mmap[hv_start..hv_end].as_ptr();
+        // Alignment is guaranteed by construction:
+        // - mmap base is page-aligned (4096-byte)
+        // - HEADER_SIZE (128), ENTRY_HV_OFFSET (32), ENTRY_SIZE (2080) are all 32-aligned
+        // So every HV pointer is 32-byte aligned. Assert rather than silently leaking.
+        assert!(
+            (ptr as usize) % 32 == 0,
+            "BinaryHV pointer not 32-byte aligned at offset {hv_start} — \
+             this indicates a layout invariant violation (bug)"
         );
-        Some(unsafe { &*ptr })
+        Some(unsafe { &*(ptr as *const BinaryHV) })
     }
 
     /// Mark an entry as deleted (tombstone).
@@ -310,8 +318,7 @@ impl HdcStore {
 
     /// Whether compaction is recommended (tombstones > 25% of live).
     pub fn needs_compaction(&self) -> bool {
-        self.header.live_count > 0
-            && self.header.tombstone_count > self.header.live_count / 4
+        self.header.live_count > 0 && self.header.tombstone_count > self.header.live_count / 4
     }
 
     /// Compact the store: copy live entries to a temp file, then atomic rename.
