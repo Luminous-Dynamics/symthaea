@@ -11,5 +11,6 @@ name = "mesh_time"
 hdk = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
 mesh_time_integrity = { path = "../integrity" }
 mycelix-bridge-common = { workspace = true }

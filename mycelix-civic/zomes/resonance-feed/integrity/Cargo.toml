@@ -11,3 +11,4 @@ name = "resonance_feed_integrity"
 hdi = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }

@@ -11,5 +11,6 @@ name = "resource_mesh"
 hdk = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
 resource_mesh_integrity = { path = "../integrity" }
 mycelix-bridge-common = { workspace = true }
