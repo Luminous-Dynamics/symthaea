@@ -104,7 +104,7 @@ impl ConsciousnessCertifier {
         #[cfg(feature = "identity")]
         {
             use ed25519_dalek::SigningKey;
-            let signing_key = SigningKey::generate(&mut rand::thread_rng());
+            let signing_key = SigningKey::generate(&mut rand::rngs::OsRng);
             Self::new(signing_key)
         }
         #[cfg(not(feature = "identity"))]
