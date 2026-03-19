@@ -41,6 +41,8 @@ pub mod boot_consciousness;
 pub mod broca;
 #[cfg(feature = "broca-full")]
 pub mod broca_full;
+#[cfg(feature = "broca-pipeline")]
+pub mod broca_pipeline;
 pub mod compass;
 pub mod config;
 pub mod dream;

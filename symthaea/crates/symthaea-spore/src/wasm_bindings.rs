@@ -125,6 +125,30 @@ impl SporeEngine {
             .map_err(|e| JsError::new(&e))
     }
 
+    /// Load a full Broca pipeline checkpoint (symthaea-broca format).
+    ///
+    /// Requires `broca-pipeline` feature. After loading, `generate_text()` uses
+    /// the production HdcLtcUnifiedNetwork + epistemic gating + semantic veto
+    /// pipeline instead of BrocaLite.
+    ///
+    /// Pass the distilled checkpoint (broca-spore-distilled.bin, ~130MB) for
+    /// browser deployment, not the full v6-joint checkpoint (~976MB).
+    #[cfg(feature = "broca-pipeline")]
+    pub fn load_broca_pipeline_checkpoint(&mut self, data: &[u8]) -> Result<(), JsError> {
+        self.inner
+            .load_broca_pipeline_checkpoint(data)
+            .map_err(|e| JsError::new(&e))
+    }
+
+    /// Check if the full Broca pipeline is loaded and ready.
+    ///
+    /// Returns false if the `broca-pipeline` feature is not enabled or no
+    /// checkpoint has been loaded.
+    #[cfg(feature = "broca-pipeline")]
+    pub fn broca_pipeline_ready(&self) -> bool {
+        self.inner.broca_pipeline_ready()
+    }
+
     /// Generate text from current consciousness state.
     /// Returns GenerationResult as JS object with `text`, `num_tokens`, `eos_terminated`.
     pub fn generate_text(&mut self, max_tokens: usize) -> Result<JsValue, JsError> {

@@ -1,6 +1,8 @@
 //! SporeEngine: the core consciousness loop for WASM targets.
 
 use crate::broca::BrocaLite;
+#[cfg(feature = "broca-pipeline")]
+use crate::broca_pipeline::BrocaPipeline;
 use crate::config::SporeConfig;
 use crate::dream::DreamEngine;
 use crate::dream_journal::DreamJournal;
@@ -338,6 +340,11 @@ pub struct SporeEngine {
     topology: TopologyAnalyzer,
     broca: BrocaLite,
 
+    // Full Broca pipeline from symthaea-broca crate (optional, feature-gated).
+    // When loaded with a trained checkpoint, takes priority over BrocaLite.
+    #[cfg(feature = "broca-pipeline")]
+    broca_pipeline: BrocaPipeline,
+
     // Dream journal for persistence of dream wisdom
     dream_journal: DreamJournal,
 
@@ -427,6 +434,8 @@ impl SporeEngine {
             fep: ActiveInferenceAgent::with_defaults(),
             topology: TopologyAnalyzer::with_defaults(),
             broca: BrocaLite::new(42),
+            #[cfg(feature = "broca-pipeline")]
+            broca_pipeline: BrocaPipeline::new(42),
             dream_journal: DreamJournal::new(),
             conversation_context: ConversationContext::new(CONVERSATION_MAX_TURNS),
             storage: None,
@@ -1000,6 +1009,10 @@ impl SporeEngine {
     // ======================================================================
 
     /// Generate text from current consciousness state using the Broca language center.
+    ///
+    /// When the `broca-pipeline` feature is enabled and a trained checkpoint has
+    /// been loaded, uses the full symthaea-broca pipeline (HdcLtcUnifiedNetwork,
+    /// epistemic gating, semantic veto). Otherwise falls back to BrocaLite.
     pub fn generate_text(&mut self, max_tokens: usize) -> crate::broca::GenerationResult {
         let neuromods = [
             self.bath.dopamine.effective(),
@@ -1007,6 +1020,26 @@ impl SporeEngine {
             self.bath.serotonin.effective(),
             self.bath.oxytocin.effective(),
         ];
+
+        // Prefer the full Broca pipeline when available and ready
+        #[cfg(feature = "broca-pipeline")]
+        if self.broca_pipeline.is_ready() {
+            if let Some(result) = self.broca_pipeline.generate(
+                self.last_consciousness,
+                self.last_output.as_ref().map_or(0.5, |_| 0.3),
+                self.evaluate_harmony_alignment(self.last_consciousness),
+                neuromods,
+                max_tokens,
+            ) {
+                return crate::broca::GenerationResult {
+                    text: result.text,
+                    num_tokens: result.num_tokens,
+                    eos_terminated: result.eos_terminated,
+                };
+            }
+        }
+
+        // Fallback to BrocaLite
         self.broca.generate_from_text(
             self.last_consciousness,
             self.last_output.as_ref().map_or(0.5, |_| 0.3),
@@ -1020,6 +1053,9 @@ impl SporeEngine {
     ///
     /// Injects the user's input as intent signals into the ThoughtChannels
     /// so that generated language relates to what the user said.
+    ///
+    /// When `broca-pipeline` is enabled and loaded, uses the full symthaea-broca
+    /// pipeline. Otherwise falls back to BrocaLite.
     pub fn generate_text_with_input(
         &mut self,
         input: &str,
@@ -1031,6 +1067,27 @@ impl SporeEngine {
             self.bath.serotonin.effective(),
             self.bath.oxytocin.effective(),
         ];
+
+        // Prefer the full Broca pipeline when available and ready
+        #[cfg(feature = "broca-pipeline")]
+        if self.broca_pipeline.is_ready() {
+            if let Some(result) = self.broca_pipeline.generate_with_input(
+                input,
+                self.last_consciousness,
+                self.last_output.as_ref().map_or(0.5, |_| 0.3),
+                self.evaluate_harmony_alignment(self.last_consciousness),
+                neuromods,
+                max_tokens,
+            ) {
+                return crate::broca::GenerationResult {
+                    text: result.text,
+                    num_tokens: result.num_tokens,
+                    eos_terminated: result.eos_terminated,
+                };
+            }
+        }
+
+        // Fallback to BrocaLite
         let mut channels = crate::broca::ThoughtChannels::from_cycle(
             self.last_consciousness,
             self.last_output.as_ref().map_or(0.5, |_| 0.3),
@@ -1046,22 +1103,17 @@ impl SporeEngine {
         if coherence > 0.7 {
             // Continuing a topic: boost curiosity/intent_0, dampen surprise
             channels.channels[0] = (channels.channels[0] + 0.2 * coherence).clamp(0.0, 1.0);
-            channels.channels[8] =
-                (channels.channels[8] * (1.0 - 0.3 * coherence)).clamp(0.0, 1.0);
+            channels.channels[8] = (channels.channels[8] * (1.0 - 0.3 * coherence)).clamp(0.0, 1.0);
         } else if coherence > 0.0 && coherence < 0.3 {
             // Topic shift: spike prediction error to signal surprise
-            channels.channels[8] =
-                (channels.channels[8] + 0.2 * (1.0 - coherence)).clamp(0.0, 1.0);
+            channels.channels[8] = (channels.channels[8] + 0.2 * (1.0 - coherence)).clamp(0.0, 1.0);
         }
 
         self.broca.generate(&channels, max_tokens)
     }
 
     /// Select the most resonant glyph for the current consciousness state and user input.
-    pub fn select_glyph(
-        &self,
-        input: &str,
-    ) -> crate::broca::GlyphResonance {
+    pub fn select_glyph(&self, input: &str) -> crate::broca::GlyphResonance {
         let mut channels = crate::broca::ThoughtChannels::from_cycle(
             self.last_consciousness,
             self.last_output.as_ref().map_or(0.5, |_| 0.3),
@@ -1090,6 +1142,25 @@ impl SporeEngine {
     /// random embeddings).
     pub fn load_broca_checkpoint(&mut self, data: &[u8]) -> Result<(), String> {
         self.broca.load_checkpoint(data)
+    }
+
+    /// Load a full Broca pipeline checkpoint from binary data.
+    ///
+    /// Requires the `broca-pipeline` feature. Deserializes a `BrocaCheckpoint`
+    /// from symthaea-broca (MessagePack or bincode format) and initializes the
+    /// production BrocaGenerator with trained weights and BPE tokenizer.
+    ///
+    /// After loading, `generate_text()` and `generate_text_with_input()` will
+    /// use the full pipeline instead of BrocaLite.
+    #[cfg(feature = "broca-pipeline")]
+    pub fn load_broca_pipeline_checkpoint(&mut self, data: &[u8]) -> Result<(), String> {
+        self.broca_pipeline.load_checkpoint(data)
+    }
+
+    /// Check if the full Broca pipeline is loaded and ready.
+    #[cfg(feature = "broca-pipeline")]
+    pub fn broca_pipeline_ready(&self) -> bool {
+        self.broca_pipeline.is_ready()
     }
 
     /// Run a dream cycle: simulate counterfactual alternatives to high-surprise events.
@@ -2845,12 +2916,8 @@ mod conversation_context_tests {
         let mut ctx = ConversationContext::new(8);
 
         let dim = 64; // Small dim for testing
-        let input1 = ContinuousHV::from_vec(
-            (0..dim).map(|i| (i as f32 * 0.1).sin()).collect(),
-        );
-        let input2 = ContinuousHV::from_vec(
-            (0..dim).map(|i| (i as f32 * 0.11).sin()).collect(),
-        );
+        let input1 = ContinuousHV::from_vec((0..dim).map(|i| (i as f32 * 0.1).sin()).collect());
+        let input2 = ContinuousHV::from_vec((0..dim).map(|i| (i as f32 * 0.11).sin()).collect());
 
         // Before any turns: enrichment is a no-op
         let enriched_before = ctx.enrich_input(&input2);
@@ -2898,7 +2965,9 @@ mod conversation_context_tests {
         let dim = 32;
         for i in 0..5u32 {
             let hv = ContinuousHV::from_vec(
-                (0..dim).map(|j| ((i * 100 + j as u32) as f32).sin()).collect(),
+                (0..dim)
+                    .map(|j| ((i * 100 + j as u32) as f32).sin())
+                    .collect(),
             );
             ctx.record_turn(&hv, 0.5);
         }

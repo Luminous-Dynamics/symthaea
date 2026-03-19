@@ -14,8 +14,14 @@ symthaea-consciousness-equation = { path = "../symthaea-consciousness-equation" 
 symthaea-neuromodulators = { path = "../symthaea-neuromodulators" }
 symthaea-types = { path = "../symthaea-types" }
 symthaea-harmonies = { path = "../symthaea-harmonies" }
+# Full Broca pipeline (symthaea-broca crate) — real language generation
+# Uses HdcLtcUnifiedNetwork, 24-channel encoder, epistemic gating, semantic veto.
+# Must use default-features = false to exclude rayon/simd (not WASM-compatible).
+symthaea-broca = { path = "../symthaea-broca", optional = true, default-features = false }
 serde = { workspace = true }
 serde_json = { workspace = true }
+bincode = { workspace = true }
+rmp-serde = { workspace = true }
 blake3 = { workspace = true }
 
 # WASM bindings (optional — rlib builds skip this)
@@ -38,7 +44,15 @@ wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:console_error_panic_h
 # emotional modulation, coherence feedback with semantic veto.
 # No additional dependencies — uses symthaea-core HDC-CfC infrastructure.
 broca-full = []
+# Full Broca pipeline from symthaea-broca crate (Tier 3): production-grade
+# HdcLtcUnifiedNetwork backbone, BpeTokenizer, trained checkpoints.
+# Replaces broca-full's self-contained vocab with real trained weights.
+broca-pipeline = ["dep:symthaea-broca"]
 
 [[bin]]
 name = "train-broca-lite"
 path = "src/bin/train_broca_lite.rs"
+
+[[bin]]
+name = "gen-spore-training-data"
+path = "src/bin/gen_spore_training_data.rs"
