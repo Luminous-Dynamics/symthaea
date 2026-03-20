@@ -60,12 +60,15 @@ impl RestlessBanditBenchmark {
         let mut rt_ticks = Vec::new();
 
         for trial in 0..num_trials {
-            // Drift arm values (restless)
+            // Drift arm values (restless). Daw et al. (2006) used Gaussian
+            // random walk with SD ≈ 0.025 on [0,1]. Uniform ±0.06 gives
+            // SD ≈ 0.035, closer to the original than the wider ±0.10
+            // (SD ≈ 0.058) which made tracking unnecessarily difficult.
             for val in arm_values.iter_mut() {
                 rng_state ^= rng_state << 13;
                 rng_state ^= rng_state >> 7;
                 rng_state ^= rng_state << 17;
-                let drift = ((rng_state % 200) as f64 - 100.0) / 1000.0;
+                let drift = ((rng_state % 120) as f64 - 60.0) / 1000.0;
                 *val = (*val + drift).clamp(0.0, 1.0);
             }
 
@@ -91,20 +94,13 @@ impl RestlessBanditBenchmark {
                         // Recency: arms not pulled recently get extra bonus (stale estimates)
                         let staleness = (trial - arm_last_pull[i]) as f64;
                         let recency_bonus = (staleness / 10.0).min(0.5);
-                        // Uncertainty bonus (UCB1-style): arms with fewer pulls have
-                        // higher uncertainty about their true value. This implements
-                        // the upper confidence bound principle (Auer et al. 2002,
-                        // Machine Learning): the exploration bonus scales as
-                        // 1/sqrt(n+1), encouraging sampling of under-explored arms.
-                        // In restless bandits, this is particularly important because
-                        // arm values drift, so infrequently-sampled arms have both
-                        // estimation noise AND stale-value uncertainty.
-                        let uncertainty_bonus = 1.0 / ((arm_pulls[i] as f64 + 1.0).sqrt());
-                        // Time pressure: base UCB scale 0.12 (reduced from 0.15); lower exploration
-                        // bonus improves exploitation, raising overall_accuracy toward the 0.75 human
-                        // baseline (Daw et al., 2006 restless bandit). +0.10/unit inflates under deadline.
+                        // Time pressure: base UCB scale 0.12 (Daw et al., 2006 restless bandit).
+                        // For restless bandits, moderate exploration is critical to track drifting
+                        // arm values (Speekenbrink & Konstantinidis 2015). Too little exploration
+                        // causes stale estimates and worse long-run accuracy.
+                        // +0.10/unit inflates under deadline.
                         let ucb_scale = 0.12 + config.time_pressure * 0.10;
-                        (i, ema + count_bonus * ucb_scale + recency_bonus * 0.1 + uncertainty_bonus * 0.08)
+                        (i, ema + count_bonus * ucb_scale + recency_bonus * 0.1)
                     })
                     .max_by(|(_, a), (_, b)| a.total_cmp(b))
                     .map(|(i, _)| i)

@@ -66,8 +66,16 @@ impl HorizonBenchmark {
             let remaining = (num_choices - choice_idx) as f64;
             // Exploration bonus: UCB-like term scaled by remaining horizon.
             // With longer horizon, information is more valuable (Wilson et al. 2014).
+            // Coefficient 0.55 provides an information bonus large enough to
+            // overcome the learned value gap (~0.35) on early free-choice trials
+            // when the less-observed arm has low count (1-2 observations).
+            // Human directed exploration at horizon 6 is ~35% (Wilson et al. 2014),
+            // driven by the "information bonus" — participants choose the less-known
+            // arm even when its expected value is lower. Thompson sampling analyses
+            // (Chapelle & Li, 2011) show that optimal exploration rate increases
+            // with the uncertainty-to-value-gap ratio.
             let exploration_bonus = |count: u64| -> f64 {
-                let info_value = 0.35 / (count as f64 + 1.0).sqrt();
+                let info_value = 0.55 / (count as f64 + 1.0).sqrt();
                 info_value * (remaining / 6.0).min(1.0)
             };
 
@@ -76,7 +84,11 @@ impl HorizonBenchmark {
 
             // Softmax action selection; time pressure: +0.10/unit adds exploration noise, modeling
             // reduced deliberation in explore-exploit tradeoffs under deadline (Wilson et al., 2014 horizon task).
-            let temp = config.action_temperature.max(0.1) * 0.35 + config.time_pressure * 0.10;
+            // Temperature 0.45 (up from 0.35) produces noisier action selection,
+            // matching the substantial stochasticity in human explore-exploit decisions
+            // (Wilson et al. 2014 — entropy of choice distributions is high even
+            // when value differences are large, suggesting noise in the decision rule).
+            let temp = config.action_temperature.max(0.1) * 0.45 + config.time_pressure * 0.10;
             let max_s = score0.max(score1);
             let e0 = ((score0 - max_s) / temp).exp();
             let e1 = ((score1 - max_s) / temp).exp();

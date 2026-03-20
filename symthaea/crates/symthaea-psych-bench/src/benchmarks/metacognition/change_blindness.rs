@@ -152,21 +152,18 @@ impl ChangeBlindnessBenchmark {
                         // common attractor and compressing their difference — making
                         // changes harder to detect.
                         //
-                        // Asymmetric disruption: the post-change scene retains slightly
-                        // more signal (0.85 vs 0.80) because the change itself creates
-                        // a residual novelty signal that partially survives the
-                        // disruption. This models the finding from Rensink (2002) that
-                        // change signals are not completely eliminated by disruption —
-                        // there is a weak residual signal from the "mismatch" between
-                        // expected and actual scene content. This asymmetry makes
-                        // detection slightly easier, moving toward the human baseline
-                        // of 0.45 detection rate.
+                        // Disruption weight 0.16 (reduced from 0.20) models a brief
+                        // mask rather than a full blank field. Rensink et al. (1997)
+                        // found that even brief disruptions (80ms grey field) produce
+                        // substantial change blindness, but the effect size depends on
+                        // mask duration. A lighter mask preserves more scene structure,
+                        // yielding detection rates closer to the human mean (~0.45).
                         xor_shift(&mut rng);
                         let blank = ContinuousHV::random(dim, rng.wrapping_add(3000));
                         let disrupted_pre =
-                            ContinuousHV::weighted_bundle(&[&pre_scene, &blank], &[0.80, 0.20]);
+                            ContinuousHV::weighted_bundle(&[&pre_scene, &blank], &[0.84, 0.16]);
                         let disrupted_post =
-                            ContinuousHV::weighted_bundle(&[&post_scene, &blank], &[0.85, 0.15]);
+                            ContinuousHV::weighted_bundle(&[&post_scene, &blank], &[0.84, 0.16]);
                         disrupted_pre.similarity(&disrupted_post) as f64
                     } else {
                         // No disruption: direct comparison, transient signal strong
@@ -223,14 +220,8 @@ impl ChangeBlindnessBenchmark {
                         search_total += 1;
                         let mut found = false;
 
-                        // Saliency-weighted search with recency bias: attend to
-                        // most-changed objects first, but also prioritize objects
-                        // that were recently updated (Rensink 2002 — change
-                        // detection is faster for objects with recent onsets;
-                        // Yantis & Jonides 1984 — abrupt onsets capture attention).
-                        // The recency bonus models the temporal attention capture
-                        // effect: recently-changed features have residual activation
-                        // that makes them more likely to be fixated in the search.
+                        // Saliency-weighted search: attend to most-changed objects first
+                        // (Rensink 1997 — change blindness is strongest in low-salience regions)
                         let mut saliency: Vec<(usize, f64)> = (0..num_objects)
                             .map(|i| {
                                 let pre_obj = objects[i].bind(&position_hvs[i]);
@@ -240,18 +231,7 @@ impl ChangeBlindnessBenchmark {
                                     objects[i].bind(&position_hvs[i])
                                 };
                                 let sim = pre_obj.similarity(&post_obj);
-                                let base_saliency = 1.0 - sim as f64;
-                                // Recency bonus: the changed object gets a recency
-                                // boost because the change itself creates a temporal
-                                // transient that partially survives the disruption.
-                                // Objects that are identical pre/post get no recency
-                                // bonus. This is proportional to change magnitude.
-                                let recency = if i == change_idx {
-                                    base_saliency * 0.3 // 30% recency amplification
-                                } else {
-                                    0.0
-                                };
-                                (i, base_saliency + recency)
+                                (i, 1.0 - sim as f64) // lower similarity = higher saliency
                             })
                             .collect();
                         saliency.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
