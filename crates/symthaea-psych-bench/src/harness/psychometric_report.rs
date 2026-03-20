@@ -259,7 +259,7 @@ mod tests {
         let mut report = BenchmarkReport::new();
 
         let mut stroop = BenchmarkResult::new("Executive::Stroop", None);
-        stroop.insert("stroop_effect", MetricValue::from_samples(&[0.10]));
+        stroop.insert("incongruent_accuracy", MetricValue::from_samples(&[0.10]));
         stroop.insert("congruent_accuracy", MetricValue::from_samples(&[0.95]));
         stroop.elapsed_ms = 50;
         stroop.trials_per_condition = 20;
@@ -303,7 +303,7 @@ mod tests {
             .iter()
             .find(|d| d.benchmark == "Executive::Stroop")
             .unwrap();
-        assert_eq!(stroop.key_metric, "stroop_effect");
+        assert_eq!(stroop.key_metric, "incongruent_accuracy");
         assert!((stroop.key_value - 0.10).abs() < 1e-10);
     }
 
@@ -365,7 +365,7 @@ mod tests {
     fn test_key_metric_mapping() {
         assert_eq!(
             key_metric_for_benchmark("Executive::Stroop"),
-            "stroop_effect"
+            "incongruent_accuracy"
         );
         assert_eq!(
             key_metric_for_benchmark("Executive::WCST"),

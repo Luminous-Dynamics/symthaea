@@ -55,7 +55,7 @@ impl TwoStepBenchmark {
         // evidence accumulates. Prevents early noise from distorting transition estimates
         // while letting later episodes reflect true 70/30 structure more sharply.
         let mut transition_counts = [[1.0f64; 2]; 2]; // will be recomputed per-episode
-                                                       // Reward model: EMA of rewards in each state
+                                                      // Reward model: EMA of rewards in each state
         let mut state_reward = [0.5f64; 2]; // prior: 0.5
                                             // Higher LR (0.50) speeds reward learning, improving the transition×reward
                                             // interaction signal (β3) in the Daw et al. (2011) two-step task.

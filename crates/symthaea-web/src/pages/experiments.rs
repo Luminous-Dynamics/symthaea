@@ -45,10 +45,7 @@ pub fn ExperimentsPage() -> impl IntoView {
 }
 
 #[component]
-fn ExperimentCard(
-    title: &'static str,
-    description: &'static str,
-) -> impl IntoView {
+fn ExperimentCard(title: &'static str, description: &'static str) -> impl IntoView {
     view! {
         <div class="experiment-card">
             <h3>{title}</h3>

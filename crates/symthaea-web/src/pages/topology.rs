@@ -231,7 +231,8 @@ pub fn TopologyPage() -> impl IntoView {
     let (betti_1, set_betti_1) = signal("--".to_string());
     let (betti_2, set_betti_2) = signal("--".to_string());
     let (euler, set_euler) = signal("--".to_string());
-    let (topo_status, set_topo_status) = signal("Awaiting topology data from SporeEngine...".to_string());
+    let (topo_status, set_topo_status) =
+        signal("Awaiting topology data from SporeEngine...".to_string());
 
     // Start the canvas animation loop on mount
     Effect::new(move |_| {

@@ -30,7 +30,7 @@ const SPACECRAFT_WINDOW: usize = 100;
 // but the nonlinear gating creates a richer trajectory-dependent representation
 // compared to the linear bundle.
 const CFC_TAU_BASE: f32 = 2.0;
-const CFC_BACKBONE_TAU: f32 = 1.0;  // State-dependent: complex states get more memory
+const CFC_BACKBONE_TAU: f32 = 1.0; // State-dependent: complex states get more memory
 const CFC_DT: f32 = 0.5;
 const CFC_SEED: u64 = 0xCAFE;
 
@@ -84,8 +84,12 @@ impl HdcEncoder {
         for row in data {
             for (i, &v) in row.iter().enumerate().take(self.n_features) {
                 if v.is_finite() {
-                    if v < self.mins[i] { self.mins[i] = v; }
-                    if v > self.maxs[i] { self.maxs[i] = v; }
+                    if v < self.mins[i] {
+                        self.mins[i] = v;
+                    }
+                    if v > self.maxs[i] {
+                        self.maxs[i] = v;
+                    }
                 }
             }
         }
@@ -99,12 +103,16 @@ impl HdcEncoder {
 
     fn normalize(&self, v: f32, idx: usize) -> f32 {
         let range = self.maxs[idx] - self.mins[idx];
-        if range.abs() < 1e-10 { return 0.0; }
+        if range.abs() < 1e-10 {
+            return 0.0;
+        }
         ((v - self.mins[idx]) / range) * 2.0 - 1.0
     }
 
     fn encode_sample(&self, features: &[f32]) -> ContinuousHV {
-        let weights: Vec<f32> = features.iter().enumerate()
+        let weights: Vec<f32> = features
+            .iter()
+            .enumerate()
             .take(self.n_features)
             .map(|(i, &v)| self.normalize(v, i))
             .collect();
@@ -256,7 +264,9 @@ struct RocPoint {
 }
 
 fn compute_roc_curve(scored: &[(f64, bool)]) -> Vec<RocPoint> {
-    if scored.is_empty() { return vec![]; }
+    if scored.is_empty() {
+        return vec![];
+    }
 
     let total_pos = scored.iter().filter(|(_, l)| *l).count() as f64;
     let total_neg = scored.iter().filter(|(_, l)| !*l).count() as f64;
@@ -288,7 +298,11 @@ fn compute_roc_curve(scored: &[(f64, bool)]) -> Vec<RocPoint> {
         let mut fp = 0u64;
         for &(score, is_pos) in scored {
             if score >= thresh {
-                if is_pos { tp += 1; } else { fp += 1; }
+                if is_pos {
+                    tp += 1;
+                } else {
+                    fp += 1;
+                }
             }
         }
         points.push(RocPoint {
@@ -297,12 +311,18 @@ fn compute_roc_curve(scored: &[(f64, bool)]) -> Vec<RocPoint> {
         });
     }
 
-    points.sort_by(|a, b| a.fpr.partial_cmp(&b.fpr).unwrap_or(std::cmp::Ordering::Equal));
+    points.sort_by(|a, b| {
+        a.fpr
+            .partial_cmp(&b.fpr)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     points
 }
 
 fn compute_auc(roc: &[RocPoint]) -> f64 {
-    if roc.len() < 2 { return 0.5; }
+    if roc.len() < 2 {
+        return 0.5;
+    }
     let mut auc = 0.0;
     for i in 1..roc.len() {
         let dx = roc[i].fpr - roc[i - 1].fpr;
@@ -314,7 +334,9 @@ fn compute_auc(roc: &[RocPoint]) -> f64 {
 
 fn find_best_f1(scored: &[(f64, bool)]) -> f64 {
     let total_pos = scored.iter().filter(|(_, l)| *l).count() as f64;
-    if total_pos < 1.0 { return 0.0; }
+    if total_pos < 1.0 {
+        return 0.0;
+    }
 
     let mut scores: Vec<f64> = scored.iter().map(|(s, _)| *s).collect();
     scores.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
@@ -330,17 +352,33 @@ fn find_best_f1(scored: &[(f64, bool)]) -> f64 {
         let mut fn_ = 0u64;
         for &(score, is_pos) in scored {
             if score >= thresh {
-                if is_pos { tp += 1; } else { fp += 1; }
+                if is_pos {
+                    tp += 1;
+                } else {
+                    fp += 1;
+                }
             } else if is_pos {
                 fn_ += 1;
             }
         }
-        let precision = if tp + fp > 0 { tp as f64 / (tp + fp) as f64 } else { 0.0 };
-        let recall = if tp + fn_ > 0 { tp as f64 / (tp + fn_) as f64 } else { 0.0 };
+        let precision = if tp + fp > 0 {
+            tp as f64 / (tp + fp) as f64
+        } else {
+            0.0
+        };
+        let recall = if tp + fn_ > 0 {
+            tp as f64 / (tp + fn_) as f64
+        } else {
+            0.0
+        };
         let f1 = if precision + recall > 0.0 {
             2.0 * precision * recall / (precision + recall)
-        } else { 0.0 };
-        if f1 > best_f1 { best_f1 = f1; }
+        } else {
+            0.0
+        };
+        if f1 > best_f1 {
+            best_f1 = f1;
+        }
     }
     best_f1
 }
@@ -366,7 +404,9 @@ fn load_battery_data(path: &std::path::Path) -> Vec<BatteryCycle> {
             Ok(r) => r,
             Err(_) => continue,
         };
-        if record.len() < 12 { continue; }
+        if record.len() < 12 {
+            continue;
+        }
 
         let voltage: f32 = record[0].parse().unwrap_or(0.0);
         let current: f32 = record[1].parse().unwrap_or(0.0);
@@ -376,33 +416,58 @@ fn load_battery_data(path: &std::path::Path) -> Vec<BatteryCycle> {
         let rec_type: &str = &record[8];
         let battery_id: String = record[11].to_string();
 
-        if rec_type != "discharge" { continue; }
-        if cycle_num == 0 { continue; }
+        if rec_type != "discharge" {
+            continue;
+        }
+        if cycle_num == 0 {
+            continue;
+        }
 
         let key = (battery_id.clone(), cycle_num);
-        cycles_map.entry(key.clone()).or_default().push(BatterySample {
-            voltage, current, temperature, capacity,
-        });
+        cycles_map
+            .entry(key.clone())
+            .or_default()
+            .push(BatterySample {
+                voltage,
+                current,
+                temperature,
+                capacity,
+            });
         capacity_map.entry(key).or_insert(capacity);
     }
 
-    let mut cycles: Vec<BatteryCycle> = cycles_map.into_iter()
+    let mut cycles: Vec<BatteryCycle> = cycles_map
+        .into_iter()
         .map(|((battery_id, cycle_num), samples)| {
-            let capacity = capacity_map.get(&(battery_id.clone(), cycle_num))
-                .copied().unwrap_or(0.0);
-            BatteryCycle { battery_id, cycle_num, samples, capacity }
+            let capacity = capacity_map
+                .get(&(battery_id.clone(), cycle_num))
+                .copied()
+                .unwrap_or(0.0);
+            BatteryCycle {
+                battery_id,
+                cycle_num,
+                samples,
+                capacity,
+            }
         })
         .collect();
 
     cycles.sort_by(|a, b| {
-        a.battery_id.cmp(&b.battery_id)
+        a.battery_id
+            .cmp(&b.battery_id)
             .then(a.cycle_num.cmp(&b.cycle_num))
     });
 
     let total_samples: usize = cycles.iter().map(|c| c.samples.len()).sum();
-    eprintln!("  Loaded {} cycles, {} total samples across {} batteries",
-        cycles.len(), total_samples,
-        cycles.iter().map(|c| &c.battery_id).collect::<std::collections::HashSet<_>>().len()
+    eprintln!(
+        "  Loaded {} cycles, {} total samples across {} batteries",
+        cycles.len(),
+        total_samples,
+        cycles
+            .iter()
+            .map(|c| &c.battery_id)
+            .collect::<std::collections::HashSet<_>>()
+            .len()
     );
 
     cycles
@@ -466,7 +531,9 @@ fn evaluate_battery(cycles: &[BatteryCycle]) -> EvalResult {
         let n_healthy = (bat_cycles.len() as f32 * HEALTHY_FRAC).ceil() as usize;
 
         for cycle in bat_cycles.iter().take(n_healthy) {
-            let samples: Vec<[f32; 3]> = cycle.samples.iter()
+            let samples: Vec<[f32; 3]> = cycle
+                .samples
+                .iter()
                 .map(|s| [s.voltage, s.current, s.temperature])
                 .collect();
             let sample_refs: Vec<&[f32]> = samples.iter().map(|s| s.as_slice()).collect();
@@ -495,8 +562,12 @@ fn evaluate_battery(cycles: &[BatteryCycle]) -> EvalResult {
     let ref_surprise_mean = mean_fn(&healthy_surprise_scores);
     let ref_surprise_std = std_fn(&healthy_surprise_scores).max(0.001);
 
-    eprintln!("  Built reference from {} healthy cycles (surprise: {:.4}+/-{:.4})",
-        healthy_hdc.len(), ref_surprise_mean, ref_surprise_std);
+    eprintln!(
+        "  Built reference from {} healthy cycles (surprise: {:.4}+/-{:.4})",
+        healthy_hdc.len(),
+        ref_surprise_mean,
+        ref_surprise_std
+    );
 
     // Evaluate on test battery
     let mut scored_hdc: Vec<(f64, bool)> = Vec::new();
@@ -519,7 +590,9 @@ fn evaluate_battery(cycles: &[BatteryCycle]) -> EvalResult {
                 continue;
             };
 
-            let samples: Vec<[f32; 3]> = cycle.samples.iter()
+            let samples: Vec<[f32; 3]> = cycle
+                .samples
+                .iter()
                 .map(|s| [s.voltage, s.current, s.temperature])
                 .collect();
             let sample_refs: Vec<&[f32]> = samples.iter().map(|s| s.as_slice()).collect();
@@ -540,20 +613,30 @@ fn evaluate_battery(cycles: &[BatteryCycle]) -> EvalResult {
         }
     }
 
-    eprintln!("  Test samples: {} (healthy: {}, degraded: {})",
+    eprintln!(
+        "  Test samples: {} (healthy: {}, degraded: {})",
         scored_hdc.len(),
         scored_hdc.iter().filter(|(_, l)| !l).count(),
         scored_hdc.iter().filter(|(_, l)| *l).count(),
     );
 
     for (label, scored) in &[
-        ("HDC", &scored_hdc), ("CfC-multi", &scored_cfc),
-        ("CfC-hybrid", &scored_hybrid), ("CfC-surprise", &scored_surprise),
+        ("HDC", &scored_hdc),
+        ("CfC-multi", &scored_cfc),
+        ("CfC-hybrid", &scored_hybrid),
+        ("CfC-surprise", &scored_surprise),
     ] {
         let h: Vec<f64> = scored.iter().filter(|(_, l)| !l).map(|(s, _)| *s).collect();
         let d: Vec<f64> = scored.iter().filter(|(_, l)| *l).map(|(s, _)| *s).collect();
-        eprintln!("  {} scores: healthy={:.4}+/-{:.4}  degraded={:.4}+/-{:.4}  sep={:.4}",
-            label, mean_fn(&h), std_fn(&h), mean_fn(&d), std_fn(&d), mean_fn(&d) - mean_fn(&h));
+        eprintln!(
+            "  {} scores: healthy={:.4}+/-{:.4}  degraded={:.4}+/-{:.4}  sep={:.4}",
+            label,
+            mean_fn(&h),
+            std_fn(&h),
+            mean_fn(&d),
+            std_fn(&d),
+            mean_fn(&d) - mean_fn(&h)
+        );
     }
 
     // Score-level fusion: combine HDC distance + CfC surprise (z-score)
@@ -562,7 +645,9 @@ fn evaluate_battery(cycles: &[BatteryCycle]) -> EvalResult {
     let hdc_mean = mean_fn(&hdc_scores);
     let hdc_std = std_fn(&hdc_scores).max(0.001);
 
-    let scored_fused: Vec<(f64, bool)> = scored_hdc.iter().zip(scored_surprise.iter())
+    let scored_fused: Vec<(f64, bool)> = scored_hdc
+        .iter()
+        .zip(scored_surprise.iter())
         .map(|((h, label), (s, _))| {
             let h_z = (h - hdc_mean) / hdc_std;
             // Weight: HDC provides strong signal, CfC surprise adds temporal
@@ -597,7 +682,9 @@ fn load_csv_rows(path: &std::path::Path, max_cols: usize) -> Vec<(Vec<f32>, bool
             Ok(r) => r,
             Err(_) => continue,
         };
-        if record.len() < max_cols + 1 { continue; }
+        if record.len() < max_cols + 1 {
+            continue;
+        }
 
         let feats: Vec<f32> = (0..max_cols)
             .map(|i| record[i].parse::<f32>().unwrap_or(0.0))
@@ -609,24 +696,25 @@ fn load_csv_rows(path: &std::path::Path, max_cols: usize) -> Vec<(Vec<f32>, bool
     rows
 }
 
-fn evaluate_spacecraft(
-    train_path: &std::path::Path,
-    test_path: &std::path::Path,
-) -> EvalResult {
+fn evaluate_spacecraft(train_path: &std::path::Path, test_path: &std::path::Path) -> EvalResult {
     let n_features = 25;
 
     let train_rows = load_csv_rows(train_path, n_features);
     let test_rows = load_csv_rows(test_path, n_features);
 
     // Fit normalization on all data
-    let all_refs: Vec<&[f32]> = train_rows.iter().chain(test_rows.iter())
-        .map(|(f, _)| f.as_slice()).collect();
+    let all_refs: Vec<&[f32]> = train_rows
+        .iter()
+        .chain(test_rows.iter())
+        .map(|(f, _)| f.as_slice())
+        .collect();
     let mut encoder = HdcEncoder::new(n_features, 0x5C_0001);
     encoder.fit(&all_refs);
 
     // Group training data into windows
     eprintln!("  Grouping into windows of {}...", SPACECRAFT_WINDOW);
-    let train_windows: Vec<Vec<&[f32]>> = train_rows.chunks(SPACECRAFT_WINDOW)
+    let train_windows: Vec<Vec<&[f32]>> = train_rows
+        .chunks(SPACECRAFT_WINDOW)
         .map(|chunk| chunk.iter().map(|(f, _)| f.as_slice()).collect())
         .collect();
 
@@ -660,11 +748,16 @@ fn evaluate_spacecraft(
     let ref_surp_mean = mean_fn(&healthy_surprise);
     let ref_surp_std = std_fn(&healthy_surprise).max(0.001);
 
-    eprintln!("  Built reference from {} training windows (surprise: {:.4}+/-{:.4})",
-        ref_windows.len(), ref_surp_mean, ref_surp_std);
+    eprintln!(
+        "  Built reference from {} training windows (surprise: {:.4}+/-{:.4})",
+        ref_windows.len(),
+        ref_surp_mean,
+        ref_surp_std
+    );
 
     // Evaluate test windows
-    let test_windows: Vec<(Vec<&[f32]>, bool)> = test_rows.chunks(SPACECRAFT_WINDOW)
+    let test_windows: Vec<(Vec<&[f32]>, bool)> = test_rows
+        .chunks(SPACECRAFT_WINDOW)
         .map(|chunk| {
             let feats: Vec<&[f32]> = chunk.iter().map(|(f, _)| f.as_slice()).collect();
             let is_anomaly = chunk.iter().any(|(_, l)| *l);
@@ -672,7 +765,8 @@ fn evaluate_spacecraft(
         })
         .collect();
 
-    eprintln!("  Test windows: {} (normal: {}, anomalous: {})",
+    eprintln!(
+        "  Test windows: {} (normal: {}, anomalous: {})",
         test_windows.len(),
         test_windows.iter().filter(|(_, l)| !l).count(),
         test_windows.iter().filter(|(_, l)| *l).count(),
@@ -695,7 +789,11 @@ fn evaluate_spacecraft(
         scored_surprise.push(((surprise - ref_surp_mean) / ref_surp_std, *is_anomaly));
 
         if (idx + 1) % 1000 == 0 {
-            eprintln!("  Processed {}/{} test windows...", idx + 1, test_windows.len());
+            eprintln!(
+                "  Processed {}/{} test windows...",
+                idx + 1,
+                test_windows.len()
+            );
         }
     }
 
@@ -704,7 +802,9 @@ fn evaluate_spacecraft(
     let hdc_mean = mean_fn(&hdc_scores);
     let hdc_std = std_fn(&hdc_scores).max(0.001);
 
-    let scored_fused: Vec<(f64, bool)> = scored_hdc.iter().zip(scored_surprise.iter())
+    let scored_fused: Vec<(f64, bool)> = scored_hdc
+        .iter()
+        .zip(scored_surprise.iter())
         .map(|((h, label), (s, _))| {
             let h_z = (h - hdc_mean) / hdc_std;
             (0.7 * h_z + 0.3 * s, *label)
@@ -738,8 +838,10 @@ fn main() {
     println!("  CfC-Multiscale: encode -> CfC evolve -> snapshots at 25/50/75/100% -> bundle");
     println!("  CfC-HV-Hybrid:  bundle(CfC-multiscale, HDC-bundle) at HV level");
     println!("  HDC+CfC Fused:  average(HDC_score, CfC_score) at score level");
-    println!("  CfC neuron: HdcLtcUnifiedNeuron (tau={}, backbone={}, dt={}, dim={})",
-        CFC_TAU_BASE, CFC_BACKBONE_TAU, CFC_DT, DIM);
+    println!(
+        "  CfC neuron: HdcLtcUnifiedNeuron (tau={}, backbone={}, dt={}, dim={})",
+        CFC_TAU_BASE, CFC_BACKBONE_TAU, CFC_DT, DIM
+    );
     println!();
 
     // ── Battery evaluation ──────────────────────────────────────────────────
@@ -752,16 +854,33 @@ fn main() {
 
         println!("---- Battery Degradation -----------------------------------------------");
         println!("  Method                AUC       Best-F1");
-        println!("  HDC-Only              {:.3}     {:.3}", r.auc_hdc, r.f1_hdc);
-        println!("  CfC Multiscale        {:.3}     {:.3}", r.auc_cfc, r.f1_cfc);
-        println!("  CfC Surprise+HDC HV   {:.3}     {:.3}", r.auc_hybrid, r.f1_hybrid);
-        println!("  HDC+CfC Score Fused   {:.3}     {:.3}", r.auc_fused, r.f1_fused);
+        println!(
+            "  HDC-Only              {:.3}     {:.3}",
+            r.auc_hdc, r.f1_hdc
+        );
+        println!(
+            "  CfC Multiscale        {:.3}     {:.3}",
+            r.auc_cfc, r.f1_cfc
+        );
+        println!(
+            "  CfC Surprise+HDC HV   {:.3}     {:.3}",
+            r.auc_hybrid, r.f1_hybrid
+        );
+        println!(
+            "  HDC+CfC Score Fused   {:.3}     {:.3}",
+            r.auc_fused, r.f1_fused
+        );
         let best_cfc = r.auc_cfc.max(r.auc_hybrid).max(r.auc_fused);
         let delta = best_cfc - r.auc_hdc;
-        println!("  Best vs HDC           {:+.3}     {:+.3}",
+        println!(
+            "  Best vs HDC           {:+.3}     {:+.3}",
             delta,
-            [r.f1_cfc, r.f1_hybrid, r.f1_fused].iter().cloned()
-                .fold(f64::NEG_INFINITY, f64::max) - r.f1_hdc);
+            [r.f1_cfc, r.f1_hybrid, r.f1_fused]
+                .iter()
+                .cloned()
+                .fold(f64::NEG_INFINITY, f64::max)
+                - r.f1_hdc
+        );
         println!();
     } else {
         eprintln!("Battery data not found at {:?}, skipping.", battery_path);
@@ -777,16 +896,33 @@ fn main() {
 
         println!("---- Spacecraft (SMAP) -------------------------------------------------");
         println!("  Method                AUC       Best-F1");
-        println!("  HDC-Only              {:.3}     {:.3}", r.auc_hdc, r.f1_hdc);
-        println!("  CfC Multiscale        {:.3}     {:.3}", r.auc_cfc, r.f1_cfc);
-        println!("  CfC Surprise+HDC HV   {:.3}     {:.3}", r.auc_hybrid, r.f1_hybrid);
-        println!("  HDC+CfC Score Fused   {:.3}     {:.3}", r.auc_fused, r.f1_fused);
+        println!(
+            "  HDC-Only              {:.3}     {:.3}",
+            r.auc_hdc, r.f1_hdc
+        );
+        println!(
+            "  CfC Multiscale        {:.3}     {:.3}",
+            r.auc_cfc, r.f1_cfc
+        );
+        println!(
+            "  CfC Surprise+HDC HV   {:.3}     {:.3}",
+            r.auc_hybrid, r.f1_hybrid
+        );
+        println!(
+            "  HDC+CfC Score Fused   {:.3}     {:.3}",
+            r.auc_fused, r.f1_fused
+        );
         let best_cfc = r.auc_cfc.max(r.auc_hybrid).max(r.auc_fused);
         let delta = best_cfc - r.auc_hdc;
-        println!("  Best vs HDC           {:+.3}     {:+.3}",
+        println!(
+            "  Best vs HDC           {:+.3}     {:+.3}",
             delta,
-            [r.f1_cfc, r.f1_hybrid, r.f1_fused].iter().cloned()
-                .fold(f64::NEG_INFINITY, f64::max) - r.f1_hdc);
+            [r.f1_cfc, r.f1_hybrid, r.f1_fused]
+                .iter()
+                .cloned()
+                .fold(f64::NEG_INFINITY, f64::max)
+                - r.f1_hdc
+        );
         println!();
     } else {
         eprintln!("Spacecraft data not found, skipping.");

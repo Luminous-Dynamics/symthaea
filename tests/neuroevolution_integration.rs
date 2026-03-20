@@ -44,7 +44,10 @@ fn test_genome_roundtrip_in_pipeline() {
     let re_decoded = re_encoded.decode();
 
     let ratio = re_decoded.neuron_config.tau_base / phenotype.neuron_config.tau_base;
-    assert!((ratio - 1.0).abs() < 0.02, "tau_base roundtrip error: {ratio}");
+    assert!(
+        (ratio - 1.0).abs() < 0.02,
+        "tau_base roundtrip error: {ratio}"
+    );
     assert_eq!(
         phenotype.network_config.layer_sizes.len(),
         re_decoded.network_config.layer_sizes.len()
@@ -123,12 +126,8 @@ fn test_reduced_dim_faster_than_full() {
     let genesis = GenesisSeed::from_phrase("dim-test");
     let genome = NeuralGenome::random(42);
 
-    let mut org_fast = NeuralOrganism::spawn_with_dim(
-        0, genome.clone(), &genesis, 0, 256,
-    );
-    let mut org_full = NeuralOrganism::spawn_with_dim(
-        1, genome, &genesis, 0, 16_384,
-    );
+    let mut org_fast = NeuralOrganism::spawn_with_dim(0, genome.clone(), &genesis, 0, 256);
+    let mut org_full = NeuralOrganism::spawn_with_dim(1, genome, &genesis, 0, 16_384);
 
     // Both should produce finite results
     let input_fast = symthaea_core::hdc::unified_hv::ContinuousHV::random(256, 99);

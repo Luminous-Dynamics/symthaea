@@ -2916,7 +2916,7 @@ mod tests {
         );
         report.add(r1);
         let mut r2 = BenchmarkResult::new("Executive::Stroop", None);
-        r2.insert("stroop_effect", MetricValue::from_samples(&[0.10, 0.12]));
+        r2.insert("incongruent_accuracy", MetricValue::from_samples(&[0.10, 0.12]));
         report.add(r2);
 
         let md = report.paper_summary();
@@ -2973,7 +2973,7 @@ mod tests {
     fn test_forest_plot_csv_header() {
         let mut report = BenchmarkReport::new();
         let mut r = BenchmarkResult::new("Executive::Stroop", None);
-        r.insert("stroop_effect", MetricValue::from_samples(&[0.10, 0.12]));
+        r.insert("incongruent_accuracy", MetricValue::from_samples(&[0.10, 0.12]));
         report.add(r);
         let csv = report.forest_plot_csv();
         assert!(csv.starts_with("domain,benchmark,metric"));
@@ -3313,8 +3313,11 @@ mod tests {
         // Compute mean and SD of grand means across seeds
         let n = grand_means.len() as f64;
         let mean_of_means: f64 = grand_means.iter().sum::<f64>() / n;
-        let variance: f64 =
-            grand_means.iter().map(|x| (x - mean_of_means).powi(2)).sum::<f64>() / (n - 1.0);
+        let variance: f64 = grand_means
+            .iter()
+            .map(|x| (x - mean_of_means).powi(2))
+            .sum::<f64>()
+            / (n - 1.0);
         let sd = variance.sqrt();
 
         eprintln!("\n--- Cross-seed stability ---");
@@ -3336,7 +3339,7 @@ mod tests {
         let mut report = BenchmarkReport::new();
         let mut stroop = BenchmarkResult::new("Executive::Stroop", None);
         stroop.insert(
-            "stroop_effect",
+            "incongruent_accuracy",
             MetricValue::from_samples(&[0.10, 0.08, 0.12]),
         );
         report.add(stroop);

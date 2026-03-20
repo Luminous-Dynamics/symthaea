@@ -429,13 +429,17 @@ impl BrocaGenerator {
 
                 // Phase 2: Algebraic coherence correction vs scalar scaling
                 if self.coherence_feedback.is_algebraic() {
-                    thought_hv = self.coherence_feedback.algebraic_correct(&output_hv, &thought_hv);
+                    thought_hv = self
+                        .coherence_feedback
+                        .algebraic_correct(&output_hv, &thought_hv);
                 } else if binding_weight > 1.0 + 1e-6 {
                     thought_hv = thought_hv.scale(binding_weight);
                 }
 
                 // Phase 4: Save snapshot at high-coherence steps for soft veto
-                if self.config.gating.enable_soft_veto && coherence >= self.config.gating.coherence_drift_threshold {
+                if self.config.gating.enable_soft_veto
+                    && coherence >= self.config.gating.coherence_drift_threshold
+                {
                     good_snapshot = Some(self.controller.save_state());
                 }
 
@@ -460,7 +464,8 @@ impl BrocaGenerator {
                     // Phase 4: Soft veto — partial restore instead of hard reset
                     if self.config.gating.enable_soft_veto {
                         if let Some(ref snapshot) = good_snapshot {
-                            self.controller.restore_partial(snapshot, self.config.gating.veto_rewind_alpha);
+                            self.controller
+                                .restore_partial(snapshot, self.config.gating.veto_rewind_alpha);
                         } else {
                             // No snapshot saved yet — fall back to hard reset
                             self.controller.reset();

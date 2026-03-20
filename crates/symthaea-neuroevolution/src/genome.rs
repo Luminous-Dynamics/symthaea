@@ -234,8 +234,7 @@ impl NeuralGenome {
             fourier_frequencies.push(freq);
         }
 
-        let layer_count_raw =
-            extract_bits(&self.hv, LAYER_COUNT_START, LAYER_COUNT_BITS) as usize;
+        let layer_count_raw = extract_bits(&self.hv, LAYER_COUNT_START, LAYER_COUNT_BITS) as usize;
         let layer_count = (layer_count_raw % MAX_LAYERS) + 1; // 1..=5
 
         let mut layer_sizes = Vec::with_capacity(layer_count);
@@ -361,7 +360,12 @@ impl NeuralGenome {
             FOURIER_COUNT_BITS,
             freq_count as u64,
         );
-        for (i, &freq) in nc.fourier_frequencies.iter().take(MAX_FOURIER_FREQS).enumerate() {
+        for (i, &freq) in nc
+            .fourier_frequencies
+            .iter()
+            .take(MAX_FOURIER_FREQS)
+            .enumerate()
+        {
             set_bits(
                 &mut hv,
                 FOURIER_FREQS_START + i * FOURIER_FREQ_BITS,

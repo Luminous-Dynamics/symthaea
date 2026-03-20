@@ -2916,9 +2916,7 @@ pub enum ConsciousRoutingDecision {
         preferred_relay: Option<[u8; 8]>,
     },
     /// Consciousness sharing — adaptive cadence says share now.
-    ConsciousnessShare {
-        tier: RadioTier,
-    },
+    ConsciousnessShare { tier: RadioTier },
     /// Threat broadcast — share immune signature with all peers.
     ThreatBroadcast {
         tier: RadioTier,
@@ -2981,13 +2979,16 @@ impl ConsciousnessAwareRouter {
         governance_tier: u8,
         current_cycle: u64,
     ) {
-        let state = self.peer_phi.entry(peer_id).or_insert(PeerConsciousnessState {
-            phi: 0.0,
-            consciousness_level: 0.0,
-            governance_tier: 0,
-            last_update_cycle: 0,
-            trust: 0.5, // Start at neutral trust
-        });
+        let state = self
+            .peer_phi
+            .entry(peer_id)
+            .or_insert(PeerConsciousnessState {
+                phi: 0.0,
+                consciousness_level: 0.0,
+                governance_tier: 0,
+                last_update_cycle: 0,
+                trust: 0.5, // Start at neutral trust
+            });
 
         // Update trust based on consistency: large jumps in Phi are suspicious.
         let phi_delta = (phi - state.phi).abs();
@@ -3015,9 +3016,11 @@ impl ConsciousnessAwareRouter {
     /// Record a threat observation for collective immune response.
     pub fn record_threat(&mut self, threat: ThreatObservation) {
         // Check for existing observation on same agent — corroborate instead of duplicate
-        if let Some(existing) = self.threat_observations.iter_mut().find(|t| {
-            t.agent_hash == threat.agent_hash && t.threat_type == threat.threat_type
-        }) {
+        if let Some(existing) = self
+            .threat_observations
+            .iter_mut()
+            .find(|t| t.agent_hash == threat.agent_hash && t.threat_type == threat.threat_type)
+        {
             existing.corroboration_count = existing.corroboration_count.saturating_add(1);
             existing.severity = existing.severity.max(threat.severity);
             return;
@@ -3033,8 +3036,9 @@ impl ConsciousnessAwareRouter {
 
     /// Prune stale peers and threat observations.
     pub fn prune(&mut self, current_cycle: u64, max_peer_age: u64) {
-        self.peer_phi
-            .retain(|_, state| current_cycle.saturating_sub(state.last_update_cycle) < max_peer_age);
+        self.peer_phi.retain(|_, state| {
+            current_cycle.saturating_sub(state.last_update_cycle) < max_peer_age
+        });
         self.threat_observations
             .retain(|t| current_cycle.saturating_sub(t.observed_cycle) < THREAT_EXPIRY_CYCLES);
     }
@@ -3125,7 +3129,9 @@ impl ConsciousnessAwareRouter {
                 // Weight: Phi * trust * consciousness_level
                 let score_a = a.phi * a.trust * a.consciousness_level;
                 let score_b = b.phi * b.trust * b.consciousness_level;
-                score_a.partial_cmp(&score_b).unwrap_or(std::cmp::Ordering::Equal)
+                score_a
+                    .partial_cmp(&score_b)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|(id, _)| *id)
     }
@@ -3210,7 +3216,11 @@ impl ConsciousnessAwareRouter {
         self.threat_observations
             .iter()
             .filter(|t| t.corroboration_count == 0) // Not yet corroborated = likely new
-            .max_by(|a, b| a.severity.partial_cmp(&b.severity).unwrap_or(std::cmp::Ordering::Equal))
+            .max_by(|a, b| {
+                a.severity
+                    .partial_cmp(&b.severity)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .cloned()
     }
 }
@@ -3440,8 +3450,12 @@ impl StoreAndForward {
             patterns.push(ConsolidatedPattern {
                 kind: "threat_summary".into(),
                 confidence: max_severity,
-                data: format!("threats:{},max_severity:{:.2}", threat_events.len(), max_severity)
-                    .into_bytes(),
+                data: format!(
+                    "threats:{},max_severity:{:.2}",
+                    threat_events.len(),
+                    max_severity
+                )
+                .into_bytes(),
             });
         }
 
@@ -5199,7 +5213,10 @@ mod tests {
         // Large Phi jump → trust decreases
         router.update_peer([1; 8], 0.99, 0.7, 2, 101);
         let trust_after = router.peer_phi.get(&[1; 8]).unwrap().trust;
-        assert!(trust_after < trust_before, "large Phi jump should decrease trust");
+        assert!(
+            trust_after < trust_before,
+            "large Phi jump should decrease trust"
+        );
     }
 
     #[test]
@@ -5298,10 +5315,7 @@ mod tests {
         });
         sf.record(OfflineExperience {
             cycle: 120,
-            kind: OfflineExperienceKind::ConsciousnessShift {
-                from: 0.5,
-                to: 0.8,
-            },
+            kind: OfflineExperienceKind::ConsciousnessShift { from: 0.5, to: 0.8 },
             salience: 0.9,
         });
         sf.record(OfflineExperience {
