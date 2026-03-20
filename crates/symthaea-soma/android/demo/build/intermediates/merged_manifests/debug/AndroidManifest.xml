@@ -58,7 +58,7 @@
         <service
             android:name="io.symthaea.soma.SomaEngineService"
             android:exported="false"
-            android:foregroundServiceType="specialUse" />
+            android:foregroundServiceType="specialUse|mediaProjection" />
 
         <!--
              Notification listener for social pressure + media state bridges.

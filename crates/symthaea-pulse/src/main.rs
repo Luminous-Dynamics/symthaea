@@ -550,6 +550,54 @@ pub struct SovereignInfo {
     pub echo_risk_history: Vec<f32>,
 }
 
+/// Manufacturing consciousness coupling snapshot.
+#[derive(Serialize, Deserialize, Default)]
+pub struct FabricationInfo {
+    /// ManufacturingTwin free energy.
+    pub manufacturing_free_energy: f32,
+    /// DesignLoopTwin free energy.
+    pub design_loop_free_energy: f32,
+    /// Current safety level string.
+    pub safety_level: String,
+    /// Anomalies detected this cycle.
+    pub anomaly_count: u32,
+    /// EMA of anomaly severity.
+    pub anomaly_ema: f32,
+    /// Recommended manufacturing action.
+    pub recommended_action: String,
+    /// Mean prediction coherence.
+    pub prediction_coherence: f32,
+    /// EMA of PoGF scores.
+    pub pog_score_ema: f32,
+    /// Active print jobs.
+    pub active_print_jobs: u32,
+    /// Reward EMA.
+    pub reward_ema: f32,
+}
+
+/// CfC-HDC neuroevolution snapshot.
+#[derive(Serialize, Deserialize, Default)]
+pub struct NeuroevolutionInfo {
+    /// Current generation number (0 when inactive).
+    pub generation: u32,
+    /// Best composite fitness.
+    pub best_fitness: f64,
+    /// Mean population fitness.
+    pub mean_fitness: f64,
+    /// Population diversity (mean pairwise Hamming distance, 0.0–1.0).
+    pub diversity: f64,
+    /// Number of species.
+    pub species_count: usize,
+    /// Best evolved tau_base.
+    pub best_tau_base: f32,
+    /// Best evolved learning rate.
+    pub best_learning_rate: f32,
+    /// Best evolved layer count.
+    pub best_layer_count: usize,
+    /// Fitness history for sparkline.
+    pub fitness_history: Vec<f64>,
+}
+
 /// Full JSON-serializable pulse snapshot for comparison mode.
 #[derive(Serialize, Deserialize)]
 pub struct PulseSnapshot {
@@ -589,6 +637,10 @@ pub struct PulseSnapshot {
     pub immune: ImmuneInfo,
     #[serde(default)]
     pub sovereign: SovereignInfo,
+    #[serde(default)]
+    pub neuroevolution: NeuroevolutionInfo,
+    #[serde(default)]
+    pub fabrication: FabricationInfo,
 }
 
 /// Computed delta between two pulse snapshots for the comparison view.
@@ -1546,6 +1598,18 @@ fn main() -> Result<()> {
             trust_history: Vec::new(),
             echo_risk_history: Vec::new(),
         },
+        neuroevolution: NeuroevolutionInfo {
+            generation: m.neuroevo_generation,
+            best_fitness: m.neuroevo_best_fitness,
+            mean_fitness: 0.0,
+            diversity: m.neuroevo_diversity,
+            species_count: m.neuroevo_species_count,
+            best_tau_base: 0.0,
+            best_learning_rate: 0.0,
+            best_layer_count: 0,
+            fitness_history: Vec::new(),
+        },
+        fabrication: FabricationInfo::default(),
     };
 
     if let Some(json_path) = &args.json {
@@ -1687,6 +1751,7 @@ fn main() -> Result<()> {
             let mut glyph_coherence_history: Vec<f32> = Vec::with_capacity(measurement);
             let mut sovereign_trust_history: Vec<f32> = Vec::with_capacity(measurement);
             let mut sovereign_echo_history: Vec<f32> = Vec::with_capacity(measurement);
+            let mut neuroevo_fitness_history: Vec<f64> = Vec::with_capacity(measurement);
             for i in 0..measurement {
                 let input = inputs[(cycle_count + i) % inputs.len()];
                 let result = service.cycle(input);
@@ -1709,6 +1774,7 @@ fn main() -> Result<()> {
                 glyph_coherence_history.push(wm.glyph_coherence);
                 sovereign_trust_history.push(wm.sovereign_trust_avg);
                 sovereign_echo_history.push(wm.sovereign_social_echo_risk);
+                neuroevo_fitness_history.push(wm.neuroevo_best_fitness);
                 watch_result = Some(result);
             }
             cycle_count += measurement;
@@ -1936,6 +2002,18 @@ fn main() -> Result<()> {
                     trust_history: sovereign_trust_history.clone(),
                     echo_risk_history: sovereign_echo_history.clone(),
                 },
+                neuroevolution: NeuroevolutionInfo {
+                    generation: wm.neuroevo_generation,
+                    best_fitness: wm.neuroevo_best_fitness,
+                    mean_fitness: 0.0,
+                    diversity: wm.neuroevo_diversity,
+                    species_count: wm.neuroevo_species_count,
+                    best_tau_base: 0.0,
+                    best_learning_rate: 0.0,
+                    best_layer_count: 0,
+                    fitness_history: neuroevo_fitness_history.clone(),
+                },
+                fabrication: FabricationInfo::default(),
             };
 
             // Delta against previous snapshot
@@ -2121,6 +2199,8 @@ mod tests {
             reasoning: ReasoningInfo::default(),
             dream: DreamInfo::default(),
             sovereign: SovereignInfo::default(),
+            neuroevolution: NeuroevolutionInfo::default(),
+            fabrication: FabricationInfo::default(),
         }
     }
 

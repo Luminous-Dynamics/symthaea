@@ -222,12 +222,62 @@ use super::thresholds::{
     WORLD_MODEL_SPONGY_LR_SCALE,
     WORLD_MODEL_STIFFNESS_LR_SCALE,
     WORLD_MODEL_STIFFNESS_THRESHOLD,
+    // Round 17: Motor modulation, Broca quality, neuroevo, homeostasis
+    MOTOR_ATTENTION_SHIFT_SCALE,
+    MOTOR_ATTENTION_SENSITIVITY_SCALE,
+    MOTOR_ATTENTION_SENSITIVITY_MIN,
+    MOTOR_ATTENTION_SENSITIVITY_MAX,
+    MOTOR_ADAPTIVE_LR_MOMENTUM,
+    MOTOR_ADAPTIVE_LR_ALPHA,
+    MOTOR_ADAPTIVE_LR_MIN,
+    MOTOR_ADAPTIVE_LR_MAX,
+    MOTOR_EXPLORATION_EPISTEMIC_THRESHOLD,
+    MOTOR_EXPLORATION_INTENSITY_SCALE,
+    MOTOR_EXPLORATION_BOOST_MAX,
+    ACTION_OUTCOME_COUPLING_RESET_THRESHOLD,
+    INFERENCE_MODE_INIT_CONFIDENCE,
+    ETHICS_CAUTION_CONFIDENCE_CAP,
+    MOTOR_SUCCESS_OBSERVATION_VALUE,
+    MOTOR_FAILURE_OBSERVATION_VALUE,
+    NEUROEVO_DEFAULT_TAU_BASE,
+    NEUROEVO_BLEND_DEFAULT_WEIGHT,
+    NEUROEVO_BLEND_EVOLVED_WEIGHT,
+    NEUROEVO_TAU_CLAMP_MIN,
+    NEUROEVO_TAU_CLAMP_MAX,
+    CPG_TAU_CLAMP_MIN,
+    CPG_TAU_CLAMP_MAX,
+    BROCA_QUALITY_COHERENCE_WEIGHT,
+    BROCA_QUALITY_PE_WEIGHT,
+    BROCA_QUALITY_LONG_COHERENCE_WEIGHT,
+    BROCA_QUALITY_EMA_MOMENTUM,
+    BROCA_QUALITY_EMA_ALPHA,
+    BROCA_LOW_QUALITY_THRESHOLD,
+    BROCA_CONSCIOUSNESS_THRESHOLD_INCREASE,
+    BROCA_CONSCIOUSNESS_THRESHOLD_MAX,
+    BROCA_CONSCIOUSNESS_THRESHOLD_DECREASE,
+    BROCA_CONSCIOUSNESS_THRESHOLD_MIN,
+    BROCA_QUALITY_HIGH_THRESHOLD,
+    BROCA_INCOHERENT_THRESHOLD,
+    BROCA_INCOHERENT_DAMPEN_RATE,
+    BROCA_QUALITY_LR_THRESHOLD,
+    BROCA_QUALITY_LR_SCALE,
+    HOMEOSTASIS_PULL_VELOCITY_SCALE,
+    HOMEOSTASIS_PULL_AROUSAL_SCALE,
+    VALENCE_HOMEOSTASIS_MOMENTUM,
+    VALENCE_HOMEOSTASIS_ALPHA,
+    CONSCIOUSNESS_RESIZE_CENTER,
+    CONSCIOUSNESS_RESIZE_SCALE,
+    GOAL_DELTA_BASE_STEP,
+    GOAL_DELTA_CONFIDENCE_SCALE,
+    WORLD_MODEL_ERROR_IMPORTANCE_SCALE,
 };
 #[cfg(feature = "vision-manifold")]
 use super::thresholds::{
     TRAINING_MAX_IMPORTANCE, VISION_SURPRISE_TRAINING_IMPORTANCE_SCALE,
     VISION_TRAINING_IMPORTANCE_SCALE,
 };
+#[cfg(feature = "cpg")]
+use super::thresholds::CPG_SYNC_TAU_FLOOR;
 use super::training::TrainingSample;
 use super::{
     ActionHint, AdaptiveBehavior, CognitiveLoopService, CycleLearningResult, TrainingMethod,
@@ -698,9 +748,12 @@ impl CognitiveLoopService {
                         ttl: crate::swarm::mesh::MESH_DEFAULT_TTL,
                         wisdom: hv,
                     };
-                    let _ = self
+                    if let Err(e) = self
                         .mesh_outbound_tx
-                        .send(crate::swarm::mesh::MeshOutbound { packet });
+                        .send(crate::swarm::mesh::MeshOutbound { packet })
+                    {
+                        tracing::debug!(error = %e, "Mesh time beacon send failed — no receiver");
+                    }
                 }
 
                 #[cfg(feature = "mesh-trust")]
@@ -1080,7 +1133,11 @@ impl CognitiveLoopService {
         let post_pull_valence = self.emotion_contagion.valence;
         let pre_dist = pre_pull_valence.abs().max(0.01);
         let post_dist = post_pull_valence.abs();
-        let cycle_efficiency = post_dist / pre_dist;
+        let cycle_efficiency = if pre_dist.is_finite() && post_dist.is_finite() {
+            post_dist / pre_dist
+        } else {
+            1.0 // neutral efficiency on NaN input
+        };
         // EMA smooth (alpha=0.2), clamped to [0.5, 1.5] to prevent unbounded drift.
         // Session 15 Item 6: Clamp homeostasis efficiency.
         // Science: Cannon (1929) — regulation has bounded operating range.
@@ -1911,25 +1968,25 @@ impl CognitiveLoopService {
         if let Some(ref enhanced_result) = enhanced_result {
             match enhanced_result.motor_command.command_type {
                 MotorCommandType::AttentionShift => {
-                    let shift_amount = enhanced_result.motor_command.intensity as f32 * 0.1;
+                    let shift_amount = enhanced_result.motor_command.intensity as f32 * MOTOR_ATTENTION_SHIFT_SCALE;
                     self.adaptive_behavior.attention_sensitivity =
-                        (self.adaptive_behavior.attention_sensitivity * (1.0 + shift_amount * 0.1))
-                            .clamp(0.5, 2.0);
+                        (self.adaptive_behavior.attention_sensitivity * (1.0 + shift_amount * MOTOR_ATTENTION_SENSITIVITY_SCALE))
+                            .clamp(MOTOR_ATTENTION_SENSITIVITY_MIN, MOTOR_ATTENTION_SENSITIVITY_MAX);
                     self.stats.attention_shift = shift_amount;
                 }
                 MotorCommandType::LearningRateAdjust => {
                     if enhanced_result.should_learn {
                         let lr_mod = enhanced_result.fep_result.learning_rate_modulation as f32;
                         self.stats.adaptive_learning_rate =
-                            (self.stats.adaptive_learning_rate * 0.9 + lr_mod * 0.1)
-                                .clamp(0.01, 1.0);
+                            (self.stats.adaptive_learning_rate * MOTOR_ADAPTIVE_LR_MOMENTUM + lr_mod * MOTOR_ADAPTIVE_LR_ALPHA)
+                                .clamp(MOTOR_ADAPTIVE_LR_MIN, MOTOR_ADAPTIVE_LR_MAX);
                     }
                 }
                 MotorCommandType::ExplorationTrigger => {
                     let intensity = enhanced_result.motor_command.intensity as f32;
-                    if enhanced_result.fep_result.epistemic_value > 0.5 {
+                    if enhanced_result.fep_result.epistemic_value > MOTOR_EXPLORATION_EPISTEMIC_THRESHOLD as f64 {
                         // Scale exploration boost by epistemic value
-                        let boost = (intensity * 0.15).min(0.2);
+                        let boost = (intensity * MOTOR_EXPLORATION_INTENSITY_SCALE).min(MOTOR_EXPLORATION_BOOST_MAX);
                         self.adjust_exploration("motor_exploration_trigger", boost);
                     }
                     // High-intensity exploration → boost learning to absorb novelty
@@ -1962,9 +2019,9 @@ impl CognitiveLoopService {
                     }
                 }
                 MotorCommandType::ExpectationReset => {
-                    if enhanced_result.action_outcome_coupling < 0.3 {
+                    if enhanced_result.action_outcome_coupling < ACTION_OUTCOME_COUPLING_RESET_THRESHOLD as f64 {
                         self.last_prediction = None;
-                        self.set_confidence("inference_mode_init", 0.5);
+                        self.set_confidence("inference_mode_init", INFERENCE_MODE_INIT_CONFIDENCE);
                         // Reset world model levels to accept new patterns
                         self.fep.world_model.reset();
                     }
@@ -1988,6 +2045,24 @@ impl CognitiveLoopService {
                             ),
                         };
                         self.motor_rendering.last_result = Some(result);
+                    } else if self.carryover.quality.subsystem_veto {
+                        // Subsystem veto: sentinel/safety manager flagged this cycle unsafe
+                        tracing::warn!(
+                            cycle = self.stats.total_cycles,
+                            "Motor output blocked by subsystem veto — safety or sentinel override"
+                        );
+                        let result = super::motor_output_bridge::MotorOutputResult {
+                            success: false,
+                            action_type: None,
+                            prediction_error: 1.0,
+                            outcome: None,
+                            error: Some(
+                                "Action blocked by subsystem veto \
+                                 — safety or sentinel override"
+                                    .to_string(),
+                            ),
+                        };
+                        self.motor_rendering.last_result = Some(result);
                     } else if let Some(ref mut bridge) = self.motor_rendering.output_bridge {
                         let request = self
                             .motor_rendering
@@ -2007,7 +2082,7 @@ impl CognitiveLoopService {
                         let effective_confidence = if *effective_verdict
                             == super::ethics_engine::EthicalVerdict::Caution
                         {
-                            enhanced_result.motor_command.confidence.min(0.3)
+                            enhanced_result.motor_command.confidence.min(ETHICS_CAUTION_CONFIDENCE_CAP as f64)
                         } else {
                             enhanced_result.motor_command.confidence
                         };
@@ -2019,7 +2094,7 @@ impl CognitiveLoopService {
                         );
 
                         // Feed outcome back as FEP observation
-                        let obs_value = if result.success { 0.9 } else { 0.1 };
+                        let obs_value = if result.success { MOTOR_SUCCESS_OBSERVATION_VALUE } else { MOTOR_FAILURE_OBSERVATION_VALUE };
                         let motor_obs = symthaea_fep::Observation::from_consciousness_state(
                             obs_value,
                             result.prediction_error,
@@ -3208,6 +3283,42 @@ impl CognitiveLoopService {
         // Science: Angilletta (2009) thermal performance curves.
         let thermal_tau_factor = self.thermal_bridge.signals().tau_factor as f32;
 
+        // 11th factor: Neuroevolution champion τ — evolved tau_base ratio.
+        // When neuroevolution discovers a better tau_base, blend it toward the
+        // live CfC dynamics. Ratio >1 = evolved organism prefers slower dynamics.
+        // Science: Hasani et al. (2021) — τ is the primary CfC evolvable.
+        #[cfg(feature = "neuroevolution")]
+        let neuroevo_tau_factor = {
+            let champ = self.neuroevolution_manager.champion_suggestion();
+            if champ.active {
+                // Blend: 90% default + 10% evolved ratio (conservative)
+                let evolved_ratio = champ.tau_base / NEUROEVO_DEFAULT_TAU_BASE;
+                let blended = NEUROEVO_BLEND_DEFAULT_WEIGHT + NEUROEVO_BLEND_EVOLVED_WEIGHT * evolved_ratio;
+                blended.clamp(NEUROEVO_TAU_CLAMP_MIN, NEUROEVO_TAU_CLAMP_MAX)
+            } else {
+                1.0
+            }
+        };
+        #[cfg(not(feature = "neuroevolution"))]
+        let neuroevo_tau_factor: f32 = 1.0;
+
+        // 12th factor: CPG oscillation gating — desynchronized oscillators slow dynamics.
+        // sync_index=1.0 → tau=1.0 (no change), sync_index=0.0 → tau=CPG_SYNC_TAU_FLOOR.
+        // Gated behind warmup to avoid spurious boost from initial phase presets.
+        // Science: Buzsáki (2006) — neural oscillation synchrony gates integration rate.
+        #[cfg(feature = "cpg")]
+        let tau_cpg = {
+            if self.stats.total_cycles > DYNAMICS_STARTUP_WARMUP_CYCLES {
+                let sync = self.cpg_manager.sync_index() as f32;
+                let sync_clamped = sync.clamp(0.0, 1.0);
+                (CPG_SYNC_TAU_FLOOR + (1.0 - CPG_SYNC_TAU_FLOOR) * sync_clamped).clamp(CPG_TAU_CLAMP_MIN, CPG_TAU_CLAMP_MAX)
+            } else {
+                1.0
+            }
+        };
+        #[cfg(not(feature = "cpg"))]
+        let tau_cpg: f32 = 1.0;
+
         let delta_t = self.config.cfc_config.delta_t
             * resonance_tau_factor
             * arousal_tau_factor
@@ -3221,7 +3332,9 @@ impl CognitiveLoopService {
                 .to_interoceptive_signals()
                 .tau_slowdown_factor as f32
             * self.substrate_manager.tau_factor
-            * thermal_tau_factor;
+            * thermal_tau_factor
+            * neuroevo_tau_factor
+            * tau_cpg;
         let _t_core = Instant::now();
         if let Err(e) = self.temporal_network.step(&input_array, delta_t) {
             tracing::warn!(error = %e, "CfC temporal step failed — continuing with stale state");
@@ -3301,7 +3414,8 @@ impl CognitiveLoopService {
                     / n;
                 mean_var += var;
             }
-            let aleatoric = (mean_var / dim as f32).sqrt().clamp(0.0, 1.0);
+            let aleatoric_raw = mean_var / dim as f32;
+            let aleatoric = if aleatoric_raw.is_finite() { aleatoric_raw.sqrt().clamp(0.0, 1.0) } else { 0.0 };
             (epistemic, aleatoric)
         } else {
             (EPISTEMIC_UNCERTAINTY_DEFAULT, ALEATORIC_UNCERTAINTY_DEFAULT) // defaults when insufficient data
@@ -3585,7 +3699,7 @@ impl CognitiveLoopService {
         if !learning_occurred && self.carryover.urgency.consecutive_low_error > 5 {
             if let Some(top) = self.fep.goal_system.top_goal() {
                 let top_id = top.id.clone();
-                let delta = (0.01 * (1.0 + self.prediction_confidence * 0.5)) as f32;
+                let delta = (GOAL_DELTA_BASE_STEP as f64 * (1.0 + self.prediction_confidence * GOAL_DELTA_CONFIDENCE_SCALE as f64)) as f32;
                 self.fep.goal_system.update_progress(&top_id, delta);
             }
         }
@@ -3596,7 +3710,7 @@ impl CognitiveLoopService {
         self.stats.ltc_consciousness = self.temporal_network.state_diversity();
 
         let consciousness_resize_factor =
-            1.0 + (self.carryover.history.consciousness_level as f32 - 0.5) * 0.3;
+            1.0 + (self.carryover.history.consciousness_level as f32 - CONSCIOUSNESS_RESIZE_CENTER) * CONSCIOUSNESS_RESIZE_SCALE;
         self.temporal_network
             .maybe_resize(prediction_error * consciousness_resize_factor);
 
@@ -3608,11 +3722,14 @@ impl CognitiveLoopService {
         #[cfg(feature = "school_learning")]
         let school_predicted_phi_gain = if self.stats.total_cycles % 53 == 0 {
             if let Some(ref school) = self.feature_integ.school_bridge {
-                school
-                    .recommend_next()
-                    .ok()
-                    .and_then(|r| (r.predicted_phi_gain > 0.001).then_some(r.predicted_phi_gain))
-                    .unwrap_or(0.0)
+                match school.recommend_next() {
+                    Ok(r) if r.predicted_phi_gain > 0.001 => r.predicted_phi_gain,
+                    Ok(_) => 0.0,
+                    Err(e) => {
+                        tracing::debug!(error = %e, "School bridge recommend_next failed");
+                        0.0
+                    }
+                }
             } else {
                 0.0
             }
@@ -3685,7 +3802,7 @@ impl CognitiveLoopService {
         let pp_emotional_valence = self.emotion_contagion.prosody_valence();
         let pp_phi = self.unification_engine.psi as f32;
         let pp_smoothed_coh = coherence as f64;
-        let pp_wm_importance_boost = self.fep.world_model.avg_error.clamp(0.0, 1.0) * 0.3;
+        let pp_wm_importance_boost = self.fep.world_model.avg_error.clamp(0.0, 1.0) * WORLD_MODEL_ERROR_IMPORTANCE_SCALE;
         let pp_thalamic_salience = match self.cognitive_depth {
             super::CognitiveDepth::DeepThought => THALAMIC_DEEP_SALIENCE,
             super::CognitiveDepth::Cortical => 0.0,
@@ -4014,19 +4131,19 @@ impl CognitiveLoopService {
                 let semantic_pe = result.semantic_pe;
                 #[cfg(not(feature = "liquid-mamba"))]
                 let semantic_pe = 0.0_f32;
-                let broca_quality = result.final_coherence * 0.4
-                    + (1.0 - semantic_pe.min(1.0)) * 0.4
-                    + result.long_coherence * 0.2;
+                let broca_quality = result.final_coherence * BROCA_QUALITY_COHERENCE_WEIGHT
+                    + (1.0 - semantic_pe.min(1.0)) * BROCA_QUALITY_PE_WEIGHT
+                    + result.long_coherence * BROCA_QUALITY_LONG_COHERENCE_WEIGHT;
                 let broca_quality = broca_quality.clamp(0.0, 1.0);
 
                 self.stats.broca_quality_ema = if self.stats.broca_generation_count == 0 {
                     broca_quality
                 } else {
-                    self.stats.broca_quality_ema * 0.85 + broca_quality * 0.15
+                    self.stats.broca_quality_ema * BROCA_QUALITY_EMA_MOMENTUM + broca_quality * BROCA_QUALITY_EMA_ALPHA
                 };
                 self.stats.broca_generation_count += 1;
 
-                if broca_quality < 0.3 {
+                if broca_quality < BROCA_LOW_QUALITY_THRESHOLD {
                     self.stats.broca_low_quality_streak =
                         self.stats.broca_low_quality_streak.saturating_add(1);
                 } else {
@@ -4034,10 +4151,10 @@ impl CognitiveLoopService {
                 }
 
                 if self.stats.broca_low_quality_streak >= 3 {
-                    broca.consciousness_threshold = (broca.consciousness_threshold + 0.05).min(0.5);
-                } else if self.stats.broca_quality_ema > 0.7 && broca.consciousness_threshold > 0.1
+                    broca.consciousness_threshold = (broca.consciousness_threshold + BROCA_CONSCIOUSNESS_THRESHOLD_INCREASE).min(BROCA_CONSCIOUSNESS_THRESHOLD_MAX);
+                } else if self.stats.broca_quality_ema > BROCA_QUALITY_HIGH_THRESHOLD && broca.consciousness_threshold > BROCA_CONSCIOUSNESS_THRESHOLD_MIN
                 {
-                    broca.consciousness_threshold = (broca.consciousness_threshold - 0.02).max(0.1);
+                    broca.consciousness_threshold = (broca.consciousness_threshold - BROCA_CONSCIOUSNESS_THRESHOLD_DECREASE).max(BROCA_CONSCIOUSNESS_THRESHOLD_MIN);
                 }
 
                 broca.last_telemetry.quality = broca_quality;
@@ -4073,16 +4190,16 @@ impl CognitiveLoopService {
                         * super::thresholds::BROCA_COHERENT_CONFIDENCE_SCALE,
                     Priority::Aesthetic,
                 );
-            } else if final_coherence < 0.3 {
+            } else if final_coherence < BROCA_INCOHERENT_THRESHOLD {
                 self.scale_confidence_pri(
                     "broca_incoherent",
-                    1.0 - (0.3 - final_coherence) * 0.05,
+                    1.0 - (BROCA_INCOHERENT_THRESHOLD - final_coherence) * BROCA_INCOHERENT_DAMPEN_RATE,
                     Priority::Aesthetic,
                 );
             }
 
-            if broca_quality > 0.6 {
-                let lr_boost = 1.0 + (broca_quality - 0.6) * 0.1;
+            if broca_quality > BROCA_QUALITY_LR_THRESHOLD {
+                let lr_boost = 1.0 + (broca_quality - BROCA_QUALITY_LR_THRESHOLD) * BROCA_QUALITY_LR_SCALE;
                 self.scale_lr_pri("broca_quality", lr_boost, Priority::Aesthetic);
             }
 
@@ -4145,12 +4262,12 @@ impl CognitiveLoopService {
             super::CycleUrgency::Critical => HOMEOSTASIS_PULL_CRITICAL,
         };
 
-        let v_pull = -smoothed_v * 0.05 * pull_mult;
-        let a_pull = (HOMEOSTASIS_AROUSAL_TARGET - smoothed_a) * 0.05 * pull_mult;
+        let v_pull = -smoothed_v * HOMEOSTASIS_PULL_VELOCITY_SCALE * pull_mult;
+        let a_pull = (HOMEOSTASIS_AROUSAL_TARGET - smoothed_a) * HOMEOSTASIS_PULL_AROUSAL_SCALE * pull_mult;
         self.emotion_contagion.valence = (smoothed_v + v_pull).clamp(-1.0, 1.0);
 
         self.stats.avg_valence_homeostasis =
-            self.stats.avg_valence_homeostasis * 0.95 + v_pull.abs() * 0.05;
+            self.stats.avg_valence_homeostasis * VALENCE_HOMEOSTASIS_MOMENTUM + v_pull.abs() * VALENCE_HOMEOSTASIS_ALPHA;
 
         // Store for next cycle's inertia computation.
         self.carryover.history.last_emotion_valence = self.emotion_contagion.valence;

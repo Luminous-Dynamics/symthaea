@@ -97,13 +97,13 @@
 56             Dream consolidation runs overnight, sensors stay active.
 57        -->
 58        <service
-58-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:40:9-43:58
+58-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:40:9-43:74
 59            android:name="io.symthaea.soma.SomaEngineService"
 59-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:41:13-62
 60            android:exported="false"
 60-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:42:13-37
-61            android:foregroundServiceType="specialUse" />
-61-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:43:13-55
+61            android:foregroundServiceType="specialUse|mediaProjection" />
+61-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:43:13-71
 62
 63        <!--
 64             Notification listener for social pressure + media state bridges.

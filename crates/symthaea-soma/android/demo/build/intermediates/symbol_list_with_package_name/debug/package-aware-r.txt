@@ -3230,6 +3230,8 @@ id center_vertical
 id chain
 id chain2
 id chains
+id chatSomaResponse
+id chatUserMsg
 id checkbox
 id checked
 id chronometer
@@ -3242,7 +3244,6 @@ id closest
 id collapseActionView
 id compress
 id confirm_button
-id consciousnessLabel
 id consciousnessMandala
 id constraint
 id container
@@ -3252,6 +3253,7 @@ id contiguous
 id continuousVelocity
 id conversationInput
 id conversationRow
+id conversationThread
 id coordinator
 id cos
 id counterclockwise
@@ -3290,6 +3292,7 @@ id dragRight
 id dragStart
 id dragUp
 id dreamNarrative
+id dreamOverlay
 id dreamText
 id dropdown_menu
 id easeIn
@@ -3308,6 +3311,7 @@ id enterAlwaysCollapsed
 id exitUntilCollapsed
 id expand_activities_button
 id expanded_menu
+id experienceLayer
 id fade
 id fill
 id fill_horizontal
@@ -3452,6 +3456,8 @@ id off
 id ollamaHost
 id on
 id onInterceptTouchReturnSwipe
+id onboardingDismiss
+id onboardingOverlay
 id open_search_bar_text_view
 id open_search_view_background
 id open_search_view_clear_button
@@ -3475,6 +3481,7 @@ id parent
 id parentPanel
 id parentRelative
 id parent_matrix
+id particleField
 id password_toggle
 id path
 id pathRelative
@@ -3496,6 +3503,7 @@ id right
 id rightToLeft
 id right_icon
 id right_side
+id rootCoordinator
 id rounded
 id row_index_key
 id save_non_transition_alpha
@@ -3590,6 +3598,7 @@ id textinput_helper_text
 id textinput_placeholder
 id textinput_prefix_text
 id textinput_suffix_text
+id thinkingIndicator
 id time
 id title
 id titleDividerNoCustom

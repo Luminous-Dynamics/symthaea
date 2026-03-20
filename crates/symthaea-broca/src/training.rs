@@ -286,6 +286,12 @@ pub struct EpochMetrics {
     pub validation_loss: Option<f32>,
     /// Mean output-thought coherence this epoch (if coherence_loss_weight > 0 or diagnostics enabled).
     pub mean_coherence: Option<f32>,
+    /// Mean adaptive dt used this epoch (when enable_adaptive_dt is on).
+    pub adaptive_dt_mean: Option<f32>,
+    /// Min adaptive dt observed this epoch.
+    pub adaptive_dt_min: Option<f32>,
+    /// Max adaptive dt observed this epoch.
+    pub adaptive_dt_max: Option<f32>,
 }
 
 /// Gradient flow diagnostics: tracks per-step L2 norms, clipping events,
@@ -747,6 +753,11 @@ pub fn train_with_adam(
         let mut total_tokens = 0usize;
         let mut coherence_sum = 0.0f32;
         let mut coherence_count = 0usize;
+        // W1.1: Fusion telemetry accumulators
+        let mut dt_sum = 0.0f32;
+        let mut dt_count = 0usize;
+        let mut dt_min_obs = f32::INFINITY;
+        let mut dt_max_obs = f32::NEG_INFINITY;
 
         // Adaptive coherence weight: ramp from 0 to config value over warmup epochs
         let effective_coherence_weight = if config.coherence_warmup_epochs > 0
@@ -830,7 +841,10 @@ pub fn train_with_adam(
                 // Coherence tracking + gated loss weighting
                 // (Bengio et al. 2009 — curriculum learning: focus on learnable examples)
                 let loss = if effective_coherence_weight > 0.0 || track_coherence {
-                    let output_hv = generator.controller().output_hv();
+                    // W1.4: Use refined_output_hv() to measure coherence of what the
+                    // model actually outputs (including compositional refinement), not
+                    // the raw network state.
+                    let output_hv = generator.controller().refined_output_hv();
                     let coherence = output_hv.similarity(&thought_hv);
                     coherence_sum += coherence;
                     coherence_count += 1;
@@ -890,16 +904,29 @@ pub fn train_with_adam(
                     )
                 };
 
+                // W1.3/W2.2: Capture effective dt for telemetry and BPTT consistency.
+                // When adaptive dt is enabled, last_effective_dt() returns the dt
+                // actually used in the forward pass (not the static config value).
+                let effective_dt = generator.controller().last_effective_dt();
+                dt_sum += effective_dt;
+                dt_count += 1;
+                if effective_dt < dt_min_obs {
+                    dt_min_obs = effective_dt;
+                }
+                if effective_dt > dt_max_obs {
+                    dt_max_obs = effective_dt;
+                }
+
                 // CfC network BPTT: backpropagate CE gradient through the network
+                // Uses effective_dt (not static dt_per_token) for gradient consistency
                 if let Some(ref d_out) = d_output {
                     let network_lr = lr * config.network_lr_scale;
-                    let dt = generator.controller().dt_per_token();
                     generator.controller_mut().backward_step(
                         d_out,
                         &thought_hv,
                         prev_token,
                         pos,
-                        dt,
+                        effective_dt,
                         network_lr,
                     );
                 }
@@ -933,6 +960,17 @@ pub fn train_with_adam(
             None
         };
 
+        // W1.1: Compute adaptive dt telemetry
+        let (adt_mean, adt_min, adt_max) = if dt_count > 0 {
+            (
+                Some(dt_sum / dt_count as f32),
+                Some(dt_min_obs),
+                Some(dt_max_obs),
+            )
+        } else {
+            (None, None, None)
+        };
+
         metrics.push(EpochMetrics {
             epoch,
             avg_loss,
@@ -940,6 +978,9 @@ pub fn train_with_adam(
             num_pairs: dataset.len(),
             validation_loss,
             mean_coherence: epoch_mean_coherence,
+            adaptive_dt_mean: adt_mean,
+            adaptive_dt_min: adt_min,
+            adaptive_dt_max: adt_max,
         });
 
         if (epoch + 1) % config.report_interval.max(1) == 0 || epoch == 0 {

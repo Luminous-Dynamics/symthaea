@@ -574,7 +574,7 @@ impl CognitiveSubsystem for CpgManager {
 
         // Critical desync during active motor → arousal boost + flag
         if desync_alert {
-            output.arousal_delta = 0.1;
+            output.arousal_delta = crate::cognitive_loop::thresholds::CPG_DESYNC_AROUSAL_DELTA;
             output.flags |= crate::cognitive_loop::subsystem_trait::output_flags::ANOMALY_DETECTED;
         }
 
@@ -596,6 +596,9 @@ impl CognitiveSubsystem for CpgManager {
     }
 
     fn restore(&mut self, data: &[u8]) -> Result<(), String> {
+        if data.is_empty() {
+            return Err("CpgManager restore: empty checkpoint data".to_string());
+        }
         let (oscillators, sync_index, sim_time, config): (Vec<CpgOscillator>, f64, f64, CpgConfig) =
             serde_json::from_slice(data).map_err(|e| format!("CpgManager restore failed: {e}"))?;
         self.oscillators = oscillators;
@@ -604,7 +607,20 @@ impl CognitiveSubsystem for CpgManager {
         // Re-derive coupling from restored config
         let gait = config.gait;
         let n = config.n_oscillators;
-        self.coupling = gait.coupling_matrix(n);
+        let coupling_8x8 = gait.coupling_matrix(config.coupling_k);
+        self.coupling = (0..n)
+            .map(|i| {
+                (0..n)
+                    .map(|j| {
+                        if i < 8 && j < 8 {
+                            coupling_8x8[i][j]
+                        } else {
+                            0.0
+                        }
+                    })
+                    .collect()
+            })
+            .collect();
         self.config = config;
         tracing::debug!(
             "CpgManager restored: {} oscillators, sim_time={sim_time:.2}s",

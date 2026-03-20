@@ -227,7 +227,9 @@ impl CognitiveLoopService {
         // Stable resonance near 0.5 → sharp attention; deviant frequency → diffuse
         if resonance_frequency > 0.0 {
             let resonance_quality = 1.0 - (resonance_frequency - 0.5).abs() * 2.0; // peaks at 0.5
-            let attention_mod = 1.0 + (resonance_quality as f32 - 0.5) * 0.1; // ±5%
+            let attention_mod = 1.0
+                + (resonance_quality as f32 - 0.5)
+                    * crate::cognitive_loop::thresholds::RESONANCE_ATTENTION_SCALE; // ±5%
             self.adaptive_behavior.attention_sensitivity *= attention_mod;
         }
 
@@ -331,12 +333,21 @@ impl CognitiveLoopService {
         // FEEDBACK: Binding strength gates WM access via attention sensitivity (Tononi 2015 IIT)
         // Science: High integrated information → more can be held in working memory;
         // low binding → restrict input (WM fragmented, accept less)
-        if phenomenal_binding_strength > 0.7 {
-            let wm_boost = ((phenomenal_binding_strength - 0.7) * 0.1) as f32; // up to +3%
+        if phenomenal_binding_strength > crate::cognitive_loop::thresholds::WM_BINDING_HIGH_THRESHOLD {
+            let wm_boost = ((phenomenal_binding_strength
+                - crate::cognitive_loop::thresholds::WM_BINDING_HIGH_THRESHOLD)
+                * crate::cognitive_loop::thresholds::WM_BINDING_BOOST_SCALE)
+                as f32;
             self.adaptive_behavior.attention_sensitivity *= 1.0 + wm_boost;
-        } else if phenomenal_binding_strength > 0.0 && phenomenal_binding_strength < 0.4 {
-            let wm_restrict = ((0.4 - phenomenal_binding_strength) * 0.08) as f32;
-            self.adaptive_behavior.attention_sensitivity *= (1.0 - wm_restrict).max(0.8);
+        } else if phenomenal_binding_strength > 0.0
+            && phenomenal_binding_strength < crate::cognitive_loop::thresholds::WM_BINDING_LOW_THRESHOLD
+        {
+            let wm_restrict = ((crate::cognitive_loop::thresholds::WM_BINDING_LOW_THRESHOLD
+                - phenomenal_binding_strength)
+                * crate::cognitive_loop::thresholds::WM_BINDING_RESTRICT_SCALE)
+                as f32;
+            self.adaptive_behavior.attention_sensitivity *=
+                (1.0 - wm_restrict).max(crate::cognitive_loop::thresholds::WM_BINDING_MIN_SENSITIVITY);
         }
 
         module_timings.phenomenal_binding = _t.elapsed().as_micros() as u64;
@@ -387,7 +398,8 @@ impl CognitiveLoopService {
             );
         } else {
             // Slowly return toward baseline (homeostasis drift toward 1.0)
-            let drift = (1.0 - self.carryover.learning.adaptive_threshold_scale) * 0.02;
+            let drift = (1.0 - self.carryover.learning.adaptive_threshold_scale)
+                * crate::cognitive_loop::thresholds::HOMEOSTASIS_DRIFT_RATE;
             self.adjust_threshold("homeostasis_drift", drift as f32);
         }
 
@@ -420,9 +432,11 @@ impl CognitiveLoopService {
 
         // FEEDBACK: High temporal coherence strengthens narrative self engagement
         // Science: Damasio (2010) — temporal continuity is the substrate of selfhood
-        if temporal_coherence_score > 0.6 {
+        if temporal_coherence_score > crate::cognitive_loop::thresholds::TEMPORAL_NARRATIVE_THRESHOLD {
             if let Some(ref mut narrative) = self.self_model_tier.narrative_self {
-                let continuity_boost = (temporal_coherence_score - 0.6) * 0.1; // up to +4%
+                let continuity_boost = (temporal_coherence_score
+                    - crate::cognitive_loop::thresholds::TEMPORAL_NARRATIVE_THRESHOLD)
+                    * crate::cognitive_loop::thresholds::TEMPORAL_NARRATIVE_BOOST_SCALE;
                 narrative.boost_coherence(continuity_boost);
             }
         }
@@ -431,9 +445,15 @@ impl CognitiveLoopService {
         // Science: Temporal binding via phase synchrony — attention must gate synchronization.
         // Low temporal coherence → attention is fragmenting the time-axis → penalize sensitivity
         // to prevent amplification of incoherent states. High coherence → attention is stable.
-        if temporal_coherence_score > 0.0 && temporal_coherence_score < 0.4 {
-            let coherence_penalty = ((0.4 - temporal_coherence_score) * 0.1) as f32;
-            self.adaptive_behavior.attention_sensitivity *= (1.0 - coherence_penalty).max(0.85);
+        if temporal_coherence_score > 0.0
+            && temporal_coherence_score < crate::cognitive_loop::thresholds::TEMPORAL_ATTENTION_PENALTY_THRESHOLD
+        {
+            let coherence_penalty = ((crate::cognitive_loop::thresholds::TEMPORAL_ATTENTION_PENALTY_THRESHOLD
+                - temporal_coherence_score)
+                * crate::cognitive_loop::thresholds::TEMPORAL_ATTENTION_PENALTY_SCALE)
+                as f32;
+            self.adaptive_behavior.attention_sensitivity *=
+                (1.0 - coherence_penalty).max(crate::cognitive_loop::thresholds::TEMPORAL_ATTENTION_MIN);
         }
 
         module_timings.temporal_consciousness = _t.elapsed().as_micros() as u64;
@@ -464,12 +484,12 @@ impl CognitiveLoopService {
                 match state.phase {
                     ConsciousnessPhase::Critical => {
                         // Edge of chaos — maximum creativity, boost exploration
-                        self.curiosity_drive.boredom *= 1.1;
+                        self.curiosity_drive.boredom *= crate::cognitive_loop::thresholds::THERMO_CRITICAL_CURIOSITY_BOOST;
                         self.adaptive_behavior.exploration_factor *= crate::cognitive_loop::thresholds::THERMODYNAMIC_STRESS_EXPLORATION_BOOST;
                     }
                     ConsciousnessPhase::Flow => {
                         // Superfluid state — boost learning rate
-                        self.carryover.learning.subsystem_lr_factor *= 1.05;
+                        self.carryover.learning.subsystem_lr_factor *= crate::cognitive_loop::thresholds::THERMO_FLOW_LR_BOOST;
                     }
                     ConsciousnessPhase::Chaotic => {
                         // Fragmented — suppress exploration, seek stability
@@ -478,7 +498,7 @@ impl CognitiveLoopService {
                     }
                     ConsciousnessPhase::Frozen => {
                         // Rigid — nudge toward exploration to unfreeze
-                        self.curiosity_drive.boredom *= 1.05;
+                        self.curiosity_drive.boredom *= crate::cognitive_loop::thresholds::THERMO_FROZEN_CURIOSITY_BOOST;
                     }
                     _ => {} // Normal, Unified — no modulation needed
                 }

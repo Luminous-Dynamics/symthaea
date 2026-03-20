@@ -38,10 +38,14 @@ use crate::encoder::{ThoughtChannels, ThoughtLanguageEncoder};
 use crate::gating::{
     consciousness_gated_max_tokens, EmotionalModulator, EpistemicGate, GatingConfig,
 };
-use crate::generator::GenerationResult;
+use crate::generator::{apply_repetition_penalty, GenerationResult};
 use crate::mamba::{MambaBackend, MambaWrapper};
 use crate::projection::{HdcSsmProjection, ProjectionGradientDiagnostics};
 use crate::temporal_projection::TemporalProjection;
+
+fn default_mamba_rep_penalty() -> f32 {
+    1.5
+}
 
 /// Configuration for the Liquid-Mamba generator.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,6 +58,9 @@ pub struct LiquidMambaConfig {
     pub temperature: f32,
     /// Top-k for sampling.
     pub top_k: usize,
+    /// Repetition penalty (frequency-scaled, >1.0 = penalize, 1.0 = off).
+    #[serde(default = "default_mamba_rep_penalty")]
+    pub repetition_penalty: f32,
     /// Coherence below this → veto (mid-sentence self-correction).
     pub veto_threshold: f32,
     /// Coherence below this → boost thought binding.
@@ -241,20 +248,19 @@ pub struct LiquidMambaConfig {
     #[serde(default = "default_e2e_grad_chunks")]
     pub e2e_grad_chunks: usize,
 
-    /// Weight for orthogonality regularization on the spatial projection's `w_up` rows
-    /// (default 0.0 = disabled). Penalizes row cosine similarity to prevent rank collapse.
-    /// Good starting values: 0.01–0.05.
-    #[serde(default)]
-    pub orthogonality_weight: f32,
-
-    /// Number of random row pairs to sample per orthogonality regularization step (default 64).
-    #[serde(default = "default_orthogonality_samples")]
-    pub orthogonality_samples: usize,
-
     /// Gating configuration (epistemic boost strengths, coherence thresholds, etc.).
     /// Override to strengthen or weaken consciousness-gated generation control.
     #[serde(default)]
     pub gating_config: GatingConfig,
+
+    /// Orthogonality regularization weight for spatial projection w_up rows (0.0 = disabled).
+    /// Penalizes cosine similarity between random row pairs to prevent rank collapse.
+    #[serde(default)]
+    pub orthogonality_weight: f32,
+
+    /// Number of random row pairs sampled per orthogonality gradient step (default 64).
+    #[serde(default = "default_orthogonality_samples")]
+    pub orthogonality_samples: usize,
 }
 
 fn default_grad_clip() -> f32 {
@@ -293,14 +299,14 @@ fn default_true() -> bool {
 fn default_lora_alpha() -> f32 {
     1.0
 }
+fn default_orthogonality_samples() -> usize {
+    64
+}
 fn default_lora_lr() -> f32 {
     0.0001
 }
 fn default_e2e_grad_chunks() -> usize {
     1
-}
-fn default_orthogonality_samples() -> usize {
-    64
 }
 
 impl Default for LiquidMambaConfig {
@@ -310,6 +316,7 @@ impl Default for LiquidMambaConfig {
             max_tokens: 256,
             temperature: 0.8,
             top_k: 40,
+            repetition_penalty: 1.5,
             veto_threshold: 0.20,
             drift_threshold: 0.30,
             coherence_window: 8,
@@ -364,9 +371,9 @@ impl Default for LiquidMambaConfig {
             lora_lr: 0.0001,
             embedding_stats_path: None,
             e2e_grad_chunks: 1,
+            gating_config: GatingConfig::default(),
             orthogonality_weight: 0.0,
             orthogonality_samples: 64,
-            gating_config: GatingConfig::default(),
         }
     }
 }
@@ -732,6 +739,15 @@ impl LiquidMambaGenerator {
                     let em_scale = self.config.gating_config.mamba_emotional_scale();
                     self.emotional_modulator
                         .apply_scaled(&mut logits, channels, pos, em_scale);
+                }
+
+                // 7d2. Repetition penalty (frequency-scaled)
+                if self.config.repetition_penalty > 1.0 && !tokens.is_empty() {
+                    apply_repetition_penalty(
+                        &mut logits,
+                        &tokens,
+                        self.config.repetition_penalty,
+                    );
                 }
 
                 // 7e. Top-k sampling
@@ -1397,14 +1413,6 @@ impl LiquidMambaGenerator {
                 }
             }
 
-            // Orthogonality regularization: decorrelate w_up rows to prevent rank collapse
-            if self.config.orthogonality_weight > 0.0 {
-                self.projection.compute_orthogonality_gradients(
-                    self.config.orthogonality_weight,
-                    self.config.orthogonality_samples,
-                );
-            }
-
             // Gradient accumulation: only apply every N steps
             self.distill_accumulator += 1;
             if self.distill_accumulator >= self.config.accumulation_steps.max(1) {
@@ -1412,6 +1420,13 @@ impl LiquidMambaGenerator {
                 if use_mamba_signal && self.config.surprise_gradient_alpha > 0.0 {
                     let scale = 1.0 + self.config.surprise_gradient_alpha * result.semantic_pe;
                     self.projection.scale_accumulated_gradients(scale);
+                }
+                // Orthogonality regularization: push w_up rows apart to prevent rank collapse
+                if self.config.orthogonality_weight > 0.0 {
+                    self.projection.compute_orthogonality_gradients(
+                        self.config.orthogonality_weight,
+                        self.config.orthogonality_samples,
+                    );
                 }
                 let metrics = self
                     .projection

@@ -1010,6 +1010,12 @@ pub struct CycleMetadata {
     /// Number of subsystems that contributed non-neutral SubsystemOutputs.
     /// 0 = no subsystems using the new CognitiveSubsystem trait yet.
     pub subsystem_integration_contributors: u32,
+    /// OR'd output_flags from all subsystem managers (0 = no flags set).
+    /// Bits: 0=REQUEST_EXPLORATION, 1=REQUEST_CONSOLIDATION, 2=ANOMALY_DETECTED,
+    /// 3=VETO_ACTION, 4=REQUEST_REST, 7=ESCALATE_URGENCY.
+    pub subsystem_flags: u32,
+    /// Whether any subsystem set the VETO_ACTION flag this cycle.
+    pub subsystem_veto_active: bool,
 
     // ── Nurture Attachment Telemetry ─────────────────────────────────────
     /// Current attachment style (e.g., "Forming", "Secure"). Empty when nurture disabled.

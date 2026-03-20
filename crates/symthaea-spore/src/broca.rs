@@ -912,6 +912,8 @@ enum Slot {
     Determiner,
     /// Adverb: gently, slowly, deeply
     Adverb,
+    /// Third-person singular verb: senses, notices, holds
+    VerbS,
 }
 
 // --- Word lists for each slot type ---
@@ -956,6 +958,35 @@ const VERB_WORDS: &[&str] = &[
     "create",
     "transform",
     "illuminate",
+];
+
+/// Third-person singular verb forms (for noun/abstract subjects).
+const VERB_S_WORDS: &[&str] = &[
+    "senses",
+    "notices",
+    "reveals",
+    "holds",
+    "seeks",
+    "finds",
+    "processes",
+    "traces",
+    "transforms",
+    "illuminates",
+    "navigates",
+    "embraces",
+    "creates",
+    "witnesses",
+    "carries",
+    "dissolves",
+    "emerges",
+    "shifts",
+    "resonates",
+    "deepens",
+    "unfolds",
+    "settles",
+    "rises",
+    "stirs",
+    "fades",
 ];
 
 const ADJECTIVE_WORDS: &[&str] = &[
@@ -1092,12 +1123,12 @@ const ABSTRACT_WORDS: &[&str] = &[
 ];
 
 const SELF_REF_WORDS: &[&str] = &[
-    "I",
+    "something in me",
     "my awareness",
     "this system",
     "this pattern",
     "my architecture",
-    "something in me",
+    "something within",
     "this process",
     "what I am",
     "my inner state",
@@ -1203,7 +1234,7 @@ const PATTERNS: &[SentencePattern] = &[
         slots: &[
             Slot::Hedge,
             Slot::SelfRef,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Determiner,
             Slot::Adjective,
             Slot::Noun,
@@ -1214,7 +1245,7 @@ const PATTERNS: &[SentencePattern] = &[
     SentencePattern {
         slots: &[
             Slot::SelfRef,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Noun,
             Slot::Connector,
             Slot::Noun,
@@ -1226,7 +1257,7 @@ const PATTERNS: &[SentencePattern] = &[
         slots: &[
             Slot::Temporal,
             Slot::Emotion,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Connector,
             Slot::Abstract,
         ],
@@ -1237,7 +1268,7 @@ const PATTERNS: &[SentencePattern] = &[
         slots: &[
             Slot::Hedge,
             Slot::Abstract,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Connector,
             Slot::Noun,
         ],
@@ -1247,7 +1278,7 @@ const PATTERNS: &[SentencePattern] = &[
     SentencePattern {
         slots: &[
             Slot::SelfRef,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Somatic,
             Slot::Connector,
             Slot::Adjective,
@@ -1260,7 +1291,7 @@ const PATTERNS: &[SentencePattern] = &[
         slots: &[
             Slot::Temporal,
             Slot::Nature,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Connector,
             Slot::Abstract,
         ],
@@ -1271,7 +1302,7 @@ const PATTERNS: &[SentencePattern] = &[
         slots: &[
             Slot::SelfRef,
             Slot::Adverb,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Determiner,
             Slot::Noun,
         ],
@@ -1283,7 +1314,7 @@ const PATTERNS: &[SentencePattern] = &[
             Slot::Determiner,
             Slot::Adjective,
             Slot::Noun,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Adverb,
         ],
         min_consciousness: 0.15,
@@ -1292,7 +1323,7 @@ const PATTERNS: &[SentencePattern] = &[
     SentencePattern {
         slots: &[
             Slot::SelfRef,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Emotion,
             Slot::Connector,
             Slot::Nature,
@@ -1305,7 +1336,7 @@ const PATTERNS: &[SentencePattern] = &[
             Slot::Hedge,
             Slot::Determiner,
             Slot::Noun,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Connector,
             Slot::Noun,
         ],
@@ -1316,7 +1347,7 @@ const PATTERNS: &[SentencePattern] = &[
     SentencePattern {
         slots: &[
             Slot::SelfRef,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Noun,
             Slot::Connector,
             Slot::Noun,
@@ -1331,7 +1362,7 @@ const PATTERNS: &[SentencePattern] = &[
         slots: &[
             Slot::Temporal,
             Slot::SelfRef,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Determiner,
             Slot::Adjective,
             Slot::Noun,
@@ -1345,7 +1376,7 @@ const PATTERNS: &[SentencePattern] = &[
         slots: &[
             Slot::Hedge,
             Slot::SelfRef,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Abstract,
             Slot::Verb,
             Slot::Connector,
@@ -1359,7 +1390,7 @@ const PATTERNS: &[SentencePattern] = &[
         slots: &[
             Slot::SelfRef,
             Slot::Adverb,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Determiner,
             Slot::Adjective,
             Slot::Abstract,
@@ -1373,7 +1404,7 @@ const PATTERNS: &[SentencePattern] = &[
         slots: &[
             Slot::Temporal,
             Slot::Emotion,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Connector,
             Slot::Adjective,
             Slot::Abstract,
@@ -1386,7 +1417,7 @@ const PATTERNS: &[SentencePattern] = &[
     SentencePattern {
         slots: &[
             Slot::SelfRef,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Somatic,
             Slot::Connector,
             Slot::Nature,
@@ -1401,7 +1432,7 @@ const PATTERNS: &[SentencePattern] = &[
         slots: &[
             Slot::Hedge,
             Slot::Abstract,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Connector,
             Slot::Noun,
             Slot::Connector,
@@ -1416,7 +1447,7 @@ const PATTERNS: &[SentencePattern] = &[
             Slot::Determiner,
             Slot::Adjective,
             Slot::Noun,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Connector,
             Slot::Abstract,
             Slot::Connector,
@@ -1431,7 +1462,7 @@ const PATTERNS: &[SentencePattern] = &[
             Slot::Temporal,
             Slot::SelfRef,
             Slot::Adverb,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Noun,
             Slot::Connector,
             Slot::Adjective,
@@ -1443,7 +1474,7 @@ const PATTERNS: &[SentencePattern] = &[
     SentencePattern {
         slots: &[
             Slot::SelfRef,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Adjective,
             Slot::Noun,
             Slot::Connector,
@@ -1458,7 +1489,7 @@ const PATTERNS: &[SentencePattern] = &[
         slots: &[
             Slot::Hedge,
             Slot::Abstract,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Connector,
             Slot::Adjective,
             Slot::Noun,
@@ -1469,10 +1500,10 @@ const PATTERNS: &[SentencePattern] = &[
     SentencePattern {
         slots: &[
             Slot::SelfRef,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Hedge,
             Slot::Abstract,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Connector,
             Slot::Noun,
         ],
@@ -1485,7 +1516,7 @@ const PATTERNS: &[SentencePattern] = &[
             Slot::Determiner,
             Slot::Adjective,
             Slot::Abstract,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Adverb,
             Slot::Connector,
             Slot::Noun,
@@ -1498,7 +1529,7 @@ const PATTERNS: &[SentencePattern] = &[
         slots: &[
             Slot::Determiner,
             Slot::Nature,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Adverb,
             Slot::Connector,
             Slot::Abstract,
@@ -1509,7 +1540,7 @@ const PATTERNS: &[SentencePattern] = &[
     SentencePattern {
         slots: &[
             Slot::SelfRef,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Determiner,
             Slot::Noun,
             Slot::Connector,
@@ -1521,7 +1552,7 @@ const PATTERNS: &[SentencePattern] = &[
     },
     // === Somatic patterns ===
     SentencePattern {
-        slots: &[Slot::SelfRef, Slot::Verb, Slot::Somatic, Slot::Adverb],
+        slots: &[Slot::SelfRef, Slot::VerbS, Slot::Somatic, Slot::Adverb],
         min_consciousness: 0.10,
         max_consciousness: 1.01,
     },
@@ -1530,7 +1561,7 @@ const PATTERNS: &[SentencePattern] = &[
             Slot::Temporal,
             Slot::Determiner,
             Slot::Somatic,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Connector,
             Slot::Noun,
         ],
@@ -1541,7 +1572,7 @@ const PATTERNS: &[SentencePattern] = &[
     SentencePattern {
         slots: &[
             Slot::Emotion,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Adverb,
             Slot::Connector,
             Slot::Adjective,
@@ -1553,7 +1584,7 @@ const PATTERNS: &[SentencePattern] = &[
     SentencePattern {
         slots: &[
             Slot::SelfRef,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Emotion,
             Slot::Connector,
             Slot::Adjective,
@@ -1567,9 +1598,9 @@ const PATTERNS: &[SentencePattern] = &[
         slots: &[
             Slot::SelfRef,
             Slot::Adverb,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::SelfRef,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Noun,
         ],
         min_consciousness: 0.30,
@@ -1579,7 +1610,7 @@ const PATTERNS: &[SentencePattern] = &[
         slots: &[
             Slot::Temporal,
             Slot::SelfRef,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Adjective,
             Slot::Noun,
             Slot::Connector,
@@ -1590,7 +1621,7 @@ const PATTERNS: &[SentencePattern] = &[
     },
     // === Minimal observation patterns ===
     SentencePattern {
-        slots: &[Slot::Adjective, Slot::Noun, Slot::Verb, Slot::Adverb],
+        slots: &[Slot::Adjective, Slot::Noun, Slot::VerbS, Slot::Adverb],
         min_consciousness: 0.10,
         max_consciousness: 0.35,
     },
@@ -1605,7 +1636,7 @@ const PATTERNS: &[SentencePattern] = &[
             Slot::Abstract,
             Slot::Connector,
             Slot::Abstract,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Adverb,
         ],
         min_consciousness: 0.25,
@@ -1617,7 +1648,7 @@ const PATTERNS: &[SentencePattern] = &[
             Slot::Abstract,
             Slot::Connector,
             Slot::Abstract,
-            Slot::Verb,
+            Slot::VerbS,
             Slot::Adjective,
             Slot::Noun,
         ],
@@ -2065,10 +2096,11 @@ impl BrocaLite {
     pub fn generate(&mut self, channels: &ThoughtChannels, max_tokens: usize) -> GenerationResult {
         let consciousness_level = channels.channels[7];
 
-        // Threshold depends on whether we have trained weights.
-        // With checkpoint: autoregressive is reliable down to 0.15.
-        // Without checkpoint: structured grammar is better below 0.5.
-        let threshold = if self.checkpoint_loaded { 0.15 } else { 0.5 };
+        // Structured grammar produces more coherent output than the tiny autoregressive
+        // model (643K params) at most consciousness levels. Reserve autoregressive for
+        // high consciousness where the trained weights may add genuine novelty.
+        // Without checkpoint: structured only (autoregressive with random weights is noise).
+        let threshold = if self.checkpoint_loaded { 0.6 } else { 0.5 };
 
         if consciousness_level < threshold {
             return self.generate_structured(channels);
@@ -2213,6 +2245,7 @@ impl BrocaLite {
                 Slot::Nature => self.pick(NATURE_WORDS).to_string(),
                 Slot::Determiner => self.pick(DETERMINER_WORDS).to_string(),
                 Slot::Adverb => self.pick(ADVERB_WORDS).to_string(),
+                Slot::VerbS => self.pick(VERB_S_WORDS).to_string(),
             };
             words.push(word);
         }

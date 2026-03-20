@@ -314,6 +314,10 @@ impl ProposalCollector {
             }
         }
 
+        // Guard: NaN from accumulated proposals would bypass clamp
+        if !value.is_finite() {
+            value = clamp_min;
+        }
         value = value.clamp(clamp_min, clamp_max);
 
         // Cache for subsequent calls with same parameters

@@ -25,6 +25,17 @@ use symthaea_core::hdc::quadrature::QuadratureEngine;
 use symthaea_core::hdc::root_finding::RootFindingEngine;
 use symthaea_core::hdc::statistics;
 
+use super::thresholds::{
+    MATH_LINEAR_VERIFIED_CONFIDENCE, MATH_LINEAR_UNVERIFIED_CONFIDENCE,
+    MATH_STATISTICS_PHI_BASELINE, MATH_STATISTICS_CONFIDENCE,
+    MATH_MULTIPATH_PHI_BOOST,
+    MATH_ROOT_FINDING_VERIFIED_CONFIDENCE, MATH_ROOT_FINDING_CONVERGED_CONFIDENCE,
+    MATH_ROOT_FINDING_FAILED_CONFIDENCE,
+    MATH_INTEGRATION_VERIFIED_CONFIDENCE, MATH_INTEGRATION_UNVERIFIED_CONFIDENCE,
+    MATH_OPTIMIZATION_CONVERGED_CONFIDENCE, MATH_OPTIMIZATION_FAILED_CONFIDENCE,
+    MATH_DEFAULT_TELEMETRY_PHI, MATH_DEFAULT_TELEMETRY_CONFIDENCE,
+};
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 /// Classification of a math problem type
@@ -337,7 +348,7 @@ impl MathService {
             vector_result: Some(x.data),
             encoding: result.encoding,
             phi: result.phi,
-            confidence: if result.verified { 0.95 } else { 0.5 },
+            confidence: if result.verified { MATH_LINEAR_VERIFIED_CONFIDENCE } else { MATH_LINEAR_UNVERIFIED_CONFIDENCE },
             multipath_verified: result.verified,
             problem_type: MathProblemType::LinearSystem,
             epistemic_caveat: if !result.verified {
@@ -367,7 +378,7 @@ impl MathService {
             data.len(), m, v, s, med, q1, q3, sk, ku
         );
 
-        let phi = 0.3;
+        let phi = MATH_STATISTICS_PHI_BASELINE;
         self.record_solve(MathProblemType::Statistics, phi);
 
         let encoding = BinaryHV::random(seed_from_name(&format!("STATS_{}", m.to_bits())));
@@ -378,7 +389,7 @@ impl MathService {
             vector_result: None,
             encoding,
             phi,
-            confidence: 0.99,
+            confidence: MATH_STATISTICS_CONFIDENCE,
             multipath_verified: false,
             problem_type: MathProblemType::Statistics,
             epistemic_caveat: if data.len() < 30 {
@@ -531,7 +542,7 @@ impl MathService {
 
         // Use Brent as primary (faster convergence), boost phi if verified
         let phi = if multipath_verified {
-            (brent_result.phi + bisect_result.phi) / 2.0 * 1.2
+            (brent_result.phi + bisect_result.phi) / 2.0 * MATH_MULTIPATH_PHI_BOOST
         } else {
             brent_result.phi
         };
@@ -552,11 +563,11 @@ impl MathService {
             encoding: brent_result.encoding,
             phi,
             confidence: if multipath_verified {
-                0.99
+                MATH_ROOT_FINDING_VERIFIED_CONFIDENCE
             } else if brent_result.converged {
-                0.9
+                MATH_ROOT_FINDING_CONVERGED_CONFIDENCE
             } else {
-                0.3
+                MATH_ROOT_FINDING_FAILED_CONFIDENCE
             },
             multipath_verified,
             problem_type: MathProblemType::RootFinding,
@@ -581,7 +592,7 @@ impl MathService {
         let multipath_verified = agreement < 1e-6;
 
         let phi = if multipath_verified {
-            (simpson.phi + gauss.phi) / 2.0 * 1.2
+            (simpson.phi + gauss.phi) / 2.0 * MATH_MULTIPATH_PHI_BOOST
         } else {
             simpson.phi
         };
@@ -598,7 +609,7 @@ impl MathService {
             vector_result: None,
             encoding: simpson.encoding,
             phi,
-            confidence: if multipath_verified { 0.99 } else { 0.9 },
+            confidence: if multipath_verified { MATH_INTEGRATION_VERIFIED_CONFIDENCE } else { MATH_INTEGRATION_UNVERIFIED_CONFIDENCE },
             multipath_verified,
             problem_type: MathProblemType::Integration,
             epistemic_caveat: if !multipath_verified {
@@ -638,7 +649,7 @@ impl MathService {
             vector_result: Some(result.x),
             encoding: result.encoding,
             phi,
-            confidence: if result.converged { 0.9 } else { 0.4 },
+            confidence: if result.converged { MATH_OPTIMIZATION_CONVERGED_CONFIDENCE } else { MATH_OPTIMIZATION_FAILED_CONFIDENCE },
             multipath_verified: false,
             problem_type: MathProblemType::Optimization,
             epistemic_caveat: if !result.converged {
@@ -919,7 +930,7 @@ impl MathService {
         let multipath_verified =
             candidates.len() >= 2 && (candidates[0].0 - candidates[1].0).abs() < 1e-6;
         let phi = if multipath_verified {
-            best.1 * 1.2
+            best.1 * MATH_MULTIPATH_PHI_BOOST
         } else {
             best.1
         };
@@ -992,8 +1003,8 @@ impl MathService {
             numerical_result: Some(det),
             vector_result: None,
             encoding: BinaryHV::random(42),
-            phi: 0.4,
-            confidence: 0.9,
+            phi: MATH_DEFAULT_TELEMETRY_PHI,
+            confidence: MATH_DEFAULT_TELEMETRY_CONFIDENCE,
             multipath_verified: false,
             problem_type: MathProblemType::MatrixAnalysis,
             epistemic_caveat: None,

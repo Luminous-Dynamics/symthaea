@@ -74,12 +74,18 @@ impl ConsciousnessEngine {
         // Sigma → learning rate + confidence modulation
         // Science: Tononi (2008) — high Φ → stabilize, low Φ → explore
         if let Some(sig) = self.cache.last_sigma {
-            if sig > 0.5 {
-                let sig_dampen = ((sig - 0.5) * 0.1).min(0.05_f64) as f32;
+            if sig > super::super::thresholds::SIGMA_HIGH_THRESHOLD {
+                let sig_dampen = ((sig - super::super::thresholds::SIGMA_HIGH_THRESHOLD)
+                    * super::super::thresholds::SIGMA_DAMPEN_SCALE)
+                    .min(super::super::thresholds::SIGMA_DAMPEN_MAX)
+                    as f32;
                 lr_factor *= 1.0 - sig_dampen;
-                confidence_delta += sig_dampen * 0.5;
-            } else if sig < 0.2 {
-                let sig_boost = ((0.2 - sig) * 0.15).min(0.05_f64) as f32;
+                confidence_delta += sig_dampen * super::super::thresholds::SIGMA_CONFIDENCE_SCALE;
+            } else if sig < super::super::thresholds::SIGMA_LOW_THRESHOLD {
+                let sig_boost = ((super::super::thresholds::SIGMA_LOW_THRESHOLD - sig)
+                    * super::super::thresholds::SIGMA_BOOST_SCALE)
+                    .min(super::super::thresholds::SIGMA_BOOST_MAX)
+                    as f32;
                 lr_factor *= 1.0 + sig_boost;
             }
         }
@@ -100,32 +106,37 @@ impl ConsciousnessEngine {
         if let Some(ref structural) = self.cache.last_structural_phi {
             if structural.num_clusters >= 2 {
                 // Weak global binding: local regions integrate but don't unify
-                if structural.emergence_ratio < 0.8 && structural.micro_phi > 0.01 {
-                    // Nudge toward exploration to discover cross-region associations
-                    exploration_delta += 0.01;
+                if structural.emergence_ratio < super::super::thresholds::STRUCTURAL_WEAK_EMERGENCE_THRESHOLD
+                    && structural.micro_phi > super::super::thresholds::STRUCTURAL_MICRO_PHI_THRESHOLD
+                {
+                    exploration_delta += super::super::thresholds::STRUCTURAL_EXPLORATION_NUDGE;
                 }
                 // Strong emergence: the whole exceeds the sum of parts
-                if structural.emergence_ratio > 1.2 {
-                    confidence_delta += 0.01;
+                if structural.emergence_ratio > super::super::thresholds::STRUCTURAL_STRONG_EMERGENCE_THRESHOLD {
+                    confidence_delta += super::super::thresholds::STRUCTURAL_CONFIDENCE_NUDGE;
                 }
                 // Bottleneck: large gap between global and inter-cluster integration
-                if structural.bottleneck_score > 0.3 {
-                    // Boost learning rate to strengthen weak inter-cluster connections
-                    lr_factor *= 1.02;
+                if structural.bottleneck_score > super::super::thresholds::STRUCTURAL_BOTTLENECK_THRESHOLD {
+                    lr_factor *= super::super::thresholds::STRUCTURAL_BOTTLENECK_LR_BOOST;
                 }
             }
         }
 
         // Adaptive Phi validation weighting
         if let Some(sig) = self.cache.last_sigma {
-            if input.phi_validation_correlation > 0.7 {
-                let validation_boost = (input.phi_validation_correlation - 0.7) as f32 * 0.1;
+            if input.phi_validation_correlation > super::super::thresholds::PHI_VALIDATION_HIGH_THRESHOLD {
+                let validation_boost = (input.phi_validation_correlation
+                    - super::super::thresholds::PHI_VALIDATION_HIGH_THRESHOLD)
+                    as f32
+                    * super::super::thresholds::PHI_VALIDATION_BOOST_SCALE;
                 confidence_delta += sig as f32 * validation_boost;
             } else if input.phi_validation_correlation > 0.0
-                && input.phi_validation_correlation < 0.3
+                && input.phi_validation_correlation < super::super::thresholds::PHI_VALIDATION_LOW_THRESHOLD
             {
-                let attenuate = (0.3 - input.phi_validation_correlation) as f32 * 0.05;
-                // Negative confidence contribution (multiplicative attenuation encoded as delta)
+                let attenuate = (super::super::thresholds::PHI_VALIDATION_LOW_THRESHOLD
+                    - input.phi_validation_correlation)
+                    as f32
+                    * super::super::thresholds::PHI_VALIDATION_ATTENUATION_SCALE;
                 confidence_delta -= attenuate;
             }
         }
@@ -157,10 +168,13 @@ impl ConsciousnessEngine {
 
         // Multimodal feedback: strong integration → learning precision
         // Science: Ghazanfar & Schroeder (2006)
-        if multimodal_phi > 0.5 {
-            let phi_conf = (multimodal_phi - 0.5) * 0.04;
+        if multimodal_phi > super::super::thresholds::MULTIMODAL_PHI_THRESHOLD {
+            let phi_conf = (multimodal_phi - super::super::thresholds::MULTIMODAL_PHI_THRESHOLD)
+                * super::super::thresholds::MULTIMODAL_CONFIDENCE_SCALE;
             confidence_delta += phi_conf as f32;
-            let phi_lr = 1.0 + (multimodal_phi - 0.5) * 0.4;
+            let phi_lr = 1.0
+                + (multimodal_phi - super::super::thresholds::MULTIMODAL_PHI_THRESHOLD)
+                    * super::super::thresholds::MULTIMODAL_LR_SCALE;
             subsystem_lr_factor *= phi_lr as f32;
         }
 
@@ -269,12 +283,18 @@ impl ConsciousnessEngine {
 
         // Equation V2 feedback: high consciousness → confidence + consolidation
         // Science: Tononi (2004), Baars (1988), Dehaene (2014)
-        if equation_v2_consciousness > 0.6 {
-            let boost = (equation_v2_consciousness - 0.6) * 0.08;
+        if equation_v2_consciousness > super::super::thresholds::EQ_V2_HIGH_THRESHOLD {
+            let boost = (equation_v2_consciousness - super::super::thresholds::EQ_V2_HIGH_THRESHOLD)
+                * super::super::thresholds::EQ_V2_CONFIDENCE_SCALE;
             confidence_delta += boost as f32;
-            episodic_consolidation_boost = Some((equation_v2_consciousness - 0.6) * 0.1);
-        } else if equation_v2_consciousness > 0.0 && equation_v2_consciousness < 0.3 {
-            exploration_delta += 0.02;
+            episodic_consolidation_boost = Some(
+                (equation_v2_consciousness - super::super::thresholds::EQ_V2_HIGH_THRESHOLD)
+                    * super::super::thresholds::EQ_V2_CONSOLIDATION_SCALE,
+            );
+        } else if equation_v2_consciousness > 0.0
+            && equation_v2_consciousness < super::super::thresholds::EQ_V2_LOW_THRESHOLD
+        {
+            exploration_delta += super::super::thresholds::EQ_V2_EXPLORATION_NUDGE;
         }
 
         // ═══════════════════════════════════════════════════════════════════
@@ -319,8 +339,10 @@ impl ConsciousnessEngine {
 
         // Pipeline feedback: high consciousness → learning coherence
         // Science: Dehaene (2011) — global workspace broadcasts learning signals
-        if pipeline_consciousness > 0.6 {
-            let pipeline_lr_scale = 1.0 + (pipeline_consciousness - 0.6) * 0.5;
+        if pipeline_consciousness > super::super::thresholds::PIPELINE_CONSCIOUSNESS_THRESHOLD {
+            let pipeline_lr_scale = 1.0
+                + (pipeline_consciousness - super::super::thresholds::PIPELINE_CONSCIOUSNESS_THRESHOLD)
+                    * super::super::thresholds::PIPELINE_LR_SCALE;
             lr_factor *= pipeline_lr_scale as f32;
         }
 
@@ -338,11 +360,19 @@ impl ConsciousnessEngine {
         // BATH-CONSCIOUSNESS COUPLING (Seth 2013 — interoceptive inference)
         // ═══════════════════════════════════════════════════════════════════
         // High 5-HT2A amplifies perceptual richness → consciousness boost
-        let sht_2a_boost = (input.sht_2a_signal - 0.5) * 0.1; // ±5% from baseline 0.5
-                                                              // GABA-A dampens global gain → consciousness reduction
-        let gaba_a_dampen = -(input.gaba_a_signal - 0.4) * 0.08; // baseline GABA=0.4
-                                                                 // Low entropy (stuck attractor) → consciousness depression
-        let entropy_factor = if input.attractor_detected { -0.05 } else { 0.0 };
+        let sht_2a_boost = (input.sht_2a_signal as f64
+            - super::super::thresholds::BATH_5HT2A_BASELINE)
+            * super::super::thresholds::BATH_5HT2A_SCALE;
+        // GABA-A dampens global gain → consciousness reduction
+        let gaba_a_dampen = -(input.gaba_a_signal as f64
+            - super::super::thresholds::BATH_GABA_BASELINE)
+            * super::super::thresholds::BATH_GABA_SCALE;
+        // Low entropy (stuck attractor) → consciousness depression
+        let entropy_factor = if input.attractor_detected {
+            super::super::thresholds::BATH_ENTROPY_ATTRACTOR_PENALTY
+        } else {
+            0.0
+        };
         // Approach B: Anomaly dampens unified consciousness
         // High moral anomaly score → reduce consciousness coherence.
         // Science: Moral incoherence as a form of cognitive dissonance

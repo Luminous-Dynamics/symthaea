@@ -606,7 +606,7 @@ impl BrocaGenerator {
 ///
 /// Science: Keskar et al. (2019) "CTRL" — repetition penalty prevents
 /// degenerate loops in autoregressive models.
-fn apply_repetition_penalty(logits: &mut [f32], generated: &[u32], penalty: f32) {
+pub(crate) fn apply_repetition_penalty(logits: &mut [f32], generated: &[u32], penalty: f32) {
     // Count occurrences of each generated token
     let mut counts: std::collections::HashMap<u32, u32> = std::collections::HashMap::new();
     for &token_id in generated {

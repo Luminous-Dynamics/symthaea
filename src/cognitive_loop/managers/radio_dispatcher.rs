@@ -5362,4 +5362,558 @@ mod tests {
         assert!(sorted[0].1 >= sorted[1].1);
         assert!(sorted[1].1 >= sorted[2].1);
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ADDITIONAL UNIT TESTS — State machine, edge cases, constants
+    // ═══════════════════════════════════════════════════════════════════
+
+    // ── NetworkHealth state machine ─────────────────────────────────
+
+    #[test]
+    fn test_network_health_regional_only_is_metro_only() {
+        // When only Regional is up (metro=false, regional=true), it maps to MetroOnly
+        let health = NetworkHealth::from_tiers(false, false, true);
+        assert_eq!(health, NetworkHealth::MetroOnly);
+    }
+
+    #[test]
+    fn test_network_health_safety_suggestion_values() {
+        assert_eq!(NetworkHealth::AllTiersUp.safety_suggestion(), 0);
+        assert_eq!(NetworkHealth::LocalDown.safety_suggestion(), 1);
+        assert_eq!(NetworkHealth::MetroOnly.safety_suggestion(), 2);
+        assert_eq!(NetworkHealth::Blackout.safety_suggestion(), 3);
+    }
+
+    #[test]
+    fn test_network_health_epistemic_discount_values() {
+        assert!((NetworkHealth::AllTiersUp.epistemic_discount() - 1.0).abs() < 1e-10);
+        assert!((NetworkHealth::LocalDown.epistemic_discount() - 0.85).abs() < 1e-10);
+        assert!((NetworkHealth::MetroOnly.epistemic_discount() - 0.6).abs() < 1e-10);
+        assert!((NetworkHealth::Blackout.epistemic_discount() - 0.3).abs() < 1e-10);
+    }
+
+    // ── PayloadClass tier mapping ───────────────────────────────────
+
+    #[test]
+    fn test_payload_class_min_tier_complete() {
+        assert_eq!(PayloadClass::Emergency.min_tier(), RadioTier::Regional);
+        assert_eq!(PayloadClass::Discovery.min_tier(), RadioTier::Metro);
+        assert_eq!(PayloadClass::Affective.min_tier(), RadioTier::Metro);
+        assert_eq!(PayloadClass::ConsciousnessDelta.min_tier(), RadioTier::Metro);
+        assert_eq!(PayloadClass::BulkSync.min_tier(), RadioTier::Local);
+        assert_eq!(PayloadClass::Gradient.min_tier(), RadioTier::Local);
+    }
+
+    #[test]
+    fn test_payload_class_urgency_gate_only_emergency() {
+        // Only Emergency has an urgency gate
+        assert_eq!(PayloadClass::Emergency.urgency_gate(), Some(2));
+        assert_eq!(PayloadClass::Discovery.urgency_gate(), None);
+        assert_eq!(PayloadClass::Affective.urgency_gate(), None);
+        assert_eq!(PayloadClass::ConsciousnessDelta.urgency_gate(), None);
+        assert_eq!(PayloadClass::BulkSync.urgency_gate(), None);
+        assert_eq!(PayloadClass::Gradient.urgency_gate(), None);
+    }
+
+    // ── CompressionStrategy tier selection ───────────────────────────
+
+    #[test]
+    fn test_compression_strategy_for_tier_local_always_full() {
+        assert_eq!(
+            CompressionStrategy::for_tier(RadioTier::Local, false),
+            CompressionStrategy::Full
+        );
+        assert_eq!(
+            CompressionStrategy::for_tier(RadioTier::Local, true),
+            CompressionStrategy::Full
+        );
+    }
+
+    #[test]
+    fn test_compression_strategy_for_tier_metro_depends_on_previous() {
+        assert_eq!(
+            CompressionStrategy::for_tier(RadioTier::Metro, false),
+            CompressionStrategy::Full,
+            "Metro without previous should use Full"
+        );
+        assert_eq!(
+            CompressionStrategy::for_tier(RadioTier::Metro, true),
+            CompressionStrategy::Delta,
+            "Metro with previous should use Delta"
+        );
+    }
+
+    #[test]
+    fn test_compression_strategy_for_tier_regional_always_hash() {
+        assert_eq!(
+            CompressionStrategy::for_tier(RadioTier::Regional, false),
+            CompressionStrategy::HashOnly
+        );
+        assert_eq!(
+            CompressionStrategy::for_tier(RadioTier::Regional, true),
+            CompressionStrategy::HashOnly
+        );
+    }
+
+    // ── TierCompressedPayload edge cases ────────────────────────────
+
+    #[test]
+    fn test_tier_compressed_payload_zero_original_ratio() {
+        let payload = TierCompressedPayload {
+            strategy: CompressionStrategy::Full,
+            data: vec![0u8; 10],
+            original_size: 0,
+        };
+        // Zero original → ratio = 1.0 (no compression)
+        assert!((payload.compression_ratio() - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_tier_compressed_payload_wire_size() {
+        let payload = TierCompressedPayload {
+            strategy: CompressionStrategy::HashOnly,
+            data: vec![0u8; 32],
+            original_size: 2048,
+        };
+        assert_eq!(payload.wire_size(), 32);
+        let ratio = payload.compression_ratio();
+        assert!(
+            (ratio - 32.0 / 2048.0).abs() < 1e-10,
+            "Expected ratio {}, got {}",
+            32.0 / 2048.0,
+            ratio
+        );
+    }
+
+    // ── SpectrumManager bandwidth & tier selection ──────────────────
+
+    #[test]
+    fn test_available_bandwidth_all_tiers_up() {
+        let sm = SpectrumManager::default();
+        let bw = sm.available_bandwidth();
+        // Sum of all default budgets: 1_000_000 + 2_500 + 250
+        assert_eq!(bw, 1_002_750);
+    }
+
+    #[test]
+    fn test_available_bandwidth_all_tiers_down() {
+        let mut sm = SpectrumManager::default();
+        sm.set_tier_available(RadioTier::Local, false);
+        sm.set_tier_available(RadioTier::Metro, false);
+        sm.set_tier_available(RadioTier::Regional, false);
+        assert_eq!(sm.available_bandwidth(), 0);
+    }
+
+    #[test]
+    fn test_available_bandwidth_local_only() {
+        let mut sm = SpectrumManager::default();
+        sm.set_tier_available(RadioTier::Metro, false);
+        sm.set_tier_available(RadioTier::Regional, false);
+        // Should be just Local budget
+        assert_eq!(sm.available_bandwidth(), 1_000_000);
+    }
+
+    #[test]
+    fn test_best_tier_for_governance_prefers_local() {
+        let sm = SpectrumManager::default();
+        assert_eq!(sm.best_tier_for_governance(), Some(RadioTier::Local));
+    }
+
+    #[test]
+    fn test_best_tier_for_governance_falls_back() {
+        let mut sm = SpectrumManager::default();
+        sm.set_tier_available(RadioTier::Local, false);
+        assert_eq!(sm.best_tier_for_governance(), Some(RadioTier::Metro));
+
+        sm.set_tier_available(RadioTier::Metro, false);
+        assert_eq!(sm.best_tier_for_governance(), Some(RadioTier::Regional));
+
+        sm.set_tier_available(RadioTier::Regional, false);
+        assert_eq!(sm.best_tier_for_governance(), None);
+    }
+
+    // ── SpectrumManager loss tracking ───────────────────────────────
+
+    #[test]
+    fn test_report_success_decreases_loss_ema() {
+        let mut sm = SpectrumManager::default();
+        // First pump up loss
+        for _ in 0..10 {
+            sm.report_loss(RadioTier::Metro);
+        }
+        let loss_after_loss = sm.tier_loss_ema[1];
+        assert!(loss_after_loss > 0.0);
+
+        // Now report successes — loss should decrease
+        for _ in 0..10 {
+            sm.report_success(RadioTier::Metro);
+        }
+        let loss_after_success = sm.tier_loss_ema[1];
+        assert!(
+            loss_after_success < loss_after_loss,
+            "Success should decrease loss: before={}, after={}",
+            loss_after_loss,
+            loss_after_success
+        );
+    }
+
+    // ── SpectrumManager energy-aware routing override ───────────────
+
+    #[test]
+    fn test_route_uses_energy_override_when_budget_tight() {
+        let mut sm = SpectrumManager::default();
+        // Spend 60% of energy → above RADIO_ENERGY_AWARE_THRESHOLD (0.5)
+        sm.energy_spent_nj = sm.energy_budget_nj * 0.6;
+
+        let decision = sm.route(PayloadClass::Discovery, 100, 1);
+        match decision {
+            Some(RoutingDecision::Routed { tier, .. }) => {
+                // Energy-aware should prefer Metro (20 nJ/bit, lowest energy)
+                assert_eq!(
+                    tier,
+                    RadioTier::Metro,
+                    "Energy-constrained should prefer Metro"
+                );
+            }
+            other => panic!("Expected Routed, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_route_normal_when_energy_plentiful() {
+        let sm = SpectrumManager::default();
+        // energy_spent = 0 → well below threshold → normal routing
+        let decision = sm.route(PayloadClass::Discovery, 64, 1);
+        match decision {
+            Some(RoutingDecision::Routed { tier, .. }) => {
+                // Normal routing for Discovery (min_tier=Metro) should prefer Local
+                assert_eq!(tier, RadioTier::Local);
+            }
+            other => panic!("Expected Routed, got {:?}", other),
+        }
+    }
+
+    // ── Waterfall noise floor variance ──────────────────────────────
+
+    #[test]
+    fn test_waterfall_noise_floor_variance_empty() {
+        let wf = SpectrumWaterfall::new(64);
+        assert!(wf.noise_floor_variance().is_none());
+    }
+
+    #[test]
+    fn test_waterfall_noise_floor_variance_single_entry() {
+        let mut wf = SpectrumWaterfall::new(64);
+        wf.push(WaterfallEntry {
+            cycle: 0,
+            noise_floor_dbm: -90.0,
+            snr_db: 20.0,
+            jammed: false,
+            observation_count: 1,
+        });
+        // Single entry → variance requires len >= 2
+        assert!(wf.noise_floor_variance().is_none());
+    }
+
+    #[test]
+    fn test_waterfall_noise_floor_variance_uniform() {
+        let mut wf = SpectrumWaterfall::new(64);
+        for i in 0..5 {
+            wf.push(WaterfallEntry {
+                cycle: i,
+                noise_floor_dbm: -90.0,
+                snr_db: 20.0,
+                jammed: false,
+                observation_count: 1,
+            });
+        }
+        let var = wf.noise_floor_variance().unwrap();
+        assert!(var.abs() < 1e-10, "Uniform data should have ~0 variance");
+    }
+
+    // ── Jamming streak accumulation ─────────────────────────────────
+
+    #[test]
+    fn test_jamming_streak_increments_with_consecutive_jammed_observations() {
+        let mut sm = SpectrumManager::default();
+        let snapshot = CycleSnapshot::default();
+
+        for cycle in 0..5 {
+            sm.inject_observation(SpectrumObservation {
+                frequency_hz: 915_000_000,
+                noise_floor_dbm: -30.0,
+                snr_db: -5.0,
+                jammed: true,
+            });
+            sm.process(&snapshot);
+            assert_eq!(
+                sm.jamming_streak,
+                cycle + 1,
+                "Jamming streak should be {} after {} jammed cycles",
+                cycle + 1,
+                cycle + 1
+            );
+        }
+    }
+
+    #[test]
+    fn test_jamming_streak_resets_on_clean_observation() {
+        let mut sm = SpectrumManager::default();
+        let snapshot = CycleSnapshot::default();
+
+        // Build up streak
+        for _ in 0..3 {
+            sm.inject_observation(SpectrumObservation {
+                frequency_hz: 915_000_000,
+                noise_floor_dbm: -30.0,
+                snr_db: -5.0,
+                jammed: true,
+            });
+            sm.process(&snapshot);
+        }
+        assert_eq!(sm.jamming_streak, 3);
+
+        // Clean observation resets streak
+        sm.inject_observation(SpectrumObservation {
+            frequency_hz: 915_000_000,
+            noise_floor_dbm: -90.0,
+            snr_db: 25.0,
+            jammed: false,
+        });
+        sm.process(&snapshot);
+        assert_eq!(sm.jamming_streak, 0, "Clean observation should reset streak");
+    }
+
+    // ── Network critical via jamming threshold ──────────────────────
+
+    #[test]
+    fn test_network_critical_via_jamming_streak() {
+        let mut sm = SpectrumManager::default();
+        // All tiers still up, but jamming_streak at threshold
+        sm.jamming_streak = RADIO_SAFETY_JAMMING_THRESHOLD;
+        assert!(
+            sm.is_network_critical(),
+            "Sustained jamming above threshold should be critical"
+        );
+    }
+
+    #[test]
+    fn test_network_not_critical_below_jamming_threshold() {
+        let mut sm = SpectrumManager::default();
+        sm.jamming_streak = RADIO_SAFETY_JAMMING_THRESHOLD - 1;
+        assert!(
+            !sm.is_network_critical(),
+            "Jamming below threshold should not be critical"
+        );
+    }
+
+    // ── Route table capacity limit ──────────────────────────────────
+
+    #[test]
+    fn test_route_table_capacity_evicts_oldest() {
+        let mut rt = RouteTable::new(3);
+        for i in 0u8..5 {
+            rt.update(RouteEntry {
+                destination: [i; 8],
+                next_hop: [i + 10; 8],
+                hop_count: 1,
+                tier: RadioTier::Metro,
+                last_seen_cycle: i as u64,
+                link_quality: 0.8,
+            });
+        }
+        // Capacity is 3, so only the 3 most recent should remain
+        assert!(
+            rt.len() <= 3,
+            "Route table should be bounded by capacity, got {}",
+            rt.len()
+        );
+    }
+
+    // ── ConsciousnessAwareRouter consciousness share ────────────────
+
+    #[test]
+    fn test_consciousness_router_shares_when_cadence_reached() {
+        let mut router = ConsciousnessAwareRouter::default();
+        let classifier = PayloadClassifier::default();
+
+        // The cadence can grow via adapt_cadence when divergence is low.
+        // Each update_local call increments cycles_since_share by 1.
+        // We need to exceed the cadence, which may grow. Use enough calls
+        // to exceed MAX_SHARING_CADENCE (200) to be safe.
+        for _ in 0..MAX_SHARING_CADENCE + 1 {
+            router.update_local(0.5, 0.7, 2);
+        }
+
+        let decision = router.route(PayloadClass::ConsciousnessDelta, 100, 1, &classifier);
+        match decision {
+            ConsciousRoutingDecision::ConsciousnessShare { tier } => {
+                // Should share on best available tier
+                assert!(
+                    tier == RadioTier::Metro
+                        || tier == RadioTier::Local
+                        || tier == RadioTier::Regional
+                );
+            }
+            other => panic!(
+                "Expected ConsciousnessShare after cadence reached, got {:?}",
+                other
+            ),
+        }
+    }
+
+    // ── ConsciousnessAwareRouter collective phi ─────────────────────
+
+    #[test]
+    fn test_consciousness_router_collective_phi_with_trusted_peers() {
+        let mut router = ConsciousnessAwareRouter::default();
+        router.update_local(0.6, 0.7, 2);
+
+        // Add a peer with stable Phi (small delta → trust increases)
+        router.update_peer([1; 8], 0.3, 0.5, 1, 100);
+        router.update_peer([1; 8], 0.32, 0.5, 1, 101); // Small delta → trust grows
+
+        let phi = router.collective_phi();
+        assert!(
+            phi > 0.0 && phi < 1.0,
+            "Collective phi should be bounded: {}",
+            phi
+        );
+    }
+
+    #[test]
+    fn test_consciousness_router_collective_divergence_zero_with_no_peers() {
+        let mut router = ConsciousnessAwareRouter::default();
+        router.update_local(0.5, 0.7, 2);
+        // With only self, divergence should be 0
+        assert!(
+            router.collective_divergence().abs() < 1e-5,
+            "Divergence with no peers should be ~0: {}",
+            router.collective_divergence()
+        );
+    }
+
+    // ── Store-and-forward go_online without enough experiences ──────
+
+    #[test]
+    fn test_store_forward_go_online_few_experiences_no_consolidation() {
+        let mut sf = StoreAndForward::default();
+        sf.go_offline(100);
+
+        // Record fewer than 10 experiences
+        for i in 0..5 {
+            sf.record(OfflineExperience {
+                cycle: 100 + i,
+                kind: OfflineExperienceKind::SensorAnomaly {
+                    sensor_id: format!("s{i}"),
+                    value: 42.0,
+                },
+                salience: 0.5,
+            });
+        }
+
+        // Should NOT trigger consolidation (< 10 experiences)
+        let needs = sf.go_online(200);
+        assert!(
+            !needs,
+            "Fewer than 10 experiences should not trigger consolidation"
+        );
+        assert_eq!(sf.reconnection_count(), 1);
+        assert!(!sf.needs_consolidation());
+    }
+
+    // ── Store-and-forward double offline is idempotent ──────────────
+
+    #[test]
+    fn test_store_forward_double_offline_idempotent() {
+        let mut sf = StoreAndForward::default();
+        sf.go_offline(100);
+        sf.go_offline(200); // Second call should not reset offline_since
+        // go_online to check the offline_since was preserved as 100
+        // Record enough to trigger consolidation
+        for i in 0..12 {
+            sf.record(OfflineExperience {
+                cycle: 100 + i,
+                kind: OfflineExperienceKind::ConsciousnessShift {
+                    from: 0.4,
+                    to: 0.8,
+                },
+                salience: 0.9,
+            });
+        }
+        let wisdom = sf.consolidate(300);
+        // offline_duration should be 300 - 100 = 200 (not 300 - 200 = 100)
+        assert_eq!(
+            wisdom.offline_duration, 200,
+            "Double go_offline should not reset offline_since"
+        );
+    }
+
+    // ── RadioTier::ALL completeness ─────────────────────────────────
+
+    #[test]
+    fn test_radio_tier_all_contains_three_tiers() {
+        assert_eq!(RadioTier::ALL.len(), 3);
+        assert_eq!(RadioTier::ALL[0], RadioTier::Local);
+        assert_eq!(RadioTier::ALL[1], RadioTier::Metro);
+        assert_eq!(RadioTier::ALL[2], RadioTier::Regional);
+    }
+
+    // ── Constants range validation ──────────────────────────────────
+
+    #[test]
+    fn test_radio_constants_energy_ordering() {
+        // Metro (LoRa) should be most energy-efficient
+        assert!(
+            RADIO_ENERGY_PER_BIT_METRO < RADIO_ENERGY_PER_BIT_LOCAL,
+            "LoRa should use less energy per bit than Wi-Fi"
+        );
+        assert!(
+            RADIO_ENERGY_PER_BIT_METRO < RADIO_ENERGY_PER_BIT_REGIONAL,
+            "LoRa should use less energy per bit than HF"
+        );
+    }
+
+    #[test]
+    fn test_radio_constants_synthetic_snr_ordering() {
+        assert!(
+            RADIO_SYNTHETIC_SNR_ISOLATED < RADIO_SYNTHETIC_SNR_BASE,
+            "Isolated SNR should be less than base SNR"
+        );
+        assert!(RADIO_SYNTHETIC_SNR_PEER_BONUS > 0.0);
+        assert!(RADIO_SYNTHETIC_SNR_PHI_BONUS > 0.0);
+    }
+
+    #[test]
+    fn test_radio_consciousness_confidence_thresholds_ordered() {
+        assert!(
+            RADIO_CONSCIOUSNESS_HIGH_CONFIDENCE > RADIO_CONSCIOUSNESS_LOW_CONFIDENCE,
+            "High confidence threshold must exceed low"
+        );
+        assert!(RADIO_CONSCIOUSNESS_HIGH_CONFIDENCE < 1.0);
+        assert!(RADIO_CONSCIOUSNESS_LOW_CONFIDENCE > 0.0);
+    }
+
+    // ── SpectrumManager energy reset per cycle ──────────────────────
+
+    #[test]
+    fn test_spectrum_manager_energy_resets_each_process_cycle() {
+        let mut sm = SpectrumManager::default();
+        let peer_id = [1u8; 8];
+        let hv = [0xBB; 2048];
+
+        // Spend some energy
+        sm.compress_for_tier(&peer_id, &hv, RadioTier::Local);
+        assert!(sm.energy_spent_nj > 0.0);
+
+        // Process cycle should reset energy
+        let snapshot = CycleSnapshot::default();
+        sm.process(&snapshot);
+        // After process, energy_spent is reset for the new cycle
+        assert!(
+            sm.energy_spent_nj < 1.0,
+            "Energy should be reset (or near-zero) after process: {}",
+            sm.energy_spent_nj
+        );
+    }
 }

@@ -12,6 +12,7 @@
 //! | [`LearningManager`] | FEP, dream, school, evolution | 13 | Friston (2010), Walker (2017) |
 //! | [`PerceptionManager`] | attention, multi-modal, social | 19 | Posner (1980), Baron-Cohen (1995) |
 //! | [`GovernanceManager`] | governance events, neuromod contagion | 37 | Schultz (1997), Zak (2012) | `mycelix` |
+//! | [`FabricationManager`] | Cincinnati quality, twin readings, PoGF | 47 | Aston-Jones (2005), Schultz (1997) | `advanced-manufacturing` |
 //! | [`SentinelManager`] | governance anomaly, Sybil, dispatch loop | 67 | Aston-Jones & Cohen (2005) | `sentinel` |
 //!
 //! ## Architecture
@@ -84,11 +85,17 @@ pub use therapeutic_dream_bridge::DreamableTherapeuticAction;
 #[cfg(feature = "therapeutic")]
 pub use therapeutic_manager::TherapeuticManager;
 
+#[cfg(feature = "advanced-manufacturing")]
+pub mod fabrication_manager;
+
 #[cfg(feature = "sentinel")]
 pub mod sentinel_manager;
 
 #[cfg(feature = "neuroevolution")]
 pub mod neuroevolution_manager;
+#[cfg(feature = "advanced-manufacturing")]
+pub use fabrication_manager::{FabricationEvent, FabricationEventKind, FabricationManager, FabricationTelemetry};
+
 #[cfg(feature = "sentinel")]
 pub use sentinel_manager::{
     SentinelEvent, SentinelManager, SentinelTelemetry, ThreatSignal, ThreatSignalKind,
@@ -96,6 +103,7 @@ pub use sentinel_manager::{
 
 #[cfg(feature = "neuroevolution")]
 pub use neuroevolution_manager::{NeuroevolutionManager, NeuroevolutionTelemetry};
+
 
 // Sovereign Inoculation managers
 #[cfg(feature = "mesh")]

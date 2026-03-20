@@ -304,6 +304,29 @@ impl FepFitnessBridge {
     pub fn set_weights(&mut self, weights: FitnessWeights) {
         self.config.weights = weights;
     }
+
+    /// Evaluate a population in parallel using rayon.
+    /// Each organism gets its own fitness bridge instance for thread safety.
+    #[cfg(feature = "parallel")]
+    pub fn evaluate_population_parallel(&self, organisms: &mut [NeuralOrganism]) -> Vec<OrganismFitness> {
+        use rayon::prelude::*;
+        organisms.par_iter_mut().map(|org| {
+            let mut local_bridge = FepFitnessBridge::new(self.config.clone());
+            local_bridge.evaluate(org)
+        }).collect()
+    }
+
+    /// Evaluate population using parallel if available, serial otherwise.
+    pub fn evaluate_auto(&mut self, organisms: &mut [NeuralOrganism]) -> Vec<OrganismFitness> {
+        #[cfg(feature = "parallel")]
+        {
+            self.evaluate_population_parallel(organisms)
+        }
+        #[cfg(not(feature = "parallel"))]
+        {
+            self.evaluate_population(organisms)
+        }
+    }
 }
 
 /// Returns 1 if a dominates b, -1 if b dominates a, 0 if neither.

@@ -161,7 +161,10 @@ impl CognitiveLoopService {
                             .domain("causal_enhancer")
                             .gen::<u64>()
                     })
-                    .unwrap_or(42),
+                    .unwrap_or_else(|| {
+                        tracing::debug!("CausalEnhancer: using default seed (no genesis phrase)");
+                        super::thresholds::CAUSAL_ENHANCER_SEED_DEFAULT
+                    }),
                 ..Default::default()
             };
             Some(CausalLoopEnhancer::with_config(causal_config))
@@ -441,7 +444,10 @@ impl CognitiveLoopService {
                             .domain("cognitive_loop::cross_manifold")
                             .gen::<u64>()
                     })
-                    .unwrap_or(7_000_042);
+                    .unwrap_or_else(|| {
+                        tracing::debug!("CrossManifoldPredictor: using default seed (no genesis phrase)");
+                        super::thresholds::CROSS_MANIFOLD_SEED_DEFAULT
+                    });
                 Some(symthaea_vision_manifold::CrossManifoldPredictor::new(
                     16_384, cmp_seed,
                 ))
@@ -625,7 +631,10 @@ impl CognitiveLoopService {
                             let genesis = symthaea_core::genesis::GenesisSeed::from_phrase(p);
                             genesis.domain("resonator_memory").gen::<u64>()
                         })
-                        .unwrap_or(0xBE50_0A70_0000_5EED);
+                        .unwrap_or_else(|| {
+                            tracing::debug!("ResonatorMemory: using default seed (no genesis phrase)");
+                            super::thresholds::RESONATOR_MEMORY_SEED_DEFAULT
+                        });
                     let mut semantic_cb = crate::dynamics::Codebook::new("semantic");
                     for i in 0..8u64 {
                         semantic_cb.add(

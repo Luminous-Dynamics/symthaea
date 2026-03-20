@@ -102,17 +102,17 @@ impl CognitiveLoopService {
         #[cfg(feature = "vision-manifold")]
         if let Some(ref mut bridge) = self.vision_sensory.vision_bridge {
             let ach = self.neuromod.bath.acetylcholine.effective();
-            let ach_factor = ach.max(0.5);
+            let ach_factor = ach.max(super::thresholds::VISION_ACH_FLOOR);
             let base_coh = self.config.scene_memory_coherence_threshold;
             let base_err = self.config.scene_memory_error_threshold;
             let base_damp = self.config.scene_memory_dampen_factor;
             bridge.manifold_mut().set_scene_store_thresholds(
-                (base_coh / ach_factor).clamp(0.3, 0.95),
-                (base_err * ach_factor.min(2.0)).clamp(0.01, 0.5),
+                (base_coh / ach_factor).clamp(super::thresholds::VISION_COHERENCE_CLAMP_MIN, super::thresholds::VISION_COHERENCE_CLAMP_MAX),
+                (base_err * ach_factor.min(super::thresholds::VISION_ACH_SCALE_CAP)).clamp(super::thresholds::VISION_ERROR_CLAMP_MIN, super::thresholds::VISION_ERROR_CLAMP_MAX),
             );
             bridge
                 .manifold_mut()
-                .set_scene_dampen_factor((base_damp * ach_factor.min(2.0)).clamp(0.1, 0.9));
+                .set_scene_dampen_factor((base_damp * ach_factor.min(super::thresholds::VISION_ACH_SCALE_CAP)).clamp(super::thresholds::VISION_DAMPEN_CLAMP_MIN, super::thresholds::VISION_DAMPEN_CLAMP_MAX));
         }
 
         // ═══════════════════════════════════════════════════════════════════════

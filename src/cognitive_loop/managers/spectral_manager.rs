@@ -363,7 +363,7 @@ impl CognitiveSubsystem for SpectralManager {
 
         // High relative gamma → consciousness boost (binding/integration)
         let rel_gamma = self.telemetry.band_power.relative_gamma();
-        if rel_gamma > 0.3 {
+        if rel_gamma > crate::cognitive_loop::thresholds::SPECTRAL_GAMMA_THRESHOLD {
             output.confidence_delta = SPECTRAL_GAMMA_CONSCIOUSNESS_BOOST as f64;
         }
 
@@ -371,15 +371,15 @@ impl CognitiveSubsystem for SpectralManager {
         let rel_delta = self.telemetry.band_power.relative_delta();
         if rel_delta > SPECTRAL_DELTA_REST_THRESHOLD as f64 {
             output.flags |= output_flags::REQUEST_REST;
-            output.arousal_delta = -0.05; // Calm down
+            output.arousal_delta = crate::cognitive_loop::thresholds::SPECTRAL_DELTA_AROUSAL_DELTA;
         }
 
         // ── Spectral entropy → exploration ───────────────────────────────
 
         // High entropy = broadband = rich content → boost exploration
-        if self.telemetry.spectral_entropy > 3.0 {
+        if self.telemetry.spectral_entropy > crate::cognitive_loop::thresholds::SPECTRAL_ENTROPY_THRESHOLD {
             output.exploration_delta =
-                (self.telemetry.spectral_entropy - 3.0) * SPECTRAL_ENTROPY_EXPLORATION_SCALE as f64;
+                (self.telemetry.spectral_entropy - crate::cognitive_loop::thresholds::SPECTRAL_ENTROPY_THRESHOLD) * SPECTRAL_ENTROPY_EXPLORATION_SCALE as f64;
         }
 
         // ── Theta-gamma PAC → consciousness confidence ──────────────────
@@ -400,6 +400,9 @@ impl CognitiveSubsystem for SpectralManager {
     }
 
     fn restore(&mut self, data: &[u8]) -> Result<(), String> {
+        if data.is_empty() {
+            return Err("SpectralManager restore: empty checkpoint data".to_string());
+        }
         let (config, telemetry): (SpectralManagerConfig, SpectralTelemetry) =
             serde_json::from_slice(data)
                 .map_err(|e| format!("SpectralManager restore failed: {e}"))?;
