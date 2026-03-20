@@ -133,6 +133,7 @@ fn main() {
         validation_dataset,
         curriculum: CurriculumSchedule::LengthAscending,
         freeze_embeddings: opts.freeze_embeddings,
+        coherence_alignment_weight: opts.coherence_alignment_weight,
         ..Default::default()
     };
 
@@ -323,6 +324,8 @@ struct TrainOpts {
     sample_temperature: f32,
     /// Top-k for sample generation, 0 = use config default (default: 0).
     sample_top_k: usize,
+    /// Coherence alignment loss weight (default: 0.0 = off).
+    coherence_alignment_weight: f32,
 }
 
 fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
@@ -350,6 +353,7 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
         freeze_embeddings: false,
         sample_temperature: 1.0,
         sample_top_k: 0,
+        coherence_alignment_weight: 0.0,
     };
 
     let mut i = 1;
@@ -496,6 +500,14 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
                     .parse()
                     .map_err(|_| "--top-k must be a positive integer")?;
             }
+            "--coherence-alignment" => {
+                i += 1;
+                opts.coherence_alignment_weight = args
+                    .get(i)
+                    .ok_or("--coherence-alignment requires a number")?
+                    .parse()
+                    .map_err(|_| "--coherence-alignment must be a float")?;
+            }
             "--help" | "-h" => {
                 print_usage();
                 process::exit(0);
@@ -541,5 +553,6 @@ fn print_usage() {
     eprintln!("  --freeze-embeddings   Only train CfC network, keep embeddings frozen");
     eprintln!("  --temperature F       Sampling temperature for --samples (default: 1.0)");
     eprintln!("  --top-k N             Top-k sampling for --samples (default: 0 = off)");
+    eprintln!("  --coherence-alignment F  Coherence alignment loss weight (default: 0.0 = off)");
     eprintln!("  --help, -h           Show this help message");
 }

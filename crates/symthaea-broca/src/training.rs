@@ -244,6 +244,13 @@ pub struct TrainingConfig {
     pub coherence_collapse_threshold: f32,
 
     // ── Training-Time Fusion ──
+    /// Weight for coherence alignment loss (0.0 = disabled).
+    /// When > 0, adds `weight * (1 - cosine(output_hv, thought_hv))` to per-token loss.
+    /// This trains the CfC to keep output representationally aligned with input thought.
+    /// Recommended: 0.1-0.3.
+    pub coherence_alignment_weight: f32,
+
+    // ── Training-Time Fusion ──
     /// Enable fusion flags on the generator's controller during training.
     /// When true, compositional logits, adaptive dt, and adaptive alpha are
     /// activated before the training loop begins, so BPTT gradients flow through
@@ -285,6 +292,7 @@ impl Default for TrainingConfig {
             enable_smoke_test: false,
             smoke_test_coherence_threshold: 0.05,
             coherence_collapse_threshold: 0.05,
+            coherence_alignment_weight: 0.0,
             enable_fusion_during_training: false,
             fusion_warmup_epochs: 0,
         }
@@ -748,9 +756,11 @@ pub fn train_with_adam(
     let mut force_train_network = false;
 
     // Track whether coherence telemetry is needed
+    let track_alignment = config.coherence_alignment_weight > 0.0;
     let track_coherence = config.coherence_loss_weight > 0.0
         || config.enable_diagnostics
-        || config.enable_anomaly_response;
+        || config.enable_anomaly_response
+        || track_alignment;
 
     for epoch in 0..config.epochs {
         // Training-time fusion: enable/disable fusion flags based on epoch.
@@ -861,14 +871,21 @@ pub fn train_with_adam(
                     let coherence = output_hv.similarity(&thought_hv);
                     coherence_sum += coherence;
                     coherence_count += 1;
-                    if effective_coherence_weight > 0.0 {
+                    let mut adjusted_loss = if effective_coherence_weight > 0.0 {
                         // weight = 1.0 when coherence=1.0, lower when coherence drops
                         let weight =
                             (1.0 - effective_coherence_weight * (1.0 - coherence)).max(0.05);
                         raw_loss * weight
                     } else {
                         raw_loss
+                    };
+                    // Coherence alignment loss: penalizes output-thought divergence
+                    if track_alignment {
+                        let alignment_penalty =
+                            config.coherence_alignment_weight * (1.0 - coherence).max(0.0);
+                        adjusted_loss += alignment_penalty;
                     }
+                    adjusted_loss
                 } else {
                     raw_loss
                 };
@@ -2883,6 +2900,88 @@ mod tests {
     fn test_coherence_warmup_default_zero() {
         let cfg = TrainingConfig::default();
         assert_eq!(cfg.coherence_warmup_epochs, 0);
+    }
+
+    /// Quality regression test: train with fusion enabled, verify no degradation.
+    ///
+    /// Trains 15 epochs with fusion flags on from epoch 5, then evaluates.
+    /// Asserts: loss decreases, output changes from pre-training, all values finite.
+    /// This is the automated gate preventing future changes from silently
+    /// degrading generation quality when fusion is active.
+    #[test]
+    fn test_fusion_training_quality_regression() {
+        use crate::encoder::ThoughtChannels;
+        use crate::generator::{BrocaConfig, BrocaGenerator, SamplingStrategy};
+
+        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("fusion-regression");
+        let config = BrocaConfig {
+            controller: crate::controller::LanguageControllerConfig {
+                network_layers: 2,
+                neurons_per_layer: 4,
+                vocab_size: 32,
+                max_seq_len: 32,
+                ..Default::default()
+            },
+            gating: crate::gating::GatingConfig {
+                base_max_tokens: 20,
+                ..Default::default()
+            },
+            sampling: SamplingStrategy::Greedy,
+            enable_coherence_feedback: true,
+            enable_semantic_veto: false,
+            ..Default::default()
+        };
+
+        let mut gen = BrocaGenerator::new(&genesis, config);
+        let tok = gen.tokenizer().clone();
+
+        // Build small dataset
+        let mut dataset = TrainingDataset::default();
+        for intent in 0..4 {
+            let channels = ThoughtChannels::with_intent(intent);
+            dataset.push(TrainingPair::new(channels, "hello world".to_string(), &tok));
+        }
+
+        // Pre-training baseline
+        let pre_result = gen.generate(&ThoughtChannels::default());
+
+        // Train WITH fusion enabled from epoch 5
+        let train_config = TrainingConfig {
+            epochs: 15,
+            learning_rate: 0.01,
+            bptt_window: 8,
+            use_adam: true,
+            train_network: true,
+            network_lr_scale: 0.3,
+            embedding_target_norm: 128.0,
+            enable_fusion_during_training: true,
+            fusion_warmup_epochs: 5,
+            ..Default::default()
+        };
+
+        let metrics = train(&mut gen, &dataset, &train_config);
+
+        // Verify training reduced loss
+        let first_loss = metrics[0].avg_loss;
+        let final_loss = metrics.last().unwrap().avg_loss;
+        assert!(
+            final_loss < first_loss,
+            "Fusion training should reduce loss: {first_loss:.4} → {final_loss:.4}"
+        );
+
+        // Verify all metrics are finite
+        for m in &metrics {
+            assert!(
+                m.avg_loss.is_finite(),
+                "Loss should be finite at epoch {}",
+                m.epoch
+            );
+        }
+
+        // Verify fusion training changed behavior (weights updated)
+        let post_result = gen.generate(&ThoughtChannels::default());
+        let changed = pre_result.token_ids != post_result.token_ids;
+        assert!(changed, "Fusion training should change generator behavior");
     }
 }
 

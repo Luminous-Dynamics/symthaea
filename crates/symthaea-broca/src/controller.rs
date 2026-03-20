@@ -85,6 +85,14 @@ pub struct LanguageControllerConfig {
     /// Maximum dt (seconds) used when coherence is low (drifting). Default 0.08.
     #[serde(default = "default_dt_max")]
     pub dt_max: f32,
+
+    // ── W3.1: Orthogonal Positional Encoding ──
+    /// Replace cyclic permutation with Gram-Schmidt orthogonal position bases.
+    #[serde(default)]
+    pub enable_orthogonal_positions: bool,
+    /// Number of orthogonal position vectors to generate. Default 512.
+    #[serde(default = "default_orthogonal_position_count")]
+    pub orthogonal_position_count: usize,
 }
 
 fn default_logit_scale() -> f32 {
@@ -113,6 +121,10 @@ fn default_dt_min() -> f32 {
 
 fn default_dt_max() -> f32 {
     0.08
+}
+
+fn default_orthogonal_position_count() -> usize {
+    512
 }
 
 impl Default for LanguageControllerConfig {

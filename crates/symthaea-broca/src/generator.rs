@@ -65,10 +65,18 @@ pub struct BrocaConfig {
     /// If `None`, uses thread-local RNG (stochastic).
     #[serde(default)]
     pub sampling_seed: Option<u64>,
+    /// Insert spaces between word tokens automatically (default: true).
+    /// BPE vocab stores spaces as separate tokens. Untrained models don't emit them.
+    #[serde(default = "default_auto_spacing")]
+    pub enable_auto_spacing: bool,
 }
 
 fn default_repetition_penalty() -> f32 {
     1.5
+}
+
+fn default_auto_spacing() -> bool {
+    true
 }
 
 impl Default for BrocaConfig {
@@ -85,6 +93,7 @@ impl Default for BrocaConfig {
             veto_hesitation: "-- wait, ".to_string(),
             repetition_penalty: default_repetition_penalty(),
             sampling_seed: None,
+            enable_auto_spacing: true,
         }
     }
 }
@@ -514,6 +523,17 @@ impl BrocaGenerator {
             // Skip special tokens in output
             if !self.tokenizer.is_special(next_token) {
                 let token_str = self.tokenizer.token_str(next_token);
+                // Auto-spacing: insert space between consecutive alphanumeric tokens
+                if self.config.enable_auto_spacing {
+                    if let (Some(&last_byte), Some(&first_byte)) =
+                        (text_bytes.last(), token_str.as_bytes().first())
+                    {
+                        if last_byte.is_ascii_alphanumeric() && first_byte.is_ascii_alphanumeric() {
+                            text_bytes.push(b' ');
+                            on_token(" ");
+                        }
+                    }
+                }
                 // Decode byte tokens (<0xHH>) to raw bytes for proper UTF-8
                 if token_str.starts_with("<0x") && token_str.ends_with('>') && token_str.len() == 6
                 {
