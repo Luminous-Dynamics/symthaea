@@ -913,3 +913,89 @@ pub const CROSS_MODAL_BINDING_MOMENTUM: f32 = 0.9;
 
 /// Cross-modal binding EMA alpha.
 pub const CROSS_MODAL_BINDING_ALPHA: f32 = 0.1;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// OUTPUT PHASE — TELEMETRY OBSERVABILITY THRESHOLDS
+// Science: Dehaene (2014) — global workspace observability requires threshold
+// gating to distinguish meaningful state changes from noise.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Conflict exploration boost increment (per-cycle delta).
+/// Basis: Botvinick et al. (2001) — ACC conflict → exploration.
+pub const CONFLICT_EXPLORATION_INCREMENT: f64 = 0.02;
+/// Confidence velocity threshold for rising-confidence dampening detection.
+/// Basis: Schultz (2016) — rising confidence at this rate warrants caution.
+pub const CONFIDENCE_VELOCITY_RISING_THRESHOLD: f32 = 0.02;
+/// Flow state intensity threshold for LR boost telemetry.
+/// Basis: Csikszentmihalyi (1990) — flow below this is too weak to modulate.
+pub const FLOW_INTENSITY_TELEMETRY_THRESHOLD: f32 = 0.5;
+/// FEP accuracy threshold for efficiency detection.
+/// Basis: Friston (2010) — accurate prediction signals good model fit.
+pub const FEP_ACCURACY_EFFICIENCY_THRESHOLD: f64 = 0.5;
+/// FEP complexity threshold for efficiency detection (below = efficient).
+/// Basis: Friston (2010) — low complexity = parsimonious model.
+pub const FEP_COMPLEXITY_EFFICIENCY_THRESHOLD: f64 = 0.5;
+/// Living mind vitality high threshold (above = feedback modulation).
+/// Basis: Thompson (2007) — autopoietic vitality above threshold sustains cognition.
+pub const LIVING_MIND_VITALITY_HIGH: f64 = 0.6;
+/// Living mind vitality low threshold (below = dampened cognition).
+/// Basis: Thompson (2007) — autopoietic vitality below threshold indicates depleted self-maintenance.
+pub const LIVING_MIND_VITALITY_LOW: f64 = 0.3;
+/// Meta-cognitive accuracy low threshold for dampening.
+/// Basis: Fleming & Dolan (2012) — poor metacognition warrants caution.
+pub const META_COGNITIVE_ACCURACY_LOW: f32 = 0.3;
+/// Predictive self-safety high threshold for LR boost.
+/// Basis: Seth (2013) — strong interoceptive self-model permits faster learning.
+pub const PREDICTIVE_SELF_SAFETY_HIGH: f32 = 0.7;
+/// Embodied agency stable range: lower bound.
+/// Basis: Gallagher (2005) — sense of agency requires moderate range.
+pub const EMBODIED_AGENCY_STABLE_MIN: f64 = 0.4;
+/// Embodied agency stable range: upper bound.
+/// Basis: Gallagher (2005) — excessive agency signal suggests over-attribution.
+pub const EMBODIED_AGENCY_STABLE_MAX: f64 = 0.6;
+/// Attention schema control signal fatigue threshold (below = fatigued).
+/// Basis: Graziano (2013) — low control signal = attentional depletion.
+pub const ATTENTION_SCHEMA_FATIGUE_THRESHOLD: f32 = 0.4;
+/// Anomaly recovery PSI acceleration multiplier.
+/// Basis: Carver & Scheier (1998) — post-anomaly recovery acceleration.
+pub const ANOMALY_RECOVERY_PSI_MULTIPLIER: f32 = 1.05;
+/// Consolidation consciousness offset (subtracted from EMA).
+/// Basis: Dehaene & Changeux (2011) — consolidation threshold sits below conscious access level.
+pub const CONSOLIDATION_CONSCIOUSNESS_OFFSET: f64 = 0.1;
+/// Consolidation threshold minimum clamp.
+/// Basis: Dehaene & Changeux (2011) — minimum ignition threshold for conscious access.
+pub const CONSOLIDATION_THRESHOLD_MIN: f64 = 0.2;
+/// Confidence velocity falling threshold for crash detection.
+/// Basis: Yu & Dayan (2005) — rapid confidence drops signal unexpected uncertainty.
+pub const CONFIDENCE_VELOCITY_FALLING_THRESHOLD: f32 = -0.05;
+/// Error slope threshold for memory consolidation trigger.
+/// Basis: Rao & Ballard (1999) — rising PE slope signals model surprise.
+pub const ERROR_SLOPE_CONSOLIDATION_THRESHOLD: f32 = 0.03;
+
+// ── Modulation observability thresholds (high/low pairs) ─────────────────
+// Science: Tononi (2004) — IIT requires transparency about integration state.
+pub const EPISTEMIC_PHI_HIGH: f32 = 0.6;
+pub const EPISTEMIC_PHI_LOW: f32 = 0.2;
+pub const PHENOMENAL_BINDING_HIGH: f32 = 0.7;
+pub const PHENOMENAL_BINDING_LOW: f32 = 0.15;
+pub const TEMPORAL_COHERENCE_HIGH: f32 = 0.75;
+pub const TEMPORAL_COHERENCE_LOW: f32 = 0.15;
+pub const HOLOGRAPHIC_UNITY_HIGH: f32 = 0.7;
+pub const HOLOGRAPHIC_UNITY_LOW: f32 = 0.15;
+pub const HARMONIES_ALIGNMENT_HIGH: f32 = 0.8;
+pub const HARMONIES_ALIGNMENT_LOW: f32 = 0.2;
+pub const CONSCIOUSNESS_GRADIENT_LR_MOD_THRESHOLD: f32 = 0.05;
+pub const VALUE_CACHE_HIT_RATE_LOW: f32 = 0.3;
+pub const VALUE_CACHE_HIT_RATE_HIGH: f32 = 0.9;
+pub const CONSCIOUSNESS_STATE_LEVEL_HIGH: f32 = 0.7;
+pub const CONSCIOUSNESS_STATE_LEVEL_LOW: f32 = 0.2;
+pub const LIVING_MIND_VITALITY_MOD_HIGH: f64 = 0.7;
+pub const LIVING_MIND_VITALITY_MOD_LOW: f64 = 0.3;
+pub const LIVING_MIND_COHERENCE_MOD_HIGH: f64 = 0.7;
+pub const LIVING_MIND_COHERENCE_MOD_LOW: f64 = 0.3;
+pub const MCTS_EFFECTIVENESS_MOD_HIGH: f32 = 0.6;
+pub const MCTS_EFFECTIVENESS_MOD_LOW: f32 = 0.2;
+pub const RESONATOR_SIMILARITY_HIGH: f32 = 0.8;
+pub const RESONATOR_SIMILARITY_LOW: f32 = 0.3;
+pub const BINDING_STRENGTH_TELEMETRY_HIGH: f32 = 0.7;
+pub const BINDING_STRENGTH_TELEMETRY_LOW: f32 = 0.3;

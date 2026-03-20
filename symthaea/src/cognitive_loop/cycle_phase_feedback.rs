@@ -1001,6 +1001,7 @@ impl CognitiveLoopService {
         // High prediction error → faster ontology adaptation (Rescorla-Wagner 1972).
         if let Some(ref mut km) = self.knowledge_manager {
             km.set_ontology_lr_from_pe(prediction_error as f32);
+            km.modulate_lr_from_consciousness(self.stats.unified_psi as f64);
         }
 
         // Theta phase → Phi modulation (Buzsáki 2006).
@@ -1332,6 +1333,25 @@ impl CognitiveLoopService {
                         * PHI_RELATIONAL_OXY_SCALE;
                     self.neuromod.bath.oxytocin.produce(oxy as f32);
                 }
+            }
+        }
+
+        // ── Consciousness → Neuromod reverse coupling ────────────────────
+        // Science: Dehaene & Changeux (2011) — conscious access modulates
+        // catecholamine release.
+        {
+            let psi = self.stats.unified_psi;
+            if psi > 0.7 {
+                let da_signal = ((psi - 0.7) * 0.15).min(0.1) as f32;
+                self.neuromod.bath.dopamine.produce(da_signal);
+            }
+            if psi > 0.5 {
+                let sht_signal = ((psi - 0.5) * 0.1).min(0.05) as f32;
+                self.neuromod.bath.serotonin.produce(sht_signal);
+            }
+            if psi < 0.3 && psi > 0.0 {
+                let ne_signal = ((0.3 - psi) * 0.12).min(0.08) as f32;
+                self.neuromod.bath.noradrenaline.produce(ne_signal);
             }
         }
 
