@@ -1060,9 +1060,33 @@ async fn smoke_test_finance_bridge_health() {
         .expect("Failed to setup app")
         .into_tuple();
 
-    let health: FinanceBridgeHealth = conductor
-        .call(&agent.zome("finance_bridge"), "health_check", ())
-        .await;
+    // Retry loop for BadNonce — conductor may need time to fully initialize
+    // WASM validation on slow systems. Nonce TTL is 5 minutes.
+    let mut health: Option<FinanceBridgeHealth> = None;
+    for attempt in 0..5 {
+        match conductor
+            .call_fallible::<_, FinanceBridgeHealth>(&agent.zome("finance_bridge"), "health_check", ())
+            .await
+        {
+            Ok(h) => {
+                health = Some(h);
+                break;
+            }
+            Err(e) => {
+                let err = format!("{:?}", e);
+                if err.contains("BadNonce") || err.contains("Expired") {
+                    eprintln!(
+                        "Attempt {}/5: BadNonce (conductor still initializing), retrying in 30s...",
+                        attempt + 1
+                    );
+                    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                } else {
+                    panic!("Unexpected error on health_check: {}", err);
+                }
+            }
+        }
+    }
+    let health = health.expect("health_check failed after 5 retries (conductor may need more time)");
 
     assert!(health.healthy, "Bridge should be healthy");
     assert!(
