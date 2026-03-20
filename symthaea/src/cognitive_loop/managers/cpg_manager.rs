@@ -596,6 +596,9 @@ impl CognitiveSubsystem for CpgManager {
     }
 
     fn restore(&mut self, data: &[u8]) -> Result<(), String> {
+        if data.is_empty() {
+            return Err("CpgManager restore: empty checkpoint data".to_string());
+        }
         let (oscillators, sync_index, sim_time, config): (Vec<CpgOscillator>, f64, f64, CpgConfig) =
             serde_json::from_slice(data).map_err(|e| format!("CpgManager restore failed: {e}"))?;
         self.oscillators = oscillators;

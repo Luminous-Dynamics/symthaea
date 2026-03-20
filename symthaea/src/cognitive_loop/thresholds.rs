@@ -5185,6 +5185,56 @@ pub const SENTINEL_THREAT_CRITICAL: f32 = 0.6;
 pub const SENTINEL_CONFIDENCE_DAMPEN_SCALE: f64 = 0.05;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// GUIDING QUESTION — Top-down attention modulation
+// Basis: Desimone & Duncan (1995) — biased competition for task-relevant features
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Exploration boost for epistemic guiding questions ("know", "learn", "understand").
+/// Basis: Gottlieb et al. (2013) — curiosity-driven exploration.
+pub const GUIDING_EPISTEMIC_EXPLORATION_BOOST: f64 = 0.03;
+
+/// Confidence boost for affective guiding questions ("feel", "emotion", "care").
+/// Basis: Damasio (1994) — somatic marker hypothesis, emotional salience.
+pub const GUIDING_AFFECTIVE_CONFIDENCE_BOOST: f64 = 0.01;
+
+/// Learning rate factor for pragmatic guiding questions ("do", "act", "make").
+/// Basis: Dolan & Dayan (2013) — action-oriented processing boosts learning.
+pub const GUIDING_PRAGMATIC_LR_FACTOR: f64 = 1.02;
+
+/// Confidence boost for social guiding questions ("connect", "relate", "together").
+/// Basis: Woolley et al. (2010) — social coherence sensitivity.
+pub const GUIDING_SOCIAL_CONFIDENCE_BOOST: f64 = 0.02;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CIVIC CRISIS DETECTOR — Classification and severity
+// Basis: Friston (2010) — prediction error; Tononi (2004) — Phi collapse
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Minimum threshold denominator to prevent division by zero in confidence computation.
+pub const CRISIS_CONFIDENCE_MIN_DENOMINATOR: f64 = 0.001;
+
+/// Maximum signal strength multiplier in confidence computation.
+pub const CRISIS_CONFIDENCE_MAX_SIGNAL: f64 = 2.0;
+
+/// Safety ordinal threshold for Red level (CyberAttack classification).
+pub const CRISIS_SAFETY_RED_ORDINAL: u8 = 3;
+
+/// Safety ordinal threshold for Orange level.
+pub const CRISIS_SAFETY_ORANGE_ORDINAL: u8 = 2;
+
+/// Severity boost when safety level is Red.
+pub const CRISIS_SEVERITY_BOOST_RED: u8 = 2;
+
+/// Severity boost when safety level is Orange.
+pub const CRISIS_SEVERITY_BOOST_ORANGE: u8 = 1;
+
+/// Minimum crisis severity.
+pub const CRISIS_SEVERITY_MIN: u8 = 1;
+
+/// Maximum crisis severity.
+pub const CRISIS_SEVERITY_MAX: u8 = 5;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -6816,5 +6866,18 @@ mod tests {
 
         // CPG manager (additional)
         assert!(CPG_DESYNC_AROUSAL_DELTA > 0.0);
+
+        // Guiding question
+        assert!(GUIDING_EPISTEMIC_EXPLORATION_BOOST > 0.0);
+        assert!(GUIDING_AFFECTIVE_CONFIDENCE_BOOST > 0.0);
+        assert!(GUIDING_PRAGMATIC_LR_FACTOR >= 1.0);
+        assert!(GUIDING_SOCIAL_CONFIDENCE_BOOST > 0.0);
+
+        // Civic crisis detector
+        assert!(CRISIS_CONFIDENCE_MIN_DENOMINATOR > 0.0);
+        assert!(CRISIS_CONFIDENCE_MAX_SIGNAL > 1.0);
+        assert!(CRISIS_SAFETY_RED_ORDINAL > CRISIS_SAFETY_ORANGE_ORDINAL);
+        assert!(CRISIS_SEVERITY_BOOST_RED > CRISIS_SEVERITY_BOOST_ORANGE);
+        assert!(CRISIS_SEVERITY_MAX > CRISIS_SEVERITY_MIN);
     }
 }

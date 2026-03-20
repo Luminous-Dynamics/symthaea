@@ -400,6 +400,9 @@ impl CognitiveSubsystem for SpectralManager {
     }
 
     fn restore(&mut self, data: &[u8]) -> Result<(), String> {
+        if data.is_empty() {
+            return Err("SpectralManager restore: empty checkpoint data".to_string());
+        }
         let (config, telemetry): (SpectralManagerConfig, SpectralTelemetry) =
             serde_json::from_slice(data)
                 .map_err(|e| format!("SpectralManager restore failed: {e}"))?;

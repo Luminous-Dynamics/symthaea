@@ -727,16 +727,17 @@ impl CognitiveSubsystem for GovernanceManager {
     }
 
     fn checkpoint(&self) -> Vec<u8> {
-        let mut data = Vec::with_capacity(16);
+        // Layout: [reward_ema: f64 = 8] = 8 bytes total.
+        // Note: outcome_history is transient — it rebuilds from live governance events.
+        let mut data = Vec::with_capacity(8);
         data.extend_from_slice(&self.reward_ema.to_le_bytes());
-        data.extend_from_slice(&(self.outcome_history.len() as u32).to_le_bytes());
         data
     }
 
     fn restore(&mut self, data: &[u8]) -> Result<(), String> {
-        if data.len() < 12 {
+        if data.len() < 8 {
             return Err(format!(
-                "GovernanceManager checkpoint too short: {} < 12",
+                "GovernanceManager checkpoint too short: {} < 8",
                 data.len()
             ));
         }
