@@ -381,6 +381,10 @@ pub struct MycelixBridge {
     /// Monotonically increasing correlation ID counter.
     #[cfg(feature = "mycelix")]
     next_correlation_id: u64,
+    /// HyperFeel encoder for gradient compression (2000x via JL projection).
+    /// Feature-gated: only available when the mycelix SDK is linked.
+    #[cfg(feature = "mycelix_sdk")]
+    hyperfeel_encoder: HyperFeelEncoder,
 }
 
 /// Commands dispatched to an external Holochain conductor process.
@@ -458,6 +462,8 @@ impl MycelixBridge {
             pending_confirmations: HashMap::new(),
             #[cfg(feature = "mycelix")]
             next_correlation_id: 1,
+            #[cfg(feature = "mycelix_sdk")]
+            hyperfeel_encoder: HyperFeelEncoder::new(EncodingConfig::default()),
         }
     }
 
@@ -481,6 +487,8 @@ impl MycelixBridge {
             pending_confirmations: HashMap::new(),
             #[cfg(feature = "mycelix")]
             next_correlation_id: 1,
+            #[cfg(feature = "mycelix_sdk")]
+            hyperfeel_encoder: HyperFeelEncoder::new(EncodingConfig::default()),
         }
     }
 
@@ -802,19 +810,62 @@ impl MycelixBridge {
         }
     }
 
-    /// Create compressed gradient for efficient transmission
-    pub fn create_compressed_gradient(&self, round: u64) -> CompressedValueGradient {
-        // In real implementation:
-        // 1. Encode harmony importance deltas as gradient
-        // 2. Compress using HyperFeel (2000x compression)
-        // 3. Return compressed form
+    /// Create compressed gradient for efficient transmission.
+    ///
+    /// When the `mycelix_sdk` feature is enabled, this encodes pending value
+    /// updates into a 2KB HyperGradient via Johnson-Lindenstrauss projection.
+    /// Without the SDK, returns a zero placeholder (backward compatible).
+    pub fn create_compressed_gradient(&mut self, round: u64) -> CompressedValueGradient {
+        #[cfg(feature = "mycelix_sdk")]
+        {
+            use super::eight_harmonies::Harmony;
 
-        CompressedValueGradient {
-            harmony_encoding: vec![0u8; 256],    // Placeholder
-            importance_gradient: vec![0u8; 256], // Placeholder
-            round,
-            agent_id: self.agent_id.clone(),
-            compression_ratio: 2000.0,
+            // Build a gradient vector from pending updates: 8 harmonies × 10 dimensions.
+            let harmony_names: &[&str] = &[
+                "CommunalVoice",
+                "EcologicalWisdom",
+                "IntergenerationalStewardship",
+                "RadicalCompassion",
+                "SovereignInterdependence",
+                "TransparentAccountability",
+                "EvolutionaryProgression",
+                "SacredStillness",
+            ];
+            let mut gradient = vec![0.0f32; harmony_names.len() * 10];
+
+            for update in &self.pending_updates {
+                if let Some(idx) = harmony_names.iter().position(|&h| h == update.harmony) {
+                    let base_idx = idx * 10;
+                    gradient[base_idx] += update.importance_delta as f32;
+                    if base_idx + 1 < gradient.len() {
+                        gradient[base_idx + 1] += update.affirmation_delta as f32 * 0.1;
+                    }
+                    if base_idx + 2 < gradient.len() {
+                        gradient[base_idx + 2] += update.phi_at_learning as f32 * 0.5;
+                    }
+                }
+            }
+
+            let hyper_gradient =
+                self.hyperfeel_encoder
+                    .encode_gradient(&gradient, round as u32, &self.agent_id);
+            CompressedValueGradient {
+                harmony_encoding: hyper_gradient.hypervector.clone(),
+                importance_gradient: hyper_gradient.gradient_hash.to_vec(),
+                round,
+                agent_id: self.agent_id.clone(),
+                compression_ratio: hyper_gradient.compression_ratio as f64,
+            }
+        }
+        #[cfg(not(feature = "mycelix_sdk"))]
+        {
+            CompressedValueGradient {
+                harmony_encoding: vec![0u8; 256],
+                importance_gradient: vec![0u8; 256],
+                round,
+                agent_id: self.agent_id.clone(),
+                compression_ratio: 2000.0,
+            }
         }
     }
 

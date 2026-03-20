@@ -124,14 +124,11 @@ impl EpistemicMathResult {
             0.0
         };
 
-        let soundness =
-            Self::classify_soundness(error_bound, method_agreement, multipath_verified);
+        let soundness = Self::classify_soundness(error_bound, method_agreement, multipath_verified);
 
         // Confidence is the max of base_confidence and soundness floor,
         // scaled by method agreement.
-        let confidence = base_confidence
-            .max(soundness.confidence_floor())
-            .min(1.0)
+        let confidence = base_confidence.max(soundness.confidence_floor()).min(1.0)
             * (0.5 + 0.5 * method_agreement);
 
         let mut caveats = Vec::new();
@@ -159,9 +156,7 @@ impl EpistemicMathResult {
             caveats.push("Result is infinite; possible singularity or overflow".to_string());
         }
         if method_count == 1 {
-            caveats.push(
-                "Only one method available; no cross-validation possible".to_string(),
-            );
+            caveats.push("Only one method available; no cross-validation possible".to_string());
         }
 
         EpistemicMathResult {
@@ -320,7 +315,10 @@ mod tests {
         assert!(result.confidence >= 0.5);
         assert!(result.is_actionable());
         // Should have a caveat about not being verified
-        assert!(result.caveats.iter().any(|c| c.contains("not independently verified")));
+        assert!(result
+            .caveats
+            .iter()
+            .any(|c| c.contains("not independently verified")));
     }
 
     #[test]
@@ -335,65 +333,54 @@ mod tests {
     #[test]
     fn test_error_bound_propagation() {
         // Small error → Probable
-        let small_err = EpistemicMathResult::from_computation(
-            42.0, 1e-8, false, 2, 1, 0.8,
-        );
+        let small_err = EpistemicMathResult::from_computation(42.0, 1e-8, false, 2, 1, 0.8);
         assert!(small_err.error_bound < 1e-6);
         assert!(small_err.soundness == SoundnessLevel::Probable);
 
         // Large error → Uncertain
-        let large_err = EpistemicMathResult::from_computation(
-            42.0, 1.0, false, 2, 1, 0.8,
-        );
+        let large_err = EpistemicMathResult::from_computation(42.0, 1.0, false, 2, 1, 0.8);
         assert_eq!(large_err.soundness, SoundnessLevel::Uncertain);
-        assert!(large_err.caveats.iter().any(|c| c.contains("Numerical error")));
+        assert!(large_err
+            .caveats
+            .iter()
+            .any(|c| c.contains("Numerical error")));
     }
 
     #[test]
     fn test_caveat_generation() {
         // NaN result should generate NaN caveat
-        let nan_result = EpistemicMathResult::from_computation(
-            f64::NAN, 0.0, false, 1, 0, 0.1,
-        );
+        let nan_result = EpistemicMathResult::from_computation(f64::NAN, 0.0, false, 1, 0, 0.1);
         assert!(nan_result.caveats.iter().any(|c| c.contains("NaN")));
 
         // Infinite result
-        let inf_result = EpistemicMathResult::from_computation(
-            f64::INFINITY, 0.0, false, 1, 0, 0.1,
-        );
+        let inf_result =
+            EpistemicMathResult::from_computation(f64::INFINITY, 0.0, false, 1, 0, 0.1);
         assert!(inf_result.caveats.iter().any(|c| c.contains("infinite")));
 
         // Low method agreement
-        let low_agree = EpistemicMathResult::from_computation(
-            1.0, 1e-8, false, 4, 1, 0.7,
-        );
-        assert!(low_agree.caveats.iter().any(|c| c.contains("Low method agreement")));
+        let low_agree = EpistemicMathResult::from_computation(1.0, 1e-8, false, 4, 1, 0.7);
+        assert!(low_agree
+            .caveats
+            .iter()
+            .any(|c| c.contains("Low method agreement")));
 
         // Single method
-        let single = EpistemicMathResult::from_computation(
-            1.0, 1e-8, false, 1, 1, 0.8,
-        );
+        let single = EpistemicMathResult::from_computation(1.0, 1e-8, false, 1, 1, 0.8);
         assert!(single.caveats.iter().any(|c| c.contains("Only one method")));
     }
 
     #[test]
     fn test_method_agreement_score() {
         // All methods agree
-        let all_agree = EpistemicMathResult::from_computation(
-            1.0, 1e-12, true, 3, 3, 0.99,
-        );
+        let all_agree = EpistemicMathResult::from_computation(1.0, 1e-12, true, 3, 3, 0.99);
         assert!((all_agree.method_agreement - 1.0).abs() < 1e-10);
 
         // Half agree
-        let half_agree = EpistemicMathResult::from_computation(
-            1.0, 1e-8, false, 4, 2, 0.8,
-        );
+        let half_agree = EpistemicMathResult::from_computation(1.0, 1e-8, false, 4, 2, 0.8);
         assert!((half_agree.method_agreement - 0.5).abs() < 1e-10);
 
         // None agree (zero of zero)
-        let none = EpistemicMathResult::from_computation(
-            1.0, 1.0, false, 0, 0, 0.1,
-        );
+        let none = EpistemicMathResult::from_computation(1.0, 1.0, false, 0, 0, 0.1);
         assert!((none.method_agreement - 0.0).abs() < 1e-10);
     }
 

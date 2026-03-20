@@ -1174,13 +1174,28 @@ impl MathService {
 
         let mut raw = Vec::new();
         if brent.converged {
-            raw.push(RawCandidate { root: brent.root, iterations: brent.iterations, converged: true, method: "brent" });
+            raw.push(RawCandidate {
+                root: brent.root,
+                iterations: brent.iterations,
+                converged: true,
+                method: "brent",
+            });
         }
         if bisect.converged {
-            raw.push(RawCandidate { root: bisect.root, iterations: bisect.iterations, converged: true, method: "bisection" });
+            raw.push(RawCandidate {
+                root: bisect.root,
+                iterations: bisect.iterations,
+                converged: true,
+                method: "bisection",
+            });
         }
         if newton.converged {
-            raw.push(RawCandidate { root: newton.root, iterations: newton.iterations, converged: true, method: "newton_raphson" });
+            raw.push(RawCandidate {
+                root: newton.root,
+                iterations: newton.iterations,
+                converged: true,
+                method: "newton_raphson",
+            });
         }
 
         if raw.is_empty() {
@@ -1190,8 +1205,15 @@ impl MathService {
         let mut solutions: Vec<PhiRankedSolution> = raw
             .iter()
             .map(|candidate| {
-                let agreeing = raw.iter().filter(|other| (other.root - candidate.root).abs() < 1e-6).count();
-                let agreement_bonus = if agreeing > 1 { 1.0 + 0.2 * (agreeing - 1) as f64 } else { 1.0 };
+                let agreeing = raw
+                    .iter()
+                    .filter(|other| (other.root - candidate.root).abs() < 1e-6)
+                    .count();
+                let agreement_bonus = if agreeing > 1 {
+                    1.0 + 0.2 * (agreeing - 1) as f64
+                } else {
+                    1.0
+                };
                 let proof_steps = candidate.iterations.max(1);
                 let verification_paths = agreeing;
                 let phi = agreement_bonus * (1.0 / proof_steps as f64) * verification_paths as f64;
@@ -1206,7 +1228,11 @@ impl MathService {
             })
             .collect();
 
-        solutions.sort_by(|a, b| b.phi.partial_cmp(&a.phi).unwrap_or(std::cmp::Ordering::Equal));
+        solutions.sort_by(|a, b| {
+            b.phi
+                .partial_cmp(&a.phi)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         if let Some(best) = solutions.first() {
             self.record_solve(MathProblemType::RootFinding, best.phi);
@@ -1737,10 +1763,8 @@ mod tests {
     #[test]
     fn test_single_method_fallback() {
         let mut service = MathService::new();
-        let solutions = service.solve_with_phi_ranking(
-            &|x: f64| (100.0 * (x - 1.0)).tanh(),
-            0.5, 1.5,
-        );
+        let solutions =
+            service.solve_with_phi_ranking(&|x: f64| (100.0 * (x - 1.0)).tanh(), 0.5, 1.5);
         assert!(!solutions.is_empty());
         let best = &solutions[0];
         assert!((best.result - 1.0).abs() < 0.01);

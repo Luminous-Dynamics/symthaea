@@ -9,9 +9,8 @@
 #![cfg(feature = "mesh")]
 
 use symthaea::cognitive_loop::{
-    CompressedDelta, ConsciousRoutingDecision, ConsciousnessAwareRouter,
-    OfflineExperience, OfflineExperienceKind, PayloadClass, PayloadClassifier, StoreAndForward,
-    ThreatObservation,
+    CompressedDelta, ConsciousRoutingDecision, ConsciousnessAwareRouter, OfflineExperience,
+    OfflineExperienceKind, PayloadClass, PayloadClassifier, StoreAndForward, ThreatObservation,
 };
 
 #[test]

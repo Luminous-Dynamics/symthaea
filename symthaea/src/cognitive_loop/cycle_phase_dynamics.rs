@@ -542,8 +542,7 @@ impl CognitiveLoopService {
                 if let Some(ref mut soul_mgr) = self.soul_manager {
                     if soul_mgr.should_run(cycle_num, urgency_u8) {
                         let soul_output = soul_mgr.process(snapshot);
-                        self.subsystem_collector
-                            .record("soul_manager", soul_output);
+                        self.subsystem_collector.record("soul_manager", soul_output);
                     }
                 }
 
@@ -3464,8 +3463,8 @@ impl CognitiveLoopService {
                 let overflow = (spectral_entropy - super::thresholds::SPECTRAL_ENTROPY_THRESHOLD)
                     / super::thresholds::SPECTRAL_ENTROPY_THRESHOLD;
                 // spectral_frac: 1.0 at threshold, MASK_FLOOR at 2× threshold
-                let spectral_frac = (1.0 - overflow as f32)
-                    .max(super::thresholds::SPECTRAL_ENTROPY_MASK_FLOOR);
+                let spectral_frac =
+                    (1.0 - overflow as f32).max(super::thresholds::SPECTRAL_ENTROPY_MASK_FLOOR);
                 // Don't over-mask: use the maximum of substrate and spectral fractions
                 let substrate_frac = self.substrate_manager.effective_dim_fraction();
                 let frac = substrate_frac.max(spectral_frac);
@@ -3479,7 +3478,9 @@ impl CognitiveLoopService {
                             tracing::warn!(err = %e, "spectral entropy mask inject failed");
                         }
                     } else {
-                        tracing::warn!("CfC read_state failed during spectral entropy mask — skipping mask");
+                        tracing::warn!(
+                            "CfC read_state failed during spectral entropy mask — skipping mask"
+                        );
                     }
                 }
             }
@@ -3493,23 +3494,24 @@ impl CognitiveLoopService {
         // Return the buffer to CLS for reuse next cycle (zero-alloc swap)
         self.cfc_input_buffer = input_array;
 
-        let prediction_coherence = if self.stats.total_cycles % super::thresholds::PREDICTION_COHERENCE_INTERVAL == 0 {
-            let coh = Self::compute_prediction_coherence_from_cache(&raw_predictions);
-            self.stats.avg_prediction_coherence = self.stats.avg_prediction_coherence
-                * COHERENCE_PREDICTION_EMA
-                + coh * (1.0 - COHERENCE_PREDICTION_EMA);
-            if coh < COHERENCE_LOW_THRESHOLD {
-                let coh_dampen = (COHERENCE_LOW_THRESHOLD - coh) * COHERENCE_LOW_DAMPEN_SCALE;
-                self.scale_confidence("pred_coherence_low", 1.0 - coh_dampen);
-            }
-            if coh > COHERENCE_HIGH_THRESHOLD {
-                let coh_boost = (coh - COHERENCE_HIGH_THRESHOLD) * COHERENCE_CONFIDENCE_BOOST;
-                self.adjust_confidence("pred_coherence_high", coh_boost);
-            }
-            coh
-        } else {
-            self.stats.avg_prediction_coherence
-        };
+        let prediction_coherence =
+            if self.stats.total_cycles % super::thresholds::PREDICTION_COHERENCE_INTERVAL == 0 {
+                let coh = Self::compute_prediction_coherence_from_cache(&raw_predictions);
+                self.stats.avg_prediction_coherence = self.stats.avg_prediction_coherence
+                    * COHERENCE_PREDICTION_EMA
+                    + coh * (1.0 - COHERENCE_PREDICTION_EMA);
+                if coh < COHERENCE_LOW_THRESHOLD {
+                    let coh_dampen = (COHERENCE_LOW_THRESHOLD - coh) * COHERENCE_LOW_DAMPEN_SCALE;
+                    self.scale_confidence("pred_coherence_low", 1.0 - coh_dampen);
+                }
+                if coh > COHERENCE_HIGH_THRESHOLD {
+                    let coh_boost = (coh - COHERENCE_HIGH_THRESHOLD) * COHERENCE_CONFIDENCE_BOOST;
+                    self.adjust_confidence("pred_coherence_high", coh_boost);
+                }
+                coh
+            } else {
+                self.stats.avg_prediction_coherence
+            };
 
         // 5b. Epistemic vs aleatoric uncertainty decomposition.
         // Epistemic (model uncertainty): prediction disagreement across horizons — reducible
@@ -3560,7 +3562,9 @@ impl CognitiveLoopService {
         } else {
             epistemic_uncertainty
         };
-        if eu_for_exploration > EPISTEMIC_EXPLORE_THRESHOLD && self.stats.total_cycles % super::thresholds::EPISTEMIC_MODULATION_INTERVAL == 0 {
+        if eu_for_exploration > EPISTEMIC_EXPLORE_THRESHOLD
+            && self.stats.total_cycles % super::thresholds::EPISTEMIC_MODULATION_INTERVAL == 0
+        {
             let mut epistemic_explore =
                 (eu_for_exploration - EPISTEMIC_EXPLORE_THRESHOLD) * EPISTEMIC_EXPLORE_SCALE;
             // Oscillation + high uncertainty = confused AND unstable → stronger exploration.
@@ -3569,7 +3573,9 @@ impl CognitiveLoopService {
                 epistemic_explore *= EPISTEMIC_OSCILLATION_MULTIPLIER;
             }
             self.adjust_exploration("epistemic_uncertainty", epistemic_explore);
-        } else if eu_for_exploration < EPISTEMIC_LOW_THRESHOLD && self.stats.total_cycles % super::thresholds::EPISTEMIC_MODULATION_INTERVAL == 0 {
+        } else if eu_for_exploration < EPISTEMIC_LOW_THRESHOLD
+            && self.stats.total_cycles % super::thresholds::EPISTEMIC_MODULATION_INTERVAL == 0
+        {
             // Low epistemic uncertainty → dampen exploration (model is confident).
             self.adjust_exploration("epistemic_low", -EPISTEMIC_LOW_DAMPEN);
         }
@@ -3856,47 +3862,52 @@ impl CognitiveLoopService {
             self.language_comm.voice_coherence.bridge.phi_contribution();
 
         #[cfg(feature = "school_learning")]
-        let school_predicted_phi_gain = if self.stats.total_cycles % super::thresholds::SCHOOL_LEARNING_INTERVAL == 0 {
-            if let Some(ref school) = self.feature_integ.school_bridge {
-                match school.recommend_next() {
-                    Ok(r) if r.predicted_phi_gain > 0.001 => r.predicted_phi_gain,
-                    Ok(_) => 0.0,
-                    Err(e) => {
-                        tracing::debug!(error = %e, "School bridge recommend_next failed");
-                        0.0
+        let school_predicted_phi_gain =
+            if self.stats.total_cycles % super::thresholds::SCHOOL_LEARNING_INTERVAL == 0 {
+                if let Some(ref school) = self.feature_integ.school_bridge {
+                    match school.recommend_next() {
+                        Ok(r) if r.predicted_phi_gain > 0.001 => r.predicted_phi_gain,
+                        Ok(_) => 0.0,
+                        Err(e) => {
+                            tracing::debug!(error = %e, "School bridge recommend_next failed");
+                            0.0
+                        }
                     }
+                } else {
+                    0.0
                 }
             } else {
                 0.0
-            }
-        } else {
-            0.0
-        };
+            };
         #[cfg(not(feature = "school_learning"))]
         let school_predicted_phi_gain = 0.0f32;
 
-        let causal_attention_boost = if self.stats.total_cycles % super::thresholds::CAUSAL_STRUCTURE_INTERVAL == 0 {
-            if let Some(ref mut cc) = self.feature_integ.causal_consciousness {
-                let vars: Vec<Vec<f64>> = perception
-                    .encoding
-                    .compressed_state
-                    .chunks(8)
-                    .map(|chunk: &[f32]| chunk.iter().map(|&v| v as f64).collect())
-                    .collect();
-                if vars.len() >= 2 {
-                    let attention = cc.attention.compute_attention(&vars);
-                    let top_strength = attention
-                        .iter()
-                        .enumerate()
-                        .flat_map(|(i, row)| {
-                            row.iter()
-                                .enumerate()
-                                .filter(move |&(j, _)| i != j)
-                                .map(|(_, &v)| v)
-                        })
-                        .fold(0.0f64, f64::max);
-                    if top_strength > CAUSAL_ATTENTION_STRENGTH_THRESHOLD as f64 {
-                        top_strength as f32
+        let causal_attention_boost =
+            if self.stats.total_cycles % super::thresholds::CAUSAL_STRUCTURE_INTERVAL == 0 {
+                if let Some(ref mut cc) = self.feature_integ.causal_consciousness {
+                    let vars: Vec<Vec<f64>> = perception
+                        .encoding
+                        .compressed_state
+                        .chunks(8)
+                        .map(|chunk: &[f32]| chunk.iter().map(|&v| v as f64).collect())
+                        .collect();
+                    if vars.len() >= 2 {
+                        let attention = cc.attention.compute_attention(&vars);
+                        let top_strength = attention
+                            .iter()
+                            .enumerate()
+                            .flat_map(|(i, row)| {
+                                row.iter()
+                                    .enumerate()
+                                    .filter(move |&(j, _)| i != j)
+                                    .map(|(_, &v)| v)
+                            })
+                            .fold(0.0f64, f64::max);
+                        if top_strength > CAUSAL_ATTENTION_STRENGTH_THRESHOLD as f64 {
+                            top_strength as f32
+                        } else {
+                            0.0
+                        }
                     } else {
                         0.0
                     }
@@ -3905,10 +3916,7 @@ impl CognitiveLoopService {
                 }
             } else {
                 0.0
-            }
-        } else {
-            0.0
-        };
+            };
         if causal_attention_boost > 0.0 {
             // Amplified from ×0.05 to be behaviorally meaningful.
             // Science: Pearl (2000) — strong causal structure justifies confidence.

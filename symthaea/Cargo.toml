@@ -61,6 +61,7 @@ members = [
     "crates/symthaea-clinical",
     "crates/symthaea-therapeutic",
     "crates/symthaea-hdc-store",
+    "crates/symthaea-mycelix-conductor",
     # DRM/KMS boot animation — needs Linux DRM headers; not in default-members.
     "crates/symthaea-quicken-fb",
     # Leptos CSR web frontend — WASM target, not in default-members.
@@ -430,7 +431,7 @@ wait-timeout = "0.2"
 # libsystemd removed: systemd feature was never implemented (no cfg gates, no code using libsystemd)
 
 [features]
-default = []
+default = ["default-mind"]
 parallel = []  # Rayon parallelism in cognitive loop (gate for WASM compat)
 
 # ── Binary build gates ──────────────────────────────────────────────
@@ -634,6 +635,7 @@ proptest = "1.4"
 serial_test = "3.2"
 symthaea-broca = { path = "crates/symthaea-broca" }
 symthaea-crucible = { path = "crates/symthaea-crucible" }
+symthaea-mycelix-conductor = { path = "crates/symthaea-mycelix-conductor" }
 tempfile = "3.8"  # For perception tests
 
 # Binaries

@@ -199,14 +199,14 @@ pub use managers::swarm_manager::{SwarmEvent, SwarmTelemetry};
 pub use subsystem_trait::{CognitiveSubsystem, CycleSnapshot, SubsystemOutput};
 
 #[cfg(feature = "mesh")]
+pub use managers::radio_dispatcher::{
+    ConsciousRoutingDecision, ConsciousnessAwareRouter, DiscoveryBeacon, OfflineExperience,
+    OfflineExperienceKind, StoreAndForward, ThreatObservation,
+};
+#[cfg(feature = "mesh")]
 pub use managers::{
     CompressedDelta, NetworkHealth, PayloadClass, PayloadClassifier, RadioTier, RoutingDecision,
     SpectrumManager, SpectrumObservation, SpectrumTelemetry,
-};
-#[cfg(feature = "mesh")]
-pub use managers::radio_dispatcher::{
-    ConsciousRoutingDecision, ConsciousnessAwareRouter, DiscoveryBeacon,
-    OfflineExperience, OfflineExperienceKind, StoreAndForward, ThreatObservation,
 };
 
 pub mod calibration;

@@ -727,28 +727,49 @@ mod tests {
         let (is_code, conf) = detector.detect("implement a function to sort arrays");
         assert!(is_code, "Should detect code task");
         assert!(conf > 0.0, "Confidence should be positive");
-        assert_eq!(detector.detect_task_type("implement a function"), CodeTaskType::Create);
+        assert_eq!(
+            detector.detect_task_type("implement a function"),
+            CodeTaskType::Create
+        );
     }
 
     #[test]
     fn test_code_task_detector_debug() {
         let detector = CodeTaskDetector::new();
-        assert_eq!(detector.detect_task_type("fix the bug in parser"), CodeTaskType::Debug);
-        assert_eq!(detector.detect_task_type("debug the crash"), CodeTaskType::Debug);
+        assert_eq!(
+            detector.detect_task_type("fix the bug in parser"),
+            CodeTaskType::Debug
+        );
+        assert_eq!(
+            detector.detect_task_type("debug the crash"),
+            CodeTaskType::Debug
+        );
     }
 
     #[test]
     fn test_code_task_detector_refactor() {
         let detector = CodeTaskDetector::new();
-        assert_eq!(detector.detect_task_type("refactor the module"), CodeTaskType::Refactor);
-        assert_eq!(detector.detect_task_type("optimize the algorithm"), CodeTaskType::Refactor);
+        assert_eq!(
+            detector.detect_task_type("refactor the module"),
+            CodeTaskType::Refactor
+        );
+        assert_eq!(
+            detector.detect_task_type("optimize the algorithm"),
+            CodeTaskType::Refactor
+        );
     }
 
     #[test]
     fn test_code_task_detector_explain() {
         let detector = CodeTaskDetector::new();
-        assert_eq!(detector.detect_task_type("explain how the function works"), CodeTaskType::Explain);
-        assert_eq!(detector.detect_task_type("what is a struct in rust"), CodeTaskType::Explain);
+        assert_eq!(
+            detector.detect_task_type("explain how the function works"),
+            CodeTaskType::Explain
+        );
+        assert_eq!(
+            detector.detect_task_type("what is a struct in rust"),
+            CodeTaskType::Explain
+        );
     }
 
     #[test]
@@ -756,7 +777,10 @@ mod tests {
         let detector = CodeTaskDetector::new();
         let (is_code, _) = detector.detect("hello how are you today");
         assert!(!is_code, "Should not detect code task in greeting");
-        assert_eq!(detector.detect_task_type("tell me about the weather"), CodeTaskType::None);
+        assert_eq!(
+            detector.detect_task_type("tell me about the weather"),
+            CodeTaskType::None
+        );
     }
 
     #[test]
@@ -777,7 +801,10 @@ mod tests {
         assert_eq!(depth, CognitiveDepth::Reflex);
         // High error + exploratory pattern → deeper routing
         let depth = router.route_from_cycle(0.9, ConsciousnessPattern::Exploratory, 0.5);
-        assert!(depth != CognitiveDepth::Reflex, "High error should not route to Reflex");
+        assert!(
+            depth != CognitiveDepth::Reflex,
+            "High error should not route to Reflex"
+        );
     }
 
     #[test]
@@ -785,10 +812,13 @@ mod tests {
         let mut router = ThalamicRouter::new();
         // Generate routing history
         router.route(0.01, 0.01, 0.01, 0.0); // Reflex
-        router.route(0.5, 0.5, 0.5, 0.0);    // Cortical
-        router.route(0.95, 0.95, 0.95, 0.9);  // DeepThought
+        router.route(0.5, 0.5, 0.5, 0.0); // Cortical
+        router.route(0.95, 0.95, 0.95, 0.9); // DeepThought
         let (reflex_rate, cortical_rate, deep_rate) = router.routing_stats();
-        assert!(reflex_rate + cortical_rate + deep_rate > 0.0, "At least one rate should be nonzero");
+        assert!(
+            reflex_rate + cortical_rate + deep_rate > 0.0,
+            "At least one rate should be nonzero"
+        );
     }
 
     #[test]
