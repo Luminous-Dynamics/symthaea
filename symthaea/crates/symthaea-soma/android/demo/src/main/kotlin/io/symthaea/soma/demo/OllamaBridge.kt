@@ -49,15 +49,18 @@ class OllamaBridge {
 
                 conn.outputStream.bufferedWriter().use { it.write(body.toString()) }
 
-                if (conn.responseCode == 200) {
-                    val response = conn.inputStream.bufferedReader().readText()
-                    val text = JSONObject(response).optString("response", "").trim()
-                    if (text.isNotBlank()) text else null
-                } else {
-                    null
+                try {
+                    if (conn.responseCode == 200) {
+                        val response = conn.inputStream.bufferedReader().readText()
+                        val text = JSONObject(response).optString("response", "").trim()
+                        if (text.isNotBlank()) text else null
+                    } else {
+                        null
+                    }
+                } finally {
+                    conn.disconnect()
                 }
             } catch (_: Exception) {
-                // Network unreachable, timeout, etc. — silent fallback
                 null
             }
         }

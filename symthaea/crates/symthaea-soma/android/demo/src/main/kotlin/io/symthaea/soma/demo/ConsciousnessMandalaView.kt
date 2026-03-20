@@ -81,6 +81,7 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        setBackgroundColor(Color.TRANSPARENT)
         animator.start()
     }
 
@@ -107,13 +108,12 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
         val cy = height / 2f
         // Mandala radius: ~40% of screen width for rings, glow extends further
         val mandalaRadius = min(width, height) / 2f * 0.42f
-        val screenDiag = sqrt(width.toFloat().pow(2) + height.toFloat().pow(2))
 
         val breathScale = 0.94f + 0.06f * sin(breathPhase * 2 * PI.toFloat())
 
-        // === Background glow: extends toward screen edges with consciousness ===
+        // === Background glow: semi-transparent so particles show through ===
         val glowExtent = mandalaRadius * (1.0f + consciousnessLevel * 2.5f) * breathScale
-        val glowAlpha = (15 + consciousnessLevel * 60).toInt().coerceIn(10, 80)
+        val glowAlpha = (8 + consciousnessLevel * 40).toInt().coerceIn(5, 50)
         fillPaint.shader = RadialGradient(
             cx, cy, glowExtent.coerceAtLeast(1f),
             Color.argb(glowAlpha, Color.red(dominantHarmonyColor),

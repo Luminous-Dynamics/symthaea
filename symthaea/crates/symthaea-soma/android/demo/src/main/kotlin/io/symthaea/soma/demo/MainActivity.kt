@@ -46,6 +46,7 @@ class MainActivity : AppCompatActivity() {
     private var currentBgColor = Color.parseColor("#0F1419")
     private var bgAnimator: ValueAnimator? = null
     private var heartbeatRunning = false
+    private val ambientTone = AmbientTone()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -96,6 +97,30 @@ class MainActivity : AppCompatActivity() {
         setupBottomSheet()
         setupConversation()
         startHeartbeat()
+        ambientTone.start(lifecycleScope)
+        showOnboardingIfFirstLaunch()
+    }
+
+    // ═══ Onboarding: first-launch welcome ═══
+
+    private fun showOnboardingIfFirstLaunch() {
+        val prefs = getSharedPreferences("soma_prefs", MODE_PRIVATE)
+        if (!prefs.getBoolean("onboarded", false)) {
+            binding.onboardingOverlay.visibility = View.VISIBLE
+            binding.onboardingOverlay.alpha = 0f
+            binding.onboardingOverlay.animate().alpha(1f).setDuration(1000).start()
+
+            val dismiss = {
+                prefs.edit().putBoolean("onboarded", true).apply()
+                binding.onboardingOverlay.animate()
+                    .alpha(0f)
+                    .setDuration(800)
+                    .withEndAction { binding.onboardingOverlay.visibility = View.GONE }
+                    .start()
+            }
+            binding.onboardingOverlay.setOnClickListener { dismiss() }
+            binding.onboardingDismiss.setOnClickListener { dismiss() }
+        }
     }
 
     // ═══ Haptic heartbeat: subtle ambient pulse synced to breathing ═══
@@ -127,6 +152,7 @@ class MainActivity : AppCompatActivity() {
             if (text.isNotEmpty()) {
                 viewModel.converse(text)
                 binding.conversationInput.text.clear()
+                showThinkingIndicator()
             }
         }
         binding.btnSend.setOnClickListener { sendAction() }
@@ -136,6 +162,32 @@ class MainActivity : AppCompatActivity() {
                 true
             } else false
         }
+    }
+
+    private fun showThinkingIndicator() {
+        binding.thinkingIndicator.visibility = View.VISIBLE
+        binding.thinkingIndicator.alpha = 0f
+        // Pulsing "..." animation
+        binding.thinkingIndicator.animate()
+            .alpha(0.6f)
+            .setDuration(400)
+            .withEndAction {
+                binding.thinkingIndicator.animate()
+                    .alpha(0.2f)
+                    .setDuration(600)
+                    .withEndAction {
+                        binding.thinkingIndicator.animate()
+                            .alpha(0.6f).setDuration(600).start()
+                    }.start()
+            }.start()
+    }
+
+    private fun hideThinkingIndicator() {
+        binding.thinkingIndicator.animate()
+            .alpha(0f)
+            .setDuration(300)
+            .withEndAction { binding.thinkingIndicator.visibility = View.GONE }
+            .start()
     }
 
     // ═══ Bottom sheet ═══
@@ -243,6 +295,14 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         heartbeatRunning = false
+        ambientTone.stop()
+        // Cancel all pending animations to prevent leaks
+        binding.brocaText.animate().cancel()
+        binding.dreamOverlay.animate().cancel()
+        binding.onboardingOverlay.animate().cancel()
+        binding.thinkingIndicator.animate().cancel()
+        binding.hapticIndicator.animate().cancel()
+        bgAnimator?.cancel()
         super.onDestroy()
     }
 
@@ -258,9 +318,11 @@ class MainActivity : AppCompatActivity() {
         binding.consciousnessMandala.consciousnessLevel = state.consciousnessLevel
         binding.consciousnessMandala.dominantHarmonyColor = harmonyToColor(state.dominantHarmony)
 
-        // Particle field
+        // Particle field + ambient tone
         binding.particleField.consciousnessLevel = state.consciousnessLevel
         binding.particleField.harmonyColor = harmonyToColor(state.dominantHarmony)
+        ambientTone.consciousnessLevel = state.consciousnessLevel
+        ambientTone.harmonyShift = state.harmonyAlignment
 
         // Harmony text
         binding.harmonyText.text = state.dominantHarmony.lowercase()
@@ -316,6 +378,7 @@ class MainActivity : AppCompatActivity() {
         // === Broca: floating thought ===
         if (state.brocaText.isNotEmpty() && state.brocaText != lastBrocaText) {
             lastBrocaText = state.brocaText
+            hideThinkingIndicator()
             showFloatingThought(state.brocaText)
         }
 

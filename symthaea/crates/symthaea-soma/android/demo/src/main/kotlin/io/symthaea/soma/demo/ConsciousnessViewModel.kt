@@ -333,10 +333,16 @@ class ConsciousnessViewModel : ViewModel() {
     override fun onCleared() {
         touchBridge?.unbind()
         screenCaptureBridge?.stop()
-        // Save checkpoint so background service can restore
-        runBlocking(dispatcher) {
-            engine?.saveCheckpoint()
-        }
+        // Save checkpoint with timeout to prevent ANR deadlock
+        try {
+            kotlinx.coroutines.runBlocking {
+                kotlinx.coroutines.withTimeoutOrNull(3000) {
+                    kotlinx.coroutines.withContext(dispatcher) {
+                        engine?.saveCheckpoint()
+                    }
+                }
+            }
+        } catch (_: Exception) {}
         engine?.close()
         engine = null
         dispatcher.close()

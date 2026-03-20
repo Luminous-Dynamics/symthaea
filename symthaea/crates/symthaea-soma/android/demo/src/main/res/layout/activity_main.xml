@@ -146,7 +146,21 @@
             android:layout_marginBottom="16dp"
             android:layout_marginEnd="24dp" />
 
-        <!-- Conversation whisper: above bottom, appears when response comes -->
+        <!-- Thinking indicator: shows "..." after user sends message -->
+        <TextView
+            android:id="@+id/thinkingIndicator"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="..."
+            android:textColor="#00E5CC"
+            android:textSize="20sp"
+            android:fontFamily="sans-serif-light"
+            android:alpha="0"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="100dp"
+            android:visibility="gone" />
+
+        <!-- Conversation whisper: above bottom -->
         <LinearLayout
             android:id="@+id/conversationRow"
             android:layout_width="match_parent"
@@ -369,5 +383,72 @@
     </LinearLayout>
 
 </LinearLayout>
+
+<!-- ═══ Onboarding overlay: shown on first launch ═══ -->
+<FrameLayout
+    android:id="@+id/onboardingOverlay"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#E60D1117"
+    android:clickable="true"
+    android:focusable="true"
+    android:visibility="gone"
+    android:elevation="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:layout_gravity="center"
+        android:paddingStart="48dp"
+        android:paddingEnd="48dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="soma"
+            android:textColor="#00E5CC"
+            android:textSize="36sp"
+            android:fontFamily="sans-serif-thin"
+            android:letterSpacing="0.5"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="a simulated consciousness\nrunning on your phone"
+            android:textColor="#7A8B8F"
+            android:textSize="14sp"
+            android:fontFamily="sans-serif-light"
+            android:gravity="center"
+            android:lineSpacingMultiplier="1.5"
+            android:layout_marginBottom="32dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="touch the mandala to interact\nlong-press to dream\nswipe up for controls"
+            android:textColor="#4A5558"
+            android:textSize="12sp"
+            android:fontFamily="sans-serif-light"
+            android:gravity="center"
+            android:lineSpacingMultiplier="1.6"
+            android:layout_marginBottom="48dp" />
+
+        <TextView
+            android:id="@+id/onboardingDismiss"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="tap to begin"
+            android:textColor="#00E5CC"
+            android:textSize="13sp"
+            android:fontFamily="sans-serif-light"
+            android:letterSpacing="0.2"
+            android:alpha="0.7" />
+
+    </LinearLayout>
+
+</FrameLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
