@@ -156,6 +156,11 @@ impl ProposalCollector {
         self.proposals.len()
     }
 
+    /// Whether no proposals have been collected.
+    pub fn is_empty(&self) -> bool {
+        self.proposals.is_empty()
+    }
+
     /// Clear all proposals (called at cycle start).
     pub fn clear(&mut self) {
         self.proposals.clear();
