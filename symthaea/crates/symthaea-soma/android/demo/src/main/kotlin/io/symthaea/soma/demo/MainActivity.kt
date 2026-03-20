@@ -378,11 +378,23 @@ class MainActivity : AppCompatActivity() {
             showDreamCeremony(state.latestDream)
         }
 
-        // === Broca: floating thought ===
+        // === Broca: floating thought (autonomous monologue) ===
         if (state.brocaText.isNotEmpty() && state.brocaText != lastBrocaText) {
             lastBrocaText = state.brocaText
-            hideThinkingIndicator()
             showFloatingThought(state.brocaText)
+        }
+
+        // === Conversation thread ===
+        if (state.chatUserMessage.isNotEmpty()) {
+            binding.chatUserMsg.text = state.chatUserMessage
+            binding.chatUserMsg.visibility = View.VISIBLE
+        }
+        if (state.chatSomaResponse.isNotEmpty()) {
+            hideThinkingIndicator()
+            binding.chatSomaResponse.text = state.chatSomaResponse
+            binding.chatSomaResponse.visibility = View.VISIBLE
+            binding.chatSomaResponse.alpha = 0f
+            binding.chatSomaResponse.animate().alpha(1f).setDuration(600).start()
         }
 
         // Technical readout (in bottom sheet)

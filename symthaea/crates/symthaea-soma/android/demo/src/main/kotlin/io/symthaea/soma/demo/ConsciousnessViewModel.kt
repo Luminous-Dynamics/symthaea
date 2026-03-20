@@ -33,6 +33,10 @@ data class SomaUiState(
     val screenSurprise: Float = 0f,
     /** Whether screen capture is active. */
     val screenCaptureActive: Boolean = false,
+    /** Last user message in conversation. */
+    val chatUserMessage: String = "",
+    /** Soma's response to user message. */
+    val chatSomaResponse: String = "",
     /** OCR text from screen vision (shown when capture is active). */
     val ocrText: String = "",
 )
@@ -263,16 +267,22 @@ class ConsciousnessViewModel : ViewModel() {
 
     /** Send user message and get Broca response. Tries Ollama first, falls back to BrocaLite. */
     fun converse(userText: String) {
-        // Boost engagement: user is actively conversing
+        // Show user message immediately
+        _state.value = _state.value.copy(
+            chatUserMessage = userText,
+            chatSomaResponse = "",
+        )
+
+        // Boost engagement
         viewModelScope.launch(dispatcher) {
             engine?.setEngagementScore(0.8f)
         }
 
-        // Try Ollama on IO thread, fall back to BrocaLite on engine thread
+        // Generate response
         viewModelScope.launch {
             var text: String? = null
 
-            // Try local Ollama first (non-blocking, timeout 5s)
+            // Try local Ollama first
             try {
                 text = ollamaBridge.generate(userText, _state.value.consciousnessLevel)
             } catch (_: Exception) {}
@@ -288,7 +298,7 @@ class ConsciousnessViewModel : ViewModel() {
             }
 
             if (!text.isNullOrBlank()) {
-                _state.value = _state.value.copy(brocaText = text)
+                _state.value = _state.value.copy(chatSomaResponse = text)
             }
         }
     }

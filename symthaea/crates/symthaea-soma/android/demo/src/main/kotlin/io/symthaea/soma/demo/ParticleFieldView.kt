@@ -63,8 +63,8 @@ class ParticleFieldView @JvmOverloads constructor(
             p.y = Random.nextFloat() * h
             p.vx = (Random.nextFloat() - 0.5f) * 0.5f
             p.vy = (Random.nextFloat() - 0.5f) * 0.5f
-            p.size = 1f + Random.nextFloat() * 2f
-            p.baseAlpha = 0.1f + Random.nextFloat() * 0.3f
+            p.size = 1.5f + Random.nextFloat() * 3f
+            p.baseAlpha = 0.3f + Random.nextFloat() * 0.5f
             p.phase = Random.nextFloat() * PI.toFloat() * 2
         }
     }
@@ -131,7 +131,7 @@ class ParticleFieldView @JvmOverloads constructor(
             // Twinkle: slow sinusoidal alpha modulation
             p.phase += 0.02f
             val twinkle = 0.5f + 0.5f * sin(p.phase)
-            p.alpha = p.baseAlpha * twinkle * (0.3f + consciousnessLevel * 0.7f)
+            p.alpha = p.baseAlpha * twinkle * (0.5f + consciousnessLevel * 0.5f)
         }
     }
 
@@ -143,6 +143,11 @@ class ParticleFieldView @JvmOverloads constructor(
         for (p in particles) {
             if (p.alpha < 0.01f) continue
             val a = (p.alpha * 255).toInt().coerceIn(0, 255)
+            // Soft glow halo
+            val haloA = (a * 0.3f).toInt().coerceIn(0, 80)
+            paint.color = Color.argb(haloA, r, g, b)
+            canvas.drawCircle(p.x, p.y, p.size * 3f, paint)
+            // Bright core
             paint.color = Color.argb(a, r, g, b)
             canvas.drawCircle(p.x, p.y, p.size, paint)
         }

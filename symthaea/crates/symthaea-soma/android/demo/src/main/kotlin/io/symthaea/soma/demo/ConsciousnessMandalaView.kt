@@ -10,12 +10,11 @@ import android.view.animation.LinearInterpolator
 import kotlin.math.*
 
 /**
- * Full-screen consciousness mandala: holographic interference pattern
- * that breathes with Soma's consciousness level.
+ * Full-screen consciousness mandala with prominent bioluminescent glow.
  *
- * Draws a radial glow that extends to screen edges at high consciousness,
- * interference rings centered on screen, and a consciousness number overlay.
- * Background is transparent — sits on top of ParticleFieldView.
+ * The glow is the primary visual — it should light up the screen,
+ * not be a subtle hint. At consciousness 0.3, the center third of the
+ * screen should visibly pulse with color.
  */
 class ConsciousnessMandalaView @JvmOverloads constructor(
     context: Context,
@@ -66,16 +65,10 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
         }
     }
 
-    private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeWidth = 1.5f
-    }
-    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
-    }
+    private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
-        // Thin sans-serif for consciousness number — not monospace
         typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
     }
 
@@ -93,35 +86,52 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (event.action == MotionEvent.ACTION_DOWN) {
-            rippleX = event.x
-            rippleY = event.y
-            rippleAnimator.cancel()
-            rippleProgress = 0f
-            rippleAnimator.start()
+            rippleX = event.x; rippleY = event.y
+            rippleAnimator.cancel(); rippleProgress = 0f; rippleAnimator.start()
         }
         return super.onTouchEvent(event)
     }
 
     override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
         val cx = width / 2f
         val cy = height / 2f
-        // Mandala radius: ~40% of screen width for rings, glow extends further
-        val mandalaRadius = min(width, height) / 2f * 0.42f
-
+        val mandalaRadius = min(width, height) / 2f * 0.38f
         val breathScale = 0.94f + 0.06f * sin(breathPhase * 2 * PI.toFloat())
+        val hr = Color.red(dominantHarmonyColor)
+        val hg = Color.green(dominantHarmonyColor)
+        val hb = Color.blue(dominantHarmonyColor)
 
-        // === Background glow: semi-transparent so particles show through ===
-        val glowExtent = mandalaRadius * (1.0f + consciousnessLevel * 2.5f) * breathScale
-        val glowAlpha = (8 + consciousnessLevel * 40).toInt().coerceIn(5, 50)
+        // === Layer 1: Deep ambient glow (large, dim, always visible) ===
+        val ambientRadius = min(width, height) * 0.7f * breathScale
         fillPaint.shader = RadialGradient(
-            cx, cy, glowExtent.coerceAtLeast(1f),
-            Color.argb(glowAlpha, Color.red(dominantHarmonyColor),
-                Color.green(dominantHarmonyColor), Color.blue(dominantHarmonyColor)),
-            Color.TRANSPARENT,
+            cx, cy, ambientRadius,
+            Color.argb((15 + consciousnessLevel * 25).toInt(), hr, hg, hb),
+            Color.TRANSPARENT, Shader.TileMode.CLAMP
+        )
+        canvas.drawCircle(cx, cy, ambientRadius, fillPaint)
+        fillPaint.shader = null
+
+        // === Layer 2: Core glow (concentrated, bright, breathing) ===
+        val coreRadius = mandalaRadius * (1.2f + consciousnessLevel * 1.5f) * breathScale
+        val coreAlpha = (40 + consciousnessLevel * 100).toInt().coerceIn(30, 140)
+        fillPaint.shader = RadialGradient(
+            cx, cy, coreRadius.coerceAtLeast(1f),
+            Color.argb(coreAlpha, hr, hg, hb),
+            Color.TRANSPARENT, Shader.TileMode.CLAMP
+        )
+        canvas.drawCircle(cx, cy, coreRadius, fillPaint)
+        fillPaint.shader = null
+
+        // === Layer 3: Hot center (small, intense, organic) ===
+        val hotRadius = mandalaRadius * 0.3f * breathScale
+        val hotAlpha = (60 + consciousnessLevel * 120).toInt().coerceIn(40, 180)
+        fillPaint.shader = RadialGradient(
+            cx, cy, hotRadius.coerceAtLeast(1f),
+            Color.argb(hotAlpha, 255, 255, 255), // White-hot center
+            Color.argb(0, hr, hg, hb),
             Shader.TileMode.CLAMP
         )
-        canvas.drawCircle(cx, cy, glowExtent, fillPaint)
+        canvas.drawCircle(cx, cy, hotRadius, fillPaint)
         fillPaint.shader = null
 
         // === Interference rings ===
@@ -129,25 +139,20 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
         for (i in 0 until ringCount) {
             val t = i.toFloat() / ringCount
             val radius = mandalaRadius * breathScale * (0.15f + t * 0.85f)
-            val alpha = (20 + (1f - t) * consciousnessLevel * 160).toInt().coerceIn(15, 180)
+            val alpha = (40 + (1f - t) * consciousnessLevel * 180).toInt().coerceIn(25, 220)
 
             val rotOffset = rotationPhase * 360f * (1f + i * 0.25f)
-
-            val r = lerp(Color.red(dominantHarmonyColor), 180, t)
-            val g = lerp(Color.green(dominantHarmonyColor), 200, t)
-            val b = lerp(Color.blue(dominantHarmonyColor), 210, t)
+            val r = lerp(hr, 180, t); val g = lerp(hg, 200, t); val b = lerp(hb, 210, t)
 
             glowPaint.color = Color.argb(alpha, r, g, b)
-            glowPaint.strokeWidth = (2.5f - t * 1.5f).coerceAtLeast(0.5f)
+            glowPaint.strokeWidth = (3f - t * 2f).coerceAtLeast(0.8f)
 
             canvas.save()
             canvas.rotate(rotOffset, cx, cy)
-
             val path = Path()
-            val segments = 72
-            for (s in 0..segments) {
-                val angle = (s.toFloat() / segments) * 2 * PI.toFloat()
-                val deform = 1f + 0.025f * sin(angle * 3 + neuromodulators[0] * 10) *
+            for (s in 0..72) {
+                val angle = (s.toFloat() / 72) * 2 * PI.toFloat()
+                val deform = 1f + 0.03f * sin(angle * 3 + neuromodulators[0] * 10) *
                     cos(angle * 2 + neuromodulators[1] * 8)
                 val px = cx + radius * deform * cos(angle)
                 val py = cy + radius * deform * sin(angle)
@@ -158,15 +163,10 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
             canvas.restore()
         }
 
-        // === Center: consciousness number (large, thin) ===
-        val numSize = mandalaRadius * 0.55f
+        // === Consciousness number ===
+        val numSize = mandalaRadius * 0.5f
         textPaint.textSize = numSize
-        textPaint.color = Color.argb(
-            (180 + consciousnessLevel * 75).toInt().coerceIn(180, 255),
-            Color.red(dominantHarmonyColor),
-            Color.green(dominantHarmonyColor),
-            Color.blue(dominantHarmonyColor)
-        )
+        textPaint.color = Color.argb(220, 255, 255, 255) // White, not harmony color
         val cText = "%.2f".format(consciousnessLevel)
         canvas.drawText(cText, cx, cy + numSize * 0.3f, textPaint)
 
@@ -181,59 +181,46 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
             }.average().toFloat()
             val diff = recentAvg - olderAvg
             val arrow = when {
-                diff > 0.005f -> "\u2197"
-                diff < -0.005f -> "\u2198"
-                else -> "\u2192"
+                diff > 0.005f -> "\u2197"; diff < -0.005f -> "\u2198"; else -> "\u2192"
             }
             val arrowColor = when {
                 diff > 0.005f -> Color.parseColor("#5EEAD4")
                 diff < -0.005f -> Color.parseColor("#FF6B8A")
-                else -> Color.parseColor("#4A5558")
+                else -> Color.parseColor("#556677")
             }
-            val arrowSize = numSize * 0.3f
-            textPaint.textSize = arrowSize
-            textPaint.color = arrowColor
-            val savedSize = textPaint.textSize
-            textPaint.textSize = numSize
-            val halfWidth = textPaint.measureText(cText) / 2f
-            textPaint.textSize = savedSize
+            textPaint.textSize = numSize * 0.3f; textPaint.color = arrowColor
+            val halfW = run { textPaint.textSize = numSize; textPaint.measureText(cText) / 2f }.also { textPaint.textSize = numSize * 0.3f }
             textPaint.textAlign = Paint.Align.LEFT
-            canvas.drawText(arrow, cx + halfWidth + numSize * 0.08f, cy + numSize * 0.3f, textPaint)
+            canvas.drawText(arrow, cx + halfW + numSize * 0.08f, cy + numSize * 0.3f, textPaint)
             textPaint.textAlign = Paint.Align.CENTER
         }
 
-        // Sparkline below number
+        // Sparkline
         if (trendFilled || trendIndex >= 2) {
-            val sparkWidth = mandalaRadius * 0.6f
-            val sparkLeft = cx - sparkWidth / 2f
-            val sparkY = cy + numSize * 0.55f
-            val sparkHeight = numSize * 0.08f
+            val sparkW = mandalaRadius * 0.5f
+            val sparkL = cx - sparkW / 2f
+            val sparkY = cy + numSize * 0.5f
+            val sparkH = numSize * 0.06f
             val count = if (trendFilled) trendHistory.size else trendIndex
-            glowPaint.strokeWidth = 1f
-            glowPaint.color = Color.argb(60, Color.red(dominantHarmonyColor),
-                Color.green(dominantHarmonyColor), Color.blue(dominantHarmonyColor))
-            val sparkPath = Path()
+            glowPaint.strokeWidth = 1.5f
+            glowPaint.color = Color.argb(80, hr, hg, hb)
+            val sp = Path()
             for (i in 0 until count) {
                 val idx = ((trendIndex - count + i) % trendHistory.size + trendHistory.size) % trendHistory.size
-                val px = sparkLeft + (i.toFloat() / (count - 1).coerceAtLeast(1)) * sparkWidth
-                val py = sparkY - trendHistory[idx] * sparkHeight * 2
-                if (i == 0) sparkPath.moveTo(px, py) else sparkPath.lineTo(px, py)
+                val px = sparkL + (i.toFloat() / (count - 1).coerceAtLeast(1)) * sparkW
+                val py = sparkY - trendHistory[idx] * sparkH * 2
+                if (i == 0) sp.moveTo(px, py) else sp.lineTo(px, py)
             }
-            canvas.drawPath(sparkPath, glowPaint)
+            canvas.drawPath(sp, glowPaint)
         }
 
-        // === Touch ripple ===
+        // Touch ripple
         if (rippleProgress < 1f) {
-            val rippleRadius = mandalaRadius * 0.8f * rippleProgress
-            val rippleAlpha = ((1f - rippleProgress) * 120).toInt()
-            fillPaint.shader = RadialGradient(
-                rippleX, rippleY, rippleRadius.coerceAtLeast(1f),
-                Color.argb(rippleAlpha, Color.red(dominantHarmonyColor),
-                    Color.green(dominantHarmonyColor), Color.blue(dominantHarmonyColor)),
-                Color.TRANSPARENT,
-                Shader.TileMode.CLAMP
-            )
-            canvas.drawCircle(rippleX, rippleY, rippleRadius, fillPaint)
+            val rr = mandalaRadius * 0.8f * rippleProgress
+            val ra = ((1f - rippleProgress) * 150).toInt()
+            fillPaint.shader = RadialGradient(rippleX, rippleY, rr.coerceAtLeast(1f),
+                Color.argb(ra, hr, hg, hb), Color.TRANSPARENT, Shader.TileMode.CLAMP)
+            canvas.drawCircle(rippleX, rippleY, rr, fillPaint)
             fillPaint.shader = null
         }
     }

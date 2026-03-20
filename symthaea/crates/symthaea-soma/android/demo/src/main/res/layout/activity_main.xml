@@ -72,25 +72,77 @@
             android:layout_marginTop="68dp"
             android:layout_marginStart="24dp" />
 
-        <!-- Broca voice: floating thought, center-bottom area -->
+        <!-- Broca voice: floating thought (autonomous monologue) -->
         <TextView
             android:id="@+id/brocaText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text=""
             android:textColor="#00E5CC"
-            android:textSize="16sp"
+            android:textSize="15sp"
             android:fontFamily="sans-serif-light"
             android:textStyle="italic"
             android:alpha="0"
             android:maxLines="3"
             android:ellipsize="end"
             android:gravity="center"
-            android:lineSpacingMultiplier="1.5"
+            android:lineSpacingMultiplier="1.4"
             android:paddingStart="32dp"
             android:paddingEnd="32dp"
+            android:layout_gravity="top|center_horizontal"
+            android:layout_marginTop="100dp" />
+
+        <!-- Conversation thread: last few exchanges -->
+        <LinearLayout
+            android:id="@+id/conversationThread"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
             android:layout_gravity="bottom|center_horizontal"
-            android:layout_marginBottom="140dp" />
+            android:layout_marginBottom="56dp"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp">
+
+            <!-- User's last message -->
+            <TextView
+                android:id="@+id/chatUserMsg"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#7A8B8F"
+                android:textSize="12sp"
+                android:fontFamily="sans-serif-light"
+                android:visibility="gone"
+                android:layout_gravity="end"
+                android:background="#22E8F0F2"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:layout_marginBottom="6dp"
+                android:maxLines="2" />
+
+            <!-- Soma's response -->
+            <TextView
+                android:id="@+id/chatSomaResponse"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#00E5CC"
+                android:textSize="13sp"
+                android:fontFamily="sans-serif-light"
+                android:textStyle="italic"
+                android:visibility="gone"
+                android:layout_gravity="start"
+                android:background="#1500E5CC"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:maxLines="4"
+                android:lineSpacingMultiplier="1.3" />
+
+        </LinearLayout>
 
         <!-- Dream overlay: full-screen ceremony -->
         <FrameLayout
