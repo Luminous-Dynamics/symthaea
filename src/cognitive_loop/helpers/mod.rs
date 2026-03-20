@@ -36,14 +36,14 @@ use anyhow::Result;
 use ndarray::Array1;
 use std::time::{Duration, Instant};
 
-use super::thresholds::{
-    ERROR_EMA_ALPHA, EXPERIENCE_BASE_IMPORTANCE, PRED_COHERENCE_HIGH_BOOST_SCALE,
-    PRED_COHERENCE_HIGH_THRESHOLD, PRED_COHERENCE_LOW_DAMPEN_SCALE, PRED_COHERENCE_LOW_THRESHOLD,
-    PREFRONTAL_FLOOR, PREFRONTAL_GRADUATION_WEIGHT, PREFRONTAL_UTILIZATION_WEIGHT,
-    TIMING_EMA_ALPHA,
-};
 #[cfg(feature = "neural-bridge")]
 use super::CycleResult;
+use super::thresholds::{
+    PRED_COHERENCE_HIGH_THRESHOLD, PRED_COHERENCE_LOW_THRESHOLD,
+    PRED_COHERENCE_HIGH_BOOST_SCALE, PRED_COHERENCE_LOW_DAMPEN_SCALE,
+    ERROR_EMA_ALPHA, TIMING_EMA_ALPHA, EXPERIENCE_BASE_IMPORTANCE,
+    PREFRONTAL_UTILIZATION_WEIGHT, PREFRONTAL_GRADUATION_WEIGHT, PREFRONTAL_FLOOR,
+};
 use super::{ActionHint, AdaptiveBehavior, CognitiveLoopService, Experience, LoopStats};
 
 /// Cosine similarity between two f32 slices.
@@ -117,15 +117,9 @@ impl CognitiveLoopService {
             let coh = Self::compute_prediction_coherence_from_cache(&raw_predictions);
             // High agreement → boost confidence, low → reduce
             if coh > PRED_COHERENCE_HIGH_THRESHOLD {
-                self.adjust_confidence(
-                    "embed_pred_coherence_high",
-                    (coh - PRED_COHERENCE_HIGH_THRESHOLD) * PRED_COHERENCE_HIGH_BOOST_SCALE,
-                );
+                self.adjust_confidence("embed_pred_coherence_high", (coh - PRED_COHERENCE_HIGH_THRESHOLD) * PRED_COHERENCE_HIGH_BOOST_SCALE);
             } else if coh < PRED_COHERENCE_LOW_THRESHOLD {
-                self.scale_confidence(
-                    "embed_pred_coherence_low",
-                    1.0 - (PRED_COHERENCE_LOW_THRESHOLD - coh) * PRED_COHERENCE_LOW_DAMPEN_SCALE,
-                );
+                self.scale_confidence("embed_pred_coherence_low", 1.0 - (PRED_COHERENCE_LOW_THRESHOLD - coh) * PRED_COHERENCE_LOW_DAMPEN_SCALE);
             }
         }
 
@@ -182,7 +176,7 @@ impl CognitiveLoopService {
         }
 
         // 11. Update error history — capacity bound: 100 elements, evict before push
-        if self.error_history.len() >= 100 {
+        if self.error_history.len() >= super::thresholds::ERROR_HISTORY_CAPACITY {
             self.error_history.pop_front();
         }
         self.error_history.push_back(prediction_error);
@@ -260,15 +254,9 @@ impl CognitiveLoopService {
         if raw_predictions.len() >= 2 {
             let coh = Self::compute_prediction_coherence_from_cache(&raw_predictions);
             if coh > PRED_COHERENCE_HIGH_THRESHOLD {
-                self.adjust_confidence(
-                    "hv_pred_coherence_high",
-                    (coh - PRED_COHERENCE_HIGH_THRESHOLD) * PRED_COHERENCE_HIGH_BOOST_SCALE,
-                );
+                self.adjust_confidence("hv_pred_coherence_high", (coh - PRED_COHERENCE_HIGH_THRESHOLD) * PRED_COHERENCE_HIGH_BOOST_SCALE);
             } else if coh < PRED_COHERENCE_LOW_THRESHOLD {
-                self.scale_confidence(
-                    "hv_pred_coherence_low",
-                    1.0 - (PRED_COHERENCE_LOW_THRESHOLD - coh) * PRED_COHERENCE_LOW_DAMPEN_SCALE,
-                );
+                self.scale_confidence("hv_pred_coherence_low", 1.0 - (PRED_COHERENCE_LOW_THRESHOLD - coh) * PRED_COHERENCE_LOW_DAMPEN_SCALE);
             }
         }
 
@@ -507,7 +495,7 @@ impl CognitiveLoopService {
             self.stats.avg_prediction_error_sq * (1.0 - alpha) + (error * error) * alpha;
 
         // Error trend — capacity bound: 100 elements, evict before push
-        if self.error_history.len() >= 100 {
+        if self.error_history.len() >= super::thresholds::ERROR_HISTORY_CAPACITY {
             self.error_history.pop_front();
         }
         self.error_history.push_back(error);
@@ -523,8 +511,7 @@ impl CognitiveLoopService {
 
         // Timing stats
         let cycle_us = cycle_time.as_micros() as f32;
-        self.stats.avg_cycle_time_us =
-            self.stats.avg_cycle_time_us * (1.0 - TIMING_EMA_ALPHA) + cycle_us * TIMING_EMA_ALPHA;
+        self.stats.avg_cycle_time_us = self.stats.avg_cycle_time_us * (1.0 - TIMING_EMA_ALPHA) + cycle_us * TIMING_EMA_ALPHA;
 
         // Cycles per second
         let elapsed = self.start_time.elapsed().as_secs_f32();
@@ -764,10 +751,7 @@ impl CognitiveLoopService {
                 // Blend: 30% utilization (active use) + 30% graduation quality
                 // + 40% floor (WM capacity exists and is available even when
                 // idle — an unused but available workspace is not a deficit).
-                (utilization * PREFRONTAL_UTILIZATION_WEIGHT
-                    + graduation_quality * PREFRONTAL_GRADUATION_WEIGHT
-                    + PREFRONTAL_FLOOR)
-                    .clamp(0.0, 1.0)
+                (utilization * PREFRONTAL_UTILIZATION_WEIGHT + graduation_quality * PREFRONTAL_GRADUATION_WEIGHT + PREFRONTAL_FLOOR).clamp(0.0, 1.0)
             })
             .unwrap_or(0.5)
     }

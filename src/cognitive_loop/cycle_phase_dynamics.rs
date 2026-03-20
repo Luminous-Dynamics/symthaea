@@ -542,7 +542,8 @@ impl CognitiveLoopService {
                 if let Some(ref mut soul_mgr) = self.soul_manager {
                     if soul_mgr.should_run(cycle_num, urgency_u8) {
                         let soul_output = soul_mgr.process(snapshot);
-                        self.subsystem_collector.record("soul_manager", soul_output);
+                        self.subsystem_collector
+                            .record("soul_manager", soul_output);
                     }
                 }
 
@@ -1008,7 +1009,7 @@ impl CognitiveLoopService {
                     Some((made_at, pred_confidence, pred_urgency));
             }
         }
-        if self.stats.total_cycles % 7 == 0
+        if self.stats.total_cycles as u64 % super::thresholds::SELF_MODEL_PREDICTION_INTERVAL == 0
             && self.carryover.history.self_model_prediction.is_none()
         {
             self.carryover.history.self_model_prediction =
@@ -3446,6 +3447,8 @@ impl CognitiveLoopService {
                     if let Err(e) = self.temporal_network.inject(&state) {
                         tracing::warn!(err = %e, "substrate mask inject failed");
                     }
+                } else {
+                    tracing::warn!("CfC read_state failed during substrate mask — skipping mask");
                 }
             }
         }
@@ -3461,8 +3464,8 @@ impl CognitiveLoopService {
                 let overflow = (spectral_entropy - super::thresholds::SPECTRAL_ENTROPY_THRESHOLD)
                     / super::thresholds::SPECTRAL_ENTROPY_THRESHOLD;
                 // spectral_frac: 1.0 at threshold, MASK_FLOOR at 2× threshold
-                let spectral_frac =
-                    (1.0 - overflow as f32).max(super::thresholds::SPECTRAL_ENTROPY_MASK_FLOOR);
+                let spectral_frac = (1.0 - overflow as f32)
+                    .max(super::thresholds::SPECTRAL_ENTROPY_MASK_FLOOR);
                 // Don't over-mask: use the maximum of substrate and spectral fractions
                 let substrate_frac = self.substrate_manager.effective_dim_fraction();
                 let frac = substrate_frac.max(spectral_frac);
@@ -3475,6 +3478,8 @@ impl CognitiveLoopService {
                         if let Err(e) = self.temporal_network.inject(&state) {
                             tracing::warn!(err = %e, "spectral entropy mask inject failed");
                         }
+                    } else {
+                        tracing::warn!("CfC read_state failed during spectral entropy mask — skipping mask");
                     }
                 }
             }
@@ -3488,7 +3493,7 @@ impl CognitiveLoopService {
         // Return the buffer to CLS for reuse next cycle (zero-alloc swap)
         self.cfc_input_buffer = input_array;
 
-        let prediction_coherence = if self.stats.total_cycles % 11 == 0 {
+        let prediction_coherence = if self.stats.total_cycles as u64 % super::thresholds::PREDICTION_COHERENCE_INTERVAL == 0 {
             let coh = Self::compute_prediction_coherence_from_cache(&raw_predictions);
             self.stats.avg_prediction_coherence = self.stats.avg_prediction_coherence
                 * COHERENCE_PREDICTION_EMA
@@ -3555,7 +3560,7 @@ impl CognitiveLoopService {
         } else {
             epistemic_uncertainty
         };
-        if eu_for_exploration > EPISTEMIC_EXPLORE_THRESHOLD && self.stats.total_cycles % 7 == 0 {
+        if eu_for_exploration > EPISTEMIC_EXPLORE_THRESHOLD && self.stats.total_cycles as u64 % super::thresholds::EPISTEMIC_MODULATION_INTERVAL == 0 {
             let mut epistemic_explore =
                 (eu_for_exploration - EPISTEMIC_EXPLORE_THRESHOLD) * EPISTEMIC_EXPLORE_SCALE;
             // Oscillation + high uncertainty = confused AND unstable → stronger exploration.
@@ -3564,7 +3569,7 @@ impl CognitiveLoopService {
                 epistemic_explore *= EPISTEMIC_OSCILLATION_MULTIPLIER;
             }
             self.adjust_exploration("epistemic_uncertainty", epistemic_explore);
-        } else if eu_for_exploration < EPISTEMIC_LOW_THRESHOLD && self.stats.total_cycles % 7 == 0 {
+        } else if eu_for_exploration < EPISTEMIC_LOW_THRESHOLD && self.stats.total_cycles as u64 % super::thresholds::EPISTEMIC_MODULATION_INTERVAL == 0 {
             // Low epistemic uncertainty → dampen exploration (model is confident).
             self.adjust_exploration("epistemic_low", -EPISTEMIC_LOW_DAMPEN);
         }
@@ -3574,7 +3579,10 @@ impl CognitiveLoopService {
             .temporal_network
             .read_state()
             .map(|arr| arr.to_vec())
-            .unwrap_or_else(|_| vec![0.0; self.config.cfc_config.num_neurons]);
+            .unwrap_or_else(|e| {
+                tracing::warn!(err = %e, "CfC read_state failed in output read — using zero state");
+                vec![0.0; self.config.cfc_config.num_neurons]
+            });
         module_timings.core_predict = _t_core.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -3587,7 +3595,7 @@ impl CognitiveLoopService {
 
         // Incorporate causal structure into world model (every 41 cycles, co-prime).
         // Pearl (2009): causal knowledge provides structural priors beyond correlation.
-        if self.stats.total_cycles % 41 == 0 {
+        if self.stats.total_cycles as u64 % super::thresholds::CAUSAL_STRUCTURE_INTERVAL == 0 {
             if let Some(ref enhancer) = self.causal_enhancer {
                 let graph = enhancer.current_graph();
                 if !graph.is_empty() {
@@ -3848,7 +3856,7 @@ impl CognitiveLoopService {
             self.language_comm.voice_coherence.bridge.phi_contribution();
 
         #[cfg(feature = "school_learning")]
-        let school_predicted_phi_gain = if self.stats.total_cycles % 53 == 0 {
+        let school_predicted_phi_gain = if self.stats.total_cycles as u64 % super::thresholds::SCHOOL_LEARNING_INTERVAL == 0 {
             if let Some(ref school) = self.feature_integ.school_bridge {
                 match school.recommend_next() {
                     Ok(r) if r.predicted_phi_gain > 0.001 => r.predicted_phi_gain,
@@ -3867,7 +3875,7 @@ impl CognitiveLoopService {
         #[cfg(not(feature = "school_learning"))]
         let school_predicted_phi_gain = 0.0f32;
 
-        let causal_attention_boost = if self.stats.total_cycles % 41 == 0 {
+        let causal_attention_boost = if self.stats.total_cycles as u64 % super::thresholds::CAUSAL_STRUCTURE_INTERVAL == 0 {
             if let Some(ref mut cc) = self.feature_integ.causal_consciousness {
                 let vars: Vec<Vec<f64>> = perception
                     .encoding
