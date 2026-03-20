@@ -1222,9 +1222,5 @@ pub const TIMING_EMA_ALPHA: f32 = 0.01;
 
 /// Base importance weight for new experiences.
 pub const EXPERIENCE_BASE_IMPORTANCE: f32 = 0.1;
-/// Prefrontal utilization weight in cognitive budget allocation.
-pub const PREFRONTAL_UTILIZATION_WEIGHT: f64 = 0.3;
-/// Prefrontal graduation weight for development tracking.
-pub const PREFRONTAL_GRADUATION_WEIGHT: f64 = 0.3;
-/// Minimum prefrontal engagement floor.
-pub const PREFRONTAL_FLOOR: f64 = 0.4;
+// PREFRONTAL_UTILIZATION_WEIGHT, PREFRONTAL_GRADUATION_WEIGHT, PREFRONTAL_FLOOR
+// are defined in feedback.rs (canonical location) — do not duplicate here.
