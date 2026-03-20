@@ -524,7 +524,7 @@ mod tests {
 
         let result = &battery.results[0];
         assert_eq!(result.benchmark, "Executive::Stroop");
-        assert_eq!(result.metric, "stroop_effect");
+        assert_eq!(result.metric, "incongruent_accuracy");
         assert!(result.icc.is_finite(), "ICC should be finite");
         assert!(
             result.icc >= -1.0 && result.icc <= 1.0,
@@ -588,7 +588,7 @@ mod tests {
     fn test_key_metric_for_known_benchmarks() {
         assert_eq!(
             key_metric_for_benchmark("Executive::Stroop"),
-            "stroop_effect"
+            "incongruent_accuracy"
         );
         assert_eq!(
             key_metric_for_benchmark("Executive::WCST"),
