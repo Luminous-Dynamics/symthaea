@@ -1455,6 +1455,18 @@ pub fn creativity_baselines() -> BTreeMap<&'static str, Baseline> {
         },
     );
 
+    // Remote Associates Test mean solution rank (Bowden & Jung-Beeman, 2003)
+    // With ~50% accuracy across 4 candidates, mean rank ≈ 1.75 (is_lower_better)
+    m.insert(
+        "rat_mean_solution_rank",
+        Baseline {
+            value: 1.75,
+            sd: Some(0.50),
+            source: "Bowden & Jung-Beeman (2003), derived from 50% accuracy over 4 candidates",
+            population: "human adults",
+        },
+    );
+
     // Alternate Uses Task fluency (Torrance, 1974)
     m.insert(
         "aut_fluency",

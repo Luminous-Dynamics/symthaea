@@ -5,10 +5,10 @@
 
 #![cfg(feature = "advanced-manufacturing")]
 
-use symthaea::cognitive_loop::managers::fabrication_manager::{
-    FabricationEvent, FabricationEventKind, FabricationManager,
+use symthaea::cognitive_loop::{
+    output_flags, CognitiveSubsystem, CycleSnapshot, FabricationEvent, FabricationEventKind,
+    FabricationManager,
 };
-use symthaea::cognitive_loop::subsystem_trait::{output_flags, CognitiveSubsystem, CycleSnapshot};
 use symthaea_fabrication_kernel::manufacturing::ManufacturingSafetyLevel;
 
 fn default_snapshot() -> CycleSnapshot {

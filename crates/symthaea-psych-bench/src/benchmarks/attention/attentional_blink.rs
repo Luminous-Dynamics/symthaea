@@ -67,9 +67,13 @@ impl AttentionalBlinkBenchmark {
         // Attention depletion model parameters
         // Working memory capacity modulates attention pool — higher WM capacity
         // supports greater attentional resource availability (Vogel et al., 2005).
+        // Lapse_rate reduces effective capacity and increases T1 cost, modeling
+        // attention-gate efficiency (Dux & Marois, 2009; individual differences
+        // in attentional control capacity).
         let wm_bonus = (config.working_memory_capacity as f64 - 4.0) * 0.04;
-        let attention_capacity: f64 = (1.0 + wm_bonus).clamp(0.7, 1.3);
-        let t1_cost: f64 = 0.75; // T1 processing depletes attention
+        let lapse_capacity_penalty = config.lapse_rate * 0.35; // up to -8.75% capacity
+        let attention_capacity: f64 = (1.0 + wm_bonus - lapse_capacity_penalty).clamp(0.7, 1.3);
+        let t1_cost: f64 = 0.75 + config.lapse_rate * 0.30; // lapse increases T1 consolidation cost
         let recovery_rate: f64 = 0.12; // Per-lag recovery
                                        // Encoding noise degrades target discrimination
         let enc_noise = config.effective_noise() as f32;
@@ -150,7 +154,7 @@ impl AttentionalBlinkBenchmark {
                 // Lapse_rate degrades attention recovery: higher lapse → slower recovery
                 // from the attentional blink, producing larger blink magnitude.
                 // This models attention-gate sluggishness (Di Lollo et al., 2005).
-                let lapse_recovery_penalty = config.lapse_rate * 0.5;
+                let lapse_recovery_penalty = config.lapse_rate * 0.7;
                 let effective_recovery = recovery_rate * (1.0 - lapse_recovery_penalty);
                 let attention_available = if t1_detected {
                     if config.ssm_backend {

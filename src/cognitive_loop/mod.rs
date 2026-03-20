@@ -196,7 +196,12 @@ pub use managers::network_service_bridge::{
     NetworkServiceBridge, NetworkServiceBridgeHandle,
 };
 pub use managers::swarm_manager::{SwarmEvent, SwarmTelemetry};
-pub use subsystem_trait::{CognitiveSubsystem, CycleSnapshot, SubsystemOutput};
+pub use subsystem_trait::{output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput};
+
+#[cfg(feature = "advanced-manufacturing")]
+pub use managers::fabrication_manager::{
+    FabricationEvent, FabricationEventKind, FabricationManager, FabricationTelemetry,
+};
 
 #[cfg(feature = "mesh")]
 pub use managers::radio_dispatcher::{

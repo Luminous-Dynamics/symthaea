@@ -963,6 +963,11 @@ impl BenchmarkReport {
         }
         if benchmark.contains("RemoteAssociates") {
             push_specific("overall_accuracy", "rat_overall_accuracy", &bl.creativity);
+            push_specific(
+                "mean_solution_rank",
+                "rat_mean_solution_rank",
+                &bl.creativity,
+            );
         }
         if benchmark.contains("StrangeStory") {
             push_specific("overall_accuracy", "strange_story_accuracy", &bl.tombench);
@@ -2155,7 +2160,7 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("Butlin") => "mean_quality_score",
         b if b.contains("ValenceClassification") => "valence_accuracy",
         b if b.contains("MoodCongruent") => "congruence_ratio",
-        b if b.contains("RemoteAssociates") => "overall_accuracy",
+        b if b.contains("RemoteAssociates") => "mean_solution_rank",
         b if b.contains("AlternateUses") => "fluency",
         b if b.contains("DivergentThinking") => "originality_score",
         b if b.contains("GoNoGo") => "nogo_accuracy",
@@ -2322,6 +2327,7 @@ pub fn is_lower_better(metric_key: &str) -> bool {
             | "capacity_ratio"
             | "interference_suppression"
             | "cross_session_leakage"
+            | "mean_solution_rank"
     )
 }
 
