@@ -352,8 +352,7 @@ impl FabricationManager {
         self.last_recommended_action = format!("{:?}", output.recommended_action);
         if !output.prediction_similarities.is_empty() {
             let sum: f32 = output.prediction_similarities.iter().map(|(_, s)| *s).sum();
-            self.last_prediction_coherence =
-                sum / output.prediction_similarities.len() as f32;
+            self.last_prediction_coherence = sum / output.prediction_similarities.len() as f32;
         }
         if output.safety_level != self.safety_level {
             self.safety_level = output.safety_level;
@@ -487,11 +486,10 @@ impl CognitiveSubsystem for FabricationManager {
                 .try_into()
                 .map_err(|_| "FabricationManager: corrupt checkpoint bytes [8..12]".to_string())?,
         );
-        self.pog_score_ema = f32::from_le_bytes(
-            data[12..16].try_into().map_err(|_| {
+        self.pog_score_ema =
+            f32::from_le_bytes(data[12..16].try_into().map_err(|_| {
                 "FabricationManager: corrupt checkpoint bytes [12..16]".to_string()
-            })?,
-        );
+            })?);
         Ok(())
     }
 }
