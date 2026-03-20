@@ -361,6 +361,7 @@ fn decode_entry<T: serde::de::DeserializeOwned>(record: &holochain::prelude::Rec
 
 /// Extract a string field from a Record's entry via msgpack deserialization.
 fn extract_entry_field(record: &holochain::prelude::Record, field: &str) -> Option<String> {
+    use holochain::prelude::{SerializedBytes, UnsafeBytes};
     let entry = record.entry().as_option()?;
     let sb = SerializedBytes::try_from(entry.clone()).ok()?;
     let bytes: Vec<u8> = UnsafeBytes::from(sb).into();
