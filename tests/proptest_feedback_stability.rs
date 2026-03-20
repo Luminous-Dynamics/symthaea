@@ -872,11 +872,11 @@ proptest! {
             assert_finite_f64(m.temporal.holographic_unity, &format!("holographic_unity@{i}"))?;
             assert_finite_f64(m.temporal.holographic_binding, &format!("holographic_binding@{i}"))?;
             assert_finite_f64(m.consciousness.consciousness_gradient_magnitude, &format!("consciousness_gradient_magnitude@{i}"))?;
-            assert_finite_f32(m.affect_consciousness_valence, &format!("affect_consciousness_valence@{i}"))?;
-            assert_finite_f32(m.affect_consciousness_arousal, &format!("affect_consciousness_arousal@{i}"))?;
+            assert_finite_f32(m.embodied.affect_consciousness_valence, &format!("affect_consciousness_valence@{i}"))?;
+            assert_finite_f32(m.embodied.affect_consciousness_arousal, &format!("affect_consciousness_arousal@{i}"))?;
             assert_finite_f64(m.pipeline_consciousness, &format!("pipeline_consciousness@{i}"))?;
             assert_finite_f64(m.multimodal_integrated_phi, &format!("multimodal_integrated_phi@{i}"))?;
-            assert_finite_f64(m.consciousness_state_level, &format!("consciousness_state_level@{i}"))?;
+            assert_finite_f64(m.consciousness.consciousness_state_level, &format!("consciousness_state_level@{i}"))?;
             assert_finite_f32(m.epistemic_gate_confidence, &format!("epistemic_gate_confidence@{i}"))?;
             assert_finite_f64(m.primitive_validation_phi_gain, &format!("primitive_validation_phi_gain@{i}"))?;
             assert_finite_f64(m.primitive_validation_p_value, &format!("primitive_validation_p_value@{i}"))?;

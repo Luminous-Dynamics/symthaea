@@ -61,6 +61,7 @@ members = [
     "crates/symthaea-clinical",
     "crates/symthaea-therapeutic",
     "crates/symthaea-hdc-store",
+    "crates/symthaea-mycelix-conductor",
     # DRM/KMS boot animation — needs Linux DRM headers; not in default-members.
     "crates/symthaea-quicken-fb",
     # Leptos CSR web frontend — WASM target, not in default-members.
