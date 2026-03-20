@@ -471,6 +471,8 @@ pub struct LoopStats {
     pub agency_strategy_override_count: u64,
     /// Cycles where predictive FE modulated surprise amplitude (cumulative).
     pub pfe_surprise_mod_count: u64,
+    /// Cycles where subsystem ANOMALY_DETECTED flag was set (cumulative).
+    pub anomaly_detected_count: u64,
     /// Cycles where codebook diversity adapted memoization threshold (cumulative).
     pub memo_threshold_adaptations: u64,
 

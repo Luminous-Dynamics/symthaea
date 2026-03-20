@@ -265,6 +265,9 @@ pub(crate) struct QualityMetrics {
     pub(crate) confidence_calibration_bias: f32,
     /// Confidence calibration: count of samples in current window.
     pub(crate) confidence_calibration_count: u32,
+    /// Whether a subsystem VETO_ACTION flag was set this cycle.
+    /// Reset at cycle start. When true, motor output should be suppressed.
+    pub(crate) subsystem_veto: bool,
     /// LR momentum: EMA of recent effective LR.
     pub(crate) lr_momentum_ema: f32,
     /// Previous metacognitive prediction (expected consciousness level).
@@ -348,6 +351,7 @@ impl Default for QualityMetrics {
             pe_variance_ema: 0.0,
             confidence_calibration_bias: 0.0,
             confidence_calibration_count: 0,
+            subsystem_veto: false,
             lr_momentum_ema: 1.0,
             prev_metacognitive_prediction: 0.0,
             sleep_pressure: 0.0,

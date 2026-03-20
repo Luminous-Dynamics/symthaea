@@ -94,7 +94,7 @@ impl CognitiveLoopService {
                                         .fold(0.0f32, f32::max);
                                     // High resonator match → boost importance (consolidation-worthy)
                                     // Low match → novel content, still store but with base importance
-                                    ctx.pp_phi + best_sim * 0.2
+                                    ctx.pp_phi + best_sim * super::super::thresholds::RESONATOR_MATCH_BOOST
                                 } else {
                                     ctx.pp_phi
                                 }
@@ -311,7 +311,7 @@ impl CognitiveLoopService {
         // Runs every cycle (lightweight: keyword detection + rolling averages)
         // ═══════════════════════════════════════════════════════════════════════
         if let Some(ref mut usi) = self.language_comm.user_state {
-            let had_error = ctx.prediction_error > 0.8;
+            let had_error = ctx.prediction_error > super::super::thresholds::USER_STATE_ERROR_THRESHOLD;
             usi.process(ctx.input, had_error);
         }
 
@@ -323,7 +323,7 @@ impl CognitiveLoopService {
         let narrative_self_psi = if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
             if let Some(ref mut narrative) = self.self_model_tier.narrative_self {
                 let significance = if ctx.moral_concern_detected {
-                    0.8
+                    super::super::thresholds::NARRATIVE_MORAL_SIGNIFICANCE
                 } else {
                     (ctx.prediction_error as f64).clamp(0.0, 1.0)
                 };

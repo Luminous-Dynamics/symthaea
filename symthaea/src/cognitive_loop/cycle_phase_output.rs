@@ -1533,6 +1533,7 @@ impl CognitiveLoopService {
         let integrated = self.subsystem_collector.integrate();
         if integrated.n_contributors > 0 {
             metadata.subsystem_integration_contributors = integrated.n_contributors as u32;
+            metadata.subsystem_flags = integrated.flags;
 
             if integrated.confidence_delta != 0.0 {
                 self.adjust_confidence("subsystem_managers", integrated.confidence_delta as f32);
@@ -1551,6 +1552,73 @@ impl CognitiveLoopService {
                 self.emotion_contagion.valence =
                     (self.emotion_contagion.valence + integrated.valence_delta).clamp(-1.0, 1.0);
             }
+
+            // ── Act on subsystem flags ──────────────────────────────────
+            // These flags are set by individual managers and OR'd together.
+            // Previously computed but never acted upon — now wired.
+            use super::subsystem_trait::output_flags;
+
+            // VETO_ACTION: A subsystem (sentinel, ethics) wants to block motor output.
+            // Science: Miller & Cohen (2001) — executive inhibition of inappropriate actions.
+            if integrated.has_flag(output_flags::VETO_ACTION) {
+                self.carryover.quality.subsystem_veto = true;
+                tracing::debug!(
+                    cycle = self.stats.total_cycles,
+                    "Subsystem VETO_ACTION: motor output will be suppressed"
+                );
+            }
+
+            // ESCALATE_URGENCY: A subsystem detected a critical situation.
+            // Boost arousal and suppress exploration to focus on the threat.
+            if integrated.has_flag(output_flags::ESCALATE_URGENCY) {
+                self.emotion_contagion.arousal =
+                    (self.emotion_contagion.arousal + 0.1).clamp(0.0, 1.0);
+                self.scale_exploration("urgency_escalation", 0.7);
+                tracing::debug!(
+                    cycle = self.stats.total_cycles,
+                    "Subsystem ESCALATE_URGENCY: arousal boosted, exploration dampened"
+                );
+            }
+
+            // REQUEST_CONSOLIDATION: Memory/learning subsystems want consolidation.
+            // Trigger episodic consolidation to commit recent learning.
+            if integrated.has_flag(output_flags::REQUEST_CONSOLIDATION) {
+                self.fep.episodic_memory.consolidate_recent();
+                tracing::trace!(
+                    cycle = self.stats.total_cycles,
+                    "Subsystem REQUEST_CONSOLIDATION: episodic consolidation triggered"
+                );
+            }
+
+            // REQUEST_REST: A subsystem is fatigued and requests reduced processing.
+            // Dampen learning rate to allow recovery.
+            if integrated.has_flag(output_flags::REQUEST_REST) {
+                self.scale_lr("subsystem_rest_request", 0.9);
+                tracing::trace!(
+                    cycle = self.stats.total_cycles,
+                    "Subsystem REQUEST_REST: LR dampened for recovery"
+                );
+            }
+
+            // REQUEST_EXPLORATION: A subsystem wants to explore (novelty, anomaly).
+            // Already handled via exploration_delta averaging, but flag provides
+            // a discrete signal — give an additional nudge.
+            if integrated.has_flag(output_flags::REQUEST_EXPLORATION) {
+                self.adjust_exploration("subsystem_request_explore", 0.02);
+            }
+
+            // ANOMALY_DETECTED: One or more subsystems detected anomalous conditions.
+            // Record for telemetry and dampen confidence slightly.
+            if integrated.has_flag(output_flags::ANOMALY_DETECTED) {
+                self.stats.anomaly_detected_count += 1;
+                self.scale_confidence("subsystem_anomaly", 0.98);
+                tracing::debug!(
+                    cycle = self.stats.total_cycles,
+                    "Subsystem ANOMALY_DETECTED: confidence dampened"
+                );
+            }
+
+            metadata.subsystem_veto_active = self.carryover.quality.subsystem_veto;
 
             tracing::trace!("Phase C integration: {}", integrated);
         }

@@ -36,26 +36,75 @@ fn geometric_mean(factors: &[f32]) -> f32 {
 // Tuning constants — see `thresholds.rs` for the centralized registry.
 // ═══════════════════════════════════════════════════════════════════════════════
 use crate::cognitive_loop::thresholds::{
+    // Arousal management
+    AROUSAL_SUPPRESS_MAX,
+    AROUSAL_SUPPRESS_SCALE,
+    AROUSAL_SUPPRESS_THRESHOLD,
+    AROUSAL_TRAP_THRESHOLD,
+    BASELINE_INTEGRATION_SCALE,
     BODY_PSI_WEIGHT,
+    // Cross-modal binding
+    CROSS_MODAL_FE_DAMPEN_MIN,
+    CROSS_MODAL_FE_DAMPEN_SCALE,
+    CROSS_MODAL_FE_DAMPEN_THRESHOLD,
+    CROSS_MODAL_LINGUISTIC_CONFIDENCE,
+    CROSS_MODAL_PRECISION_BOOST_SCALE,
+    CROSS_MODAL_PRECISION_BOOST_THRESHOLD,
     EMBODIED_PSI_WEIGHT,
+    // FEP actions
+    FEP_ACTION_FE_BOOST_SCALE,
+    FEP_ACTION_FE_DIVISOR,
+    FEP_EXPLORATION_NUDGE_CALM,
+    FEP_EXPLORATION_NUDGE_SURPRISED,
     // FEP / Surprise
     FEP_LR_DECAY,
+    FEP_REWARD_WEIGHT,
+    FEP_SENSORY_PRECISION_BLEND,
     FEP_SURPRISE_SCALE,
     // Psi synthesis
     FLOW_PSI_WEIGHT,
+    // Low arousal consolidation
+    LOW_AROUSAL_CONSOLIDATION_MAX,
+    LOW_AROUSAL_CONSOLIDATION_SCALE,
+    LOW_AROUSAL_CONSOLIDATION_THRESHOLD,
     MEMORY_CONTEXT_BOOST_SCALE,
+    // Memory / episodic
+    MEMORY_PHI_PRIME_SCALE,
+    MEMORY_PHI_PRIME_THRESHOLD,
     MEMORY_RECALL_SIM_THRESHOLD,
     // Memory recall
     MEMORY_RECALL_TOP_K,
+    MEMORY_VALENCE_NUDGE_SCALE,
+    MEMORY_VALENCE_THRESHOLD,
     // Moral evaluation
     MORAL_BENEFIT_CONFIDENCE_BOOST,
     MORAL_BENEFIT_THRESHOLD,
     MORAL_CONCERN_EXPLORATION_DAMPEN,
     MORAL_CONCERN_PAUSE_BOOST,
     MORAL_CONCERN_THRESHOLD,
+    MORAL_CONSENT_CONFIDENCE_SCALE,
+    MORAL_CONSENT_LR_FACTOR,
+    MORAL_DUTY_LR_FACTOR,
     MORAL_EVAL_INTERVAL,
+    MORAL_HARM_CONFIDENCE_SCALE,
+    MORAL_HARM_EXPLORATION_SCALE,
+    MORAL_OTHER_LR_FACTOR,
+    MORAL_VALUE_FEEDBACK_SCALE,
     NEGATION_DAMPENING,
     NEGATION_POLARITY_THRESHOLD,
+    // PFE surprise
+    PFE_SURPRISE_AMPLIFY_MAX,
+    PFE_SURPRISE_AMPLIFY_SCALE,
+    PFE_SURPRISE_DAMPEN_MAX,
+    PFE_SURPRISE_DAMPEN_SCALE,
+    PFE_SURPRISE_HIGH_THRESHOLD,
+    PFE_SURPRISE_LOW_THRESHOLD,
+    // Self-reflection
+    REFLECTION_CONFIDENCE_THRESHOLD,
+    REFLECTION_EXPLORATION_DECREASE,
+    REFLECTION_EXPLORATION_INCREASE,
+    REFLECTION_LR_DECREASE,
+    REFLECTION_LR_INCREASE,
     RELATIONAL_PSI_WEIGHT,
     REWARD_BAD_BASE,
     REWARD_BAD_SCALE,
@@ -73,6 +122,7 @@ use crate::cognitive_loop::thresholds::{
     STRATEGY_SUPPORTIVE_PAUSE,
     // Surprise & exploration
     SURPRISE_BOREDOM_DAMPEN,
+    SURPRISE_EXPLORATION_FACTOR_SCALE,
 };
 
 impl CognitiveLoopService {
@@ -292,7 +342,11 @@ impl CognitiveLoopService {
 
         // Value feedback: self-correcting moral alignment via TD-learning trend
         let value_trend = self.primitive_tier.value_feedback.recent_trend(50);
-        let moral_feedback = 1.0 + (value_trend * 0.1).clamp(-0.1, 0.1);
+        let moral_feedback = 1.0
+            + (value_trend * MORAL_VALUE_FEEDBACK_SCALE).clamp(
+                -MORAL_VALUE_FEEDBACK_SCALE,
+                MORAL_VALUE_FEEDBACK_SCALE,
+            );
         let moral_score = moral_score * moral_feedback;
         {
             let signal = self.primitive_tier.value_feedback.create_signal(
@@ -346,14 +400,17 @@ impl CognitiveLoopService {
                 / n;
 
             // Memory valence biases current emotional state (emotional re-experiencing)
-            if memory_valence_avg.abs() > 0.1 {
-                let valence_nudge = memory_valence_avg * 0.15;
+            if memory_valence_avg.abs() > MEMORY_VALENCE_THRESHOLD {
+                let valence_nudge = memory_valence_avg * MEMORY_VALENCE_NUDGE_SCALE;
                 self.emotion_contagion.valence =
                     (self.emotion_contagion.valence + valence_nudge).clamp(-1.0, 1.0);
             }
             // Memory Phi primes consciousness expectation
-            if memory_phi_avg > 0.4 {
-                self.adjust_confidence("memory_phi_prime", (memory_phi_avg - 0.4) * 0.05);
+            if memory_phi_avg > MEMORY_PHI_PRIME_THRESHOLD {
+                self.adjust_confidence(
+                    "memory_phi_prime",
+                    (memory_phi_avg - MEMORY_PHI_PRIME_THRESHOLD) * MEMORY_PHI_PRIME_SCALE,
+                );
             }
         }
 
@@ -385,7 +442,7 @@ impl CognitiveLoopService {
                 self.curiosity_drive
                     .set_boredom_threshold(current_threshold * SURPRISE_BOREDOM_DAMPEN);
                 let expl_factor = bridge.exploration_factor;
-                deferred_exploration_delta = Some(expl_factor * 0.3);
+                deferred_exploration_delta = Some(expl_factor * SURPRISE_EXPLORATION_FACTOR_SCALE);
                 exploration_action =
                     action.map(|a| format!("perturbation[{}d,scale={:.3}]", a.len(), expl_factor));
                 tracing::debug!(
@@ -447,7 +504,7 @@ impl CognitiveLoopService {
             .voice_coherence
             .bridge
             .smoothed_coherence()
-            * 0.3;
+            * BASELINE_INTEGRATION_SCALE;
 
         let unified_psi = (baseline_integration
             + coherence_psi
@@ -490,7 +547,7 @@ impl CognitiveLoopService {
             if prev_fe > 0.0 {
                 // FE reduction: positive when improving (prev > current)
                 let fe_reduction = (prev_fe - current_fe).clamp(-1.0, 1.0);
-                (fe_reduction * 0.15) as f32 // 15% weight for FEP signal
+                (fe_reduction * FEP_REWARD_WEIGHT as f64) as f32
             } else {
                 0.0 // first cycle — no previous FE
             }
@@ -613,10 +670,11 @@ impl CognitiveLoopService {
             0 => {
                 // Boost learning rate when free energy is high
                 if let Some(ref fe) = self.fep.agent.last_fe_components {
-                    let fe_boost = (fe.total.abs() as f32 / 2.0).clamp(0.0, 1.5);
+                    let fe_boost =
+                        (fe.total.abs() as f32 / FEP_ACTION_FE_DIVISOR).clamp(0.0, 1.5);
                     self.scale_lr_pri(
                         "fep_free_energy",
-                        1.0 + fe_boost * 0.5,
+                        1.0 + fe_boost * FEP_ACTION_FE_BOOST_SCALE,
                         Priority::Homeostatic,
                     );
                 }
@@ -624,11 +682,16 @@ impl CognitiveLoopService {
             1 => {
                 // Reset sensory precision toward 1.0 to trust new observations after shift
                 let current = self.fep.agent.precision.sensory_precision;
-                self.fep.agent.precision.sensory_precision = current * 0.7 + 1.0 * 0.3;
+                self.fep.agent.precision.sensory_precision =
+                    current * (1.0 - FEP_SENSORY_PRECISION_BLEND as f64) + FEP_SENSORY_PRECISION_BLEND as f64;
             }
             2 => {
                 // Boost exploration -- stronger nudge when surprised
-                let nudge = if is_surprised { 0.15 } else { 0.05 };
+                let nudge = if is_surprised {
+                    FEP_EXPLORATION_NUDGE_SURPRISED
+                } else {
+                    FEP_EXPLORATION_NUDGE_CALM
+                };
                 self.adjust_exploration_pri("perturbation", nudge, Priority::Homeostatic);
             }
             3 => {
@@ -673,7 +736,7 @@ impl CognitiveLoopService {
                 let linguistic_repr = ModalRepresentation::new(
                     Modality::Linguistic,
                     ContinuousHV::from_vec(hv16.to_bipolar()),
-                    0.8,
+                    CROSS_MODAL_LINGUISTIC_CONFIDENCE,
                     "encoder",
                 );
                 binder.add_representation(linguistic_repr);
@@ -711,14 +774,19 @@ impl CognitiveLoopService {
 
         // FEEDBACK: Predictive <-> Cross-Modal bidirectional coupling (Talsma 2015)
         if let Some(ref mut mind) = self.consciousness_state.predictive_mind {
-            if cross_modal_binding_strength > 0.5 {
-                let precision_boost = (cross_modal_binding_strength - 0.5) as f64 * 0.1;
+            if cross_modal_binding_strength > CROSS_MODAL_PRECISION_BOOST_THRESHOLD {
+                let precision_boost = (cross_modal_binding_strength
+                    - CROSS_MODAL_PRECISION_BOOST_THRESHOLD) as f64
+                    * CROSS_MODAL_PRECISION_BOOST_SCALE;
                 mind.precision.boost_precision(precision_boost);
             }
         }
         if let Some(ref mut binder) = self.consciousness_state.cross_modal_binder {
-            if predictive_free_energy > 0.6 {
-                let dampen = (1.0 - (predictive_free_energy - 0.6) * 0.3).max(0.5) as f32;
+            if predictive_free_energy > CROSS_MODAL_FE_DAMPEN_THRESHOLD {
+                let dampen = (1.0
+                    - (predictive_free_energy - CROSS_MODAL_FE_DAMPEN_THRESHOLD)
+                        * CROSS_MODAL_FE_DAMPEN_SCALE)
+                    .max(CROSS_MODAL_FE_DAMPEN_MIN as f64) as f32;
                 binder.set_attention_weight(dampen);
             }
         }
@@ -778,9 +846,11 @@ impl CognitiveLoopService {
     /// - Phase 3 (escape, cycles >10): forced exploration=1.0, confidence×0.9, reset
     /// - Low arousal (<0.3): consolidation LR boost (Steriade 1996)
     pub(in crate::cognitive_loop) fn manage_arousal_trap(&mut self, affective_arousal: f32) {
-        if affective_arousal > 0.7 {
+        if affective_arousal > AROUSAL_SUPPRESS_THRESHOLD {
             // Attenuated 50%: DA learning_rate_factor() already scales LR via the bath
-            let arousal_suppress = ((affective_arousal - 0.7) * 0.25).min(0.08);
+            let arousal_suppress = ((affective_arousal - AROUSAL_SUPPRESS_THRESHOLD)
+                * AROUSAL_SUPPRESS_SCALE)
+                .min(AROUSAL_SUPPRESS_MAX);
             self.scale_lr_pri(
                 "affective_arousal_suppress",
                 1.0 - arousal_suppress,
@@ -788,7 +858,7 @@ impl CognitiveLoopService {
             );
 
             // Arousal trap detection (Yerkes-Dodson 1908 — inverted-U performance curve)
-            if affective_arousal > 0.8 {
+            if affective_arousal > AROUSAL_TRAP_THRESHOLD {
                 self.carryover.urgency.arousal_trap_counter = self
                     .carryover
                     .urgency
@@ -835,10 +905,12 @@ impl CognitiveLoopService {
             // Reset trap counter when arousal drops below threshold
             self.carryover.urgency.arousal_trap_counter = 0;
 
-            if affective_arousal < 0.3 {
+            if affective_arousal < LOW_AROUSAL_CONSOLIDATION_THRESHOLD {
                 // Low arousal enhances consolidation (Steriade 1996)
                 // Attenuated 50%: DA handles low-error consolidation boost via the bath
-                let consolidation_boost = ((0.3 - affective_arousal) * 0.3).min(0.05);
+                let consolidation_boost = ((LOW_AROUSAL_CONSOLIDATION_THRESHOLD - affective_arousal)
+                    * LOW_AROUSAL_CONSOLIDATION_SCALE)
+                    .min(LOW_AROUSAL_CONSOLIDATION_MAX);
                 self.scale_lr_pri(
                     "low_arousal_consolidate",
                     1.0 + consolidation_boost,
@@ -893,18 +965,18 @@ impl CognitiveLoopService {
                 let violation_conf = (1.0 - moral_score).clamp(0.3, 1.0);
                 self.scale_confidence_weighted(
                     "moral_consent_viol",
-                    0.7,
+                    MORAL_CONSENT_CONFIDENCE_SCALE,
                     Priority::Safety,
                     violation_conf,
                 );
-                self.carryover.learning.subsystem_lr_factor *= 0.5;
+                self.carryover.learning.subsystem_lr_factor *= MORAL_CONSENT_LR_FACTOR;
                 moral_steering_category = "consent";
             } else if moral_judgment.violations.iter().any(|v| v.contains("harm")) {
                 let violation_conf = (1.0 - moral_score).clamp(0.3, 1.0);
-                self.scale_exploration_pri("harm_detected", 0.4, Priority::Safety);
+                self.scale_exploration_pri("harm_detected", MORAL_HARM_EXPLORATION_SCALE, Priority::Safety);
                 self.scale_confidence_weighted(
                     "moral_harm_detect",
-                    0.85,
+                    MORAL_HARM_CONFIDENCE_SCALE,
                     Priority::Safety,
                     violation_conf,
                 );
@@ -915,10 +987,10 @@ impl CognitiveLoopService {
                 .any(|v| v.contains("perfect") || v.contains("duty"))
             {
                 self.self_model_tier.self_reflection.force_reflection();
-                self.carryover.learning.subsystem_lr_factor *= 0.8;
+                self.carryover.learning.subsystem_lr_factor *= MORAL_DUTY_LR_FACTOR;
                 moral_steering_category = "duty";
             } else if !moral_judgment.violations.is_empty() {
-                self.carryover.learning.subsystem_lr_factor *= 0.9;
+                self.carryover.learning.subsystem_lr_factor *= MORAL_OTHER_LR_FACTOR;
                 moral_steering_category = "other";
             }
         } else if moral_score > MORAL_BENEFIT_THRESHOLD {
@@ -944,13 +1016,17 @@ impl CognitiveLoopService {
 
         // Phase 21: Predictive free energy → surprise amplitude scaling
         let cached_pfe = self.carryover.consciousness.last_predictive_free_energy;
-        let pfe_surprise_mod = if is_surprised && cached_pfe > 0.5 {
-            let amplification = ((cached_pfe - 0.5) * 0.2).min(0.1) as f32;
+        let pfe_surprise_mod = if is_surprised && cached_pfe > PFE_SURPRISE_HIGH_THRESHOLD {
+            let amplification = ((cached_pfe - PFE_SURPRISE_HIGH_THRESHOLD)
+                * PFE_SURPRISE_AMPLIFY_SCALE)
+                .min(PFE_SURPRISE_AMPLIFY_MAX) as f32;
             self.adjust_exploration("pfe_surprise_amplify", amplification);
             self.stats.pfe_surprise_mod_count += 1;
             amplification
-        } else if is_surprised && cached_pfe < 0.2 && cached_pfe > 0.0 {
-            let dampening = ((0.2 - cached_pfe) * 0.15).min(0.05) as f32;
+        } else if is_surprised && cached_pfe < PFE_SURPRISE_LOW_THRESHOLD && cached_pfe > 0.0 {
+            let dampening = ((PFE_SURPRISE_LOW_THRESHOLD - cached_pfe)
+                * PFE_SURPRISE_DAMPEN_SCALE)
+                .min(PFE_SURPRISE_DAMPEN_MAX) as f32;
             self.scale_exploration("pfe_surprise_dampen", 1.0 - dampening);
             self.stats.pfe_surprise_mod_count += 1;
             -dampening
@@ -1019,25 +1095,25 @@ impl CognitiveLoopService {
         if self.self_model_tier.self_reflection.should_reflect() {
             let recommendations = self.self_model_tier.self_reflection.reflect();
             for rec in &recommendations {
-                if rec.confidence < 0.5 {
+                if rec.confidence < REFLECTION_CONFIDENCE_THRESHOLD {
                     continue;
                 }
                 match rec.target {
                     super::super::RecommendationTarget::LearningRate => match rec.direction {
                         super::super::AdjustmentDirection::Decrease => {
-                            self.scale_lr("reflection_decrease", 0.9);
+                            self.scale_lr("reflection_decrease", REFLECTION_LR_DECREASE);
                         }
                         super::super::AdjustmentDirection::Increase => {
-                            self.scale_lr("reflection_increase", 1.1);
+                            self.scale_lr("reflection_increase", REFLECTION_LR_INCREASE);
                         }
                         _ => {}
                     },
                     super::super::RecommendationTarget::ExplorationFactor => match rec.direction {
                         super::super::AdjustmentDirection::Increase => {
-                            self.adjust_exploration("metacog_explore_increase", 0.12);
+                            self.adjust_exploration("metacog_explore_increase", REFLECTION_EXPLORATION_INCREASE);
                         }
                         super::super::AdjustmentDirection::Decrease => {
-                            self.scale_exploration("metacog_explore_decrease", 0.75);
+                            self.scale_exploration("metacog_explore_decrease", REFLECTION_EXPLORATION_DECREASE);
                         }
                         _ => {}
                     },

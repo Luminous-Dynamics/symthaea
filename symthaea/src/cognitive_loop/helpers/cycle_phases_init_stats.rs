@@ -108,6 +108,7 @@ impl CognitiveLoopService {
         );
         // ── Phase 2.3: Clear subsystem output collector ────
         self.subsystem_collector.clear();
+        self.carryover.quality.subsystem_veto = false;
 
         // Chronobiology: refresh biorhythm every 97 cycles (co-prime amortization)
         self.biorhythm_mgr.refresh_counter += 1;
