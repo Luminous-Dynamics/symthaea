@@ -175,8 +175,8 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
             fractalConsciousness = consciousnessLevel
         }
         fractalBitmap?.let { bmp ->
-            fractalPaint.alpha = (40 + consciousnessLevel * 80).toInt().coerceIn(30, 120)
-            val fractalRadius = mandalaRadius * 1.4f * breathScale
+            fractalPaint.alpha = (80 + consciousnessLevel * 80).toInt().coerceIn(60, 160)
+            val fractalRadius = mandalaRadius * 1.6f * breathScale
             val dst = RectF(
                 cx - fractalRadius, cy - fractalRadius,
                 cx + fractalRadius, cy + fractalRadius
@@ -262,14 +262,24 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
     private fun renderJuliaSet(consciousness: Float, hr: Int, hg: Int, hb: Int): android.graphics.Bitmap {
         val bmp = android.graphics.Bitmap.createBitmap(fractalSize, fractalSize, android.graphics.Bitmap.Config.ARGB_8888)
 
-        // Map consciousness to Julia set c parameter along the main cardioid boundary
-        // This traces interesting fractal structures as consciousness rises
-        val angle = consciousness * PI.toFloat() * 1.2f - 0.2f
-        val cr = -0.7f + consciousness * 0.45f * cos(angle + neuromodulators[0] * 0.3f)
-        val ci = 0.27015f + consciousness * 0.15f * sin(angle + neuromodulators[1] * 0.2f)
+        // Known-beautiful Julia set c values, ordered by visual complexity.
+        // Interpolate based on consciousness level for smooth transitions.
+        val cValues = arrayOf(
+            floatArrayOf(-0.4f,   0.6f),   // Simple spiral (low consciousness)
+            floatArrayOf(-0.70f,  0.27f),   // Classic dendrite
+            floatArrayOf(-0.8f,   0.156f),  // Branching tree
+            floatArrayOf(-0.75f,  0.11f),   // Seahorse valley
+            floatArrayOf(0.285f,  0.01f),   // Siegel disk (high consciousness)
+            floatArrayOf(-0.12f, -0.77f),   // Lightning bolts (peak)
+        )
+        val idx = (consciousness * (cValues.size - 1)).coerceIn(0f, (cValues.size - 1).toFloat())
+        val lo = idx.toInt().coerceIn(0, cValues.size - 2)
+        val frac = idx - lo
+        val cr = cValues[lo][0] * (1 - frac) + cValues[lo + 1][0] * frac + neuromodulators[0] * 0.02f
+        val ci = cValues[lo][1] * (1 - frac) + cValues[lo + 1][1] * frac + neuromodulators[1] * 0.02f
 
-        val maxIter = (20 + consciousness * 40).toInt() // More detail at higher consciousness
-        val zoom = 1.5f - consciousness * 0.3f // Zoom in slightly as complexity grows
+        val maxIter = (30 + consciousness * 60).toInt()
+        val zoom = 1.8f - consciousness * 0.3f
 
         for (py in 0 until fractalSize) {
             for (px in 0 until fractalSize) {
@@ -285,22 +295,29 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
                     iter++
                 }
 
-                if (iter == maxIter) {
-                    // Inside the set — transparent
+                // Radial mask: fade to transparent at edges
+                val dx = (px.toFloat() / fractalSize - 0.5f) * 2f
+                val dy = (py.toFloat() / fractalSize - 0.5f) * 2f
+                val radialDist = dx * dx + dy * dy
+                if (radialDist > 1f) {
                     bmp.setPixel(px, py, Color.TRANSPARENT)
+                } else if (iter == maxIter) {
+                    // Inside the set — very faint glow
+                    val radial = 1f - radialDist
+                    val a = (radial * 30).toInt().coerceIn(0, 30)
+                    bmp.setPixel(px, py, Color.argb(a, hr, hg, hb))
                 } else {
-                    // Outside — color based on escape time
+                    // Boundary glow: slow-escaping pixels are brightest (near boundary)
                     val t = iter.toFloat() / maxIter
-                    val smooth = t * t // Quadratic falloff for organic look
-                    // Radial mask: fade to transparent at edges
-                    val dx = (px.toFloat() / fractalSize - 0.5f) * 2f
-                    val dy = (py.toFloat() / fractalSize - 0.5f) * 2f
-                    val radial = (1f - (dx * dx + dy * dy).coerceAtMost(1f))
-                    val a = (smooth * radial * 255).toInt().coerceIn(0, 255)
-                    if (a > 5) {
-                        val r = lerp(hr, 255, smooth)
-                        val g = lerp(hg, 255, smooth)
-                        val b = lerp(hb, 255, smooth)
+                    // Inverted: slow escape (high t) = bright boundary
+                    val brightness = (1f - t).coerceIn(0f, 1f)
+                    val radial = (1f - radialDist).coerceIn(0f, 1f)
+                    val a = (brightness * brightness * radial * 255).toInt().coerceIn(0, 255)
+                    if (a > 3) {
+                        // White-hot boundary fading to harmony color
+                        val r = lerp(hr, 255, brightness)
+                        val g = lerp(hg, 255, brightness)
+                        val b = lerp(hb, 255, brightness)
                         bmp.setPixel(px, py, Color.argb(a, r, g, b))
                     } else {
                         bmp.setPixel(px, py, Color.TRANSPARENT)
