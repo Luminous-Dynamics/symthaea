@@ -183,6 +183,9 @@ symthaea-support = { path = "crates/symthaea-support", optional = true }
 # Mycelix FL Core - Unified federated learning algorithms (shared with Mycelix SDK)
 mycelix-fl-core = { path = "stubs/mycelix-fl-core", optional = true }
 
+# Mycelix Conductor bridge - governance dispatch to Holochain conductor
+symthaea-mycelix-conductor = { path = "crates/symthaea-mycelix-conductor", optional = true }
+
 # Mycelix Crypto - Post-quantum cryptography (ML-KEM-768, ML-DSA-65, SPHINCS+)
 mycelix-crypto = { path = "stubs/mycelix-crypto", optional = true, features = ["native"] }
 
@@ -467,7 +470,7 @@ mesh-key-exchange = ["mesh-encryption", "dep:x25519-dalek", "dep:hkdf", "dep:sha
 swarm = ["iroh"]                            # Real-time P2P tensor streaming via Iroh 0.95+
 secure-mesh = ["identity", "mesh-key-exchange", "swarm"]  # Full crypto stack: Ed25519 + ChaCha20-Poly1305 + X25519 DH + HKDF
 pqc-handshake = ["identity", "mesh-key-exchange", "dep:mycelix-crypto"]  # Hybrid Ed25519 + ML-KEM-768 post-quantum handshake
-mycelix = ["mycelix-fl-core", "sha3"]       # Mycelix FL algorithms + hashing
+mycelix = ["mycelix-fl-core", "sha3", "dep:symthaea-mycelix-conductor"]       # Mycelix FL algorithms + hashing + conductor bridge
 mycelix_sdk = ["mycelix", "dep:mycelix-sdk"]                  # Enabled Mycelix SDK integration
 
 # ── Sovereign Inoculation ──────────────────────────────────────────
@@ -617,7 +620,6 @@ proptest = "1.4"
 serial_test = "3.2"
 symthaea-broca = { path = "crates/symthaea-broca" }
 symthaea-crucible = { path = "crates/symthaea-crucible" }
-symthaea-mycelix-conductor = { path = "crates/symthaea-mycelix-conductor" }
 tempfile = "3.8"  # For perception tests
 
 # Binaries
