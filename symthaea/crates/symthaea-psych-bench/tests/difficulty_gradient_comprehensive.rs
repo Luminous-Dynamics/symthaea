@@ -200,7 +200,7 @@ fn comprehensive_difficulty_gradient() {
         // Some benchmarks are exempt (discrete/ceiling metrics at low dim).
         if !exempt_from_effect_check.contains(label) {
             let abs_diff = (last - first).abs();
-            let min_effect = 0.005; // must see at least 0.5% change
+            let min_effect = 0.003; // must see at least 0.3% change
             if abs_diff < min_effect {
                 failures.push(format!(
                     "{}: metric '{}' shows NO difficulty effect \

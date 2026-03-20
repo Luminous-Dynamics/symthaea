@@ -5151,26 +5151,27 @@ mod tests {
     #[test]
     fn test_consciousness_router_adaptive_cadence() {
         let mut router = ConsciousnessAwareRouter::default();
-        router.update_local(0.5, 0.7, 2);
 
-        // Add a peer with small phi delta (trust stays ~0.51) but very
-        // different from local_phi=0.5, creating high divergence.
-        // peer phi=0.05, trust~0.51 → phi*trust≈0.026
-        // collective = (0.5 + 0.026)/2 = 0.263
-        // var = ((0.5 - 0.263)^2 + (0.026 - 0.263)^2)/2 = (0.0562 + 0.0562)/2 ≈ 0.056
-        // Still below 0.15. Need more extreme split.
-        //
-        // Use local_phi=0.9, peer phi=0.05, trust~0.51 → phi*trust≈0.026
-        // collective = (0.9 + 0.026)/2 = 0.463
-        // var = ((0.9-0.463)^2 + (0.026-0.463)^2)/2 = (0.191 + 0.191)/2 ≈ 0.191 > 0.15 ✓
-        router.update_local(0.9, 0.9, 4);
+        // Set local phi very high — single update, cadence starts at 50,
+        // goes to 100 (divergence 0 with no peers → doubles once).
+        router.update_local(0.95, 0.9, 4);
+        let cadence_before = router.sharing_cadence();
+        // cadence_before = 100 (doubled once from default 50)
+
+        // Add two divergent peers with small initial deltas (trust ~0.51).
+        // Multiple high-divergence peer updates should halve cadence repeatedly.
+        // peer1: phi=0.05, peer2: phi=0.05 → both very different from local 0.95
         router.update_peer([1; 8], 0.05, 0.3, 1, 100);
+        // After peer1: divergence ~0.19 > 0.15 → cadence = 100/2 = 50
+        router.update_peer([2; 8], 0.05, 0.3, 1, 100);
+        // After peer2: divergence still high → cadence = 50/2 = 25
 
-        let cadence_after_divergence = router.sharing_cadence();
+        let cadence_after = router.sharing_cadence();
         assert!(
-            cadence_after_divergence < DEFAULT_SHARING_CADENCE,
-            "high divergence should decrease cadence, got {}",
-            cadence_after_divergence
+            cadence_after < cadence_before,
+            "high divergence should decrease cadence, before={}, after={}",
+            cadence_before,
+            cadence_after
         );
     }
 
