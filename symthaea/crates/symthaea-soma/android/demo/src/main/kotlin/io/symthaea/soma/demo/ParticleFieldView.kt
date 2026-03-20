@@ -25,6 +25,8 @@ class ParticleFieldView @JvmOverloads constructor(
 
     var consciousnessLevel: Float = 0.15f
     var harmonyColor: Int = Color.parseColor("#00E5CC")
+    /** Neuromod levels [DA, NE, 5-HT, OT] for particle color tinting. */
+    var neuromodLevels: FloatArray = floatArrayOf(0.5f, 0.5f, 0.5f, 0.5f)
 
     private val particles = Array(80) { Particle() }
     private var touchX = -1f
@@ -135,14 +137,31 @@ class ParticleFieldView @JvmOverloads constructor(
         }
     }
 
-    override fun onDraw(canvas: Canvas) {
-        val r = Color.red(harmonyColor)
-        val g = Color.green(harmonyColor)
-        val b = Color.blue(harmonyColor)
+    // Neuromod colors: DA=coral, NE=amber, 5-HT=teal, OT=indigo
+    private val neuroColors = intArrayOf(
+        Color.parseColor("#FF6B8A"), Color.parseColor("#FFBE4F"),
+        Color.parseColor("#5EEAD4"), Color.parseColor("#818CF8"),
+    )
 
-        for (p in particles) {
+    override fun onDraw(canvas: Canvas) {
+        val baseR = Color.red(harmonyColor)
+        val baseG = Color.green(harmonyColor)
+        val baseB = Color.blue(harmonyColor)
+
+        for ((i, p) in particles.withIndex()) {
             if (p.alpha < 0.01f) continue
             val a = (p.alpha * 255).toInt().coerceIn(0, 255)
+
+            // Tint some particles with neuromod colors (every 4th particle per channel)
+            val neuroIdx = i % 4
+            val neuroStrength = neuromodLevels.getOrElse(neuroIdx) { 0.5f }
+            val nc = neuroColors[neuroIdx]
+            // Blend: mostly harmony color, slight neuromod tint scaled by that neuromod's level
+            val tint = (neuroStrength * 0.4f).coerceIn(0f, 0.4f)
+            val r = ((1f - tint) * baseR + tint * Color.red(nc)).toInt().coerceIn(0, 255)
+            val g = ((1f - tint) * baseG + tint * Color.green(nc)).toInt().coerceIn(0, 255)
+            val b = ((1f - tint) * baseB + tint * Color.blue(nc)).toInt().coerceIn(0, 255)
+
             // Soft glow halo
             val haloA = (a * 0.3f).toInt().coerceIn(0, 80)
             paint.color = Color.argb(haloA, r, g, b)

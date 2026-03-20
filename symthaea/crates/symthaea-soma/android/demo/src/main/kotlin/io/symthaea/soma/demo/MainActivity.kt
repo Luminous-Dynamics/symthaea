@@ -244,6 +244,19 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+
+        // Holon desktop sync
+        binding.btnHolon.setOnClickListener {
+            val host = binding.holonHost.text.toString().trim()
+            if (host.isNotEmpty()) {
+                viewModel.connectHolon(host)
+                binding.btnHolon.text = "..."
+                lifecycleScope.launch {
+                    delay(3000)
+                    binding.btnHolon.text = if (viewModel.holonConnected) "synced" else "failed"
+                }
+            }
+        }
     }
 
     // ═══ Permissions ═══
@@ -353,11 +366,13 @@ class MainActivity : AppCompatActivity() {
             currentBgColor = targetBg
         }
 
-        // Neuromod flows (in bottom sheet)
+        // Neuromod flows + mandala deformation + particle tinting
         val nm = state.neuromodulators
         if (nm.size >= 4) {
-            binding.neuromodFlows.levels = floatArrayOf(nm[0], nm[1], nm[2], nm[3])
-            binding.consciousnessMandala.neuromodulators = floatArrayOf(nm[0], nm[1], nm[2], nm[3])
+            val nmArr = floatArrayOf(nm[0], nm[1], nm[2], nm[3])
+            binding.neuromodFlows.levels = nmArr
+            binding.consciousnessMandala.neuromodulators = nmArr
+            binding.particleField.neuromodLevels = nmArr
         }
 
         // Status whisper
@@ -416,11 +431,10 @@ class MainActivity : AppCompatActivity() {
     /** Show Broca text as a floating thought with fade-in/hold/fade-out. */
     private fun showFloatingThought(text: String) {
         binding.brocaText.text = text
-        binding.brocaText.setTextColor(
-            Color.argb(200, Color.red(harmonyToColor(viewModel.state.value.dominantHarmony)),
-                Color.green(harmonyToColor(viewModel.state.value.dominantHarmony)),
-                Color.blue(harmonyToColor(viewModel.state.value.dominantHarmony)))
-        )
+        val hc = harmonyToColor(viewModel.state.value.dominantHarmony)
+        binding.brocaText.setTextColor(Color.argb(220, Color.red(hc), Color.green(hc), Color.blue(hc)))
+        // Glow shadow for readability against mandala
+        binding.brocaText.setShadowLayer(12f, 0f, 0f, Color.argb(120, Color.red(hc), Color.green(hc), Color.blue(hc)))
         binding.brocaText.animate().cancel()
         binding.brocaText.alpha = 0f
         binding.brocaText.animate()

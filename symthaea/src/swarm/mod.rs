@@ -98,6 +98,9 @@ pub mod resonance_graph;
 #[cfg(feature = "mesh")]
 pub mod web_of_trust;
 
+/// PQC-secured remote display protocol.
+pub mod rdp_protocol;
+
 // Re-exports
 pub use config::{
     AeadAlgorithm, BootstrapConfig, CryptoConfig, PeerConfig, SwarmConfig, MYCELIX_BOOTSTRAP_NODES,

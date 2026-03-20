@@ -68,6 +68,9 @@ class ConsciousnessViewModel : ViewModel() {
     /** Milestone tracker for richer notifications. */
     private val milestones = MilestoneTracker()
 
+    /** Holon WebSocket for phone<->desktop consciousness sync. */
+    private var holonWs: HolonWebSocket? = null
+
     /** Register bridges as lifecycle observers so onStart()/onStop() fire. */
     fun registerBridges(owner: LifecycleOwner) {
         sensorBridge?.let { owner.lifecycle.addObserver(it) }
@@ -303,6 +306,20 @@ class ConsciousnessViewModel : ViewModel() {
         }
     }
 
+    /** Connect holon WebSocket to desktop Symthaea. */
+    fun connectHolon(host: String, port: Int = 5491) {
+        val e = engine ?: return
+        holonWs?.stop()
+        val ws = HolonWebSocket(e)
+        ws.host = host
+        ws.port = port
+        ws.start(viewModelScope)
+        holonWs = ws
+    }
+
+    /** Whether the holon connection is active. */
+    val holonConnected: Boolean get() = holonWs?.isConnected ?: false
+
     /** Configure Ollama host for local LLM conversation. */
     fun configureOllama(host: String) {
         ollamaBridge.host = host
@@ -343,6 +360,7 @@ class ConsciousnessViewModel : ViewModel() {
     override fun onCleared() {
         touchBridge?.unbind()
         screenCaptureBridge?.stop()
+        holonWs?.stop()
         // Save checkpoint with timeout to prevent ANR deadlock
         try {
             kotlinx.coroutines.runBlocking {
