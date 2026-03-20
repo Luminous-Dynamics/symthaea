@@ -49,6 +49,7 @@ id btnSleep
 id btnVision
 id chatSomaResponse
 id chatUserMsg
+id consciousnessGarden
 id consciousnessMandala
 id conversationInput
 id conversationRow

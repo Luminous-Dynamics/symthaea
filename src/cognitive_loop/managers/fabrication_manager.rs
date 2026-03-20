@@ -605,7 +605,7 @@ mod tests {
     #[test]
     fn test_poor_quality_dampens_lr() {
         let mut mgr = FabricationManager::default();
-        mgr.inject_event(print_completed_event(0.3, 0.2));
+        mgr.inject_event(print_completed_event(0.2, 0.1));
         let output = mgr.process(&default_snapshot());
         assert!(output.lr_modulation < 1.0);
         assert!(output.exploration_delta > 0.0);

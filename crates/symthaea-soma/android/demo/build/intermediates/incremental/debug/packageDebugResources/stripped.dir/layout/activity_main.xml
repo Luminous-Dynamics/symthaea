@@ -26,6 +26,14 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <!-- Layer 1.5: Consciousness garden (lower screen area) -->
+    <io.symthaea.soma.demo.ConsciousnessGardenView
+        android:id="@+id/consciousnessGarden"
+        android:layout_width="match_parent"
+        android:layout_height="120dp"
+        android:layout_gravity="bottom"
+        android:layout_marginBottom="56dp" />
+
     <!-- Layer 2: Overlaid text — floating on top of mandala -->
     <FrameLayout
         android:layout_width="match_parent"

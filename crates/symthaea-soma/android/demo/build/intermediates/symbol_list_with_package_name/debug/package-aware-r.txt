@@ -3246,6 +3246,7 @@ id closest
 id collapseActionView
 id compress
 id confirm_button
+id consciousnessGarden
 id consciousnessMandala
 id constraint
 id container
