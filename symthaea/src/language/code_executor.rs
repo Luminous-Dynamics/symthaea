@@ -607,6 +607,19 @@ impl CompileError {
         }
     }
 
+    /// Extract the unresolved type name from "cannot find type `T` in this scope".
+    fn extract_unresolved_type(message: &str) -> Option<String> {
+        // rustc format: "cannot find type `T` in this scope"
+        if message.contains("cannot find type") {
+            if let Some(start) = message.find('`') {
+                if let Some(end) = message[start + 1..].find('`') {
+                    return Some(message[start + 1..start + 1 + end].to_string());
+                }
+            }
+        }
+        None
+    }
+
     /// Extract error code like "E0308" from "error[E0308]: ..."
     fn extract_error_code(line: &str) -> Option<String> {
         if let Some(start) = line.find("[E") {
@@ -649,12 +662,13 @@ impl CompileError {
                 "E0277" if message.contains("expected") => ErrorCategory::TypeMismatch,
                 "E0277" => ErrorCategory::MissingImpl,
                 "E0412" => {
-                    // Single-letter type names (T, U, V, K, V) are undeclared generics,
-                    // not missing imports. Extract the type name from the message.
+                    // Single-letter uppercase = generic param (T, U, V, K, E, etc.)
                     let is_generic = Self::extract_unresolved_type(message)
                         .map(|t| {
                             t.len() == 1
-                                && t.chars().next().map_or(false, |c| c.is_ascii_uppercase())
+                                && t.chars()
+                                    .next()
+                                    .map_or(false, |c| c.is_ascii_uppercase())
                         })
                         .unwrap_or(false);
                     if is_generic {
@@ -1568,6 +1582,49 @@ mod tests {
         assert_eq!(errors.len(), 2);
         assert_eq!(errors[0].code.as_deref(), Some("E0433"));
         assert_eq!(errors[1].code.as_deref(), Some("E0412"));
+    }
+
+    #[test]
+    fn test_categorize_e0412_generic_t() {
+        let cat = CompileError::categorize(
+            &Some("E0412".to_string()),
+            "cannot find type `T` in this scope",
+        );
+        assert_eq!(cat, ErrorCategory::UndeclaredGeneric);
+    }
+
+    #[test]
+    fn test_categorize_e0412_named_type() {
+        let cat = CompileError::categorize(
+            &Some("E0412".to_string()),
+            "cannot find type `HashMap` in this scope",
+        );
+        assert_eq!(cat, ErrorCategory::MissingImport);
+    }
+
+    #[test]
+    fn test_categorize_e0601() {
+        let cat = CompileError::categorize(
+            &Some("E0601".to_string()),
+            "`main` function not found in crate `mylib`",
+        );
+        assert_eq!(cat, ErrorCategory::UnwantedMain);
+    }
+
+    #[test]
+    fn test_extract_unresolved_type() {
+        assert_eq!(
+            CompileError::extract_unresolved_type("cannot find type `T` in this scope"),
+            Some("T".to_string())
+        );
+        assert_eq!(
+            CompileError::extract_unresolved_type("cannot find type `HashMap` in this scope"),
+            Some("HashMap".to_string())
+        );
+        assert_eq!(
+            CompileError::extract_unresolved_type("some other error message"),
+            None
+        );
     }
 
     #[test]

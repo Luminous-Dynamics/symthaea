@@ -1,6 +1,6 @@
 //! Coding Agent Benchmark Suite — with real compilation and test assertions
 //!
-//! Measures end-to-end performance across 50 tasks with three validation levels:
+//! Measures end-to-end performance across 55 tasks with three validation levels:
 //! 1. **Name check**: does the output contain the expected function/type name?
 //! 2. **Compilation**: does the generated code compile with `rustc`?
 //! 3. **Correctness**: does it pass test assertions?
@@ -307,7 +307,7 @@ fn build_task_suite() -> Vec<BenchTask> {
     #[test] fn test_flatten() { assert_eq!(flatten(&[vec![1,2], vec![3,4]]), vec![1,2,3,4]); assert_eq!(flatten::<i32>(&[]), vec![]); }
 "#,
         },
-        // ── Medium: 15 tasks ─────────────────────────────────────────
+        // ── Medium: 20 tasks ─────────────────────────────────────────
         BenchTask {
             description: "implement a linked list",
             difficulty: Difficulty::Medium,
@@ -483,6 +483,74 @@ fn build_task_suite() -> Vec<BenchTask> {
         assert_eq!(r.len(), 3);
         r.push(4); // overwrites 1
         assert_eq!(r.pop(), Some(2));
+    }
+"#,
+        },
+        // ── Medium (auto-fix stress): 5 tasks ────────────────────────
+        // These exercise the chained auto-fix pipeline
+        BenchTask {
+            description: "implement Levenshtein edit distance",
+            difficulty: Difficulty::Medium,
+            expected_fn: "levenshtein",
+            max_iterations: 8,
+            test_source: r#"
+    #[test] fn test_levenshtein() {
+        assert_eq!(levenshtein("kitten", "sitting"), 3);
+        assert_eq!(levenshtein("", "abc"), 3);
+        assert_eq!(levenshtein("same", "same"), 0);
+    }
+"#,
+        },
+        BenchTask {
+            description: "create a function to generate all permutations of a string",
+            difficulty: Difficulty::Medium,
+            expected_fn: "permutations",
+            max_iterations: 8,
+            test_source: r#"
+    #[test] fn test_permutations() {
+        let mut p = permutations("abc");
+        p.sort();
+        assert_eq!(p.len(), 6);
+        assert_eq!(p[0], "abc");
+    }
+"#,
+        },
+        BenchTask {
+            description: "implement depth-first search on a graph",
+            difficulty: Difficulty::Medium,
+            expected_fn: "dfs",
+            max_iterations: 8,
+            test_source: r#"
+    #[test] fn test_dfs() {
+        let graph = vec![vec![1, 2], vec![3], vec![3], vec![]];
+        let order = dfs(&graph, 0);
+        assert!(order.contains(&0));
+        assert!(order.contains(&3));
+    }
+"#,
+        },
+        BenchTask {
+            description: "create a Pascal's triangle generator",
+            difficulty: Difficulty::Medium,
+            expected_fn: "pascal_triangle",
+            max_iterations: 8,
+            test_source: r#"
+    #[test] fn test_pascal() {
+        let t = pascal_triangle(5);
+        assert_eq!(t[4], vec![1, 4, 6, 4, 1]);
+    }
+"#,
+        },
+        BenchTask {
+            description: "implement an email address validator",
+            difficulty: Difficulty::Medium,
+            expected_fn: "validate_email",
+            max_iterations: 8,
+            test_source: r#"
+    #[test] fn test_email() {
+        assert!(validate_email("test@example.com"));
+        assert!(!validate_email("invalid"));
+        assert!(!validate_email("@no-local.com"));
     }
 "#,
         },
@@ -753,7 +821,7 @@ fn validate_code(source: &str, test_source: &str) -> (bool, Vec<String>, usize, 
     if result
         .compile_errors
         .iter()
-        .any(|e| e.contains("cannot find type") && e.contains("T"))
+        .any(|e| e.contains("cannot find type `T`"))
     {
         // Find "fn name(" and inject "<T>" before the paren
         let lines: Vec<&str> = source_to_fix.lines().collect();
@@ -1046,6 +1114,23 @@ fn print_report(results: &[TaskResult], stats: &BenchStats) {
         "  Total time: {:.1}s",
         stats.total_elapsed_ms as f64 / 1000.0
     );
+    println!();
+
+    // Timing breakdown by difficulty
+    println!("── Timing Breakdown ────────────────────────────────────");
+    for diff in &[Difficulty::Native, Difficulty::Medium, Difficulty::Hard] {
+        let times: Vec<u128> = results
+            .iter()
+            .filter(|r| r.difficulty == *diff)
+            .map(|r| r.elapsed_ms)
+            .collect();
+        if !times.is_empty() {
+            let avg = times.iter().sum::<u128>() / times.len() as u128;
+            let max = *times.iter().max().unwrap_or(&0);
+            let min = *times.iter().min().unwrap_or(&0);
+            println!("  {}: avg {}ms, min {}ms, max {}ms", diff, avg, min, max);
+        }
+    }
     println!();
 
     // Compilation failures

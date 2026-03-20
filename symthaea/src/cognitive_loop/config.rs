@@ -1371,34 +1371,34 @@ impl CognitiveLoopConfig {
             ));
         }
         #[cfg(feature = "vision-manifold")]
+        if self.scene_memory_coherence_threshold < 0.0
+            || self.scene_memory_coherence_threshold > 1.0
+            || !self.scene_memory_coherence_threshold.is_finite()
         {
-            if self.scene_memory_coherence_threshold < 0.0
-                || self.scene_memory_coherence_threshold > 1.0
-                || !self.scene_memory_coherence_threshold.is_finite()
-            {
-                return Err(format!(
-                    "CognitiveLoopConfig: scene_memory_coherence_threshold must be in [0.0, 1.0], got {}",
-                    self.scene_memory_coherence_threshold
-                ));
-            }
-            if self.scene_memory_error_threshold < 0.0
-                || self.scene_memory_error_threshold > 1.0
-                || !self.scene_memory_error_threshold.is_finite()
-            {
-                return Err(format!(
-                    "CognitiveLoopConfig: scene_memory_error_threshold must be in [0.0, 1.0], got {}",
-                    self.scene_memory_error_threshold
-                ));
-            }
-            if self.scene_memory_dampen_factor < 0.0
-                || self.scene_memory_dampen_factor > 1.0
-                || !self.scene_memory_dampen_factor.is_finite()
-            {
-                return Err(format!(
-                    "CognitiveLoopConfig: scene_memory_dampen_factor must be in [0.0, 1.0], got {}",
-                    self.scene_memory_dampen_factor
-                ));
-            }
+            return Err(format!(
+                "CognitiveLoopConfig: scene_memory_coherence_threshold must be in [0.0, 1.0], got {}",
+                self.scene_memory_coherence_threshold
+            ));
+        }
+        #[cfg(feature = "vision-manifold")]
+        if self.scene_memory_error_threshold < 0.0
+            || self.scene_memory_error_threshold > 1.0
+            || !self.scene_memory_error_threshold.is_finite()
+        {
+            return Err(format!(
+                "CognitiveLoopConfig: scene_memory_error_threshold must be in [0.0, 1.0], got {}",
+                self.scene_memory_error_threshold
+            ));
+        }
+        #[cfg(feature = "vision-manifold")]
+        if self.scene_memory_dampen_factor < 0.0
+            || self.scene_memory_dampen_factor > 1.0
+            || !self.scene_memory_dampen_factor.is_finite()
+        {
+            return Err(format!(
+                "CognitiveLoopConfig: scene_memory_dampen_factor must be in [0.0, 1.0], got {}",
+                self.scene_memory_dampen_factor
+            ));
         }
         // Validate moral anomaly config
         self.moral_anomaly_config
