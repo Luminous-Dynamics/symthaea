@@ -4805,6 +4805,10 @@ pub const SUBSTRATE_NOISE_FRACTION_DIVISOR: f32 = 70.0;
 /// Substrate noise std divisor for compressed state path: pressure / divisor → [0, 0.2].
 pub const SUBSTRATE_NOISE_STD_DIVISOR: f32 = 35.0;
 
+/// Maximum scale pressure magnitude used for noise injection.
+/// Caps noise at ~10% (BinaryHV) / ~20% (compressed) of dimensionality.
+pub const SUBSTRATE_NOISE_MAX_PRESSURE: f32 = 7.0;
+
 /// GABA weight for neuromod stillness computation.
 /// Science: Bhatt et al. (2020) — GABAergic tone ↔ resting-state activity.
 pub const NEUROMOD_STILLNESS_GABA_WEIGHT: f32 = 0.6;
@@ -5233,6 +5237,62 @@ pub const CRISIS_SEVERITY_MIN: u8 = 1;
 
 /// Maximum crisis severity.
 pub const CRISIS_SEVERITY_MAX: u8 = 5;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COGNITIVE DEPTH — Thalamic routing scores
+// Basis: Sherman & Guillery (2006) — thalamic gating, driver/modulator distinction
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Thalamic depth score for DeepThought mode (full cortical engagement).
+pub const DEPTH_SCORE_DEEP_THOUGHT: f32 = 1.0;
+
+/// Thalamic depth score for Cortical mode (standard processing).
+pub const DEPTH_SCORE_CORTICAL: f32 = 0.5;
+
+/// Thalamic depth score for Reflex mode (fast/reactive).
+pub const DEPTH_SCORE_REFLEX: f32 = 0.2;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VISION ACH MODULATION — Acetylcholine-driven scene memory thresholds
+// Basis: Sarter et al. (2005) — cholinergic modulation of attention/perception
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Minimum ACh level for modulation (floor prevents division by near-zero).
+pub const VISION_ACH_FLOOR: f32 = 0.5;
+
+/// Maximum ACh scaling factor for error/dampen modulation.
+pub const VISION_ACH_SCALE_CAP: f32 = 2.0;
+
+/// Minimum scene coherence threshold (even with high ACh).
+pub const VISION_COHERENCE_CLAMP_MIN: f32 = 0.3;
+
+/// Maximum scene coherence threshold (even with low ACh).
+pub const VISION_COHERENCE_CLAMP_MAX: f32 = 0.95;
+
+/// Minimum scene error threshold.
+pub const VISION_ERROR_CLAMP_MIN: f32 = 0.01;
+
+/// Maximum scene error threshold.
+pub const VISION_ERROR_CLAMP_MAX: f32 = 0.5;
+
+/// Minimum scene dampen factor.
+pub const VISION_DAMPEN_CLAMP_MIN: f32 = 0.1;
+
+/// Maximum scene dampen factor.
+pub const VISION_DAMPEN_CLAMP_MAX: f32 = 0.9;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONSTRUCTOR — Default seeds for deterministic initialization
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Default seed for causal enhancer when genesis phrase is absent.
+pub const CAUSAL_ENHANCER_SEED_DEFAULT: u64 = 42;
+
+/// Default seed for cross-manifold predictor when genesis phrase is absent.
+pub const CROSS_MANIFOLD_SEED_DEFAULT: u64 = 7_000_042;
+
+/// Default seed for resonator memory when genesis phrase is absent.
+pub const RESONATOR_MEMORY_SEED_DEFAULT: u64 = 0xBE50_0A70_0000_5EED;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
@@ -6879,5 +6939,20 @@ mod tests {
         assert!(CRISIS_SAFETY_RED_ORDINAL > CRISIS_SAFETY_ORANGE_ORDINAL);
         assert!(CRISIS_SEVERITY_BOOST_RED > CRISIS_SEVERITY_BOOST_ORANGE);
         assert!(CRISIS_SEVERITY_MAX > CRISIS_SEVERITY_MIN);
+
+        // Cognitive depth scores
+        assert!(DEPTH_SCORE_DEEP_THOUGHT > DEPTH_SCORE_CORTICAL);
+        assert!(DEPTH_SCORE_CORTICAL > DEPTH_SCORE_REFLEX);
+        assert!(DEPTH_SCORE_REFLEX > 0.0);
+
+        // Vision ACh modulation
+        assert!(VISION_ACH_FLOOR > 0.0);
+        assert!(VISION_ACH_SCALE_CAP > 1.0);
+        assert!(VISION_COHERENCE_CLAMP_MIN < VISION_COHERENCE_CLAMP_MAX);
+        assert!(VISION_ERROR_CLAMP_MIN < VISION_ERROR_CLAMP_MAX);
+        assert!(VISION_DAMPEN_CLAMP_MIN < VISION_DAMPEN_CLAMP_MAX);
+
+        // Substrate noise cap
+        assert!(SUBSTRATE_NOISE_MAX_PRESSURE > 0.0);
     }
 }

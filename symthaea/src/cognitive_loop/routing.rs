@@ -406,7 +406,7 @@ impl ThalamicRouter {
         emotional_valence: f32,
     ) -> CognitiveDepth {
         // Novelty from prediction error (high error = novel)
-        let novelty = prediction_error.min(1.0);
+        let novelty = if prediction_error.is_finite() { prediction_error.min(1.0) } else { 0.5 };
 
         // Complexity from pattern
         let complexity = match pattern {
@@ -599,7 +599,7 @@ impl ActiveInferenceBridge {
 
         // Pearson correlation, normalized to [0, 1]
         let denom = (conf_variance * out_variance).sqrt();
-        if denom < 1e-10 {
+        if !denom.is_finite() || denom < 1e-10 {
             return Some(0.0);
         }
 
