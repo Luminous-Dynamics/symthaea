@@ -4,8 +4,9 @@
 
 ### Credentials
 ```bash
-bws get secret-name    # BWS is ONLY credential manager
+~/.cargo/bin/bws secret get <secret-id>   # BWS (no unlock needed, uses BWS_ACCESS_TOKEN)
 ```
+BWS requires `BWS_ACCESS_TOKEN` env var (set in ~/.zshrc). Fallback: `bw` CLI (needs `BW_SESSION`).
 Full details: @.claude/rules/CREDENTIALS.md
 
 ### Ports
