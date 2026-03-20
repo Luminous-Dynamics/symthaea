@@ -448,7 +448,7 @@ impl Default for CycleHistory {
 /// the next cycle's processing. All fields are reset to defaults by
 /// `CognitiveLoopService::reset()`.
 #[derive(Debug, Clone, Default)]
-pub(crate) struct CycleCarryover {
+pub struct CycleCarryover {
     /// Cached consciousness integration scores
     pub(crate) consciousness: ConsciousnessCache,
     /// Urgency scheduling state
