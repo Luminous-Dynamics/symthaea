@@ -393,6 +393,15 @@ elif $SKIP_CHECK; then
     echo
 fi
 
+# --- Post-sync license fixups -------------------------------------------------
+# The monorepo uses AGPL-3.0-or-later for some crates that should be Apache-2.0
+# in the standalone repo (e.g. symthaea-mycelix-conductor).
+CONDUCTOR_TOML="${STANDALONE_REPO}/crates/symthaea-mycelix-conductor/Cargo.toml"
+if [ -f "$CONDUCTOR_TOML" ] && grep -q 'license = "AGPL-3.0-or-later"' "$CONDUCTOR_TOML"; then
+    sed -i 's/^license = "AGPL-3.0-or-later"/license = "Apache-2.0"/' "$CONDUCTOR_TOML"
+    info "Fixed symthaea-mycelix-conductor license → Apache-2.0"
+fi
+
 # --- Format with CI toolchain -------------------------------------------------
 # CI uses dtolnay/rust-toolchain@1.93.0, so format with the same version
 # to avoid spurious diffs from different rustfmt versions.

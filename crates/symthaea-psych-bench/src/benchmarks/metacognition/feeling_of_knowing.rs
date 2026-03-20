@@ -96,7 +96,13 @@ impl FeelingOfKnowingBenchmark {
             // range attenuates gamma). Base 0.55 (down from 0.60) lowers the
             // floor for mid-list items, creating more failed-recall items with
             // diverse encoding strengths.
-            let encoding = (0.55 + primacy + recency + attention_noise).clamp(0.20, 0.95);
+            // Difficulty degrades encoding via SNR reduction (signal_multiplier < 1.0
+            // at high difficulty). This compresses encoding toward the midpoint,
+            // reducing FOK discriminability — matching human FOK degradation under
+            // cognitive load (Lichtenstein et al. 1982).
+            let sig_mult = diff_model.signal_multiplier(config.difficulty);
+            let raw_enc = 0.55 + primacy + recency + attention_noise;
+            let encoding = (0.5 + (raw_enc - 0.5) * sig_mult).clamp(0.20, 0.95);
 
             // Create memory trace: bound cue-target pair degraded by (1 - encoding) noise.
             let pair = cue.bind(&target);
