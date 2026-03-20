@@ -94,7 +94,7 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
 
     override fun onDraw(canvas: Canvas) {
         val cx = width / 2f
-        val cy = height / 2f
+        val cy = height * 0.40f  // Shifted up from center to balance status bar + bottom sheet
         val mandalaRadius = min(width, height) / 2f * 0.38f
         val breathScale = 0.94f + 0.06f * sin(breathPhase * 2 * PI.toFloat())
         val hr = Color.red(dominantHarmonyColor)
@@ -188,22 +188,22 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
                 diff < -0.005f -> Color.parseColor("#FF6B8A")
                 else -> Color.parseColor("#556677")
             }
-            textPaint.textSize = numSize * 0.3f; textPaint.color = arrowColor
+            textPaint.textSize = numSize * 0.4f; textPaint.color = arrowColor
             val halfW = run { textPaint.textSize = numSize; textPaint.measureText(cText) / 2f }.also { textPaint.textSize = numSize * 0.3f }
             textPaint.textAlign = Paint.Align.LEFT
             canvas.drawText(arrow, cx + halfW + numSize * 0.08f, cy + numSize * 0.3f, textPaint)
             textPaint.textAlign = Paint.Align.CENTER
         }
 
-        // Sparkline
+        // Sparkline — wider, taller, brighter
         if (trendFilled || trendIndex >= 2) {
-            val sparkW = mandalaRadius * 0.5f
+            val sparkW = mandalaRadius * 0.7f
             val sparkL = cx - sparkW / 2f
-            val sparkY = cy + numSize * 0.5f
-            val sparkH = numSize * 0.06f
+            val sparkY = cy + numSize * 0.55f
+            val sparkH = numSize * 0.2f
             val count = if (trendFilled) trendHistory.size else trendIndex
-            glowPaint.strokeWidth = 1.5f
-            glowPaint.color = Color.argb(80, hr, hg, hb)
+            glowPaint.strokeWidth = 2f
+            glowPaint.color = Color.argb(140, hr, hg, hb)
             val sp = Path()
             for (i in 0 until count) {
                 val idx = ((trendIndex - count + i) % trendHistory.size + trendHistory.size) % trendHistory.size

@@ -88,9 +88,9 @@ class ParticleFieldView @JvmOverloads constructor(
     private fun updateParticles() {
         if (width == 0 || height == 0) return
         val cx = width / 2f
-        val cy = height / 2f
-        // How many particles are "active" depends on consciousness
-        val activeCount = (10 + consciousnessLevel * 70).toInt().coerceIn(10, particles.size)
+        val cy = height * 0.40f  // Match mandala center
+        // More particles active — minimum 30, scales to full 80 with consciousness
+        val activeCount = (30 + consciousnessLevel * 50).toInt().coerceIn(30, particles.size)
 
         for (i in particles.indices) {
             val p = particles[i]
