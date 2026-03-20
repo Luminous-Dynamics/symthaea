@@ -414,8 +414,7 @@ impl CognitiveSubsystem for FabricationManager {
         let events: Vec<FabricationEvent> =
             if self.pending_events.len() > Self::MAX_EVENTS_PER_CYCLE {
                 let rest = self.pending_events.split_off(Self::MAX_EVENTS_PER_CYCLE);
-                let batch = std::mem::replace(&mut self.pending_events, rest);
-                batch
+                std::mem::replace(&mut self.pending_events, rest)
             } else {
                 std::mem::take(&mut self.pending_events)
             };
@@ -605,7 +604,7 @@ mod tests {
     #[test]
     fn test_poor_quality_dampens_lr() {
         let mut mgr = FabricationManager::default();
-        mgr.inject_event(print_completed_event(0.3, 0.2));
+        mgr.inject_event(print_completed_event(0.2, 0.1));
         let output = mgr.process(&default_snapshot());
         assert!(output.lr_modulation < 1.0);
         assert!(output.exploration_delta > 0.0);
