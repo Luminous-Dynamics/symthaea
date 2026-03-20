@@ -360,11 +360,11 @@ proptest! {
             ontology.set_is_a(&names[i], &names[i + 1]);
         }
 
-        // Chain from leaf should have correct depth
+        // Chain from leaf should have correct depth (parents only, not the concept itself)
         let chain = ontology.is_a_chain(&names[0], 20);
-        prop_assert_eq!(chain.len(), chain_depth + 1, "Chain should include all ancestors");
-        prop_assert_eq!(&chain[0], &names[0], "Chain should start with queried concept");
-        prop_assert_eq!(&chain[chain_depth], &names[chain_depth], "Chain should end at root");
+        prop_assert_eq!(chain.len(), chain_depth, "Chain should include all ancestors");
+        prop_assert_eq!(&chain[0], &names[1], "Chain should start with direct parent");
+        prop_assert_eq!(&chain[chain_depth - 1], &names[chain_depth], "Chain should end at root");
 
         // Children consistency: concept_1's children should include concept_0
         let children = ontology.children_of(&names[1]);

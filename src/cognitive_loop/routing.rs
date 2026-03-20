@@ -500,6 +500,12 @@ pub enum CouplingQuality {
     StrongCoupling,
 }
 
+impl std::fmt::Display for CouplingQuality {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 impl CouplingQuality {
     /// Is coupling meaningful?
     pub fn is_meaningful(&self) -> bool {

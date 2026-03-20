@@ -963,6 +963,12 @@ impl CognitiveLoopService {
         // (Zak 2012, Arnsten 2009, Crockett 2009, Schultz 1997)
         self.apply_swarm_neuromod();
 
+        // Fabrication→Neuromod: Cincinnati anomaly → NE, print success → DA,
+        // emergency → NE+5-HT, quality trend → 5-HT, PoGF → oxytocin
+        // (Aston-Jones 2005, Schultz 1997, Sapolsky 2004, Crockett 2009, Zak 2012)
+        #[cfg(feature = "advanced-manufacturing")]
+        self.apply_fabrication_neuromod();
+
         // Swarm↔Governance: bidirectional peer Φ / governance confidence
         // (Woolley 2010)
         #[cfg(feature = "mycelix")]

@@ -167,7 +167,22 @@ impl RemoteAssociatesBenchmark {
             .iter()
             .map(|c| adapter.encode(&Word(c.to_string()), dim))
             .collect();
-        let bundle = ContinuousHV::bundle_owned(&cue_hvs);
+        let raw_bundle = ContinuousHV::bundle_owned(&cue_hvs);
+
+        // Lapse_rate degrades associative binding coherence: higher lapse → noisier
+        // bundle representation, modeling reduced spreading activation depth
+        // (Mednick 1962; individual differences in associative search breadth).
+        let bundle = if config.lapse_rate > 0.0 {
+            let corruption = (config.lapse_rate * 0.4) as f32; // up to 10% binding disruption
+            let noise_hv =
+                ContinuousHV::random(dim, config.trial_seed("creativity", "rat_lapse", trial_idx));
+            ContinuousHV::weighted_bundle(
+                &[&raw_bundle, &noise_hv],
+                &[1.0 - corruption, corruption],
+            )
+        } else {
+            raw_bundle
+        };
 
         // Encode solution and distractors
         let solution_hv = adapter.encode(&Word(triad.solution.to_string()), dim);

@@ -543,6 +543,23 @@ impl CognitiveLoopService {
         metadata.tom_exploration_triggered =
             self.stats.tom_prediction_mismatch_ema > 0.4 && self.stats.total_cycles > 10;
 
+        // ── Cantor fractal dream telemetry ──
+        metadata.cantor = super::CantorTelemetry {
+            cantor_buffer_occupancy: self.cantor_dream.broadcast_buffer.len() as u32,
+            cantor_metacognitive_depth: self.cantor_dream.dream_surprise as f64,
+            cantor_resonance_boost: self.cantor_dream.resonance_boost as f64,
+            cantor_dream_surprise: self.cantor_dream.dream_surprise as f64,
+            cantor_codebook_size: self.cantor_dream.cleanup_engine.codebook.len() as u32,
+            cantor_depth_histogram: {
+                let mut hist = [0u32; 6];
+                for crhv in &self.cantor_dream.broadcast_buffer {
+                    let d = crhv.depth.min(5);
+                    hist[d] += 1;
+                }
+                hist
+            },
+        };
+
         // ── MCE factor telemetry (from consciousness carryover cache) ──
         metadata.mce_bottleneck = self.carryover.consciousness.mce_bottleneck_name.clone();
         metadata.mce_softmin = self.carryover.consciousness.mce_softmin;
@@ -935,6 +952,21 @@ impl CognitiveLoopService {
             metadata.cpg_mean_freq = ct.mean_freq as f32;
             metadata.cpg_motor_active = ct.motor_active;
             metadata.cpg_desync_alert = ct.desync_alert;
+        }
+
+        // ── Fabrication Manager telemetry ──
+        #[cfg(feature = "advanced-manufacturing")]
+        {
+            let ft = self.fabrication_manager.telemetry();
+            metadata.fabrication_manufacturing_fe = ft.manufacturing_free_energy;
+            metadata.fabrication_design_loop_fe = ft.design_loop_free_energy;
+            metadata.fabrication_safety_level = ft.safety_level;
+            metadata.fabrication_anomaly_count = ft.anomaly_count;
+            metadata.fabrication_anomaly_ema = ft.anomaly_ema;
+            metadata.fabrication_pog_score_ema = ft.pog_score_ema;
+            metadata.fabrication_active_jobs = ft.active_print_jobs;
+            metadata.fabrication_reward_ema = ft.reward_ema;
+            metadata.fabrication_prediction_coherence = ft.prediction_coherence;
         }
 
         // ── Spectrum Manager telemetry ──
@@ -1443,7 +1475,7 @@ impl CognitiveLoopService {
                 .values
                 .chunks(chunk_size)
                 .take(32)
-                .map(|chunk: &[f32]| chunk.iter().sum::<f32>() / chunk.len() as f32)
+                .map(|chunk: &[f32]| chunk.iter().sum::<f32>() / chunk.len().max(1) as f32)
                 .collect()
         };
 

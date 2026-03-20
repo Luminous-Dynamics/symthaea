@@ -12,7 +12,7 @@
     android:id="@+id/experienceLayer"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:layout_marginBottom="44dp">
+    android:layout_marginBottom="32dp">
 
     <!-- Layer 0: Particle field (behind everything) -->
     <io.symthaea.soma.demo.ParticleFieldView
@@ -286,7 +286,7 @@
     android:paddingBottom="16dp"
     android:elevation="8dp"
     app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior"
-    app:behavior_peekHeight="44dp"
+    app:behavior_peekHeight="32dp"
     app:behavior_hideable="false">
 
     <!-- Drag handle (large touch target) -->

@@ -225,7 +225,7 @@ impl CognitiveLoopService {
     /// **Cognitive mod** (geomean): flow, semantic, reasoning, curiosity.
     /// **Meta-learning mod** (geomean): FEP boost, MCE boost, subsystem LR factor.
     /// Final: `base x cognitive_mod x meta_mod`, clamped [0, 0.01].
-    pub(in crate::cognitive_loop) fn compose_effective_lr(
+    pub fn compose_effective_lr(
         &mut self,
         semantic_lr_factor: f32,
         reasoning_lr_factor: f32,

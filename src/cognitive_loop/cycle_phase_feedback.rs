@@ -1397,12 +1397,12 @@ impl CognitiveLoopService {
         ];
         // Guard: NaN in any signal would propagate through mean/variance/sqrt
         let all_finite = signals.iter().all(|s| s.is_finite());
-        let mean_signal: f32 = signals.iter().sum::<f32>() / signals.len() as f32;
+        let mean_signal: f32 = signals.iter().sum::<f32>() / signals.len().max(1) as f32;
         let variance: f32 = signals
             .iter()
             .map(|s| (s - mean_signal).powi(2))
             .sum::<f32>()
-            / signals.len() as f32;
+            / signals.len().max(1) as f32;
         let cross_module_agreement: f32 = if all_finite {
             (1.0_f32 - (variance * CROSS_MODULE_VARIANCE_AMPLIFICATION as f32).sqrt())
                 .clamp(0.0, 1.0)

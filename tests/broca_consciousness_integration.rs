@@ -460,7 +460,7 @@ fn test_epistemic_gate_apply_scaled_reduces_effect() {
     use symthaea_broca::gating::EpistemicGate;
     use symthaea_broca::tokenizer::BpeTokenizer;
 
-    let tokenizer = BpeTokenizer::new(&test_genesis(), 4096);
+    let tokenizer = BpeTokenizer::default_minimal();
     let config = GatingConfig::default();
     let gate = EpistemicGate::new(&tokenizer, &config);
 

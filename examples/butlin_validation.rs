@@ -74,13 +74,13 @@ fn collect_runtime(backend: TemporalBackend) -> RuntimeData {
     for i in 0..MEASUREMENT_CYCLES {
         let result = service.cycle(stimuli[i % stimuli.len()]);
         let md = &result.metadata;
-        vals.micro_phi += md.structural_micro_phi;
-        vals.meso_phi += md.structural_meso_phi;
-        vals.macro_phi += md.structural_macro_phi;
-        vals.bottleneck += md.structural_bottleneck;
-        vals.emergence += md.structural_emergence_ratio;
-        vals.num_clusters += md.structural_num_clusters as f64;
-        vals.consciousness_level += md.consciousness_level;
+        vals.micro_phi += md.structural.structural_micro_phi;
+        vals.meso_phi += md.structural.structural_meso_phi;
+        vals.macro_phi += md.structural.structural_macro_phi;
+        vals.bottleneck += md.structural.structural_bottleneck;
+        vals.emergence += md.structural.structural_emergence_ratio;
+        vals.num_clusters += md.structural.structural_num_clusters as f64;
+        vals.consciousness_level += md.consciousness.consciousness_level;
         vals.pipeline_phi += md.pipeline_consciousness;
         vals.coherence += md.prediction_coherence as f64;
         vals.attention_fatigue += md.attention.attention_fatigue as f64;

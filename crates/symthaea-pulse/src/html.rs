@@ -17,8 +17,9 @@ use symthaea_types::N_HARMONIES;
 
 use crate::{
     Anomaly, CantorInfo, DreamInfo, DriveInfo, FabricationInfo, GovernanceInfo, ImmuneInfo,
-    IntegrityInfo, KnowledgeInfo, LearningInfo, MoralCompass, Narrative, NeuroBath, PerceptionInfo,
-    PulseDelta, PulseSnapshot, ReasoningInfo, SparklinePoint, SubstrateInfo, SwarmInfo, Vitals,
+    IntegrityInfo, KnowledgeInfo, LearningInfo, MeshConsciousnessInfo, MoralCompass, Narrative,
+    NeuroBath, PerceptionInfo, PulseDelta, PulseSnapshot, ReasoningInfo, SparklinePoint,
+    SpectrumInfo, SubstrateInfo, SwarmInfo, Vitals,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -457,6 +458,7 @@ pub fn generate_pulse_html(
     write_governance_pane(&mut html, &current.governance);
     write_glyph_pane(&mut html, &current.glyph);
     write_swarm_pane(&mut html, &current.swarm);
+    write_mesh_consciousness_pane(&mut html, &current.mesh_consciousness, &current.spectrum);
     write_knowledge_pane(&mut html, &current.knowledge);
     write_cantor_pane(&mut html, &current.cantor);
     write_perception_pane(&mut html, &current.perception);
@@ -2088,6 +2090,113 @@ fn write_swarm_pane(html: &mut String, swarm: &SwarmInfo) {
         },
         anoms = swarm.anomaly_count,
     );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Pane 7b+: Mesh Consciousness — Distributed Mind Network
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn write_mesh_consciousness_pane(
+    html: &mut String,
+    mesh: &MeshConsciousnessInfo,
+    spectrum: &SpectrumInfo,
+) {
+    let active = mesh.consciousness_peers > 0
+        || mesh.is_offline
+        || mesh.threat_count > 0
+        || mesh.reconnection_count > 0;
+
+    if !active && spectrum.known_peers == 0 {
+        return; // Don't show empty pane when mesh is unused
+    }
+
+    let (status_label, status_color) = if mesh.is_offline {
+        ("OFFLINE", "#c76b5a")
+    } else if mesh.threat_count > 0 {
+        ("THREATENED", "#e8a547")
+    } else if mesh.consciousness_peers == 0 {
+        ("SOLITARY", "#8a9a8a")
+    } else if mesh.collective_divergence > 0.15 {
+        ("DIVERGING", "#e8c547")
+    } else {
+        ("HARMONIZED", "#7ec8a0")
+    };
+
+    let _ = write!(
+        html,
+        r##"<div class="pane">
+<h2>Mesh Consciousness</h2>
+<div style="text-align:center;margin-bottom:12px">
+  <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:{color};box-shadow:0 0 12px {color};margin-right:8px;vertical-align:middle"></span>
+  <span style="color:{color};font-weight:bold;font-size:1.1em;vertical-align:middle">{label}</span>
+</div>
+<table style="width:100%;font-size:0.88em">
+<tr><td>Collective &Phi;</td><td style="text-align:right;color:{phi_color}">{phi:.3}</td></tr>
+<tr><td>&Phi; Divergence</td><td style="text-align:right;color:{div_color}">{div:.4}</td></tr>
+<tr><td>Consciousness Peers</td><td style="text-align:right">{peers}</td></tr>
+<tr><td>Sharing Cadence</td><td style="text-align:right">{cadence} cy</td></tr>
+<tr><td>Network Health</td><td style="text-align:right;color:{health_color}">{health}</td></tr>
+<tr><td>Best Relay Score</td><td style="text-align:right">{relay:.3}</td></tr>
+<tr><td>Threat Observations</td><td style="text-align:right;color:{threat_color}">{threats}</td></tr>
+<tr><td>Offline Buffer</td><td style="text-align:right">{buffer}</td></tr>
+<tr><td>Reconnections</td><td style="text-align:right">{reconnections}</td></tr>
+<tr><td>Encryption Sessions</td><td style="text-align:right">{enc}</td></tr>
+<tr><td>Jamming Streak</td><td style="text-align:right;color:{jam_color}">{jams}</td></tr>
+</table>"##,
+        color = status_color,
+        label = status_label,
+        phi_color = if mesh.collective_phi > 0.5 {
+            "#e8c547"
+        } else {
+            "#8a9a8a"
+        },
+        phi = mesh.collective_phi,
+        div_color = if mesh.collective_divergence > 0.15 {
+            "#c76b5a"
+        } else {
+            "#7ec8a0"
+        },
+        div = mesh.collective_divergence,
+        peers = mesh.consciousness_peers,
+        cadence = mesh.sharing_cadence,
+        health_color = match mesh.network_health.as_str() {
+            "AllTiersUp" => "#7ec8a0",
+            "LocalDown" => "#e8c547",
+            "MetroOnly" => "#e8a547",
+            "Blackout" => "#c76b5a",
+            _ => "#8a9a8a",
+        },
+        health = mesh.network_health,
+        relay = mesh.best_relay_score,
+        threat_color = if mesh.threat_count > 0 {
+            "#c76b5a"
+        } else {
+            "#8a9a8a"
+        },
+        threats = mesh.threat_count,
+        buffer = mesh.offline_buffer_size,
+        reconnections = mesh.reconnection_count,
+        enc = spectrum.encryption_sessions,
+        jam_color = if spectrum.jamming_streak > 0 {
+            "#c76b5a"
+        } else {
+            "#8a9a8a"
+        },
+        jams = spectrum.jamming_streak,
+    );
+
+    // Phi convergence sparkline (if history available)
+    if mesh.phi_history.len() >= 2 {
+        html.push_str("<div style=\"text-align:center;margin-top:10px\">");
+        html.push_str(
+            "<span style=\"font-size:0.75em;color:#8a9a8a\">&Phi; Convergence</span><br>",
+        );
+        let data: Vec<f64> = mesh.phi_history.iter().map(|&v| v as f64).collect();
+        write_sparkline_svg(html, &data, 180, 30, "#e8c547");
+        html.push_str("</div>");
+    }
+
+    html.push_str("</div>\n");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

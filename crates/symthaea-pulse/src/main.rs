@@ -354,6 +354,34 @@ pub struct SpectrumInfo {
     pub tier_loss_ema: [f64; 3],
 }
 
+/// Mesh consciousness integration snapshot — consciousness-aware routing,
+/// collective Phi convergence, store-and-forward, distributed immunity.
+#[derive(Serialize, Deserialize, Default)]
+pub struct MeshConsciousnessInfo {
+    /// Collective Phi across all mesh peers (trust-weighted mean).
+    pub collective_phi: f32,
+    /// Collective Phi divergence (variance — high = disagreement).
+    pub collective_divergence: f32,
+    /// Number of consciousness-tracked peers.
+    pub consciousness_peers: usize,
+    /// Adaptive sharing cadence (cycles between consciousness broadcasts).
+    pub sharing_cadence: u32,
+    /// Current network health: "AllTiersUp", "LocalDown", "MetroOnly", "Blackout".
+    pub network_health: String,
+    /// Active threat observations.
+    pub threat_count: usize,
+    /// Store-and-forward buffer size (experiences during offline).
+    pub offline_buffer_size: usize,
+    /// Whether currently offline (no mesh connectivity).
+    pub is_offline: bool,
+    /// Total reconnection events this session.
+    pub reconnection_count: u32,
+    /// Highest-Phi peer trust score (relay quality indicator).
+    pub best_relay_score: f32,
+    /// Phi convergence history (last N collective Phi values).
+    pub phi_history: Vec<f32>,
+}
+
 /// Immune system / defense snapshot.
 #[derive(Serialize, Deserialize, Default)]
 pub struct ImmuneInfo {
@@ -641,6 +669,8 @@ pub struct PulseSnapshot {
     pub neuroevolution: NeuroevolutionInfo,
     #[serde(default)]
     pub fabrication: FabricationInfo,
+    #[serde(default)]
+    pub mesh_consciousness: MeshConsciousnessInfo,
 }
 
 /// Computed delta between two pulse snapshots for the comparison view.
@@ -1512,6 +1542,27 @@ fn main() -> Result<()> {
             encryption_sessions: m.spectrum_encryption_sessions,
             ..SpectrumInfo::default()
         },
+        // Mesh consciousness: aggregated from spectrum + swarm telemetry.
+        // Full data comes from ConsciousnessAwareRouter when mesh feature is active.
+        mesh_consciousness: MeshConsciousnessInfo {
+            collective_phi: m.swarm_mean_peer_phi,
+            collective_divergence: 0.0, // populated from router when wired
+            consciousness_peers: m.swarm_connected_peers,
+            sharing_cadence: 50, // default, updated from router
+            network_health: match m.spectrum_network_health {
+                0 => "AllTiersUp".into(),
+                1 => "LocalDown".into(),
+                2 => "MetroOnly".into(),
+                3 => "Blackout".into(),
+                _ => "Unknown".into(),
+            },
+            threat_count: 0,
+            offline_buffer_size: 0,
+            is_offline: m.spectrum_network_health == 3,
+            reconnection_count: 0,
+            best_relay_score: 0.0,
+            phi_history: Vec::new(),
+        },
         perception: PerceptionInfo {
             attention_focus: m.attention.attention_schema_focus,
             attention_fatigue: m.attention.attention_fatigue,
@@ -2036,6 +2087,7 @@ fn main() -> Result<()> {
                     active_print_jobs: wm.fabrication_active_jobs,
                     reward_ema: wm.fabrication_reward_ema,
                 },
+                mesh_consciousness: MeshConsciousnessInfo::default(),
             };
 
             // Delta against previous snapshot
@@ -2223,6 +2275,7 @@ mod tests {
             sovereign: SovereignInfo::default(),
             neuroevolution: NeuroevolutionInfo::default(),
             fabrication: FabricationInfo::default(),
+            mesh_consciousness: MeshConsciousnessInfo::default(),
         }
     }
 

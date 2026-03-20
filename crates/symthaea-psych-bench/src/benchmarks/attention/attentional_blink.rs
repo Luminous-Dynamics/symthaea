@@ -147,6 +147,11 @@ impl AttentionalBlinkBenchmark {
                 }
 
                 // T2 detection — attention depleted by T1 processing
+                // Lapse_rate degrades attention recovery: higher lapse → slower recovery
+                // from the attentional blink, producing larger blink magnitude.
+                // This models attention-gate sluggishness (Di Lollo et al., 2005).
+                let lapse_recovery_penalty = config.lapse_rate * 0.5;
+                let effective_recovery = recovery_rate * (1.0 - lapse_recovery_penalty);
                 let attention_available = if t1_detected {
                     if config.ssm_backend {
                         // SSM path: T1 depletes attention (negative pulse),
@@ -160,10 +165,12 @@ impl AttentionalBlinkBenchmark {
                         }
                         // SSM output is negative (decaying from -1 input); map to [0, 1]
                         // attention = 1.0 + ssm_out  (ssm_out in ~[-1, 0] range)
-                        (1.0 + ssm_out as f64).clamp(0.0, attention_capacity)
+                        let base = (1.0 + ssm_out as f64).clamp(0.0, attention_capacity);
+                        // Lapse penalty slows SSM recovery at short lags
+                        (base - lapse_recovery_penalty * 0.3).clamp(0.0, attention_capacity)
                     } else {
                         let depleted = attention_capacity - t1_cost;
-                        let recovered = recovery_rate * (lag as f64 - 1.0);
+                        let recovered = effective_recovery * (lag as f64 - 1.0);
                         (depleted + recovered).clamp(0.0, attention_capacity)
                     }
                 } else {

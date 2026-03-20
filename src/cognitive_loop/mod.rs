@@ -146,7 +146,7 @@ pub(crate) mod episodic_persistence_manager;
 pub(crate) mod ethics_engine;
 pub(crate) mod ethics_values_manager;
 pub(crate) mod feature_integration_manager;
-pub(crate) mod feedback_state;
+pub mod feedback_state;
 pub(crate) mod fep_module;
 pub(crate) mod gwt_manager;
 mod helpers;
@@ -509,7 +509,8 @@ pub struct CognitiveLoopService {
 
     /// State carried over between consecutive cycles (phi modulations, veto flags,
     /// urgency hysteresis, MCE boost, etc.). Reset via `CycleCarryover::default()`.
-    carryover: CycleCarryover,
+    /// Exposed for property testing; prefer accessors for production code.
+    pub carryover: CycleCarryover,
 
     // soul moved to ethics_values_manager
     /// Attention visualizer for debugging attention flow.

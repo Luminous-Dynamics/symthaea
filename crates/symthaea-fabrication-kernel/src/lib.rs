@@ -6,6 +6,7 @@
 
 #[cfg(feature = "analytical")]
 pub mod analytical;
+pub mod autonomy_loop;
 pub mod bsp;
 pub mod building;
 pub mod csg;

@@ -132,7 +132,8 @@ fn run_backend(backend: TemporalBackend, inputs: &[&str]) -> MetricsAccumulator 
 
         acc.phi.push(md.pipeline_consciousness);
         acc.coherence.push(md.prediction_coherence);
-        acc.consciousness_level.push(md.consciousness_level);
+        acc.consciousness_level
+            .push(md.consciousness.consciousness_level);
         acc.prediction_error.push(result.prediction_error);
         acc.attention_fatigue.push(md.attention.attention_fatigue);
         acc.attention_pred_accuracy
@@ -144,7 +145,7 @@ fn run_backend(backend: TemporalBackend, inputs: &[&str]) -> MetricsAccumulator 
                 i + 1,
                 md.pipeline_consciousness,
                 md.prediction_coherence,
-                md.consciousness_level,
+                md.consciousness.consciousness_level,
                 result.prediction_error
             );
         }
