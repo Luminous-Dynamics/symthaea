@@ -1,6 +1,30 @@
+// TODO: HDK 0.4→0.6 upgrade complete. Old `entry_defs` callback replaced with
+// `#[hdk_entry_helper]` + `#[hdk_entry_types]` macros. Entry types are not yet
+// used by zome functions (submit_gradient stores nothing in DHT), so this is
+// forward-compatible scaffolding for when DHT storage is implemented.
+
 use hdk::prelude::*;
 
 /// Gradient entry for federated learning
+#[hdk_entry_helper]
+#[derive(Clone)]
+pub struct GradientEntry {
+    pub worker_id: String,
+    pub round: u32,
+    pub values: Vec<f64>,
+    pub timestamp: i64,
+}
+
+/// Aggregated model entry
+#[hdk_entry_helper]
+#[derive(Clone)]
+pub struct AggregatedModelEntry {
+    pub round: u32,
+    pub model: Vec<f64>,
+    pub detected_byzantine: Vec<String>,
+}
+
+/// Plain gradient (not a DHT entry — used for function inputs/outputs)
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Gradient {
     pub worker_id: String,
@@ -9,7 +33,7 @@ pub struct Gradient {
     pub timestamp: i64,
 }
 
-/// Aggregated model entry
+/// Aggregated model (not a DHT entry — used for function outputs)
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct AggregatedModel {
     pub round: u32,
@@ -31,27 +55,23 @@ pub struct KrumInput {
     pub round: u32,
 }
 
-#[hdk_extern]
-pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
-    Ok(InitCallbackResult::Pass)
+/// Entry type definitions (HDK 0.6 pattern)
+#[hdk_entry_types]
+#[unit_enum(UnitEntryTypes)]
+pub enum EntryTypes {
+    GradientEntry(GradientEntry),
+    AggregatedModelEntry(AggregatedModelEntry),
+}
+
+/// Link types (required by HDK 0.6 even if unused)
+#[hdk_link_types]
+pub enum LinkTypes {
+    GradientToRound,
 }
 
 #[hdk_extern]
-pub fn entry_defs(_: ()) -> ExternResult<EntryDefsCallbackResult> {
-    Ok(EntryDefsCallbackResult::from(vec![
-        EntryDef {
-            id: "gradient".into(),
-            visibility: EntryVisibility::Public,
-            required_validations: RequiredValidations(1),
-            cache_at_agent_activity: false,
-        },
-        EntryDef {
-            id: "aggregated_model".into(),
-            visibility: EntryVisibility::Public,
-            required_validations: RequiredValidations(1),
-            cache_at_agent_activity: false,
-        },
-    ]))
+pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
+    Ok(InitCallbackResult::Pass)
 }
 
 /// Submit a gradient for a training round

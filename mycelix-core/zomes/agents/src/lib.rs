@@ -65,7 +65,7 @@ struct RateLimitEntry {
     window_start: i64,
 }
 
-#[hdk_entry_defs]
+#[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
     AgentRegistration(AgentRegistration),
@@ -299,7 +299,7 @@ pub fn register_agent(input: RegisterAgentInput) -> ExternResult<ActionHash> {
         active: true,
     };
 
-    let action_hash = create_entry(&EntryTypes::AgentRegistration(registration))?;
+    let action_hash = create_entry(EntryTypes::AgentRegistration(registration))?;
 
     // Link from agents anchor
     let anchor = anchor_hash("agents", "all")?;
@@ -406,7 +406,7 @@ pub fn submit_model_update(input: SubmitUpdateInput) -> ExternResult<ActionHash>
         submitter: agent_info.agent_initial_pubkey.to_string(),
     };
 
-    let action_hash = create_entry(&EntryTypes::ModelUpdate(update))?;
+    let action_hash = create_entry(EntryTypes::ModelUpdate(update))?;
 
     // Link from round anchor
     let round_anchor = anchor_hash("training_rounds", &input.round_id.to_string())?;
@@ -519,7 +519,7 @@ pub fn deactivate_agent(agent_id: String) -> ExternResult<bool> {
                             }
 
                             reg.active = false;
-                            update_entry(action_hash, &EntryTypes::AgentRegistration(reg))?;
+                            update_entry(action_hash, EntryTypes::AgentRegistration(reg))?;
                             return Ok(true);
                         }
                     }

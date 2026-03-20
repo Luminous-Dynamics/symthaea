@@ -13,8 +13,8 @@ name = "pogq_zome_dilithium"
 [workspace]
 
 [dependencies]
-# Holochain SDK
-hdk = "0.4"
+# Holochain SDK (upgraded from 0.4)
+hdk = "0.6.0"
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
@@ -36,8 +36,8 @@ vsv-core = { path = "../../../vsv-stark/vsv-core" }
 
 [dev-dependencies]
 # Holochain test harness for integration tests
-holochain = { version = "0.4", features = ["test_utils", "sweettest"] }
-holochain_test_wasm_common = "0.4"
+holochain = { version = "0.6", features = ["test_utils", "sweettest"] }
+holochain_test_wasm_common = "0.6"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 
 [features]

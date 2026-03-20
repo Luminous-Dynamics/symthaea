@@ -8,6 +8,6 @@ crate-type = ["cdylib", "rlib"]
 name = "gradient_storage"
 
 [dependencies]
-hdk = "0.4"
+hdk = "0.6.0"
 serde = "1"
 serde_bytes = "0.11"

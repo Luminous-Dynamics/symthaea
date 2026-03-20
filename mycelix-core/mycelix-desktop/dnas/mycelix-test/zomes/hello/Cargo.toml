@@ -10,7 +10,7 @@ crate-type = ["cdylib"]
 [workspace]
 
 [dependencies]
-hdk = "0.5.6"
+hdk = "0.6.0"
 serde = "1"
 
 [profile.release]

@@ -10,7 +10,7 @@ crate-type = ["cdylib", "rlib"]
 [workspace]
 
 [dependencies]
-# Exact versions per Holochain 0.4 upgrade guide
-hdk = "=0.4.0"
-hdi = "=0.5.0"
+# Holochain 0.6 (upgraded from 0.4)
+hdk = "0.6.0"
+hdi = "0.7.0"
 serde = "1.0"
