@@ -542,8 +542,7 @@ impl CognitiveLoopService {
                 if let Some(ref mut soul_mgr) = self.soul_manager {
                     if soul_mgr.should_run(cycle_num, urgency_u8) {
                         let soul_output = soul_mgr.process(snapshot);
-                        self.subsystem_collector
-                            .record("soul_manager", soul_output);
+                        self.subsystem_collector.record("soul_manager", soul_output);
                     }
                 }
 
@@ -3462,8 +3461,8 @@ impl CognitiveLoopService {
                 let overflow = (spectral_entropy - super::thresholds::SPECTRAL_ENTROPY_THRESHOLD)
                     / super::thresholds::SPECTRAL_ENTROPY_THRESHOLD;
                 // spectral_frac: 1.0 at threshold, MASK_FLOOR at 2× threshold
-                let spectral_frac = (1.0 - overflow as f32)
-                    .max(super::thresholds::SPECTRAL_ENTROPY_MASK_FLOOR);
+                let spectral_frac =
+                    (1.0 - overflow as f32).max(super::thresholds::SPECTRAL_ENTROPY_MASK_FLOOR);
                 // Don't over-mask: use the maximum of substrate and spectral fractions
                 let substrate_frac = self.substrate_manager.effective_dim_fraction();
                 let frac = substrate_frac.max(spectral_frac);

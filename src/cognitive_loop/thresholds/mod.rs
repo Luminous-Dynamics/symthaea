@@ -1866,7 +1866,9 @@ mod tests {
 
         // CPG manager (additional)
         assert!(CPG_DESYNC_AROUSAL_DELTA > 0.0);
-        assert!(CPG_SYNC_PHI_MODULATION_AMPLITUDE > 0.0 && CPG_SYNC_PHI_MODULATION_AMPLITUDE <= 0.1);
+        assert!(
+            CPG_SYNC_PHI_MODULATION_AMPLITUDE > 0.0 && CPG_SYNC_PHI_MODULATION_AMPLITUDE <= 0.1
+        );
 
         // Guiding question
         assert!(GUIDING_EPISTEMIC_EXPLORATION_BOOST > 0.0);
