@@ -542,8 +542,7 @@ impl CognitiveLoopService {
                 if let Some(ref mut soul_mgr) = self.soul_manager {
                     if soul_mgr.should_run(cycle_num, urgency_u8) {
                         let soul_output = soul_mgr.process(snapshot);
-                        self.subsystem_collector
-                            .record("soul_manager", soul_output);
+                        self.subsystem_collector.record("soul_manager", soul_output);
                     }
                 }
 
