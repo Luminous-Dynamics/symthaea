@@ -6,23 +6,23 @@
 
 /// Moral score below this triggers concern and biases toward Supportive strategy.
 /// Basis: Haidt (2001) — moral intuition triggers fast conservative override.
-pub const MORAL_CONCERN_THRESHOLD: f64 = -0.3;
+pub const MORAL_CONCERN_THRESHOLD: f32 = -0.3;
 
 /// Moral score above this boosts prediction confidence.
 /// Basis: Damasio (1994) — positive somatic markers reinforce decision confidence.
-pub const MORAL_BENEFIT_THRESHOLD: f64 = 0.5;
+pub const MORAL_BENEFIT_THRESHOLD: f32 = 0.5;
 
 /// Exploration dampening when moral concern detected (multiplicative).
 /// Basis: De Martino (2006) — amygdala activation reduces exploratory behavior.
-pub const MORAL_CONCERN_EXPLORATION_DAMPEN: f64 = 0.5;
+pub const MORAL_CONCERN_EXPLORATION_DAMPEN: f32 = 0.5;
 
 /// Speech rate boost on moral concern (multiplicative, >1 = slower/more cautious).
 /// Basis: Forgas (2011) — negative affect promotes systematic processing.
-pub const MORAL_CONCERN_PAUSE_BOOST: f64 = 1.5;
+pub const MORAL_CONCERN_PAUSE_BOOST: f32 = 1.5;
 
 /// Confidence nudge for positive moral alignment (multiplicative).
 /// Basis: Schwartz (2012) — value-aligned actions strengthen self-efficacy.
-pub const MORAL_BENEFIT_CONFIDENCE_BOOST: f64 = 1.05;
+pub const MORAL_BENEFIT_CONFIDENCE_BOOST: f32 = 1.05;
 
 /// Moral evaluation amortization interval (cycles). Co-prime.
 /// Basis: Kahneman (2011) — System 2 moral evaluation is expensive.
@@ -30,10 +30,10 @@ pub const MORAL_EVAL_INTERVAL: usize = 7;
 
 /// Negation polarity threshold for moral input preprocessing.
 /// Basis: Horn (1989) — pragmatic negation inverts semantic content.
-pub const NEGATION_POLARITY_THRESHOLD: f64 = 0.5;
+pub const NEGATION_POLARITY_THRESHOLD: f32 = 0.5;
 
 /// Negation dampening factor applied to moral evaluation.
-pub const NEGATION_DAMPENING: f64 = 0.3;
+pub const NEGATION_DAMPENING: f32 = 0.3;
 
 /// Maximum Love Coherence — no finite system claims perfect moral alignment.
 /// Basis: Residual free energy (Friston 2010); tawāḍuʿ (Al-Ghazali 1095),
@@ -46,7 +46,7 @@ pub const MORAL_HUMILITY_CEILING: f64 = 0.95;
 
 /// Moral salience threshold for boosted episodic consolidation.
 /// Science: Zak (2012) — moral narratives enhance oxytocin → memory consolidation.
-pub const MORAL_CONSOLIDATION_THRESHOLD: f64 = 0.3;
+pub const MORAL_CONSOLIDATION_THRESHOLD: f32 = 0.3;
 
 /// Consolidation threshold reduction per unit of moral salience.
 /// Lowers the consciousness-EMA threshold for triggering consolidation.
@@ -60,13 +60,13 @@ pub const MORAL_CONSOLIDATION_EASE: f64 = 0.15;
 pub const HARMONIC_INTERFERENCE_MAX_COUNT: usize = 3;
 
 /// Per-interference LR dampening factor.
-pub const HARMONIC_INTERFERENCE_DAMPEN: f64 = 0.02;
+pub const HARMONIC_INTERFERENCE_DAMPEN: f32 = 0.02;
 
 /// Max cumulative LR dampening from interference.
-pub const HARMONIC_INTERFERENCE_MAX_DAMPEN: f64 = 0.1;
+pub const HARMONIC_INTERFERENCE_MAX_DAMPEN: f32 = 0.1;
 
 /// Harmony boost when all clear (0 interferences).
-pub const HARMONIC_ALL_CLEAR_BOOST: f64 = 0.02;
+pub const HARMONIC_ALL_CLEAR_BOOST: f32 = 0.02;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // HARMONIC FIELD
@@ -74,10 +74,10 @@ pub const HARMONIC_ALL_CLEAR_BOOST: f64 = 0.02;
 
 /// Harmonic field coherence threshold for LR stability boost.
 /// Basis: Schwartz (2012) — value coherence enables stable learning.
-pub const HARMONIC_FIELD_BOOST_THRESHOLD: f64 = 0.6;
+pub const HARMONIC_FIELD_BOOST_THRESHOLD: f32 = 0.6;
 
 /// Harmonic field coherence → LR boost factor.
-pub const HARMONIC_FIELD_BOOST_FACTOR: f64 = 0.05;
+pub const HARMONIC_FIELD_BOOST_FACTOR: f32 = 0.05;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // KOSMIC SONG (Unified Identity Synthesis)
@@ -89,17 +89,17 @@ pub const KOSMIC_SONG_INTERVAL: usize = 23;
 
 /// Low coherence threshold: below this, dampen exploration (fragmented identity → cautious).
 /// Science: Gallagher (2000) — fragmented narrative self reduces decision confidence.
-pub const KOSMIC_LOW_COHERENCE_THRESHOLD: f64 = 0.3;
+pub const KOSMIC_LOW_COHERENCE_THRESHOLD: f32 = 0.3;
 
 /// Low coherence exploration dampening (multiplicative).
-pub const KOSMIC_LOW_COHERENCE_EXPLORATION_DAMPEN: f64 = 0.95;
+pub const KOSMIC_LOW_COHERENCE_EXPLORATION_DAMPEN: f32 = 0.95;
 
 /// High coherence confidence boost (additive).
 /// Science: Conway & Pleydell-Pearce (2000) — coherent identity → reliable decisions.
-pub const KOSMIC_HIGH_COHERENCE_CONFIDENCE_BOOST: f64 = 0.02;
+pub const KOSMIC_HIGH_COHERENCE_CONFIDENCE_BOOST: f32 = 0.02;
 
 /// High coherence threshold: above this, boost confidence.
-pub const KOSMIC_HIGH_COHERENCE_THRESHOLD: f64 = 0.7;
+pub const KOSMIC_HIGH_COHERENCE_THRESHOLD: f32 = 0.7;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // EMPATHIC NEUROMODULATION
@@ -110,14 +110,14 @@ pub const KOSMIC_HIGH_COHERENCE_THRESHOLD: f64 = 0.7;
 pub const EMPATHIC_COMPASSION_OXY_THRESHOLD: f64 = 0.7;
 
 /// Oxytocin production scale from empathic compassion.
-pub const EMPATHIC_COMPASSION_OXY_SCALE: f64 = 0.15;
+pub const EMPATHIC_COMPASSION_OXY_SCALE: f32 = 0.15;
 
 /// Empathic compassion threshold for dopamine boost (reward from connection).
 /// Science: Rilling et al. (2002) — mutual cooperation activates DA reward circuits.
 pub const EMPATHIC_COMPASSION_DA_THRESHOLD: f64 = 0.8;
 
 /// Dopamine production scale from empathic compassion.
-pub const EMPATHIC_COMPASSION_DA_SCALE: f64 = 0.08;
+pub const EMPATHIC_COMPASSION_DA_SCALE: f32 = 0.08;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SOUL COHERENCE FEEDBACK
@@ -127,24 +127,24 @@ pub const EMPATHIC_COMPASSION_DA_SCALE: f64 = 0.08;
 
 /// Soul coherence threshold below which confidence is dampened.
 /// Low coherence indicates fragmented identity → uncertain predictions.
-pub const SOUL_COHERENCE_LOW_THRESHOLD: f64 = 0.5;
+pub const SOUL_COHERENCE_LOW_THRESHOLD: f32 = 0.5;
 
 /// Scale factor for soul-coherence confidence dampening.
-pub const SOUL_COHERENCE_CONFIDENCE_SCALE: f64 = 0.01;
+pub const SOUL_COHERENCE_CONFIDENCE_SCALE: f32 = 0.01;
 
 /// Growth potential threshold above which exploration is boosted.
 /// High growth potential = learning opportunity detected.
-pub const SOUL_GROWTH_EXPLORATION_THRESHOLD: f64 = 0.7;
+pub const SOUL_GROWTH_EXPLORATION_THRESHOLD: f32 = 0.7;
 
 /// Scale factor for growth-driven exploration boost.
-pub const SOUL_GROWTH_EXPLORATION_SCALE: f64 = 0.01;
+pub const SOUL_GROWTH_EXPLORATION_SCALE: f32 = 0.01;
 
 /// Value alignment threshold below which exploration is boosted.
 /// Low alignment = misaligned values, need recalibration.
-pub const SOUL_ALIGNMENT_LOW_THRESHOLD: f64 = 0.3;
+pub const SOUL_ALIGNMENT_LOW_THRESHOLD: f32 = 0.3;
 
 /// Exploration multiplier when value alignment is low.
-pub const SOUL_ALIGNMENT_EXPLORATION_MULT: f64 = 1.02;
+pub const SOUL_ALIGNMENT_EXPLORATION_MULT: f32 = 1.02;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // LOVE RESONANCE COUPLING
@@ -152,15 +152,15 @@ pub const SOUL_ALIGNMENT_EXPLORATION_MULT: f64 = 1.02;
 
 /// Minimum harmonic love resonance to trigger confidence/soul amplification.
 /// Science: Fredrickson (2013) — positivity resonance requires threshold mutual engagement.
-pub const LOVE_RESONANCE_THRESHOLD: f64 = 0.6;
+pub const LOVE_RESONANCE_THRESHOLD: f32 = 0.6;
 
 /// Scale factor for love resonance → confidence boost (per unit above threshold).
 /// Boost = (resonance - threshold) * scale.
-pub const LOVE_RESONANCE_CONFIDENCE_SCALE: f64 = 0.04;
+pub const LOVE_RESONANCE_CONFIDENCE_SCALE: f32 = 0.04;
 
 /// Fraction of love resonance boost applied to learning rate.
 /// LR *= 1.0 + boost * fraction.
-pub const LOVE_RESONANCE_LR_FRACTION: f64 = 0.5;
+pub const LOVE_RESONANCE_LR_FRACTION: f32 = 0.5;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SOCIAL LEARNING MODULATION
@@ -168,25 +168,25 @@ pub const LOVE_RESONANCE_LR_FRACTION: f64 = 0.5;
 
 /// Base learning rate factor for social trust modulation.
 /// Science: Decety & Chaminade (2003) — social trust modulates learning engagement.
-pub const SOCIAL_LR_BASE: f64 = 0.8;
+pub const SOCIAL_LR_BASE: f32 = 0.8;
 
 /// Range of social trust modulation (LR factor = BASE + RANGE * trust).
 /// Full range: [0.8, 1.2] maps distrust → full trust.
-pub const SOCIAL_LR_RANGE: f64 = 0.4;
+pub const SOCIAL_LR_RANGE: f32 = 0.4;
 
 /// Theory-of-Mind accuracy above which prediction confidence is boosted.
 /// Science: Frith & Frith (2006) — accurate mentalizing reinforces social predictions.
-pub const TOM_ACCURACY_HIGH: f64 = 0.7;
+pub const TOM_ACCURACY_HIGH: f32 = 0.7;
 
 /// Theory-of-Mind accuracy below which prediction confidence is dampened.
-pub const TOM_ACCURACY_LOW: f64 = 0.3;
+pub const TOM_ACCURACY_LOW: f32 = 0.3;
 
 /// Scale factor for ToM accuracy → confidence adjustment (per unit from threshold).
-pub const TOM_ACCURACY_SCALE: f64 = 0.05;
+pub const TOM_ACCURACY_SCALE: f32 = 0.05;
 
 /// Minimum causal average confidence to trigger urgency gating.
 /// Science: Pearl (2009) — causal reasoning requires sufficient confidence in causal links.
-pub const CAUSAL_URGENCY_CONFIDENCE: f64 = 0.6;
+pub const CAUSAL_URGENCY_CONFIDENCE: f32 = 0.6;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ENTROPY LR MODULATION
@@ -236,16 +236,16 @@ pub const TRUST_DECAY_FACTOR: f64 = 0.999;
 
 /// Minimum empathic tone adjustment magnitude to trigger speech rate modulation.
 /// Science: Porges (2011) — polyvagal theory links prosody to social engagement.
-pub const EMPATHIC_TONE_THRESHOLD: f64 = 0.1;
+pub const EMPATHIC_TONE_THRESHOLD: f32 = 0.1;
 
 /// Rate at which empathic tone modulates speech rate (multiplicative).
-pub const EMPATHIC_TONE_RATE_SCALE: f64 = 0.1;
+pub const EMPATHIC_TONE_RATE_SCALE: f32 = 0.1;
 
 /// Minimum speech rate multiplier after empathic modulation.
-pub const SPEECH_RATE_CLAMP_MIN: f64 = 0.6;
+pub const SPEECH_RATE_CLAMP_MIN: f32 = 0.6;
 
 /// Maximum speech rate multiplier after empathic modulation.
-pub const SPEECH_RATE_CLAMP_MAX: f64 = 1.5;
+pub const SPEECH_RATE_CLAMP_MAX: f32 = 1.5;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SOCIAL TRUST STRATEGY BIAS
@@ -253,20 +253,20 @@ pub const SPEECH_RATE_CLAMP_MAX: f64 = 1.5;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Trust midpoint — deviation from this triggers social strategy bias.
-pub const SOCIAL_TRUST_MIDPOINT: f64 = 0.5;
+pub const SOCIAL_TRUST_MIDPOINT: f32 = 0.5;
 /// Trust deviation deadzone — below this, no strategy bias applied.
-pub const SOCIAL_TRUST_DEADZONE: f64 = 0.1;
+pub const SOCIAL_TRUST_DEADZONE: f32 = 0.1;
 /// Minimum cooperation rate for trust-based strategy upgrade.
-pub const SOCIAL_COOPERATION_THRESHOLD: f64 = 0.3;
+pub const SOCIAL_COOPERATION_THRESHOLD: f32 = 0.3;
 /// Scaling factor for trust deviation → bias strength mapping.
 /// Maps deviation [0.1, 0.5] → strength [0, 1].
-pub const SOCIAL_TRUST_STRENGTH_SCALE: f64 = 2.5;
+pub const SOCIAL_TRUST_STRENGTH_SCALE: f32 = 2.5;
 /// Minimum strength for strategy override (Concise→Supportive or Exploratory→Detailed).
-pub const SOCIAL_TRUST_OVERRIDE_THRESHOLD: f64 = 0.5;
+pub const SOCIAL_TRUST_OVERRIDE_THRESHOLD: f32 = 0.5;
 /// Minimum strength for exploration adjustment (no strategy override).
-pub const SOCIAL_TRUST_EXPLORE_THRESHOLD: f64 = 0.3;
+pub const SOCIAL_TRUST_EXPLORE_THRESHOLD: f32 = 0.3;
 /// Exploration adjustment scale from social trust.
-pub const SOCIAL_TRUST_EXPLORE_SCALE: f64 = 0.05;
+pub const SOCIAL_TRUST_EXPLORE_SCALE: f32 = 0.05;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TOM PREDICTION MISMATCH
@@ -274,11 +274,11 @@ pub const SOCIAL_TRUST_EXPLORE_SCALE: f64 = 0.05;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// EMA decay for ToM prediction mismatch tracking.
-pub const TOM_MISMATCH_EMA_DECAY: f64 = 0.9;
+pub const TOM_MISMATCH_EMA_DECAY: f32 = 0.9;
 /// ToM mismatch threshold for exploration trigger.
-pub const TOM_MISMATCH_THRESHOLD: f64 = 0.4;
+pub const TOM_MISMATCH_THRESHOLD: f32 = 0.4;
 /// Exploration boost scale from ToM mismatch.
-pub const TOM_MISMATCH_EXPLORE_SCALE: f64 = 0.1;
+pub const TOM_MISMATCH_EXPLORE_SCALE: f32 = 0.1;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SOUL ALIGNMENT LR MODULATION
@@ -286,21 +286,21 @@ pub const TOM_MISMATCH_EXPLORE_SCALE: f64 = 0.1;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Soul alignment threshold for LR boost (positive alignment).
-pub const SOUL_ALIGNMENT_BOOST_THRESHOLD: f64 = 0.3;
+pub const SOUL_ALIGNMENT_BOOST_THRESHOLD: f32 = 0.3;
 /// LR boost scale from positive soul alignment.
-pub const SOUL_ALIGNMENT_BOOST_SCALE: f64 = 0.1;
+pub const SOUL_ALIGNMENT_BOOST_SCALE: f32 = 0.1;
 /// LR clamp minimum for positive soul alignment.
-pub const SOUL_ALIGNMENT_BOOST_LR_MIN: f64 = 0.8;
+pub const SOUL_ALIGNMENT_BOOST_LR_MIN: f32 = 0.8;
 /// LR clamp maximum for positive soul alignment.
-pub const SOUL_ALIGNMENT_BOOST_LR_MAX: f64 = 1.3;
+pub const SOUL_ALIGNMENT_BOOST_LR_MAX: f32 = 1.3;
 /// Soul alignment threshold for LR dampening (negative alignment).
-pub const SOUL_ALIGNMENT_DAMPEN_THRESHOLD: f64 = -0.3;
+pub const SOUL_ALIGNMENT_DAMPEN_THRESHOLD: f32 = -0.3;
 /// LR dampening scale from negative soul alignment.
-pub const SOUL_ALIGNMENT_DAMPEN_SCALE: f64 = 0.15;
+pub const SOUL_ALIGNMENT_DAMPEN_SCALE: f32 = 0.15;
 /// LR clamp minimum for negative soul alignment.
-pub const SOUL_ALIGNMENT_DAMPEN_LR_MIN: f64 = 0.7;
+pub const SOUL_ALIGNMENT_DAMPEN_LR_MIN: f32 = 0.7;
 /// LR clamp maximum for negative soul alignment.
-pub const SOUL_ALIGNMENT_DAMPEN_LR_MAX: f64 = 1.2;
+pub const SOUL_ALIGNMENT_DAMPEN_LR_MAX: f32 = 1.2;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // NARRATIVE SELF-PHI
@@ -312,13 +312,13 @@ pub const SOUL_ALIGNMENT_DAMPEN_LR_MAX: f64 = 1.2;
 pub const NARRATIVE_SELF_PHI_CONFIDENCE_THRESHOLD: f64 = 0.4;
 
 /// Confidence boost scale for high narrative self-phi.
-pub const NARRATIVE_SELF_PHI_CONFIDENCE_SCALE: f64 = 0.008;
+pub const NARRATIVE_SELF_PHI_CONFIDENCE_SCALE: f32 = 0.008;
 
 /// Self-Phi threshold below which exploration is boosted (fragmented identity → seek coherence).
 pub const NARRATIVE_SELF_PHI_LOW_THRESHOLD: f64 = 0.15;
 
 /// Exploration boost for low narrative self-phi.
-pub const NARRATIVE_SELF_PHI_LOW_EXPLORE_BOOST: f64 = 0.02;
+pub const NARRATIVE_SELF_PHI_LOW_EXPLORE_BOOST: f32 = 0.02;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // HARMONIES ALIGNMENT
@@ -326,17 +326,17 @@ pub const NARRATIVE_SELF_PHI_LOW_EXPLORE_BOOST: f64 = 0.02;
 
 /// Low harmonies alignment → explore to find value-congruent actions.
 /// Basis: Schwartz (2012) — value incongruence signals need for behavioral adjustment.
-pub const HARMONIES_MISALIGNMENT_THRESHOLD: f64 = 0.3;
+pub const HARMONIES_MISALIGNMENT_THRESHOLD: f32 = 0.3;
 
 /// Exploration boost when harmonies are misaligned.
-pub const HARMONIES_MISALIGNMENT_EXPLORE_BOOST: f64 = 0.02;
+pub const HARMONIES_MISALIGNMENT_EXPLORE_BOOST: f32 = 0.02;
 
 /// High harmonies alignment → boost confidence (value-congruent action).
 /// Basis: Schwartz (2012) — value congruence strengthens self-efficacy.
-pub const HARMONIES_ALIGNED_THRESHOLD: f64 = 0.7;
+pub const HARMONIES_ALIGNED_THRESHOLD: f32 = 0.7;
 
 /// Confidence boost when harmonies are well-aligned.
-pub const HARMONIES_ALIGNED_CONFIDENCE_BOOST: f64 = 0.01;
+pub const HARMONIES_ALIGNED_CONFIDENCE_BOOST: f32 = 0.01;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // NARRATIVE SELF
@@ -354,16 +354,16 @@ pub const NARRATIVE_SELF_HIGH_THRESHOLD: f64 = 0.7;
 pub const NARRATIVE_SELF_WEAK_THRESHOLD: f64 = 0.2;
 
 /// Confidence boost for strong narrative identity (Gallagher 2000).
-pub const NARRATIVE_SELF_CONFIDENCE_BOOST: f64 = 1.02;
+pub const NARRATIVE_SELF_CONFIDENCE_BOOST: f32 = 1.02;
 
 /// Confidence dampen for weak narrative identity.
-pub const NARRATIVE_SELF_CONFIDENCE_DAMPEN: f64 = 0.95;
+pub const NARRATIVE_SELF_CONFIDENCE_DAMPEN: f32 = 0.95;
 
 /// Moral learning signal stabilization scale for high self-coherence (Gallagher & Hutto 2007).
-pub const NARRATIVE_SELF_MORAL_STABILIZE_SCALE: f64 = 0.1;
+pub const NARRATIVE_SELF_MORAL_STABILIZE_SCALE: f32 = 0.1;
 
 /// Moral sensitivity amplification scale for low self-coherence.
-pub const NARRATIVE_SELF_MORAL_SENSITIVITY_SCALE: f64 = 0.15;
+pub const NARRATIVE_SELF_MORAL_SENSITIVITY_SCALE: f32 = 0.15;
 
 /// Social trust boost from strong narrative identity (Baumeister & Leary 1995).
-pub const NARRATIVE_SELF_SOCIAL_TRUST_BOOST: f64 = 1.02;
+pub const NARRATIVE_SELF_SOCIAL_TRUST_BOOST: f32 = 1.02;

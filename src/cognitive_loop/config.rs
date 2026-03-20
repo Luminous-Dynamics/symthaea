@@ -820,7 +820,8 @@ impl Default for CognitiveLoopConfig {
             broca_checkpoint_path: None,
             enable_energy_budget: false,
             energy_budget_joules_per_sec: None,
-            substrate_transition_alpha: super::thresholds::SUBSTRATE_TRANSITION_ALPHA_DEFAULT,
+            substrate_transition_alpha: super::thresholds::SUBSTRATE_TRANSITION_ALPHA_DEFAULT
+                as f32,
             enable_thermal_adaptation: false,
             federation_enabled: false,
             federation_round_interval_ms: 30_000,
@@ -942,7 +943,8 @@ impl CognitiveLoopConfig {
         self.enable_substrate_encoding_noise = true;
         self.enable_validation_overlay = true;
         self.enable_energy_budget = true;
-        self.substrate_transition_alpha = super::thresholds::SUBSTRATE_TRANSITION_ALPHA_SIMULATION;
+        self.substrate_transition_alpha =
+            super::thresholds::SUBSTRATE_TRANSITION_ALPHA_SIMULATION as f32;
         self
     }
 }

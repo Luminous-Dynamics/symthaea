@@ -46,12 +46,12 @@ pub mod radio_dispatcher;
 pub use drive_manager::DriveManager;
 pub use learning_manager::LearningManager;
 pub use memory_manager::MemoryManager;
-pub use soul_manager::{SoulManager, SoulTelemetry};
 pub use network_service_bridge::{
     forward_affective_state, forward_federated_round, NetworkServiceBridge,
     NetworkServiceBridgeHandle,
 };
 pub use perception_manager::PerceptionManager;
+pub use soul_manager::{SoulManager, SoulTelemetry};
 pub use swarm_manager::SwarmManager;
 
 #[cfg(feature = "mycelix")]

@@ -146,9 +146,11 @@ impl FeelingOfKnowingBenchmark {
             // regions of the list produce higher mean cue-trace similarity,
             // providing an additional metacognitive signal beyond the target-specific
             // partial activation.
-            let fluency: f64 = traces.iter()
+            let fluency: f64 = traces
+                .iter()
                 .map(|t| cues[i].similarity(t).max(0.0) as f64)
-                .sum::<f64>() / num_items as f64;
+                .sum::<f64>()
+                / num_items as f64;
             let raw_fok = partial_activation * 0.35 + encoding_strengths[i] * 0.55 + fluency * 0.10;
 
             // No logistic — preserve linear relationship with encoding.

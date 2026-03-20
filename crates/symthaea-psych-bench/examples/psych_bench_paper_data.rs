@@ -18,35 +18,55 @@ use symthaea_psych_bench::benchmarks::affect::{
     EmotionalStroopBenchmark, MoodCongruentRecallBenchmark, ValenceClassificationBenchmark,
 };
 use symthaea_psych_bench::benchmarks::attention::{
-    AttentionalBlinkBenchmark, VisualSearchBenchmark,
+    AttentionalBlinkBenchmark, MismatchNegativityBenchmark, VisualSearchBenchmark,
+};
+use symthaea_psych_bench::benchmarks::binding::{
+    CrossModalBindingBenchmark, FeatureConjunctionBenchmark, TemporalOrderBenchmark,
 };
 use symthaea_psych_bench::benchmarks::butlin::ButlinIndicatorSuite;
+use symthaea_psych_bench::benchmarks::causal_reasoning;
+use symthaea_psych_bench::benchmarks::clinical::{
+    AllianceMaintenanceBenchmark, CognitiveDistortionBenchmark, CrisisDetectionBenchmark,
+    EmpathicAccuracyBenchmark, MotivationalInterviewingBenchmark, TherapeuticResponseBenchmark,
+};
 use symthaea_psych_bench::benchmarks::cogbench::{
     BartBenchmark, HorizonBenchmark, InstrumentalLearningBenchmark,
     ProbabilisticReasoningBenchmark, RestlessBanditBenchmark, ReversalLearningBenchmark,
     TemporalDiscountingBenchmark, TwoStepBenchmark,
 };
+use symthaea_psych_bench::benchmarks::consciousness::{
+    BinocularRivalryBenchmark, BlindSightBenchmark, PerceptualCrowdingBenchmark,
+};
 use symthaea_psych_bench::benchmarks::creativity::{
-    AlternateUsesBenchmark, RemoteAssociatesBenchmark,
+    AlternateUsesBenchmark, DivergentThinkingBenchmark, RemoteAssociatesBenchmark,
 };
 use symthaea_psych_bench::benchmarks::executive::{
     DualTaskBenchmark, FlankerBenchmark, IowaGamblingBenchmark, RavensProgressiveMatricesBenchmark,
     StroopBenchmark, TowerOfLondonBenchmark, WisconsinCardSortingBenchmark,
 };
-use symthaea_psych_bench::benchmarks::inhibition::{GoNoGoBenchmark, StopSignalBenchmark};
+use symthaea_psych_bench::benchmarks::inhibition::{
+    FlankerInhibitionBenchmark, GoNoGoBenchmark, StopSignalBenchmark,
+};
+use symthaea_psych_bench::benchmarks::institutional_reasoning;
 use symthaea_psych_bench::benchmarks::language::{
     GardenPathBenchmark, LexicalDecisionBenchmark, SemanticCoherenceBenchmark,
     SemanticPrimingBenchmark,
+};
+use symthaea_psych_bench::benchmarks::mathematics::{
+    ArithmeticWordProblemsBenchmark, BayesianReasoningBenchmark, ConstraintPuzzlesBenchmark,
+    DefiniteIntegralsBenchmark, LinearSystemSolvingBenchmark, LogicalDeductionBenchmark,
+    MatrixOperationsBenchmark, PolynomialRootsBenchmark, ProofConstructionBenchmark,
+    StatisticalInferenceBenchmark,
 };
 use symthaea_psych_bench::benchmarks::memory_agent::{
     AccurateRetrievalBenchmark, ConflictResolutionBenchmark, LongRangeBenchmark,
     ProspectiveMemoryBenchmark, TestTimeLearningBenchmark,
 };
 use symthaea_psych_bench::benchmarks::metacognition::{
-    FeelingOfKnowingBenchmark, MetacognitiveCalibrationBenchmark,
+    ChangeBlindnessBenchmark, FeelingOfKnowingBenchmark, MetacognitiveCalibrationBenchmark,
 };
 use symthaea_psych_bench::benchmarks::motor::{
-    BimanualBenchmark, FittsLawBenchmark, SrttBenchmark,
+    BimanualBenchmark, FittsLawBenchmark, ProprioceptiveDriftBenchmark, SrttBenchmark,
 };
 use symthaea_psych_bench::benchmarks::neuromod::{
     AllostaticStressBenchmark, AntagonistProfilesBenchmark, AttentionNetworkBenchmark,
@@ -61,8 +81,23 @@ use symthaea_psych_bench::benchmarks::reasoning::{
     ArcCompositionalBenchmark, ArcFewShotBenchmark, ArcFluidBenchmark, ArcNoiseBenchmark,
     ArcRsaBenchmark, ArcScalingBenchmark, ArcStaircaseBenchmark,
 };
+use symthaea_psych_bench::benchmarks::security::{
+    CollectiveAggregationBenchmark, CrossMaskPrivacyBenchmark, EncryptedBindingBenchmark,
+    EncryptedClassificationBenchmark, EncryptedLearningBenchmark, ScalingAnalysisBenchmark,
+};
 use symthaea_psych_bench::benchmarks::social::{
+    DictatorGameBenchmark, MachiavelliBenchmark, PrisonersDilemmaBenchmark, PublicGoodsBenchmark,
     RmeBenchmark, SocialNormBenchmark, UltimatumGameBenchmark,
+};
+use symthaea_psych_bench::benchmarks::spatial::{
+    LandmarkBindingBenchmark, MentalRotationBenchmark, PerspectiveTakingBenchmark,
+    SpatialPathUpdatingBenchmark,
+};
+use symthaea_psych_bench::benchmarks::speech::{
+    CategoricalPerceptionBenchmark, PhonemeDiscriminationBenchmark, VotContinuumBenchmark,
+};
+use symthaea_psych_bench::benchmarks::substrate::{
+    SubstrateDegradationBenchmark, SubstrateLatencyBenchmark, SubstrateTransferBenchmark,
 };
 use symthaea_psych_bench::benchmarks::sustained_attention::{
     CptBenchmark, PvtBenchmark, SartBenchmark,
@@ -76,11 +111,11 @@ use symthaea_psych_bench::benchmarks::worm::{
     SerialRecallBenchmark, SpatialUpdatingBenchmark,
 };
 use symthaea_psych_bench::harness::{
-    AblationPreset, BenchmarkConfig, BenchmarkReport, CognitiveProfile, CrossDomainMatrix,
-    NormativeReport, PsychBenchmark, ReliabilityBattery, SatBattery,
+    AblationPreset, BenchmarkConfig, BenchmarkReport, CrossDomainMatrix, NormativeReport,
+    PsychBenchmark, ReliabilityBattery, SatBattery,
 };
 
-/// All 76 PsychBenchmark-trait benchmarks (excludes ConsciousnessFeedback and
+/// All PsychBenchmark-trait benchmarks (excludes ConsciousnessFeedback and
 /// MoralOxytocin which have standalone run() signatures).
 fn all_benchmarks() -> Vec<Box<dyn PsychBenchmark + Send + Sync>> {
     vec![
@@ -108,9 +143,10 @@ fn all_benchmarks() -> Vec<Box<dyn PsychBenchmark + Send + Sync>> {
         Box::new(FlankerBenchmark),
         Box::new(TowerOfLondonBenchmark),
         Box::new(DualTaskBenchmark),
-        // Metacognition (2)
+        // Metacognition (3)
         Box::new(MetacognitiveCalibrationBenchmark),
         Box::new(FeelingOfKnowingBenchmark),
+        Box::new(ChangeBlindnessBenchmark),
         // Butlin (1)
         Box::new(ButlinIndicatorSuite),
         // ToMBench (5)
@@ -129,15 +165,18 @@ fn all_benchmarks() -> Vec<Box<dyn PsychBenchmark + Send + Sync>> {
         Box::new(ValenceClassificationBenchmark),
         Box::new(MoodCongruentRecallBenchmark),
         Box::new(EmotionalStroopBenchmark),
-        // Creativity (2)
+        // Creativity (3)
         Box::new(RemoteAssociatesBenchmark),
         Box::new(AlternateUsesBenchmark),
-        // Inhibition (2)
+        Box::new(DivergentThinkingBenchmark),
+        // Inhibition (3)
         Box::new(GoNoGoBenchmark),
         Box::new(StopSignalBenchmark),
-        // Attention (2)
+        Box::new(FlankerInhibitionBenchmark),
+        // Attention (3)
         Box::new(AttentionalBlinkBenchmark),
         Box::new(VisualSearchBenchmark),
+        Box::new(MismatchNegativityBenchmark),
         // Reasoning (11)
         Box::new(ArcFluidBenchmark),
         Box::new(ArcCompositionalBenchmark),
@@ -154,19 +193,82 @@ fn all_benchmarks() -> Vec<Box<dyn PsychBenchmark + Send + Sync>> {
         Box::new(SartBenchmark),
         Box::new(PvtBenchmark),
         Box::new(CptBenchmark),
-        // Motor (3)
+        // Motor (4)
         Box::new(SrttBenchmark),
         Box::new(FittsLawBenchmark),
         Box::new(BimanualBenchmark),
+        Box::new(ProprioceptiveDriftBenchmark),
         // Language (4)
         Box::new(GardenPathBenchmark),
         Box::new(SemanticCoherenceBenchmark),
         Box::new(LexicalDecisionBenchmark),
         Box::new(SemanticPrimingBenchmark),
-        // Social (3)
+        // Social (7)
         Box::new(RmeBenchmark),
         Box::new(UltimatumGameBenchmark),
         Box::new(SocialNormBenchmark),
+        Box::new(PrisonersDilemmaBenchmark),
+        Box::new(PublicGoodsBenchmark),
+        Box::new(DictatorGameBenchmark),
+        Box::new(MachiavelliBenchmark),
+        // Binding (3)
+        Box::new(TemporalOrderBenchmark),
+        Box::new(CrossModalBindingBenchmark),
+        Box::new(FeatureConjunctionBenchmark),
+        // Spatial (4)
+        Box::new(MentalRotationBenchmark),
+        Box::new(SpatialPathUpdatingBenchmark),
+        Box::new(LandmarkBindingBenchmark),
+        Box::new(PerspectiveTakingBenchmark),
+        // Causal Reasoning (3)
+        Box::new(causal_reasoning::CausalChainBenchmark),
+        Box::new(causal_reasoning::ConfoundDetectionBenchmark),
+        Box::new(causal_reasoning::InterventionEffectBenchmark),
+        // Speech (3)
+        Box::new(PhonemeDiscriminationBenchmark),
+        Box::new(VotContinuumBenchmark),
+        Box::new(CategoricalPerceptionBenchmark),
+        // Consciousness (3)
+        Box::new(BlindSightBenchmark),
+        Box::new(BinocularRivalryBenchmark),
+        Box::new(PerceptualCrowdingBenchmark),
+        // Substrate (3)
+        Box::new(SubstrateTransferBenchmark),
+        Box::new(SubstrateDegradationBenchmark),
+        Box::new(SubstrateLatencyBenchmark),
+        // Clinical/Therapeutic (6)
+        Box::new(EmpathicAccuracyBenchmark),
+        Box::new(TherapeuticResponseBenchmark),
+        Box::new(AllianceMaintenanceBenchmark),
+        Box::new(CrisisDetectionBenchmark),
+        Box::new(CognitiveDistortionBenchmark),
+        Box::new(MotivationalInterviewingBenchmark),
+        // Institutional Reasoning (7)
+        Box::new(institutional_reasoning::InstitutionalReasoningBenchmark),
+        Box::new(institutional_reasoning::AnalogicalReasoningBenchmark),
+        Box::new(institutional_reasoning::CausalChainBenchmark),
+        Box::new(institutional_reasoning::CounterfactualReasoningBenchmark),
+        Box::new(institutional_reasoning::WeightedDecompositionBenchmark),
+        Box::new(institutional_reasoning::InstitutionalStabilityBenchmark),
+        Box::new(institutional_reasoning::InstitutionalIsomorphismBenchmark),
+        // Mathematics (10)
+        Box::new(ArithmeticWordProblemsBenchmark),
+        Box::new(LinearSystemSolvingBenchmark),
+        Box::new(PolynomialRootsBenchmark),
+        Box::new(MatrixOperationsBenchmark),
+        Box::new(StatisticalInferenceBenchmark),
+        Box::new(BayesianReasoningBenchmark),
+        Box::new(LogicalDeductionBenchmark),
+        Box::new(ConstraintPuzzlesBenchmark),
+        Box::new(ProofConstructionBenchmark),
+        Box::new(DefiniteIntegralsBenchmark),
+        // Security (HDC-FHE) (6)
+        Box::new(EncryptedClassificationBenchmark),
+        Box::new(CollectiveAggregationBenchmark),
+        Box::new(EncryptedLearningBenchmark),
+        Box::new(CrossMaskPrivacyBenchmark),
+        Box::new(EncryptedBindingBenchmark),
+        Box::new(ScalingAnalysisBenchmark),
         // Neuromod (14 — trait-based)
         Box::new(AttentionNetworkBenchmark),
         Box::new(MoodInductionBenchmark),
@@ -281,26 +383,33 @@ fn main() {
 
     eprintln!("  Full battery: {:.1}s", start.elapsed().as_secs_f64());
 
-    // ── CSV 1: cognitive_profile.csv ────────────────────────────────
+    // ── CSV 1: cognitive_profile.csv (26 domains via composite z-scores) ─
     eprintln!("\n[2/7] Generating cognitive_profile.csv...");
-    let profile = CognitiveProfile::from_report(&report);
     {
+        let composites = report.composite_scores();
         let path = out.join("cognitive_profile.csv");
         let mut f = fs::File::create(&path).unwrap();
         writeln!(f, "domain,score,n_benchmarks,interpretation").unwrap();
-        for d in &profile.domains {
+        for (domain, cs) in &composites {
+            let interpretation = if cs.mean_z >= 2.0 {
+                "Exceptional"
+            } else if cs.mean_z >= 1.0 {
+                "Strong"
+            } else if cs.mean_z >= 0.0 {
+                "Average"
+            } else if cs.mean_z >= -1.0 {
+                "Below average"
+            } else {
+                "Impaired"
+            };
             writeln!(
                 f,
                 "{},{:.6},{},{}",
-                d.domain, d.score, d.n_benchmarks, d.interpretation
+                domain, cs.mean_z, cs.n_benchmarks, interpretation
             )
             .unwrap();
         }
-        eprintln!(
-            "  Wrote {} ({} domains)",
-            path.display(),
-            profile.domains.len()
-        );
+        eprintln!("  Wrote {} ({} domains)", path.display(), composites.len());
     }
 
     // ── CSV 2: normative_zscores.csv ────────────────────────────────
@@ -343,8 +452,9 @@ fn main() {
     // ── CSV 3: ablation_domains.csv ─────────────────────────────────
     eprintln!("\n[4/7] Generating ablation_domains.csv...");
     {
+        use std::collections::BTreeMap;
         let presets = AblationPreset::all();
-        let mut ablation_profiles: Vec<(String, CognitiveProfile)> = Vec::new();
+        let mut ablation_composites: Vec<(String, BTreeMap<String, f64>)> = Vec::new();
 
         for &preset in presets {
             let ac = preset.to_config(42);
@@ -354,45 +464,37 @@ fn main() {
             for r in ab_results {
                 ab_report.add(r);
             }
-            let ab_profile = CognitiveProfile::from_report(&ab_report);
-            ablation_profiles.push((ac.name.clone(), ab_profile));
+            let composites = ab_report.composite_scores();
+            let domain_scores: BTreeMap<String, f64> = composites
+                .into_iter()
+                .map(|(domain, cs)| (domain, cs.mean_z))
+                .collect();
+            ablation_composites.push((ac.name.clone(), domain_scores));
         }
 
         let path = out.join("ablation_domains.csv");
         let mut f = fs::File::create(&path).unwrap();
         // Wide format: domain, then one column per preset
-        let preset_names: Vec<&str> = ablation_profiles.iter().map(|(n, _)| n.as_str()).collect();
         write!(f, "domain").unwrap();
-        for name in &preset_names {
-            // Sanitize column name for pgfplotstableread (no spaces or parens)
+        for (name, _) in &ablation_composites {
             let clean = name.replace(' ', "").replace("(K=3)", "");
             write!(f, ",{}", clean).unwrap();
         }
         writeln!(f).unwrap();
 
-        // Collect all unique domain names (sorted)
-        let domain_names: Vec<String> = ablation_profiles[0]
-            .1
-            .domains
-            .iter()
-            .map(|d| d.domain.clone())
-            .collect();
+        // Collect all unique domain names (sorted via BTreeMap)
+        let domain_names: Vec<String> = ablation_composites[0].1.keys().cloned().collect();
 
         for domain in &domain_names {
             write!(f, "{}", domain).unwrap();
-            for (_name, prof) in &ablation_profiles {
-                let score = prof
-                    .domains
-                    .iter()
-                    .find(|d| &d.domain == domain)
-                    .map(|d| d.score)
-                    .unwrap_or(0.0);
+            for (_name, scores) in &ablation_composites {
+                let score = scores.get(domain).copied().unwrap_or(0.0);
                 write!(f, ",{:.6}", score).unwrap();
             }
             writeln!(f).unwrap();
         }
         eprintln!(
-            "  Wrote {} ({} presets × {} domains)",
+            "  Wrote {} ({} presets x {} domains)",
             path.display(),
             presets.len(),
             domain_names.len()

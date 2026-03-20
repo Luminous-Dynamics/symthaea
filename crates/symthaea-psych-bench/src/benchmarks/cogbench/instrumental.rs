@@ -38,6 +38,15 @@ impl InstrumentalLearningBenchmark {
         let mut action_reward = [0.5f64; 2]; // prior: neutral
         let reward_lr = 0.3; // EMA for reward learning
 
+        // Delta-P contingency tracker (Dickinson 1985; Shanks & Dickinson 1991):
+        // Tracks P(reward|action) and P(reward|~action) separately for each action.
+        // Contingency = P(R|A) - P(R|~A). This captures the causal structure of
+        // action-outcome relationships, not just reward magnitude.
+        let mut action_reward_count = [0u64; 2]; // times action gave high reward
+        let mut action_total = [0u64; 2]; // times action was chosen
+        let mut other_reward_count = [0u64; 2]; // times OTHER action gave high reward
+        let mut other_total = [0u64; 2]; // times other action was chosen (= action_total of other)
+
         // Track contingency sensitivity: proportion of correct choices
         // (action 0 is always the higher-reward action)
         let mut late_correct = 0u32;
@@ -48,13 +57,38 @@ impl InstrumentalLearningBenchmark {
         for trial in 0..20 {
             let action_result = agent.select_action();
 
-            // Blend FEP probs with explicit reward-based probs
+            // Blend FEP probs with contingency-based probs (Delta-P; Dickinson 1985).
+            // Delta-P = P(R|A) - P(R|~A) captures causal action-outcome structure.
             let fep_probs = &action_result.action_probabilities;
+
+            // Compute Delta-P contingency for each action
+            let delta_p: Vec<f64> = (0..2)
+                .map(|a| {
+                    let p_r_given_a = if action_total[a] > 0 {
+                        action_reward_count[a] as f64 / action_total[a] as f64
+                    } else {
+                        0.5 // uninformative prior
+                    };
+                    let p_r_given_not_a = if other_total[a] > 0 {
+                        other_reward_count[a] as f64 / other_total[a] as f64
+                    } else {
+                        0.5
+                    };
+                    // Contingency: positive means action causes reward
+                    p_r_given_a - p_r_given_not_a
+                })
+                .collect();
+
+            // Convert contingency to action values: blend EMA reward with Delta-P
+            let contingency_values: Vec<f64> = (0..2)
+                .map(|a| action_reward[a] + delta_p[a] * 0.3)
+                .collect();
+
             // Time pressure: base 0.15 yields ~85% optimal choice rate; +0.10/unit flattens
             // reward discrimination, modeling hasty valuation under SAT (Wickelgren, 1977).
             let rv_temp = 0.15 + config.time_pressure * 0.10;
-            let rv_max = action_reward[0].max(action_reward[1]);
-            let rv_exp: Vec<f64> = action_reward
+            let rv_max = contingency_values[0].max(contingency_values[1]);
+            let rv_exp: Vec<f64> = contingency_values
                 .iter()
                 .map(|v| ((v - rv_max) / rv_temp).exp())
                 .collect();
@@ -70,10 +104,13 @@ impl InstrumentalLearningBenchmark {
 
             let chosen = sample_action(&final_probs, &mut rng_state);
 
-            // RT proxy: decision difficulty from value certainty — smaller difference
-            // between action values means harder choice (Wickelgren, 1977 SAT).
+            // RT proxy: decision difficulty from contingency certainty — when both
+            // actions have similar contingency, deliberation takes longer
+            // (Shanks & Dickinson 1991; Wickelgren, 1977 SAT).
+            let contingency_diff = (delta_p[0] - delta_p[1]).abs();
             let value_diff = (action_reward[0] - action_reward[1]).abs();
-            let ticks = 5.0 + (1.0 - value_diff.min(1.0)) * 8.0;
+            let combined_diff = (contingency_diff + value_diff) / 2.0;
+            let ticks = 5.0 + (1.0 - combined_diff.min(1.0)) * 8.0;
             rt_ticks.push(ticks);
 
             // Track contingency sensitivity in last 10 trials (after learning)
@@ -97,6 +134,21 @@ impl InstrumentalLearningBenchmark {
                 0.1
             };
 
+            let high_reward = reward > 0.5;
+
+            // Update Delta-P counters
+            action_total[chosen] += 1;
+            if high_reward {
+                action_reward_count[chosen] += 1;
+            }
+            // The unchosen action's "other" counters: this trial's outcome
+            // is a P(R|~other) observation for the unchosen action
+            let unchosen = 1 - chosen;
+            other_total[unchosen] += 1;
+            if high_reward {
+                other_reward_count[unchosen] += 1;
+            }
+
             // Update action-value EMA
             action_reward[chosen] = (1.0 - reward_lr) * action_reward[chosen] + reward_lr * reward;
 
@@ -111,10 +163,32 @@ impl InstrumentalLearningBenchmark {
             let action_result = agent.select_action();
 
             let fep_probs = &action_result.action_probabilities;
+
+            // Delta-P contingency-based action selection (same as Phase 1)
+            let delta_p: Vec<f64> = (0..2)
+                .map(|a| {
+                    let p_r_given_a = if action_total[a] > 0 {
+                        action_reward_count[a] as f64 / action_total[a] as f64
+                    } else {
+                        0.5
+                    };
+                    let p_r_given_not_a = if other_total[a] > 0 {
+                        other_reward_count[a] as f64 / other_total[a] as f64
+                    } else {
+                        0.5
+                    };
+                    p_r_given_a - p_r_given_not_a
+                })
+                .collect();
+
+            let contingency_values: Vec<f64> = (0..2)
+                .map(|a| action_reward[a] + delta_p[a] * 0.3)
+                .collect();
+
             // Time pressure: same SAT scaling as win phase (Wickelgren, 1977).
             let rv_temp = 0.15 + config.time_pressure * 0.10;
-            let rv_max = action_reward[0].max(action_reward[1]);
-            let rv_exp: Vec<f64> = action_reward
+            let rv_max = contingency_values[0].max(contingency_values[1]);
+            let rv_exp: Vec<f64> = contingency_values
                 .iter()
                 .map(|v| ((v - rv_max) / rv_temp).exp())
                 .collect();
@@ -130,9 +204,11 @@ impl InstrumentalLearningBenchmark {
 
             let chosen = sample_action(&final_probs, &mut rng_state);
 
-            // RT proxy: same value-certainty model as win phase
+            // RT proxy: same contingency-certainty model as win phase
+            let contingency_diff = (delta_p[0] - delta_p[1]).abs();
             let value_diff = (action_reward[0] - action_reward[1]).abs();
-            let ticks = 5.0 + (1.0 - value_diff.min(1.0)) * 8.0;
+            let combined_diff = (contingency_diff + value_diff) / 2.0;
+            let ticks = 5.0 + (1.0 - combined_diff.min(1.0)) * 8.0;
             rt_ticks.push(ticks);
 
             rng_state ^= rng_state << 13;
@@ -150,6 +226,19 @@ impl InstrumentalLearningBenchmark {
             } else {
                 0.1
             };
+
+            let high_reward = reward > 0.3; // adjusted threshold for loss condition
+
+            // Update Delta-P counters
+            action_total[chosen] += 1;
+            if high_reward {
+                action_reward_count[chosen] += 1;
+            }
+            let unchosen = 1 - chosen;
+            other_total[unchosen] += 1;
+            if high_reward {
+                other_reward_count[unchosen] += 1;
+            }
 
             action_reward[chosen] = (1.0 - reward_lr) * action_reward[chosen] + reward_lr * reward;
 

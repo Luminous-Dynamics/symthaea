@@ -259,7 +259,9 @@ impl CivicCrisisDetector {
         }
 
         // Signal 2: Safety level escalation (direct threat)
-        if input.safety_level_ordinal >= crate::cognitive_loop::thresholds::CRISIS_SAFETY_ORANGE_ORDINAL {
+        if input.safety_level_ordinal
+            >= crate::cognitive_loop::thresholds::CRISIS_SAFETY_ORANGE_ORDINAL
+        {
             // Orange or Red
             signals.push(CrisisSignal {
                 name: "safety_level".to_string(),
@@ -324,7 +326,10 @@ impl CivicCrisisDetector {
         let has_phi = signals.iter().any(|s| s.name == "phi_collapse");
         let has_arousal = signals.iter().any(|s| s.name == "community_arousal");
 
-        let crisis_type = if has_safety && input.safety_level_ordinal >= crate::cognitive_loop::thresholds::CRISIS_SAFETY_RED_ORDINAL {
+        let crisis_type = if has_safety
+            && input.safety_level_ordinal
+                >= crate::cognitive_loop::thresholds::CRISIS_SAFETY_RED_ORDINAL
+        {
             CrisisType::CyberAttack // Red safety = active threat
         } else if has_phi {
             CrisisType::ConsciousnessFailure
@@ -338,14 +343,21 @@ impl CivicCrisisDetector {
 
         // Severity: 1 (single weak signal) to 5 (multiple strong signals + Red safety)
         let signal_count = signals.len() as u8;
-        let safety_boost = if input.safety_level_ordinal >= crate::cognitive_loop::thresholds::CRISIS_SAFETY_RED_ORDINAL {
+        let safety_boost = if input.safety_level_ordinal
+            >= crate::cognitive_loop::thresholds::CRISIS_SAFETY_RED_ORDINAL
+        {
             crate::cognitive_loop::thresholds::CRISIS_SEVERITY_BOOST_RED
-        } else if input.safety_level_ordinal >= crate::cognitive_loop::thresholds::CRISIS_SAFETY_ORANGE_ORDINAL {
+        } else if input.safety_level_ordinal
+            >= crate::cognitive_loop::thresholds::CRISIS_SAFETY_ORANGE_ORDINAL
+        {
             crate::cognitive_loop::thresholds::CRISIS_SEVERITY_BOOST_ORANGE
         } else {
             0
         };
-        let severity = (signal_count + safety_boost).clamp(crate::cognitive_loop::thresholds::CRISIS_SEVERITY_MIN, crate::cognitive_loop::thresholds::CRISIS_SEVERITY_MAX);
+        let severity = (signal_count + safety_boost).clamp(
+            crate::cognitive_loop::thresholds::CRISIS_SEVERITY_MIN,
+            crate::cognitive_loop::thresholds::CRISIS_SEVERITY_MAX,
+        );
 
         (crisis_type, severity)
     }
@@ -358,7 +370,12 @@ impl CivicCrisisDetector {
         // Average of (value / threshold) across signals, clamped to 1.0
         let total: f64 = signals
             .iter()
-            .map(|s| (s.value / s.threshold.max(crate::cognitive_loop::thresholds::CRISIS_CONFIDENCE_MIN_DENOMINATOR)).min(crate::cognitive_loop::thresholds::CRISIS_CONFIDENCE_MAX_SIGNAL))
+            .map(|s| {
+                (s.value
+                    / s.threshold
+                        .max(crate::cognitive_loop::thresholds::CRISIS_CONFIDENCE_MIN_DENOMINATOR))
+                .min(crate::cognitive_loop::thresholds::CRISIS_CONFIDENCE_MAX_SIGNAL)
+            })
             .sum();
         (total / signals.len() as f64).min(1.0)
     }

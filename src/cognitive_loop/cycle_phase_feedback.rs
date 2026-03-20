@@ -1001,7 +1001,7 @@ impl CognitiveLoopService {
         // High prediction error → faster ontology adaptation (Rescorla-Wagner 1972).
         if let Some(ref mut km) = self.knowledge_manager {
             km.set_ontology_lr_from_pe(prediction_error as f32);
-            km.modulate_lr_from_consciousness(self.stats.unified_psi);
+            km.modulate_lr_from_consciousness(self.stats.unified_psi as f64);
         }
 
         // Theta phase → Phi modulation (Buzsáki 2006).

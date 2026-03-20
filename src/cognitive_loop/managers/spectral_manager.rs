@@ -411,7 +411,7 @@ impl CognitiveSubsystem for SpectralManager {
         // History is transient (ring buffer rebuilt from live data); analyzer stays as-is.
         tracing::debug!(
             "SpectralManager restored: dims={}, cycle_count={}",
-            self.config.analysis_dims,
+            self.config.analyzed_dims,
             self.cycle_count
         );
         Ok(())

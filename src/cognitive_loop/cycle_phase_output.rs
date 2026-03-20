@@ -628,7 +628,7 @@ impl CognitiveLoopService {
             && self.stats.resonator_error_exploration_count > (self.stats.total_cycles / 2) as u64;
         metadata.modulation.anomaly_recovery_phi_accelerated =
             self.carryover.urgency.anomaly_was_active
-                && self.stats.unified_psi > self.stats.avg_psi * ANOMALY_RECOVERY_PSI_MULTIPLIER;
+                && self.stats.unified_psi > self.stats.avg_psi * ANOMALY_RECOVERY_PSI_MULTIPLIER as f32;
 
         // ── Session 16 telemetry ──
         {

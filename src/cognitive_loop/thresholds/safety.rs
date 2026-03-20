@@ -40,16 +40,16 @@ pub const KEY_ROTATION_GRACE_PERIOD_DEFAULT: u64 = 500;
 /// Learning rate multiplier when SafetyLevel is Yellow.
 /// Reduces plasticity to prevent learning from degraded states.
 /// Basis: Arnsten (2009) — stress impairs prefrontal function; reduced plasticity is protective.
-pub const SAFETY_YELLOW_LR_MULTIPLIER: f64 = 0.7;
+pub const SAFETY_YELLOW_LR_MULTIPLIER: f32 = 0.7;
 
 /// Learning rate multiplier when SafetyLevel is Orange.
 /// Severe reduction — only essential learning proceeds.
 /// Basis: McEwen (2007) — allostatic overload degrades synaptic plasticity.
-pub const SAFETY_ORANGE_LR_MULTIPLIER: f64 = 0.3;
+pub const SAFETY_ORANGE_LR_MULTIPLIER: f32 = 0.3;
 
 /// Learning rate multiplier when SafetyLevel is Red.
 /// Near-zero — consciousness is too degraded for reliable learning.
-pub const SAFETY_RED_LR_MULTIPLIER: f64 = 0.05;
+pub const SAFETY_RED_LR_MULTIPLIER: f32 = 0.05;
 
 /// Whether motor output is permitted at Orange safety level.
 /// Only ReadOnly actions pass; Reversible and above are blocked.
@@ -62,22 +62,22 @@ pub const SAFETY_RED_MOTOR_GATE: bool = false;
 
 /// Exploration dampening at Orange level (multiplicative on exploration_bonus).
 /// Basis: Yerkes-Dodson (1908) — high stress eliminates exploratory behavior.
-pub const SAFETY_ORANGE_EXPLORATION_DAMPEN: f64 = 0.1;
+pub const SAFETY_ORANGE_EXPLORATION_DAMPEN: f32 = 0.1;
 
 /// Exploration dampening at Yellow level (multiplicative).
-pub const SAFETY_YELLOW_EXPLORATION_DAMPEN: f64 = 0.5;
+pub const SAFETY_YELLOW_EXPLORATION_DAMPEN: f32 = 0.5;
 
 /// Consciousness modulation at Orange — nudge down to trigger deeper safety cascade.
 /// Basis: Dehaene (2014) — ignition failure propagates through GWT.
-pub const SAFETY_ORANGE_CONSCIOUSNESS_PENALTY: f64 = 0.05;
+pub const SAFETY_ORANGE_CONSCIOUSNESS_PENALTY: f32 = 0.05;
 
 /// Neuromodulator NE boost during Yellow safety (vigilance increase).
 /// Basis: Aston-Jones & Cohen (2005) — LC-NE system governs arousal/vigilance tradeoff.
-pub const SAFETY_YELLOW_NE_BOOST: f64 = 0.03;
+pub const SAFETY_YELLOW_NE_BOOST: f32 = 0.03;
 
 /// Neuromodulator cortisol boost during Orange safety (stress response).
 /// Basis: Sapolsky (2004) — HPA axis cortisol release under sustained threat.
-pub const SAFETY_ORANGE_CORTISOL_BOOST: f64 = 0.05;
+pub const SAFETY_ORANGE_CORTISOL_BOOST: f32 = 0.05;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DEFENSE / IMMUNE SYSTEM — Graduated Response
@@ -90,7 +90,7 @@ pub const DEFENSE_QUARANTINE_MAX_CYCLES: u32 = 1000;
 /// Minimum moral algebra severity score to permit a defensive action.
 /// Actions scoring above this are blocked unless overridden by Guardian.
 /// Basis: APA Ethics Code — proportionality principle.
-pub const DEFENSE_MAX_MORAL_SEVERITY: f64 = 0.7;
+pub const DEFENSE_MAX_MORAL_SEVERITY: f32 = 0.7;
 
 /// Rate limit: maximum governance proposals per agent per minute.
 pub const DEFENSE_PROPOSAL_RATE_LIMIT: u32 = 10;
@@ -100,8 +100,8 @@ pub const DEFENSE_VOTE_LIMIT_PER_PROPOSAL: u32 = 1;
 
 /// Anomaly score threshold for peer quarantine consideration.
 /// Basis: Mahalanobis distance > 3σ indicates outlier behavior.
-pub const DEFENSE_PEER_QUARANTINE_THRESHOLD: f64 = 0.7;
+pub const DEFENSE_PEER_QUARANTINE_THRESHOLD: f32 = 0.7;
 
 /// Reputation penalty multiplier for detected Byzantine behavior.
 /// Applied as: reputation *= (1.0 - SLASH_FACTOR).
-pub const DEFENSE_REPUTATION_SLASH_FACTOR: f64 = 0.5;
+pub const DEFENSE_REPUTATION_SLASH_FACTOR: f32 = 0.5;

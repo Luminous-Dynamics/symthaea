@@ -191,8 +191,8 @@ impl CognitiveSubsystem for SoulManager {
 
         // ── High alignment → boost confidence and learning ──────────────
         if alignment > ALIGNMENT_BOOST_THRESHOLD {
-            let strength = (alignment - ALIGNMENT_BOOST_THRESHOLD)
-                / (1.0 - ALIGNMENT_BOOST_THRESHOLD);
+            let strength =
+                (alignment - ALIGNMENT_BOOST_THRESHOLD) / (1.0 - ALIGNMENT_BOOST_THRESHOLD);
             // Boost confidence — aligned actions deserve commitment
             output.confidence_delta += strength as f64 * 0.05;
             // Boost learning rate — value-congruent experiences are salient
@@ -201,8 +201,7 @@ impl CognitiveSubsystem for SoulManager {
 
         // ── Low alignment → drop confidence, explore alternatives ───────
         if alignment < ALIGNMENT_CONCERN_THRESHOLD {
-            let severity = (ALIGNMENT_CONCERN_THRESHOLD - alignment)
-                / ALIGNMENT_CONCERN_THRESHOLD;
+            let severity = (ALIGNMENT_CONCERN_THRESHOLD - alignment) / ALIGNMENT_CONCERN_THRESHOLD;
             // Drop confidence — misaligned actions shouldn't be committed to
             output.confidence_delta -= severity as f64 * 0.08;
             // Boost exploration — seek value-aligned alternatives
@@ -273,9 +272,7 @@ impl CognitiveSubsystem for SoulManager {
         self.last_experiences = u64::from_le_bytes(
             data[16..24]
                 .try_into()
-                .map_err(|_| {
-                    "SoulManager: corrupt checkpoint bytes [16..24]".to_string()
-                })?,
+                .map_err(|_| "SoulManager: corrupt checkpoint bytes [16..24]".to_string())?,
         );
         if data.len() > 24 {
             self.has_update = data[24] != 0;

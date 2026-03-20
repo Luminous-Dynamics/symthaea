@@ -106,23 +106,23 @@ impl CodeTaskDetector {
 
         for &kw in &self.code_keywords {
             if lower.contains(kw) {
-                score += super::thresholds::CODE_TASK_KEYWORD_WEIGHT;
+                score += super::thresholds::CODE_TASK_KEYWORD_WEIGHT as f32;
             }
         }
         for &kw in &self.debug_keywords {
             if lower.contains(kw) {
-                score += super::thresholds::CODE_TASK_DEBUG_WEIGHT;
+                score += super::thresholds::CODE_TASK_DEBUG_WEIGHT as f32;
             }
         }
         for &kw in &self.refactor_keywords {
             if lower.contains(kw) {
-                score += super::thresholds::CODE_TASK_REFACTOR_WEIGHT;
+                score += super::thresholds::CODE_TASK_REFACTOR_WEIGHT as f32;
             }
         }
 
         let confidence = score.min(1.0);
         (
-            confidence >= super::thresholds::CODE_TASK_CONFIDENCE_THRESHOLD,
+            confidence >= super::thresholds::CODE_TASK_CONFIDENCE_THRESHOLD as f32,
             confidence,
         )
     }
@@ -226,9 +226,9 @@ pub struct ThalamicRouter {
 impl Default for ThalamicRouter {
     fn default() -> Self {
         Self {
-            novelty_threshold: THALAMIC_NOVELTY_THRESHOLD,
-            urgency_threshold: THALAMIC_URGENCY_THRESHOLD,
-            familiarity_threshold: THALAMIC_FAMILIARITY_THRESHOLD,
+            novelty_threshold: THALAMIC_NOVELTY_THRESHOLD as f32,
+            urgency_threshold: THALAMIC_URGENCY_THRESHOLD as f32,
+            familiarity_threshold: THALAMIC_FAMILIARITY_THRESHOLD as f32,
             routing_history: VecDeque::with_capacity(100),
             max_history: 100,
         }
@@ -257,14 +257,14 @@ impl ThalamicRouter {
     ) -> CognitiveDepth {
         let depth = if novelty > self.novelty_threshold
             || urgency > self.urgency_threshold
-            || complexity > super::thresholds::THALAMIC_COMPLEXITY_DEEP_THRESHOLD
-            || emotional_intensity > super::thresholds::THALAMIC_EMOTIONAL_DEEP_THRESHOLD
+            || complexity > super::thresholds::THALAMIC_COMPLEXITY_DEEP_THRESHOLD as f32
+            || emotional_intensity > super::thresholds::THALAMIC_EMOTIONAL_DEEP_THRESHOLD as f32
         {
             // High stakes - use deep thought
             CognitiveDepth::DeepThought
         } else if novelty < self.familiarity_threshold
-            && complexity < super::thresholds::THALAMIC_COMPLEXITY_REFLEX_THRESHOLD
-            && urgency < super::thresholds::THALAMIC_URGENCY_REFLEX_THRESHOLD
+            && complexity < super::thresholds::THALAMIC_COMPLEXITY_REFLEX_THRESHOLD as f32
+            && urgency < super::thresholds::THALAMIC_URGENCY_REFLEX_THRESHOLD as f32
         {
             // Familiar, simple, not urgent - use reflex
             CognitiveDepth::Reflex
@@ -406,7 +406,11 @@ impl ThalamicRouter {
         emotional_valence: f32,
     ) -> CognitiveDepth {
         // Novelty from prediction error (high error = novel)
-        let novelty = if prediction_error.is_finite() { prediction_error.min(1.0) } else { 0.5 };
+        let novelty = if prediction_error.is_finite() {
+            prediction_error.min(1.0)
+        } else {
+            0.5
+        };
 
         // Complexity from pattern
         let complexity = match pattern {

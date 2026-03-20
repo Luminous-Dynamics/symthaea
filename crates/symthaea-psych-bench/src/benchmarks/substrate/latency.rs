@@ -106,9 +106,9 @@ impl SubstrateLatencyBenchmark {
             // The quadratic term steepens the gradient at low speeds, which
             // increases the Pearson r between speed and accuracy.
             let speed_deficit = 1.0 - speed;
-            let latency_noise =
-                (speed_deficit * 0.45 + speed_deficit * speed_deficit * 0.20) as f32
-                    + config.effective_noise() as f32 * 0.05;
+            let latency_noise = (speed_deficit * 0.45 + speed_deficit * speed_deficit * 0.20)
+                as f32
+                + config.effective_noise() as f32 * 0.05;
 
             let mut correct = 0u32;
             let mut total = 0u32;

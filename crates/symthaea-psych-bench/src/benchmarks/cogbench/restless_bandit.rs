@@ -52,7 +52,7 @@ impl RestlessBanditBenchmark {
         // noisy overreaction (cf. Behrens et al. 2007 volatility estimation).
         let mut arm_ema_fast: Vec<f64> = vec![0.5; num_arms];
         let mut arm_ema_slow: Vec<f64> = vec![0.5; num_arms];
-        let ema_alpha_fast = 0.8;
+        let ema_alpha_fast = 0.80;
         let ema_alpha_slow = 0.45;
         // Track last-pull time per arm (recency-aware exploration)
         let mut arm_pulls: Vec<u64> = vec![0; num_arms];
