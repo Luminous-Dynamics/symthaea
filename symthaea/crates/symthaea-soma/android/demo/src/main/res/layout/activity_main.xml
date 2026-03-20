@@ -160,17 +160,17 @@
             android:layout_marginBottom="100dp"
             android:visibility="gone" />
 
-        <!-- Conversation whisper: above bottom -->
+        <!-- Conversation: visible input bar above bottom sheet -->
         <LinearLayout
             android:id="@+id/conversationRow"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="44dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:layout_gravity="bottom|center_horizontal"
-            android:layout_marginBottom="40dp"
-            android:paddingStart="24dp"
-            android:paddingEnd="16dp">
+            android:background="#CC161D26"
+            android:paddingStart="20dp"
+            android:paddingEnd="12dp">
 
             <EditText
                 android:id="@+id/conversationInput"
@@ -179,8 +179,8 @@
                 android:layout_weight="1"
                 android:hint="speak to soma..."
                 android:textColor="#E8F0F2"
-                android:textColorHint="#33E8F0F2"
-                android:textSize="12sp"
+                android:textColorHint="#557A8B8F"
+                android:textSize="13sp"
                 android:fontFamily="sans-serif-light"
                 android:background="@android:color/transparent"
                 android:paddingStart="0dp"
@@ -191,11 +191,11 @@
 
             <ImageView
                 android:id="@+id/btnSend"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
                 android:src="@android:drawable/ic_menu_send"
-                android:alpha="0.4"
-                android:padding="4dp"
+                android:alpha="0.5"
+                android:padding="6dp"
                 android:contentDescription="send" />
 
         </LinearLayout>
@@ -220,13 +220,17 @@
     app:behavior_peekHeight="44dp"
     app:behavior_hideable="false">
 
-    <!-- Drag handle -->
-    <View
-        android:layout_width="40dp"
-        android:layout_height="3dp"
-        android:layout_gravity="center_horizontal"
-        android:background="@color/soma_whisper"
-        android:layout_marginBottom="10dp" />
+    <!-- Drag handle (large touch target) -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="24dp"
+        android:layout_marginBottom="4dp">
+        <View
+            android:layout_width="48dp"
+            android:layout_height="4dp"
+            android:layout_gravity="center"
+            android:background="@color/soma_whisper" />
+    </FrameLayout>
 
     <!-- Neuromod arcs (moved from main view) -->
     <io.symthaea.soma.demo.NeuromodFlowView

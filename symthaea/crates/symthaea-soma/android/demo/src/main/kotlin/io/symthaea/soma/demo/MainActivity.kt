@@ -195,6 +195,9 @@ class MainActivity : AppCompatActivity() {
     private fun setupBottomSheet() {
         val behavior = BottomSheetBehavior.from(binding.bottomSheet)
         behavior.state = BottomSheetBehavior.STATE_COLLAPSED
+        behavior.isHideable = false
+        behavior.isFitToContents = true // Snaps between collapsed and expanded
+        behavior.halfExpandedRatio = 0.4f
 
         binding.btnDream.setOnClickListener {
             viewModel.dreamConsolidate()
