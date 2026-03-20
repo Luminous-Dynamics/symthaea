@@ -63,8 +63,15 @@ pub struct LanguageControllerConfig {
     /// Blend weight for compositional correction (0.0 = no-op, 1.0 = full bind).
     /// Default 0.15: gentle correction that preserves autoregressive dynamics
     /// while amplifying dimensions where output aligns with thought intent.
+    /// When `adaptive_compositional_alpha` is true, this becomes the *maximum*
+    /// alpha, scaled by `(1 - coherence)` so correction is strongest when drifting.
     #[serde(default = "default_compositional_alpha")]
     pub compositional_alpha: f32,
+    /// Enable coherence-conditioned alpha: `effective_alpha = alpha * (1 - coherence)`.
+    /// When coherence is high (on-track), alpha → 0 (no correction needed).
+    /// When coherence is low (drifting), alpha → max (full correction).
+    #[serde(default)]
+    pub adaptive_compositional_alpha: bool,
 
     // ── Phase 3: Adaptive dt from Coherence ──
     /// Enable adaptive dt modulation from coherence feedback.
@@ -124,9 +131,12 @@ impl Default for LanguageControllerConfig {
             parallel_threshold: default_parallel_threshold(),
             enable_compositional_logits: false,
             compositional_alpha: default_compositional_alpha(),
+            adaptive_compositional_alpha: false,
             enable_adaptive_dt: false,
             dt_min: default_dt_min(),
             dt_max: default_dt_max(),
+            enable_orthogonal_positions: false,
+            orthogonal_position_count: default_orthogonal_position_count(),
         }
     }
 }
@@ -290,7 +300,16 @@ impl LanguageController {
         // thought intent (Hadamard product: both positive → large positive).
         // The weighted bundle blends raw output with this thought-conditioned signal.
         let logit_hv = if self.config.enable_compositional_logits {
-            let alpha = self.config.compositional_alpha.clamp(0.0, 1.0);
+            let base_alpha = self.config.compositional_alpha.clamp(0.0, 1.0);
+            // Coherence-conditioned alpha: correct more when drifting, less when on-track.
+            // effective_alpha = base * (1 - coherence). At coherence=1.0, alpha=0 (no correction).
+            // At coherence=0.0, alpha=base (full correction).
+            let alpha = if self.config.adaptive_compositional_alpha {
+                let c = self.coherence_for_dt.clamp(0.0, 1.0);
+                base_alpha * (1.0 - c)
+            } else {
+                base_alpha
+            };
             if alpha > 1e-6 {
                 let correction = output_hv.bind(thought_hv).normalize();
                 ContinuousHV::weighted_bundle(&[&output_hv, &correction], &[1.0 - alpha, alpha])
@@ -331,6 +350,12 @@ impl LanguageController {
     /// Get the controller configuration.
     pub fn config(&self) -> &LanguageControllerConfig {
         &self.config
+    }
+
+    /// Get mutable reference to the controller configuration.
+    /// Used by training-time fusion to enable/disable flags per epoch.
+    pub fn config_mut(&mut self) -> &mut LanguageControllerConfig {
+        &mut self.config
     }
 
     /// Get token embedding, returning a zero vector for out-of-range IDs.

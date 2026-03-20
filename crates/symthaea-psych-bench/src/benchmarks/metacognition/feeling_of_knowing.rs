@@ -137,20 +137,26 @@ impl FeelingOfKnowingBenchmark {
             // retrieval strength even when full recall fails.
             let partial_activation = recall_sim.max(0.0);
 
-            // Raw FOK combines three metacognitive cues (Reder & Ritter 1992;
-            // Koriat 1997): (1) partial retrieval strength, (2) encoding quality
-            // (trace-based accessibility), and (3) retrieval fluency — the mean
-            // similarity between the cue and all stored traces. Fluency reflects
-            // the ease with which related information comes to mind, even when
-            // the specific target cannot be recalled. Items from richly encoded
-            // regions of the list produce higher mean cue-trace similarity,
-            // providing an additional metacognitive signal beyond the target-specific
-            // partial activation.
+            // Retrieval fluency: the mean similarity of the cue to all stored
+            // traces serves as a metacognitive cue (Reder & Ritter 1992 —
+            // feeling of knowing reflects cue familiarity). High cue-trace
+            // similarity indicates that the cue activated a memory neighborhood,
+            // which correlates with subsequent recognition success because
+            // well-encoded items create stronger trace neighborhoods.
             let fluency: f64 = traces
                 .iter()
                 .map(|t| cues[i].similarity(t).max(0.0) as f64)
                 .sum::<f64>()
                 / num_items as f64;
+
+            // Raw FOK combines partial retrieval strength + implicit
+            // encoding-quality awareness + retrieval fluency.
+            // Encoding-weighted FOK: for failed-recall items, partial activation
+            // is noisy and compressed, so encoding strength is the primary
+            // discriminative signal (Koriat 1997 — trace-based accessibility).
+            // Fluency adds a small but correlated cue (Reder & Ritter 1992).
+            // The 35/55/10 split lets encoding drive FOK rankings while
+            // partial activation and fluency add ecologically valid variability.
             let raw_fok = partial_activation * 0.35 + encoding_strengths[i] * 0.55 + fluency * 0.10;
 
             // No logistic — preserve linear relationship with encoding.

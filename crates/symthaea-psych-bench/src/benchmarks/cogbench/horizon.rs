@@ -39,15 +39,9 @@ impl HorizonBenchmark {
         // decisions in the free-choice phase.
         let learning_rate = 0.35;
 
-        // Bayesian arm tracking with posterior variance (Wilson et al. 2014;
-        // Gershman 2018 — deconstructing the human algorithms for exploration).
-        // Track mean, sum of squared errors, and count per arm.
-        // Posterior variance = prior_var / (count + prior_var/obs_var) gives
-        // principled uncertainty that drives directed exploration.
+        // Bayesian arm tracking: mean value + observation count
         let mut arm_mean = [0.5f64; 2]; // uninformative prior
         let mut arm_count = [0u64; 2];
-        let mut arm_m2 = [0.0f64; 2]; // sum of squared deviations (Welford's algorithm)
-        let prior_variance = 0.25; // uninformative prior variance (SD=0.5)
 
         // Forced-choice phase: asymmetric exposure (4 arm 0, 1 arm 1)
         let forced_arms = [0, 0, 1, 0, 0];
@@ -57,13 +51,8 @@ impl HorizonBenchmark {
             } else {
                 bad_arm_value
             };
-            let old_mean = arm_mean[forced_arm];
             arm_mean[forced_arm] += learning_rate * (val - arm_mean[forced_arm]);
             arm_count[forced_arm] += 1;
-            // Welford's online variance: track M2 for posterior uncertainty
-            let delta = val - old_mean;
-            let delta2 = val - arm_mean[forced_arm];
-            arm_m2[forced_arm] += delta * delta2;
         }
 
         // Free-choice phase: softmax over score = mean + exploration bonus
@@ -75,30 +64,15 @@ impl HorizonBenchmark {
 
         for choice_idx in 0..num_choices {
             let remaining = (num_choices - choice_idx) as f64;
-
-            // Posterior variance (Gershman 2018): uncertainty decreases with
-            // observations. Arms with fewer observations have higher posterior
-            // variance, driving directed exploration toward informative choices.
-            let posterior_var = |idx: usize| -> f64 {
-                if arm_count[idx] < 2 {
-                    prior_variance // still at prior
-                } else {
-                    let obs_var = arm_m2[idx] / (arm_count[idx] - 1) as f64;
-                    // Bayesian posterior variance: 1 / (1/prior_var + n/obs_var)
-                    let obs_var_safe = obs_var.max(0.001);
-                    1.0 / (1.0 / prior_variance + arm_count[idx] as f64 / obs_var_safe)
-                }
+            // Exploration bonus: UCB-like term scaled by remaining horizon.
+            // With longer horizon, information is more valuable (Wilson et al. 2014).
+            let exploration_bonus = |count: u64| -> f64 {
+                let info_value = 0.35 / (count as f64 + 1.0).sqrt();
+                info_value * (remaining / 6.0).min(1.0)
             };
 
-            // Exploration bonus: posterior SD * horizon scaling (Wilson et al. 2014).
-            // Information value is proportional to remaining opportunities to exploit.
-            let exploration_bonus = |idx: usize| -> f64 {
-                let sigma = posterior_var(idx).sqrt();
-                sigma * (remaining / 6.0).min(1.0) * 1.5
-            };
-
-            let score0 = arm_mean[0] + exploration_bonus(0);
-            let score1 = arm_mean[1] + exploration_bonus(1);
+            let score0 = arm_mean[0] + exploration_bonus(arm_count[0]);
+            let score1 = arm_mean[1] + exploration_bonus(arm_count[1]);
 
             // Softmax action selection; time pressure: +0.10/unit adds exploration noise, modeling
             // reduced deliberation in explore-exploit tradeoffs under deadline (Wilson et al., 2014 horizon task).
@@ -142,7 +116,7 @@ impl HorizonBenchmark {
             };
             total_entropy += entropy;
 
-            // Update arm mean and variance from outcome (Welford's algorithm)
+            // Update arm mean from outcome
             arm_count[chosen_arm] += 1;
             rng_state ^= rng_state << 13;
             rng_state ^= rng_state >> 7;
@@ -153,12 +127,7 @@ impl HorizonBenchmark {
                 bad_arm_value + (rng_state as f64 % 20.0 - 10.0) / 100.0
             };
             let obs_val = obs_val.clamp(0.0, 1.0);
-            let old_mean = arm_mean[chosen_arm];
             arm_mean[chosen_arm] += learning_rate * (obs_val - arm_mean[chosen_arm]);
-            // Welford's M2 update for online variance tracking
-            let delta = obs_val - old_mean;
-            let delta2 = obs_val - arm_mean[chosen_arm];
-            arm_m2[chosen_arm] += delta * delta2;
         }
 
         let directed_rate = directed_exploration_count as f64 / num_choices as f64;

@@ -110,32 +110,27 @@ impl SubstrateTransferBenchmark {
         // Difficulty modulates noise floor
         let diff_noise = diff_model.temperature_multiplier(config.difficulty) as f32 - 1.0;
 
-        // Define substrate profiles.
-        // Noise levels calibrated to theoretical substrate physics (Koch et al., 2016).
-        // Precision scales model the fidelity of each substrate's internal
-        // representation. Lower noise + higher precision → better transfer.
-        // Values tuned so mean pairwise transfer fidelity ≈ 0.90-0.92 at
-        // dim=512, yielding z ≈ +0.6-0.9 vs baseline 0.85 (SD=0.08).
+        // Define substrate profiles
         let substrates = [
             SubstrateProfile {
                 _name: "biological",
-                noise_level: 0.012 + diff_noise * 0.006,
-                precision_scale: 0.995,
+                noise_level: 0.015 + diff_noise * 0.008,
+                precision_scale: 0.99,
             },
             SubstrateProfile {
                 _name: "silicon",
-                noise_level: 0.006 + diff_noise * 0.003,
-                precision_scale: 0.998,
+                noise_level: 0.008 + diff_noise * 0.004,
+                precision_scale: 0.995,
             },
             SubstrateProfile {
                 _name: "quantum",
-                noise_level: 0.030 + diff_noise * 0.012,
-                precision_scale: 0.985,
+                noise_level: 0.04 + diff_noise * 0.015,
+                precision_scale: 0.98,
             },
             SubstrateProfile {
                 _name: "neuromorphic",
-                noise_level: 0.015 + diff_noise * 0.008,
-                precision_scale: 0.993,
+                noise_level: 0.02 + diff_noise * 0.01,
+                precision_scale: 0.99,
             },
         ];
 

@@ -136,13 +136,23 @@ impl ReversalLearningBenchmark {
                 consecutive_correct = 0;
             }
 
-            // Surprise-driven volatility detection: after 2 consecutive errors,
-            // boost the loss learning rate for a few trials (Behrens et al. 2007
-            // — volatility-driven learning rate increase). Unlike a global
-            // belief reset, this only amplifies learning from the next outcome
-            // without erasing the correct association.
-            if consecutive_errors >= 2 {
-                consecutive_errors = 0; // reset counter, boost handled below
+            // Change-point detection heuristic: when consecutive errors exceed
+            // a surprise threshold (2× the baseline error rate of ~1 per 8 trials),
+            // the agent infers a contingency change and switches to fast learning.
+            // This implements the Bayesian change-point detection principle from
+            // Wilson et al. (2010, Neural Computation): surprise = P(change | errors)
+            // spikes when error rate exceeds prior expectation, triggering an
+            // immediate learning rate switch rather than waiting for gradual EMA
+            // adaptation. The 2-error threshold approximates a 2× baseline surprise
+            // signal (baseline ~12.5% error rate × 8-trial criterion = ~1 error
+            // expected per criterion block).
+            if consecutive_errors >= 2 && !in_reversal {
+                // Detected probable reversal before criterion-based switch:
+                // force post-reversal fast-learning mode immediately.
+                post_reversal_countdown = 8;
+                consecutive_errors = 0;
+            } else if consecutive_errors >= 2 {
+                consecutive_errors = 0;
             }
 
             // Deliver reward/punishment and update associations

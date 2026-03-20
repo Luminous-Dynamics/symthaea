@@ -242,6 +242,20 @@ pub struct TrainingConfig {
     /// When mean epoch coherence drops below this, triggers `CoherenceCollapse` anomaly.
     /// Only active when `enable_anomaly_response` is true. Default: 0.05.
     pub coherence_collapse_threshold: f32,
+
+    // ── Training-Time Fusion ──
+    /// Enable fusion flags on the generator's controller during training.
+    /// When true, compositional logits, adaptive dt, and adaptive alpha are
+    /// activated before the training loop begins, so BPTT gradients flow through
+    /// the full fused forward path (not just the raw CfC output).
+    /// Without this, the CfC network learns dynamics for raw output, and fusion
+    /// flags at eval time are a post-hoc overlay.
+    pub enable_fusion_during_training: bool,
+    /// Epoch at which to enable fusion flags (phased activation).
+    /// During epochs 0..fusion_warmup, training uses the raw CfC path.
+    /// After fusion_warmup, fusion flags are enabled for the remainder.
+    /// Default 0 (enable from the start when enable_fusion_during_training=true).
+    pub fusion_warmup_epochs: usize,
 }
 
 impl Default for TrainingConfig {
@@ -271,6 +285,8 @@ impl Default for TrainingConfig {
             enable_smoke_test: false,
             smoke_test_coherence_threshold: 0.05,
             coherence_collapse_threshold: 0.05,
+            enable_fusion_during_training: false,
+            fusion_warmup_epochs: 0,
         }
     }
 }
@@ -737,6 +753,17 @@ pub fn train_with_adam(
         || config.enable_anomaly_response;
 
     for epoch in 0..config.epochs {
+        // Training-time fusion: enable/disable fusion flags based on epoch.
+        // Before fusion_warmup: raw CfC path (learn basic dynamics).
+        // After fusion_warmup: fused path (learn dynamics that leverage fusion).
+        if config.enable_fusion_during_training {
+            let fusion_active = epoch >= config.fusion_warmup_epochs;
+            let ctrl_config = &mut generator.controller_mut().config_mut();
+            ctrl_config.enable_compositional_logits = fusion_active;
+            ctrl_config.adaptive_compositional_alpha = fusion_active;
+            ctrl_config.enable_adaptive_dt = fusion_active;
+        }
+
         // Reset CfC momentum between epochs to prevent accumulated directional
         // bias from 67K+ gradient steps (momentum 0.9 × 67K steps → runaway).
         if epoch > 0 && config.train_network {

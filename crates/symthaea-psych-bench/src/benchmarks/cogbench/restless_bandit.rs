@@ -52,7 +52,7 @@ impl RestlessBanditBenchmark {
         // noisy overreaction (cf. Behrens et al. 2007 volatility estimation).
         let mut arm_ema_fast: Vec<f64> = vec![0.5; num_arms];
         let mut arm_ema_slow: Vec<f64> = vec![0.5; num_arms];
-        let ema_alpha_fast = 0.80;
+        let ema_alpha_fast = 0.8;
         let ema_alpha_slow = 0.45;
         // Track last-pull time per arm (recency-aware exploration)
         let mut arm_pulls: Vec<u64> = vec![0; num_arms];
@@ -91,11 +91,25 @@ impl RestlessBanditBenchmark {
                         // Recency: arms not pulled recently get extra bonus (stale estimates)
                         let staleness = (trial - arm_last_pull[i]) as f64;
                         let recency_bonus = (staleness / 10.0).min(0.5);
+                        // Uncertainty bonus (UCB1-style): arms with fewer pulls have
+                        // higher uncertainty about their true value. This implements
+                        // the upper confidence bound principle (Auer et al. 2002,
+                        // Machine Learning): the exploration bonus scales as
+                        // 1/sqrt(n+1), encouraging sampling of under-explored arms.
+                        // In restless bandits, this is particularly important because
+                        // arm values drift, so infrequently-sampled arms have both
+                        // estimation noise AND stale-value uncertainty.
+                        let uncertainty_bonus = 1.0 / ((arm_pulls[i] as f64 + 1.0).sqrt());
                         // Time pressure: base UCB scale 0.12 (reduced from 0.15); lower exploration
                         // bonus improves exploitation, raising overall_accuracy toward the 0.75 human
                         // baseline (Daw et al., 2006 restless bandit). +0.10/unit inflates under deadline.
                         let ucb_scale = 0.12 + config.time_pressure * 0.10;
-                        (i, ema + count_bonus * ucb_scale + recency_bonus * 0.1)
+                        (
+                            i,
+                            ema + count_bonus * ucb_scale
+                                + recency_bonus * 0.1
+                                + uncertainty_bonus * 0.08,
+                        )
                     })
                     .max_by(|(_, a), (_, b)| a.total_cmp(b))
                     .map(|(i, _)| i)
