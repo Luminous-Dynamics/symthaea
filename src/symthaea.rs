@@ -3403,7 +3403,6 @@ impl Symthaea {
         // The dispatch loop still provides timeout tracking and outcome routing.
         //
         // Bridge between GovernanceDispatchCommand (mycelix_bridge) and DispatchCommand (conductor).
-        // These are structurally identical but separate types to avoid circular deps.
         use symthaea_mycelix_conductor::DispatchCommand;
         let (cmd_tx, cmd_rx) = std::sync::mpsc::sync_channel::<DispatchCommand>(64);
         let (outcome_tx, mut outcome_rx) = tokio::sync::mpsc::channel(64);
@@ -3414,13 +3413,37 @@ impl Symthaea {
             use crate::consciousness::mycelix_bridge::GovernanceDispatchCommand as GDC;
             while let Ok(gdc) = rx.recv() {
                 let dc = match gdc {
-                    GDC::SubmitProposal { correlation_id, description, proposer_did, consciousness_phi, alignment_score } =>
-                        DispatchCommand::SubmitProposal { correlation_id, description, proposer_did, consciousness_phi, alignment_score },
-                    GDC::CastVote { correlation_id, proposal_id, voter_did, approve, rationale } =>
-                        DispatchCommand::CastVote { correlation_id, proposal_id, voter_did, approve, rationale },
+                    GDC::SubmitProposal {
+                        correlation_id,
+                        description,
+                        proposer_did,
+                        consciousness_phi,
+                        alignment_score,
+                    } => DispatchCommand::SubmitProposal {
+                        correlation_id,
+                        description,
+                        proposer_did,
+                        consciousness_phi,
+                        alignment_score,
+                    },
+                    GDC::CastVote {
+                        correlation_id,
+                        proposal_id,
+                        voter_did,
+                        approve,
+                        rationale,
+                    } => DispatchCommand::CastVote {
+                        correlation_id,
+                        proposal_id,
+                        voter_did,
+                        approve,
+                        rationale,
+                    },
                     GDC::QueryActiveProposals => DispatchCommand::QueryActiveProposals,
                 };
-                if cmd_tx.send(dc).is_err() { break; }
+                if cmd_tx.send(dc).is_err() {
+                    break;
+                }
             }
         });
 

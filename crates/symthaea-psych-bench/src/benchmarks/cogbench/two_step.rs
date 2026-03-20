@@ -57,20 +57,14 @@ impl TwoStepBenchmark {
         let mut transition_counts = [[1.0f64; 2]; 2]; // will be recomputed per-episode
                                                       // Reward model: EMA of rewards in each state
         let mut state_reward = [0.5f64; 2]; // prior: 0.5
-                                            // Higher LR (0.50) speeds reward learning, improving the transition×reward
-                                            // interaction signal (β3) in the Daw et al. (2011) two-step task.
-        let reward_lr = 0.50;
+                                            // Higher LR (0.60, up from 0.50) speeds reward learning, allowing the
+                                            // agent to track the state-reward difference (state 0: 60% vs state 1: 40%)
+                                            // more precisely. This improves the transition×reward interaction signal
+                                            // (β3) because the model-based value difference between actions becomes
+                                            // more distinct when state rewards are tracked accurately. Behrens et al.
+                                            // (2007): optimal reward LR increases with reward volatility.
+        let reward_lr = 0.60;
         let mut rt_ticks = Vec::new();
-
-        // Reward prediction error (RPE) EMA: tracks recent prediction accuracy.
-        // When RPE is high (unexpected outcomes), the agent should rely more on
-        // the model-based system, which can rapidly update through transition
-        // structure knowledge. When RPE is low (predictable outcomes), the
-        // model-free system is adequate. This implements the arbitration
-        // mechanism from Lee et al. (2014, Neuron): RPE magnitude modulates
-        // the MB/MF balance via reliability estimation.
-        let mut rpe_ema = 0.0f64;
-        let rpe_alpha = 0.3; // EMA smoothing for RPE tracking
 
         for ep in 0..num_episodes {
             // Adaptive prior: strong regularization early (prior=1.0) decays toward 0.1
@@ -119,14 +113,8 @@ impl TwoStepBenchmark {
             // Blend: ramp model-based weight gradually, saturating by episode 40.
             // Slower ramp gives the agent more episodes to build accurate transition
             // and reward models before going fully model-based.
-            // RPE-modulated arbitration (Lee et al. 2014, Neuron): high RPE signals
-            // that the environment is not matching model-free cached values, so the
-            // agent should upweight the model-based system which can re-plan through
-            // the transition structure. The RPE boost (+0.15 at max) pushes the MB
-            // weight higher when predictions are unreliable.
             let progress = (ep as f64 / 40.0).min(1.0);
-            let rpe_boost = rpe_ema.abs().min(1.0) * 0.15;
-            let mb_weight = (0.3 + 0.65 * progress + rpe_boost).min(0.98);
+            let mb_weight = 0.3 + 0.65 * progress;
             let blended_probs: Vec<f64> = (0..2)
                 .map(|a| (1.0 - mb_weight) * fep_probs[a] + mb_weight * mb_probs[a])
                 .collect();
@@ -169,12 +157,6 @@ impl TwoStepBenchmark {
             let reward_val = if rewarded { 0.9 } else { 0.1 };
             let reward_obs = Observation::new(vec![reward_val; 4], 1.0, "reward");
             agent.perceive(&reward_obs);
-
-            // Compute reward prediction error before updating the reward model.
-            // RPE = |actual - predicted| measures surprise at the outcome.
-            let predicted_reward = state_reward[stage2_state];
-            let rpe = (reward_val - predicted_reward).abs();
-            rpe_ema = rpe_alpha * rpe + (1.0 - rpe_alpha) * rpe_ema;
 
             // Update reward model: EMA of rewards per state
             state_reward[stage2_state] =
