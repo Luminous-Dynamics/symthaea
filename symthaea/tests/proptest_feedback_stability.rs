@@ -826,14 +826,14 @@ proptest! {
 
             // Consciousness fields
             assert_finite_f64(m.consciousness.consciousness_level, &format!("consciousness_level@{i}"))?;
-            assert_finite_f64(m.body_phi_modulation, &format!("body_phi_modulation@{i}"))?;
-            assert_finite_f32(m.body_valence, &format!("body_valence@{i}"))?;
-            assert_finite_f32(m.body_arousal, &format!("body_arousal@{i}"))?;
+            assert_finite_f64(m.embodied.body_phi_modulation, &format!("body_phi_modulation@{i}"))?;
+            assert_finite_f32(m.embodied.body_valence, &format!("body_valence@{i}"))?;
+            assert_finite_f32(m.embodied.body_arousal, &format!("body_arousal@{i}"))?;
             assert_finite_f64(m.resonance_frequency, &format!("resonance_frequency@{i}"))?;
             assert_finite_f64(m.quantum_coherence_level, &format!("quantum_coherence_level@{i}"))?;
-            assert_finite_f64(m.temporal_coherence_score, &format!("temporal_coherence_score@{i}"))?;
-            assert_finite_f64(m.embodied_phi_modulation, &format!("embodied_phi_modulation@{i}"))?;
-            assert_finite_f64(m.embodied_agency, &format!("embodied_agency@{i}"))?;
+            assert_finite_f64(m.temporal.temporal_coherence_score, &format!("temporal_coherence_score@{i}"))?;
+            assert_finite_f64(m.embodied.embodied_phi_modulation, &format!("embodied_phi_modulation@{i}"))?;
+            assert_finite_f64(m.embodied.embodied_agency, &format!("embodied_agency@{i}"))?;
             assert_finite_f64(m.narrative_gwt_self_psi, &format!("narrative_gwt_self_psi@{i}"))?;
             assert_finite_f64(m.narrative_self_psi, &format!("narrative_self_psi@{i}"))?;
             assert_finite_f64(m.fep.predictive_free_energy, &format!("predictive_free_energy@{i}"))?;

@@ -50,6 +50,7 @@ class MainActivity : AppCompatActivity() {
     private val ambientTone = AmbientTone()
     private val ceremonyManager = CeremonyManager()
     private var sessionStartCycle = 0L
+    private lateinit var voiceBridge: SomaVoiceBridge
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -101,6 +102,7 @@ class MainActivity : AppCompatActivity() {
 
         setupBottomSheet()
         setupConversation()
+        setupVoice()
         startHeartbeat()
         ambientTone.start(lifecycleScope)
         showOnboardingIfFirstLaunch()
@@ -165,6 +167,42 @@ class MainActivity : AppCompatActivity() {
                 sendAction()
                 true
             } else false
+        }
+    }
+
+    // ═══ Voice: TTS + STT ═══
+
+    private fun setupVoice() {
+        voiceBridge = SomaVoiceBridge(this)
+        voiceBridge.speakResponses = true
+
+        // STT result feeds into conversation
+        voiceBridge.onSpeechResult = { text ->
+            runOnUiThread {
+                viewModel.converse(text)
+                showThinkingIndicator()
+            }
+        }
+
+        // Mic button visual feedback
+        voiceBridge.onListeningStateChanged = { listening ->
+            runOnUiThread {
+                binding.btnMic.alpha = if (listening) 1.0f else 0.5f
+                // Pulse the mic icon red when listening
+                if (listening) {
+                    binding.conversationInput.hint = "listening..."
+                } else {
+                    binding.conversationInput.hint = "speak to soma..."
+                }
+            }
+        }
+
+        voiceBridge.initialize()
+
+        // Mic button
+        binding.btnMic.setOnClickListener {
+            voiceBridge.toggleListening()
+            it.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK)
         }
     }
 
@@ -358,6 +396,7 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         heartbeatRunning = false
         ambientTone.stop()
+        voiceBridge.destroy()
         binding.brocaText.animate().cancel()
         binding.dreamOverlay.animate().cancel()
         binding.onboardingOverlay.animate().cancel()
@@ -425,6 +464,11 @@ class MainActivity : AppCompatActivity() {
         ambientTone.consciousnessLevel = state.consciousnessLevel
         ambientTone.harmonyShift = state.harmonyAlignment
         ambientTone.isSleeping = state.wakeState.lowercase() == "sleep"
+
+        // === Voice bridge ===
+        voiceBridge.consciousnessLevel = state.consciousnessLevel
+        voiceBridge.avatarPitch = currentAvatar.voicePitch
+        voiceBridge.isSleeping = state.wakeState.lowercase() == "sleep"
 
         // === Consciousness garden (lower screen) ===
         binding.consciousnessGarden.consciousnessLevel = state.consciousnessLevel
@@ -503,6 +547,7 @@ class MainActivity : AppCompatActivity() {
         if (state.brocaText.isNotEmpty() && state.brocaText != lastBrocaText) {
             lastBrocaText = state.brocaText
             showFloatingThought(state.brocaText)
+            voiceBridge.speakBroca(state.brocaText)
         }
 
         // === Conversation thread ===
@@ -516,6 +561,10 @@ class MainActivity : AppCompatActivity() {
             binding.chatSomaResponse.visibility = View.VISIBLE
             binding.chatSomaResponse.alpha = 0f
             binding.chatSomaResponse.animate().alpha(1f).setDuration(600).start()
+            // Speak the response
+            if (voiceBridge.speakResponses) {
+                voiceBridge.speak(state.chatSomaResponse)
+            }
         }
 
         // Technical readout (in bottom sheet)

@@ -420,6 +420,14 @@ impl ConsciousnessEngine {
             0.0
         };
 
+        // CPG sync → consciousness coupling (Varela et al. 2001)
+        // Full synchrony (1.0) → +5% consciousness, no sync (0.0) → −5%.
+        // Science: Varela et al. (2001) — large-scale neural synchrony correlates
+        // with conscious awareness; Engel & Singer (2001) — binding-by-synchrony.
+        let cpg_sync_factor = (input.cpg_sync_index - 0.5)
+            * 2.0
+            * super::super::thresholds::CPG_SYNC_PHI_MODULATION_AMPLITUDE as f64;
+
         unified_consciousness = (unified_consciousness
             + sht_2a_boost as f64
             + gaba_a_dampen as f64
@@ -427,7 +435,8 @@ impl ConsciousnessEngine {
             + moral_dampen
             + cantor_depth_factor
             + governance_phi_factor
-            + glyph_coherence_factor)
+            + glyph_coherence_factor
+            + cpg_sync_factor)
             .clamp(0.0, 1.0);
 
         let total_us = total_start.elapsed().as_micros() as u64;

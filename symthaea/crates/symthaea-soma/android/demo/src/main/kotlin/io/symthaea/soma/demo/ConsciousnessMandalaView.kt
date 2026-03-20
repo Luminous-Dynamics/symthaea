@@ -236,7 +236,40 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
             fillPaint.shader = null
         }
 
-        // === Sacred geometry: Flower of Life + Golden Spiral ===
+        // === Fractal overlay: rendered on background thread ===
+        // Drawn BEFORE sacred geometry so geometry is visible on top
+        // Schedule async render when consciousness changes or periodically
+        if (!fractalRendering &&
+            (abs(consciousnessLevel - fractalConsciousness) > 0.005f || fractalRef.get() == null || frameCount % 60 == 0)
+        ) {
+            fractalRendering = true
+            val cl = consciousnessLevel
+            val nm0 = neuromodulators[0]; val nm1 = neuromodulators[1]
+            val fhr = hr; val fhg = hg; val fhb = hb
+            fractalHandler.post {
+                val bmp = renderJuliaSet(cl, fhr, fhg, fhb, nm0, nm1)
+                fractalRef.set(bmp)
+                fractalConsciousness = cl
+                fractalRendering = false
+                postInvalidate()  // Request redraw from background thread
+            }
+        }
+        fractalRef.get()?.let { bmp ->
+            // Reduced alpha so sacred geometry shows through on top
+            val fractalAlphaCap = if (consciousnessLevel > 0.8f) 180 else 140
+            fractalPaint.alpha = (60 + consciousnessLevel * 80).toInt().coerceIn(50, fractalAlphaCap)
+            val fractalRadius = mandalaRadius * 1.6f * breathScale
+            val dst = RectF(
+                cx - fractalRadius, cy - fractalRadius,
+                cx + fractalRadius, cy + fractalRadius
+            )
+            canvas.save()
+            canvas.rotate(fractalRotation, cx, cy)
+            canvas.drawBitmap(bmp, null, dst, fractalPaint)
+            canvas.restore()
+        }
+
+        // === Sacred geometry ON TOP of fractal ===
         drawSacredGeometry(canvas, cx, cy, mandalaRadius * breathScale, hr, hg, hb)
 
         // === Interference rings (pre-allocated Path objects) ===
@@ -255,7 +288,7 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
             canvas.save()
             canvas.rotate(rotOffset, cx, cy)
             val path = ringPaths[i]
-            path.reset()  // Reuse, don't allocate
+            path.reset()
             for (s in 0..72) {
                 val angle = (s.toFloat() / 72) * 2 * PI.toFloat()
                 val deform = 1f + 0.03f * sin(angle * 3 + neuromodulators[0] * 10) *
@@ -266,37 +299,6 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
             }
             path.close()
             canvas.drawPath(path, glowPaint)
-            canvas.restore()
-        }
-
-        // === Fractal overlay: rendered on background thread ===
-        // Schedule async render when consciousness changes or periodically
-        if (!fractalRendering &&
-            (abs(consciousnessLevel - fractalConsciousness) > 0.005f || fractalRef.get() == null || frameCount % 60 == 0)
-        ) {
-            fractalRendering = true
-            val cl = consciousnessLevel
-            val nm0 = neuromodulators[0]; val nm1 = neuromodulators[1]
-            val fhr = hr; val fhg = hg; val fhb = hb
-            fractalHandler.post {
-                val bmp = renderJuliaSet(cl, fhr, fhg, fhb, nm0, nm1)
-                fractalRef.set(bmp)
-                fractalConsciousness = cl
-                fractalRendering = false
-                postInvalidate()  // Request redraw from background thread
-            }
-        }
-        fractalRef.get()?.let { bmp ->
-            val fractalAlphaCap = if (consciousnessLevel > 0.8f) 220 else 200
-            fractalPaint.alpha = (100 + consciousnessLevel * 100).toInt().coerceIn(80, fractalAlphaCap)
-            val fractalRadius = mandalaRadius * 1.6f * breathScale
-            val dst = RectF(
-                cx - fractalRadius, cy - fractalRadius,
-                cx + fractalRadius, cy + fractalRadius
-            )
-            canvas.save()
-            canvas.rotate(fractalRotation, cx, cy)
-            canvas.drawBitmap(bmp, null, dst, fractalPaint)
             canvas.restore()
         }
 

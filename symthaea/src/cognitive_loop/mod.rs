@@ -203,8 +203,15 @@ pub use managers::{
     CompressedDelta, NetworkHealth, PayloadClass, PayloadClassifier, RadioTier, RoutingDecision,
     SpectrumManager, SpectrumObservation, SpectrumTelemetry,
 };
+#[cfg(feature = "mesh")]
+pub use managers::radio_dispatcher::{
+    ConsciousRoutingDecision, ConsciousnessAwareRouter, DiscoveryBeacon,
+    OfflineExperience, OfflineExperienceKind, StoreAndForward, ThreatObservation,
+};
 
 pub mod calibration;
+#[cfg(feature = "mathematics")]
+pub mod math_epistemic;
 #[cfg(feature = "mathematics")]
 pub mod math_service;
 

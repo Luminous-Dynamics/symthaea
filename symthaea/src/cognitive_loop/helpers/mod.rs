@@ -176,7 +176,7 @@ impl CognitiveLoopService {
         }
 
         // 11. Update error history — capacity bound: 100 elements, evict before push
-        if self.error_history.len() >= 100 {
+        if self.error_history.len() >= super::thresholds::ERROR_HISTORY_CAPACITY {
             self.error_history.pop_front();
         }
         self.error_history.push_back(prediction_error);
@@ -495,7 +495,7 @@ impl CognitiveLoopService {
             self.stats.avg_prediction_error_sq * (1.0 - alpha) + (error * error) * alpha;
 
         // Error trend — capacity bound: 100 elements, evict before push
-        if self.error_history.len() >= 100 {
+        if self.error_history.len() >= super::thresholds::ERROR_HISTORY_CAPACITY {
             self.error_history.pop_front();
         }
         self.error_history.push_back(error);

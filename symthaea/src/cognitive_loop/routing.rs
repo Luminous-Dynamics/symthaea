@@ -40,6 +40,19 @@ pub enum CodeTaskType {
     None,
 }
 
+impl CodeTaskType {
+    /// String representation for telemetry and logging.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Create => "Create",
+            Self::Debug => "Debug",
+            Self::Refactor => "Refactor",
+            Self::Explain => "Explain",
+            Self::None => "None",
+        }
+    }
+}
+
 /// Detects whether natural language input is a code-related task
 ///
 /// Uses keyword-based heuristics to classify input text as code tasks
@@ -706,5 +719,82 @@ mod tests {
             bp_high, threshold_depth,
             "BP routing should agree with threshold routing for extreme high inputs"
         );
+    }
+
+    #[test]
+    fn test_code_task_detector_create() {
+        let detector = CodeTaskDetector::new();
+        let (is_code, conf) = detector.detect("implement a function to sort arrays");
+        assert!(is_code, "Should detect code task");
+        assert!(conf > 0.0, "Confidence should be positive");
+        assert_eq!(detector.detect_task_type("implement a function"), CodeTaskType::Create);
+    }
+
+    #[test]
+    fn test_code_task_detector_debug() {
+        let detector = CodeTaskDetector::new();
+        assert_eq!(detector.detect_task_type("fix the bug in parser"), CodeTaskType::Debug);
+        assert_eq!(detector.detect_task_type("debug the crash"), CodeTaskType::Debug);
+    }
+
+    #[test]
+    fn test_code_task_detector_refactor() {
+        let detector = CodeTaskDetector::new();
+        assert_eq!(detector.detect_task_type("refactor the module"), CodeTaskType::Refactor);
+        assert_eq!(detector.detect_task_type("optimize the algorithm"), CodeTaskType::Refactor);
+    }
+
+    #[test]
+    fn test_code_task_detector_explain() {
+        let detector = CodeTaskDetector::new();
+        assert_eq!(detector.detect_task_type("explain how the function works"), CodeTaskType::Explain);
+        assert_eq!(detector.detect_task_type("what is a struct in rust"), CodeTaskType::Explain);
+    }
+
+    #[test]
+    fn test_code_task_detector_none() {
+        let detector = CodeTaskDetector::new();
+        let (is_code, _) = detector.detect("hello how are you today");
+        assert!(!is_code, "Should not detect code task in greeting");
+        assert_eq!(detector.detect_task_type("tell me about the weather"), CodeTaskType::None);
+    }
+
+    #[test]
+    fn test_code_task_as_str() {
+        assert_eq!(CodeTaskType::Create.as_str(), "Create");
+        assert_eq!(CodeTaskType::Debug.as_str(), "Debug");
+        assert_eq!(CodeTaskType::Refactor.as_str(), "Refactor");
+        assert_eq!(CodeTaskType::Explain.as_str(), "Explain");
+        assert_eq!(CodeTaskType::None.as_str(), "None");
+    }
+
+    #[test]
+    fn test_thalamic_router_route_from_cycle() {
+        use crate::dynamics::temporal_signatures::ConsciousnessPattern;
+        let mut router = ThalamicRouter::new();
+        // Low error + resting pattern + neutral valence → Reflex
+        let depth = router.route_from_cycle(0.05, ConsciousnessPattern::Resting, 0.0);
+        assert_eq!(depth, CognitiveDepth::Reflex);
+        // High error + exploratory pattern → deeper routing
+        let depth = router.route_from_cycle(0.9, ConsciousnessPattern::Exploratory, 0.5);
+        assert!(depth != CognitiveDepth::Reflex, "High error should not route to Reflex");
+    }
+
+    #[test]
+    fn test_thalamic_router_routing_stats() {
+        let mut router = ThalamicRouter::new();
+        // Generate routing history
+        router.route(0.01, 0.01, 0.01, 0.0); // Reflex
+        router.route(0.5, 0.5, 0.5, 0.0);    // Cortical
+        router.route(0.95, 0.95, 0.95, 0.9);  // DeepThought
+        let (reflex_rate, cortical_rate, deep_rate) = router.routing_stats();
+        assert!(reflex_rate + cortical_rate + deep_rate > 0.0, "At least one rate should be nonzero");
+    }
+
+    #[test]
+    fn test_cognitive_depth_as_str() {
+        assert_eq!(CognitiveDepth::Reflex.as_str(), "Reflex");
+        assert_eq!(CognitiveDepth::Cortical.as_str(), "Cortical");
+        assert_eq!(CognitiveDepth::DeepThought.as_str(), "DeepThought");
     }
 }

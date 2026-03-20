@@ -803,7 +803,19 @@ fn evaluate_trial(
 
         // Base similarity: response (≈ optimal skill HV + noise) vs. candidate skill HV.
         // Optimal skill scores ~1 - noise_rate ≈ 0.85–0.95; all others score ~0.50.
-        let sim = response.similarity(&skill_hv) as f64;
+        let mut sim = response.similarity(&skill_hv) as f64;
+
+        // Skill confusion: same-stage non-optimal skills get a similarity boost,
+        // modeling how clinicians confuse related skills (e.g., reflection vs.
+        // interpretation). Hill (2009) notes this as a primary source of error.
+        if *skill != scenario.optimal_skill {
+            let confusion = if skill.stage() == scenario.optimal_skill.stage() {
+                0.15 * scenario.difficulty as f64 // same-stage: larger confusion
+            } else {
+                0.06 * scenario.difficulty as f64 // cross-stage: mild confusion
+            };
+            sim += confusion;
+        }
 
         // ── Context-based adjustments ──
 

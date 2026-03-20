@@ -152,6 +152,13 @@ pub(crate) struct ConsciousnessEngineInput<'a> {
     /// Defaults to 0.5 when meta_cognition is disabled (backward compat).
     pub hot_depth: f64,
 
+    // ── CPG sync → consciousness coupling (Varela et al. 2001) ────────
+    /// CPG oscillator synchronization index [0.0, 1.0].
+    /// Modulates unified consciousness ±5%: full sync → +5%, no sync → −5%.
+    /// Science: Varela et al. (2001) — large-scale neural synchrony correlates
+    /// with conscious awareness; Engel & Singer (2001) — binding-by-synchrony.
+    pub cpg_sync_index: f64,
+
     // ── Cantor metacognitive depth → consciousness coupling ─────────
     /// Self-similarity of the most recent GWT-promoted CRHV [0.0, 1.0].
     /// Higher values indicate richer fractal self-reference structure (strange loops).

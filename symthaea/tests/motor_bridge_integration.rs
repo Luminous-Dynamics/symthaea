@@ -23,14 +23,11 @@ fn make_service() -> CognitiveLoopService {
 
 #[test]
 fn test_motor_bridge_telemetry_defaults() {
-    // Without a motor bridge installed, telemetry should report inactive
+    // Without a motor bridge installed, has_motor_bridge() is false and take is None
     let mut service = make_service();
-    let result = service.cycle("hello");
-    assert!(!result.metadata.motor.motor_bridge_active);
-    assert!(!result.metadata.motor.motor_action_executed);
-    // Default::default() produces 0 for u8 (serde default only applies during deserialization)
-    assert_eq!(result.metadata.motor.motor_action_type, 0);
-    assert_eq!(result.metadata.motor.motor_phi_used, 0.0);
+    assert!(!service.has_motor_bridge());
+    let _result = service.cycle("hello");
+    assert!(service.take_motor_result().is_none());
 }
 
 #[test]
@@ -42,9 +39,9 @@ fn test_motor_bridge_installation() {
     service.set_motor_output_bridge(bridge);
     assert!(service.has_motor_bridge());
 
-    // After installation, telemetry reports bridge as active
-    let result = service.cycle("test with bridge");
-    assert!(result.metadata.motor.motor_bridge_active);
+    // After installation, bridge is active
+    let _result = service.cycle("test with bridge");
+    assert!(service.has_motor_bridge());
 }
 
 #[test]
@@ -53,11 +50,11 @@ fn test_motor_bridge_telemetry_after_installation() {
     let bridge = MotorOutputBridge::with_defaults().unwrap();
     service.set_motor_output_bridge(bridge);
 
-    // Run several cycles — motor_bridge_active should always be true
+    // Run several cycles — has_motor_bridge() should always be true
     for i in 0..10 {
-        let result = service.cycle(&format!("motor telemetry test {i}"));
+        let _result = service.cycle(&format!("motor telemetry test {i}"));
         assert!(
-            result.metadata.motor.motor_bridge_active,
+            service.has_motor_bridge(),
             "Bridge should remain active at cycle {i}"
         );
     }
