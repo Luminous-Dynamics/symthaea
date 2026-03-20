@@ -1,5 +1,5 @@
-use super::CodingAgent;
 use super::types::*;
+use super::CodingAgent;
 use crate::coding_experience::CodingExperience;
 use crate::cognitive_loop::CycleResult;
 use crate::language::intelligent_dispatcher::BackendTier;
@@ -115,7 +115,10 @@ impl CodingAgent {
     }
 
     /// Extract consciousness signals from a cycle result for decision-making.
-    pub(crate) fn extract_consciousness_signals(&self, cycle_result: &CycleResult) -> ConsciousnessSignals {
+    pub(crate) fn extract_consciousness_signals(
+        &self,
+        cycle_result: &CycleResult,
+    ) -> ConsciousnessSignals {
         let prediction_error = 1.0 - self.cognitive_loop.prediction_confidence();
         let confidence_velocity = if self.prediction_error_history.len() >= 2 {
             let prev = self.prediction_error_history[self.prediction_error_history.len() - 1];
@@ -497,7 +500,9 @@ impl CodingAgent {
 
     /// Generate auto-curriculum lessons from accumulated failure patterns.
     #[cfg(feature = "school_learning")]
-    pub(crate) fn generate_lessons_from_failures(&self) -> Vec<crate::school::code_learning::CodeLesson> {
+    pub(crate) fn generate_lessons_from_failures(
+        &self,
+    ) -> Vec<crate::school::code_learning::CodeLesson> {
         let failures: Vec<(String, String, usize)> = self
             .failure_patterns
             .iter()

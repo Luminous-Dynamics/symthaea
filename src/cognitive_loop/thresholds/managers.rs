@@ -5,52 +5,52 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Minimum dose magnitude to queue a neuromod effect (prevents spurious micro-nudges).
-pub const GOV_NEUROMOD_FLOOR: f32 = 0.01;
+pub const GOV_NEUROMOD_FLOOR: f64 = 0.01;
 
 /// NE baseline nudge on EmergencyDeclared.
 /// Basis: Arnsten (2009) — acute stress NE surge for vigilance.
-pub const GOV_EMERGENCY_NE_NUDGE: f32 = 0.05;
+pub const GOV_EMERGENCY_NE_NUDGE: f64 = 0.05;
 
 /// Oxytocin injection dose per ReciprocityPledge.
 /// Basis: Zak (2012) — reciprocity → oxytocin for social bonding.
-pub const GOV_RECIPROCITY_OXY_DOSE: f32 = 0.02;
+pub const GOV_RECIPROCITY_OXY_DOSE: f64 = 0.02;
 
 /// Maximum cumulative oxytocin from reciprocity per cycle.
-pub const GOV_RECIPROCITY_OXY_CAP: f32 = 0.10;
+pub const GOV_RECIPROCITY_OXY_CAP: f64 = 0.10;
 
 /// Half-life (in cycles) for reciprocity oxytocin injection.
 pub const GOV_RECIPROCITY_OXY_HALFLIFE: u32 = 40;
 
 /// NE baseline nudge for self-involved JusticeDispute.
 /// Basis: Sapolsky (2004) — personal conflict → cortisol proxy.
-pub const GOV_DISPUTE_NE_NUDGE: f32 = 0.03;
+pub const GOV_DISPUTE_NE_NUDGE: f64 = 0.03;
 
 /// 5-HT baseline nudge for self-involved JusticeDispute (negative = dip).
 /// Basis: Sapolsky (2004) — stress → serotonin suppression.
-pub const GOV_DISPUTE_SHT_NUDGE: f32 = -0.02;
+pub const GOV_DISPUTE_SHT_NUDGE: f64 = -0.02;
 
 /// DA phasic injection dose on aligned pass.
 /// Basis: Schultz (1997) — reward prediction confirmation → phasic dopamine.
-pub const GOV_ALIGNED_PASS_DA_DOSE: f32 = 0.10;
+pub const GOV_ALIGNED_PASS_DA_DOSE: f64 = 0.10;
 
 /// Half-life (in cycles) for aligned-pass DA injection.
 pub const GOV_ALIGNED_PASS_DA_HALFLIFE: u32 = 20;
 
 /// DA baseline nudge on aligned fail (negative = dip).
 /// Basis: Schultz (1997) — reward prediction error → dopamine suppression.
-pub const GOV_ALIGNED_FAIL_DA_NUDGE: f32 = -0.02;
+pub const GOV_ALIGNED_FAIL_DA_NUDGE: f64 = -0.02;
 
 /// 5-HT baseline nudge on negative reputation change.
 /// Basis: Crockett (2009) — social rejection → serotonin dip.
-pub const GOV_REPUTATION_DECLINE_SHT: f32 = -0.02;
+pub const GOV_REPUTATION_DECLINE_SHT: f64 = -0.02;
 
 /// 5-HT baseline nudge on positive reputation change.
 /// Basis: Crockett (2009) — social approval → serotonin boost (symmetric with decline).
-pub const GOV_REPUTATION_GAIN_SHT: f32 = 0.02;
+pub const GOV_REPUTATION_GAIN_SHT: f64 = 0.02;
 
 /// ECB baseline nudge on high collective Phi (>0.5).
 /// Group coherence → endocannabinoid system activation.
-pub const GOV_COLLECTIVE_PHI_ECB: f32 = 0.01;
+pub const GOV_COLLECTIVE_PHI_ECB: f64 = 0.01;
 
 /// Collective Phi → consciousness modulation strength (±2%).
 /// High collective Phi boosts unified consciousness via social integration.
@@ -115,7 +115,7 @@ pub const GOV_FRAGILE_CONSENSUS_EXPLORE: f64 = 0.05;
 pub const GOV_HIGH_PHI_VOTER_CONFIDENCE: f64 = 0.005;
 
 /// Arousal delta on emergency declaration.
-pub const GOV_EMERGENCY_AROUSAL: f32 = 0.1;
+pub const GOV_EMERGENCY_AROUSAL: f64 = 0.1;
 
 /// Exploration suppression during emergency.
 pub const GOV_EMERGENCY_EXPLORE_SUPPRESS: f64 = 0.1;
@@ -141,21 +141,21 @@ pub const GOV_COMMUNITY_HARMONIC_BIAS: f64 = 0.005;
 
 /// Boredom increment per low-error cycle (linear ramp to MAX_BOREDOM).
 /// Basis: Berlyne (1960) — arousal potential theory; monotony → exploration drive.
-pub const DRIVE_BOREDOM_INCREMENT: f32 = 0.03;
+pub const DRIVE_BOREDOM_INCREMENT: f64 = 0.03;
 
 /// Boredom level that triggers exploration boost.
 /// Basis: Berlyne (1960) — above this, boredom generates exploration urge.
-pub const DRIVE_BOREDOM_EXPLORATION_THRESHOLD: f32 = 0.3;
+pub const DRIVE_BOREDOM_EXPLORATION_THRESHOLD: f64 = 0.3;
 
 /// Boredom→exploration coupling scale.
 pub const DRIVE_BOREDOM_EXPLORATION_SCALE: f64 = 0.1;
 
 /// Minimum arousal for flow state (below this, system is disengaged).
 /// Basis: Csikszentmihalyi (1990) — flow requires optimal arousal.
-pub const DRIVE_FLOW_AROUSAL_MIN: f32 = 0.3;
+pub const DRIVE_FLOW_AROUSAL_MIN: f64 = 0.3;
 
 /// Maximum arousal for flow state (above this, system is over-stimulated).
-pub const DRIVE_FLOW_AROUSAL_MAX: f32 = 0.8;
+pub const DRIVE_FLOW_AROUSAL_MAX: f64 = 0.8;
 
 /// Flow→learning rate boost scale.
 /// Basis: Csikszentmihalyi (1990) — peak plasticity during flow.
@@ -168,24 +168,24 @@ pub const DRIVE_FLOW_EXPLORATION_DAMPEN: f64 = 0.05;
 pub const DRIVE_FLOW_CONFIDENCE_BOOST: f64 = 0.01;
 
 /// Boredom reset factor when entering flow.
-pub const DRIVE_FLOW_BOREDOM_RESET: f32 = 0.5;
+pub const DRIVE_FLOW_BOREDOM_RESET: f64 = 0.5;
 
 /// Surprise→exploration coupling scale (positive PE excess drives exploration).
 /// Basis: Yerkes-Dodson (1908) — moderate arousal optimal for exploration.
 pub const DRIVE_SURPRISE_EXPLORATION_SCALE: f64 = 0.15;
 
 /// Surprise→arousal coupling scale.
-pub const DRIVE_SURPRISE_AROUSAL_SCALE: f32 = 0.05;
+pub const DRIVE_SURPRISE_AROUSAL_SCALE: f64 = 0.05;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PERCEPTION MANAGER — ATTENTION BUDGET & COHERENCE
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// EMA decay for attention budget utilization tracking.
-pub const PERCEPTION_BUDGET_EMA_DECAY: f32 = 0.8;
+pub const PERCEPTION_BUDGET_EMA_DECAY: f64 = 0.8;
 
 /// EMA weight for new budget utilization data (1 - decay).
-pub const PERCEPTION_BUDGET_EMA_NEW: f32 = 0.2;
+pub const PERCEPTION_BUDGET_EMA_NEW: f64 = 0.2;
 
 /// Exploration reduction when attention budget consistently exceeded.
 pub const PERCEPTION_BUDGET_EXPLORATION_DAMPEN: f64 = 0.02;
@@ -202,13 +202,13 @@ pub const PERCEPTION_COHERENCE_EXPLORATION_SCALE: f64 = 0.02;
 
 /// Arousal correction gain (Yerkes-Dodson homeostasis).
 /// Basis: Yerkes & Dodson (1908) — inverted-U performance curve.
-pub const PERCEPTION_AROUSAL_CORRECTION_GAIN: f32 = 0.03;
+pub const PERCEPTION_AROUSAL_CORRECTION_GAIN: f64 = 0.03;
 
 /// Vigilance mode attention amplification factor.
-pub const PERCEPTION_VIGILANCE_AMPLIFY: f32 = 1.2;
+pub const PERCEPTION_VIGILANCE_AMPLIFY: f64 = 1.2;
 
 /// Vigilance exit attention recovery factor.
-pub const PERCEPTION_VIGILANCE_RECOVERY: f32 = 0.9;
+pub const PERCEPTION_VIGILANCE_RECOVERY: f64 = 0.9;
 
 /// Phenomenal binding→confidence modulation scale.
 /// Basis: Treisman & Gelade (1980) — feature integration theory.
@@ -220,10 +220,10 @@ pub const PERCEPTION_BINDING_CONFIDENCE_SCALE: f64 = 0.01;
 
 /// Surprise threshold above which plasticity increases.
 /// Basis: BCM metaplasticity (Bienenstock, Cooper & Munro 1982).
-pub const LEARNING_PLASTICITY_HIGH_SURPRISE: f32 = 0.3;
+pub const LEARNING_PLASTICITY_HIGH_SURPRISE: f64 = 0.3;
 
 /// Surprise threshold below which plasticity decreases.
-pub const LEARNING_PLASTICITY_LOW_SURPRISE: f32 = 0.1;
+pub const LEARNING_PLASTICITY_LOW_SURPRISE: f64 = 0.1;
 
 /// LR modulation floor (minimum learning rate multiplier from plasticity).
 pub const LEARNING_LR_FLOOR: f64 = 0.8;
@@ -267,34 +267,34 @@ pub const LEARNING_SOMATIC_STRESS_SENSITIVITY: f64 = 0.2;
 
 /// Oxytocin dose per √(connected_peers). Diminishing returns via sqrt.
 /// Basis: Zak (2012) — social bonding → oxytocin release.
-pub const SWARM_OXY_PER_SQRT_PEER: f32 = 0.02;
+pub const SWARM_OXY_PER_SQRT_PEER: f64 = 0.02;
 
 /// Maximum oxytocin dose from peer bonding (caps sqrt scaling).
-pub const SWARM_OXY_CAP: f32 = 0.08;
+pub const SWARM_OXY_CAP: f64 = 0.08;
 
 /// Oxytocin injection half-life (cycles) for peer bonding signal.
 pub const SWARM_OXY_HALFLIFE: u32 = 60;
 
 /// NE baseline nudge multiplier per anomaly (capped at 3 anomalies).
 /// Basis: Arnsten (2009) — network disruption → noradrenergic alarm.
-pub const SWARM_ANOMALY_NE_MULT: f32 = 0.03;
+pub const SWARM_ANOMALY_NE_MULT: f64 = 0.03;
 
 /// Maximum NE nudge from network anomalies.
-pub const SWARM_ANOMALY_NE_CAP: f32 = 0.09;
+pub const SWARM_ANOMALY_NE_CAP: f64 = 0.09;
 
 /// 5-HT gain from peer Phi delta (mean_peer_phi - 0.5).
 /// Basis: Crockett (2009) — collective flourishing → serotonin (social satisfaction).
-pub const SWARM_PHI_SHT_GAIN: f32 = 0.04;
+pub const SWARM_PHI_SHT_GAIN: f64 = 0.04;
 
 /// Maximum 5-HT nudge from high collective Phi.
-pub const SWARM_PHI_SHT_CAP: f32 = 0.03;
+pub const SWARM_PHI_SHT_CAP: f64 = 0.03;
 
 /// DA gain from affective contagion intensity.
 /// Basis: Schultz (1997) — shared positive affect → dopaminergic reward.
-pub const SWARM_CONTAGION_DA_GAIN: f32 = 0.03;
+pub const SWARM_CONTAGION_DA_GAIN: f64 = 0.03;
 
 /// Maximum DA nudge from affective contagion.
-pub const SWARM_CONTAGION_DA_CAP: f32 = 0.04;
+pub const SWARM_CONTAGION_DA_CAP: f64 = 0.04;
 
 /// Minimum affective contagion to trigger DA modulation.
 pub const SWARM_CONTAGION_DA_THRESHOLD: f64 = 0.05;
@@ -350,21 +350,21 @@ pub const NEUROEVO_TOURNAMENT_SIZE: usize = 3;
 
 /// Default elitism fraction.
 /// De Jong (1975) — 10% elite preservation.
-pub const NEUROEVO_ELITISM_FRACTION: f32 = 0.1;
+pub const NEUROEVO_ELITISM_FRACTION: f64 = 0.1;
 
 /// Default per-bit mutation rate.
 /// Back (1993) — ~0.02 balances exploration and stability.
-pub const NEUROEVO_MUTATION_RATE: f32 = 0.02;
+pub const NEUROEVO_MUTATION_RATE: f64 = 0.02;
 
 /// Default crossover probability.
 /// Holland (1975) — 0.7 crossover rate for GA.
-pub const NEUROEVO_CROSSOVER_RATE: f32 = 0.7;
+pub const NEUROEVO_CROSSOVER_RATE: f64 = 0.7;
 
 /// Generations without improvement before convergence declared.
 pub const NEUROEVO_CONVERGENCE_PATIENCE: usize = 10;
 
 /// Hamming distance threshold for speciation.
-pub const NEUROEVO_SPECIATION_THRESHOLD: f32 = 0.15;
+pub const NEUROEVO_SPECIATION_THRESHOLD: f64 = 0.15;
 
 /// Manager trigger interval (co-prime with other managers).
 pub const NEUROEVO_MANAGER_INTERVAL: usize = 71;
@@ -391,13 +391,13 @@ pub const MEMORY_RETRIEVAL_COHERENCE_WEIGHT: f64 = 0.5;
 
 /// Retrieval quality threshold for confidence boost.
 /// Basis: Koriat (2000) — high-confidence retrieval signals reliable encoding.
-pub const MEMORY_RETRIEVAL_HIGH_QUALITY: f32 = 0.7;
+pub const MEMORY_RETRIEVAL_HIGH_QUALITY: f64 = 0.7;
 
 /// Confidence gain per unit of above-threshold retrieval quality.
 pub const MEMORY_RETRIEVAL_CONFIDENCE_GAIN: f64 = 0.02;
 
 /// Retrieval quality threshold below which exploration is boosted.
-pub const MEMORY_RETRIEVAL_LOW_QUALITY: f32 = 0.3;
+pub const MEMORY_RETRIEVAL_LOW_QUALITY: f64 = 0.3;
 
 /// Exploration gain per unit of below-threshold retrieval quality.
 pub const MEMORY_RETRIEVAL_EXPLORATION_GAIN: f64 = 0.03;
@@ -431,10 +431,10 @@ pub const SWARM_AFFECTIVE_AROUSAL_CENTER: f64 = 0.5;
 
 /// Per-corroboration confidence boost for shared knowledge.
 /// Basis: Surowiecki (2004) — wisdom of crowds via independent confirmation.
-pub const SWARM_CORROBORATION_BOOST: f32 = 0.05;
+pub const SWARM_CORROBORATION_BOOST: f64 = 0.05;
 
 /// Maximum corroboration confidence bonus.
-pub const SWARM_CORROBORATION_CAP: f32 = 0.3;
+pub const SWARM_CORROBORATION_CAP: f64 = 0.3;
 
 /// Maximum confidence delta from social buffering.
 /// Basis: Heinrichs (2003) — social support has diminishing returns.
@@ -477,14 +477,14 @@ pub const SWARM_ISOLATION_EXPLORATION_BOOST: f64 = 0.05;
 pub const TRUST_VIOLATION_SLASH_FACTOR: f64 = 0.5;
 
 /// Maximum arousal delta from trust violations (NE cap).
-pub const TRUST_VIOLATION_AROUSAL_CAP: f32 = 0.1;
+pub const TRUST_VIOLATION_AROUSAL_CAP: f64 = 0.1;
 
 /// Negative valence per violation event (betrayal penalty).
 /// Basis: Zak (2012) — cortisol-mediated aversive response.
-pub const TRUST_BETRAYAL_VALENCE_PENALTY: f32 = 0.02;
+pub const TRUST_BETRAYAL_VALENCE_PENALTY: f64 = 0.02;
 
 /// Arousal spike from trust anomaly detection.
-pub const TRUST_ANOMALY_AROUSAL: f32 = 0.03;
+pub const TRUST_ANOMALY_AROUSAL: f64 = 0.03;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SOCIAL FABRIC MANAGER — Resonance, diversity, echo-chamber detection
@@ -527,19 +527,19 @@ pub const TIME_DRIFT_SURPRISE_DIVISOR: f64 = 100.0;
 
 /// Arousal scaling for low-level threat (proportional vigilance).
 /// Basis: Aston-Jones & Cohen (2005) — LC-NE governs arousal/vigilance.
-pub const SENTINEL_AROUSAL_SCALE_NORMAL: f32 = 0.05;
+pub const SENTINEL_AROUSAL_SCALE_NORMAL: f64 = 0.05;
 
 /// Threat level threshold for moderate response (exploration dampening).
-pub const SENTINEL_THREAT_MODERATE: f32 = 0.3;
+pub const SENTINEL_THREAT_MODERATE: f64 = 0.3;
 
 /// Exploration dampening scale per unit of threat level.
 pub const SENTINEL_EXPLORATION_DAMPEN_SCALE: f64 = 0.1;
 
 /// Arousal scaling for moderate threat (heightened vigilance).
-pub const SENTINEL_AROUSAL_SCALE_HEIGHTENED: f32 = 0.08;
+pub const SENTINEL_AROUSAL_SCALE_HEIGHTENED: f64 = 0.08;
 
 /// Threat level threshold for critical response (confidence reduction).
-pub const SENTINEL_THREAT_CRITICAL: f32 = 0.6;
+pub const SENTINEL_THREAT_CRITICAL: f64 = 0.6;
 
 /// Confidence dampening scale per unit of critical threat level.
 /// Basis: epistemic caution under significant threat.

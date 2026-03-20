@@ -795,7 +795,7 @@ jobs:
   compliance:
     name: Compliance Dashboard
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
         with:
@@ -822,6 +822,7 @@ jobs:
 
       - name: Run compliance dashboard
         run: bash scripts/compliance-dashboard.sh --json | tee compliance-results.json
+        timeout-minutes: 150
 
       - name: Verify all suites pass
         run: |

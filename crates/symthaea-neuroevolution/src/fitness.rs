@@ -308,12 +308,18 @@ impl FepFitnessBridge {
     /// Evaluate a population in parallel using rayon.
     /// Each organism gets its own fitness bridge instance for thread safety.
     #[cfg(feature = "parallel")]
-    pub fn evaluate_population_parallel(&self, organisms: &mut [NeuralOrganism]) -> Vec<OrganismFitness> {
+    pub fn evaluate_population_parallel(
+        &self,
+        organisms: &mut [NeuralOrganism],
+    ) -> Vec<OrganismFitness> {
         use rayon::prelude::*;
-        organisms.par_iter_mut().map(|org| {
-            let mut local_bridge = FepFitnessBridge::new(self.config.clone());
-            local_bridge.evaluate(org)
-        }).collect()
+        organisms
+            .par_iter_mut()
+            .map(|org| {
+                let mut local_bridge = FepFitnessBridge::new(self.config.clone());
+                local_bridge.evaluate(org)
+            })
+            .collect()
     }
 
     /// Evaluate population using parallel if available, serial otherwise.

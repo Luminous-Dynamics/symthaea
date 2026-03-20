@@ -438,6 +438,43 @@
 
     </LinearLayout>
 
+    <!-- Holon desktop sync -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="4dp">
+
+        <EditText
+            android:id="@+id/holonHost"
+            android:layout_width="0dp"
+            android:layout_height="32dp"
+            android:layout_weight="1"
+            android:hint="desktop host (holon sync)"
+            android:textColor="#7A8B8F"
+            android:textColorHint="#334A5558"
+            android:textSize="10sp"
+            android:fontFamily="monospace"
+            android:background="@android:color/transparent"
+            android:paddingStart="4dp"
+            android:singleLine="true"
+            android:inputType="text" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnHolon"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:text="sync"
+            android:textColor="#FFB347"
+            android:textSize="9sp"
+            android:fontFamily="monospace"
+            android:minWidth="56dp"
+            app:rippleColor="#22FFB347" />
+
+    </LinearLayout>
+
 </LinearLayout>
 
 <!-- ═══ Onboarding overlay: shown on first launch ═══ -->

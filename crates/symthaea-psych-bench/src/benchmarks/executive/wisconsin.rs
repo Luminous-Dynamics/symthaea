@@ -105,12 +105,21 @@ impl WisconsinCardSortingBenchmark {
         let mut rt_ticks = Vec::new();
 
         // Explicit hypothesis testing: 3 rule confidences [color, shape, number]
-        let mut rule_confidence = [1.0f64, 0.0, 0.0]; // Start believing color
-                                                      // Encoding noise and time pressure degrade learning rates (impaired feedback)
+        // Start uncertain — agent must learn the rule from feedback (Milner 1963).
+        let mut rule_confidence = [0.34f64, 0.33, 0.33];
+
+        // Post-error slowing: after errors, exploration increases for a brief
+        // window (Rabbitt 1966; Dutilh et al. 2012). Countdown to 0.
+        let mut post_error_trials: u32 = 0;
+
+        // Encoding noise and time pressure degrade learning rates (impaired feedback)
         let noise = config.effective_noise();
         let lr_scale = 1.0 - noise * 0.6;
-        let lr_correct = 0.2 * lr_scale; // Moderate reinforcement (lower cap = less needed)
-        let lr_error = 0.8 * lr_scale; // Stronger error penalty for faster set-shifting
+        let lr_correct = 0.2 * lr_scale; // Moderate reinforcement
+                                         // Asymmetric learning: faster unlearning of old rule than learning of
+                                         // new rule (Monsell 2003: "switch cost asymmetry")
+        let lr_error_old = 0.9 * lr_scale; // Fast perseveration decay
+        let lr_error_new = 0.3 * lr_scale; // Slower new-rule acquisition
 
         let all_colors = [Color::Red, Color::Blue, Color::Green, Color::Yellow];
         let all_shapes = [Shape::Triangle, Shape::Circle, Shape::Square, Shape::Star];
@@ -158,12 +167,18 @@ impl WisconsinCardSortingBenchmark {
             let candidates = [match_by_color, match_by_shape, match_by_number];
 
             // Softmax over rule confidences for stochastic selection.
-            // Time pressure: gain 1.5 produces ~15% perseverative errors (Heaton, 1993 WCST norms);
-            // -0.8/unit flattens selection toward chance, modeling impaired set-shifting under SAT (Heitz, 2014).
+            // Post-error slowing: reduce gain (= more exploration) for 2 trials
+            // after an error (Rabbitt 1966; Dutilh et al. 2012).
+            let post_error_penalty = if post_error_trials > 0 { 0.4 } else { 0.0 };
             let diff_model = difficulty_model_for("Executive::WCST");
             // Time pressure AND encoding noise both flatten softmax selection
-            let softmax_gain = (1.5 - config.time_pressure * 1.2 - noise * 0.8).max(0.1)
-                * diff_model.temperature_multiplier(config.difficulty);
+            let softmax_gain =
+                (1.5 - config.time_pressure * 1.2 - noise * 0.8 - post_error_penalty).max(0.1)
+                    * diff_model.temperature_multiplier(config.difficulty);
+            // Decrement post-error counter
+            if post_error_trials > 0 {
+                post_error_trials -= 1;
+            }
             let max_conf = rule_confidence
                 .iter()
                 .cloned()
@@ -244,15 +259,17 @@ impl WisconsinCardSortingBenchmark {
                     non_perseverative_errors += 1;
                 }
                 consecutive_correct = 0;
+                // Trigger post-error slowing: 2 trials of increased exploration
+                // (Rabbitt 1966; Dutilh et al. 2012)
+                post_error_trials = 2;
 
-                // Multiplicative decay + additive penalty for faster switching.
-                // Halving the wrong hypothesis' confidence is faster than subtracting
-                // a fixed amount when confidence is high.
+                // Asymmetric learning: fast decay of wrong hypothesis (perseveration
+                // break), slow growth of alternatives (Monsell 2003).
                 rule_confidence[chosen_rule_idx] *= 0.4; // Rapid decay
-                rule_confidence[chosen_rule_idx] -= lr_error;
+                rule_confidence[chosen_rule_idx] -= lr_error_old;
                 for (i, c) in rule_confidence.iter_mut().enumerate() {
                     if i != chosen_rule_idx {
-                        *c += lr_error * 0.5;
+                        *c += lr_error_new * 0.5;
                     }
                 }
             }

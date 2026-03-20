@@ -71,6 +71,12 @@ impl IowaGamblingBenchmark {
         let somatic_alpha = 0.12 * fep_lr_multiplier; // Slightly faster than default (0.10)
         let loss_aversion = 2.6f32; // Slightly above K&T's 2.25
 
+        // Frequency-based learning: track loss frequency per deck (Damasio 1994).
+        // Humans use BOTH magnitude ("how much did I lose") AND frequency
+        // ("how often did I lose") to guide decisions.
+        let mut deck_loss_count: [u32; 4] = [0; 4];
+        let mut deck_outcome_count: [u32; 4] = [0; 4];
+
         let mut deck_draw_count = [0u32; 4];
         let mut block_net_scores = [0i32; 5]; // (C+D) - (A+B) per block
         let mut total_net_score = 0i32;
@@ -82,7 +88,11 @@ impl IowaGamblingBenchmark {
         for trial in 0..num_trials {
             let block = trial / 20;
 
-            // Blend HDC similarity with somatic marker for deck scoring
+            // Exploration-exploitation decay (Daw et al. 2006):
+            // Early trials explore broadly; later trials exploit learned values.
+            let explore_rate = 0.4 * (1.0 - trial as f64 / num_trials as f64);
+
+            // Blend HDC similarity, somatic marker, AND frequency signal
             let deck_scores: Vec<f32> = deck_hvs
                 .iter()
                 .enumerate()
@@ -96,16 +106,33 @@ impl IowaGamblingBenchmark {
                     // matching human learning curves (Bechara et al., 1994).
                     let somatic_weight =
                         (deck_draw_count[i] as f64 / (deck_draw_count[i] as f64 + 8.0)).min(0.60);
-                    let blended =
-                        (1.0 - somatic_weight) * hdc_score + somatic_weight * deck_somatic[i];
+
+                    // Frequency signal: loss frequency penalizes decks (Damasio 1994).
+                    // Deck A has 5/10 losses, Deck B has 1/10, Deck C has 5/10 (small),
+                    // Deck D has 1/10 (small). Frequency helps distinguish A (frequent
+                    // large losses) from D (infrequent small losses).
+                    let freq_penalty = if deck_outcome_count[i] > 0 {
+                        deck_loss_count[i] as f64 / deck_outcome_count[i] as f64
+                    } else {
+                        0.0
+                    };
+                    // Frequency weight grows with experience, saturates at 0.25
+                    let freq_weight = (deck_outcome_count[i] as f64
+                        / (deck_outcome_count[i] as f64 + 12.0))
+                        .min(0.25);
+
+                    let blended = (1.0 - somatic_weight - freq_weight) * hdc_score
+                        + somatic_weight * deck_somatic[i]
+                        - freq_weight * freq_penalty;
                     blended as f32
                 })
                 .collect();
 
             // Softmax selection — warm enough for human-like exploration noise.
+            // Exploration decay increases temperature early, decreases late.
             // Time pressure: base 0.55 matches ~60% advantageous deck preference (Bechara et al., 1994);
             // +0.25/unit captures somatic marker bypass under urgency (Damasio, 1996; Luce, 1986 RT model).
-            let temp = 0.55f32 + config.time_pressure as f32 * 0.25;
+            let temp = 0.55f32 + config.time_pressure as f32 * 0.25 + explore_rate as f32 * 0.3;
             let max_score = deck_scores
                 .iter()
                 .cloned()
@@ -171,6 +198,12 @@ impl IowaGamblingBenchmark {
                 &[&deck_memory[chosen], &outcome_hv],
                 &[ema_decay, 1.0 - ema_decay],
             );
+
+            // Update frequency tracking (Damasio 1994: "how often did I lose")
+            deck_outcome_count[chosen] += 1;
+            if loss < 0.0 {
+                deck_loss_count[chosen] += 1;
+            }
 
             // Somatic marker update: net value normalized to [-1, 1]
             // Losses are amplified by loss_aversion factor

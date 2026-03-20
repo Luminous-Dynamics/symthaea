@@ -80,7 +80,6 @@ pub struct LanguageControllerConfig {
     pub dt_max: f32,
 
     // ── W3.1: Fourier Positional Encoding ──
-
     /// Replace cyclic permutation with Gram-Schmidt orthogonal position bases.
     /// Gives truly independent position vectors instead of rotated copies.
     /// Better position separation for long sequences (>50 tokens).

@@ -17,9 +17,8 @@ use symthaea_types::N_HARMONIES;
 
 use crate::{
     Anomaly, CantorInfo, DreamInfo, DriveInfo, FabricationInfo, GovernanceInfo, ImmuneInfo,
-    IntegrityInfo, KnowledgeInfo, LearningInfo, MoralCompass, Narrative, NeuroBath,
-    PerceptionInfo, PulseDelta, PulseSnapshot, ReasoningInfo, SparklinePoint, SubstrateInfo,
-    SwarmInfo, Vitals,
+    IntegrityInfo, KnowledgeInfo, LearningInfo, MoralCompass, Narrative, NeuroBath, PerceptionInfo,
+    PulseDelta, PulseSnapshot, ReasoningInfo, SparklinePoint, SubstrateInfo, SwarmInfo, Vitals,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2880,9 +2879,19 @@ fn write_neuroevolution_pane(html: &mut String, ne: &super::NeuroevolutionInfo) 
         color = status_color,
         label = status_label,
         gen = ne.generation,
-        fit_color = if ne.best_fitness > 0.0 { "#7ec8a0" } else { "#c76b5a" },
+        fit_color = if ne.best_fitness > 0.0 {
+            "#7ec8a0"
+        } else {
+            "#c76b5a"
+        },
         fitness = ne.best_fitness,
-        div_color = if ne.diversity > 0.15 { "#7ec8a0" } else if ne.diversity > 0.05 { "#e8c547" } else { "#c76b5a" },
+        div_color = if ne.diversity > 0.15 {
+            "#7ec8a0"
+        } else if ne.diversity > 0.05 {
+            "#e8c547"
+        } else {
+            "#c76b5a"
+        },
         diversity = ne.diversity,
         species = ne.species_count,
         tau = ne.best_tau_base,
@@ -2963,7 +2972,11 @@ fn write_fabrication_pane(html: &mut String, fab: &FabricationInfo) {
         color = status_color,
         label = status_label,
         jobs = fab.active_print_jobs,
-        safety = if fab.safety_level.is_empty() { "Green" } else { &fab.safety_level },
+        safety = if fab.safety_level.is_empty() {
+            "Green"
+        } else {
+            &fab.safety_level
+        },
         safety_color = match fab.safety_level.as_str() {
             "Red" => "#c76b5a",
             "Orange" => "#e8c547",
@@ -2971,17 +2984,45 @@ fn write_fabrication_pane(html: &mut String, fab: &FabricationInfo) {
             _ => "#7ec8a0",
         },
         mfg_fe = fab.manufacturing_free_energy,
-        fe_color = if fab.manufacturing_free_energy > 0.5 { "#c76b5a" } else if fab.manufacturing_free_energy > 0.1 { "#e8c547" } else { "#7ec8a0" },
+        fe_color = if fab.manufacturing_free_energy > 0.5 {
+            "#c76b5a"
+        } else if fab.manufacturing_free_energy > 0.1 {
+            "#e8c547"
+        } else {
+            "#7ec8a0"
+        },
         dl_fe = fab.design_loop_free_energy,
         anomaly = fab.anomaly_ema,
-        anomaly_color = if fab.anomaly_ema > 0.5 { "#c76b5a" } else if fab.anomaly_ema > 0.2 { "#e8c547" } else { "#8a9a8a" },
+        anomaly_color = if fab.anomaly_ema > 0.5 {
+            "#c76b5a"
+        } else if fab.anomaly_ema > 0.2 {
+            "#e8c547"
+        } else {
+            "#8a9a8a"
+        },
         anomaly_count = fab.anomaly_count,
         pog = fab.pog_score_ema,
-        pog_color = if fab.pog_score_ema > 0.7 { "#7ec8a0" } else if fab.pog_score_ema > 0.4 { "#e8c547" } else { "#c76b5a" },
+        pog_color = if fab.pog_score_ema > 0.7 {
+            "#7ec8a0"
+        } else if fab.pog_score_ema > 0.4 {
+            "#e8c547"
+        } else {
+            "#c76b5a"
+        },
         coherence = fab.prediction_coherence,
-        action = if fab.recommended_action.is_empty() { "—" } else { &fab.recommended_action },
+        action = if fab.recommended_action.is_empty() {
+            "—"
+        } else {
+            &fab.recommended_action
+        },
         reward = fab.reward_ema,
-        reward_color = if fab.reward_ema > 0.01 { "#7ec8a0" } else if fab.reward_ema < -0.01 { "#c76b5a" } else { "#8a9a8a" },
+        reward_color = if fab.reward_ema > 0.01 {
+            "#7ec8a0"
+        } else if fab.reward_ema < -0.01 {
+            "#c76b5a"
+        } else {
+            "#8a9a8a"
+        },
     );
 }
 

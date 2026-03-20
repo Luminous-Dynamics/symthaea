@@ -841,8 +841,7 @@ fn test_100_cycle_stress_no_unbounded_growth() {
 
     // Phi trace length should approximately match iterations used
     // (retry strategies may cause ±1 discrepancy at phase boundaries)
-    let diff =
-        (result.phi_trace.len() as isize - result.iterations_used as isize).unsigned_abs();
+    let diff = (result.phi_trace.len() as isize - result.iterations_used as isize).unsigned_abs();
     assert!(
         diff <= 1,
         "phi_trace length ({}) should be within 1 of iterations_used ({})",
@@ -1598,8 +1597,7 @@ fn test_warm_up_runs_without_consuming_iterations() {
         result.iterations_used
     );
     // Phi trace should only contain entries from real iterations, not warm-up
-    let diff =
-        (result.phi_trace.len() as isize - result.iterations_used as isize).unsigned_abs();
+    let diff = (result.phi_trace.len() as isize - result.iterations_used as isize).unsigned_abs();
     assert!(diff <= 1, "Phi trace should track real iterations");
 }
 
@@ -2450,9 +2448,10 @@ fn test_learned_template_used_by_native_code_template() {
     // Verify the learned template is retrievable from the experience store.
     // Note: native_code_template() checks HDC Program Algebra first (which may return
     // a spurious match at 0.52 threshold), so we verify the store directly.
-    let stored = agent.experience_store.as_ref().and_then(|s| {
-        s.lookup_learned_template("implement xyzzy quux frobnicate nonsense widget")
-    });
+    let stored = agent
+        .experience_store
+        .as_ref()
+        .and_then(|s| s.lookup_learned_template("implement xyzzy quux frobnicate nonsense widget"));
     assert!(
         stored.is_some(),
         "Should find learned template in experience store"
@@ -2485,8 +2484,7 @@ fn test_learned_template_similarity_matching() {
     // Skip hardcoded patterns since email_valid is in match_native_pattern
     // Just test the store directly
     let store = agent.experience_store.as_ref().unwrap();
-    let template =
-        store.lookup_learned_template("create a function to validate email addresses");
+    let template = store.lookup_learned_template("create a function to validate email addresses");
     assert!(template.is_some(), "Exact match should work");
 }
 

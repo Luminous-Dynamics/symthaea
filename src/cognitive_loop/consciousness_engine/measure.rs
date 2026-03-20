@@ -106,17 +106,23 @@ impl ConsciousnessEngine {
         if let Some(ref structural) = self.cache.last_structural_phi {
             if structural.num_clusters >= 2 {
                 // Weak global binding: local regions integrate but don't unify
-                if structural.emergence_ratio < super::super::thresholds::STRUCTURAL_WEAK_EMERGENCE_THRESHOLD
-                    && structural.micro_phi > super::super::thresholds::STRUCTURAL_MICRO_PHI_THRESHOLD
+                if structural.emergence_ratio
+                    < super::super::thresholds::STRUCTURAL_WEAK_EMERGENCE_THRESHOLD
+                    && structural.micro_phi
+                        > super::super::thresholds::STRUCTURAL_MICRO_PHI_THRESHOLD
                 {
                     exploration_delta += super::super::thresholds::STRUCTURAL_EXPLORATION_NUDGE;
                 }
                 // Strong emergence: the whole exceeds the sum of parts
-                if structural.emergence_ratio > super::super::thresholds::STRUCTURAL_STRONG_EMERGENCE_THRESHOLD {
+                if structural.emergence_ratio
+                    > super::super::thresholds::STRUCTURAL_STRONG_EMERGENCE_THRESHOLD
+                {
                     confidence_delta += super::super::thresholds::STRUCTURAL_CONFIDENCE_NUDGE;
                 }
                 // Bottleneck: large gap between global and inter-cluster integration
-                if structural.bottleneck_score > super::super::thresholds::STRUCTURAL_BOTTLENECK_THRESHOLD {
+                if structural.bottleneck_score
+                    > super::super::thresholds::STRUCTURAL_BOTTLENECK_THRESHOLD
+                {
                     lr_factor *= super::super::thresholds::STRUCTURAL_BOTTLENECK_LR_BOOST;
                 }
             }
@@ -124,18 +130,20 @@ impl ConsciousnessEngine {
 
         // Adaptive Phi validation weighting
         if let Some(sig) = self.cache.last_sigma {
-            if input.phi_validation_correlation > super::super::thresholds::PHI_VALIDATION_HIGH_THRESHOLD {
+            if input.phi_validation_correlation
+                > super::super::thresholds::PHI_VALIDATION_HIGH_THRESHOLD
+            {
                 let validation_boost = (input.phi_validation_correlation
                     - super::super::thresholds::PHI_VALIDATION_HIGH_THRESHOLD)
                     as f32
                     * super::super::thresholds::PHI_VALIDATION_BOOST_SCALE;
                 confidence_delta += sig as f32 * validation_boost;
             } else if input.phi_validation_correlation > 0.0
-                && input.phi_validation_correlation < super::super::thresholds::PHI_VALIDATION_LOW_THRESHOLD
+                && input.phi_validation_correlation
+                    < super::super::thresholds::PHI_VALIDATION_LOW_THRESHOLD
             {
                 let attenuate = (super::super::thresholds::PHI_VALIDATION_LOW_THRESHOLD
-                    - input.phi_validation_correlation)
-                    as f32
+                    - input.phi_validation_correlation) as f32
                     * super::super::thresholds::PHI_VALIDATION_ATTENUATION_SCALE;
                 confidence_delta -= attenuate;
             }
@@ -284,7 +292,8 @@ impl ConsciousnessEngine {
         // Equation V2 feedback: high consciousness → confidence + consolidation
         // Science: Tononi (2004), Baars (1988), Dehaene (2014)
         if equation_v2_consciousness > super::super::thresholds::EQ_V2_HIGH_THRESHOLD {
-            let boost = (equation_v2_consciousness - super::super::thresholds::EQ_V2_HIGH_THRESHOLD)
+            let boost = (equation_v2_consciousness
+                - super::super::thresholds::EQ_V2_HIGH_THRESHOLD)
                 * super::super::thresholds::EQ_V2_CONFIDENCE_SCALE;
             confidence_delta += boost as f32;
             episodic_consolidation_boost = Some(
@@ -341,7 +350,8 @@ impl ConsciousnessEngine {
         // Science: Dehaene (2011) — global workspace broadcasts learning signals
         if pipeline_consciousness > super::super::thresholds::PIPELINE_CONSCIOUSNESS_THRESHOLD {
             let pipeline_lr_scale = 1.0
-                + (pipeline_consciousness - super::super::thresholds::PIPELINE_CONSCIOUSNESS_THRESHOLD)
+                + (pipeline_consciousness
+                    - super::super::thresholds::PIPELINE_CONSCIOUSNESS_THRESHOLD)
                     * super::super::thresholds::PIPELINE_LR_SCALE;
             lr_factor *= pipeline_lr_scale as f32;
         }

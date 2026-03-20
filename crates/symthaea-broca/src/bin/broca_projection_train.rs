@@ -1075,7 +1075,9 @@ fn print_usage() {
     eprintln!("  --e2e-grad-chunks K         Simultaneous E2E gradient positions per step (default: 1 = legacy rotating)");
     eprintln!("  --bottleneck N              Spatial projection bottleneck dimension (default: 256, try 384 or 512)");
     eprintln!("  --orthogonality W           Orthogonality regularization weight for w_up rows (default: 0, try 0.01-0.05)");
-    eprintln!("  --orth-samples N            Row pairs sampled per orthogonality step (default: 64)");
+    eprintln!(
+        "  --orth-samples N            Row pairs sampled per orthogonality step (default: 64)"
+    );
     eprintln!();
     eprintln!("Gate + sampling overrides:");
     eprintln!("  --hedging-boost N      Override epistemic hedging boost (default: 5.0, Unknown=N, Uncertain=N/2)");

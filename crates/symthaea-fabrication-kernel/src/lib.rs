@@ -17,7 +17,16 @@ pub mod mesh;
 pub mod primitives;
 pub mod simulator;
 pub mod thought;
+pub mod cincinnati_live;
+pub mod printer_control;
+pub mod slicer;
+pub mod toolpath;
+pub mod nurbs;
+pub mod step_import;
 pub mod validate;
+pub mod generative;
+pub mod autonomy_loop;
+pub mod defect_prediction;
 
 pub use bsp::{csg_intersect, csg_subtract};
 pub use csg::{BooleanOp, CSGNode, Primitive, Transform3D};

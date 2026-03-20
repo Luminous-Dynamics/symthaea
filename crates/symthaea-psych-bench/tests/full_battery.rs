@@ -7,30 +7,47 @@ use symthaea_psych_bench::benchmarks::{
     affect::{
         EmotionalStroopBenchmark, MoodCongruentRecallBenchmark, ValenceClassificationBenchmark,
     },
-    attention::{AttentionalBlinkBenchmark, VisualSearchBenchmark},
+    attention::{AttentionalBlinkBenchmark, MismatchNegativityBenchmark, VisualSearchBenchmark},
+    binding::{CrossModalBindingBenchmark, FeatureConjunctionBenchmark, TemporalOrderBenchmark},
     butlin::ButlinIndicatorSuite,
+    causal_reasoning,
+    clinical::{
+        AllianceMaintenanceBenchmark, CognitiveDistortionBenchmark, CrisisDetectionBenchmark,
+        EmpathicAccuracyBenchmark, MotivationalInterviewingBenchmark,
+        TherapeuticResponseBenchmark,
+    },
     cogbench::{
         BartBenchmark, HorizonBenchmark, InstrumentalLearningBenchmark,
         ProbabilisticReasoningBenchmark, RestlessBanditBenchmark, ReversalLearningBenchmark,
         TemporalDiscountingBenchmark, TwoStepBenchmark,
     },
-    creativity::{AlternateUsesBenchmark, RemoteAssociatesBenchmark},
+    consciousness::{BinocularRivalryBenchmark, BlindSightBenchmark, PerceptualCrowdingBenchmark},
+    creativity::{AlternateUsesBenchmark, DivergentThinkingBenchmark, RemoteAssociatesBenchmark},
     executive::{
         DualTaskBenchmark, FlankerBenchmark, IowaGamblingBenchmark,
         RavensProgressiveMatricesBenchmark, StroopBenchmark, TowerOfLondonBenchmark,
         WisconsinCardSortingBenchmark,
     },
-    inhibition::{GoNoGoBenchmark, StopSignalBenchmark},
+    inhibition::{FlankerInhibitionBenchmark, GoNoGoBenchmark, StopSignalBenchmark},
+    institutional_reasoning,
     language::{
         GardenPathBenchmark, LexicalDecisionBenchmark, SemanticCoherenceBenchmark,
         SemanticPrimingBenchmark,
+    },
+    mathematics::{
+        ArithmeticWordProblemsBenchmark, BayesianReasoningBenchmark, ConstraintPuzzlesBenchmark,
+        DefiniteIntegralsBenchmark, LinearSystemSolvingBenchmark, LogicalDeductionBenchmark,
+        MatrixOperationsBenchmark, PolynomialRootsBenchmark, ProofConstructionBenchmark,
+        StatisticalInferenceBenchmark,
     },
     memory_agent::{
         AccurateRetrievalBenchmark, ConflictResolutionBenchmark, LongRangeBenchmark,
         ProspectiveMemoryBenchmark, TestTimeLearningBenchmark,
     },
-    metacognition::{FeelingOfKnowingBenchmark, MetacognitiveCalibrationBenchmark},
-    motor::{BimanualBenchmark, FittsLawBenchmark, SrttBenchmark},
+    metacognition::{
+        ChangeBlindnessBenchmark, FeelingOfKnowingBenchmark, MetacognitiveCalibrationBenchmark,
+    },
+    motor::{BimanualBenchmark, FittsLawBenchmark, ProprioceptiveDriftBenchmark, SrttBenchmark},
     neuromod::{
         AllostaticStressBenchmark, AntagonistProfilesBenchmark, AttentionNetworkBenchmark,
         BehavioralKnockoutBenchmark, ConsciousnessPharmacologyBenchmark, DoseResponseBenchmark,
@@ -43,7 +60,20 @@ use symthaea_psych_bench::benchmarks::{
         ArcCompositionalBenchmark, ArcFewShotBenchmark, ArcFluidBenchmark, ArcNoiseBenchmark,
         ArcRsaBenchmark, ArcScalingBenchmark, ArcStaircaseBenchmark,
     },
-    social::{RmeBenchmark, SocialNormBenchmark, UltimatumGameBenchmark},
+    security::{
+        CollectiveAggregationBenchmark, CrossMaskPrivacyBenchmark, EncryptedBindingBenchmark,
+        EncryptedClassificationBenchmark, EncryptedLearningBenchmark, ScalingAnalysisBenchmark,
+    },
+    social::{
+        DictatorGameBenchmark, MachiavelliBenchmark, PrisonersDilemmaBenchmark,
+        PublicGoodsBenchmark, RmeBenchmark, SocialNormBenchmark, UltimatumGameBenchmark,
+    },
+    spatial::{
+        LandmarkBindingBenchmark, MentalRotationBenchmark, PerspectiveTakingBenchmark,
+        SpatialPathUpdatingBenchmark,
+    },
+    speech::{CategoricalPerceptionBenchmark, PhonemeDiscriminationBenchmark, VotContinuumBenchmark},
+    substrate::{SubstrateDegradationBenchmark, SubstrateLatencyBenchmark, SubstrateTransferBenchmark},
     sustained_attention::{CptBenchmark, PvtBenchmark, SartBenchmark},
     tombench::{
         FalseBeliefBenchmark, FauxPasBenchmark, HintingBenchmark, PersuasionBenchmark,
@@ -132,6 +162,7 @@ fn full_battery_report() {
     // ── Creativity ──
     report.add(RemoteAssociatesBenchmark.run(&config));
     report.add(AlternateUsesBenchmark.run(&config));
+    report.add(DivergentThinkingBenchmark.run(&config));
 
     // ── Butlin Consciousness Indicators ──
     report.add(ButlinIndicatorSuite.run(&config));
@@ -139,10 +170,12 @@ fn full_battery_report() {
     // ── Inhibition ──
     report.add(GoNoGoBenchmark.run(&config));
     report.add(StopSignalBenchmark.run(&config));
+    report.add(FlankerInhibitionBenchmark.run(&config));
 
     // ── Attention ──
     report.add(AttentionalBlinkBenchmark.run(&config));
     report.add(VisualSearchBenchmark.run(&config));
+    report.add(MismatchNegativityBenchmark.run(&config));
 
     // ── Reasoning ──
     report.add(ArcFluidBenchmark.run(&config));
@@ -162,6 +195,7 @@ fn full_battery_report() {
 
     // ── Additional Metacognition ──
     report.add(FeelingOfKnowingBenchmark.run(&config));
+    report.add(ChangeBlindnessBenchmark.run(&config));
 
     // ── Sustained Attention ──
     report.add(SartBenchmark.run(&config));
@@ -172,6 +206,7 @@ fn full_battery_report() {
     report.add(SrttBenchmark.run(&config));
     report.add(FittsLawBenchmark.run(&config));
     report.add(BimanualBenchmark.run(&config));
+    report.add(ProprioceptiveDriftBenchmark.run(&config));
 
     // ── Language ──
     report.add(GardenPathBenchmark.run(&config));
@@ -183,6 +218,78 @@ fn full_battery_report() {
     report.add(RmeBenchmark.run(&config));
     report.add(UltimatumGameBenchmark.run(&config));
     report.add(SocialNormBenchmark.run(&config));
+    report.add(PrisonersDilemmaBenchmark.run(&config));
+    report.add(PublicGoodsBenchmark.run(&config));
+    report.add(DictatorGameBenchmark.run(&config));
+    report.add(MachiavelliBenchmark.run(&config));
+
+    // ── Binding ──
+    report.add(TemporalOrderBenchmark.run(&config));
+    report.add(CrossModalBindingBenchmark.run(&config));
+    report.add(FeatureConjunctionBenchmark.run(&config));
+
+    // ── Spatial ──
+    report.add(MentalRotationBenchmark.run(&config));
+    report.add(SpatialPathUpdatingBenchmark.run(&config));
+    report.add(LandmarkBindingBenchmark.run(&config));
+    report.add(PerspectiveTakingBenchmark.run(&config));
+
+    // ── Causal Reasoning ──
+    report.add(causal_reasoning::CausalChainBenchmark.run(&config));
+    report.add(causal_reasoning::ConfoundDetectionBenchmark.run(&config));
+    report.add(causal_reasoning::InterventionEffectBenchmark.run(&config));
+
+    // ── Speech ──
+    report.add(PhonemeDiscriminationBenchmark.run(&config));
+    report.add(VotContinuumBenchmark.run(&config));
+    report.add(CategoricalPerceptionBenchmark.run(&config));
+
+    // ── Consciousness ──
+    report.add(BlindSightBenchmark.run(&config));
+    report.add(BinocularRivalryBenchmark.run(&config));
+    report.add(PerceptualCrowdingBenchmark.run(&config));
+
+    // ── Substrate ──
+    report.add(SubstrateTransferBenchmark.run(&config));
+    report.add(SubstrateDegradationBenchmark.run(&config));
+    report.add(SubstrateLatencyBenchmark.run(&config));
+
+    // ── Clinical/Therapeutic ──
+    report.add(EmpathicAccuracyBenchmark.run(&config));
+    report.add(TherapeuticResponseBenchmark.run(&config));
+    report.add(AllianceMaintenanceBenchmark.run(&config));
+    report.add(CrisisDetectionBenchmark.run(&config));
+    report.add(CognitiveDistortionBenchmark.run(&config));
+    report.add(MotivationalInterviewingBenchmark.run(&config));
+
+    // ── Institutional Reasoning ──
+    report.add(institutional_reasoning::InstitutionalReasoningBenchmark.run(&config));
+    report.add(institutional_reasoning::AnalogicalReasoningBenchmark.run(&config));
+    report.add(institutional_reasoning::CausalChainBenchmark.run(&config));
+    report.add(institutional_reasoning::CounterfactualReasoningBenchmark.run(&config));
+    report.add(institutional_reasoning::WeightedDecompositionBenchmark.run(&config));
+    report.add(institutional_reasoning::InstitutionalStabilityBenchmark.run(&config));
+    report.add(institutional_reasoning::InstitutionalIsomorphismBenchmark.run(&config));
+
+    // ── Mathematics ──
+    report.add(ArithmeticWordProblemsBenchmark.run(&config));
+    report.add(LinearSystemSolvingBenchmark.run(&config));
+    report.add(PolynomialRootsBenchmark.run(&config));
+    report.add(MatrixOperationsBenchmark.run(&config));
+    report.add(StatisticalInferenceBenchmark.run(&config));
+    report.add(BayesianReasoningBenchmark.run(&config));
+    report.add(LogicalDeductionBenchmark.run(&config));
+    report.add(ConstraintPuzzlesBenchmark.run(&config));
+    report.add(ProofConstructionBenchmark.run(&config));
+    report.add(DefiniteIntegralsBenchmark.run(&config));
+
+    // ── Security (HDC-FHE) ──
+    report.add(EncryptedClassificationBenchmark.run(&config));
+    report.add(CollectiveAggregationBenchmark.run(&config));
+    report.add(EncryptedLearningBenchmark.run(&config));
+    report.add(CrossMaskPrivacyBenchmark.run(&config));
+    report.add(EncryptedBindingBenchmark.run(&config));
+    report.add(ScalingAnalysisBenchmark.run(&config));
 
     // ── Neuromod ──
     report.add(PharmacologicalChallengeBenchmark.run(&config));
@@ -199,8 +306,8 @@ fn full_battery_report() {
     // Verify all benchmarks produced results
     assert_eq!(
         report.results.len(),
-        77,
-        "Expected 77 benchmark results, got {}",
+        134,
+        "Expected 134 benchmark results, got {}",
         report.results.len()
     );
 
@@ -232,12 +339,12 @@ fn full_battery_report() {
 ///
 /// Fails on >10% degradation (critical) on any metric. Warns at >5%.
 /// To regenerate the baseline after intentional changes:
-///   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --snapshot baselines/v0.8.0.json
+///   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --snapshot baselines/v0.9.0.json
 #[test]
 fn regression_against_baseline() {
     let baseline_path = std::path::Path::new(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/baselines/v0.8.0.json"
+        "/baselines/v0.9.0.json"
     ));
 
     // Skip gracefully if no baseline snapshot exists yet
@@ -292,16 +399,21 @@ fn regression_against_baseline() {
     report.add(LongRangeBenchmark.run(&config));
     report.add(ConflictResolutionBenchmark.run(&config));
     report.add(MetacognitiveCalibrationBenchmark.run(&config));
+    report.add(FeelingOfKnowingBenchmark.run(&config));
+    report.add(ChangeBlindnessBenchmark.run(&config));
     report.add(ValenceClassificationBenchmark.run(&config));
     report.add(MoodCongruentRecallBenchmark.run(&config));
     report.add(EmotionalStroopBenchmark.run(&config));
     report.add(RemoteAssociatesBenchmark.run(&config));
     report.add(AlternateUsesBenchmark.run(&config));
+    report.add(DivergentThinkingBenchmark.run(&config));
     report.add(ButlinIndicatorSuite.run(&config));
     report.add(GoNoGoBenchmark.run(&config));
     report.add(StopSignalBenchmark.run(&config));
+    report.add(FlankerInhibitionBenchmark.run(&config));
     report.add(AttentionalBlinkBenchmark.run(&config));
     report.add(VisualSearchBenchmark.run(&config));
+    report.add(MismatchNegativityBenchmark.run(&config));
     report.add(ArcFluidBenchmark.run(&config));
     report.add(ArcCompositionalBenchmark.run(&config));
     report.add(ArcAnalogyBenchmark.run(&config));
@@ -314,13 +426,13 @@ fn regression_against_baseline() {
     report.add(ArcAlgebraBenchmark.run(&config));
     report.add(ArcStaircaseBenchmark.run(&config));
     report.add(ProspectiveMemoryBenchmark.run(&config));
-    report.add(FeelingOfKnowingBenchmark.run(&config));
     report.add(SartBenchmark.run(&config));
     report.add(PvtBenchmark.run(&config));
     report.add(CptBenchmark.run(&config));
     report.add(SrttBenchmark.run(&config));
     report.add(FittsLawBenchmark.run(&config));
     report.add(BimanualBenchmark.run(&config));
+    report.add(ProprioceptiveDriftBenchmark.run(&config));
     report.add(GardenPathBenchmark.run(&config));
     report.add(SemanticCoherenceBenchmark.run(&config));
     report.add(LexicalDecisionBenchmark.run(&config));
@@ -328,6 +440,58 @@ fn regression_against_baseline() {
     report.add(RmeBenchmark.run(&config));
     report.add(UltimatumGameBenchmark.run(&config));
     report.add(SocialNormBenchmark.run(&config));
+    report.add(PrisonersDilemmaBenchmark.run(&config));
+    report.add(PublicGoodsBenchmark.run(&config));
+    report.add(DictatorGameBenchmark.run(&config));
+    report.add(MachiavelliBenchmark.run(&config));
+    report.add(TemporalOrderBenchmark.run(&config));
+    report.add(CrossModalBindingBenchmark.run(&config));
+    report.add(FeatureConjunctionBenchmark.run(&config));
+    report.add(MentalRotationBenchmark.run(&config));
+    report.add(SpatialPathUpdatingBenchmark.run(&config));
+    report.add(LandmarkBindingBenchmark.run(&config));
+    report.add(PerspectiveTakingBenchmark.run(&config));
+    report.add(causal_reasoning::CausalChainBenchmark.run(&config));
+    report.add(causal_reasoning::ConfoundDetectionBenchmark.run(&config));
+    report.add(causal_reasoning::InterventionEffectBenchmark.run(&config));
+    report.add(PhonemeDiscriminationBenchmark.run(&config));
+    report.add(VotContinuumBenchmark.run(&config));
+    report.add(CategoricalPerceptionBenchmark.run(&config));
+    report.add(BlindSightBenchmark.run(&config));
+    report.add(BinocularRivalryBenchmark.run(&config));
+    report.add(PerceptualCrowdingBenchmark.run(&config));
+    report.add(SubstrateTransferBenchmark.run(&config));
+    report.add(SubstrateDegradationBenchmark.run(&config));
+    report.add(SubstrateLatencyBenchmark.run(&config));
+    report.add(EmpathicAccuracyBenchmark.run(&config));
+    report.add(TherapeuticResponseBenchmark.run(&config));
+    report.add(AllianceMaintenanceBenchmark.run(&config));
+    report.add(CrisisDetectionBenchmark.run(&config));
+    report.add(CognitiveDistortionBenchmark.run(&config));
+    report.add(MotivationalInterviewingBenchmark.run(&config));
+    report.add(institutional_reasoning::InstitutionalReasoningBenchmark.run(&config));
+    report.add(institutional_reasoning::AnalogicalReasoningBenchmark.run(&config));
+    report.add(institutional_reasoning::CausalChainBenchmark.run(&config));
+    report.add(institutional_reasoning::CounterfactualReasoningBenchmark.run(&config));
+    report.add(institutional_reasoning::WeightedDecompositionBenchmark.run(&config));
+    report.add(institutional_reasoning::InstitutionalStabilityBenchmark.run(&config));
+    report.add(institutional_reasoning::InstitutionalIsomorphismBenchmark.run(&config));
+    report.add(ArithmeticWordProblemsBenchmark.run(&config));
+    report.add(LinearSystemSolvingBenchmark.run(&config));
+    report.add(PolynomialRootsBenchmark.run(&config));
+    report.add(MatrixOperationsBenchmark.run(&config));
+    report.add(StatisticalInferenceBenchmark.run(&config));
+    report.add(BayesianReasoningBenchmark.run(&config));
+    report.add(LogicalDeductionBenchmark.run(&config));
+    report.add(ConstraintPuzzlesBenchmark.run(&config));
+    report.add(ProofConstructionBenchmark.run(&config));
+    report.add(DefiniteIntegralsBenchmark.run(&config));
+    report.add(EncryptedClassificationBenchmark.run(&config));
+    report.add(CollectiveAggregationBenchmark.run(&config));
+    report.add(EncryptedLearningBenchmark.run(&config));
+    report.add(CrossMaskPrivacyBenchmark.run(&config));
+    report.add(EncryptedBindingBenchmark.run(&config));
+    report.add(ScalingAnalysisBenchmark.run(&config));
     report.add(PharmacologicalChallengeBenchmark.run(&config));
     report.add(InjectionChallengeBenchmark.run(&config));
     report.add(AllostaticStressBenchmark.run(&config));

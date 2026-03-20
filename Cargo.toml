@@ -412,7 +412,7 @@ wait-timeout = "0.2"
 # libsystemd removed: systemd feature was never implemented (no cfg gates, no code using libsystemd)
 
 [features]
-default = []
+default = ["default-mind"]
 parallel = []  # Rayon parallelism in cognitive loop (gate for WASM compat)
 
 # ── Binary build gates ──────────────────────────────────────────────
@@ -581,6 +581,43 @@ candle_stack = ["neural-bridge"]                        # Unifies candle depende
 consciousness_full = ["reasoning_engine", "identity"]   # Full consciousness: reasoning engine + identity signatures
 nix_full = ["nix-mind"]                                 # All NixOS features via the symthaea-nix crate
 all_benchmarks = ["benchmarks", "physics"]              # All benchmarking features (causal validation + tokamak plasma)
+
+# ── Mind bundles (graduated consciousness stacks) ─────────────────
+# default-mind: Core consciousness infrastructure — all pure cfg gates, zero external deps.
+# Enables: reasoning (7-step MAGI), integrity (tamper detection), glyph codex (symbolic field),
+# sentinel (immune system), safety agents (NRC 4-tier), CPG (motor oscillators), spectral state.
+default-mind = [
+    "reasoning_engine",  # 7-step MAGI reasoning cycle (adds symthaea-causal-reasoning)
+    "integrity",         # BLAKE3 attestation, 6 canaries, temporal consistency
+    "glyph_codex",       # 70 glyphs, 11 Field Modality basis vectors
+    "sentinel",          # Distributed immune: governance anomaly, threat memory, collective immunity
+    "safety-agents",     # NRC 4-tier safety (Green/Yellow/Orange/Red), guardian posture
+    "cpg",               # Central Pattern Generator (Kuramoto coupled oscillators)
+    "spectral_state",    # Frequency-domain CfC state analysis (spectral twin)
+]
+
+# networked-mind: default-mind + distributed mesh + Mycelix governance integration.
+# Adds: P2P mesh radio, Mycelix federated learning, multi-agent Byzantine consensus.
+networked-mind = [
+    "default-mind",
+    "mycelix",           # Mycelix FL algorithms + governance bridge (adds mycelix-fl-core, sha3)
+    "mesh",              # Physical mesh radio (LoRa + B.A.T.M.A.N. + Yggdrasil)
+    "multi_agent",       # Byzantine trust scoring, causal consensus (adds full_consciousness)
+]
+
+# embodied-mind: default-mind + motor systems for physical embodiment.
+embodied-mind = [
+    "default-mind",
+    "flight",            # HDC-LTC quadrotor flight control via FEP Active Inference
+    "humanoid",          # HDC-LTC bipedal humanoid control (DMC benchmark)
+]
+
+# sovereign-mind: Full autonomous stack — reasoning + crypto + mesh + governance.
+sovereign-mind = [
+    "networked-mind",
+    "secure-mesh",       # Ed25519 + ChaCha20-Poly1305 + X25519 DH + HKDF
+    "ssm_language",      # Native CfC-HDC Broca language center
+]
 
 
 [dev-dependencies]

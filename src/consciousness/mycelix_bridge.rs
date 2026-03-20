@@ -2079,7 +2079,10 @@ mod tests {
             stressed_positions: 6,
             ..Default::default()
         };
-        assert!(!moderate.is_crisis(), "moderate stress should NOT be crisis — cooperatives rally");
+        assert!(
+            !moderate.is_crisis(),
+            "moderate stress should NOT be crisis — cooperatives rally"
+        );
     }
 
     #[test]

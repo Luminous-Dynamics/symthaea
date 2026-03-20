@@ -70,7 +70,9 @@ pub use checkpoint::{AdamState, BrocaCheckpoint};
 pub use controller::{LanguageController, LanguageControllerConfig, NetworkSnapshot};
 pub use encoder::{ThoughtChannels, ThoughtLanguageEncoder};
 pub use evaluation::{EvalConfig, EvalResult, IntentScore};
-pub use gating::{CoherenceFeedback, EmotionalModulator, EpistemicGate, GatingConfig};
+pub use gating::{
+    CoherenceFeedback, EmotionalModulator, EpistemicGate, GatingConfig, SpectralCoherenceGate,
+};
 pub use generator::{BrocaConfig, BrocaGenerator, GenerationResult, SamplingStrategy};
 pub use tokenizer::BpeTokenizer;
 pub use training::{

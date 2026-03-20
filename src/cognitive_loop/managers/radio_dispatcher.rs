@@ -863,7 +863,13 @@ impl FecEncoder {
 /// - 8 bytes: node ID
 /// - 8 bytes: capabilities hash
 /// - 4 bytes: cycle counter (for liveliness)
-/// - 4 bytes: network health + tier mask + reserved
+/// - 2 bytes: network health + tier mask
+/// - 1 byte: consciousness Phi (quantized 0-255 → 0.0-1.0)
+/// - 1 byte: governance tier (0=Observer, 1=Participant, 2=Citizen, 3=Steward, 4=Guardian)
+///
+/// The Phi and governance_tier fields use bytes 22-23 (previously reserved),
+/// so beacons from older nodes will read 0 for both — a safe default
+/// (zero Phi = unknown, tier 0 = Observer).
 #[derive(Debug, Clone)]
 pub struct DiscoveryBeacon {
     /// First 8 bytes of the node's identity.
@@ -876,6 +882,13 @@ pub struct DiscoveryBeacon {
     pub network_health: u8,
     /// Bitmask of available tiers (bit 0 = Local, 1 = Metro, 2 = Regional).
     pub tier_mask: u8,
+    /// Consciousness Phi quantized to u8 (0-255 maps to 0.0-1.0).
+    /// Enables consciousness-aware routing: peers with higher Phi
+    /// are preferred as relay nodes for moral emergency traffic.
+    pub phi_quantized: u8,
+    /// Governance tier from Mycelix consciousness gating (0-4).
+    /// Higher tiers have more relay authority (Guardian can relay moral alerts).
+    pub governance_tier: u8,
 }
 
 impl DiscoveryBeacon {
@@ -887,7 +900,8 @@ impl DiscoveryBeacon {
         buf[16..20].copy_from_slice(&self.cycle_counter.to_le_bytes());
         buf[20] = self.network_health;
         buf[21] = self.tier_mask;
-        // 22-23: reserved
+        buf[22] = self.phi_quantized;
+        buf[23] = self.governance_tier;
         buf
     }
 
@@ -904,7 +918,19 @@ impl DiscoveryBeacon {
             cycle_counter,
             network_health: data[20],
             tier_mask: data[21],
+            phi_quantized: data[22],
+            governance_tier: data[23],
         }
+    }
+
+    /// Quantize a floating-point Phi [0.0, 1.0] to u8 [0, 255].
+    pub fn quantize_phi(phi: f32) -> u8 {
+        (phi.clamp(0.0, 1.0) * 255.0) as u8
+    }
+
+    /// Dequantize a u8 Phi back to floating-point [0.0, 1.0].
+    pub fn dequantize_phi(quantized: u8) -> f32 {
+        quantized as f32 / 255.0
     }
 
     /// Generate tier mask from availability array.
@@ -1998,6 +2024,8 @@ impl SpectrumManager {
             cycle_counter: self.current_cycle as u32,
             network_health: self.network_health.safety_suggestion(),
             tier_mask: DiscoveryBeacon::tier_mask_from(&self.tier_available),
+            phi_quantized: 0,   // filled by caller with current Phi
+            governance_tier: 0, // filled by caller with Mycelix tier
         })
     }
 
@@ -4579,6 +4607,8 @@ mod tests {
             cycle_counter: 42,
             network_health: 1,
             tier_mask: 0x07,
+            phi_quantized: DiscoveryBeacon::quantize_phi(0.72),
+            governance_tier: 3,
         };
         let bytes = beacon.to_bytes();
         assert_eq!(bytes.len(), RADIO_BEACON_SIZE);
@@ -4588,6 +4618,13 @@ mod tests {
         assert_eq!(decoded.cycle_counter, 42);
         assert_eq!(decoded.network_health, 1);
         assert_eq!(decoded.tier_mask, 0x07);
+        // Consciousness fields use the previously-reserved bytes 22-23
+        assert_eq!(decoded.governance_tier, 3);
+        let phi = DiscoveryBeacon::dequantize_phi(decoded.phi_quantized);
+        assert!(
+            (phi - 0.72).abs() < 0.01,
+            "phi roundtrip: expected ~0.72, got {phi}"
+        );
     }
 
     #[test]
@@ -4626,6 +4663,8 @@ mod tests {
             cycle_counter: 100,
             network_health: 0,
             tier_mask: 0x07,
+            phi_quantized: 0,
+            governance_tier: 0,
         };
         sm.process_beacon(&beacon, RadioTier::Metro, 15.0);
         assert_eq!(sm.route_table.len(), 1);
@@ -4949,6 +4988,8 @@ mod tests {
             cycle_counter: 100,
             network_health: 0,
             tier_mask: 0b111,
+            phi_quantized: DiscoveryBeacon::quantize_phi(0.5),
+            governance_tier: 2,
         };
         let is_new = sm.process_beacon(&beacon, RadioTier::Local, 15.0);
         assert!(is_new, "First beacon from peer should be new");
@@ -5399,7 +5440,10 @@ mod tests {
         assert_eq!(PayloadClass::Emergency.min_tier(), RadioTier::Regional);
         assert_eq!(PayloadClass::Discovery.min_tier(), RadioTier::Metro);
         assert_eq!(PayloadClass::Affective.min_tier(), RadioTier::Metro);
-        assert_eq!(PayloadClass::ConsciousnessDelta.min_tier(), RadioTier::Metro);
+        assert_eq!(
+            PayloadClass::ConsciousnessDelta.min_tier(),
+            RadioTier::Metro
+        );
         assert_eq!(PayloadClass::BulkSync.min_tier(), RadioTier::Local);
         assert_eq!(PayloadClass::Gradient.min_tier(), RadioTier::Local);
     }
@@ -5681,7 +5725,10 @@ mod tests {
             jammed: false,
         });
         sm.process(&snapshot);
-        assert_eq!(sm.jamming_streak, 0, "Clean observation should reset streak");
+        assert_eq!(
+            sm.jamming_streak, 0,
+            "Clean observation should reset streak"
+        );
     }
 
     // ── Network critical via jamming threshold ──────────────────────
@@ -5829,15 +5876,12 @@ mod tests {
         let mut sf = StoreAndForward::default();
         sf.go_offline(100);
         sf.go_offline(200); // Second call should not reset offline_since
-        // go_online to check the offline_since was preserved as 100
-        // Record enough to trigger consolidation
+                            // go_online to check the offline_since was preserved as 100
+                            // Record enough to trigger consolidation
         for i in 0..12 {
             sf.record(OfflineExperience {
                 cycle: 100 + i,
-                kind: OfflineExperienceKind::ConsciousnessShift {
-                    from: 0.4,
-                    to: 0.8,
-                },
+                kind: OfflineExperienceKind::ConsciousnessShift { from: 0.4, to: 0.8 },
                 salience: 0.9,
             });
         }

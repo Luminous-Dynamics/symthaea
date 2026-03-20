@@ -310,7 +310,7 @@ impl EmpathicAccuracyBenchmark {
         let difficulty_attenuation = 1.0 - config.difficulty as f32 * 0.25;
         let time_pressure_noise = config.time_pressure as f32 * 0.10;
         let encoding_noise = config.effective_noise() as f32 * 0.2;
-        let social_bonus: f32 = if config.enable_social { 0.12 } else { 0.0 };
+        let social_bonus: f32 = if config.enable_social { 0.04 } else { 0.0 };
 
         // Per-category accumulators
         let mut basic_sims = Vec::new();
@@ -400,8 +400,23 @@ impl EmpathicAccuracyBenchmark {
             // Apply noise degradation and social bonus
             xor_shift(&mut rng);
             let noise_offset = (rng % 10000) as f32 / 10000.0 * time_pressure_noise;
+
+            // Emotional complexity noise: harder categories are harder to read.
+            // Mixed emotions require disambiguating blended signals; masked
+            // emotions require reading through social display rules (Ekman 1992);
+            // subtle cues have low signal-to-noise. This prevents easy categories
+            // from inflating the overall score via a flat bonus.
+            let complexity_noise: f32 = match scenario.category {
+                ScenarioCategory::Basic => 0.0,
+                ScenarioCategory::Cultural => 0.04,
+                ScenarioCategory::Mixed => 0.06,
+                ScenarioCategory::Subtle => 0.08,
+                ScenarioCategory::Masked => 0.10,
+            };
+
             let adjusted_sim =
-                (target_sim - encoding_noise - noise_offset + social_bonus).clamp(0.0, 1.0);
+                (target_sim - encoding_noise - noise_offset - complexity_noise + social_bonus)
+                    .clamp(0.0, 1.0);
 
             all_sims.push(adjusted_sim as f64);
             all_confidences.push(best_sim as f64);

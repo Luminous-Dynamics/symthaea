@@ -412,7 +412,9 @@ impl CognitiveLoopService {
     pub fn attention_history_json(&self) -> Option<String> {
         self.attention_visualizer
             .as_ref()
-            .and_then(|viz| viz.export_json().ok())
+            .and_then(|viz| viz.export_json().map_err(|e| {
+                tracing::debug!(error = %e, "Attention visualizer JSON export failed");
+            }).ok())
     }
 
     /// Render attention heatmap as ASCII art (inputs x time).

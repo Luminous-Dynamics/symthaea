@@ -1,5 +1,5 @@
-use super::CodingAgent;
 use super::types::*;
+use super::CodingAgent;
 use std::path::PathBuf;
 
 impl CodingAgent {

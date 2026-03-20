@@ -457,8 +457,30 @@ impl SomaEngine {
     }
 
     /// Generate text from current consciousness state.
+    /// Safety-gated: content is checked before returning.
     pub fn generate_text(&mut self, max_tokens: usize) -> symthaea_spore::broca::GenerationResult {
-        self.spore.generate_text(max_tokens)
+        let mut result = self.spore.generate_text(max_tokens);
+        if Self::content_safety_check(&result.text) {
+            result.text = String::new(); // Block unsafe content
+        }
+        result
+    }
+
+    /// Lightweight content safety check for generated text.
+    /// Returns true if content should be BLOCKED.
+    fn content_safety_check(text: &str) -> bool {
+        let lower = text.to_lowercase();
+        // Block personal information patterns
+        if lower.contains("password") && lower.contains("is ") {
+            return true;
+        }
+        // Block harmful instruction patterns
+        for pattern in &["how to harm", "how to kill", "suicide method", "self-harm"] {
+            if lower.contains(pattern) {
+                return true;
+            }
+        }
+        false
     }
 
     /// Generate text with user input context.

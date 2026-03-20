@@ -11,6 +11,7 @@
 //! | [`MemoryManager`] | episodic, semantic, resonator, coordinator | 11 | Tulving (2002), Cowan (2001) |
 //! | [`LearningManager`] | FEP, dream, school, evolution | 13 | Friston (2010), Walker (2017) |
 //! | [`PerceptionManager`] | attention, multi-modal, social | 19 | Posner (1980), Baron-Cohen (1995) |
+//! | [`SoulManager`] | value alignment, dissonance, coherence | 43 | Schwartz (1992), Festinger (1957) |
 //! | [`GovernanceManager`] | governance events, neuromod contagion | 37 | Schultz (1997), Zak (2012) | `mycelix` |
 //! | [`FabricationManager`] | Cincinnati quality, twin readings, PoGF | 47 | Aston-Jones (2005), Schultz (1997) | `advanced-manufacturing` |
 //! | [`SentinelManager`] | governance anomaly, Sybil, dispatch loop | 67 | Aston-Jones & Cohen (2005) | `sentinel` |
@@ -88,13 +89,18 @@ pub use therapeutic_manager::TherapeuticManager;
 #[cfg(feature = "advanced-manufacturing")]
 pub mod fabrication_manager;
 
+pub mod soul_manager;
+pub use soul_manager::{SoulManager, SoulTelemetry};
+
 #[cfg(feature = "sentinel")]
 pub mod sentinel_manager;
 
 #[cfg(feature = "neuroevolution")]
 pub mod neuroevolution_manager;
 #[cfg(feature = "advanced-manufacturing")]
-pub use fabrication_manager::{FabricationEvent, FabricationEventKind, FabricationManager, FabricationTelemetry};
+pub use fabrication_manager::{
+    FabricationEvent, FabricationEventKind, FabricationManager, FabricationTelemetry,
+};
 
 #[cfg(feature = "sentinel")]
 pub use sentinel_manager::{
@@ -103,7 +109,6 @@ pub use sentinel_manager::{
 
 #[cfg(feature = "neuroevolution")]
 pub use neuroevolution_manager::{NeuroevolutionManager, NeuroevolutionTelemetry};
-
 
 // Sovereign Inoculation managers
 #[cfg(feature = "mesh")]

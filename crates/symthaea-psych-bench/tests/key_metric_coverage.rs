@@ -5,17 +5,28 @@
 
 use symthaea_psych_bench::benchmarks::affect::*;
 use symthaea_psych_bench::benchmarks::attention::*;
+use symthaea_psych_bench::benchmarks::binding::*;
 use symthaea_psych_bench::benchmarks::butlin::*;
+use symthaea_psych_bench::benchmarks::causal_reasoning;
+use symthaea_psych_bench::benchmarks::clinical::*;
 use symthaea_psych_bench::benchmarks::cogbench::*;
+use symthaea_psych_bench::benchmarks::consciousness::*;
 use symthaea_psych_bench::benchmarks::creativity::*;
 use symthaea_psych_bench::benchmarks::executive::*;
 use symthaea_psych_bench::benchmarks::inhibition::*;
+use symthaea_psych_bench::benchmarks::institutional_reasoning;
 use symthaea_psych_bench::benchmarks::language::*;
+use symthaea_psych_bench::benchmarks::mathematics::*;
 use symthaea_psych_bench::benchmarks::memory_agent::*;
 use symthaea_psych_bench::benchmarks::metacognition::*;
 use symthaea_psych_bench::benchmarks::motor::*;
+use symthaea_psych_bench::benchmarks::neuromod::*;
 use symthaea_psych_bench::benchmarks::reasoning::*;
+use symthaea_psych_bench::benchmarks::security::*;
 use symthaea_psych_bench::benchmarks::social::*;
+use symthaea_psych_bench::benchmarks::spatial::*;
+use symthaea_psych_bench::benchmarks::speech::*;
+use symthaea_psych_bench::benchmarks::substrate::*;
 use symthaea_psych_bench::benchmarks::sustained_attention::*;
 use symthaea_psych_bench::benchmarks::tombench::*;
 use symthaea_psych_bench::benchmarks::worm::*;
@@ -70,6 +81,7 @@ fn test_key_metric_exists_in_output() {
         // Metacognition
         Box::new(MetacognitiveCalibrationBenchmark),
         Box::new(FeelingOfKnowingBenchmark),
+        Box::new(ChangeBlindnessBenchmark),
         // Affect
         Box::new(EmotionalStroopBenchmark),
         Box::new(MoodCongruentRecallBenchmark),
@@ -77,14 +89,17 @@ fn test_key_metric_exists_in_output() {
         // Creativity
         Box::new(AlternateUsesBenchmark),
         Box::new(RemoteAssociatesBenchmark),
+        Box::new(DivergentThinkingBenchmark),
         // Butlin
         Box::new(ButlinIndicatorSuite),
         // Inhibition
         Box::new(GoNoGoBenchmark),
         Box::new(StopSignalBenchmark),
+        Box::new(FlankerInhibitionBenchmark),
         // Attention
         Box::new(AttentionalBlinkBenchmark),
         Box::new(VisualSearchBenchmark),
+        Box::new(MismatchNegativityBenchmark),
         // Reasoning
         Box::new(ArcFluidBenchmark),
         Box::new(ArcCompositionalBenchmark),
@@ -105,6 +120,7 @@ fn test_key_metric_exists_in_output() {
         Box::new(SrttBenchmark),
         Box::new(FittsLawBenchmark),
         Box::new(BimanualBenchmark),
+        Box::new(ProprioceptiveDriftBenchmark),
         // Language
         Box::new(GardenPathBenchmark),
         Box::new(SemanticCoherenceBenchmark),
@@ -114,6 +130,82 @@ fn test_key_metric_exists_in_output() {
         Box::new(RmeBenchmark),
         Box::new(UltimatumGameBenchmark),
         Box::new(SocialNormBenchmark),
+        Box::new(PrisonersDilemmaBenchmark),
+        Box::new(PublicGoodsBenchmark),
+        Box::new(DictatorGameBenchmark),
+        Box::new(MachiavelliBenchmark),
+        // Binding
+        Box::new(TemporalOrderBenchmark),
+        Box::new(CrossModalBindingBenchmark),
+        Box::new(FeatureConjunctionBenchmark),
+        // Spatial
+        Box::new(MentalRotationBenchmark),
+        Box::new(SpatialPathUpdatingBenchmark),
+        Box::new(LandmarkBindingBenchmark),
+        Box::new(PerspectiveTakingBenchmark),
+        // Causal Reasoning
+        Box::new(causal_reasoning::CausalChainBenchmark),
+        Box::new(causal_reasoning::ConfoundDetectionBenchmark),
+        Box::new(causal_reasoning::InterventionEffectBenchmark),
+        // Speech
+        Box::new(PhonemeDiscriminationBenchmark),
+        Box::new(VotContinuumBenchmark),
+        Box::new(CategoricalPerceptionBenchmark),
+        // Consciousness
+        Box::new(BlindSightBenchmark),
+        Box::new(BinocularRivalryBenchmark),
+        Box::new(PerceptualCrowdingBenchmark),
+        // Substrate
+        Box::new(SubstrateTransferBenchmark),
+        Box::new(SubstrateDegradationBenchmark),
+        Box::new(SubstrateLatencyBenchmark),
+        // Clinical/Therapeutic
+        Box::new(EmpathicAccuracyBenchmark),
+        Box::new(TherapeuticResponseBenchmark),
+        Box::new(AllianceMaintenanceBenchmark),
+        Box::new(CrisisDetectionBenchmark),
+        Box::new(CognitiveDistortionBenchmark),
+        Box::new(MotivationalInterviewingBenchmark),
+        // Institutional Reasoning
+        Box::new(institutional_reasoning::InstitutionalReasoningBenchmark),
+        Box::new(institutional_reasoning::AnalogicalReasoningBenchmark),
+        Box::new(institutional_reasoning::CausalChainBenchmark),
+        Box::new(institutional_reasoning::CounterfactualReasoningBenchmark),
+        Box::new(institutional_reasoning::WeightedDecompositionBenchmark),
+        Box::new(institutional_reasoning::InstitutionalStabilityBenchmark),
+        Box::new(institutional_reasoning::InstitutionalIsomorphismBenchmark),
+        // Mathematics
+        Box::new(ArithmeticWordProblemsBenchmark),
+        Box::new(LinearSystemSolvingBenchmark),
+        Box::new(PolynomialRootsBenchmark),
+        Box::new(MatrixOperationsBenchmark),
+        Box::new(StatisticalInferenceBenchmark),
+        Box::new(BayesianReasoningBenchmark),
+        Box::new(LogicalDeductionBenchmark),
+        Box::new(ConstraintPuzzlesBenchmark),
+        Box::new(ProofConstructionBenchmark),
+        Box::new(DefiniteIntegralsBenchmark),
+        // Security (HDC-FHE)
+        Box::new(EncryptedClassificationBenchmark),
+        Box::new(CollectiveAggregationBenchmark),
+        Box::new(EncryptedLearningBenchmark),
+        Box::new(CrossMaskPrivacyBenchmark),
+        Box::new(EncryptedBindingBenchmark),
+        Box::new(ScalingAnalysisBenchmark),
+        // Neuromod
+        Box::new(PharmacologicalChallengeBenchmark),
+        Box::new(InjectionChallengeBenchmark),
+        Box::new(AllostaticStressBenchmark),
+        Box::new(RewardLearningBenchmark),
+        Box::new(YerkesDodsonBenchmark),
+        Box::new(AttentionNetworkBenchmark),
+        Box::new(MoodInductionBenchmark),
+        Box::new(PharmacologicalAblationBenchmark),
+        Box::new(BehavioralKnockoutBenchmark),
+        Box::new(ConsciousnessPharmacologyBenchmark),
+        Box::new(DoseResponseBenchmark),
+        Box::new(AntagonistProfilesBenchmark),
+        Box::new(ToleranceWithdrawalBenchmark),
     ];
 
     let mut failures = Vec::new();

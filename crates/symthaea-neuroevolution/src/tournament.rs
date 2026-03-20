@@ -173,8 +173,7 @@ impl NeuroevolutionEngine {
         self.generation += 1;
 
         // 1. Evaluate all organisms (parallel when rayon feature enabled)
-        self.fitness_bridge
-            .evaluate_auto(&mut self.population);
+        self.fitness_bridge.evaluate_auto(&mut self.population);
 
         // 2. Assign species
         self.assign_species();
@@ -550,7 +549,11 @@ impl NeuroevolutionEngine {
         let checkpoint = Checkpoint {
             generation: self.generation,
             best_genome: self.best_ever.as_ref().map(|(g, _)| g.clone()),
-            best_fitness: self.best_ever.as_ref().map(|(_, f)| *f).unwrap_or(f64::NEG_INFINITY),
+            best_fitness: self
+                .best_ever
+                .as_ref()
+                .map(|(_, f)| *f)
+                .unwrap_or(f64::NEG_INFINITY),
             population_genomes: self.population.iter().map(|o| o.genome.clone()).collect(),
             config: self.config.clone(),
             history: self.history.iter().cloned().collect(),
@@ -570,7 +573,9 @@ impl NeuroevolutionEngine {
             .population_genomes
             .into_iter()
             .enumerate()
-            .map(|(i, genome)| NeuralOrganism::spawn(i as u64, genome, &genesis, checkpoint.generation))
+            .map(|(i, genome)| {
+                NeuralOrganism::spawn(i as u64, genome, &genesis, checkpoint.generation)
+            })
             .collect();
 
         let mut engine = Self {

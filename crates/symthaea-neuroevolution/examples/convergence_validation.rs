@@ -6,9 +6,7 @@
 //! Run: cargo run -p symthaea-neuroevolution --example convergence_validation --release
 
 use std::time::Instant;
-use symthaea_neuroevolution::{
-    FepFitnessConfig, NeuroevolutionConfig, NeuroevolutionEngine,
-};
+use symthaea_neuroevolution::{FepFitnessConfig, NeuroevolutionConfig, NeuroevolutionEngine};
 
 fn main() {
     println!("=== Neuroevolution Convergence Validation ===");
@@ -69,15 +67,28 @@ fn main() {
     let result = engine.best_ever();
 
     println!("\n--- Results ---");
-    println!("  Total time:      {:.1}s ({:.1}s/gen)", total.as_secs_f64(), total.as_secs_f64() / 50.0);
+    println!(
+        "  Total time:      {:.1}s ({:.1}s/gen)",
+        total.as_secs_f64(),
+        total.as_secs_f64() / 50.0
+    );
     println!("  Monotonic violations: {}", monotonic_violations);
     if let Some((genome, fitness)) = result {
         let phenotype = genome.decode();
         println!("  Best fitness:    {:.6}", fitness);
         println!("  Evolved tau:     {:.4}", phenotype.neuron_config.tau_base);
-        println!("  Evolved LR:      {:.6}", phenotype.neuron_config.learning_rate);
-        println!("  Evolved layers:  {:?}", phenotype.network_config.layer_sizes);
-        println!("  Activation:      {:?}", phenotype.neuron_config.activation);
+        println!(
+            "  Evolved LR:      {:.6}",
+            phenotype.neuron_config.learning_rate
+        );
+        println!(
+            "  Evolved layers:  {:?}",
+            phenotype.network_config.layer_sizes
+        );
+        println!(
+            "  Activation:      {:?}",
+            phenotype.neuron_config.activation
+        );
     }
 
     // Save checkpoint
@@ -90,6 +101,9 @@ fn main() {
     if monotonic_violations == 0 {
         println!("\n  PASS: Fitness monotonically non-decreasing across all 50 generations.");
     } else {
-        println!("\n  WARN: {} monotonic violations detected (elitism bug?).", monotonic_violations);
+        println!(
+            "\n  WARN: {} monotonic violations detected (elitism bug?).",
+            monotonic_violations
+        );
     }
 }

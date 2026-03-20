@@ -11,6 +11,31 @@ use super::thresholds::{
     COMPOUND_INSTABILITY_AGREEMENT, COMPOUND_INSTABILITY_ERROR_SLOPE,
     EPISTEMIC_UNCERTAINTY_EMA_CURRENT, EPISTEMIC_UNCERTAINTY_EMA_PRIOR, FLOW_INTENSITY_FEEDBACK,
     PROPOSAL_CONFLICT_EXPLORATION,
+    // Round 18: output phase telemetry thresholds
+    CONFLICT_EXPLORATION_INCREMENT,
+    CONFIDENCE_VELOCITY_RISING_THRESHOLD, CONFIDENCE_VELOCITY_FALLING_THRESHOLD,
+    FLOW_INTENSITY_LR_THRESHOLD,
+    FEP_ACCURACY_EFFICIENCY_THRESHOLD, FEP_COMPLEXITY_EFFICIENCY_THRESHOLD,
+    LIVING_MIND_VITALITY_HIGH, LIVING_MIND_VITALITY_LOW,
+    META_COGNITIVE_ACCURACY_LOW, PREDICTIVE_SELF_SAFETY_HIGH,
+    EMBODIED_AGENCY_STABLE_MIN, EMBODIED_AGENCY_STABLE_MAX,
+    ATTENTION_SCHEMA_FATIGUE_THRESHOLD, ANOMALY_RECOVERY_PSI_MULTIPLIER,
+    CONSOLIDATION_CONSCIOUSNESS_OFFSET, CONSOLIDATION_THRESHOLD_MIN,
+    ERROR_SLOPE_CONSOLIDATION_THRESHOLD,
+    EPISTEMIC_PHI_HIGH, EPISTEMIC_PHI_LOW,
+    PHENOMENAL_BINDING_HIGH, PHENOMENAL_BINDING_LOW,
+    TEMPORAL_COHERENCE_HIGH, TEMPORAL_COHERENCE_LOW,
+    HOLOGRAPHIC_UNITY_HIGH, HOLOGRAPHIC_UNITY_LOW,
+    HARMONIES_ALIGNMENT_HIGH, HARMONIES_ALIGNMENT_LOW,
+    CONSCIOUSNESS_GRADIENT_LR_MOD_THRESHOLD,
+    VALUE_CACHE_HIT_RATE_LOW, VALUE_CACHE_HIT_RATE_HIGH,
+    CONSCIOUSNESS_STATE_LEVEL_HIGH, CONSCIOUSNESS_STATE_LEVEL_LOW,
+    LIVING_MIND_VITALITY_MOD_HIGH, LIVING_MIND_VITALITY_MOD_LOW,
+    LIVING_MIND_COHERENCE_MOD_HIGH, LIVING_MIND_COHERENCE_MOD_LOW,
+    MCTS_EFFECTIVENESS_MOD_HIGH, MCTS_EFFECTIVENESS_MOD_LOW,
+    RESONATOR_SIMILARITY_HIGH, RESONATOR_SIMILARITY_LOW,
+    BINDING_STRENGTH_TELEMETRY_HIGH, BINDING_STRENGTH_TELEMETRY_LOW,
+    PIPELINE_CONSCIOUSNESS_HIGH_THRESHOLD, PIPELINE_CONSCIOUSNESS_LOW_THRESHOLD,
 };
 use super::{CognitiveLoopService, CycleResult};
 
@@ -532,7 +557,7 @@ impl CognitiveLoopService {
             if conflict > PROPOSAL_CONFLICT_EXPLORATION && self.stats.total_cycles > 15 {
                 self.feedback_state.exploration.propose(
                     "high_conflict",
-                    super::feedback_state::FeedbackProposal::Add(0.02),
+                    super::feedback_state::FeedbackProposal::Add(CONFLICT_EXPLORATION_INCREMENT),
                 );
                 metadata.modulation.conflict_exploration_boost = true;
             }
@@ -546,12 +571,12 @@ impl CognitiveLoopService {
         metadata.modulation.temporal_discontinuity_recovery =
             feedback.self_model.temporal_discontinuity && self.stats.total_cycles > 15;
         metadata.modulation.binding_attention_modulated =
-            (feedback.self_model.cross_modal_binding_strength > 0.7
-                || feedback.self_model.cross_modal_binding_strength < 0.3)
+            (feedback.self_model.cross_modal_binding_strength > BINDING_STRENGTH_TELEMETRY_HIGH
+                || feedback.self_model.cross_modal_binding_strength < BINDING_STRENGTH_TELEMETRY_LOW)
                 && self.stats.total_cycles > 10;
         metadata.modulation.resonator_semantic_lr_mod = (dynamics.resonator.resonator_best_sim
-            > 0.8
-            || (dynamics.resonator.resonator_best_sim < 0.3
+            > RESONATOR_SIMILARITY_HIGH
+            || (dynamics.resonator.resonator_best_sim < RESONATOR_SIMILARITY_LOW
                 && dynamics.resonator.resonator_best_sim > 0.0))
             && self.stats.total_cycles > 10;
 
@@ -559,11 +584,11 @@ impl CognitiveLoopService {
         metadata.modulation.fep_td_converged =
             self.carryover.quality.consecutive_low_td_error > 10 && self.stats.total_cycles > 30;
         metadata.modulation.confidence_rising_dampen =
-            dynamics.neuromod.confidence_velocity > 0.02 && self.stats.total_cycles > 15;
+            dynamics.neuromod.confidence_velocity > CONFIDENCE_VELOCITY_RISING_THRESHOLD && self.stats.total_cycles > 15;
         metadata.modulation.flow_lr_boost =
-            self.flow_state.in_flow && self.flow_state.intensity > 0.5;
+            self.flow_state.in_flow && self.flow_state.intensity > FLOW_INTENSITY_LR_THRESHOLD;
         metadata.modulation.fep_efficiency_boost =
-            dynamics.fep.fep_accuracy > 0.5 && dynamics.fep.fep_complexity < 0.5;
+            dynamics.fep.fep_accuracy > FEP_ACCURACY_EFFICIENCY_THRESHOLD && dynamics.fep.fep_complexity < FEP_COMPLEXITY_EFFICIENCY_THRESHOLD;
         metadata.modulation.attention_overload_threshold =
             dynamics.attention.attention_budget_exceeded
                 && self.stats.attention_budget_exceeded_count > 1;
@@ -572,19 +597,19 @@ impl CognitiveLoopService {
 
         // ── Session 14 telemetry ──
         metadata.modulation.living_mind_vitality_feedback =
-            feedback.self_model.living_mind_vitality > 0.6
-                || (feedback.self_model.living_mind_vitality < 0.3
+            feedback.self_model.living_mind_vitality > LIVING_MIND_VITALITY_HIGH
+                || (feedback.self_model.living_mind_vitality < LIVING_MIND_VITALITY_LOW
                     && feedback.self_model.living_mind_vitality > 0.0);
         metadata.modulation.metacog_low_accuracy_dampen =
-            feedback.self_model.meta_cognitive_accuracy < 0.3 && self.stats.total_cycles > 20;
-        metadata.modulation.self_safety_lr_boost = feedback.self_model.predictive_self_safety > 0.7;
-        metadata.modulation.embodied_agency_stable = feedback.self_model.embodied_agency >= 0.4
-            && feedback.self_model.embodied_agency <= 0.6;
+            feedback.self_model.meta_cognitive_accuracy < META_COGNITIVE_ACCURACY_LOW && self.stats.total_cycles > 20;
+        metadata.modulation.self_safety_lr_boost = feedback.self_model.predictive_self_safety > PREDICTIVE_SELF_SAFETY_HIGH;
+        metadata.modulation.embodied_agency_stable = feedback.self_model.embodied_agency >= EMBODIED_AGENCY_STABLE_MIN
+            && feedback.self_model.embodied_agency <= EMBODIED_AGENCY_STABLE_MAX;
 
         // ── Session 15 telemetry ──
         metadata.modulation.pipeline_consciousness_gated = {
             let pc = self.carryover.quality.last_pipeline_consciousness;
-            (pc > 0.7 || (pc < 0.3 && pc > 0.0)) && self.stats.total_cycles > 15
+            (pc > PIPELINE_CONSCIOUSNESS_HIGH_THRESHOLD || (pc < PIPELINE_CONSCIOUSNESS_LOW_THRESHOLD && pc > 0.0)) && self.stats.total_cycles > 15
         };
         metadata.modulation.low_coherence_early_warning = {
             let clc = self.carryover.urgency.consecutive_low_coherence;
@@ -598,12 +623,12 @@ impl CognitiveLoopService {
             .self_model_tier
             .attention_schema
             .as_ref()
-            .map_or(false, |a| a.control_signal < 0.4);
+            .map_or(false, |a| a.control_signal < ATTENTION_SCHEMA_FATIGUE_THRESHOLD);
         metadata.modulation.resonator_sustained_low_boost = self.stats.total_cycles > 20
             && self.stats.resonator_error_exploration_count > (self.stats.total_cycles / 2) as u64;
         metadata.modulation.anomaly_recovery_phi_accelerated =
             self.carryover.urgency.anomaly_was_active
-                && self.stats.unified_psi > self.stats.avg_psi * 1.05;
+                && self.stats.unified_psi > self.stats.avg_psi * ANOMALY_RECOVERY_PSI_MULTIPLIER;
 
         // ── Session 16 telemetry ──
         {
@@ -666,7 +691,7 @@ impl CognitiveLoopService {
                 && (eff > HOMEOSTASIS_RECALIBRATE_HIGH
                     || (eff < HOMEOSTASIS_RECALIBRATE_LOW && eff > 0.0));
             metadata.modulation.confidence_falling_lr_boost =
-                dynamics.neuromod.confidence_velocity < -0.05 && self.stats.total_cycles > 15;
+                dynamics.neuromod.confidence_velocity < CONFIDENCE_VELOCITY_FALLING_THRESHOLD && self.stats.total_cycles > 15;
             let cv = self.carryover.quality.coherence_velocity;
             metadata.modulation.coherence_velocity_budget_scaled =
                 cv.abs() > COHERENCE_VELOCITY_BUDGET_THRESHOLD;
@@ -702,41 +727,41 @@ impl CognitiveLoopService {
         if self.stats.total_cycles > 15 {
             let phi_eff = metadata.quality.epistemic_phi_eff as f32;
             metadata.modulation.epistemic_phi_modulated =
-                phi_eff > 0.6 || (phi_eff > 0.0 && phi_eff < 0.2);
+                phi_eff > EPISTEMIC_PHI_HIGH || (phi_eff > 0.0 && phi_eff < EPISTEMIC_PHI_LOW);
 
             let pb = metadata.temporal.phenomenal_binding_strength as f32;
-            metadata.modulation.phenomenal_binding_modulated = pb > 0.7 || (pb > 0.0 && pb < 0.15);
+            metadata.modulation.phenomenal_binding_modulated = pb > PHENOMENAL_BINDING_HIGH || (pb > 0.0 && pb < PHENOMENAL_BINDING_LOW);
 
             let tc = metadata.temporal.temporal_coherence_score as f32;
-            metadata.modulation.temporal_coherence_modulated = tc > 0.75 || (tc > 0.0 && tc < 0.15);
+            metadata.modulation.temporal_coherence_modulated = tc > TEMPORAL_COHERENCE_HIGH || (tc > 0.0 && tc < TEMPORAL_COHERENCE_LOW);
 
             let hu = metadata.temporal.holographic_unity as f32;
-            metadata.modulation.holographic_unity_modulated = hu > 0.7 || (hu > 0.0 && hu < 0.15);
+            metadata.modulation.holographic_unity_modulated = hu > HOLOGRAPHIC_UNITY_HIGH || (hu > 0.0 && hu < HOLOGRAPHIC_UNITY_LOW);
 
             let ha = metadata.harmonics.harmonies_alignment;
-            metadata.modulation.harmonies_alignment_modulated = ha > 0.8 || ha < 0.2;
+            metadata.modulation.harmonies_alignment_modulated = ha > HARMONIES_ALIGNMENT_HIGH || ha < HARMONIES_ALIGNMENT_LOW;
 
             let cg = feedback.consciousness.consciousness_gradient_magnitude;
-            metadata.modulation.consciousness_gradient_lr_modulated = cg.abs() as f32 > 0.05;
+            metadata.modulation.consciousness_gradient_lr_modulated = cg.abs() as f32 > CONSCIOUSNESS_GRADIENT_LR_MOD_THRESHOLD;
 
             let vch = metadata.value_cache_hit_rate;
-            metadata.modulation.value_cache_confidence_modulated = vch < 0.3 || vch > 0.9;
+            metadata.modulation.value_cache_confidence_modulated = vch < VALUE_CACHE_HIT_RATE_LOW || vch > VALUE_CACHE_HIT_RATE_HIGH;
 
             let csl = feedback.consciousness.consciousness_state_level as f32;
             metadata.modulation.consciousness_state_modulated =
-                csl > 0.7 || (csl > 0.0 && csl < 0.2);
+                csl > CONSCIOUSNESS_STATE_LEVEL_HIGH || (csl > 0.0 && csl < CONSCIOUSNESS_STATE_LEVEL_LOW);
 
             metadata.modulation.living_mind_vitality_modulated = metadata.living_mind_vitality
                 > 0.0
-                && (metadata.living_mind_vitality > 0.7 || metadata.living_mind_vitality < 0.3);
+                && (metadata.living_mind_vitality > LIVING_MIND_VITALITY_MOD_HIGH || metadata.living_mind_vitality < LIVING_MIND_VITALITY_MOD_LOW);
 
             metadata.modulation.living_mind_coherence_modulated = metadata.living_mind_coherence
                 > 0.0
-                && (metadata.living_mind_coherence > 0.7 || metadata.living_mind_coherence < 0.3);
+                && (metadata.living_mind_coherence > LIVING_MIND_COHERENCE_MOD_HIGH || metadata.living_mind_coherence < LIVING_MIND_COHERENCE_MOD_LOW);
 
             let mpe = metadata.mcts_plan_effectiveness;
             metadata.modulation.mcts_effectiveness_modulated =
-                mpe > 0.6 || (mpe > 0.0 && mpe < 0.2);
+                mpe > MCTS_EFFECTIVENESS_MOD_HIGH || (mpe > 0.0 && mpe < MCTS_EFFECTIVENESS_MOD_LOW);
         }
 
         // ── GWT handler telemetry ──
@@ -753,7 +778,7 @@ impl CognitiveLoopService {
         // GWT broadcast (Dehaene & Changeux 2011) or rising error slope
         // (Rao & Ballard 1999) → record state for episodic replay.
         let should_consolidate =
-            metadata.gwt_memory_consolidation_requested || (perception.urgency.error_slope > 0.03);
+            metadata.gwt_memory_consolidation_requested || (perception.urgency.error_slope > ERROR_SLOPE_CONSOLIDATION_THRESHOLD);
         if should_consolidate {
             if let Some(ref mut dream) = self.dream_engine {
                 let action: Vec<f32> = perception
@@ -1373,7 +1398,7 @@ impl CognitiveLoopService {
                 .values
                 .chunks(chunk_size)
                 .take(32)
-                .map(|chunk: &[f32]| chunk.iter().sum::<f32>() / chunk.len() as f32)
+                .map(|chunk: &[f32]| (chunk.iter().sum::<f32>() / chunk.len() as f32).clamp(-1.0, 1.0))
                 .collect()
         };
 
@@ -1507,8 +1532,12 @@ impl CognitiveLoopService {
         // slow substrates (tau > 1.0) blend more gently with cycle-start values.
         let feedback_consensus = if (self.substrate_manager.tau_factor - 1.0).abs() > 0.05 {
             let tau = self.substrate_manager.tau_factor.max(0.01); // Guard: prevent div-by-zero
-            // Integration strength: tau=0.5 → 100% consensus, tau=2.0 → 50% consensus
-            let integration_rate = if tau.is_finite() { (1.0 / tau).clamp(0.5, 1.0) as f64 } else { 1.0 };
+                                                                   // Integration strength: tau=0.5 → 100% consensus, tau=2.0 → 50% consensus
+            let integration_rate = if tau.is_finite() {
+                (1.0 / tau).clamp(0.5, 1.0) as f64
+            } else {
+                1.0
+            };
             let cs = &self.feedback_state;
             super::feedback_state::ConsensusResult {
                 consensus_confidence: cs.cycle_start_confidence() * (1.0 - integration_rate)

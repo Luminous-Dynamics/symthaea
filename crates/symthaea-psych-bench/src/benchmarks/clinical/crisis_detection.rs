@@ -797,6 +797,48 @@ fn build_scenarios() -> Vec<CrisisScenario> {
         is_indirect: true,
     });
 
+    // ── Ambiguous crisis scenarios (no explicit keywords) ──────────────
+    // These represent the clinical reality where crisis presentations
+    // use euphemistic, metaphorical, or contextual language that
+    // keyword-based systems miss. Human clinicians detect these through
+    // clinical intuition and contextual reasoning (Rudd et al., 2006).
+    scenarios.push(CrisisScenario {
+        text: "I've been settling all my affairs and saying goodbye to everyone important",
+        level: CrisisLevel::High,
+        crisis_type: CrisisType::Suicidal,
+        is_indirect: true,
+    });
+    scenarios.push(CrisisScenario {
+        text: "I found a quiet place where nobody will find me in time",
+        level: CrisisLevel::Critical,
+        crisis_type: CrisisType::Suicidal,
+        is_indirect: true,
+    });
+    scenarios.push(CrisisScenario {
+        text: "I've been researching what happens after and I feel calm about it now",
+        level: CrisisLevel::High,
+        crisis_type: CrisisType::Suicidal,
+        is_indirect: true,
+    });
+    scenarios.push(CrisisScenario {
+        text: "My partner says if I leave he will make sure I regret it forever",
+        level: CrisisLevel::High,
+        crisis_type: CrisisType::DomesticViolence,
+        is_indirect: true,
+    });
+    scenarios.push(CrisisScenario {
+        text: "The shapes on the wall keep changing and telling me things I need to do",
+        level: CrisisLevel::High,
+        crisis_type: CrisisType::Psychosis,
+        is_indirect: true,
+    });
+    scenarios.push(CrisisScenario {
+        text: "I mixed everything together and drank it all and now I feel strange",
+        level: CrisisLevel::Critical,
+        crisis_type: CrisisType::SubstanceCrisis,
+        is_indirect: true,
+    });
+
     // ── True Negatives: Benign language (should NOT detect) ──────────────
     scenarios.push(CrisisScenario {
         text: "I had a good day today at work",

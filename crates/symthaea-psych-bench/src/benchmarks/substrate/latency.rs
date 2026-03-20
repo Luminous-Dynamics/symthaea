@@ -116,8 +116,43 @@ impl SubstrateLatencyBenchmark {
                     memory.clone()
                 };
 
-                // Retrieve: unbind role to get item, then match
-                let retrieved = degraded_memory.bind(&roles[query_idx]);
+                // Rehearsal encoding: slower substrates have more time for
+                // iterative cleanup (Rundus, 1971; Baddeley, 2003 — rehearsal
+                // in working memory). Number of rehearsal passes scales with
+                // available time (inversely proportional to speed). Fast
+                // substrates (speed ≈ 1.0) get 1 pass; slow substrates
+                // (speed ≈ 0.1) get up to 3 passes. Each pass unbinds the
+                // query role, producing a noisy estimate, then averages
+                // across passes for a cleaner retrieval signal.
+                let rehearsal_passes = ((1.0 - speed) * 3.0).ceil().max(1.0) as usize;
+
+                // Retrieve: unbind role to get item, with rehearsal averaging
+                let retrieved = if rehearsal_passes <= 1 {
+                    degraded_memory.bind(&roles[query_idx])
+                } else {
+                    // Multiple retrieval passes with independent noise,
+                    // then bundle (average) for noise cancellation
+                    let mut pass_results: Vec<ContinuousHV> = Vec::with_capacity(rehearsal_passes);
+                    for _pass in 0..rehearsal_passes {
+                        // Each pass gets slightly different noise realization
+                        xor_shift(&mut rng);
+                        let pass_noise = ContinuousHV::random(dim, rng);
+                        let pass_memory = if latency_noise > 0.005 {
+                            // Re-degrade original memory with fresh noise
+                            ContinuousHV::weighted_bundle(
+                                &[&memory, &pass_noise],
+                                &[1.0 - latency_noise, latency_noise],
+                            )
+                        } else {
+                            memory.clone()
+                        };
+                        pass_results.push(pass_memory.bind(&roles[query_idx]));
+                    }
+                    // Average across rehearsal passes — independent noise
+                    // cancels, improving SNR by √(passes)
+                    let refs: Vec<&ContinuousHV> = pass_results.iter().collect();
+                    ContinuousHV::bundle(&refs)
+                };
 
                 let mut best_idx = 0;
                 let mut best_sim = f32::NEG_INFINITY;

@@ -8,6 +8,9 @@ license = "MIT"
 [features]
 default = ["analytical"]
 analytical = []
+nurbs = []
+printer-control = []
+slicer = []
 
 [dependencies]
 symthaea-core = { path = "../../symthaea-core" }

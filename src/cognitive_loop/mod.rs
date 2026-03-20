@@ -203,8 +203,14 @@ pub use managers::{
     CompressedDelta, NetworkHealth, PayloadClass, PayloadClassifier, RadioTier, RoutingDecision,
     SpectrumManager, SpectrumObservation, SpectrumTelemetry,
 };
+#[cfg(feature = "mesh")]
+pub(crate) use managers::radio_dispatcher::{
+    ConsciousnessAwareRouter, StoreAndForward,
+};
 
 pub mod calibration;
+#[cfg(feature = "mathematics")]
+pub mod math_epistemic;
 #[cfg(feature = "mathematics")]
 pub mod math_service;
 
@@ -683,6 +689,10 @@ pub struct CognitiveLoopService {
     /// Implements CognitiveSubsystem — proposals fed into OutputCollector.
     perception_manager: managers::PerceptionManager,
 
+    /// Soul Manager: value alignment → confidence, exploration, LR modulation.
+    /// Implements CognitiveSubsystem at interval 43. Active when soul is enabled.
+    soul_manager: Option<managers::SoulManager>,
+
     /// Governance Manager: Mycelix governance events → neuromod contagion, confidence,
     /// exploration. Implements CognitiveSubsystem at interval 37. Feature-gated behind `mycelix`.
     #[cfg(feature = "mycelix")]
@@ -710,6 +720,15 @@ pub struct CognitiveLoopService {
     /// Implements CognitiveSubsystem at interval 53. Feature-gated behind `mesh`.
     #[cfg(feature = "mesh")]
     pub(crate) spectrum_manager: SpectrumManager,
+
+    /// Consciousness-Aware Router: Routes mesh traffic by Phi, moral urgency,
+    /// governance tier. Adaptive sharing cadence based on collective coherence.
+    #[cfg(feature = "mesh")]
+    pub(crate) consciousness_router: ConsciousnessAwareRouter,
+
+    /// Store-and-Forward: Dream-consolidated reconnection for intermittent mesh nodes.
+    #[cfg(feature = "mesh")]
+    pub(crate) store_and_forward: StoreAndForward,
 
     /// CPG Manager: Kuramoto coupled oscillators for rhythmic motor timing.
     /// Implements CognitiveSubsystem at interval 59. Feature-gated behind `cpg`.

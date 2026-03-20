@@ -1067,6 +1067,16 @@ impl KnowledgeManager {
         self.ontology_lr_multiplier = (0.5 + prediction_error * 1.5).clamp(0.3, 2.0);
     }
 
+    /// Modulate knowledge learning rate by consciousness level.
+    /// High Psi → boosted plasticity (conscious moments are more memorable).
+    /// Science: Dehaene et al. (2006) — conscious access enhances learning and memory.
+    pub fn modulate_lr_from_consciousness(&mut self, unified_psi: f64) {
+        // Consciousness boost: [0.85, 1.15] range, centered at psi=0.5
+        let consciousness_factor = (0.85 + unified_psi * 0.3).clamp(0.85, 1.15) as f32;
+        self.ontology_lr_multiplier *= consciousness_factor;
+        self.ontology_lr_multiplier = self.ontology_lr_multiplier.clamp(0.3, 2.5);
+    }
+
     /// Get per-domain uncertainty: (domain_name, avg_confidence, fact_count).
     /// Sorted by confidence ascending (most uncertain first).
     pub fn domain_uncertainty(&self) -> Vec<(String, f32, usize)> {

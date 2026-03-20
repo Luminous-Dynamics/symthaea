@@ -261,6 +261,34 @@ pub struct LiquidMambaConfig {
     /// Number of random row pairs sampled per orthogonality gradient step (default 64).
     #[serde(default = "default_orthogonality_samples")]
     pub orthogonality_samples: usize,
+
+    // ── W4.1: Per-Layer Delta from Coherence ──
+    /// Enable per-layer delta modulation conditioned on HDC coherence.
+    /// Early layers (syntax) get stronger modulation, later layers (semantics) get weaker.
+    #[serde(default)]
+    pub enable_per_layer_delta: bool,
+    /// Strength of per-layer gradient (0.0-1.0). Default 0.3.
+    /// Controls how much early vs late layers differ in delta scaling.
+    #[serde(default = "default_per_layer_delta_strength")]
+    pub per_layer_delta_strength: f32,
+
+    // ── W4.2: Compositional Back-Projection ──
+    /// Enable Phase 1's compositional refinement on back-projected token HDC vectors.
+    /// Makes Mamba coherence monitoring consistent with CfC-HDC path.
+    #[serde(default)]
+    pub enable_compositional_backproj: bool,
+    /// Blend weight for compositional back-projection correction. Default 0.15.
+    #[serde(default = "default_compositional_backproj_alpha")]
+    pub compositional_backproj_alpha: f32,
+
+    // ── W4.3: Soft Mamba Veto ──
+    /// Enable soft veto: scale hidden states instead of full reset on veto trigger.
+    /// Preserves semantic context through the veto event.
+    #[serde(default)]
+    pub enable_soft_mamba_veto: bool,
+    /// Scale factor for soft veto (0.0 = full erase, 1.0 = no change). Default 0.3.
+    #[serde(default = "default_mamba_veto_scale")]
+    pub mamba_veto_scale: f32,
 }
 
 fn default_grad_clip() -> f32 {
@@ -307,6 +335,15 @@ fn default_lora_lr() -> f32 {
 }
 fn default_e2e_grad_chunks() -> usize {
     1
+}
+fn default_per_layer_delta_strength() -> f32 {
+    0.3
+}
+fn default_compositional_backproj_alpha() -> f32 {
+    0.15
+}
+fn default_mamba_veto_scale() -> f32 {
+    0.3
 }
 
 impl Default for LiquidMambaConfig {
@@ -374,6 +411,12 @@ impl Default for LiquidMambaConfig {
             gating_config: GatingConfig::default(),
             orthogonality_weight: 0.0,
             orthogonality_samples: 64,
+            enable_per_layer_delta: false,
+            per_layer_delta_strength: 0.3,
+            enable_compositional_backproj: false,
+            compositional_backproj_alpha: 0.15,
+            enable_soft_mamba_veto: false,
+            mamba_veto_scale: 0.3,
         }
     }
 }
@@ -713,6 +756,22 @@ impl LiquidMambaGenerator {
                     // delta_scale: CfC tiredness → smaller temporal steps (more conservative)
                     // b_scale: same signal modulates input sensitivity
                     self.mamba.set_cfc_modulation(scale, scale.sqrt());
+
+                    // W4.1: Per-layer delta modulation conditioned on coherence.
+                    // Early layers (syntax) get stronger modulation, later layers
+                    // (semantics) get weaker. When last token had low coherence,
+                    // early layers are pushed harder to correct syntax.
+                    if self.config.enable_per_layer_delta {
+                        let n_layer = self.mamba.n_layer();
+                        let strength = self.config.per_layer_delta_strength;
+                        let mut per_layer = vec![1.0f32; n_layer];
+                        for (i, delta) in per_layer.iter_mut().enumerate() {
+                            let layer_frac = i as f32 / (n_layer - 1).max(1) as f32;
+                            // Early layers: scale * (1.0), Late layers: scale * (1-strength)
+                            *delta = scale * (1.0 - layer_frac * strength);
+                        }
+                        self.mamba.set_per_layer_delta_modulation(&per_layer);
+                    }
                 }
 
                 // 7b. Forward one token through Mamba
@@ -743,11 +802,7 @@ impl LiquidMambaGenerator {
 
                 // 7d2. Repetition penalty (frequency-scaled)
                 if self.config.repetition_penalty > 1.0 && !tokens.is_empty() {
-                    apply_repetition_penalty(
-                        &mut logits,
-                        &tokens,
-                        self.config.repetition_penalty,
-                    );
+                    apply_repetition_penalty(&mut logits, &tokens, self.config.repetition_penalty);
                 }
 
                 // 7e. Top-k sampling
@@ -755,11 +810,25 @@ impl LiquidMambaGenerator {
 
                 // 7f. Back-project token to HDC (unconditional — for distillation + veto)
                 let token_emb = self.mamba.embedding_vector(next_token)?;
-                let token_hdc = if let Some(ref tp) = self.temporal_proj {
+                let mut token_hdc = if let Some(ref tp) = self.temporal_proj {
                     tp.project_to_hdc(&token_emb)
                 } else {
                     self.projection.project_to_hdc(&token_emb)
                 };
+
+                // W4.2: Compositional back-projection refinement.
+                // Apply Phase 1's bind(thought_hv) correction to back-projected vectors
+                // so coherence monitoring measures thought-conditioned similarity.
+                if self.config.enable_compositional_backproj {
+                    let alpha = self.config.compositional_backproj_alpha.clamp(0.0, 1.0);
+                    if alpha > 1e-6 {
+                        let correction = token_hdc.bind(&thought_hv).normalize();
+                        token_hdc = ContinuousHV::weighted_bundle(
+                            &[&token_hdc, &correction],
+                            &[1.0 - alpha, alpha],
+                        );
+                    }
+                }
                 output_hvs.push(token_hdc.clone());
 
                 // 7f2. Per-token PE feedback: compute token-level coherence with thought
@@ -790,20 +859,34 @@ impl LiquidMambaGenerator {
                             cb(&self.config.veto_hesitation);
                         }
 
-                        // Reset Mamba and re-inject thought context
-                        if let Some(ref tp) = self.temporal_proj {
-                            let sequence = if self.config.temporal_chunk_budget > 0 {
-                                tp.project_to_ssm_sequence_topk(
-                                    &thought_hv,
-                                    self.config.temporal_chunk_budget,
-                                )
+                        // W4.3: Soft Mamba veto — scale hidden states instead of
+                        // full reset to preserve semantic context through the veto.
+                        if self.config.enable_soft_mamba_veto {
+                            self.mamba.scale_hidden_states(self.config.mamba_veto_scale)?;
+                            // Partial re-anchor: inject only last 8 temporal chunks
+                            if let Some(ref tp) = self.temporal_proj {
+                                let sequence = tp.project_to_ssm_sequence(&thought_hv);
+                                let tail = sequence.len().saturating_sub(8);
+                                self.mamba.inject_context_sequence(&sequence[tail..])?;
                             } else {
-                                tp.project_to_ssm_sequence(&thought_hv)
-                            };
-                            self.mamba.inject_context_sequence(&sequence)?;
+                                self.mamba.inject_initial_context(&ssm_context)?;
+                            }
                         } else {
-                            self.mamba.reset();
-                            self.mamba.inject_initial_context(&ssm_context)?;
+                            // Original hard veto: full reset + re-inject
+                            if let Some(ref tp) = self.temporal_proj {
+                                let sequence = if self.config.temporal_chunk_budget > 0 {
+                                    tp.project_to_ssm_sequence_topk(
+                                        &thought_hv,
+                                        self.config.temporal_chunk_budget,
+                                    )
+                                } else {
+                                    tp.project_to_ssm_sequence(&thought_hv)
+                                };
+                                self.mamba.inject_context_sequence(&sequence)?;
+                            } else {
+                                self.mamba.reset();
+                                self.mamba.inject_initial_context(&ssm_context)?;
+                            }
                         }
                         coherence_monitor.reset();
 

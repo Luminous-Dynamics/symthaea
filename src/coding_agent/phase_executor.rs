@@ -1,10 +1,8 @@
-use super::CodingAgent;
 use super::types::*;
+use super::CodingAgent;
 use crate::action::primitives::{Atom, Molecule, MoleculeExecutor, PrimitiveValue};
-use crate::action::{ActionOutcome};
-use crate::cognitive_loop::motor_output_bridge::{
-    ActionType, MotorOutputResult,
-};
+use crate::action::ActionOutcome;
+use crate::cognitive_loop::motor_output_bridge::{ActionType, MotorOutputResult};
 use crate::cognitive_loop::CycleResult;
 use crate::consciousness::fep_active_inference::MotorCommandType;
 use crate::language::intelligent_dispatcher::BackendTier;

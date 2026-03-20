@@ -1,5 +1,5 @@
-use super::CodingAgent;
 use super::types::*;
+use super::CodingAgent;
 use crate::language::intelligent_dispatcher::{BackendTier, DispatchResult, IntelligentDispatcher};
 use crate::language::llm_backend::GenerationParams;
 use crate::mind::structured_thought::EpistemicStatus;

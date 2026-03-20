@@ -762,8 +762,9 @@ fn encode_scenario(scenario: &TherapeuticScenario, base_seed: u64) -> BinaryHV {
 fn encode_ideal_response(scenario: &TherapeuticScenario, base_seed: u64) -> BinaryHV {
     let optimal_hv = skill_prototype(scenario.optimal_skill, base_seed);
 
-    // Add difficulty-dependent noise: harder scenarios → noisier signal
-    let noise = 0.02 + (1.0 - scenario.difficulty) * 0.06;
+    // Add difficulty-dependent noise: harder scenarios → noisier signal.
+    // Range: easy (difficulty=0.2) → noise=0.14, hard (difficulty=0.9) → noise=0.08.
+    let noise = 0.05 + (1.0 - scenario.difficulty) * 0.10;
     let noise_seed = base_seed.wrapping_add(900_000).wrapping_add(
         scenario
             .id
@@ -792,8 +793,9 @@ fn evaluate_trial(
 ) -> (usize, [f64; 12]) {
     let ideal = encode_ideal_response(scenario, base_seed);
 
-    // Add per-trial noise to simulate response variability across trials
-    let deviation = scenario.difficulty * 0.15 + 0.05;
+    // Add per-trial noise to simulate response variability across trials.
+    // Higher difficulty → more deviation from ideal (modeling clinical uncertainty).
+    let deviation = scenario.difficulty * 0.18 + 0.08;
     let response = ideal.add_noise(deviation, trial_seed);
 
     let mut scores = [0.0f64; 12];
@@ -804,6 +806,23 @@ fn evaluate_trial(
         // Base similarity: response (≈ optimal skill HV + noise) vs. candidate skill HV.
         // Optimal skill scores ~1 - noise_rate ≈ 0.85–0.95; all others score ~0.50.
         let sim = response.similarity(&skill_hv) as f64;
+
+        // ── Skill confusion noise ──
+        // Human clinicians confuse related skills, e.g. "reflection" vs
+        // "interpretation", "paraphrasing" vs "reflecting meaning" (Hill 2009,
+        // Ch. 15). Same-stage non-optimal skills get a similarity boost that
+        // makes them competitive with the optimal skill on harder scenarios.
+        // This narrows the HDC discrimination gap between optimal and
+        // related skills, modeling the real difficulty of skill selection.
+        let confusion_boost = if *skill != scenario.optimal_skill {
+            // Same-stage skills are most confusable
+            let stage_match = skill.stage() == scenario.optimal_skill.stage();
+            let base_confusion: f64 = if stage_match { 0.15 } else { 0.06 };
+            // Harder scenarios produce more confusion
+            base_confusion * scenario.difficulty as f64
+        } else {
+            0.0
+        };
 
         // ── Context-based adjustments ──
 
@@ -882,7 +901,7 @@ fn evaluate_trial(
             0.0
         };
 
-        scores[i] = sim + stage_adj + distress_adj + alliance_adj + session_adj;
+        scores[i] = sim + confusion_boost + stage_adj + distress_adj + alliance_adj + session_adj;
     }
 
     // Select the skill with the highest adjusted score

@@ -7,7 +7,7 @@
 
 /// SNR threshold below which a channel is considered jammed (dB).
 /// Science: Haykin (2005) — cognitive radio spectrum sensing threshold.
-pub const RADIO_JAMMING_SNR_THRESHOLD: f32 = 5.0;
+pub const RADIO_JAMMING_SNR_THRESHOLD: f64 = 5.0;
 
 /// Arousal spike when jamming is detected (threat response).
 /// Science: LeDoux (2003) — amygdala rapid threat detection.
@@ -72,11 +72,11 @@ pub const RADIO_SPECTRUM_PE_SURPRISE_THRESHOLD: f64 = 0.5;
 
 /// Maximum arousal contribution from spectrum prediction error.
 /// Science: Bounded arousal prevents runaway excitation (Yerkes-Dodson 1908).
-pub const RADIO_SPECTRUM_PE_AROUSAL_MAX: f32 = 0.08;
+pub const RADIO_SPECTRUM_PE_AROUSAL_MAX: f64 = 0.08;
 
 /// Arousal scale factor for spectrum prediction error.
 /// Science: Linear mapping from PE magnitude to arousal delta.
-pub const RADIO_SPECTRUM_PE_AROUSAL_SCALE: f32 = 0.05;
+pub const RADIO_SPECTRUM_PE_AROUSAL_SCALE: f64 = 0.05;
 
 /// Waterfall ring buffer capacity (spectrum observations kept for pattern detection).
 /// Science: ~64 observations at 53-cycle interval ≈ 3400 cycles of history.
@@ -92,7 +92,7 @@ pub const RADIO_HOP_COOLDOWN_CYCLES: u32 = 5;
 
 /// SNR improvement threshold to trigger a frequency hop (dB).
 /// Science: Only hop if predicted SNR gain exceeds measurement noise floor.
-pub const RADIO_HOP_SNR_IMPROVEMENT_DB: f32 = 3.0;
+pub const RADIO_HOP_SNR_IMPROVEMENT_DB: f64 = 3.0;
 
 /// Peer discovery beacon interval (cycles between beacon transmissions).
 /// Science: Balance discovery latency vs duty cycle budget (Heinrichs 2003).
@@ -114,7 +114,7 @@ pub const RADIO_ROUTE_EXPIRY_CYCLES: u64 = 500;
 
 /// FEC overhead ratio for Metro tier (Reed-Solomon parity bytes / data bytes).
 /// Science: RS(255,223) = 14% overhead, corrects up to 16 byte errors.
-pub const RADIO_FEC_OVERHEAD_RATIO: f32 = 0.14;
+pub const RADIO_FEC_OVERHEAD_RATIO: f64 = 0.14;
 
 /// FEC minimum payload size (bytes). Below this, FEC overhead exceeds benefit.
 pub const RADIO_FEC_MIN_PAYLOAD: usize = 32;
@@ -182,19 +182,19 @@ pub const RADIO_ENERGY_AWARE_THRESHOLD: f64 = 0.5;
 
 /// Exploration dampening when network is in full blackout (all tiers down).
 /// Science: Conservation of resources under extreme stress (Hobfoll 1989).
-pub const RADIO_BLACKOUT_STRATEGY_EXPLORATION_DAMPEN: f32 = 0.15;
+pub const RADIO_BLACKOUT_STRATEGY_EXPLORATION_DAMPEN: f64 = 0.15;
 
 /// Exploration dampening when network is degraded (metro-only).
 /// Science: Moderate stress reduces exploratory behavior (Yerkes-Dodson 1908).
-pub const RADIO_DEGRADED_STRATEGY_EXPLORATION_DAMPEN: f32 = 0.05;
+pub const RADIO_DEGRADED_STRATEGY_EXPLORATION_DAMPEN: f64 = 0.05;
 
 /// NE baseline nudge during sustained jamming (≥3 consecutive cycles).
 /// Science: Locus coeruleus NE response to sustained threat (Aston-Jones & Cohen 2005).
-pub const RADIO_JAMMING_NE_NUDGE: f32 = 0.02;
+pub const RADIO_JAMMING_NE_NUDGE: f64 = 0.02;
 
 /// DA baseline nudge on network recovery (jamming/degradation → healthy).
 /// Science: Reward prediction error signal on threat resolution (Schultz 1997).
-pub const RADIO_RECOVERY_DA_NUDGE: f32 = 0.015;
+pub const RADIO_RECOVERY_DA_NUDGE: f64 = 0.015;
 
 /// Minimum consecutive jamming cycles before neuromod coupling activates.
 pub const RADIO_NEUROMOD_JAMMING_MIN_STREAK: u32 = 3;

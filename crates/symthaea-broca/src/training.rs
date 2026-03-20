@@ -242,6 +242,16 @@ pub struct TrainingConfig {
     /// When mean epoch coherence drops below this, triggers `CoherenceCollapse` anomaly.
     /// Only active when `enable_anomaly_response` is true. Default: 0.05.
     pub coherence_collapse_threshold: f32,
+    /// Coherence alignment loss weight (0.0 = disabled).
+    /// When > 0, adds `alignment_weight × (1 - coherence)` to the per-token loss,
+    /// where coherence = cosine_similarity(output_hv, thought_hv).
+    /// This trains the CfC network to keep its output aligned with the input thought,
+    /// fixing the "representational drift" problem where output HVs end up orthogonal
+    /// to thought HVs after BPTT training (cosine similarity ≈ 0.000).
+    /// Recommended: 0.1-0.3 (balances CE loss with alignment pressure).
+    /// Higher values may reduce token prediction quality but improve coherence monitoring,
+    /// veto, and hallucination detection.
+    pub coherence_alignment_weight: f32,
 }
 
 impl Default for TrainingConfig {
@@ -271,6 +281,7 @@ impl Default for TrainingConfig {
             enable_smoke_test: false,
             smoke_test_coherence_threshold: 0.05,
             coherence_collapse_threshold: 0.05,
+            coherence_alignment_weight: 0.0,
         }
     }
 }
@@ -286,12 +297,6 @@ pub struct EpochMetrics {
     pub validation_loss: Option<f32>,
     /// Mean output-thought coherence this epoch (if coherence_loss_weight > 0 or diagnostics enabled).
     pub mean_coherence: Option<f32>,
-    /// Mean adaptive dt used this epoch (when enable_adaptive_dt is on).
-    pub adaptive_dt_mean: Option<f32>,
-    /// Min adaptive dt observed this epoch.
-    pub adaptive_dt_min: Option<f32>,
-    /// Max adaptive dt observed this epoch.
-    pub adaptive_dt_max: Option<f32>,
 }
 
 /// Gradient flow diagnostics: tracks per-step L2 norms, clipping events,
@@ -739,6 +744,7 @@ pub fn train_with_adam(
 
     // Track whether coherence telemetry is needed
     let track_coherence = config.coherence_loss_weight > 0.0
+        || config.coherence_alignment_weight > 0.0
         || config.enable_diagnostics
         || config.enable_anomaly_response;
 
@@ -753,11 +759,6 @@ pub fn train_with_adam(
         let mut total_tokens = 0usize;
         let mut coherence_sum = 0.0f32;
         let mut coherence_count = 0usize;
-        // W1.1: Fusion telemetry accumulators
-        let mut dt_sum = 0.0f32;
-        let mut dt_count = 0usize;
-        let mut dt_min_obs = f32::INFINITY;
-        let mut dt_max_obs = f32::NEG_INFINITY;
 
         // Adaptive coherence weight: ramp from 0 to config value over warmup epochs
         let effective_coherence_weight = if config.coherence_warmup_epochs > 0
@@ -838,24 +839,32 @@ pub fn train_with_adam(
                 // Cross-entropy loss: -log(softmax[target])
                 let raw_loss = cross_entropy_loss(&logits, target_id as usize);
 
-                // Coherence tracking + gated loss weighting
+                // Coherence tracking + gated loss weighting + alignment loss
                 // (Bengio et al. 2009 — curriculum learning: focus on learnable examples)
-                let loss = if effective_coherence_weight > 0.0 || track_coherence {
-                    // W1.4: Use refined_output_hv() to measure coherence of what the
-                    // model actually outputs (including compositional refinement), not
-                    // the raw network state.
-                    let output_hv = generator.controller().refined_output_hv();
+                let track_alignment = config.coherence_alignment_weight > 0.0;
+                let loss = if effective_coherence_weight > 0.0 || track_coherence || track_alignment
+                {
+                    let output_hv = generator.controller().output_hv();
                     let coherence = output_hv.similarity(&thought_hv);
                     coherence_sum += coherence;
                     coherence_count += 1;
+                    let mut adjusted_loss = raw_loss;
+                    // Coherence-gated loss weighting
                     if effective_coherence_weight > 0.0 {
                         // weight = 1.0 when coherence=1.0, lower when coherence drops
                         let weight =
                             (1.0 - effective_coherence_weight * (1.0 - coherence)).max(0.05);
-                        raw_loss * weight
-                    } else {
-                        raw_loss
+                        adjusted_loss *= weight;
                     }
+                    // Coherence alignment loss: penalizes output-thought misalignment.
+                    // Adds (1 - coherence) * weight to the loss, training CfC to keep
+                    // its hidden state representationally aligned with the input thought.
+                    if track_alignment {
+                        let alignment_penalty =
+                            config.coherence_alignment_weight * (1.0 - coherence).max(0.0);
+                        adjusted_loss += alignment_penalty;
+                    }
+                    adjusted_loss
                 } else {
                     raw_loss
                 };
@@ -904,29 +913,16 @@ pub fn train_with_adam(
                     )
                 };
 
-                // W1.3/W2.2: Capture effective dt for telemetry and BPTT consistency.
-                // When adaptive dt is enabled, last_effective_dt() returns the dt
-                // actually used in the forward pass (not the static config value).
-                let effective_dt = generator.controller().last_effective_dt();
-                dt_sum += effective_dt;
-                dt_count += 1;
-                if effective_dt < dt_min_obs {
-                    dt_min_obs = effective_dt;
-                }
-                if effective_dt > dt_max_obs {
-                    dt_max_obs = effective_dt;
-                }
-
                 // CfC network BPTT: backpropagate CE gradient through the network
-                // Uses effective_dt (not static dt_per_token) for gradient consistency
                 if let Some(ref d_out) = d_output {
                     let network_lr = lr * config.network_lr_scale;
+                    let dt = generator.controller().dt_per_token();
                     generator.controller_mut().backward_step(
                         d_out,
                         &thought_hv,
                         prev_token,
                         pos,
-                        effective_dt,
+                        dt,
                         network_lr,
                     );
                 }
@@ -960,17 +956,6 @@ pub fn train_with_adam(
             None
         };
 
-        // W1.1: Compute adaptive dt telemetry
-        let (adt_mean, adt_min, adt_max) = if dt_count > 0 {
-            (
-                Some(dt_sum / dt_count as f32),
-                Some(dt_min_obs),
-                Some(dt_max_obs),
-            )
-        } else {
-            (None, None, None)
-        };
-
         metrics.push(EpochMetrics {
             epoch,
             avg_loss,
@@ -978,9 +963,6 @@ pub fn train_with_adam(
             num_pairs: dataset.len(),
             validation_loss,
             mean_coherence: epoch_mean_coherence,
-            adaptive_dt_mean: adt_mean,
-            adaptive_dt_min: adt_min,
-            adaptive_dt_max: adt_max,
         });
 
         if (epoch + 1) % config.report_interval.max(1) == 0 || epoch == 0 {

@@ -15,8 +15,8 @@
 //!
 //! Requires `psych-bench` feature: `cargo test --features psych-bench`
 
-use serde::{Deserialize, Serialize};
 use crate::harness::{BenchmarkConfig, BenchmarkResult, PsychBenchmark};
+use serde::{Deserialize, Serialize};
 
 use symthaea_neuroevolution::NeuralPhenotype;
 use symthaea_neuroevolution::OrganismFitness;
@@ -116,9 +116,8 @@ pub fn phenotype_to_benchmark_config(
 
     // Map learning_rate [0.0001, 0.1] → encoding_noise [0.0, 0.15]
     // Higher LR = more encoding noise (speed-accuracy tradeoff)
-    let encoding_noise = (nc.learning_rate.ln() - 0.0001f32.ln())
-        / (0.1f32.ln() - 0.0001f32.ln())
-        * 0.15;
+    let encoding_noise =
+        (nc.learning_rate.ln() - 0.0001f32.ln()) / (0.1f32.ln() - 0.0001f32.ln()) * 0.15;
 
     // Map layer_count [1, 5] → working_memory_capacity [3, 9]
     let wm_capacity = (phenotype.network_config.layer_sizes.len() * 2 + 1).min(9);
@@ -185,8 +184,8 @@ pub fn psych_bench_to_organism_fitness(
     psych_weight: f64,
 ) -> OrganismFitness {
     // Blend psych-bench score with FEP fitness
-    let blended_composite = fep_fitness.composite * (1.0 - psych_weight)
-        + psych_result.composite * psych_weight;
+    let blended_composite =
+        fep_fitness.composite * (1.0 - psych_weight) + psych_result.composite * psych_weight;
 
     OrganismFitness {
         composite: blended_composite,
@@ -313,8 +312,8 @@ fn extract_composite_score(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use symthaea_neuroevolution::NeuralGenome;
     use crate::harness::MetricValue;
+    use symthaea_neuroevolution::NeuralGenome;
 
     #[test]
     fn test_phenotype_to_config_valid() {
@@ -392,10 +391,7 @@ mod tests {
             "accuracy",
             MetricValue::from_samples(&[0.9, 0.85, 0.92, 0.88, 0.91]),
         );
-        result.insert(
-            "rt",
-            MetricValue::from_samples(&[5.0, 6.0, 4.5, 5.5, 5.0]),
-        );
+        result.insert("rt", MetricValue::from_samples(&[5.0, 6.0, 4.5, 5.5, 5.0]));
 
         let score = super::extract_composite_score(&result, 0.5, 0.3, 0.2);
         assert!(score > 0.0 && score <= 1.0);

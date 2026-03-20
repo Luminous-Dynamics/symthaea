@@ -3,9 +3,7 @@
 //! Run with: cargo run -p symthaea-neuroevolution --example benchmark
 
 use std::time::Instant;
-use symthaea_neuroevolution::{
-    FepFitnessConfig, NeuroevolutionConfig, NeuroevolutionEngine,
-};
+use symthaea_neuroevolution::{FepFitnessConfig, NeuroevolutionConfig, NeuroevolutionEngine};
 
 fn main() {
     println!("=== CfC-HDC Neuroevolution Benchmark ===\n");
@@ -27,7 +25,10 @@ fn main() {
         ..Default::default()
     };
 
-    println!("Config: pop={}, eval_steps={}, dim=256", config_256.population_size, config_256.fitness_config.eval_steps);
+    println!(
+        "Config: pop={}, eval_steps={}, dim=256",
+        config_256.population_size, config_256.fitness_config.eval_steps
+    );
     let mut engine = NeuroevolutionEngine::new(config_256);
     engine.initialize();
 
@@ -50,7 +51,8 @@ fn main() {
     }
     let total = start.elapsed();
 
-    let mean_ms = gen_times.iter().map(|d| d.as_millis()).sum::<u128>() as f64 / gen_times.len() as f64;
+    let mean_ms =
+        gen_times.iter().map(|d| d.as_millis()).sum::<u128>() as f64 / gen_times.len() as f64;
     let max_ms = gen_times.iter().map(|d| d.as_millis()).max().unwrap_or(0);
     let genome_kb = engine.population().len() * 2;
 
@@ -58,7 +60,11 @@ fn main() {
     println!("  Total:     {:.1}s", total.as_secs_f64());
     println!("  Mean/gen:  {:.0}ms", mean_ms);
     println!("  Max/gen:   {}ms", max_ms);
-    println!("  Genome mem: {}KB ({} organisms x 2KB)", genome_kb, engine.population().len());
+    println!(
+        "  Genome mem: {}KB ({} organisms x 2KB)",
+        genome_kb,
+        engine.population().len()
+    );
 
     if let Some((genome, fitness)) = engine.best_ever() {
         let phenotype = genome.decode();
@@ -67,7 +73,10 @@ fn main() {
         println!("  Tau base:   {:.4}", phenotype.neuron_config.tau_base);
         println!("  LR:         {:.6}", phenotype.neuron_config.learning_rate);
         println!("  Layers:     {:?}", phenotype.network_config.layer_sizes);
-        println!("  Skip conn:  {}", phenotype.network_config.skip_connections);
+        println!(
+            "  Skip conn:  {}",
+            phenotype.network_config.skip_connections
+        );
         println!("  Activation: {:?}", phenotype.neuron_config.activation);
     }
 }

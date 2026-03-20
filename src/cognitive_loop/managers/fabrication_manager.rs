@@ -64,17 +64,11 @@ pub enum FabricationEventKind {
         pog_score: f32,
     },
     /// Manufacturing safety level changed.
-    SafetyLevelChanged {
-        level: ManufacturingSafetyLevel,
-    },
+    SafetyLevelChanged { level: ManufacturingSafetyLevel },
     /// ManufacturingTwin reading (periodic sensor data).
-    TwinReading {
-        reading: ManufacturingReading,
-    },
+    TwinReading { reading: ManufacturingReading },
     /// DesignLoopTwin reading (design-manufacture feedback).
-    DesignLoopReading {
-        reading: DesignLoopReading,
-    },
+    DesignLoopReading { reading: DesignLoopReading },
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -445,8 +439,7 @@ impl FabricationManager {
         // Compute mean prediction coherence
         if !output.prediction_similarities.is_empty() {
             let sum: f32 = output.prediction_similarities.iter().map(|(_, s)| *s).sum();
-            self.last_prediction_coherence =
-                sum / output.prediction_similarities.len() as f32;
+            self.last_prediction_coherence = sum / output.prediction_similarities.len() as f32;
         }
 
         // Safety level from twin output
@@ -468,8 +461,8 @@ impl FabricationManager {
         } else {
             return;
         };
-        self.reward_ema =
-            self.reward_ema * thresholds::FAB_REWARD_EMA_DECAY + r * (1.0 - thresholds::FAB_REWARD_EMA_DECAY);
+        self.reward_ema = self.reward_ema * thresholds::FAB_REWARD_EMA_DECAY
+            + r * (1.0 - thresholds::FAB_REWARD_EMA_DECAY);
     }
 
     /// Queue a neuromod injection with floor check.
@@ -512,14 +505,14 @@ impl CognitiveSubsystem for FabricationManager {
         self.anomaly_count_this_cycle = 0;
 
         // Drain pending events (capped per cycle)
-        let events: Vec<FabricationEvent> = if self.pending_events.len() > Self::MAX_EVENTS_PER_CYCLE
-        {
-            let rest = self.pending_events.split_off(Self::MAX_EVENTS_PER_CYCLE);
-            let batch = std::mem::replace(&mut self.pending_events, rest);
-            batch
-        } else {
-            std::mem::take(&mut self.pending_events)
-        };
+        let events: Vec<FabricationEvent> =
+            if self.pending_events.len() > Self::MAX_EVENTS_PER_CYCLE {
+                let rest = self.pending_events.split_off(Self::MAX_EVENTS_PER_CYCLE);
+                let batch = std::mem::replace(&mut self.pending_events, rest);
+                batch
+            } else {
+                std::mem::take(&mut self.pending_events)
+            };
 
         // Early return if nothing to do
         if events.is_empty() {
@@ -593,11 +586,10 @@ impl CognitiveSubsystem for FabricationManager {
                 .try_into()
                 .map_err(|_| "FabricationManager: corrupt checkpoint bytes [8..12]".to_string())?,
         );
-        self.pog_score_ema = f32::from_le_bytes(
-            data[12..16]
-                .try_into()
-                .map_err(|_| "FabricationManager: corrupt checkpoint bytes [12..16]".to_string())?,
-        );
+        self.pog_score_ema =
+            f32::from_le_bytes(data[12..16].try_into().map_err(|_| {
+                "FabricationManager: corrupt checkpoint bytes [12..16]".to_string()
+            })?);
         Ok(())
     }
 }
@@ -716,7 +708,10 @@ mod tests {
             injections.iter().any(|i| i.target == "dopamine"),
             "Successful print should trigger DA injection"
         );
-        assert!(output.confidence_delta > 0.0, "Success should boost confidence");
+        assert!(
+            output.confidence_delta > 0.0,
+            "Success should boost confidence"
+        );
     }
 
     #[test]
@@ -758,7 +753,9 @@ mod tests {
         let injections = mgr.drain_injections();
         assert!(injections.iter().any(|i| i.target == "norepinephrine"));
         let baselines = mgr.drain_baselines();
-        assert!(baselines.iter().any(|b| b.target == "serotonin" && b.nudge < 0.0));
+        assert!(baselines
+            .iter()
+            .any(|b| b.target == "serotonin" && b.nudge < 0.0));
     }
 
     #[test]
