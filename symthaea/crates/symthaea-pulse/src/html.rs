@@ -16,9 +16,9 @@ use symthaea_psych_bench::harness::cognitive_profile::CognitiveProfile;
 use symthaea_types::N_HARMONIES;
 
 use crate::{
-    Anomaly, CantorInfo, DreamInfo, DriveInfo, GovernanceInfo, ImmuneInfo, IntegrityInfo,
-    KnowledgeInfo, LearningInfo, MoralCompass, Narrative, NeuroBath, PerceptionInfo, PulseDelta,
-    PulseSnapshot, ReasoningInfo, SparklinePoint, SubstrateInfo, SwarmInfo, Vitals,
+    Anomaly, CantorInfo, DreamInfo, DriveInfo, FabricationInfo, GovernanceInfo, ImmuneInfo,
+    IntegrityInfo, KnowledgeInfo, LearningInfo, MoralCompass, Narrative, NeuroBath, PerceptionInfo,
+    PulseDelta, PulseSnapshot, ReasoningInfo, SparklinePoint, SubstrateInfo, SwarmInfo, Vitals,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -466,6 +466,8 @@ pub fn generate_pulse_html(
     write_dream_pane(&mut html, &current.dream);
     write_immune_pane(&mut html, &current.immune);
     write_sovereign_pane(&mut html, &current.sovereign);
+    write_neuroevolution_pane(&mut html, &current.neuroevolution);
+    write_fabrication_pane(&mut html, &current.fabrication);
     write_narrative_pane(&mut html, narrative);
     if !timeline.is_empty() {
         write_timeline_pane(&mut html, timeline, current);
@@ -2841,6 +2843,189 @@ fn write_dream_pane(html: &mut String, dream: &DreamInfo) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+// Pane: Neuroevolution
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn write_neuroevolution_pane(html: &mut String, ne: &super::NeuroevolutionInfo) {
+    let active = ne.generation > 0;
+    let (status_label, status_color) = if !active {
+        ("DORMANT", "#8a9a8a")
+    } else if ne.diversity > 0.2 {
+        ("EXPLORING", "#e8c547")
+    } else if ne.species_count > 1 {
+        ("SPECIATING", "#7ec8a0")
+    } else {
+        ("CONVERGING", "#6bacc7")
+    };
+
+    let _ = write!(
+        html,
+        r##"<div class="pane">
+<h2>Neuroevolution</h2>
+<div style="text-align:center;margin-bottom:12px">
+  <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:{color};box-shadow:0 0 12px {color};margin-right:8px;vertical-align:middle"></span>
+  <span style="color:{color};font-weight:bold;font-size:1.1em;vertical-align:middle">{label}</span>
+</div>
+<table style="width:100%;font-size:0.88em">
+<tr><td>Generation</td><td style="text-align:right">{gen}</td></tr>
+<tr><td>Best Fitness</td><td style="text-align:right;color:{fit_color}">{fitness:+.4}</td></tr>
+<tr><td>Diversity</td><td style="text-align:right;color:{div_color}">{diversity:.3}</td></tr>
+<tr><td>Species</td><td style="text-align:right">{species}</td></tr>
+<tr><td>Evolved τ</td><td style="text-align:right">{tau:.4}</td></tr>
+<tr><td>Evolved LR</td><td style="text-align:right">{lr:.6}</td></tr>
+<tr><td>Evolved Layers</td><td style="text-align:right">{layers}</td></tr>
+</table>"##,
+        color = status_color,
+        label = status_label,
+        gen = ne.generation,
+        fit_color = if ne.best_fitness > 0.0 {
+            "#7ec8a0"
+        } else {
+            "#c76b5a"
+        },
+        fitness = ne.best_fitness,
+        div_color = if ne.diversity > 0.15 {
+            "#7ec8a0"
+        } else if ne.diversity > 0.05 {
+            "#e8c547"
+        } else {
+            "#c76b5a"
+        },
+        diversity = ne.diversity,
+        species = ne.species_count,
+        tau = ne.best_tau_base,
+        lr = ne.best_learning_rate,
+        layers = ne.best_layer_count,
+    );
+
+    // Fitness history sparkline
+    if !ne.fitness_history.is_empty() {
+        let sparkline: String = ne
+            .fitness_history
+            .iter()
+            .map(|&f| {
+                if f > 0.1 {
+                    '\u{2588}'
+                } else if f > 0.0 {
+                    '\u{2584}'
+                } else if f > -0.1 {
+                    '\u{2582}'
+                } else {
+                    '\u{2581}'
+                }
+            })
+            .collect();
+        let _ = write!(
+            html,
+            r#"<div style="margin-top:8px;font-family:monospace;font-size:0.9em;letter-spacing:1px;color:#7ec8a0" title="Fitness history">{sparkline}</div>"#,
+            sparkline = sparkline,
+        );
+    }
+
+    html.push_str("</div>\n");
+}
+
+// Fabrication / Manufacturing Consciousness
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn write_fabrication_pane(html: &mut String, fab: &FabricationInfo) {
+    let active = fab.active_print_jobs > 0
+        || fab.anomaly_count > 0
+        || fab.anomaly_ema > 1e-6
+        || fab.reward_ema.abs() > 1e-6;
+
+    let (status_label, status_color) = if !active {
+        ("DORMANT", "#8a9a8a")
+    } else if fab.safety_level == "Red" {
+        ("EMERGENCY", "#c76b5a")
+    } else if fab.safety_level == "Orange" {
+        ("ALERT", "#e8c547")
+    } else if fab.active_print_jobs > 0 {
+        ("PRINTING", "#7ec8a0")
+    } else {
+        ("MONITORING", "#6bacc7")
+    };
+
+    let _ = write!(
+        html,
+        r##"<div class="pane">
+<h2>Fabrication</h2>
+<div style="text-align:center;margin-bottom:12px">
+  <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:{color};box-shadow:0 0 12px {color};margin-right:8px;vertical-align:middle"></span>
+  <span style="color:{color};font-weight:bold;font-size:1.1em;vertical-align:middle">{label}</span>
+</div>
+<table style="width:100%;font-size:0.88em">
+<tr><td>Active Jobs</td><td style="text-align:right">{jobs}</td></tr>
+<tr><td>Safety</td><td style="text-align:right;color:{safety_color}">{safety}</td></tr>
+<tr><td>Mfg Free Energy</td><td style="text-align:right;color:{fe_color}">{mfg_fe:.4}</td></tr>
+<tr><td>Design Loop FE</td><td style="text-align:right">{dl_fe:.4}</td></tr>
+<tr><td>Anomaly EMA</td><td style="text-align:right;color:{anomaly_color}">{anomaly:.3}</td></tr>
+<tr><td>Anomalies/cycle</td><td style="text-align:right">{anomaly_count}</td></tr>
+<tr><td>PoGF EMA</td><td style="text-align:right;color:{pog_color}">{pog:.3}</td></tr>
+<tr><td>Pred Coherence</td><td style="text-align:right">{coherence:.3}</td></tr>
+<tr><td>Action</td><td style="text-align:right;font-size:0.85em">{action}</td></tr>
+<tr><td>Reward EMA</td><td style="text-align:right;color:{reward_color}">{reward:+.4}</td></tr>
+</table>
+</div>
+"##,
+        color = status_color,
+        label = status_label,
+        jobs = fab.active_print_jobs,
+        safety = if fab.safety_level.is_empty() {
+            "Green"
+        } else {
+            &fab.safety_level
+        },
+        safety_color = match fab.safety_level.as_str() {
+            "Red" => "#c76b5a",
+            "Orange" => "#e8c547",
+            "Yellow" => "#d4c878",
+            _ => "#7ec8a0",
+        },
+        mfg_fe = fab.manufacturing_free_energy,
+        fe_color = if fab.manufacturing_free_energy > 0.5 {
+            "#c76b5a"
+        } else if fab.manufacturing_free_energy > 0.1 {
+            "#e8c547"
+        } else {
+            "#7ec8a0"
+        },
+        dl_fe = fab.design_loop_free_energy,
+        anomaly = fab.anomaly_ema,
+        anomaly_color = if fab.anomaly_ema > 0.5 {
+            "#c76b5a"
+        } else if fab.anomaly_ema > 0.2 {
+            "#e8c547"
+        } else {
+            "#8a9a8a"
+        },
+        anomaly_count = fab.anomaly_count,
+        pog = fab.pog_score_ema,
+        pog_color = if fab.pog_score_ema > 0.7 {
+            "#7ec8a0"
+        } else if fab.pog_score_ema > 0.4 {
+            "#e8c547"
+        } else {
+            "#c76b5a"
+        },
+        coherence = fab.prediction_coherence,
+        action = if fab.recommended_action.is_empty() {
+            "—"
+        } else {
+            &fab.recommended_action
+        },
+        reward = fab.reward_ema,
+        reward_color = if fab.reward_ema > 0.01 {
+            "#7ec8a0"
+        } else if fab.reward_ema < -0.01 {
+            "#c76b5a"
+        } else {
+            "#8a9a8a"
+        },
+    );
+}
+
 // Pane 8: Narrative / Inner Voice
 // ═══════════════════════════════════════════════════════════════════════════════
 

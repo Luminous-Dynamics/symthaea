@@ -1507,8 +1507,12 @@ impl CognitiveLoopService {
         // slow substrates (tau > 1.0) blend more gently with cycle-start values.
         let feedback_consensus = if (self.substrate_manager.tau_factor - 1.0).abs() > 0.05 {
             let tau = self.substrate_manager.tau_factor.max(0.01); // Guard: prevent div-by-zero
-            // Integration strength: tau=0.5 → 100% consensus, tau=2.0 → 50% consensus
-            let integration_rate = if tau.is_finite() { (1.0 / tau).clamp(0.5, 1.0) as f64 } else { 1.0 };
+                                                                   // Integration strength: tau=0.5 → 100% consensus, tau=2.0 → 50% consensus
+            let integration_rate = if tau.is_finite() {
+                (1.0 / tau).clamp(0.5, 1.0) as f64
+            } else {
+                1.0
+            };
             let cs = &self.feedback_state;
             super::feedback_state::ConsensusResult {
                 consensus_confidence: cs.cycle_start_confidence() * (1.0 - integration_rate)

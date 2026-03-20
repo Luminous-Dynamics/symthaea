@@ -20,29 +20,31 @@
 //! 3. Add any ordering constraints to `validate()`
 //! 4. Update any existing `const` in cycle.rs to reference this module
 
-mod moral;
 mod consciousness;
-mod learning;
 mod dynamics;
+mod fabrication;
+mod feedback;
+mod language;
+mod learning;
 mod managers;
+mod moral;
+mod neuromod;
 mod radio;
 mod safety;
 mod substrate;
-mod language;
-mod neuromod;
-mod feedback;
 
-pub use moral::*;
 pub use consciousness::*;
-pub use learning::*;
 pub use dynamics::*;
+pub use fabrication::*;
+pub use feedback::*;
+pub use language::*;
+pub use learning::*;
 pub use managers::*;
+pub use moral::*;
+pub use neuromod::*;
 pub use radio::*;
 pub use safety::*;
 pub use substrate::*;
-pub use language::*;
-pub use neuromod::*;
-pub use feedback::*;
 
 #[allow(clippy::assertions_on_constants)]
 pub fn validate() {
@@ -232,7 +234,6 @@ pub fn validate() {
     assert!(GOV_COLLECTIVE_PHI_ECB > 0.0 && GOV_COLLECTIVE_PHI_ECB <= 0.05);
     assert!(GOV_CONSCIOUSNESS_MODULATION > 0.0 && GOV_CONSCIOUSNESS_MODULATION <= 0.10);
 }
-
 
 #[cfg(test)]
 #[allow(clippy::assertions_on_constants)]
@@ -1659,6 +1660,8 @@ mod tests {
         assert!(CPG_WALK_MIN_SYNC <= 1.0 && CPG_CRITICAL_DESYNC >= 0.0);
         assert!(CPG_DESYNC_EXPLORATION_BOOST > 0.0 && CPG_DESYNC_EXPLORATION_BOOST <= 0.1);
         assert!(CPG_INTERVAL > 50 && CPG_INTERVAL < 100);
+        // CPG sync tau floor: must be in (0, 1) — floor=0 would kill dynamics on desync
+        assert!(CPG_SYNC_TAU_FLOOR > 0.0 && CPG_SYNC_TAU_FLOOR < 1.0);
     }
 
     #[test]

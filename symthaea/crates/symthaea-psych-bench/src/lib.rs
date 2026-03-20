@@ -53,5 +53,8 @@ pub mod benchmarks;
 pub mod harness;
 pub mod wm;
 
+#[cfg(feature = "neuroevolution")]
+pub mod neuroevolution_fitness;
+
 #[cfg(test)]
 mod proptest_math_benchmarks;

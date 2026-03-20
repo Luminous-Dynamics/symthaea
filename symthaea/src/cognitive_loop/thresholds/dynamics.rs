@@ -477,6 +477,11 @@ pub const CPG_INTERVAL: u32 = 59;
 /// Basis: Grillner (2006) — desync during locomotion triggers corrective arousal.
 pub const CPG_DESYNC_AROUSAL_DELTA: f32 = 0.1;
 
+/// CPG synchronization tau floor: minimum tau factor when oscillators are fully desynchronized.
+/// sync_index=1.0 → tau=1.0 (no change), sync_index=0.0 → tau=CPG_SYNC_TAU_FLOOR.
+/// Science: Buzsáki (2006) — neural oscillation synchrony gates information integration rate.
+pub const CPG_SYNC_TAU_FLOOR: f32 = 0.7;
+
 // ── Complex CfC Neuron (Phase 3) ────────────────────────────────────────────
 
 /// Minimum real part of eigenvalues (stability bound — must be negative).
@@ -658,9 +663,7 @@ pub const MORAL_TOPOLOGY_COMPLETENESS_THRESHOLD: f64 = 0.3;
 /// Scale for structural boost from topology gap: (threshold - completeness) × scale.
 pub const MORAL_TOPOLOGY_STRUCTURAL_BOOST_SCALE: f64 = 0.3;
 
-
 // ─── Strategy Encoding Constants ──────────────────────────────────────────
-
 
 /// GABA weight for neuromod stillness computation.
 /// Science: Bhatt et al. (2020) — GABAergic tone ↔ resting-state activity.
@@ -731,3 +734,87 @@ pub const VISION_DAMPEN_CLAMP_MIN: f32 = 0.1;
 
 /// Maximum scene dampen factor.
 pub const VISION_DAMPEN_CLAMP_MAX: f32 = 0.9;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MOTOR COMMAND MODULATION
+// Science: Wolpert & Ghahramani (2000) — motor control as probabilistic inference.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Intensity scaling for attention shift motor commands.
+/// Basis: Posner (1980) — small attention shifts accumulate via repeated micro-adjustments.
+pub const MOTOR_ATTENTION_SHIFT_SCALE: f32 = 0.1;
+
+/// Nested scale for attention sensitivity modulation from motor shift.
+pub const MOTOR_ATTENTION_SENSITIVITY_SCALE: f32 = 0.1;
+
+/// Attention sensitivity clamp: minimum.
+pub const MOTOR_ATTENTION_SENSITIVITY_MIN: f32 = 0.5;
+
+/// Attention sensitivity clamp: maximum.
+pub const MOTOR_ATTENTION_SENSITIVITY_MAX: f32 = 2.0;
+
+/// Adaptive LR EMA momentum (weight of prior estimate).
+/// Basis: Kingma & Ba (2015) — exponential moving average smoothing.
+pub const MOTOR_ADAPTIVE_LR_MOMENTUM: f32 = 0.9;
+
+/// Adaptive LR EMA alpha (weight of new observation).
+pub const MOTOR_ADAPTIVE_LR_ALPHA: f32 = 0.1;
+
+/// Adaptive LR clamp: minimum.
+pub const MOTOR_ADAPTIVE_LR_MIN: f32 = 0.01;
+
+/// Adaptive LR clamp: maximum.
+pub const MOTOR_ADAPTIVE_LR_MAX: f32 = 1.0;
+
+/// Epistemic value threshold for exploration trigger.
+/// Basis: Friston (2010) — epistemic value drives exploration.
+pub const MOTOR_EXPLORATION_EPISTEMIC_THRESHOLD: f32 = 0.5;
+
+/// Exploration boost intensity scale from motor commands.
+pub const MOTOR_EXPLORATION_INTENSITY_SCALE: f32 = 0.15;
+
+/// Maximum exploration boost from motor commands.
+pub const MOTOR_EXPLORATION_BOOST_MAX: f32 = 0.2;
+
+/// Action outcome coupling threshold below which expectation reset triggers.
+/// Basis: Rescorla-Wagner (1972) — decoupled outcomes warrant prediction reset.
+pub const ACTION_OUTCOME_COUPLING_RESET_THRESHOLD: f32 = 0.3;
+
+/// Confidence value after inference mode initialization/reset.
+pub const INFERENCE_MODE_INIT_CONFIDENCE: f32 = 0.5;
+
+/// Motor confidence cap under ethics Caution verdict.
+/// Basis: Cushman (2013) — moral uncertainty should reduce action commitment.
+pub const ETHICS_CAUTION_CONFIDENCE_CAP: f32 = 0.3;
+
+/// FEP observation value for successful motor outcome.
+pub const MOTOR_SUCCESS_OBSERVATION_VALUE: f64 = 0.9;
+
+/// FEP observation value for failed motor outcome.
+pub const MOTOR_FAILURE_OBSERVATION_VALUE: f64 = 0.1;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NEUROEVOLUTION TAU BLENDING
+// Science: Hasani et al. (2021) — τ is the primary CfC evolvable parameter.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Default tau_base for CfC dynamics.
+pub const NEUROEVO_DEFAULT_TAU_BASE: f32 = 0.1;
+
+/// Weight of default dynamics in neuroevo blending (conservative: 90% default).
+pub const NEUROEVO_BLEND_DEFAULT_WEIGHT: f32 = 0.9;
+
+/// Weight of evolved dynamics in neuroevo blending.
+pub const NEUROEVO_BLEND_EVOLVED_WEIGHT: f32 = 0.1;
+
+/// Neuroevo tau safety clamp: minimum.
+pub const NEUROEVO_TAU_CLAMP_MIN: f32 = 0.5;
+
+/// Neuroevo tau safety clamp: maximum.
+pub const NEUROEVO_TAU_CLAMP_MAX: f32 = 2.0;
+
+/// CPG tau oscillation clamp: minimum.
+pub const CPG_TAU_CLAMP_MIN: f32 = 0.5;
+
+/// CPG tau oscillation clamp: maximum.
+pub const CPG_TAU_CLAMP_MAX: f32 = 2.0;

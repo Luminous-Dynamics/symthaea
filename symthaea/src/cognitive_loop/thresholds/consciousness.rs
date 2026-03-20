@@ -41,7 +41,6 @@ pub const CANTOR_RESONANCE_SIMILARITY_THRESHOLD: f32 = 0.8;
 /// Resonant fractal patterns indicate stable attractor formation.
 pub const CANTOR_RESONANCE_CONFIDENCE_BOOST: f32 = 0.02;
 
-
 /// Dream surprise threshold for exploration boost.
 /// Above this, novel fractal territory triggers map-exploration.
 /// Science: Sutton & Barto (2018) — surprise-driven explore/exploit tradeoff.
@@ -1122,10 +1121,8 @@ pub const STRUCTURAL_BOTTLENECK_LR_BOOST: f32 = 1.02;
 // Science: Tononi (2004) — validated Phi measurements deserve higher weight
 // ═══════════════════════════════════════════════════════════════════════════════
 
-
 /// Scale for validation-based confidence boost.
 pub const PHI_VALIDATION_BOOST_SCALE: f32 = 0.1;
-
 
 /// Scale for validation-based confidence attenuation.
 pub const PHI_VALIDATION_ATTENUATION_SCALE: f32 = 0.05;
@@ -1260,3 +1257,54 @@ pub const NARRATIVE_MORAL_SIGNIFICANCE: f64 = 0.8;
 
 /// User state error threshold for cognitive load inference.
 pub const USER_STATE_ERROR_THRESHOLD: f32 = 0.8;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MATH SERVICE — PHI SCORING & CONFIDENCE TIERS
+// Science: Tononi (2004) — Phi reflects integration; multi-path verification
+// provides epistemic confidence in computational results.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Confidence for verified linear system solutions.
+pub const MATH_LINEAR_VERIFIED_CONFIDENCE: f32 = 0.95;
+
+/// Confidence for unverified linear system solutions.
+pub const MATH_LINEAR_UNVERIFIED_CONFIDENCE: f32 = 0.5;
+
+/// Statistics baseline Phi value.
+pub const MATH_STATISTICS_PHI_BASELINE: f32 = 0.3;
+
+/// Statistics computation confidence (high — deterministic).
+pub const MATH_STATISTICS_CONFIDENCE: f32 = 0.99;
+
+/// Regression R² threshold for weak fit detection.
+pub const MATH_REGRESSION_WEAK_FIT_THRESHOLD: f32 = 0.5;
+
+/// Multi-path verified Phi boost factor.
+pub const MATH_MULTIPATH_PHI_BOOST: f32 = 1.2;
+
+/// Root finding verified confidence.
+pub const MATH_ROOT_FINDING_VERIFIED_CONFIDENCE: f32 = 0.99;
+
+/// Root finding converged (unverified) confidence.
+pub const MATH_ROOT_FINDING_CONVERGED_CONFIDENCE: f32 = 0.9;
+
+/// Root finding failed confidence.
+pub const MATH_ROOT_FINDING_FAILED_CONFIDENCE: f32 = 0.3;
+
+/// Integration verified confidence.
+pub const MATH_INTEGRATION_VERIFIED_CONFIDENCE: f32 = 0.99;
+
+/// Integration unverified confidence.
+pub const MATH_INTEGRATION_UNVERIFIED_CONFIDENCE: f32 = 0.9;
+
+/// Optimization converged confidence.
+pub const MATH_OPTIMIZATION_CONVERGED_CONFIDENCE: f32 = 0.9;
+
+/// Optimization failed confidence.
+pub const MATH_OPTIMIZATION_FAILED_CONFIDENCE: f32 = 0.4;
+
+/// Default telemetry Phi value.
+pub const MATH_DEFAULT_TELEMETRY_PHI: f32 = 0.4;
+
+/// Default telemetry confidence value.
+pub const MATH_DEFAULT_TELEMETRY_CONFIDENCE: f32 = 0.9;

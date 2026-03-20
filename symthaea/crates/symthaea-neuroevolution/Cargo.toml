@@ -13,6 +13,10 @@ categories = ["science", "algorithms"]
 [lints]
 workspace = true
 
+[features]
+default = []
+parallel = ["dep:rayon"]
+
 [dependencies]
 symthaea-core = { path = "../../symthaea-core", default-features = false }
 symthaea-fep = { path = "../symthaea-fep" }
@@ -20,6 +24,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 rand = { workspace = true }
 blake3 = { workspace = true }
+rayon = { workspace = true, optional = true }
 
 [dev-dependencies]
 proptest = { workspace = true }

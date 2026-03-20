@@ -820,3 +820,96 @@ pub const KNOWLEDGE_ATTENTION_CONTRADICTION_THRESHOLD: f64 = 0.5;
 /// Minimum causal edge strength to flag as a confounding variable.
 /// Science: Confounders with weak links are noise; strong links warrant attention (Pearl 2009).
 pub const KNOWLEDGE_CONFOUNDER_STRENGTH_THRESHOLD: f32 = 0.3;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FEEDBACK PHASE — CONSCIOUSNESS GATING & EPISTEMIC MODULATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Consciousness gradient stability threshold (below = stable, skip modulation).
+/// Basis: Dehaene (2014) — ignition requires meaningful gradient.
+pub const CONSCIOUSNESS_GRADIENT_STABILITY_THRESHOLD: f32 = 0.01;
+
+/// Attention sensitivity boost for high efficacy.
+/// Basis: Bandura (1997) — self-efficacy boosts attentional engagement.
+pub const EFFICACY_ATTENTION_BOOST: f32 = 1.05;
+
+/// LR boost for high efficacy.
+pub const EFFICACY_LR_BOOST: f32 = 1.05;
+
+/// HOT hubris dampening factor for moral confidence.
+/// Basis: Kruger & Dunning (1999) — overconfidence invites moral miscalibration.
+pub const HOT_HUBRIS_CONFIDENCE_DAMPEN: f32 = 0.7;
+
+/// Knowledge reasoning log scale divisor for contradiction factor.
+pub const KNOWLEDGE_REASONING_LOG_SCALE: f32 = 10.0;
+
+/// Knowledge contradiction factor denominator for LR modulation.
+pub const KNOWLEDGE_CONTRADICTION_FACTOR_DENOM: f32 = 0.1;
+
+/// Scale boost sigmoid amplitude.
+/// Basis: Tononi (2004) — multi-scale integration follows sigmoid enrichment.
+pub const SCALE_BOOST_SIGMOID_AMPLITUDE: f32 = 0.15;
+
+/// Scale boost sigmoid exponent.
+pub const SCALE_BOOST_SIGMOID_EXPONENT: f32 = 2.0;
+
+/// Reasoning reliability center (confidence offset for reasoning gate).
+pub const REASONING_RELIABILITY_CENTER: f32 = 0.5;
+
+/// Reasoning gate success LR scale.
+pub const REASONING_GATE_SUCCESS_LR_SCALE: f32 = 1.02;
+
+/// Social model turn-taking quality default.
+pub const SOCIAL_MODEL_TURN_TAKING_DEFAULT: f32 = 0.7;
+
+/// Social model trust threshold for mode selection.
+pub const SOCIAL_MODEL_TRUST_MODE_THRESHOLD: f32 = 0.3;
+
+/// Coherence-trust center threshold.
+pub const COHERENCE_TRUST_CENTER: f32 = 0.5;
+
+/// Moral score normalization offset.
+pub const MORAL_SCORE_NORMALIZE_OFFSET: f32 = 1.0;
+
+/// Moral score normalization scale (maps [-1,1] → [0,1]).
+pub const MORAL_SCORE_NORMALIZE_SCALE: f32 = 0.5;
+
+/// Cross-module agreement neutral point (no adjustment).
+pub const CROSS_MODULE_AGREEMENT_NEUTRAL: f32 = 0.5;
+
+/// Cross-module agreement adjustment center.
+pub const CROSS_MODULE_AGREEMENT_ADJUSTMENT_CENTER: f32 = 0.5;
+
+/// Flow state LR boost multiplier.
+/// Basis: Csikszentmihalyi (1990) — flow enhances learning.
+pub const FLOW_STATE_LR_BOOST_MULTIPLIER: f32 = 1.05;
+
+/// Unified quality score high threshold for LR scaling.
+pub const UNIFIED_QUALITY_HIGH_THRESHOLD: f32 = 0.7;
+
+/// Quality floor exploration adjustment magnitude.
+pub const QUALITY_FLOOR_EXPLORATION_ADJUSTMENT: f32 = 0.01;
+
+/// Epistemic conflict exploration scale.
+pub const EPISTEMIC_CONFLICT_EXPLORATION_SCALE: f32 = 0.015;
+
+/// Phenomenal fragmentation confidence dampening.
+pub const PHENOMENAL_FRAGMENTED_CONFIDENCE_DAMPEN: f32 = 0.95;
+
+/// Phenomenal fragmentation exploration boost.
+pub const PHENOMENAL_FRAGMENTED_EXPLORATION_BOOST: f32 = 0.02;
+
+/// Temporal discontinuity LR dampening.
+pub const TEMPORAL_DISCONTINUITY_LR_DAMPEN: f32 = 0.95;
+
+/// Temporal discontinuity exploration boost.
+pub const TEMPORAL_DISCONTINUITY_EXPLORATION_BOOST: f32 = 0.02;
+
+/// Temporal binding high exploration scale (near-1.0 = slight dampening).
+pub const TEMPORAL_BINDING_HIGH_EXPLORATION_SCALE: f32 = 0.98;
+
+/// Cross-modal binding EMA momentum.
+pub const CROSS_MODAL_BINDING_MOMENTUM: f32 = 0.9;
+
+/// Cross-modal binding EMA alpha.
+pub const CROSS_MODAL_BINDING_ALPHA: f32 = 0.1;

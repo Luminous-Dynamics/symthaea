@@ -36,5 +36,6 @@ pub use fitness::{FepFitnessBridge, FepFitnessConfig, FitnessWeights, InputStrat
 pub use genome::{NeuralGenome, NeuralPhenotype};
 pub use organism::{NeuralOrganism, OrganismFitness, StepResult};
 pub use tournament::{
-    EvolutionResult, GenerationSnapshot, NeuroevolutionConfig, NeuroevolutionEngine, SpeciesInfo,
+    Checkpoint, EvolutionResult, GenerationSnapshot, NeuroevolutionConfig, NeuroevolutionEngine,
+    SpeciesInfo,
 };

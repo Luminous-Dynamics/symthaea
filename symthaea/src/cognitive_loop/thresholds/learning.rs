@@ -215,7 +215,6 @@ pub const RESONATOR_NOVEL_LR_SCALE: f32 = 1.15;
 /// LR scale when attention budget is persistently exceeded (cognitive overload).
 pub const ATTENTION_BUDGET_GATED_LR_SCALE: f32 = 0.7;
 
-
 /// LR scale when structural bottleneck is high (protect against fragmentation).
 pub const STRUCTURAL_BOTTLENECK_LR_SCALE: f32 = 0.8;
 
@@ -957,7 +956,6 @@ pub const RESONATOR_RECALL_PRIME_SCALE: f32 = 0.05;
 /// Confidence boost when resonator error is sustained low across many cycles.
 pub const RESONATOR_SUSTAINED_LOW_CONFIDENCE: f32 = 0.01;
 
-
 /// Exploration boost when causal graph is sparse (few patterns learned).
 /// Science: Pearl (2009) — sparse causal knowledge → explore to discover structure.
 pub const SPARSE_CAUSAL_EXPLORATION_BOOST: f32 = 0.03;
@@ -1031,7 +1029,6 @@ pub const MCTS_EFFECTIVENESS_NORM_SCALE: f32 = 0.5;
 
 /// MCTS effectiveness normalization offset.
 pub const MCTS_EFFECTIVENESS_NORM_OFFSET: f32 = 0.5;
-
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CYCLE EXTRACTED: Moral feedback, memory, FEP, arousal

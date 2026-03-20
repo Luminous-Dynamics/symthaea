@@ -445,7 +445,9 @@ impl CognitiveLoopService {
                             .gen::<u64>()
                     })
                     .unwrap_or_else(|| {
-                        tracing::debug!("CrossManifoldPredictor: using default seed (no genesis phrase)");
+                        tracing::debug!(
+                            "CrossManifoldPredictor: using default seed (no genesis phrase)"
+                        );
                         super::thresholds::CROSS_MANIFOLD_SEED_DEFAULT
                     });
                 Some(symthaea_vision_manifold::CrossManifoldPredictor::new(
@@ -632,7 +634,9 @@ impl CognitiveLoopService {
                             genesis.domain("resonator_memory").gen::<u64>()
                         })
                         .unwrap_or_else(|| {
-                            tracing::debug!("ResonatorMemory: using default seed (no genesis phrase)");
+                            tracing::debug!(
+                                "ResonatorMemory: using default seed (no genesis phrase)"
+                            );
                             super::thresholds::RESONATOR_MEMORY_SEED_DEFAULT
                         });
                     let mut semantic_cb = crate::dynamics::Codebook::new("semantic");
@@ -985,6 +989,11 @@ impl CognitiveLoopService {
             federation_handle,
             #[cfg(feature = "mesh")]
             spectrum_manager: super::managers::SpectrumManager::default(),
+            #[cfg(feature = "mesh")]
+            consciousness_router:
+                super::managers::radio_dispatcher::ConsciousnessAwareRouter::default(),
+            #[cfg(feature = "mesh")]
+            store_and_forward: super::managers::radio_dispatcher::StoreAndForward::default(),
             #[cfg(feature = "cpg")]
             cpg_manager: super::managers::CpgManager::new(
                 super::managers::cpg_manager::CpgConfig::default(),

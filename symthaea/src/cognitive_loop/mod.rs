@@ -711,6 +711,16 @@ pub struct CognitiveLoopService {
     #[cfg(feature = "mesh")]
     pub(crate) spectrum_manager: SpectrumManager,
 
+    /// Consciousness-Aware Router: Routes mesh traffic by Phi, moral urgency,
+    /// governance tier. Adaptive sharing cadence based on collective coherence.
+    #[cfg(feature = "mesh")]
+    pub(crate) consciousness_router: managers::radio_dispatcher::ConsciousnessAwareRouter,
+
+    /// Store-and-Forward: Dream-consolidated reconnection for intermittent mesh nodes.
+    /// Buffers offline experiences, consolidates on reconnect.
+    #[cfg(feature = "mesh")]
+    pub(crate) store_and_forward: managers::radio_dispatcher::StoreAndForward,
+
     /// CPG Manager: Kuramoto coupled oscillators for rhythmic motor timing.
     /// Implements CognitiveSubsystem at interval 59. Feature-gated behind `cpg`.
     #[cfg(feature = "cpg")]

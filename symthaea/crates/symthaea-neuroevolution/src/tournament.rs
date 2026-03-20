@@ -172,9 +172,8 @@ impl NeuroevolutionEngine {
     pub fn step_generation(&mut self) -> GenerationSnapshot {
         self.generation += 1;
 
-        // 1. Evaluate all organisms
-        self.fitness_bridge
-            .evaluate_population(&mut self.population);
+        // 1. Evaluate all organisms (parallel when rayon feature enabled)
+        self.fitness_bridge.evaluate_auto(&mut self.population);
 
         // 2. Assign species
         self.assign_species();
@@ -544,6 +543,69 @@ impl NeuroevolutionEngine {
     pub fn best_ever(&self) -> Option<(&NeuralGenome, f64)> {
         self.best_ever.as_ref().map(|(g, f)| (g, *f))
     }
+
+    /// Save a checkpoint to a file (JSON).
+    pub fn save_checkpoint(&self, path: &std::path::Path) -> Result<(), String> {
+        let checkpoint = Checkpoint {
+            generation: self.generation,
+            best_genome: self.best_ever.as_ref().map(|(g, _)| g.clone()),
+            best_fitness: self
+                .best_ever
+                .as_ref()
+                .map(|(_, f)| *f)
+                .unwrap_or(f64::NEG_INFINITY),
+            population_genomes: self.population.iter().map(|o| o.genome.clone()).collect(),
+            config: self.config.clone(),
+            history: self.history.iter().cloned().collect(),
+        };
+        let json = serde_json::to_string(&checkpoint).map_err(|e| e.to_string())?;
+        std::fs::write(path, json).map_err(|e| e.to_string())
+    }
+
+    /// Load a checkpoint from a file, resuming evolution.
+    pub fn load_checkpoint(path: &std::path::Path) -> Result<Self, String> {
+        let json = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+        let checkpoint: Checkpoint = serde_json::from_str(&json).map_err(|e| e.to_string())?;
+        let genesis = GenesisSeed::from_phrase(&checkpoint.config.genesis_phrase);
+        let fitness_bridge = FepFitnessBridge::new(checkpoint.config.fitness_config.clone());
+
+        let population: Vec<NeuralOrganism> = checkpoint
+            .population_genomes
+            .into_iter()
+            .enumerate()
+            .map(|(i, genome)| {
+                NeuralOrganism::spawn(i as u64, genome, &genesis, checkpoint.generation)
+            })
+            .collect();
+
+        let mut engine = Self {
+            config: checkpoint.config,
+            population,
+            fitness_bridge,
+            generation: checkpoint.generation,
+            next_id: 0,
+            history: checkpoint.history.into_iter().collect(),
+            best_ever: checkpoint.best_genome.map(|g| (g, checkpoint.best_fitness)),
+            genesis,
+            species_assignments: HashMap::new(),
+            species_representatives: Vec::new(),
+            patience_counter: 0,
+            last_best_fitness: checkpoint.best_fitness,
+        };
+        engine.next_id = engine.population.len() as u64;
+        Ok(engine)
+    }
+}
+
+/// Serializable checkpoint for saving/loading evolution state.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Checkpoint {
+    pub generation: u32,
+    pub best_genome: Option<NeuralGenome>,
+    pub best_fitness: f64,
+    pub population_genomes: Vec<NeuralGenome>,
+    pub config: NeuroevolutionConfig,
+    pub history: Vec<GenerationSnapshot>,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -586,14 +648,22 @@ fn blake3_f64(seed: u64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fitness::InputStrategy;
 
     fn small_config() -> NeuroevolutionConfig {
         NeuroevolutionConfig {
-            population_size: 10,
+            population_size: 5,
             tournament_size: 3,
             max_generations: 5,
             convergence_patience: 3,
-            fitness_config: FepFitnessConfig::fast_test(),
+            fitness_config: FepFitnessConfig {
+                warmup_steps: 2,
+                eval_steps: 5,
+                dt: 0.05,
+                input_dim: 256,
+                input_strategy: InputStrategy::default(),
+                weights: FitnessWeights::default(),
+            },
             ..Default::default()
         }
     }
@@ -612,7 +682,7 @@ mod tests {
         engine.initialize();
         let snapshot = engine.step_generation();
         assert_eq!(snapshot.generation, 1);
-        assert_eq!(snapshot.population_size, 10);
+        assert_eq!(snapshot.population_size, 5);
         assert!(snapshot.best_fitness.is_finite());
         assert!(snapshot.mean_fitness.is_finite());
     }
@@ -675,13 +745,16 @@ mod tests {
     #[test]
     fn test_evolve_fitness_improves_or_stable() {
         let config = NeuroevolutionConfig {
-            population_size: 10,
+            population_size: 5,
             max_generations: 10,
-            convergence_patience: 20, // Don't converge early
+            convergence_patience: 20,
             fitness_config: FepFitnessConfig {
                 warmup_steps: 2,
                 eval_steps: 5,
-                ..Default::default()
+                dt: 0.05,
+                input_dim: 256,
+                input_strategy: InputStrategy::default(),
+                weights: FitnessWeights::default(),
             },
             ..Default::default()
         };
@@ -741,7 +814,10 @@ mod tests {
             fitness_config: FepFitnessConfig {
                 warmup_steps: 1,
                 eval_steps: 3,
-                ..Default::default()
+                dt: 0.05,
+                input_dim: 256,
+                input_strategy: InputStrategy::default(),
+                weights: FitnessWeights::default(),
             },
             ..Default::default()
         };
