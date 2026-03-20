@@ -500,47 +500,26 @@ impl CognitiveLoopService {
 
                                     // Consciousness-Aware Router: extract peer consciousness from events.
                                     #[cfg(feature = "mesh")]
-                                    match &event {
-                                        SwarmEvent::PeerJoined {
-                                            ref peer_id,
-                                            trust_level,
-                                        } => {
-                                            let peer_id_bytes = {
-                                                let mut buf = [0u8; 8];
-                                                let bytes = peer_id.as_bytes();
-                                                let len = bytes.len().min(8);
-                                                buf[..len].copy_from_slice(&bytes[..len]);
-                                                buf
-                                            };
-                                            self.consciousness_router.update_peer(
-                                                peer_id_bytes,
-                                                *trust_level as f32 * 0.5,
-                                                0.5,
-                                                1,
-                                                cycle_num,
-                                            );
-                                        }
-                                        SwarmEvent::ConsciousnessUpdate {
-                                            ref peer_id,
-                                            phi,
-                                            ..
-                                        } => {
-                                            let peer_id_bytes = {
-                                                let mut buf = [0u8; 8];
-                                                let bytes = peer_id.as_bytes();
-                                                let len = bytes.len().min(8);
-                                                buf[..len].copy_from_slice(&bytes[..len]);
-                                                buf
-                                            };
-                                            self.consciousness_router.update_peer(
-                                                peer_id_bytes,
-                                                *phi as f32,
-                                                *phi as f32,
-                                                1,
-                                                cycle_num,
-                                            );
-                                        }
-                                        _ => {}
+                                    if let SwarmEvent::PeerJoined {
+                                        ref peer_id,
+                                        trust_level: trust_score,
+                                        ..
+                                    } = &event
+                                    {
+                                        let peer_id_bytes = {
+                                            let mut buf = [0u8; 8];
+                                            let bytes = peer_id.as_bytes();
+                                            let len = bytes.len().min(8);
+                                            buf[..len].copy_from_slice(&bytes[..len]);
+                                            buf
+                                        };
+                                        self.consciousness_router.update_peer(
+                                            peer_id_bytes,
+                                            0.5, // initial phi estimate
+                                            0.5, // initial consciousness
+                                            1,   // default participant tier
+                                            cycle_num,
+                                        );
                                     }
 
                                     // All events still go to SwarmManager for normal processing.
@@ -563,7 +542,8 @@ impl CognitiveLoopService {
                 if let Some(ref mut soul_mgr) = self.soul_manager {
                     if soul_mgr.should_run(cycle_num, urgency_u8) {
                         let soul_output = soul_mgr.process(snapshot);
-                        self.subsystem_collector.record("soul_manager", soul_output);
+                        self.subsystem_collector
+                            .record("soul_manager", soul_output);
                     }
                 }
 
@@ -604,7 +584,9 @@ impl CognitiveLoopService {
                                 wisdom.patterns.len(),
                                 wisdom.offline_duration
                             );
-                            // TODO: Transmit consolidated wisdom via mesh bridge
+                            // TODO(blocked:mesh-wisdom): Transmit consolidated wisdom via mesh bridge.
+                            // Blocker: NetworkServiceBridge bidirectional message passing.
+                            // Gate: #[cfg(feature = "mesh")]
                         }
                     }
 

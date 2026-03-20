@@ -210,6 +210,12 @@ class ParticleFieldView @JvmOverloads constructor(
             p.x += p.vx
             p.y += p.vy
 
+            // Record trail position (ring buffer)
+            p.trailX[p.trailHead] = p.x
+            p.trailY[p.trailHead] = p.y
+            p.trailHead = (p.trailHead + 1) % TRAIL_LENGTH
+            if (p.trailHead == 0) p.trailFilled = true
+
             // Wrap around screen edges
             if (p.x < -20) p.x = width + 20f
             if (p.x > width + 20) p.x = -20f
@@ -307,6 +313,23 @@ class ParticleFieldView @JvmOverloads constructor(
                 else -> p.size
             }
 
+            // Trail afterimages at consciousness > 0.5 (not MINIMAL or FIREFLIES)
+            if (consciousnessLevel > 0.5f && particleStyle != ParticleStyle.MINIMAL
+                && particleStyle != ParticleStyle.FIREFLIES && (p.trailFilled || p.trailHead > 1)
+            ) {
+                val trailCount = if (p.trailFilled) TRAIL_LENGTH else p.trailHead
+                val trailFade = (consciousnessLevel - 0.5f) * 2f  // 0..1 at 0.5..1.0 consciousness
+                for (ti in 0 until trailCount) {
+                    val idx = ((p.trailHead - 1 - ti) % TRAIL_LENGTH + TRAIL_LENGTH) % TRAIL_LENGTH
+                    val age = (ti + 1).toFloat() / TRAIL_LENGTH
+                    val trailAlpha = (a * (1f - age) * 0.4f * trailFade).toInt().coerceIn(0, 60)
+                    if (trailAlpha > 2) {
+                        paint.color = Color.argb(trailAlpha, r, g, b)
+                        canvas.drawCircle(p.trailX[idx], p.trailY[idx], drawSize * (1f - age * 0.3f), paint)
+                    }
+                }
+            }
+
             // Soft glow halo
             val haloA = (a * 0.3f).toInt().coerceIn(0, 80)
             paint.color = Color.argb(haloA, r, g, b)
@@ -317,7 +340,7 @@ class ParticleFieldView @JvmOverloads constructor(
         }
     }
 
-    /** Draw aurora-style vertical flowing ribbons. */
+    /** Draw aurora-style vertical flowing ribbons using quadratic bezier curves. */
     private fun drawAurora(canvas: Canvas) {
         val primaryR = Color.red(harmonyColor)
         val primaryG = Color.green(harmonyColor)
@@ -339,14 +362,54 @@ class ParticleFieldView @JvmOverloads constructor(
             )
             ribbonPaint.strokeWidth = (6f + consciousnessLevel * 6f) * ribbon.widthFactor
 
-            var started = false
-            for (i in ribbon.points.indices) {
-                val px = ribbon.points[i].x
-                val py = ribbon.points[i].y
-                if (!started) { path.moveTo(px, py); started = true }
-                else path.lineTo(px, py)
+            val pts = ribbon.points
+            if (pts.size < 2) continue
+
+            // Smooth bezier path through control points for organic ribbon feel
+            path.moveTo(pts[0].x, pts[0].y)
+            if (pts.size == 2) {
+                path.lineTo(pts[1].x, pts[1].y)
+            } else {
+                // First segment: quadratic from start to midpoint of first two
+                path.quadTo(
+                    pts[0].x, pts[0].y,
+                    (pts[0].x + pts[1].x) / 2f, (pts[0].y + pts[1].y) / 2f
+                )
+                // Middle segments: smooth quadratic through midpoints
+                for (i in 1 until pts.size - 1) {
+                    val midX = (pts[i].x + pts[i + 1].x) / 2f
+                    val midY = (pts[i].y + pts[i + 1].y) / 2f
+                    path.quadTo(pts[i].x, pts[i].y, midX, midY)
+                }
+                // Last segment: end at final point
+                val last = pts.size - 1
+                path.quadTo(
+                    pts[last].x, pts[last].y,
+                    pts[last].x, pts[last].y
+                )
             }
             canvas.drawPath(path, ribbonPaint)
+
+            // Draw a slightly offset ghost ribbon for width/depth illusion
+            val ghostPath = Path()
+            val offset = ribbonPaint.strokeWidth * 0.4f
+            ghostPath.moveTo(pts[0].x + offset, pts[0].y)
+            if (pts.size > 2) {
+                ghostPath.quadTo(
+                    pts[0].x + offset, pts[0].y,
+                    (pts[0].x + pts[1].x) / 2f + offset, (pts[0].y + pts[1].y) / 2f
+                )
+                for (i in 1 until pts.size - 1) {
+                    val midX = (pts[i].x + pts[i + 1].x) / 2f + offset * sin(i.toFloat() * 0.5f)
+                    val midY = (pts[i].y + pts[i + 1].y) / 2f
+                    ghostPath.quadTo(pts[i].x + offset, pts[i].y, midX, midY)
+                }
+                val last = pts.size - 1
+                ghostPath.quadTo(pts[last].x + offset, pts[last].y, pts[last].x + offset, pts[last].y)
+            }
+            val ghostAlpha = (baseAlpha * ribbon.alphaFactor * 0.3f).toInt().coerceIn(5, 60)
+            ribbonPaint.color = Color.argb(ghostAlpha, r, g, b)
+            canvas.drawPath(ghostPath, ribbonPaint)
         }
     }
 
@@ -357,21 +420,39 @@ class ParticleFieldView @JvmOverloads constructor(
         var alpha = 0f; var baseAlpha = 0.2f
         var phase = 0f
         var blinkTimer = 0f  // For FIREFLIES
+        // Trail: ring buffer of previous positions for afterimage effect
+        val trailX = FloatArray(TRAIL_LENGTH)
+        val trailY = FloatArray(TRAIL_LENGTH)
+        var trailHead = 0
+        var trailFilled = false
     }
 
-    /** Aurora ribbon: a vertical flowing band of light. */
-    private class AuroraRibbon(index: Int) {
-        val points = Array(20) { PointF() }
+    companion object {
+        const val TRAIL_LENGTH = 6  // Number of afterimage positions
+    }
+
+    /**
+     * Aurora ribbon: a vertical flowing band of light with organic movement.
+     *
+     * Uses 8 control points with multiple harmonic oscillations for natural,
+     * curtain-like aurora behavior. Bezier curves in drawAurora() smooth
+     * between these control points.
+     */
+    private class AuroraRibbon(private val index: Int) {
+        val points = Array(8) { PointF() }  // 8 control points for smooth bezier
         var baseX = 0f
         var phase = index * 0.9f
-        val colorBlend = (index % 3) / 2f  // Varied color blend
+        val colorBlend = (index % 3) / 2f
         val alphaFactor = 0.5f + (index % 4) * 0.15f
         val widthFactor = 0.7f + (index % 3) * 0.3f
-        private val speed = 0.01f + index * 0.003f
-        private val amplitude = 30f + index * 10f
+        private val speed = 0.008f + index * 0.002f
+        private val amplitude = 40f + index * 12f
+        // Each ribbon has unique harmonic ratios for non-repetitive motion
+        private val harmonic1 = 1.0f + index * 0.13f
+        private val harmonic2 = 0.5f + index * 0.07f
 
         fun init(w: Int, h: Int) {
-            baseX = w * (index + 1f) / 8f  // Distribute across screen width
+            baseX = w * (index + 1f) / 8f
             for (i in points.indices) {
                 points[i].x = baseX
                 points[i].y = h * i.toFloat() / (points.size - 1)
@@ -383,11 +464,12 @@ class ParticleFieldView @JvmOverloads constructor(
             val amp = amplitude * (0.5f + consciousness * 0.5f)
             for (i in points.indices) {
                 val t = i.toFloat() / (points.size - 1)
-                points[i].x = baseX + amp * sin(phase + t * 3f) * cos(phase * 0.7f + t * 1.5f)
+                // Multiple harmonics create organic, curtain-like sway
+                val wave1 = sin(phase * harmonic1 + t * 2.5f) * amp
+                val wave2 = sin(phase * harmonic2 + t * 4f) * amp * 0.3f
+                val wave3 = cos(phase * 0.6f + t * 1.2f) * amp * 0.15f
+                points[i].x = baseX + wave1 + wave2 + wave3
             }
         }
-
-        // Store index for color variation
-        private val index = index
     }
 }

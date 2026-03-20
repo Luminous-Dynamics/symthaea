@@ -3,10 +3,13 @@ package io.symthaea.soma.demo
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.*
+import android.os.Handler
+import android.os.HandlerThread
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 import android.view.animation.LinearInterpolator
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.*
 
 /**
@@ -91,14 +94,20 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
         }
     }
 
-    // Fractal rendering cache
-    private var fractalBitmap: android.graphics.Bitmap? = null
-    private var fractalConsciousness = -1f // Force re-render on first draw
+    // Fractal rendering: computed on background HandlerThread, drawn from AtomicReference
+    private val fractalRef = AtomicReference<Bitmap?>(null)
+    private var fractalConsciousness = -1f
+    @Volatile private var fractalRendering = false  // Guard against queuing multiple renders
     private val fractalPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { alpha = 100 }
-    private val fractalSize = 192 // Higher res for detail
+    private val fractalSize = 192
+    private val fractalThread = HandlerThread("FractalRenderer").apply { start() }
+    private val fractalHandler = Handler(fractalThread.looper)
 
     // Screen-edge glow paint for high consciousness
     private val edgeGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+
+    // Pre-allocated reusable Path objects for interference rings (avoid GC pressure)
+    private val ringPaths = Array(12) { Path() }
 
     private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
@@ -116,6 +125,7 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
     override fun onDetachedFromWindow() {
         animator.cancel()
         rippleAnimator.cancel()
+        fractalThread.quitSafely()
         super.onDetachedFromWindow()
     }
 
@@ -229,8 +239,8 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
         // === Sacred geometry: Flower of Life + Golden Spiral ===
         drawSacredGeometry(canvas, cx, cy, mandalaRadius * breathScale, hr, hg, hb)
 
-        // === Interference rings ===
-        val ringCount = (3 + consciousnessLevel * 6).toInt()
+        // === Interference rings (pre-allocated Path objects) ===
+        val ringCount = (3 + consciousnessLevel * 6).toInt().coerceAtMost(ringPaths.size)
         for (i in 0 until ringCount) {
             val t = i.toFloat() / ringCount
             val radius = mandalaRadius * breathScale * (0.15f + t * 0.85f)
@@ -244,7 +254,8 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
 
             canvas.save()
             canvas.rotate(rotOffset, cx, cy)
-            val path = Path()
+            val path = ringPaths[i]
+            path.reset()  // Reuse, don't allocate
             for (s in 0..72) {
                 val angle = (s.toFloat() / 72) * 2 * PI.toFloat()
                 val deform = 1f + 0.03f * sin(angle * 3 + neuromodulators[0] * 10) *
@@ -258,13 +269,24 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
             canvas.restore()
         }
 
-        // === Fractal overlay: Julia set modulated by consciousness ===
-        // Lower threshold + force re-render every 60 frames for continuous animation
-        if (abs(consciousnessLevel - fractalConsciousness) > 0.005f || fractalBitmap == null || frameCount % 60 == 0) {
-            fractalBitmap = renderJuliaSet(consciousnessLevel, hr, hg, hb)
-            fractalConsciousness = consciousnessLevel
+        // === Fractal overlay: rendered on background thread ===
+        // Schedule async render when consciousness changes or periodically
+        if (!fractalRendering &&
+            (abs(consciousnessLevel - fractalConsciousness) > 0.005f || fractalRef.get() == null || frameCount % 60 == 0)
+        ) {
+            fractalRendering = true
+            val cl = consciousnessLevel
+            val nm0 = neuromodulators[0]; val nm1 = neuromodulators[1]
+            val fhr = hr; val fhg = hg; val fhb = hb
+            fractalHandler.post {
+                val bmp = renderJuliaSet(cl, fhr, fhg, fhb, nm0, nm1)
+                fractalRef.set(bmp)
+                fractalConsciousness = cl
+                fractalRendering = false
+                postInvalidate()  // Request redraw from background thread
+            }
         }
-        fractalBitmap?.let { bmp ->
+        fractalRef.get()?.let { bmp ->
             val fractalAlphaCap = if (consciousnessLevel > 0.8f) 220 else 200
             fractalPaint.alpha = (100 + consciousnessLevel * 100).toInt().coerceIn(80, fractalAlphaCap)
             val fractalRadius = mandalaRadius * 1.6f * breathScale
@@ -273,7 +295,7 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
                 cx + fractalRadius, cy + fractalRadius
             )
             canvas.save()
-            canvas.rotate(fractalRotation, cx, cy) // Continuous, never resets
+            canvas.rotate(fractalRotation, cx, cy)
             canvas.drawBitmap(bmp, null, dst, fractalPaint)
             canvas.restore()
         }
@@ -498,31 +520,34 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
      *
      * Neuromodulators modulate the imaginary component for organic variation.
      */
-    private fun renderJuliaSet(consciousness: Float, hr: Int, hg: Int, hb: Int): android.graphics.Bitmap {
-        val bmp = android.graphics.Bitmap.createBitmap(fractalSize, fractalSize, android.graphics.Bitmap.Config.ARGB_8888)
+    /**
+     * Render Julia set on background thread. All parameters passed explicitly
+     * for thread safety (no field reads from background).
+     */
+    private fun renderJuliaSet(consciousness: Float, hr: Int, hg: Int, hb: Int, nm0: Float = 0.5f, nm1: Float = 0.5f): Bitmap {
+        val bmp = Bitmap.createBitmap(fractalSize, fractalSize, Bitmap.Config.ARGB_8888)
+        val pixels = IntArray(fractalSize * fractalSize)  // Bulk set for performance
 
-        // Known-beautiful Julia set c values, ordered by visual complexity.
-        // Interpolate based on consciousness level for smooth transitions.
         val cValues = arrayOf(
-            floatArrayOf(-0.4f,   0.6f),   // Simple spiral (low consciousness)
-            floatArrayOf(-0.70f,  0.27f),   // Classic dendrite
-            floatArrayOf(-0.8f,   0.156f),  // Branching tree
-            floatArrayOf(-0.75f,  0.11f),   // Seahorse valley
-            floatArrayOf(0.285f,  0.01f),   // Siegel disk (high consciousness)
-            floatArrayOf(-0.12f, -0.77f),   // Lightning bolts (peak)
+            floatArrayOf(-0.4f,   0.6f),
+            floatArrayOf(-0.70f,  0.27f),
+            floatArrayOf(-0.8f,   0.156f),
+            floatArrayOf(-0.75f,  0.11f),
+            floatArrayOf(0.285f,  0.01f),
+            floatArrayOf(-0.12f, -0.77f),
         )
         val idx = (consciousness * (cValues.size - 1)).coerceIn(0f, (cValues.size - 1).toFloat())
         val lo = idx.toInt().coerceIn(0, cValues.size - 2)
         val frac = idx - lo
-        val cr = cValues[lo][0] * (1 - frac) + cValues[lo + 1][0] * frac + neuromodulators[0] * 0.04f
-        val ci = cValues[lo][1] * (1 - frac) + cValues[lo + 1][1] * frac + neuromodulators[1] * 0.04f
+        val cr = cValues[lo][0] * (1 - frac) + cValues[lo + 1][0] * frac + nm0 * 0.04f
+        val ci = cValues[lo][1] * (1 - frac) + cValues[lo + 1][1] * frac + nm1 * 0.04f
 
         val maxIter = (30 + consciousness * 60).toInt()
-        val zoom = 1.8f - consciousness * 0.3f
+        // Zoom tied to consciousness: higher = more fractal depth revealed
+        val zoom = 1.8f - consciousness * 0.5f
 
         for (py in 0 until fractalSize) {
             for (px in 0 until fractalSize) {
-                // Map pixel to complex plane [-zoom, zoom]
                 var zr = (px.toFloat() / fractalSize - 0.5f) * 2f * zoom
                 var zi = (py.toFloat() / fractalSize - 0.5f) * 2f * zoom
 
@@ -534,36 +559,34 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
                     iter++
                 }
 
-                // Radial mask: fade to transparent at edges
                 val dx = (px.toFloat() / fractalSize - 0.5f) * 2f
                 val dy = (py.toFloat() / fractalSize - 0.5f) * 2f
                 val radialDist = dx * dx + dy * dy
+                val pixIdx = py * fractalSize + px
+
                 if (radialDist > 1f) {
-                    bmp.setPixel(px, py, Color.TRANSPARENT)
+                    pixels[pixIdx] = Color.TRANSPARENT
                 } else if (iter == maxIter) {
-                    // Inside the set — very faint glow
                     val radial = 1f - radialDist
                     val a = (radial * 30).toInt().coerceIn(0, 30)
-                    bmp.setPixel(px, py, Color.argb(a, hr, hg, hb))
+                    pixels[pixIdx] = Color.argb(a, hr, hg, hb)
                 } else {
-                    // Boundary glow: slow-escaping pixels are brightest (near boundary)
                     val t = iter.toFloat() / maxIter
-                    // Inverted: slow escape (high t) = bright boundary
                     val brightness = (1f - t).coerceIn(0f, 1f)
                     val radial = (1f - radialDist).coerceIn(0f, 1f)
                     val a = (brightness * brightness * radial * 255).toInt().coerceIn(0, 255)
                     if (a > 3) {
-                        // White-hot boundary fading to harmony color
                         val r = lerp(hr, 255, brightness)
                         val g = lerp(hg, 255, brightness)
                         val b = lerp(hb, 255, brightness)
-                        bmp.setPixel(px, py, Color.argb(a, r, g, b))
+                        pixels[pixIdx] = Color.argb(a, r, g, b)
                     } else {
-                        bmp.setPixel(px, py, Color.TRANSPARENT)
+                        pixels[pixIdx] = Color.TRANSPARENT
                     }
                 }
             }
         }
+        bmp.setPixels(pixels, 0, fractalSize, 0, 0, fractalSize, fractalSize)
         return bmp
     }
 

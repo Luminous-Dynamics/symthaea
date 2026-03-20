@@ -185,7 +185,7 @@ struct PendingChallenge {
     issued_at: SystemTime,
 
     /// The peer we challenged
-    #[allow(dead_code)]
+    #[allow(dead_code)] // RESERVED(mesh): handshake protocol state
     peer_node_id: String,
 }
 

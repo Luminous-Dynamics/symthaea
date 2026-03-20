@@ -366,6 +366,8 @@ impl CognitiveLoopService {
                     "Civic crisis detected — forwarding to Mycelix emergency-incidents"
                 );
                 // TODO(blocked:conductor): Forward crisis_event to Mycelix civic bridge.
+                // Blocker: Holochain conductor API for event forwarding.
+                // Gate: #[cfg(feature = "mycelix")] — ready when conductor supports CallTargetCell::OtherRole from async.
                 // Requires: Holochain conductor connected + civic::create_incident zome call.
                 // Workaround: event logged + counted in security_telemetry.crisis_events_emitted.
             }

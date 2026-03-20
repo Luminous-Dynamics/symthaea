@@ -29,9 +29,9 @@ use super::super::subsystem_trait::{
 };
 use super::super::thresholds;
 
-use symthaea_fabrication_kernel::{
-    DesignLoopReading, DesignLoopTwin, ManufacturingReading, ManufacturingSafetyLevel,
-    ManufacturingTwin,
+use symthaea_fabrication_kernel::design_loop::{DesignLoopReading, DesignLoopTwin};
+use symthaea_fabrication_kernel::manufacturing::{
+    ManufacturingReading, ManufacturingSafetyLevel, ManufacturingTwin,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════

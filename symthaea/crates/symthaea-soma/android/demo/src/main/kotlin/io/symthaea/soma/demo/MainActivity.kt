@@ -431,14 +431,11 @@ class MainActivity : AppCompatActivity() {
         binding.consciousnessGarden.dominantHarmonyIndex = harmonyToIndex(state.dominantHarmony)
         binding.consciousnessGarden.dreamCount = state.dreamCount
         binding.consciousnessGarden.primaryColor = blendedColor
-        binding.consciousnessGarden.breathPhase = state.consciousnessLevel  // Approximate
         // Session progress: rough estimate based on cycle count
         if (sessionStartCycle > 0 && state.cycleCount > sessionStartCycle) {
             binding.consciousnessGarden.sessionProgress =
                 ((state.cycleCount - sessionStartCycle).toFloat() / 5000f).coerceIn(0f, 1f)
         }
-        binding.consciousnessGarden.invalidate()
-
         // Harmony text
         binding.harmonyText.text = state.dominantHarmony.lowercase()
         binding.harmonyText.setTextColor(blendedColor)
