@@ -3186,7 +3186,7 @@ impl ConsciousnessAwareRouter {
         let mut sum = self.local_phi;
         let mut count = 1u32;
 
-        for (_, state) in &self.peer_phi {
+        for state in self.peer_phi.values() {
             sum += state.phi * state.trust; // Trust-weighted
             count += 1;
         }
@@ -3195,7 +3195,7 @@ impl ConsciousnessAwareRouter {
 
         // Variance
         let mut var_sum = (self.local_phi - self.collective_phi).powi(2);
-        for (_, state) in &self.peer_phi {
+        for state in self.peer_phi.values() {
             var_sum += (state.phi * state.trust - self.collective_phi).powi(2);
         }
         self.collective_phi_divergence = var_sum / count as f32;
