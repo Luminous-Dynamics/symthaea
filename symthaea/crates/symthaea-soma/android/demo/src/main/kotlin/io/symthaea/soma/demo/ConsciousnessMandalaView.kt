@@ -65,6 +65,12 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
         }
     }
 
+    // Fractal rendering cache
+    private var fractalBitmap: android.graphics.Bitmap? = null
+    private var fractalConsciousness = -1f // Force re-render on first draw
+    private val fractalPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { alpha = 80 }
+    private val fractalSize = 128 // Low-res for performance
+
     private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -163,6 +169,24 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
             canvas.restore()
         }
 
+        // === Fractal overlay: Julia set modulated by consciousness ===
+        if (abs(consciousnessLevel - fractalConsciousness) > 0.02f || fractalBitmap == null) {
+            fractalBitmap = renderJuliaSet(consciousnessLevel, hr, hg, hb)
+            fractalConsciousness = consciousnessLevel
+        }
+        fractalBitmap?.let { bmp ->
+            fractalPaint.alpha = (40 + consciousnessLevel * 80).toInt().coerceIn(30, 120)
+            val fractalRadius = mandalaRadius * 1.4f * breathScale
+            val dst = RectF(
+                cx - fractalRadius, cy - fractalRadius,
+                cx + fractalRadius, cy + fractalRadius
+            )
+            canvas.save()
+            canvas.rotate(rotationPhase * 60f, cx, cy) // Slow fractal rotation
+            canvas.drawBitmap(bmp, null, dst, fractalPaint)
+            canvas.restore()
+        }
+
         // === Consciousness number ===
         val numSize = mandalaRadius * 0.5f
         textPaint.textSize = numSize
@@ -223,6 +247,68 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
             canvas.drawCircle(rippleX, rippleY, rr, fillPaint)
             fillPaint.shader = null
         }
+    }
+
+    /**
+     * Render a Julia set at low resolution, colored by harmony.
+     *
+     * The `c` parameter of the Julia set is derived from consciousness level:
+     * - Low consciousness (0.1): c near origin → simple circular boundary
+     * - Mid consciousness (0.3-0.5): c at interesting boundary → branching tendrils
+     * - High consciousness (0.7+): c deep in fractal → maximum complexity
+     *
+     * Neuromodulators modulate the imaginary component for organic variation.
+     */
+    private fun renderJuliaSet(consciousness: Float, hr: Int, hg: Int, hb: Int): android.graphics.Bitmap {
+        val bmp = android.graphics.Bitmap.createBitmap(fractalSize, fractalSize, android.graphics.Bitmap.Config.ARGB_8888)
+
+        // Map consciousness to Julia set c parameter along the main cardioid boundary
+        // This traces interesting fractal structures as consciousness rises
+        val angle = consciousness * PI.toFloat() * 1.2f - 0.2f
+        val cr = -0.7f + consciousness * 0.45f * cos(angle + neuromodulators[0] * 0.3f)
+        val ci = 0.27015f + consciousness * 0.15f * sin(angle + neuromodulators[1] * 0.2f)
+
+        val maxIter = (20 + consciousness * 40).toInt() // More detail at higher consciousness
+        val zoom = 1.5f - consciousness * 0.3f // Zoom in slightly as complexity grows
+
+        for (py in 0 until fractalSize) {
+            for (px in 0 until fractalSize) {
+                // Map pixel to complex plane [-zoom, zoom]
+                var zr = (px.toFloat() / fractalSize - 0.5f) * 2f * zoom
+                var zi = (py.toFloat() / fractalSize - 0.5f) * 2f * zoom
+
+                var iter = 0
+                while (zr * zr + zi * zi < 4f && iter < maxIter) {
+                    val tmp = zr * zr - zi * zi + cr
+                    zi = 2f * zr * zi + ci
+                    zr = tmp
+                    iter++
+                }
+
+                if (iter == maxIter) {
+                    // Inside the set — transparent
+                    bmp.setPixel(px, py, Color.TRANSPARENT)
+                } else {
+                    // Outside — color based on escape time
+                    val t = iter.toFloat() / maxIter
+                    val smooth = t * t // Quadratic falloff for organic look
+                    // Radial mask: fade to transparent at edges
+                    val dx = (px.toFloat() / fractalSize - 0.5f) * 2f
+                    val dy = (py.toFloat() / fractalSize - 0.5f) * 2f
+                    val radial = (1f - (dx * dx + dy * dy).coerceAtMost(1f))
+                    val a = (smooth * radial * 255).toInt().coerceIn(0, 255)
+                    if (a > 5) {
+                        val r = lerp(hr, 255, smooth)
+                        val g = lerp(hg, 255, smooth)
+                        val b = lerp(hb, 255, smooth)
+                        bmp.setPixel(px, py, Color.argb(a, r, g, b))
+                    } else {
+                        bmp.setPixel(px, py, Color.TRANSPARENT)
+                    }
+                }
+            }
+        }
+        return bmp
     }
 
     private fun lerp(a: Int, b: Int, t: Float): Int = (a + (b - a) * t).toInt().coerceIn(0, 255)

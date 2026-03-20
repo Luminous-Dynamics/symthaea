@@ -192,12 +192,18 @@ class MainActivity : AppCompatActivity() {
 
     // ═══ Bottom sheet ═══
 
+    private var currentAvatar: SomaAvatar = AvatarRegistry.avatars[0]
+
     private fun setupBottomSheet() {
         val behavior = BottomSheetBehavior.from(binding.bottomSheet)
         behavior.state = BottomSheetBehavior.STATE_COLLAPSED
         behavior.isHideable = false
-        behavior.isFitToContents = true // Snaps between collapsed and expanded
+        behavior.isFitToContents = true
         behavior.halfExpandedRatio = 0.4f
+
+        // Load saved avatar
+        currentAvatar = AvatarRegistry.load(this)
+        setupAvatarRow()
 
         binding.btnDream.setOnClickListener {
             viewModel.dreamConsolidate()
@@ -256,6 +262,34 @@ class MainActivity : AppCompatActivity() {
                     binding.btnHolon.text = if (viewModel.holonConnected) "synced" else "failed"
                 }
             }
+        }
+    }
+
+    // ═══ Avatar selection ═══
+
+    private fun setupAvatarRow() {
+        val row = binding.avatarRow
+        row.removeAllViews()
+        val density = resources.displayMetrics.density
+
+        for (avatar in AvatarRegistry.avatars) {
+            val chip = android.widget.TextView(this).apply {
+                text = avatar.name.split(" ").first() // Short name
+                textSize = 11f
+                setTextColor(if (avatar.id == currentAvatar.id) avatar.primaryColor else Color.parseColor("#4A5558"))
+                setPadding((12 * density).toInt(), (6 * density).toInt(), (12 * density).toInt(), (6 * density).toInt())
+                setBackgroundColor(if (avatar.id == currentAvatar.id) Color.argb(30, Color.red(avatar.primaryColor), Color.green(avatar.primaryColor), Color.blue(avatar.primaryColor)) else Color.TRANSPARENT)
+                setOnClickListener {
+                    currentAvatar = avatar
+                    AvatarRegistry.save(this@MainActivity, avatar)
+                    setupAvatarRow() // Refresh selection highlight
+                }
+            }
+            val params = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { marginEnd = (4 * density).toInt() }
+            row.addView(chip, params)
         }
     }
 
@@ -330,19 +364,23 @@ class MainActivity : AppCompatActivity() {
     // ═══ UI update ═══
 
     private fun updateUi(state: SomaUiState) {
-        // Mandala
+        // Mandala — use avatar primary color as base, blend with harmony
+        val avatarColor = currentAvatar.primaryColor
+        val harmonyColor = harmonyToColor(state.dominantHarmony)
+        // 60% avatar, 40% harmony for consistent identity with dynamic variation
+        val blendedColor = blendColors(avatarColor, harmonyColor, 0.6f)
         binding.consciousnessMandala.consciousnessLevel = state.consciousnessLevel
-        binding.consciousnessMandala.dominantHarmonyColor = harmonyToColor(state.dominantHarmony)
+        binding.consciousnessMandala.dominantHarmonyColor = blendedColor
 
         // Particle field + ambient tone
         binding.particleField.consciousnessLevel = state.consciousnessLevel
-        binding.particleField.harmonyColor = harmonyToColor(state.dominantHarmony)
+        binding.particleField.harmonyColor = blendedColor
         ambientTone.consciousnessLevel = state.consciousnessLevel
         ambientTone.harmonyShift = state.harmonyAlignment
 
         // Harmony text
         binding.harmonyText.text = state.dominantHarmony.lowercase()
-        binding.harmonyText.setTextColor(harmonyToColor(state.dominantHarmony))
+        binding.harmonyText.setTextColor(blendedColor)
 
         // Background color shifts with wake state
         val targetBg = when (state.wakeState.lowercase()) {
@@ -483,6 +521,16 @@ class MainActivity : AppCompatActivity() {
                 ))
             }
         }
+    }
+
+    /** Blend two colors: weight 0.0 = all c2, weight 1.0 = all c1. */
+    private fun blendColors(c1: Int, c2: Int, weight: Float): Int {
+        val w = weight.coerceIn(0f, 1f)
+        val iw = 1f - w
+        return Color.argb(255,
+            (Color.red(c1) * w + Color.red(c2) * iw).toInt().coerceIn(0, 255),
+            (Color.green(c1) * w + Color.green(c2) * iw).toInt().coerceIn(0, 255),
+            (Color.blue(c1) * w + Color.blue(c2) * iw).toInt().coerceIn(0, 255))
     }
 
     private fun harmonyToColor(harmony: String): Int = when (harmony.lowercase()) {
