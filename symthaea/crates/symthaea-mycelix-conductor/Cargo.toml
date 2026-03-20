@@ -2,6 +2,7 @@
 name = "symthaea-mycelix-conductor"
 version = "0.1.0"
 edition = "2021"
+license = "AGPL-3.0-or-later"
 description = "Adapter bridging Symthaea's governance dispatch to a real Holochain conductor"
 
 [dependencies]
