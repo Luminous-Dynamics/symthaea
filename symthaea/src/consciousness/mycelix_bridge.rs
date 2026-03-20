@@ -1625,36 +1625,72 @@ impl FinanceHealthSignals {
         (self.stressed_positions as f32 / self.active_positions as f32).min(1.0)
     }
 
-    /// Compute engagement modulation from financial health.
+    /// Compute engagement modulation for **individual** financial operations.
     ///
-    /// Financial stress dampens the engagement dimension of consciousness:
-    /// - `stress_index < 0.1`: no effect (healthy)
-    /// - `stress_index 0.1–0.5`: −5% to −15% engagement
-    /// - `stress_index > 0.5`: −15% to −30% engagement (crisis)
+    /// Dampens engagement for deposits, collateral, minting — individual
+    /// decisions degrade under stress (Kahneman & Tversky 1979, Mani et al. 2013).
     ///
-    /// This ensures communities under financial duress have reduced
-    /// governance weight, preventing stress-driven bad decisions.
-    ///
-    /// # Science
-    ///
-    /// Kahneman & Tversky (1979) — loss aversion amplifies under stress.
-    /// Mani et al. (2013) — poverty impedes cognitive function.
-    pub fn engagement_modulation(&self) -> f32 {
+    /// - `stress < 0.1`: no effect
+    /// - `stress 0.1–0.5`: −5% to −15%
+    /// - `stress > 0.5`: −15% to −30%
+    pub fn individual_engagement_modulation(&self) -> f32 {
         let stress = self.compute_stress_index();
         if stress < 0.1 {
-            0.0 // No modulation
+            0.0
         } else if stress < 0.5 {
-            // Linear: -5% to -15%
             -0.05 - (stress - 0.1) * 0.25
         } else {
-            // Linear: -15% to -30%
             -0.15 - (stress - 0.5) * 0.30
         }
     }
 
-    /// Whether the financial system is in crisis (stress > 0.5 or breakers open).
+    /// Compute engagement modulation for **cooperative governance** operations.
+    ///
+    /// Cooperatives rally during moderate adversity — communities need MORE
+    /// governance capacity during crises, not less. Only extreme shock (>0.7)
+    /// triggers dampening (collective paralysis).
+    ///
+    /// - `stress < 0.1`: no effect (healthy)
+    /// - `stress 0.1–0.5`: +5% to +10% (mobilize collective response)
+    /// - `stress 0.5–0.7`: 0% (stress cancels boost)
+    /// - `stress > 0.7`: −10% to −20% (extreme crisis — circuit breaker)
+    ///
+    /// # Science
+    ///
+    /// Ostrom (1990) — commons governance strengthens under moderate scarcity.
+    /// Aldrich (2012) — social capital mobilizes during community crises.
+    /// Solnit (2009) — communities self-organize in disasters ("A Paradise Built in Hell").
+    pub fn cooperative_engagement_modulation(&self) -> f32 {
+        let stress = self.compute_stress_index();
+        if stress < 0.1 {
+            0.0
+        } else if stress < 0.5 {
+            // Mobilize: +5% to +10% (linear)
+            0.05 + (stress - 0.1) * 0.125
+        } else if stress < 0.7 {
+            // Neutral: boost fades as stress becomes extreme
+            // Linear from +10% at 0.5 to 0% at 0.7
+            0.10 - (stress - 0.5) * 0.50
+        } else {
+            // Extreme crisis: −10% to −20% (collective paralysis)
+            -0.10 - (stress - 0.7) * 0.333
+        }
+    }
+
+    /// Legacy engagement_modulation — delegates to individual modulation.
+    ///
+    /// Callers that need cooperative modulation should use
+    /// `cooperative_engagement_modulation()` instead.
+    pub fn engagement_modulation(&self) -> f32 {
+        self.individual_engagement_modulation()
+    }
+
+    /// Whether the financial system is in crisis (stress > 0.7 or breakers open).
+    ///
+    /// Threshold raised from 0.5 to 0.7 to match the cooperative governance
+    /// model — moderate stress (0.5) triggers mobilization, not crisis.
     pub fn is_crisis(&self) -> bool {
-        self.compute_stress_index() > 0.5 || self.open_breakers > 0
+        self.compute_stress_index() > 0.7 || self.open_breakers > 0
     }
 }
 
@@ -1931,43 +1967,88 @@ mod tests {
     }
 
     #[test]
-    fn test_finance_engagement_modulation_healthy() {
+    fn test_finance_individual_modulation_healthy() {
         // stress < 0.1 → no modulation
         let signals = FinanceHealthSignals {
             active_positions: 100,
             stressed_positions: 5,
             ..Default::default()
         };
-        assert_eq!(signals.engagement_modulation(), 0.0);
+        assert_eq!(signals.individual_engagement_modulation(), 0.0);
     }
 
     #[test]
-    fn test_finance_engagement_modulation_moderate() {
+    fn test_finance_individual_modulation_moderate() {
         // stress = 0.3 → between -5% and -15%
         let signals = FinanceHealthSignals {
             active_positions: 100,
             stressed_positions: 30,
             ..Default::default()
         };
-        let mod_val = signals.engagement_modulation();
+        let mod_val = signals.individual_engagement_modulation();
         assert!(
             mod_val < -0.05 && mod_val > -0.15,
-            "moderate stress should give -5% to -15%, got {mod_val}"
+            "moderate stress should dampen individual engagement -5% to -15%, got {mod_val}"
         );
     }
 
     #[test]
-    fn test_finance_engagement_modulation_crisis() {
+    fn test_finance_individual_modulation_crisis() {
         // stress = 0.8 → between -15% and -30%
         let signals = FinanceHealthSignals {
             active_positions: 100,
             stressed_positions: 80,
             ..Default::default()
         };
-        let mod_val = signals.engagement_modulation();
+        let mod_val = signals.individual_engagement_modulation();
         assert!(
             mod_val < -0.15 && mod_val > -0.31,
-            "crisis stress should give -15% to -30%, got {mod_val}"
+            "crisis should dampen individual engagement -15% to -30%, got {mod_val}"
+        );
+    }
+
+    #[test]
+    fn test_finance_cooperative_modulation_mobilize() {
+        // stress = 0.3 → cooperatives RALLY: +5% to +10%
+        let signals = FinanceHealthSignals {
+            active_positions: 100,
+            stressed_positions: 30,
+            ..Default::default()
+        };
+        let mod_val = signals.cooperative_engagement_modulation();
+        assert!(
+            mod_val > 0.05 && mod_val < 0.10,
+            "moderate stress should BOOST cooperative governance, got {mod_val}"
+        );
+    }
+
+    #[test]
+    fn test_finance_cooperative_modulation_neutral() {
+        // stress = 0.6 → boost fading, near neutral
+        let signals = FinanceHealthSignals {
+            active_positions: 100,
+            stressed_positions: 60,
+            ..Default::default()
+        };
+        let mod_val = signals.cooperative_engagement_modulation();
+        assert!(
+            mod_val.abs() < 0.06,
+            "high stress should be near-neutral for cooperatives, got {mod_val}"
+        );
+    }
+
+    #[test]
+    fn test_finance_cooperative_modulation_extreme_crisis() {
+        // stress = 0.9 → even cooperatives freeze: -10% to -20%
+        let signals = FinanceHealthSignals {
+            active_positions: 100,
+            stressed_positions: 90,
+            ..Default::default()
+        };
+        let mod_val = signals.cooperative_engagement_modulation();
+        assert!(
+            mod_val < -0.05 && mod_val > -0.25,
+            "extreme crisis should dampen even cooperative governance, got {mod_val}"
         );
     }
 
@@ -1984,12 +2065,21 @@ mod tests {
 
     #[test]
     fn test_finance_is_crisis_stress() {
+        // stress = 0.8 > 0.7 threshold → crisis
         let signals = FinanceHealthSignals {
             active_positions: 10,
             stressed_positions: 8,
             ..Default::default()
         };
         assert!(signals.is_crisis());
+
+        // stress = 0.6 < 0.7 threshold → NOT crisis (cooperatives mobilize)
+        let moderate = FinanceHealthSignals {
+            active_positions: 10,
+            stressed_positions: 6,
+            ..Default::default()
+        };
+        assert!(!moderate.is_crisis(), "moderate stress should NOT be crisis — cooperatives rally");
     }
 
     #[test]
