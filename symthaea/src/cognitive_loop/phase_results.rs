@@ -58,6 +58,7 @@ pub(super) struct PercMath {
     /// Whether math intent was detected in the input
     pub(super) math_detected: bool,
     /// Classified problem type (if detected)
+    #[cfg(feature = "mathematics")]
     pub(super) problem_type: Option<crate::cognitive_loop::math_service::MathProblemType>,
     /// Phi from the math computation (0.0 if no math)
     pub(super) phi: f64,

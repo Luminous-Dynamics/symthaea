@@ -225,9 +225,7 @@ impl NetworkService {
 
     /// Get the PQC handshake manager (if feature enabled).
     #[cfg(feature = "pqc-handshake")]
-    pub fn pqc_manager(
-        &self,
-    ) -> &Option<Arc<RwLock<super::pqc_handshake::PqcHandshakeManager>>> {
+    pub fn pqc_manager(&self) -> &Option<Arc<RwLock<super::pqc_handshake::PqcHandshakeManager>>> {
         &self.pqc_manager
     }
 

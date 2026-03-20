@@ -55,19 +55,19 @@ pub mod tokenizer;
 pub mod training;
 
 // Liquid-Mamba fusion: pre-trained Mamba SSM + HDC projection + consciousness gating
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 pub mod liquid_mamba;
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 pub mod mamba;
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 pub mod mamba_model;
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 pub mod projection;
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 pub mod temporal_projection;
 
 pub use checkpoint::{AdamState, BrocaCheckpoint};
-pub use controller::{LanguageController, LanguageControllerConfig};
+pub use controller::{LanguageController, LanguageControllerConfig, NetworkSnapshot};
 pub use encoder::{ThoughtChannels, ThoughtLanguageEncoder};
 pub use evaluation::{EvalConfig, EvalResult, IntentScore};
 pub use gating::{CoherenceFeedback, EmotionalModulator, EpistemicGate, GatingConfig};
@@ -78,20 +78,20 @@ pub use training::{
     TrainingValidation,
 };
 
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 pub use checkpoint::ProjectionCheckpoint;
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 pub use evaluation::{
     GatingTestResult, LiquidMambaEvalConfig, LiquidMambaEvalResult, QualityGateThresholds,
 };
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 pub use liquid_mamba::{LiquidMambaConfig, LiquidMambaGenerator};
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 pub use mamba::MambaBackend;
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 pub use projection::{
     GradientDiagnosticsSnapshot, GradientStepMetrics, HdcSsmProjection,
     ProjectionGradientDiagnostics,
 };
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 pub use temporal_projection::TemporalProjection;

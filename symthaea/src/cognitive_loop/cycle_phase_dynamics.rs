@@ -588,6 +588,16 @@ impl CognitiveLoopService {
                     }
                 }
 
+                // ── Neuroevolution Manager (interval 71, co-prime) ─────
+                #[cfg(feature = "neuroevolution")]
+                {
+                    let neuro_output = self.neuroevolution_manager.process(snapshot);
+                    if neuro_output.lr_modulation != 1.0 {
+                        self.subsystem_collector
+                            .record("neuroevolution", neuro_output);
+                    }
+                }
+
                 // ── Governance Manager (interval 37, co-prime) ──────────
                 #[cfg(feature = "mycelix")]
                 if self.governance_mgr.should_run(cycle_num, urgency_u8) {
@@ -1599,6 +1609,7 @@ impl CognitiveLoopService {
         // Science: Dehaene (2011) — number sense as a core cognitive module;
         //          Lakoff & Núñez (2000) — mathematical reasoning is embodied.
         // ═══════════════════════════════════════════════════════════════════════
+        #[cfg(feature = "mathematics")]
         let math_result = if perception.math.math_detected {
             let _t = Instant::now();
             // ── Phase 7c: Memory recall — check for analogous past problems ──
@@ -1834,6 +1845,8 @@ impl CognitiveLoopService {
         } else {
             DynMath::default()
         };
+        #[cfg(not(feature = "mathematics"))]
+        let math_result = DynMath::default();
 
         // ═══════════════════════════════════════════════════════════════════════
         // NEUROMODULATOR BATH + PSI SYNTHESIS (extracted to cycle_neuromod_phase.rs)

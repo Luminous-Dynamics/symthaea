@@ -21,6 +21,7 @@ pub mod neuromod;
 pub mod normative_integration;
 pub mod qualia_confidence;
 pub mod reasoning;
+pub mod security;
 pub mod social;
 pub mod spatial;
 pub mod speech;

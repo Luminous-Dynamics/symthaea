@@ -907,11 +907,8 @@ pub mod onnx {
             // Model: sentence-transformers/all-MiniLM-L6-v2
             let embedding_dim = 384;
 
-            // Initialize ONNX Runtime
-            ort::init()
-                .with_name("symthaea")
-                .commit()
-                .map_err(|e| format!("Failed to init ONNX Runtime: {}", e))?;
+            // Initialize ONNX Runtime (ORT 2.0: commit() returns bool)
+            ort::init().with_name("symthaea").commit();
 
             // Download model from HuggingFace Hub
             let api = hf_hub::api::sync::Api::new()
@@ -1123,9 +1120,8 @@ pub fn create_best_encoder() -> Box<dyn SemanticEncoder> {
 pub fn create_ethics_encoder() -> Box<dyn SemanticEncoder> {
     #[cfg(feature = "embeddings")]
     {
-        match onnx::OnnxSemanticEncoder::new() {
-            Ok(encoder) => return Box::new(encoder),
-            Err(_) => {}
+        if let Ok(encoder) = onnx::OnnxSemanticEncoder::new() {
+            return Box::new(encoder);
         }
     }
 

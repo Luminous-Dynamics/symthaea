@@ -7,14 +7,15 @@
 
 use crate::serializer::{
     self, CareCircleRelay, EmergencyRelay, FoodRelay, HearthAlertRelay, KnowledgeClaimRelay,
-    MutualAidRelay, PriceReportRelay, RelayPayload, RelayType, ShelterRelay, SupplyRelay,
-    TendRelay, WaterAlertRelay,
+    MutualAidRelay, PriceReportRelay, RelayPayload, RelayType, SensorReadingRelay, ShelterRelay,
+    SupplyRelay, TendRelay, WaterAlertRelay,
 };
 use crate::transport::MeshTransport;
 use crate::BridgeMetrics;
 use anyhow::Result;
 use chacha20poly1305::XChaCha20Poly1305;
-use holochain_client::{AgentSigner, AppWebsocket, ClientAgentSigner, ExternIO, ZomeCallTarget};
+use holochain_client::{AgentSigner, AppWebsocket, ClientAgentSigner, ZomeCallTarget};
+use holochain_types::prelude::ExternIO;
 use std::collections::HashSet;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -38,6 +39,11 @@ const BACKOFF_MAX_SECS: u64 = 300;
 
 /// Max entries per domain per poll cycle (backpressure).
 const MAX_ENTRIES_PER_DOMAIN: usize = 20;
+
+/// Encode a value as ExternIO, converting the error for match arms.
+fn encode_extern_io<T: serde::Serialize + std::fmt::Debug>(val: T) -> std::result::Result<ExternIO, String> {
+    ExternIO::encode(val).map_err(|e| format!("{e}"))
+}
 
 /// Run the poller loop: conductor → serializer → mesh transport.
 ///
@@ -260,7 +266,7 @@ async fn poll_once(
             let signer: Arc<dyn AgentSigner + Send + Sync> =
                 Arc::new(ClientAgentSigner::default());
             tracing::debug!("Connecting to conductor at {conductor_url}");
-            AppWebsocket::connect(conductor_url, token, signer).await?
+            AppWebsocket::connect(conductor_url, token, signer).await.map_err(|e| anyhow::anyhow!("{e:?}"))?
         }
     };
 
@@ -282,6 +288,9 @@ async fn poll_once(
 
     // --- Poll food harvests ---
     relayed += poll_food(&ws, dedup, origin, transport, cipher).await;
+
+    // --- Poll IoT sensor readings (safety-critical: water/air quality) ---
+    relayed += poll_sensors(&ws, dedup, origin, transport, cipher).await;
 
     // === LOWER-PRIORITY: every other cycle ===
     if poll_count % 2 == 0 {
@@ -310,7 +319,7 @@ async fn poll_tend(
     transport: &dyn MeshTransport,
     cipher: Option<&XChaCha20Poly1305>,
 ) -> usize {
-    let input = match ExternIO::encode(serde_json::json!({
+    let input = match encode_extern_io(serde_json::json!({
         "dao_did": "roodepoort-resilience",
         "limit": MAX_ENTRIES_PER_DOMAIN
     })) {
@@ -366,7 +375,7 @@ async fn poll_emergency(
     transport: &dyn MeshTransport,
     cipher: Option<&XChaCha20Poly1305>,
 ) -> usize {
-    let input = match ExternIO::encode(()) {
+    let input = match encode_extern_io(()) {
         Ok(i) => i,
         Err(_) => return 0,
     };
@@ -417,7 +426,7 @@ async fn poll_food(
     transport: &dyn MeshTransport,
     cipher: Option<&XChaCha20Poly1305>,
 ) -> usize {
-    let input = match ExternIO::encode(serde_json::json!({ "limit": MAX_ENTRIES_PER_DOMAIN })) {
+    let input = match encode_extern_io(serde_json::json!({ "limit": MAX_ENTRIES_PER_DOMAIN })) {
         Ok(i) => i,
         Err(_) => return 0,
     };
@@ -469,7 +478,7 @@ async fn poll_water(
     transport: &dyn MeshTransport,
     cipher: Option<&XChaCha20Poly1305>,
 ) -> usize {
-    let input = match ExternIO::encode(()) {
+    let input = match encode_extern_io(()) {
         Ok(i) => i,
         Err(_) => return 0,
     };
@@ -521,7 +530,7 @@ async fn poll_hearth(
     transport: &dyn MeshTransport,
     cipher: Option<&XChaCha20Poly1305>,
 ) -> usize {
-    let input = match ExternIO::encode(()) {
+    let input = match encode_extern_io(()) {
         Ok(i) => i,
         Err(_) => return 0,
     };
@@ -572,7 +581,7 @@ async fn poll_knowledge(
     transport: &dyn MeshTransport,
     cipher: Option<&XChaCha20Poly1305>,
 ) -> usize {
-    let input = match ExternIO::encode(serde_json::json!({ "limit": MAX_ENTRIES_PER_DOMAIN })) {
+    let input = match encode_extern_io(serde_json::json!({ "limit": MAX_ENTRIES_PER_DOMAIN })) {
         Ok(i) => i,
         Err(_) => return 0,
     };
@@ -634,7 +643,7 @@ async fn poll_care_circles(
     transport: &dyn MeshTransport,
     cipher: Option<&XChaCha20Poly1305>,
 ) -> usize {
-    let input = match ExternIO::encode(()) {
+    let input = match encode_extern_io(()) {
         Ok(i) => i,
         Err(_) => return 0,
     };
@@ -685,7 +694,7 @@ async fn poll_shelter(
     transport: &dyn MeshTransport,
     cipher: Option<&XChaCha20Poly1305>,
 ) -> usize {
-    let input = match ExternIO::encode(()) {
+    let input = match encode_extern_io(()) {
         Ok(i) => i,
         Err(_) => return 0,
     };
@@ -736,7 +745,7 @@ async fn poll_supplies(
     transport: &dyn MeshTransport,
     cipher: Option<&XChaCha20Poly1305>,
 ) -> usize {
-    let input = match ExternIO::encode(()) {
+    let input = match encode_extern_io(()) {
         Ok(i) => i,
         Err(_) => return 0,
     };
@@ -788,7 +797,7 @@ async fn poll_mutual_aid(
     transport: &dyn MeshTransport,
     cipher: Option<&XChaCha20Poly1305>,
 ) -> usize {
-    let input = match ExternIO::encode(serde_json::json!({ "limit": MAX_ENTRIES_PER_DOMAIN })) {
+    let input = match encode_extern_io(serde_json::json!({ "limit": MAX_ENTRIES_PER_DOMAIN })) {
         Ok(i) => i,
         Err(_) => return 0,
     };
@@ -840,7 +849,7 @@ async fn poll_price_reports(
     transport: &dyn MeshTransport,
     cipher: Option<&XChaCha20Poly1305>,
 ) -> usize {
-    let input = match ExternIO::encode(serde_json::json!({ "limit": MAX_ENTRIES_PER_DOMAIN })) {
+    let input = match encode_extern_io(serde_json::json!({ "limit": MAX_ENTRIES_PER_DOMAIN })) {
         Ok(i) => i,
         Err(_) => return 0,
     };
@@ -884,6 +893,67 @@ async fn poll_price_reports(
     count
 }
 
+async fn poll_sensors(
+    ws: &AppWebsocket,
+    dedup: &mut HashSet<String>,
+    origin: &[u8; 8],
+    transport: &dyn MeshTransport,
+    cipher: Option<&XChaCha20Poly1305>,
+) -> usize {
+    let input = match encode_extern_io(serde_json::json!({ "limit": MAX_ENTRIES_PER_DOMAIN })) {
+        Ok(i) => i,
+        Err(_) => return 0,
+    };
+
+    let response = ws
+        .call_zome(
+            ZomeCallTarget::RoleName("commons_care".to_string().into()),
+            "resource_mesh".into(),
+            "get_recent_readings".into(),
+            input,
+        )
+        .await;
+
+    let mut count = 0;
+    if let Ok(result) = response {
+        if let Ok(readings) = result.decode::<Vec<serde_json::Value>>() {
+            for r in readings.iter().take(MAX_ENTRIES_PER_DOMAIN) {
+                let id = jstr(r, "id");
+                if id.is_empty() || dedup.contains(&id) {
+                    continue;
+                }
+
+                let location = jstr(r, "location");
+                let location_hash: [u8; 8] = {
+                    let h = blake3::hash(location.as_bytes());
+                    let mut buf = [0u8; 8];
+                    buf.copy_from_slice(&h.as_bytes()[..8]);
+                    buf
+                };
+
+                let sensor = SensorReadingRelay {
+                    sensor_id: jstr(r, "sensor_id"),
+                    resource_type: jstr(r, "resource_type"),
+                    value: jf32(r, "value"),
+                    unit: jstr(r, "unit"),
+                    location_hash,
+                };
+
+                if let Ok(data) = bincode::serialize(&sensor) {
+                    if relay_payload(RelayType::SensorReading, origin, data, transport, cipher)
+                        .await
+                        .is_ok()
+                    {
+                        dedup.insert(id);
+                        count += 1;
+                    }
+                }
+            }
+        }
+    }
+    count
+}
+
 /// Get an 8-byte origin ID from the hostname.
 fn get_origin_id() -> [u8; 8] {
     let hostname = hostname::get()
@@ -902,7 +972,7 @@ async fn startup_check(conductor_url: &str) -> Result<()> {
         .unwrap_or_default()
         .into_bytes();
     let signer: Arc<dyn AgentSigner + Send + Sync> = Arc::new(ClientAgentSigner::default());
-    let _ws = AppWebsocket::connect(conductor_url, token, signer).await?;
+    let _ws = AppWebsocket::connect(conductor_url, token, signer).await.map_err(|e| anyhow::anyhow!("{e:?}"))?;
     Ok(())
 }
 

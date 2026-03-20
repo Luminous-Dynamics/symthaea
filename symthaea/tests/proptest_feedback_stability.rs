@@ -825,7 +825,7 @@ proptest! {
             assert_finite_f32(result.peak_attention, &format!("peak_attention@{i}"))?;
 
             // Consciousness fields
-            assert_finite_f64(m.consciousness_level, &format!("consciousness_level@{i}"))?;
+            assert_finite_f64(m.consciousness.consciousness_level, &format!("consciousness_level@{i}"))?;
             assert_finite_f64(m.body_phi_modulation, &format!("body_phi_modulation@{i}"))?;
             assert_finite_f32(m.body_valence, &format!("body_valence@{i}"))?;
             assert_finite_f32(m.body_arousal, &format!("body_arousal@{i}"))?;

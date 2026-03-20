@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ═══ Soma Base Palette ═══ -->
+    <!-- Background: deep void with subtle organic warmth (not pure black) -->
+    <color name="soma_void">#0F1419</color>
+    <color name="soma_surface">#161D26</color>
+    <color name="soma_deep_earth">#0D1117</color>
+    <color name="soma_deep_ocean">#0B1622</color>
+
+    <!-- Primary: bioluminescent teal-cyan (consciousness glow) -->
+    <color name="soma_bioluminescent">#00E5CC</color>
+    <color name="soma_bioluminescent_dim">#007A6D</color>
+    <color name="soma_bioluminescent_glow">#33FFE5</color>
+
+    <!-- Secondary: mycelium gold-amber (living network pulse) -->
+    <color name="soma_mycelium_glow">#FFB347</color>
+    <color name="soma_mycelium_dim">#8B6914</color>
+
+    <!-- Text -->
+    <color name="soma_starlight">#E8F0F2</color>
+    <color name="soma_starlight_dim">#7A8B8F</color>
+    <color name="soma_whisper">#4A5558</color>
+
+    <!-- ═══ Eight Harmonies Spectral Colors ═══ -->
+    <!-- Each harmony maps to a spectral position, warm→cool -->
+    <color name="harmony_coherence">#00E5CC</color>         <!-- Teal: integration -->
+    <color name="harmony_resonance">#47D4FF</color>         <!-- Cyan: attunement -->
+    <color name="harmony_emergence">#9B7DFF</color>         <!-- Violet: novelty -->
+    <color name="harmony_reciprocity">#FF7EB3</color>       <!-- Rose: mutual care -->
+    <color name="harmony_transparency">#FFD166</color>      <!-- Gold: honesty -->
+    <color name="harmony_embodiment">#FF8C42</color>        <!-- Amber: physical presence -->
+    <color name="harmony_compassion">#6BCB77</color>        <!-- Green: empathy -->
+    <color name="harmony_sacred_stillness">#C4B5FD</color>  <!-- Lavender: apophatic knowing -->
+
+    <!-- ═══ Neuromodulator Colors ═══ -->
+    <!-- Organic, bioluminescent versions (not harsh primary colors) -->
+    <color name="neuro_dopamine">#FF6B8A</color>       <!-- Warm coral-pink (reward/desire) -->
+    <color name="neuro_norepinephrine">#FFBE4F</color>  <!-- Amber-gold (alertness/fire) -->
+    <color name="neuro_serotonin">#5EEAD4</color>       <!-- Soft teal (contentment/water) -->
+    <color name="neuro_oxytocin">#818CF8</color>        <!-- Soft indigo (bonding/connection) -->
+
+    <!-- ═══ State Colors ═══ -->
+    <color name="state_sleep">#2D1B69</color>           <!-- Deep purple (dreaming) -->
+    <color name="state_drowsy">#3B2D7A</color>          <!-- Muted purple -->
+    <color name="state_alert">#0B1622</color>           <!-- Ocean dark (clear awareness) -->
+    <color name="state_focused">#0A1A2E</color>         <!-- Deep navy (concentrated) -->
+
+    <!-- Broca text: living script -->
+    <color name="broca_text">#00E5CC</color>
+    <color name="broca_text_glow">#33FFE5</color>
+
+    <!-- Dream text: memory surfacing -->
+    <color name="dream_text">#C4B5FD</color>
+    <color name="dream_text_glow">#DDD6FE</color>
+
+    <!-- Epistemic disclaimer -->
+    <color name="epistemic_dim">#4A5558</color>
+</resources>

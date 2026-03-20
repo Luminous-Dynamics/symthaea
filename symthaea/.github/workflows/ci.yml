@@ -98,7 +98,7 @@ jobs:
           integrity,semantic-encoder,neural-bridge,webcam,\
           mesh,mesh-encryption,mesh-key-exchange,swarm,notifications,\
           nix-mind,identity,physics,physics-bridge,\
-          flight,humanoid,hal,ssm-power,ssm_language,liquid-mamba,\
+          flight,humanoid,hal,ssm-power,ssm_language,\
           lancedb-backend,multi_agent,full_consciousness,full_perception,\
           full_language,magi_loop,reasoning_engine,code_generation,\
           wasm-sandbox,school_learning,benchmarks,all_benchmarks,\
@@ -110,7 +110,7 @@ jobs:
           datacenter,experiment-planner,strategic-materials,critical-minerals,\
           advanced-manufacturing,building-systems,design-production,\
           mycelix,unstable-examples"
-          cargo clippy --lib --bins --features "$CI_FEATURES" -- -D warnings
+          cargo clippy -p symthaea --lib --bins --features "$CI_FEATURES" -- -D warnings
 
   test:
     name: Test (default features)
@@ -142,7 +142,7 @@ jobs:
             libdbus-1-dev
 
       - name: Run tests
-        run: cargo test
+        run: cargo test -p symthaea --lib
 
   test-integration:
     name: Integration Tests
@@ -228,7 +228,7 @@ jobs:
           integrity,semantic-encoder,neural-bridge,webcam,\
           mesh,mesh-encryption,mesh-key-exchange,swarm,notifications,\
           nix-mind,identity,physics,physics-bridge,\
-          flight,humanoid,hal,ssm-power,ssm_language,liquid-mamba,\
+          flight,humanoid,hal,ssm-power,ssm_language,\
           lancedb-backend,multi_agent,full_consciousness,full_perception,\
           full_language,magi_loop,reasoning_engine,code_generation,\
           wasm-sandbox,school_learning,benchmarks,all_benchmarks,\
@@ -240,7 +240,7 @@ jobs:
           datacenter,experiment-planner,strategic-materials,critical-minerals,\
           advanced-manufacturing,building-systems,design-production,\
           mycelix,unstable-examples"
-          cargo test --lib --features "$CI_FEATURES"
+          cargo test -p symthaea --lib --features "$CI_FEATURES"
 
   test-feature-matrix-critical:
     name: Test Feature Matrix (core/web_research/pathology)
@@ -251,9 +251,9 @@ jobs:
       matrix:
         include:
           - name: core
-            cmd: cargo test -p symthaea
+            cmd: cargo test -p symthaea --lib
           - name: web_research
-            cmd: cargo test -p symthaea --features "web_research_module school_learning"
+            cmd: cargo test -p symthaea --lib --features "web_research_module school_learning"
           - name: pathology_resilience
             cmd: cargo test --test pathology_resilience -- --nocapture
     steps:
@@ -288,6 +288,7 @@ jobs:
   test-feature-matrix:
     name: Test Feature Combinations
     runs-on: ubuntu-latest
+    timeout-minutes: 420
     strategy:
       fail-fast: false
       matrix:
@@ -345,7 +346,15 @@ jobs:
             cmake
 
       - name: Test with feature ${{ matrix.features }}
-        run: cargo test --lib --features "${{ matrix.features }}" || cargo test --lib --features "${{ matrix.features }}"
+        run: |
+          FEATURES="${{ matrix.features }}"
+          if [ "$FEATURES" = "school_learning" ]; then
+            # school_learning is very slow on free-tier runners — limit parallelism
+            # to reduce memory pressure and avoid 6h timeout
+            cargo test --lib --features "$FEATURES" -- --test-threads=1
+          else
+            cargo test --lib --features "$FEATURES" || cargo test --lib --features "$FEATURES"
+          fi
 
   psych-bench:
     name: Psych-Bench Regression
@@ -445,7 +454,6 @@ jobs:
           - "consciousness_full,school_learning"
           - "all_benchmarks,reasoning_engine"
           - "genesis,reasoning_engine"
-          - "liquid-mamba,reasoning_engine"
           - "vision-manifold,full_perception"
           - "vocal-tract,voice-tts"
           - "embeddings,reasoning_engine"
@@ -470,8 +478,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-combo-${{ matrix.features }}-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-combo-${{ hashFiles('**/Cargo.lock') }}-${{ strategy.job-index }}
           restore-keys: |
+            ${{ runner.os }}-cargo-combo-${{ hashFiles('**/Cargo.lock') }}-${{ strategy.job-index }}
             ${{ runner.os }}-cargo-combo-
 
       - name: Install system dependencies

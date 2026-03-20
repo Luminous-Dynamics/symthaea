@@ -364,14 +364,19 @@ impl EmpathicAccuracyBenchmark {
                 cue_hvs.push(cue);
             }
 
-            // Add distractor emotion traces for mixed/masked scenarios
+            // Add distractor emotion traces for mixed/masked scenarios.
+            // Distractor noise scales with scenario difficulty: in hard scenarios
+            // (masked/subtle), social masking produces ambiguous expression rather
+            // than a clean alternative emotion (Ekman, 1992; Matsumoto et al., 2008).
+            // Distractor flip is at least as high as the target cue's base flip,
+            // ensuring distractors never outweigh genuine emotional signals.
+            let distractor_flip = base_flip.max(0.25);
             for d in 0..scenario.distractor_count {
                 let dist_idx = ((scenario.seed_offset as usize) + d + 3) % NUM_EMOTION_PROTOTYPES;
                 let dist_seed = seed
                     .wrapping_add(scenario.seed_offset)
                     .wrapping_add(3000 + d as u64 * 61);
-                // Distractor is a noisy version of a different emotion
-                let dist_cue = emotion_prototypes[dist_idx].add_noise(0.15, dist_seed);
+                let dist_cue = emotion_prototypes[dist_idx].add_noise(distractor_flip, dist_seed);
                 cue_hvs.push(dist_cue);
             }
 

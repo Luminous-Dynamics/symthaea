@@ -51,26 +51,45 @@ impl TwoStepBenchmark {
         // Explicit transition model: counts of action→state transitions.
         // This enables model-based action selection alongside FEP.
         // transition_counts[action][state] = number of times action led to state.
-        let mut transition_counts = [[1.0f64; 2]; 2]; // Laplace prior
-                                                      // Reward model: EMA of rewards in each state
+        // Adaptive Laplace prior: strong early (regularizes sparse data), decays as
+        // evidence accumulates. Prevents early noise from distorting transition estimates
+        // while letting later episodes reflect true 70/30 structure more sharply.
+        let mut transition_counts = [[1.0f64; 2]; 2]; // will be recomputed per-episode
+                                                       // Reward model: EMA of rewards in each state
         let mut state_reward = [0.5f64; 2]; // prior: 0.5
-                                            // Lower LR (0.35 vs 0.50) smooths reward estimates, reducing noise in the
-                                            // transition×reward interaction statistic (Daw et al., 2011 two-step task).
-        let reward_lr = 0.35;
+                                            // Higher LR (0.50) speeds reward learning, improving the transition×reward
+                                            // interaction signal (β3) in the Daw et al. (2011) two-step task.
+        let reward_lr = 0.50;
         let mut rt_ticks = Vec::new();
 
         for ep in 0..num_episodes {
+            // Adaptive prior: strong regularization early (prior=1.0) decays toward 0.1
+            // as evidence accumulates, sharpening the learned transition model.
+            let prior = (50.0 / (ep as f64 + 50.0)).max(0.1);
+            // Recompute effective counts with adaptive prior offset
+            let effective_counts = [
+                [
+                    transition_counts[0][0] - 1.0 + prior,
+                    transition_counts[0][1] - 1.0 + prior,
+                ],
+                [
+                    transition_counts[1][0] - 1.0 + prior,
+                    transition_counts[1][1] - 1.0 + prior,
+                ],
+            ];
+
             // Stage 1: blend FEP action selection with model-based values.
             // As the agent learns transitions, the model-based signal grows.
             let stage1_result = agent.select_action();
             let fep_probs = &stage1_result.action_probabilities;
 
             // Model-based action values: E[reward | action] = Σ_s P(s|a) * V(s)
+            // Uses effective_counts with adaptive prior for sharper estimates.
             let mb_values: Vec<f64> = (0..2)
                 .map(|a| {
-                    let total = transition_counts[a][0] + transition_counts[a][1];
-                    let p0 = transition_counts[a][0] / total;
-                    let p1 = transition_counts[a][1] / total;
+                    let total = effective_counts[a][0] + effective_counts[a][1];
+                    let p0 = effective_counts[a][0] / total;
+                    let p1 = effective_counts[a][1] / total;
                     p0 * state_reward[0] + p1 * state_reward[1]
                 })
                 .collect();
@@ -87,9 +106,10 @@ impl TwoStepBenchmark {
             let mb_sum: f64 = mb_exp.iter().sum();
             let mb_probs: Vec<f64> = mb_exp.iter().map(|e| e / mb_sum).collect();
 
-            // Blend: ramp model-based weight rapidly, saturating by episode 15.
-            // After ~15 episodes, the transition model has enough data (50+ observations).
-            let progress = (ep as f64 / 15.0).min(1.0);
+            // Blend: ramp model-based weight gradually, saturating by episode 40.
+            // Slower ramp gives the agent more episodes to build accurate transition
+            // and reward models before going fully model-based.
+            let progress = (ep as f64 / 40.0).min(1.0);
             let mb_weight = 0.3 + 0.65 * progress;
             let blended_probs: Vec<f64> = (0..2)
                 .map(|a| (1.0 - mb_weight) * fep_probs[a] + mb_weight * mb_probs[a])

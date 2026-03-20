@@ -1036,7 +1036,7 @@ fn bundle_scalar_portable(vectors: &[&[u8; 2048]]) -> [u8; 2048] {
 
         for vec in vectors {
             let byte = vec[byte_idx];
-            bit_counts[0] += ((byte >> 0) & 1) as i16;
+            bit_counts[0] += (byte & 1) as i16;
             bit_counts[1] += ((byte >> 1) & 1) as i16;
             bit_counts[2] += ((byte >> 2) & 1) as i16;
             bit_counts[3] += ((byte >> 3) & 1) as i16;

@@ -67,8 +67,8 @@ impl SemanticPrimingBenchmark {
                     dim,
                     seed.wrapping_add(c as u64 * 200 + w as u64 * 50 + 100),
                 );
-                // Cluster members share 70% of cluster center
-                let word = ContinuousHV::weighted_bundle(&[&center, &noise], &[0.70, 0.30]);
+                // Cluster members share 80% of cluster center (stronger semantic structure)
+                let word = ContinuousHV::weighted_bundle(&[&center, &noise], &[0.80, 0.20]);
                 cluster.push(word);
             }
             clusters.push(cluster);
@@ -138,7 +138,12 @@ impl SemanticPrimingBenchmark {
             // Blend: temporal decay + SSM (decay dominates for better SOA modulation)
             let priming_boost = (activation as f32 * 0.7 + ssm_boost * 0.3).max(0.0);
 
-            // 4-AFC: match target against candidates from different clusters
+            // 4-AFC with priming-modulated probe quality.
+            // Science: priming pre-activates the target's semantic neighborhood,
+            // enhancing the internal recognition template (Neely 1977). When the
+            // prime is related, the probe is less noisy (better recognition).
+            // When unrelated, no pre-activation benefit — noisier probe.
+            // FEP predictive coding amplifies the pre-activation benefit.
             let mut candidates = vec![(target_cluster, target_word_idx)];
             while candidates.len() < 4 {
                 xor_shift(&mut rng);
@@ -150,25 +155,42 @@ impl SemanticPrimingBenchmark {
                 }
             }
 
+            // Prime pre-activation modulates probe quality:
+            // - Related prime: reduces effective noise (better recognition)
+            // - Unrelated prime: no benefit (full noise)
+            let base_noise = 0.55 + config.encoding_noise as f32 * 0.20;
+            let fep_scale = if config.enable_fep { 1.0 } else { 0.4 };
+            let prime_benefit = if is_related {
+                priming_boost * fep_scale * 0.70
+            } else {
+                0.0
+            };
+            let effective_noise = (base_noise - prime_benefit).clamp(0.15, 0.80);
+            let probe_noise =
+                ContinuousHV::random(dim, seed.wrapping_add(pair_idx as u64 * 777 + 42));
+            let probe = ContinuousHV::weighted_bundle(
+                &[target, &probe_noise],
+                &[1.0 - effective_noise, effective_noise],
+            );
+
             let mut best_sim = f32::NEG_INFINITY;
             let mut best_is_target = false;
             for (ci, wi) in &candidates {
                 let candidate = &clusters[*ci][*wi];
-                let mut sim = target.similarity(candidate);
-                // Priming boost for same-cluster items
-                if *ci == prime_cluster {
-                    // FEP enables predictive priming; without it, reduced boost
-                    let fep_scale = if config.enable_fep { 0.3 } else { 0.1 };
-                    sim += priming_boost * fep_scale;
-                }
+                let sim = probe.similarity(candidate);
                 xor_shift(&mut rng);
                 let noise = (rng % 10000) as f32 / 10000.0 * noise_level;
-                sim += noise;
-                if sim > best_sim {
-                    best_sim = sim;
+                let total = sim + noise;
+                if total > best_sim {
+                    best_sim = total;
                     best_is_target = *ci == target_cluster && *wi == target_word_idx;
                 }
             }
+
+            // Lapse model: attention lapses can flip the correctness outcome.
+            let lapse_trial_idx = trial_idx * n_pairs + pair_idx;
+            let best_is_target =
+                config.check_correct(best_is_target, "semantic_priming", lapse_trial_idx);
 
             if best_is_target {
                 if is_related {
@@ -392,6 +414,29 @@ mod tests {
             acc >= 0.0 && acc <= 1.0,
             "related accuracy ({:.3}) out of bounds",
             acc
+        );
+    }
+
+    #[test]
+    fn test_semantic_priming_effect_positive() {
+        // With degraded probe, priming should produce a measurable effect
+        let config = BenchmarkConfig {
+            dimension: 512,
+            trials_per_condition: 30,
+            ..Default::default()
+        };
+        let result = SemanticPrimingBenchmark.run(&config);
+        let effect = result.metrics["priming_effect"].mean;
+        let related = result.metrics["related_accuracy"].mean;
+        let unrelated = result.metrics["unrelated_accuracy"].mean;
+        eprintln!(
+            "priming_effect={:.3}, related={:.3}, unrelated={:.3}",
+            effect, related, unrelated
+        );
+        assert!(
+            effect > 0.02,
+            "priming effect ({:.3}) should be > 0.02 with degraded probe",
+            effect
         );
     }
 

@@ -261,8 +261,8 @@ fn simulate_threshold(threshold: f64, base_seed: u64) -> ThresholdResult {
     let phi_proxy = mean_occupancy * broadcast_rate;
 
     let mut domain_survival = [0.0; 8];
-    for i in 0..8 {
-        domain_survival[i] = domain_entries[i] as f64 / n;
+    for (i, entry) in domain_entries.iter().enumerate() {
+        domain_survival[i] = *entry as f64 / n;
     }
 
     ThresholdResult {
@@ -447,18 +447,18 @@ impl PsychBenchmark for GwtAsphyxiationBenchmark {
 
         // Extract per-domain survival at each threshold
         let mut domain_death_thresholds = Vec::with_capacity(8);
-        for di in 0..8 {
+        for (di, domain) in DOMAINS.iter().enumerate() {
             let survival_curve: Vec<f64> = results.iter().map(|r| r.domain_survival[di]).collect();
 
             let death_t = domain_death_threshold(&THRESHOLDS[..], &survival_curve);
             domain_death_thresholds.push(death_t);
 
             // Report survival at every threshold level
-            let domain_lower = DOMAINS[di].name.to_lowercase();
+            let domain_lower = domain.name.to_lowercase();
 
             // Survival at baseline
             result.insert(
-                &format!("{domain_lower}_survival_baseline"),
+                format!("{domain_lower}_survival_baseline"),
                 MetricValue::from_samples(&[survival_curve[0]]),
             );
 
@@ -466,14 +466,14 @@ impl PsychBenchmark for GwtAsphyxiationBenchmark {
             for (ti, t) in THRESHOLDS.iter().enumerate() {
                 let t_label = format!("{:.0}", t * 100.0);
                 result.insert(
-                    &format!("{domain_lower}_survival_at_{t_label}"),
+                    format!("{domain_lower}_survival_at_{t_label}"),
                     MetricValue::from_samples(&[survival_curve[ti]]),
                 );
             }
 
             // Death threshold for this domain
             result.insert(
-                &format!("{domain_lower}_death_threshold"),
+                format!("{domain_lower}_death_threshold"),
                 MetricValue::from_samples(&[death_t]),
             );
         }
@@ -527,8 +527,8 @@ impl PsychBenchmark for GwtAsphyxiationBenchmark {
         // Sedation onset: first domain loses >50% survival
         let mut sedation_onset = *THRESHOLDS.last().unwrap();
         'sedation: for (ti, t) in THRESHOLDS.iter().enumerate() {
-            for di in 0..8 {
-                if results[ti].domain_survival[di] < 0.50 {
+            for survival in &results[ti].domain_survival {
+                if *survival < 0.50 {
                     sedation_onset = *t;
                     break 'sedation;
                 }
@@ -560,15 +560,15 @@ impl PsychBenchmark for GwtAsphyxiationBenchmark {
         for (ti, t) in THRESHOLDS.iter().enumerate() {
             let t_label = format!("{:.0}", t * 100.0); // e.g., "30", "35", "40"
             result.insert(
-                &format!("phi_proxy_at_{t_label}"),
+                format!("phi_proxy_at_{t_label}"),
                 MetricValue::from_samples(&[phi_curve[ti]]),
             );
             result.insert(
-                &format!("occupancy_at_{t_label}"),
+                format!("occupancy_at_{t_label}"),
                 MetricValue::from_samples(&[occupancy_curve[ti]]),
             );
             result.insert(
-                &format!("ignition_at_{t_label}"),
+                format!("ignition_at_{t_label}"),
                 MetricValue::from_samples(&[ignition_curve[ti]]),
             );
         }
@@ -586,8 +586,8 @@ impl PsychBenchmark for GwtAsphyxiationBenchmark {
                     response_idx: 0,
                     extra: {
                         let mut m = BTreeMap::new();
-                        for di in 0..8 {
-                            m.insert(DOMAINS[di].name.to_string(), r.domain_survival[di]);
+                        for (di, domain) in DOMAINS.iter().enumerate() {
+                            m.insert(domain.name.to_string(), r.domain_survival[di]);
                         }
                         m
                     },

@@ -66,6 +66,7 @@ impl CognitiveLoopService {
         // PHASE 0.4b: Math Intent Detection (classify input for solver routing)
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
+        #[cfg(feature = "mathematics")]
         let math_result = {
             let problem_type = super::math_service::MathService::classify_problem(input);
             if problem_type != super::math_service::MathProblemType::Unknown {
@@ -79,6 +80,8 @@ impl CognitiveLoopService {
                 PercMath::default()
             }
         };
+        #[cfg(not(feature = "mathematics"))]
+        let math_result = PercMath::default();
         module_timings.math_service = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -468,6 +471,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "mathematics")]
     fn perception_detects_math_intent() {
         let mut svc = make_service();
         let mut timings = ModuleTimings::default();
@@ -486,6 +490,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "mathematics")]
     fn perception_no_math_for_normal_input() {
         let mut svc = make_service();
         let mut timings = ModuleTimings::default();

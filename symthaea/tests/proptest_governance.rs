@@ -143,7 +143,7 @@ proptest! {
         for _ in 0..50 {
             let r = svc.cycle("mixed governance proptest");
             let m = &r.metadata;
-            prop_assert!(m.consciousness_level.is_finite());
+            prop_assert!(m.consciousness.consciousness_level.is_finite());
             prop_assert!(m.actual_effective_lr.is_finite());
         }
     }
@@ -165,8 +165,8 @@ proptest! {
         });
         for _ in 0..40 {
             let r = svc.cycle("phi consciousness check");
-            prop_assert!(r.metadata.consciousness_level >= 0.0);
-            prop_assert!(r.metadata.consciousness_level <= 1.0);
+            prop_assert!(r.metadata.consciousness.consciousness_level >= 0.0);
+            prop_assert!(r.metadata.consciousness.consciousness_level <= 1.0);
         }
     }
 

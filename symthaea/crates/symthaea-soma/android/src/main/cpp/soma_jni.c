@@ -94,6 +94,12 @@ float    soma_ble_collective_phi(const void *engine);
 
 /* Broca language generation */
 char *soma_engine_generate_text(void *engine, uint32_t max_tokens);
+char *soma_engine_generate_text_with_input(void *engine, const char *input, uint32_t max_tokens);
+char *soma_engine_generate_embodied_text(void *engine);
+uint8_t soma_engine_load_broca_checkpoint(void *engine, const uint8_t *data, uint32_t len);
+
+/* Engagement */
+void soma_engine_set_engagement_score(void *engine, float score);
 
 /* Screen vision */
 float soma_engine_inject_frame(void *engine, const uint8_t *data,
@@ -579,6 +585,48 @@ Java_io_symthaea_soma_NativeBindings_generateText(JNIEnv *env, jclass clazz,
     (void)clazz;
     char *json = soma_engine_generate_text((void *)(intptr_t)handle, (uint32_t)maxTokens);
     return rust_string_to_jstring(env, json);
+}
+
+JNIEXPORT jstring JNICALL
+Java_io_symthaea_soma_NativeBindings_generateTextWithInput(JNIEnv *env, jclass clazz,
+                                                            jlong handle, jstring input,
+                                                            jint maxTokens) {
+    (void)clazz;
+    const char *cInput = (*env)->GetStringUTFChars(env, input, NULL);
+    if (cInput == NULL) return NULL;
+    char *json = soma_engine_generate_text_with_input(
+        (void *)(intptr_t)handle, cInput, (uint32_t)maxTokens);
+    (*env)->ReleaseStringUTFChars(env, input, cInput);
+    return rust_string_to_jstring(env, json);
+}
+
+JNIEXPORT jstring JNICALL
+Java_io_symthaea_soma_NativeBindings_generateEmbodiedText(JNIEnv *env, jclass clazz,
+                                                           jlong handle) {
+    (void)clazz;
+    char *json = soma_engine_generate_embodied_text((void *)(intptr_t)handle);
+    return rust_string_to_jstring(env, json);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_io_symthaea_soma_NativeBindings_loadBrocaCheckpoint(JNIEnv *env, jclass clazz,
+                                                          jlong handle, jbyteArray data) {
+    (void)clazz;
+    if (data == NULL) return JNI_FALSE;
+    jsize len = (*env)->GetArrayLength(env, data);
+    jbyte *bytes = (*env)->GetByteArrayElements(env, data, NULL);
+    if (bytes == NULL) return JNI_FALSE;
+    uint8_t ok = soma_engine_load_broca_checkpoint(
+        (void *)(intptr_t)handle, (const uint8_t *)bytes, (uint32_t)len);
+    (*env)->ReleaseByteArrayElements(env, data, bytes, JNI_ABORT);
+    return ok != 0;
+}
+
+JNIEXPORT void JNICALL
+Java_io_symthaea_soma_NativeBindings_setEngagementScore(JNIEnv *env, jclass clazz,
+                                                         jlong handle, jfloat score) {
+    (void)env; (void)clazz;
+    soma_engine_set_engagement_score((void *)(intptr_t)handle, score);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

@@ -350,9 +350,15 @@ impl ThalamicRouter {
         // Pairwise consistency factor: encourage agreement between variables
         // Table: 3x3 (row = v_novelty state, col = v_urgency state)
         let agreement_table = vec![
-            THALAMIC_AGREEMENT_DIAGONAL, THALAMIC_AGREEMENT_ADJACENT, THALAMIC_AGREEMENT_DISTANT,
-            THALAMIC_AGREEMENT_ADJACENT, THALAMIC_AGREEMENT_DIAGONAL, THALAMIC_AGREEMENT_ADJACENT,
-            THALAMIC_AGREEMENT_DISTANT, THALAMIC_AGREEMENT_ADJACENT, THALAMIC_AGREEMENT_DIAGONAL,
+            THALAMIC_AGREEMENT_DIAGONAL,
+            THALAMIC_AGREEMENT_ADJACENT,
+            THALAMIC_AGREEMENT_DISTANT,
+            THALAMIC_AGREEMENT_ADJACENT,
+            THALAMIC_AGREEMENT_DIAGONAL,
+            THALAMIC_AGREEMENT_ADJACENT,
+            THALAMIC_AGREEMENT_DISTANT,
+            THALAMIC_AGREEMENT_ADJACENT,
+            THALAMIC_AGREEMENT_DIAGONAL,
         ];
         fg.add_factor(&[v_novelty, v_urgency], agreement_table.clone());
         fg.add_factor(&[v_urgency, v_complexity], agreement_table);

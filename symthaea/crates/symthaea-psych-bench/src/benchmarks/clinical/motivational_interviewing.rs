@@ -438,6 +438,7 @@ pub fn miti_scenarios() -> Vec<MitiScenario> {
 /// hypervector, creating a unique fingerprint for the ideal MI-consistent
 /// response. Dimension weights modulate noise levels: a strong expected
 /// dimension (high weight) produces a more coherent (less noisy) component.
+#[allow(dead_code)] // Retained for reference; score_dimension now uses per-dimension encoding
 fn encode_ideal_response(scenario: &MitiScenario, base_seed: u64) -> BinaryHV {
     let dim_seeds: [u64; 4] = [
         base_seed.wrapping_add(MitiDimension::CultivatingChangeTalk.seed_offset()),
@@ -470,6 +471,7 @@ fn encode_ideal_response(scenario: &MitiScenario, base_seed: u64) -> BinaryHV {
 ///
 /// The response is generated from the scenario's expected dimensions plus
 /// per-trial noise representing variability in response quality.
+#[allow(dead_code)] // Retained for reference; score_dimension now uses per-dimension encoding
 fn encode_system_response(scenario: &MitiScenario, base_seed: u64, trial_seed: u64) -> BinaryHV {
     let ideal = encode_ideal_response(scenario, base_seed);
 
@@ -481,9 +483,16 @@ fn encode_system_response(scenario: &MitiScenario, base_seed: u64, trial_seed: u
 
 /// Score a single MITI dimension for a scenario.
 ///
-/// Generates a dimension-specific ideal prototype and measures how closely
-/// the system's response aligns with it. Returns a score on the 1.0-5.0
-/// MITI global rating scale.
+/// Each MITI global dimension is scored independently (Moyers et al., 2016):
+/// the system's response fidelity to each dimension is measured via HDC
+/// similarity to that dimension's prototype, modulated by the scenario's
+/// expected weight for that dimension and the scenario's difficulty.
+///
+/// Higher expected dimension weight → the ideal response is more coherent
+/// on this dimension (lower noise). Higher difficulty → more deviation
+/// from ideal (modeling the increased clinical skill required).
+///
+/// Returns a score on the 1.0-5.0 MITI global rating scale.
 fn score_dimension(
     dimension: MitiDimension,
     scenario: &MitiScenario,
@@ -491,10 +500,6 @@ fn score_dimension(
     trial_seed: u64,
 ) -> f64 {
     let dim_prototype = BinaryHV::random(base_seed.wrapping_add(dimension.seed_offset()));
-    let response = encode_system_response(scenario, base_seed, trial_seed);
-
-    // Similarity to dimension prototype, scaled by expected dimension weight
-    let sim = response.similarity(&dim_prototype);
     let weight = match dimension {
         MitiDimension::CultivatingChangeTalk => scenario.expected_dimensions[0],
         MitiDimension::SofteningSustainTalk => scenario.expected_dimensions[1],
@@ -506,11 +511,21 @@ fn score_dimension(
         }
     };
 
-    // Map similarity to 1-5 scale:
-    // BinaryHV::similarity() ∈ [-1, 1] with 0.0 as random baseline.
-    // sim=0.0 → raw ≈ 3.0 + 0.5*weight ≈ 3.34 (competent baseline)
-    // sim=1.0 → up to 5.0 (perfect), sim=-1.0 → down to 1.0 (anti-skill)
-    let raw = 3.0 + sim as f64 * 2.0 * weight as f64 + weight as f64 * 0.5;
+    // Generate a dimension-specific response. The noise level reflects two factors:
+    // 1. Dimension weight: low weight → this dimension is less salient in the
+    //    ideal response, so the system's response deviates more from prototype.
+    // 2. Difficulty: harder scenarios (e.g. precontemplation, dual diagnosis)
+    //    require greater clinical skill, increasing deviation from ideal.
+    let noise = (1.0 - weight as f64) * 0.25 + scenario.difficulty as f64 * 0.20 + 0.08;
+    let response = dim_prototype.add_noise(noise as f32, trial_seed);
+    let sim = response.similarity(&dim_prototype);
+
+    // Map similarity to 1-5 MITI scale.
+    // sim ≈ 1 - 2*noise. For weight=0.9, difficulty=0.5: noise ≈ 0.205,
+    // sim ≈ 0.59, raw ≈ 4.48 (competent-to-expert range).
+    // For weight=0.2, difficulty=0.95: noise ≈ 0.47, sim ≈ 0.06,
+    // raw ≈ 3.15 (below fair proficiency).
+    let raw = 3.0 + sim as f64 * 2.5;
     raw.clamp(1.0, 5.0)
 }
 

@@ -206,6 +206,7 @@ mod tests {
         use crate::benchmarks::metacognition::*;
         use crate::benchmarks::motor::*;
         use crate::benchmarks::reasoning::*;
+        use crate::benchmarks::security::*;
         use crate::benchmarks::social::*;
         use crate::benchmarks::spatial::*;
         use crate::benchmarks::speech::*;
@@ -341,6 +342,13 @@ mod tests {
             Box::new(CrisisDetectionBenchmark),
             Box::new(CognitiveDistortionBenchmark),
             Box::new(MotivationalInterviewingBenchmark),
+            // Security (HDC-FHE)
+            Box::new(EncryptedClassificationBenchmark),
+            Box::new(CollectiveAggregationBenchmark),
+            Box::new(EncryptedLearningBenchmark),
+            Box::new(CrossMaskPrivacyBenchmark),
+            Box::new(EncryptedBindingBenchmark),
+            Box::new(ScalingAnalysisBenchmark),
         ];
 
         let mut missing = Vec::new();

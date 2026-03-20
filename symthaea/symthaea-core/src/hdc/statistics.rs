@@ -57,7 +57,7 @@ pub fn median(data: &[f64]) -> f64 {
     let mut sorted = data.to_vec();
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     let n = sorted.len();
-    if n % 2 == 0 {
+    if n.is_multiple_of(2) {
         (sorted[n / 2 - 1] + sorted[n / 2]) / 2.0
     } else {
         sorted[n / 2]
@@ -72,7 +72,7 @@ pub fn quartiles(data: &[f64]) -> (f64, f64, f64) {
     let q2 = median(data);
 
     let lower = &sorted[..n / 2];
-    let upper = if n % 2 == 0 {
+    let upper = if n.is_multiple_of(2) {
         &sorted[n / 2..]
     } else {
         &sorted[n / 2 + 1..]
@@ -184,7 +184,7 @@ impl Distribution {
                 }
             }
             Distribution::Beta { alpha, beta } => {
-                if x < 0.0 || x > 1.0 {
+                if !(0.0..=1.0).contains(&x) {
                     return 0.0;
                 }
                 let b_val = beta_function(*alpha, *beta);
@@ -625,7 +625,7 @@ fn gamma_function(x: f64) -> f64 {
         let c = [
             0.999_999_999_999_810,
             676.520_368_121_885_1,
-            -1259.139_216_722_403,
+            -1_259.139_216_722_403,
             771.323_428_777_653_1,
             -176.615_029_162_140_6,
             12.507_343_278_686_905,

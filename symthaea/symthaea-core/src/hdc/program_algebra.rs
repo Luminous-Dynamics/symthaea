@@ -312,10 +312,10 @@ impl ProgramNode {
 fn encode_atom(name: &str) -> BinaryHV {
     // Check if it's a known operation
     if let Some(hv) = ops().get(name.to_uppercase().as_str()) {
-        return hv.clone();
+        return *hv;
     }
     if let Some(hv) = types().get(name.to_uppercase().as_str()) {
-        return hv.clone();
+        return *hv;
     }
 
     // N-gram encoding: each character gets a position-shifted base vector,
@@ -345,12 +345,53 @@ fn encode_atom(name: &str) -> BinaryHV {
 /// ```
 pub fn encode_task_description(text: &str) -> BinaryHV {
     const STOP_WORDS: &[&str] = &[
-        "a", "an", "the", "to", "of", "in", "for", "and", "or", "that", "this",
-        "with", "from", "by", "on", "is", "are", "was", "be", "been", "being",
-        "implement", "create", "add", "write", "make", "build", "define",
-        "function", "method", "struct", "class", "module", "program",
-        "please", "should", "would", "could", "can", "will",
-        "using", "use", "given", "return", "returns", "take", "takes",
+        "a",
+        "an",
+        "the",
+        "to",
+        "of",
+        "in",
+        "for",
+        "and",
+        "or",
+        "that",
+        "this",
+        "with",
+        "from",
+        "by",
+        "on",
+        "is",
+        "are",
+        "was",
+        "be",
+        "been",
+        "being",
+        "implement",
+        "create",
+        "add",
+        "write",
+        "make",
+        "build",
+        "define",
+        "function",
+        "method",
+        "struct",
+        "class",
+        "module",
+        "program",
+        "please",
+        "should",
+        "would",
+        "could",
+        "can",
+        "will",
+        "using",
+        "use",
+        "given",
+        "return",
+        "returns",
+        "take",
+        "takes",
     ];
 
     let lower = text.to_lowercase();
@@ -758,48 +799,118 @@ impl ProgramPatternLibrary {
         );
 
         // ── Annotate patterns with metadata for the translator ──
-        lib.annotate("fibonacci", "Compute the nth Fibonacci number",
-            "(n: u64) -> u64", "(n: int) -> int", "INT",
-            &["fibonacci", "fib", "sequence"]);
-        lib.annotate("factorial", "Compute the factorial of n",
-            "(n: u64) -> u64", "(n: int) -> int", "INT",
-            &["factorial", "fact"]);
-        lib.annotate("gcd", "Compute the greatest common divisor",
-            "(a: u64, b: u64) -> u64", "(a: int, b: int) -> int", "INT",
-            &["gcd", "greatest", "common", "divisor", "euclidean"]);
-        lib.annotate("sum", "Sum all elements in a slice",
-            "(v: &[i64]) -> i64", "(v: list) -> int", "INT",
-            &["sum", "total", "add", "accumulate"]);
-        lib.annotate("max", "Find the maximum value",
-            "(v: &[i64]) -> Option<i64>", "(v: list) -> int", "INT",
-            &["max", "maximum", "largest", "biggest"]);
-        lib.annotate("min", "Find the minimum value",
-            "(v: &[i64]) -> Option<i64>", "(v: list) -> int", "INT",
-            &["min", "minimum", "smallest"]);
-        lib.annotate("reverse", "Reverse a collection",
-            "(v: &[T]) -> Vec<T>", "(v: list) -> list", "LIST",
-            &["reverse", "reversed", "flip"]);
-        lib.annotate("sort", "Sort a collection",
-            "(v: &mut [T])", "(v: list) -> list", "LIST",
-            &["sort", "sorted", "order", "arrange"]);
-        lib.annotate("reverse_string", "Reverse a string",
-            "(s: &str) -> String", "(s: str) -> str", "STRING",
-            &["reverse", "string", "backwards"]);
-        lib.annotate("count_vowels", "Count vowels in a string",
-            "(s: &str) -> usize", "(s: str) -> int", "INT",
-            &["count", "vowels", "vowel"]);
-        lib.annotate("palindrome_check", "Check if a string is a palindrome",
-            "(s: &str) -> bool", "(s: str) -> bool", "BOOL",
-            &["palindrome", "mirror", "symmetric"]);
-        lib.annotate("binary_search", "Binary search in a sorted slice",
-            "(arr: &[T], target: &T) -> Option<usize>", "(arr: list, target) -> int", "OPTION",
-            &["binary", "search", "find", "bisect"]);
-        lib.annotate("merge_sort", "Sort using merge sort algorithm",
-            "(arr: &mut [T])", "(arr: list) -> list", "LIST",
-            &["merge", "sort", "divide", "conquer"]);
-        lib.annotate("bubble_sort", "Sort using bubble sort algorithm",
-            "(arr: &mut [T])", "(arr: list) -> list", "LIST",
-            &["bubble", "sort", "swap"]);
+        lib.annotate(
+            "fibonacci",
+            "Compute the nth Fibonacci number",
+            "(n: u64) -> u64",
+            "(n: int) -> int",
+            "INT",
+            &["fibonacci", "fib", "sequence"],
+        );
+        lib.annotate(
+            "factorial",
+            "Compute the factorial of n",
+            "(n: u64) -> u64",
+            "(n: int) -> int",
+            "INT",
+            &["factorial", "fact"],
+        );
+        lib.annotate(
+            "gcd",
+            "Compute the greatest common divisor",
+            "(a: u64, b: u64) -> u64",
+            "(a: int, b: int) -> int",
+            "INT",
+            &["gcd", "greatest", "common", "divisor", "euclidean"],
+        );
+        lib.annotate(
+            "sum",
+            "Sum all elements in a slice",
+            "(v: &[i64]) -> i64",
+            "(v: list) -> int",
+            "INT",
+            &["sum", "total", "add", "accumulate"],
+        );
+        lib.annotate(
+            "max",
+            "Find the maximum value",
+            "(v: &[i64]) -> Option<i64>",
+            "(v: list) -> int",
+            "INT",
+            &["max", "maximum", "largest", "biggest"],
+        );
+        lib.annotate(
+            "min",
+            "Find the minimum value",
+            "(v: &[i64]) -> Option<i64>",
+            "(v: list) -> int",
+            "INT",
+            &["min", "minimum", "smallest"],
+        );
+        lib.annotate(
+            "reverse",
+            "Reverse a collection",
+            "(v: &[T]) -> Vec<T>",
+            "(v: list) -> list",
+            "LIST",
+            &["reverse", "reversed", "flip"],
+        );
+        lib.annotate(
+            "sort",
+            "Sort a collection",
+            "(v: &mut [T])",
+            "(v: list) -> list",
+            "LIST",
+            &["sort", "sorted", "order", "arrange"],
+        );
+        lib.annotate(
+            "reverse_string",
+            "Reverse a string",
+            "(s: &str) -> String",
+            "(s: str) -> str",
+            "STRING",
+            &["reverse", "string", "backwards"],
+        );
+        lib.annotate(
+            "count_vowels",
+            "Count vowels in a string",
+            "(s: &str) -> usize",
+            "(s: str) -> int",
+            "INT",
+            &["count", "vowels", "vowel"],
+        );
+        lib.annotate(
+            "palindrome_check",
+            "Check if a string is a palindrome",
+            "(s: &str) -> bool",
+            "(s: str) -> bool",
+            "BOOL",
+            &["palindrome", "mirror", "symmetric"],
+        );
+        lib.annotate(
+            "binary_search",
+            "Binary search in a sorted slice",
+            "(arr: &[T], target: &T) -> Option<usize>",
+            "(arr: list, target) -> int",
+            "OPTION",
+            &["binary", "search", "find", "bisect"],
+        );
+        lib.annotate(
+            "merge_sort",
+            "Sort using merge sort algorithm",
+            "(arr: &mut [T])",
+            "(arr: list) -> list",
+            "LIST",
+            &["merge", "sort", "divide", "conquer"],
+        );
+        lib.annotate(
+            "bubble_sort",
+            "Sort using bubble sort algorithm",
+            "(arr: &mut [T])",
+            "(arr: list) -> list",
+            "LIST",
+            &["bubble", "sort", "swap"],
+        );
 
         lib
     }
@@ -826,6 +937,7 @@ impl ProgramPatternLibrary {
     }
 
     /// Add a pattern with full metadata.
+    #[allow(clippy::too_many_arguments)]
     fn add_with_meta(
         &mut self,
         name: &str,
@@ -867,10 +979,8 @@ impl ProgramPatternLibrary {
 
         for entry in &self.patterns {
             let sim = query.similarity(&entry.encoding);
-            if sim > threshold {
-                if best.is_none() || sim > best.unwrap().1 {
-                    best = Some((entry, sim));
-                }
+            if sim > threshold && best.as_ref().is_none_or(|(_, s)| sim > *s) {
+                best = Some((entry, sim));
             }
         }
 

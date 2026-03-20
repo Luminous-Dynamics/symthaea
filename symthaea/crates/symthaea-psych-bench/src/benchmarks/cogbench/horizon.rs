@@ -34,7 +34,10 @@ impl HorizonBenchmark {
 
         let good_arm_value = 0.8;
         let bad_arm_value = 0.3;
-        let learning_rate = 0.25;
+        // Higher LR helps build stronger arm-value distinctions during the
+        // short forced-choice phase, enabling more informed exploration
+        // decisions in the free-choice phase.
+        let learning_rate = 0.35;
 
         // Bayesian arm tracking: mean value + observation count
         let mut arm_mean = [0.5f64; 2]; // uninformative prior

@@ -248,6 +248,7 @@ impl DemoRunner {
             structural_emergence_ratio: m.structural.structural_emergence_ratio,
             // Substrate
             substrate_feasibility: m.substrate_effective_feasibility,
+            ..Default::default()
         };
 
         // Populate vision telemetry from CycleMetadata (internal VisionBridge path)

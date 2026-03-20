@@ -164,7 +164,7 @@ impl DreamableAction for TherapeuticAction {
             .enumerate()
             .map(|(i, &s)| {
                 let nudge = match i % 6 {
-                    0 => d.serotonin * scale,           // valence
+                    0 => d.serotonin * scale,            // valence
                     1 => d.dopamine * scale,             // motivation
                     2 => d.oxytocin * scale,             // social bond
                     3 => -d.gaba * scale * 0.5,          // arousal ↓
@@ -291,7 +291,10 @@ mod tests {
             let action = make_action(strategy, 0.5);
             let ordinal = action.strategy_ordinal();
             let recovered = TherapeuticAction::strategy_from_ordinal(ordinal);
-            assert_eq!(strategy, recovered, "ordinal roundtrip failed for {strategy:?}");
+            assert_eq!(
+                strategy, recovered,
+                "ordinal roundtrip failed for {strategy:?}"
+            );
         }
     }
 

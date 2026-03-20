@@ -169,8 +169,7 @@ pub struct IrohBridgeActor {
     /// Set to false only for local testing via `SwarmConfig::local_only()`.
     require_handshake: bool,
     /// Optional attestation manager for signing outbound and verifying inbound CVs.
-    attestation:
-        Option<Arc<parking_lot::RwLock<crate::swarm::attestation::AttestationManager>>>,
+    attestation: Option<Arc<parking_lot::RwLock<crate::swarm::attestation::AttestationManager>>>,
 }
 
 impl IrohBridgeActor {

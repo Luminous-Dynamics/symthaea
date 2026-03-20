@@ -225,7 +225,7 @@ impl PsychBenchmark for UnconsciousPrimingBenchmark {
             let level_mean = level_priming.iter().sum::<f64>() / level_priming.len() as f64;
             let act_pct = (activation * 100.0) as usize;
             result.insert(
-                &format!("priming_at_activation_{act_pct:03}"),
+                format!("priming_at_activation_{act_pct:03}"),
                 MetricValue::from_samples(&[level_mean]),
             );
         }
@@ -295,7 +295,7 @@ impl PsychBenchmark for UnconsciousPrimingBenchmark {
         for (ai, &activation) in ACTIVATION_LEVELS.iter().enumerate() {
             let act_pct = (activation * 100.0) as usize;
             result.insert(
-                &format!("ignition_rate_at_{act_pct:03}"),
+                format!("ignition_rate_at_{act_pct:03}"),
                 MetricValue::from_samples(&[ignition_rates[ai]]),
             );
         }

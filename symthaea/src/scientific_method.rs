@@ -562,6 +562,440 @@ impl ScientificMethodEngine {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONFIGURABLE ENGINE — hypothesis-test-update cycle with HDC similarity
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Configuration for the configurable scientific method engine.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScientificMethodConfig {
+    /// Maximum number of active hypotheses (default 16).
+    pub max_hypotheses: usize,
+    /// Posterior threshold for confirming a hypothesis (default 0.9).
+    pub confirmation_threshold: f64,
+    /// Posterior threshold for refuting a hypothesis (default 0.1).
+    pub refutation_threshold: f64,
+    /// Default prior probability for new hypotheses (default 0.5).
+    pub prior_default: f64,
+    /// Minimum experiments before status transition (default 3).
+    pub min_experiments: usize,
+}
+
+impl Default for ScientificMethodConfig {
+    fn default() -> Self {
+        Self {
+            max_hypotheses: 16,
+            confirmation_threshold: 0.9,
+            refutation_threshold: 0.1,
+            prior_default: 0.5,
+            min_experiments: 3,
+        }
+    }
+}
+
+/// Aggregate telemetry for the configurable scientific method engine.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ScientificMethodTelemetry {
+    /// Total hypotheses generated across the engine's lifetime.
+    pub hypotheses_generated: usize,
+    /// Number of hypotheses currently in `Confirmed` status.
+    pub hypotheses_confirmed: usize,
+    /// Number of hypotheses currently in `Refuted` status.
+    pub hypotheses_refuted: usize,
+    /// Total experiments run.
+    pub experiments_run: usize,
+    /// Mean match_score across all experiments (0.0 when none).
+    pub average_prediction_accuracy: f64,
+    /// Total Bayesian update steps performed.
+    pub bayesian_updates: usize,
+}
+
+/// A prediction derived from a hypothesis — an expected HDC encoding with
+/// confidence and tolerance for similarity comparison.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Prediction {
+    /// Expected observation in HDC space.
+    #[serde(skip)]
+    pub expected_encoding: BinaryHV,
+    /// Confidence in this prediction (0.0–1.0).
+    pub confidence: f64,
+    /// Similarity tolerance: match_score must exceed `1.0 - tolerance` to confirm.
+    pub tolerance: f64,
+}
+
+/// Result of running an HDC-based experiment against a prediction.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExperimentResult {
+    /// Which hypothesis this experiment concerns.
+    pub hypothesis_id: u64,
+    /// Index into the hypothesis's prediction list.
+    pub prediction_idx: usize,
+    /// The observed HDC vector.
+    #[serde(skip)]
+    pub observed: BinaryHV,
+    /// Cosine similarity between predicted and observed encodings.
+    pub match_score: f64,
+    /// Whether the match exceeded the prediction's tolerance.
+    pub confirmed: bool,
+}
+
+/// Extended hypothesis with prediction list for the configurable engine.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConfigurableHypothesis {
+    /// Unique identifier.
+    pub id: u64,
+    /// Human-readable description.
+    pub description: String,
+    /// HDC encoding.
+    #[serde(skip)]
+    pub encoding: BinaryHV,
+    /// Prior probability P(H).
+    pub prior: f64,
+    /// Posterior probability P(H|E).
+    pub posterior: f64,
+    /// Testable predictions derived from this hypothesis.
+    pub predictions: Vec<Prediction>,
+    /// Current status.
+    pub status: HypothesisStatus,
+    /// Number of experiments run against this hypothesis.
+    pub experiment_count: usize,
+}
+
+/// Extended observation with surprise for the configurable engine.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SurpriseObservation {
+    /// HDC encoding of the observation.
+    #[serde(skip)]
+    pub encoding: BinaryHV,
+    /// Logical timestamp.
+    pub timestamp: u64,
+    /// Prediction error magnitude (surprise signal).
+    pub surprise: f64,
+}
+
+/// Configurable Scientific Method Engine with HDC-based hypothesis testing.
+///
+/// Implements a formal hypothesis-test-update cycle:
+/// 1. **Observe** — gather HDC-encoded data points with surprise signals
+/// 2. **Hypothesize** — register candidate explanations with default priors
+/// 3. **Predict** — attach testable expectations (HDC encodings) to hypotheses
+/// 4. **Experiment** — compare predictions to observations via HDC similarity
+/// 5. **Update** — Bayesian posterior update from likelihood ratios
+/// 6. **Evaluate** — confirm/refute based on configurable thresholds
+pub struct ConfigurableScientificMethodEngine {
+    hypotheses: Vec<ConfigurableHypothesis>,
+    observations: Vec<SurpriseObservation>,
+    experiments: Vec<ExperimentResult>,
+    telemetry: ScientificMethodTelemetry,
+    config: ScientificMethodConfig,
+    /// Monotonic counter for hypothesis IDs.
+    next_id: u64,
+    /// Monotonic clock for observation timestamps.
+    clock: u64,
+}
+
+impl Default for ConfigurableScientificMethodEngine {
+    fn default() -> Self {
+        Self::new(ScientificMethodConfig::default())
+    }
+}
+
+impl ConfigurableScientificMethodEngine {
+    // ── Construction ────────────────────────────────────────────────────────
+
+    /// Create a new engine with the given configuration.
+    pub fn new(config: ScientificMethodConfig) -> Self {
+        Self {
+            hypotheses: Vec::new(),
+            observations: Vec::new(),
+            experiments: Vec::new(),
+            telemetry: ScientificMethodTelemetry::default(),
+            config,
+            next_id: 0,
+            clock: 0,
+        }
+    }
+
+    // ── 1. Observe ──────────────────────────────────────────────────────────
+
+    /// Record an observation with its HDC encoding and surprise magnitude.
+    pub fn observe(&mut self, encoding: BinaryHV, surprise: f64) {
+        self.clock += 1;
+        self.observations.push(SurpriseObservation {
+            encoding,
+            timestamp: self.clock,
+            surprise: surprise.max(0.0),
+        });
+    }
+
+    // ── 2. Hypothesize ──────────────────────────────────────────────────────
+
+    /// Register a new hypothesis. Returns the assigned ID, or `None` if
+    /// `max_hypotheses` has been reached.
+    pub fn hypothesize(&mut self, description: &str, encoding: BinaryHV) -> Option<u64> {
+        let active_count = self
+            .hypotheses
+            .iter()
+            .filter(|h| matches!(h.status, HypothesisStatus::Proposed | HypothesisStatus::Testing | HypothesisStatus::Inconclusive))
+            .count();
+        if active_count >= self.config.max_hypotheses {
+            return None;
+        }
+        let id = self.next_id;
+        self.next_id += 1;
+        self.telemetry.hypotheses_generated += 1;
+        self.hypotheses.push(ConfigurableHypothesis {
+            id,
+            description: description.to_string(),
+            encoding,
+            prior: self.config.prior_default,
+            posterior: self.config.prior_default,
+            predictions: Vec::new(),
+            status: HypothesisStatus::Proposed,
+            experiment_count: 0,
+        });
+        Some(id)
+    }
+
+    // ── 3. Predict ──────────────────────────────────────────────────────────
+
+    /// Attach a prediction to a hypothesis.
+    ///
+    /// `expected` is the HDC encoding the hypothesis predicts should be
+    /// observed. `confidence` is how certain the hypothesis is about this
+    /// prediction. `tolerance` sets how close the observation must be
+    /// (match_score must exceed `1.0 - tolerance`).
+    pub fn predict(
+        &mut self,
+        hypothesis_id: u64,
+        expected: BinaryHV,
+        confidence: f64,
+        tolerance: f64,
+    ) -> bool {
+        if let Some(h) = self.hypotheses.iter_mut().find(|h| h.id == hypothesis_id) {
+            h.predictions.push(Prediction {
+                expected_encoding: expected,
+                confidence: confidence.clamp(0.0, 1.0),
+                tolerance: tolerance.clamp(0.0, 1.0),
+            });
+            true
+        } else {
+            false
+        }
+    }
+
+    // ── 4. Experiment ───────────────────────────────────────────────────────
+
+    /// Test a specific prediction against an observed HDC vector.
+    ///
+    /// Computes match_score as the cosine similarity between the prediction's
+    /// expected encoding and the observed encoding. Returns the experiment
+    /// result, or `None` if the hypothesis or prediction index is invalid.
+    pub fn experiment(
+        &mut self,
+        hypothesis_id: u64,
+        prediction_idx: usize,
+        observed: BinaryHV,
+    ) -> Option<ExperimentResult> {
+        let h = self.hypotheses.iter().find(|h| h.id == hypothesis_id)?;
+        let pred = h.predictions.get(prediction_idx)?;
+
+        let match_score = pred.expected_encoding.similarity(&observed) as f64;
+        let confirmed = match_score >= (1.0 - pred.tolerance);
+
+        let result = ExperimentResult {
+            hypothesis_id,
+            prediction_idx,
+            observed,
+            match_score,
+            confirmed,
+        };
+        self.experiments.push(result.clone());
+        self.telemetry.experiments_run += 1;
+
+        // Increment the hypothesis experiment count.
+        if let Some(h) = self.hypotheses.iter_mut().find(|h| h.id == hypothesis_id) {
+            h.experiment_count += 1;
+            // Transition from Proposed to Testing.
+            if h.status == HypothesisStatus::Proposed {
+                h.status = HypothesisStatus::Testing;
+            }
+        }
+
+        // Update running average prediction accuracy.
+        let n = self.telemetry.experiments_run as f64;
+        self.telemetry.average_prediction_accuracy =
+            self.telemetry.average_prediction_accuracy * ((n - 1.0) / n)
+                + match_score / n;
+
+        Some(result)
+    }
+
+    // ── 5. Bayesian Update ──────────────────────────────────────────────────
+
+    /// Update the posterior of a hypothesis using a likelihood ratio.
+    ///
+    /// Applies Bayes' rule:
+    ///   P(H|E) = P(E|H) * P(H) / [P(E|H) * P(H) + P(E|~H) * (1 - P(H))]
+    ///
+    /// where `likelihood_ratio = P(E|H) / P(E|~H)`.
+    ///
+    /// The prior used is the current posterior (sequential updating).
+    pub fn bayesian_update(&mut self, hypothesis_id: u64, likelihood_ratio: f64) -> bool {
+        if let Some(h) = self.hypotheses.iter_mut().find(|h| h.id == hypothesis_id) {
+            let lr = likelihood_ratio.max(1e-10); // prevent division by zero
+            let prior = h.posterior;
+            // Bayes: posterior = lr * prior / (lr * prior + 1 * (1 - prior))
+            let numerator = lr * prior;
+            let denominator = numerator + (1.0 - prior);
+            h.posterior = (numerator / denominator).clamp(0.0, 1.0);
+            self.telemetry.bayesian_updates += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    // ── 6. Evaluate ─────────────────────────────────────────────────────────
+
+    /// Evaluate a hypothesis against the configured thresholds.
+    ///
+    /// A hypothesis is only promoted to `Supported`/`Refuted` once it has
+    /// accumulated at least `min_experiments` experiments.
+    pub fn evaluate_hypothesis(&mut self, hypothesis_id: u64) {
+        if let Some(h) = self.hypotheses.iter_mut().find(|h| h.id == hypothesis_id) {
+            if h.status == HypothesisStatus::Proposed {
+                return; // no evidence yet
+            }
+            if h.experiment_count < self.config.min_experiments {
+                h.status = HypothesisStatus::Inconclusive;
+                return;
+            }
+            if h.posterior >= self.config.confirmation_threshold {
+                h.status = HypothesisStatus::Supported;
+            } else if h.posterior <= self.config.refutation_threshold {
+                h.status = HypothesisStatus::Refuted;
+            } else {
+                h.status = HypothesisStatus::Inconclusive;
+            }
+        }
+    }
+
+    // ── 7. Best Hypothesis ──────────────────────────────────────────────────
+
+    /// Return the hypothesis with the highest posterior, or `None` if empty.
+    pub fn best_hypothesis(&self) -> Option<&ConfigurableHypothesis> {
+        self.hypotheses
+            .iter()
+            .max_by(|a, b| a.posterior.partial_cmp(&b.posterior).unwrap_or(std::cmp::Ordering::Equal))
+    }
+
+    // ── 8. Competing Hypotheses ─────────────────────────────────────────────
+
+    /// Return all pairs of hypotheses whose posteriors are within 0.1 of
+    /// each other — these are the "competing" explanations that need
+    /// discriminating evidence.
+    pub fn competing_hypotheses(&self) -> Vec<(&ConfigurableHypothesis, &ConfigurableHypothesis)> {
+        let mut pairs = Vec::new();
+        let n = self.hypotheses.len();
+        for i in 0..n {
+            for j in (i + 1)..n {
+                let gap = (self.hypotheses[i].posterior - self.hypotheses[j].posterior).abs();
+                if gap <= 0.1 {
+                    pairs.push((&self.hypotheses[i], &self.hypotheses[j]));
+                }
+            }
+        }
+        pairs
+    }
+
+    // ── 9. Most Informative Experiment ──────────────────────────────────────
+
+    /// Find the (hypothesis_id, prediction_idx) pair that would maximally
+    /// discriminate between competing hypotheses.
+    ///
+    /// The heuristic selects the prediction that maximises the expected
+    /// information gain: the product of the prediction's confidence and
+    /// the inverse of the hypothesis posterior certainty (how far from 0.5).
+    /// Predictions from hypotheses that are already Supported/Refuted are
+    /// excluded.
+    pub fn most_informative_experiment(&self) -> Option<(u64, usize)> {
+        let mut best: Option<(u64, usize, f64)> = None;
+
+        for h in &self.hypotheses {
+            // Skip resolved hypotheses.
+            if matches!(h.status, HypothesisStatus::Supported | HypothesisStatus::Refuted) {
+                continue;
+            }
+            // Uncertainty: maximal at posterior=0.5, zero at 0 or 1.
+            let uncertainty = 1.0 - (2.0 * (h.posterior - 0.5)).abs();
+
+            for (idx, pred) in h.predictions.iter().enumerate() {
+                // Information gain proxy = prediction confidence * hypothesis uncertainty.
+                let info_gain = pred.confidence * uncertainty;
+                if best.map_or(true, |(_, _, b)| info_gain > b) {
+                    best = Some((h.id, idx, info_gain));
+                }
+            }
+        }
+
+        best.map(|(id, idx, _)| (id, idx))
+    }
+
+    // ── Telemetry ───────────────────────────────────────────────────────────
+
+    /// Return a snapshot of the engine's aggregate telemetry.
+    pub fn telemetry(&self) -> &ScientificMethodTelemetry {
+        &self.telemetry
+    }
+
+    /// Recompute derived telemetry counters from current hypothesis states.
+    pub fn refresh_telemetry(&mut self) {
+        self.telemetry.hypotheses_confirmed = self
+            .hypotheses
+            .iter()
+            .filter(|h| h.status == HypothesisStatus::Supported)
+            .count();
+        self.telemetry.hypotheses_refuted = self
+            .hypotheses
+            .iter()
+            .filter(|h| h.status == HypothesisStatus::Refuted)
+            .count();
+    }
+
+    // ── Accessors ───────────────────────────────────────────────────────────
+
+    /// Borrow a hypothesis by id.
+    pub fn get_hypothesis(&self, id: u64) -> Option<&ConfigurableHypothesis> {
+        self.hypotheses.iter().find(|h| h.id == id)
+    }
+
+    /// Number of hypotheses registered.
+    pub fn hypothesis_count(&self) -> usize {
+        self.hypotheses.len()
+    }
+
+    /// Number of observations recorded.
+    pub fn observation_count(&self) -> usize {
+        self.observations.len()
+    }
+
+    /// Borrow the full observations slice.
+    pub fn observations(&self) -> &[SurpriseObservation] {
+        &self.observations
+    }
+
+    /// Borrow the full experiment results slice.
+    pub fn experiment_results(&self) -> &[ExperimentResult] {
+        &self.experiments
+    }
+
+    /// Borrow the config.
+    pub fn config(&self) -> &ScientificMethodConfig {
+        &self.config
+    }
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /// Encode a text string as a BinaryHV by hashing word-level seeds and
@@ -948,5 +1382,337 @@ mod tests {
             math_resp.multipath_verified,
             "should be multi-path verified"
         );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // CONFIGURABLE ENGINE TESTS
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // ── 19. Full observe → hypothesize → predict → experiment → update cycle
+
+    #[test]
+    fn test_configurable_full_cycle() {
+        let mut engine = ConfigurableScientificMethodEngine::default();
+
+        // 1. Observe
+        let obs_hv = BinaryHV::random(seed_from_name("observation_alpha"));
+        engine.observe(obs_hv.clone(), 0.3);
+        assert_eq!(engine.observation_count(), 1);
+
+        // 2. Hypothesize
+        let h_hv = BinaryHV::random(seed_from_name("hypothesis_alpha"));
+        let hid = engine.hypothesize("Temperature drives reaction rate", h_hv).unwrap();
+
+        // 3. Predict — the hypothesis predicts we'll see obs_hv
+        engine.predict(hid, obs_hv.clone(), 0.8, 0.3);
+
+        // 4. Experiment — compare prediction to actual observation
+        let result = engine.experiment(hid, 0, obs_hv.clone()).unwrap();
+        assert!(
+            result.match_score > 0.99,
+            "identical vectors should have similarity ~1.0, got {}",
+            result.match_score
+        );
+        assert!(result.confirmed);
+
+        // 5. Bayesian update — confirming evidence raises posterior
+        let prior = engine.get_hypothesis(hid).unwrap().posterior;
+        engine.bayesian_update(hid, 5.0); // strong evidence for H
+        let posterior = engine.get_hypothesis(hid).unwrap().posterior;
+        assert!(
+            posterior > prior,
+            "posterior {posterior:.3} should exceed prior {prior:.3}"
+        );
+
+        // 6. Evaluate
+        // Need min_experiments=3 by default; add more experiments.
+        for _ in 0..2 {
+            engine.experiment(hid, 0, obs_hv.clone());
+            engine.bayesian_update(hid, 5.0);
+        }
+        engine.evaluate_hypothesis(hid);
+        assert_eq!(
+            engine.get_hypothesis(hid).unwrap().status,
+            HypothesisStatus::Supported,
+        );
+    }
+
+    // ── 20. Bayesian convergence — repeated strong evidence drives posterior toward 1.0
+
+    #[test]
+    fn test_bayesian_convergence() {
+        let mut engine = ConfigurableScientificMethodEngine::default();
+        let hv = BinaryHV::random(seed_from_name("convergence"));
+        let hid = engine.hypothesize("Converging hypothesis", hv).unwrap();
+
+        for _ in 0..20 {
+            engine.bayesian_update(hid, 3.0);
+        }
+
+        let post = engine.get_hypothesis(hid).unwrap().posterior;
+        assert!(
+            post > 0.99,
+            "20 rounds of LR=3 should converge posterior near 1.0, got {post:.4}"
+        );
+    }
+
+    // ── 21. Hypothesis refutation via low likelihood ratio
+
+    #[test]
+    fn test_hypothesis_refutation() {
+        let config = ScientificMethodConfig {
+            min_experiments: 1,
+            ..Default::default()
+        };
+        let mut engine = ConfigurableScientificMethodEngine::new(config);
+        let hv = BinaryHV::random(seed_from_name("refutation"));
+        let pred_hv = BinaryHV::random(seed_from_name("pred_refutation"));
+        let hid = engine.hypothesize("Bad hypothesis", hv).unwrap();
+        engine.predict(hid, pred_hv, 0.8, 0.3);
+
+        // Run experiment with orthogonal vector — low match.
+        let obs = BinaryHV::random(seed_from_name("different_observation"));
+        engine.experiment(hid, 0, obs);
+
+        // Repeated weak evidence.
+        for _ in 0..15 {
+            engine.bayesian_update(hid, 0.1); // strong evidence against
+        }
+
+        engine.evaluate_hypothesis(hid);
+        assert_eq!(
+            engine.get_hypothesis(hid).unwrap().status,
+            HypothesisStatus::Refuted,
+        );
+    }
+
+    // ── 22. Competing hypotheses detection
+
+    #[test]
+    fn test_competing_hypotheses_detection() {
+        let mut engine = ConfigurableScientificMethodEngine::default();
+        let hv1 = BinaryHV::random(seed_from_name("comp_a"));
+        let hv2 = BinaryHV::random(seed_from_name("comp_b"));
+
+        // Both start at prior_default=0.5, so they are within 0.1.
+        engine.hypothesize("Hypothesis A", hv1).unwrap();
+        engine.hypothesize("Hypothesis B", hv2).unwrap();
+
+        let pairs = engine.competing_hypotheses();
+        assert_eq!(pairs.len(), 1, "two hypotheses with same posterior should compete");
+    }
+
+    // ── 23. Most informative experiment selection
+
+    #[test]
+    fn test_most_informative_experiment() {
+        let mut engine = ConfigurableScientificMethodEngine::default();
+        let hv1 = BinaryHV::random(seed_from_name("info_a"));
+        let hv2 = BinaryHV::random(seed_from_name("info_b"));
+        let pred_hv = BinaryHV::random(seed_from_name("info_pred"));
+
+        let h1 = engine.hypothesize("Uncertain hypothesis", hv1).unwrap();
+        let h2 = engine.hypothesize("Also uncertain", hv2).unwrap();
+
+        // h1 has a high-confidence prediction; h2 has a low-confidence one.
+        engine.predict(h1, pred_hv.clone(), 0.9, 0.2);
+        engine.predict(h2, pred_hv, 0.2, 0.5);
+
+        let (best_id, best_idx) = engine.most_informative_experiment().unwrap();
+        assert_eq!(best_id, h1, "higher confidence prediction should be more informative");
+        assert_eq!(best_idx, 0);
+    }
+
+    // ── 24. max_hypotheses limit
+
+    #[test]
+    fn test_max_hypotheses_limit() {
+        let config = ScientificMethodConfig {
+            max_hypotheses: 2,
+            ..Default::default()
+        };
+        let mut engine = ConfigurableScientificMethodEngine::new(config);
+
+        let hv = || BinaryHV::random(seed_from_name("limit"));
+        assert!(engine.hypothesize("H1", hv()).is_some());
+        assert!(engine.hypothesize("H2", hv()).is_some());
+        assert!(
+            engine.hypothesize("H3 (overflow)", hv()).is_none(),
+            "should reject hypothesis beyond max"
+        );
+    }
+
+    // ── 25. Telemetry counters
+
+    #[test]
+    fn test_telemetry_counters() {
+        let config = ScientificMethodConfig {
+            min_experiments: 1,
+            ..Default::default()
+        };
+        let mut engine = ConfigurableScientificMethodEngine::new(config);
+        let hv = BinaryHV::random(seed_from_name("telem"));
+        let pred_hv = BinaryHV::random(seed_from_name("telem_pred"));
+
+        let hid = engine.hypothesize("Telemetry test", hv).unwrap();
+        engine.predict(hid, pred_hv.clone(), 0.8, 0.3);
+
+        engine.experiment(hid, 0, pred_hv.clone());
+        engine.bayesian_update(hid, 2.0);
+
+        let t = engine.telemetry();
+        assert_eq!(t.hypotheses_generated, 1);
+        assert_eq!(t.experiments_run, 1);
+        assert_eq!(t.bayesian_updates, 1);
+        assert!(t.average_prediction_accuracy > 0.0);
+    }
+
+    // ── 26. Best hypothesis selection
+
+    #[test]
+    fn test_best_hypothesis_selection() {
+        let mut engine = ConfigurableScientificMethodEngine::default();
+        let hv1 = BinaryHV::random(seed_from_name("best_a"));
+        let hv2 = BinaryHV::random(seed_from_name("best_b"));
+
+        let h1 = engine.hypothesize("Weak", hv1).unwrap();
+        let h2 = engine.hypothesize("Strong", hv2).unwrap();
+
+        // Push h2's posterior higher.
+        engine.bayesian_update(h2, 10.0);
+
+        let best = engine.best_hypothesis().unwrap();
+        assert_eq!(best.id, h2, "h2 should have highest posterior after strong update");
+    }
+
+    // ── 27. Experiment with mismatched vectors produces low match_score
+
+    #[test]
+    fn test_experiment_mismatch() {
+        let mut engine = ConfigurableScientificMethodEngine::default();
+        let hv = BinaryHV::random(seed_from_name("mismatch_h"));
+        let pred_hv = BinaryHV::random(seed_from_name("mismatch_pred"));
+        let obs_hv = BinaryHV::random(seed_from_name("mismatch_obs"));
+
+        let hid = engine.hypothesize("Mismatch test", hv).unwrap();
+        engine.predict(hid, pred_hv, 0.8, 0.05); // tight tolerance
+
+        let result = engine.experiment(hid, 0, obs_hv).unwrap();
+        // Random BinaryHVs have similarity ~0.5.
+        assert!(
+            result.match_score < 0.7,
+            "orthogonal vectors should have low similarity, got {}",
+            result.match_score
+        );
+        assert!(!result.confirmed, "tight tolerance should reject orthogonal vectors");
+    }
+
+    // ── 28. Evaluate requires min_experiments
+
+    #[test]
+    fn test_evaluate_requires_min_experiments() {
+        let config = ScientificMethodConfig {
+            min_experiments: 5,
+            confirmation_threshold: 0.9,
+            ..Default::default()
+        };
+        let mut engine = ConfigurableScientificMethodEngine::new(config);
+        let hv = BinaryHV::random(seed_from_name("min_exp"));
+        let pred_hv = BinaryHV::random(seed_from_name("min_exp_pred"));
+
+        let hid = engine.hypothesize("Min experiments test", hv).unwrap();
+        engine.predict(hid, pred_hv.clone(), 0.8, 0.5);
+
+        // Only 2 experiments — below min_experiments=5.
+        engine.experiment(hid, 0, pred_hv.clone());
+        engine.experiment(hid, 0, pred_hv);
+        for _ in 0..10 {
+            engine.bayesian_update(hid, 10.0);
+        }
+
+        engine.evaluate_hypothesis(hid);
+        assert_eq!(
+            engine.get_hypothesis(hid).unwrap().status,
+            HypothesisStatus::Inconclusive,
+            "should remain Inconclusive until min_experiments met"
+        );
+    }
+
+    // ── 29. Observe records surprise correctly
+
+    #[test]
+    fn test_observe_records_surprise() {
+        let mut engine = ConfigurableScientificMethodEngine::default();
+        let hv = BinaryHV::random(seed_from_name("surprise_test"));
+        engine.observe(hv, 0.75);
+
+        let obs = &engine.observations()[0];
+        assert!((obs.surprise - 0.75).abs() < 1e-9);
+        assert_eq!(obs.timestamp, 1);
+    }
+
+    // ── 30. Negative surprise clamped to zero
+
+    #[test]
+    fn test_negative_surprise_clamped() {
+        let mut engine = ConfigurableScientificMethodEngine::default();
+        let hv = BinaryHV::random(seed_from_name("neg_surprise"));
+        engine.observe(hv, -5.0);
+
+        let obs = &engine.observations()[0];
+        assert!(
+            obs.surprise >= 0.0,
+            "negative surprise should be clamped to 0, got {}",
+            obs.surprise
+        );
+    }
+
+    // ── 31. refresh_telemetry updates confirmed/refuted counts
+
+    #[test]
+    fn test_refresh_telemetry() {
+        let config = ScientificMethodConfig {
+            min_experiments: 1,
+            ..Default::default()
+        };
+        let mut engine = ConfigurableScientificMethodEngine::new(config);
+        let hv = BinaryHV::random(seed_from_name("refresh"));
+        let pred_hv = BinaryHV::random(seed_from_name("refresh_pred"));
+
+        let hid = engine.hypothesize("Refresh test", hv).unwrap();
+        engine.predict(hid, pred_hv.clone(), 0.8, 0.5);
+        engine.experiment(hid, 0, pred_hv);
+
+        for _ in 0..20 {
+            engine.bayesian_update(hid, 10.0);
+        }
+        engine.evaluate_hypothesis(hid);
+        engine.refresh_telemetry();
+
+        assert_eq!(engine.telemetry().hypotheses_confirmed, 1);
+        assert_eq!(engine.telemetry().hypotheses_refuted, 0);
+    }
+
+    // ── 32. Empty engine returns None for best_hypothesis
+
+    #[test]
+    fn test_empty_engine_best_hypothesis() {
+        let engine = ConfigurableScientificMethodEngine::default();
+        assert!(engine.best_hypothesis().is_none());
+        assert!(engine.most_informative_experiment().is_none());
+        assert!(engine.competing_hypotheses().is_empty());
+    }
+
+    // ── 33. Invalid hypothesis_id returns None/false
+
+    #[test]
+    fn test_invalid_hypothesis_id() {
+        let mut engine = ConfigurableScientificMethodEngine::default();
+        let obs = BinaryHV::random(seed_from_name("invalid_test"));
+
+        assert!(!engine.bayesian_update(999, 2.0));
+        assert!(engine.experiment(999, 0, obs).is_none());
+        assert!(!engine.predict(999, BinaryHV::random(42), 0.5, 0.5));
+        assert!(engine.get_hypothesis(999).is_none());
     }
 }

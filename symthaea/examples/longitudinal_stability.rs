@@ -203,7 +203,9 @@ fn main() {
             Phase::Stress => 3,
         };
         let stats = &mut phase_stats[pi];
-        stats.consciousness_levels.push(m.consciousness_level);
+        stats
+            .consciousness_levels
+            .push(m.consciousness.consciousness_level);
         stats.prediction_errors.push(result.prediction_error as f64);
         stats
             .moral_anomaly_scores
@@ -231,7 +233,7 @@ fn main() {
              {}",
             cycle,
             phase.name(),
-            m.consciousness_level,
+            m.consciousness.consciousness_level,
             m.quality.equation_v2_consciousness,
             result.prediction_error,
             m.neuromod.dopamine_effective,
@@ -274,7 +276,7 @@ fn main() {
                 cycle + 1,
                 TOTAL_CYCLES,
                 phase.name(),
-                m.consciousness_level,
+                m.consciousness.consciousness_level,
                 result.prediction_error,
                 m.ethics.moral_anomaly_score,
             );

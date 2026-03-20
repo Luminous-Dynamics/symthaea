@@ -271,8 +271,8 @@ impl PsychBenchmark for ArcAbductiveBenchmark {
             accuracies.push(r.abduction_accuracy);
             similarities.push(r.unbinding_similarity);
             rts.push(r.rt_ticks);
-            for i in 0..4 {
-                per_type[i].push(r.per_type_accuracy[i]);
+            for (i, acc) in r.per_type_accuracy.iter().enumerate() {
+                per_type[i].push(*acc);
             }
             if config.trial_trace {
                 trace.push(TrialOutcome {
@@ -298,7 +298,7 @@ impl PsychBenchmark for ArcAbductiveBenchmark {
         // Per-task-type breakdowns
         for (i, name) in type_names.iter().enumerate() {
             result.insert(
-                &format!("abduction_{}", name),
+                format!("abduction_{}", name),
                 MetricValue::from_samples(&per_type[i]),
             );
         }

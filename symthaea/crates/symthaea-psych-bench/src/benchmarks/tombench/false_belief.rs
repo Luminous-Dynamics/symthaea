@@ -193,18 +193,28 @@ impl FalseBeliefBenchmark {
             // No setup sentences; fall back to structural score only
             return if structural_score > 0.0 { 1.0 } else { 0.0 };
         };
-        // Encoding noise degrades belief-reality discrimination
-        let noise_degrade = config.effective_noise() as f32 * 0.4;
-        let belief_sim = agent.similarity(&belief_hv) * (1.0 - noise_degrade);
-        let reality_sim = agent.similarity(&reality_hv) * (1.0 - noise_degrade);
+        // Encoding noise adds per-comparison noise (individual differences in
+        // mentalizing precision; Conway & Engle, 1996 WM and controlled attention).
+        let enc_noise = config.effective_noise() as f32;
+        let noise_seed = config.trial_seed("tombench", "false_belief", trial_idx);
+        let belief_noise_val = {
+            let ns = noise_seed.wrapping_add(8000);
+            ((ns.wrapping_mul(0x9E3779B97F4A7C15) >> 33) as f32 / (1u64 << 31) as f32) - 0.5
+        };
+        let reality_noise_val = {
+            let ns = noise_seed.wrapping_add(8001);
+            ((ns.wrapping_mul(0x9E3779B97F4A7C15) >> 33) as f32 / (1u64 << 31) as f32) - 0.5
+        };
+        let belief_sim = agent.similarity(&belief_hv) + belief_noise_val * enc_noise * 0.35;
+        let reality_sim = agent.similarity(&reality_hv) + reality_noise_val * enc_noise * 0.35;
         // Time pressure: 0.15/unit attenuates belief-reality discrimination, modeling reality bias
         // under cognitive load (Birch & Bloom, 2007 curse of knowledge; Wickelgren, 1977 SAT).
         let pressure_noise =
             config.time_pressure * 0.15 * diff_model.interference_multiplier(config.difficulty);
         let geo_signal = (belief_sim - reality_sim) as f64 * (1.0 - pressure_noise);
 
-        // --- Combined: structural tracking is primary, HDC is tiebreaker ---
-        let combined = structural_score * 0.8 + geo_signal * 0.2;
+        // --- Combined: structural + HDC geometry equally weighted ---
+        let combined = structural_score * 0.4 + geo_signal * 0.6;
         if combined > 0.0 {
             1.0
         } else {
@@ -268,10 +278,15 @@ impl FalseBeliefBenchmark {
         }
         let belief_hv = adapter.encode(&Scenario::new(scenario.belief_location), dim);
         let reality_hv = adapter.encode(&Scenario::new(scenario.reality_location), dim);
-        let noise_degrade2 = config.effective_noise() as f32 * 0.4;
+        let enc_noise2 = config.effective_noise() as f32;
+        let seed = config.trial_seed("tombench", "false_belief_rt", trial_idx);
+        let rt_noise = {
+            let ns = seed.wrapping_add(9000);
+            ((ns.wrapping_mul(0x9E3779B97F4A7C15) >> 33) as f32 / (1u64 << 31) as f32) - 0.5
+        };
         let margin = if let Some(ref agent) = agent_belief {
             ((agent.similarity(&belief_hv) - agent.similarity(&reality_hv))
-                * (1.0 - noise_degrade2))
+                + rt_noise * enc_noise2 * 0.10)
                 .abs() as f64
         } else {
             0.5
@@ -318,6 +333,14 @@ impl PsychBenchmark for FalseBeliefBenchmark {
             #[cfg(not(feature = "symthaea-backend"))]
             {
                 let (mut acc, rt) = self.run_trial(config, trial);
+
+                // Attention lapse: on a lapse trial the subject guesses randomly
+                // instead of applying their mentalizing ability.
+                acc = if config.check_correct(acc > 0.5, "false_belief", trial) {
+                    1.0
+                } else {
+                    0.0
+                };
 
                 // Curse of knowledge: stochastic response flip at higher difficulty (Birch & Bloom 2007).
                 // Two mechanisms: (1) belief-reality confusion (difficulty * 0.35 flip rate),

@@ -82,9 +82,11 @@ impl AlternateUsesBenchmark {
 
         // Generate candidate uses by unbinding features and binding with random contexts
         // Cognitive generation budget: humans produce ~8 uses in typical 2-minute
-        // window (Torrance 1974). With the tighter semantic plausibility filter
-        // (~14% acceptance rate), ~60 attempts yields fluency near the human mean.
-        let max_attempts = 60;
+        // window (Torrance 1974, mean). Creative individuals with high openness
+        // produce 12+ uses (Silvia et al., 2008). With the ~14% acceptance rate
+        // from the semantic plausibility filter, 75 attempts models persistent
+        // associative search — near the 75th percentile of fluency distributions.
+        let max_attempts = 75;
         let mut accepted_uses = Vec::new();
         let mut use_sims = Vec::new(); // similarity of each use to object (for originality)
 

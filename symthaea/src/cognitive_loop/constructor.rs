@@ -1091,6 +1091,7 @@ impl CognitiveLoopService {
                 None
             },
             cfc_input_buffer: ndarray::Array1::zeros(cfc_input_dim),
+            #[cfg(feature = "mathematics")]
             math_service: super::math_service::MathService::new(),
             #[cfg(feature = "epistemic_auditor")]
             epistemic_auditor: None, // initialized below after struct construction
@@ -1111,6 +1112,8 @@ impl CognitiveLoopService {
             defense_actions_approved: 0,
             #[cfg(feature = "safety-agents")]
             civic_crisis_detector: super::civic_crisis_detector::CivicCrisisDetector::new(),
+            #[cfg(feature = "neuroevolution")]
+            neuroevolution_manager: super::managers::NeuroevolutionManager::default(),
             security_telemetry: crate::swarm::SecurityTelemetry::default(),
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
             streaming_inference: if enable_streaming_inference {

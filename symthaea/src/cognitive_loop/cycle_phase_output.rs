@@ -286,6 +286,10 @@ impl CognitiveLoopService {
             causal_avg_confidence: feedback.reasoning.causal_avg_confidence,
             evolution_generation: feedback.evolution.evolution_generation,
             evolution_phi_delta: feedback.evolution.evolution_phi_delta,
+            neuroevo_generation: 0,
+            neuroevo_best_fitness: 0.0,
+            neuroevo_diversity: 0.0,
+            neuroevo_species_count: 0,
             value_embeddings_created: feedback.ethics.value_embeddings_created,
             value_cache_hit_rate: feedback.ethics.value_cache_hit_rate,
             adaptive_reasoning_phi: feedback.reasoning.adaptive_reasoning_phi,
@@ -925,6 +929,15 @@ impl CognitiveLoopService {
             metadata.sovereign_survival_alert_count = sv.alert_count;
         }
 
+        // ── Math Service telemetry ──
+        #[cfg(feature = "mathematics")]
+        {
+            let mt = self.math_service.telemetry();
+            metadata.math_problems_solved = mt.problems_solved;
+            metadata.math_verification_rate = mt.verification_rate;
+            metadata.math_avg_confidence = mt.average_confidence;
+        }
+
         // ── FHE Collective Wisdom telemetry ──
         #[cfg(feature = "fhe-wisdom")]
         if self.config.fhe_wisdom_enabled {
@@ -1304,6 +1317,14 @@ impl CognitiveLoopService {
             metadata.immune_quarantined_peers = st.quarantined_peers as u32;
             metadata.immune_threat_patterns = self.threat_memory.pattern_count() as u32;
             metadata.immune_response_active = self.collective_immune_state.immune_response_active;
+        }
+        #[cfg(feature = "neuroevolution")]
+        {
+            let nt = self.neuroevolution_manager.telemetry();
+            metadata.neuroevo_generation = nt.generation;
+            metadata.neuroevo_best_fitness = nt.best_fitness;
+            metadata.neuroevo_diversity = nt.diversity;
+            metadata.neuroevo_species_count = nt.species_count;
         }
         #[cfg(feature = "safety-agents")]
         {

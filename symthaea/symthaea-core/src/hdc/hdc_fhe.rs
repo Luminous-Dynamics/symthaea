@@ -223,8 +223,7 @@ impl CollectiveWisdomPool {
             return None;
         }
 
-        let ciphertexts: Vec<BinaryHV> =
-            self.contributions.iter().map(|e| e.ciphertext).collect();
+        let ciphertexts: Vec<BinaryHV> = self.contributions.iter().map(|e| e.ciphertext).collect();
 
         Some(EncryptedHV {
             ciphertext: BinaryHV::bundle(&ciphertexts),
@@ -317,7 +316,10 @@ mod tests {
 
         // Should equal bind(a, b)
         let expected = a.bind(&b);
-        assert_eq!(decrypted, expected, "Homomorphic bind should produce bind(a,b)");
+        assert_eq!(
+            decrypted, expected,
+            "Homomorphic bind should produce bind(a,b)"
+        );
     }
 
     #[test]
@@ -452,10 +454,7 @@ mod tests {
     fn test_collective_pool_clear() {
         let mask = BinaryHV::random(99);
         let mut pool = CollectiveWisdomPool::new();
-        pool.contribute(
-            "peer-1",
-            EncryptedHV::encrypt(&BinaryHV::random(1), &mask),
-        );
+        pool.contribute("peer-1", EncryptedHV::encrypt(&BinaryHV::random(1), &mask));
         assert_eq!(pool.contribution_count(), 1);
 
         pool.clear();
@@ -473,14 +472,8 @@ mod tests {
     fn test_contributor_ids_tracked() {
         let mask = BinaryHV::random(99);
         let mut pool = CollectiveWisdomPool::new();
-        pool.contribute(
-            "alice",
-            EncryptedHV::encrypt(&BinaryHV::random(1), &mask),
-        );
-        pool.contribute(
-            "bob",
-            EncryptedHV::encrypt(&BinaryHV::random(2), &mask),
-        );
+        pool.contribute("alice", EncryptedHV::encrypt(&BinaryHV::random(1), &mask));
+        pool.contribute("bob", EncryptedHV::encrypt(&BinaryHV::random(2), &mask));
         assert_eq!(pool.contributors(), &["alice", "bob"]);
     }
 }

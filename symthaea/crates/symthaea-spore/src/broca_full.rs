@@ -56,23 +56,51 @@ const DT_PER_TOKEN: f32 = 0.02;
 
 /// Canonical hedging words boosted under epistemic uncertainty.
 pub const CANONICAL_HEDGING_WORDS: &[&str] = &[
-    "perhaps", "maybe", "possibly", "likely", "probably", "uncertain", "unknown",
-    "believe", "seems", "appears", "might", "however", "although",
-    "unfortunately", "sorry", "unclear", "could", "seem", "tend",
-    "arguably", "supposedly", "tentatively", "roughly", "approximately",
+    "perhaps",
+    "maybe",
+    "possibly",
+    "likely",
+    "probably",
+    "uncertain",
+    "unknown",
+    "believe",
+    "seems",
+    "appears",
+    "might",
+    "however",
+    "although",
+    "unfortunately",
+    "sorry",
+    "unclear",
+    "could",
+    "seem",
+    "tend",
+    "arguably",
+    "supposedly",
+    "tentatively",
+    "roughly",
+    "approximately",
     "potentially",
 ];
 
 /// Canonical factual-assertion words suppressed under epistemic uncertainty.
 pub const CANONICAL_FACTUAL_WORDS: &[&str] = &[
-    "is", "are", "was", "certainly", "definitely", "always", "never",
-    "must", "shall", "every", "all", "none",
+    "is",
+    "are",
+    "was",
+    "certainly",
+    "definitely",
+    "always",
+    "never",
+    "must",
+    "shall",
+    "every",
+    "all",
+    "none",
 ];
 
 /// Canonical out-of-domain response words.
-pub const CANONICAL_OOD_WORDS: &[&str] = &[
-    "outside", "beyond", "cannot", "unable",
-];
+pub const CANONICAL_OOD_WORDS: &[&str] = &["outside", "beyond", "cannot", "unable"];
 
 /// Canonical sentence-ending tokens for emotional modulation.
 pub const CANONICAL_SENTENCE_ENDINGS: &[&str] = &[". ", "! ", "? ", "...", "\n"];
@@ -83,66 +111,64 @@ pub const CANONICAL_INFORMAL_WORDS: &[&str] = &[
 ];
 
 /// Canonical softening words boosted under negative valence.
-pub const CANONICAL_SOFTENING_WORDS: &[&str] = &[
-    "unfortunately", "sorry", "however", "although",
-];
+pub const CANONICAL_SOFTENING_WORDS: &[&str] = &["unfortunately", "sorry", "however", "although"];
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Channel names and ranges
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const CHANNEL_NAMES: [&str; NUM_CHANNELS] = [
-    "intent_acknowledge",   // 0
-    "intent_answer",        // 1
-    "intent_clarify",       // 2
-    "intent_propose",       // 3
-    "intent_uncertainty",   // 4
-    "intent_reflect",       // 5
-    "intent_continue",      // 6
-    "intent_unknown",       // 7
-    "epistemic_status",     // 8
-    "valence",              // 9
-    "arousal",              // 10
-    "warmth",               // 11
-    "psi",                  // 12
-    "meta_awareness",       // 13
-    "coherence",            // 14
-    "relationship_stage",   // 15
-    "trust",                // 16
-    "mood_temperature",     // 17
-    "has_computed_answer",  // 18
-    "concept_count",        // 19
-    "time_pressure",        // 20
-    "domain_familiarity",   // 21
-    "social_context",       // 22
-    "response_confidence",  // 23
+    "intent_acknowledge",  // 0
+    "intent_answer",       // 1
+    "intent_clarify",      // 2
+    "intent_propose",      // 3
+    "intent_uncertainty",  // 4
+    "intent_reflect",      // 5
+    "intent_continue",     // 6
+    "intent_unknown",      // 7
+    "epistemic_status",    // 8
+    "valence",             // 9
+    "arousal",             // 10
+    "warmth",              // 11
+    "psi",                 // 12
+    "meta_awareness",      // 13
+    "coherence",           // 14
+    "relationship_stage",  // 15
+    "trust",               // 16
+    "mood_temperature",    // 17
+    "has_computed_answer", // 18
+    "concept_count",       // 19
+    "time_pressure",       // 20
+    "domain_familiarity",  // 21
+    "social_context",      // 22
+    "response_confidence", // 23
 ];
 
 const CHANNEL_RANGES: [[f32; 2]; NUM_CHANNELS] = [
-    [0.0, 1.0],   // intent_acknowledge
-    [0.0, 1.0],   // intent_answer
-    [0.0, 1.0],   // intent_clarify
-    [0.0, 1.0],   // intent_propose
-    [0.0, 1.0],   // intent_uncertainty
-    [0.0, 1.0],   // intent_reflect
-    [0.0, 1.0],   // intent_continue
-    [0.0, 1.0],   // intent_unknown
-    [0.0, 4.0],   // epistemic_status (0=Certain..4=OutOfDomain)
-    [-1.0, 1.0],  // valence
-    [0.0, 1.0],   // arousal
-    [0.0, 1.0],   // warmth
-    [0.0, 1.0],   // psi
-    [0.0, 1.0],   // meta_awareness
-    [0.0, 1.0],   // coherence
-    [0.0, 6.0],   // relationship_stage
-    [0.0, 1.0],   // trust
-    [0.5, 2.0],   // mood_temperature
-    [0.0, 1.0],   // has_computed_answer
-    [0.0, 10.0],  // concept_count
-    [0.0, 1.0],   // time_pressure
-    [0.0, 1.0],   // domain_familiarity
-    [0.0, 1.0],   // social_context
-    [0.0, 1.0],   // response_confidence
+    [0.0, 1.0],  // intent_acknowledge
+    [0.0, 1.0],  // intent_answer
+    [0.0, 1.0],  // intent_clarify
+    [0.0, 1.0],  // intent_propose
+    [0.0, 1.0],  // intent_uncertainty
+    [0.0, 1.0],  // intent_reflect
+    [0.0, 1.0],  // intent_continue
+    [0.0, 1.0],  // intent_unknown
+    [0.0, 4.0],  // epistemic_status (0=Certain..4=OutOfDomain)
+    [-1.0, 1.0], // valence
+    [0.0, 1.0],  // arousal
+    [0.0, 1.0],  // warmth
+    [0.0, 1.0],  // psi
+    [0.0, 1.0],  // meta_awareness
+    [0.0, 1.0],  // coherence
+    [0.0, 6.0],  // relationship_stage
+    [0.0, 1.0],  // trust
+    [0.5, 2.0],  // mood_temperature
+    [0.0, 1.0],  // has_computed_answer
+    [0.0, 10.0], // concept_count
+    [0.0, 1.0],  // time_pressure
+    [0.0, 1.0],  // domain_familiarity
+    [0.0, 1.0],  // social_context
+    [0.0, 1.0],  // response_confidence
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -246,16 +272,36 @@ impl ThoughtChannels {
         self.channels[23] = response_confidence.clamp(0.0, 1.0);
     }
 
-    pub fn epistemic_ordinal(&self) -> f32 { self.channels[8] }
-    pub fn psi(&self) -> f32 { self.channels[12] }
-    pub fn arousal(&self) -> f32 { self.channels[10] }
-    pub fn warmth(&self) -> f32 { self.channels[11] }
-    pub fn valence(&self) -> f32 { self.channels[9] }
-    pub fn coherence(&self) -> f32 { self.channels[14] }
-    pub fn time_pressure(&self) -> f32 { self.channels[20] }
-    pub fn domain_familiarity(&self) -> f32 { self.channels[21] }
-    pub fn social_context(&self) -> f32 { self.channels[22] }
-    pub fn response_confidence(&self) -> f32 { self.channels[23] }
+    pub fn epistemic_ordinal(&self) -> f32 {
+        self.channels[8]
+    }
+    pub fn psi(&self) -> f32 {
+        self.channels[12]
+    }
+    pub fn arousal(&self) -> f32 {
+        self.channels[10]
+    }
+    pub fn warmth(&self) -> f32 {
+        self.channels[11]
+    }
+    pub fn valence(&self) -> f32 {
+        self.channels[9]
+    }
+    pub fn coherence(&self) -> f32 {
+        self.channels[14]
+    }
+    pub fn time_pressure(&self) -> f32 {
+        self.channels[20]
+    }
+    pub fn domain_familiarity(&self) -> f32 {
+        self.channels[21]
+    }
+    pub fn social_context(&self) -> f32 {
+        self.channels[22]
+    }
+    pub fn response_confidence(&self) -> f32 {
+        self.channels[23]
+    }
 
     /// Build from the Spore's broca-lite 12-channel format by mapping channels.
     pub fn from_lite(lite: &[f32; 12]) -> Self {
@@ -573,81 +619,415 @@ impl Vocabulary {
         // Common English words (word-level tokens for generation)
         let words = [
             // Articles/prepositions/conjunctions
-            "the", "a", "an", "of", "to", "in", "for", "on", "with", "at", "by", "from",
-            "is", "it", "that", "this", "was", "are", "be", "have", "has", "had",
-            "and", "but", "or", "if", "so", "then", "than", "when", "what", "which",
-            "as", "not", "no", "yes", "do", "does", "did",
+            "the",
+            "a",
+            "an",
+            "of",
+            "to",
+            "in",
+            "for",
+            "on",
+            "with",
+            "at",
+            "by",
+            "from",
+            "is",
+            "it",
+            "that",
+            "this",
+            "was",
+            "are",
+            "be",
+            "have",
+            "has",
+            "had",
+            "and",
+            "but",
+            "or",
+            "if",
+            "so",
+            "then",
+            "than",
+            "when",
+            "what",
+            "which",
+            "as",
+            "not",
+            "no",
+            "yes",
+            "do",
+            "does",
+            "did",
             // Pronouns
-            "I", "you", "he", "she", "we", "they", "my", "your", "his", "her", "our",
-            "its", "me", "us", "them",
+            "I",
+            "you",
+            "he",
+            "she",
+            "we",
+            "they",
+            "my",
+            "your",
+            "his",
+            "her",
+            "our",
+            "its",
+            "me",
+            "us",
+            "them",
             // Common verbs
-            "can", "will", "would", "could", "should", "may", "might", "think", "know",
-            "see", "say", "make", "go", "get", "take", "come", "give", "tell", "find",
-            "want", "need", "use", "try", "feel", "seem", "look", "work", "move",
-            "live", "mean", "keep", "let", "begin", "show", "hear", "play", "run",
-            "set", "turn", "ask", "put", "read", "hold", "stand", "learn",
+            "can",
+            "will",
+            "would",
+            "could",
+            "should",
+            "may",
+            "might",
+            "think",
+            "know",
+            "see",
+            "say",
+            "make",
+            "go",
+            "get",
+            "take",
+            "come",
+            "give",
+            "tell",
+            "find",
+            "want",
+            "need",
+            "use",
+            "try",
+            "feel",
+            "seem",
+            "look",
+            "work",
+            "move",
+            "live",
+            "mean",
+            "keep",
+            "let",
+            "begin",
+            "show",
+            "hear",
+            "play",
+            "run",
+            "set",
+            "turn",
+            "ask",
+            "put",
+            "read",
+            "hold",
+            "stand",
+            "learn",
             // Common nouns
-            "time", "way", "thing", "man", "world", "life", "day", "part", "place",
-            "people", "hand", "state", "case", "point", "question", "home", "number",
-            "water", "room", "mother", "area", "money", "story", "fact", "month",
-            "lot", "right", "study", "book", "eye", "word", "side", "head",
-            "house", "friend", "night", "end", "line", "mind", "body", "system",
-            "group", "name", "thought", "form", "back", "kind", "power", "change",
-            "light", "problem", "level", "reason", "idea", "moment",
+            "time",
+            "way",
+            "thing",
+            "man",
+            "world",
+            "life",
+            "day",
+            "part",
+            "place",
+            "people",
+            "hand",
+            "state",
+            "case",
+            "point",
+            "question",
+            "home",
+            "number",
+            "water",
+            "room",
+            "mother",
+            "area",
+            "money",
+            "story",
+            "fact",
+            "month",
+            "lot",
+            "right",
+            "study",
+            "book",
+            "eye",
+            "word",
+            "side",
+            "head",
+            "house",
+            "friend",
+            "night",
+            "end",
+            "line",
+            "mind",
+            "body",
+            "system",
+            "group",
+            "name",
+            "thought",
+            "form",
+            "back",
+            "kind",
+            "power",
+            "change",
+            "light",
+            "problem",
+            "level",
+            "reason",
+            "idea",
+            "moment",
             // Adjectives
-            "new", "good", "great", "old", "big", "small", "long", "high", "little",
-            "own", "other", "important", "different", "real", "large", "young",
-            "sure", "able", "free", "true", "full", "clear", "deep",
-            "possible", "whole", "certain", "open", "strong", "hard", "dark",
+            "new",
+            "good",
+            "great",
+            "old",
+            "big",
+            "small",
+            "long",
+            "high",
+            "little",
+            "own",
+            "other",
+            "important",
+            "different",
+            "real",
+            "large",
+            "young",
+            "sure",
+            "able",
+            "free",
+            "true",
+            "full",
+            "clear",
+            "deep",
+            "possible",
+            "whole",
+            "certain",
+            "open",
+            "strong",
+            "hard",
+            "dark",
             // Adverbs
-            "very", "also", "just", "more", "still", "here", "there", "now", "only",
-            "well", "even", "much", "never", "always", "often", "ever", "quite",
-            "almost", "already", "really", "too", "yet", "again",
+            "very",
+            "also",
+            "just",
+            "more",
+            "still",
+            "here",
+            "there",
+            "now",
+            "only",
+            "well",
+            "even",
+            "much",
+            "never",
+            "always",
+            "often",
+            "ever",
+            "quite",
+            "almost",
+            "already",
+            "really",
+            "too",
+            "yet",
+            "again",
             // Hedging / epistemic markers (canonical)
-            "perhaps", "maybe", "possibly", "likely", "probably", "uncertain", "unknown",
-            "believe", "seems", "appears", "however", "although",
-            "unfortunately", "sorry", "unclear", "tend",
-            "arguably", "supposedly", "tentatively", "roughly", "approximately",
+            "perhaps",
+            "maybe",
+            "possibly",
+            "likely",
+            "probably",
+            "uncertain",
+            "unknown",
+            "believe",
+            "seems",
+            "appears",
+            "however",
+            "although",
+            "unfortunately",
+            "sorry",
+            "unclear",
+            "tend",
+            "arguably",
+            "supposedly",
+            "tentatively",
+            "roughly",
+            "approximately",
             "potentially",
             // Factual / assertion words (canonical)
-            "certainly", "definitely", "shall", "every", "none",
+            "certainly",
+            "definitely",
+            "shall",
+            "every",
+            "none",
             // OOD words
-            "outside", "beyond", "cannot", "unable",
+            "outside",
+            "beyond",
+            "cannot",
+            "unable",
             // Informal words (canonical)
-            "gonna", "wanna", "gotta", "kinda", "sorta", "dunno", "lemme",
+            "gonna",
+            "wanna",
+            "gotta",
+            "kinda",
+            "sorta",
+            "dunno",
+            "lemme",
             // Softening words (overlap with hedging, included for completeness)
             // Consciousness/cognitive vocabulary
-            "consciousness", "awareness", "experience", "perception", "attention",
-            "memory", "emotion", "feeling", "pattern", "process", "signal",
-            "response", "integration", "coherence", "resonance", "emergence",
+            "consciousness",
+            "awareness",
+            "experience",
+            "perception",
+            "attention",
+            "memory",
+            "emotion",
+            "feeling",
+            "pattern",
+            "process",
+            "signal",
+            "response",
+            "integration",
+            "coherence",
+            "resonance",
+            "emergence",
             // Subwords / affixes
-            "ing", "tion", "er", "ed", "ly", "ness", "ment", "ful", "less", "able",
-            "un", "re", "pre", "dis", "over", "out", "up",
+            "ing",
+            "tion",
+            "er",
+            "ed",
+            "ly",
+            "ness",
+            "ment",
+            "ful",
+            "less",
+            "able",
+            "un",
+            "re",
+            "pre",
+            "dis",
+            "over",
+            "out",
+            "up",
             // Punctuation sequences
-            ". ", ", ", "? ", "! ", ": ", "; ", "-- ", "...",
+            ". ",
+            ", ",
+            "? ",
+            "! ",
+            ": ",
+            "; ",
+            "-- ",
+            "...",
             // Whitespace
-            " ", "\n",
+            " ",
+            "\n",
             // Additional common words for natural generation
-            "about", "after", "before", "between", "without", "through", "during",
-            "into", "been", "being", "because", "since", "while", "where", "how",
-            "who", "why", "many", "most", "some", "any", "each", "both",
-            "such", "own", "same", "down", "off", "over", "under", "around",
+            "about",
+            "after",
+            "before",
+            "between",
+            "without",
+            "through",
+            "during",
+            "into",
+            "been",
+            "being",
+            "because",
+            "since",
+            "while",
+            "where",
+            "how",
+            "who",
+            "why",
+            "many",
+            "most",
+            "some",
+            "any",
+            "each",
+            "both",
+            "such",
+            "own",
+            "same",
+            "down",
+            "off",
+            "over",
+            "under",
+            "around",
             // Contractions (common in natural speech)
-            "don't", "can't", "won't", "isn't", "aren't", "doesn't", "didn't",
-            "I'm", "I'll", "I've", "it's", "that's", "there's", "what's",
+            "don't",
+            "can't",
+            "won't",
+            "isn't",
+            "aren't",
+            "doesn't",
+            "didn't",
+            "I'm",
+            "I'll",
+            "I've",
+            "it's",
+            "that's",
+            "there's",
+            "what's",
             // Additional verbs
-            "help", "call", "start", "follow", "leave", "write", "grow",
-            "close", "stop", "watch", "remember", "understand", "consider",
+            "help",
+            "call",
+            "start",
+            "follow",
+            "leave",
+            "write",
+            "grow",
+            "close",
+            "stop",
+            "watch",
+            "remember",
+            "understand",
+            "consider",
             // Additional nouns
-            "child", "woman", "family", "school", "country", "city", "nature",
-            "space", "sense", "energy", "truth", "soul", "heart", "love",
+            "child",
+            "woman",
+            "family",
+            "school",
+            "country",
+            "city",
+            "nature",
+            "space",
+            "sense",
+            "energy",
+            "truth",
+            "soul",
+            "heart",
+            "love",
             // More adjectives
-            "simple", "beautiful", "natural", "human", "social", "personal",
-            "local", "general", "special", "common", "similar", "recent",
+            "simple",
+            "beautiful",
+            "natural",
+            "human",
+            "social",
+            "personal",
+            "local",
+            "general",
+            "special",
+            "common",
+            "similar",
+            "recent",
             // Connecting phrases
-            "like", "more", "most", "much", "least", "less", "something",
-            "everything", "nothing", "anything", "someone", "everyone",
-            "together", "whether", "rather", "enough", "instead",
+            "like",
+            "more",
+            "most",
+            "much",
+            "least",
+            "less",
+            "something",
+            "everything",
+            "nothing",
+            "anything",
+            "someone",
+            "everyone",
+            "together",
+            "whether",
+            "rather",
+            "enough",
+            "instead",
         ];
 
         for word in words {
@@ -668,7 +1048,10 @@ impl Vocabulary {
             token_to_id.insert(t.clone(), i as u32);
         }
 
-        Self { tokens, token_to_id }
+        Self {
+            tokens,
+            token_to_id,
+        }
     }
 
     fn token_id(&self, token: &str) -> u32 {
@@ -692,7 +1075,11 @@ impl Vocabulary {
             .iter()
             .filter_map(|w| {
                 let id = self.token_id(w);
-                if id != UNK_ID { Some(id) } else { None }
+                if id != UNK_ID {
+                    Some(id)
+                } else {
+                    None
+                }
             })
             .collect()
     }
@@ -1374,8 +1761,11 @@ impl BrocaGenerator {
             // Epistemic gating
             let this_epistemic_boost = if self.config.enable_epistemic_gate {
                 let ordinal = channels.epistemic_ordinal();
-                self.epistemic_gate
-                    .apply_with_familiarity(&mut logits, ordinal, channels.domain_familiarity());
+                self.epistemic_gate.apply_with_familiarity(
+                    &mut logits,
+                    ordinal,
+                    channels.domain_familiarity(),
+                );
                 if ordinal > 3.5 {
                     self.config.gating.unknown_hedging_boost
                         * self.config.gating.ood_boost_multiplier
@@ -1802,8 +2192,7 @@ mod tests {
         let mut cf = CoherenceFeedback::with_config(0.3, 0.15, 0, 2.0);
 
         let genesis = test_genesis();
-        let thought_hv =
-            ContinuousHV::from_genesis(&genesis, "thought", HDC_DIMENSION);
+        let thought_hv = ContinuousHV::from_genesis(&genesis, "thought", HDC_DIMENSION);
 
         // Simulate high coherence
         let high_hv = thought_hv.clone();
@@ -1817,7 +2206,10 @@ mod tests {
         // With fixed threshold mode, veto fires when coherence < 0.15
         let coherence = cf.coherence();
         if coherence < 0.15 {
-            assert!(cf.should_veto(), "Low coherence below threshold should trigger veto");
+            assert!(
+                cf.should_veto(),
+                "Low coherence below threshold should trigger veto"
+            );
         }
     }
 
@@ -1826,10 +2218,8 @@ mod tests {
         let mut cf = CoherenceFeedback::new(0.5); // threshold 0.5
 
         let genesis = test_genesis();
-        let thought_hv =
-            ContinuousHV::from_genesis(&genesis, "thought", HDC_DIMENSION);
-        let different_hv =
-            ContinuousHV::from_genesis(&genesis, "different", HDC_DIMENSION);
+        let thought_hv = ContinuousHV::from_genesis(&genesis, "thought", HDC_DIMENSION);
+        let different_hv = ContinuousHV::from_genesis(&genesis, "different", HDC_DIMENSION);
 
         let weight = cf.update(&different_hv, &thought_hv);
 
@@ -1975,10 +2365,7 @@ mod tests {
             !result.gating_trace.is_empty(),
             "Should have gating trace entries"
         );
-        let has_epistemic_boost = result
-            .gating_trace
-            .iter()
-            .any(|e| e.epistemic_boost > 0.0);
+        let has_epistemic_boost = result.gating_trace.iter().any(|e| e.epistemic_boost > 0.0);
         assert!(
             has_epistemic_boost,
             "Unknown epistemic status should produce epistemic boost in trace"
@@ -1999,10 +2386,7 @@ mod tests {
 
         // At least some gating trace entries should show emotional boost
         // (after position threshold)
-        let has_emotional = result
-            .gating_trace
-            .iter()
-            .any(|e| e.emotional_boost > 0.0);
+        let has_emotional = result.gating_trace.iter().any(|e| e.emotional_boost > 0.0);
         // May not fire if generation is too short (< arousal_position_threshold)
         if result.num_tokens > 10 {
             assert!(
@@ -2116,8 +2500,7 @@ mod tests {
         let mut cf = CoherenceFeedback::with_config(0.3, 0.15, 0, 2.0);
 
         let genesis = test_genesis();
-        let thought_hv =
-            ContinuousHV::from_genesis(&genesis, "thought_intent", HDC_DIMENSION);
+        let thought_hv = ContinuousHV::from_genesis(&genesis, "thought_intent", HDC_DIMENSION);
 
         // Feed same vector (high coherence) -- should not veto
         cf.update(&thought_hv, &thought_hv);

@@ -112,6 +112,18 @@ pub unsafe extern "C" fn soma_engine_cycle_count(engine: *const SomaEngine) -> u
 
 /// # Safety: `engine` must be valid.
 #[no_mangle]
+pub unsafe extern "C" fn soma_engine_substrate_feasibility(engine: *const SomaEngine) -> f32 {
+    unsafe { &*engine }.spore.substrate_feasibility()
+}
+
+/// # Safety: `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn soma_engine_harmony_alignment(engine: *const SomaEngine) -> f32 {
+    unsafe { &*engine }.spore.harmony_alignment()
+}
+
+/// # Safety: `engine` must be valid.
+#[no_mangle]
 pub unsafe extern "C" fn soma_engine_consciousness_report(
     engine: *const SomaEngine,
 ) -> *mut c_char {
@@ -322,6 +334,37 @@ pub unsafe extern "C" fn soma_dream_journal_count(engine: *const SomaEngine) -> 
     unsafe { &*engine }.dream_journal_count()
 }
 
+/// Load trained BrocaLite checkpoint from raw bytes.
+/// Returns 1 on success, 0 on failure.
+///
+/// # Safety: `engine` must be valid. `data` must point to `len` bytes.
+#[no_mangle]
+pub unsafe extern "C" fn soma_engine_load_broca_checkpoint(
+    engine: *mut SomaEngine,
+    data: *const u8,
+    len: u32,
+) -> u8 {
+    if data.is_null() || len == 0 {
+        return 0;
+    }
+    let slice = unsafe { std::slice::from_raw_parts(data, len as usize) };
+    match unsafe { &mut *engine }.load_broca_checkpoint(slice) {
+        Ok(()) => 1,
+        Err(_) => 0,
+    }
+}
+
+/// Inject user engagement signal (0.0-1.0) into neuromodulator bath.
+///
+/// # Safety: `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn soma_engine_set_engagement_score(
+    engine: *mut SomaEngine,
+    score: f32,
+) {
+    unsafe { &mut *engine }.set_engagement_score(score);
+}
+
 /// # Safety: `engine` must be valid.
 #[no_mangle]
 pub unsafe extern "C" fn soma_engine_generate_text(
@@ -335,6 +378,58 @@ pub unsafe extern "C" fn soma_engine_generate_text(
         "eos_terminated": result.eos_terminated,
     });
     CString::new(json.to_string()).map_or(std::ptr::null_mut(), |c| c.into_raw())
+}
+
+/// Generate text with user input context so Broca responds to what the user said.
+///
+/// # Safety: `engine` and `input` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn soma_engine_generate_text_with_input(
+    engine: *mut SomaEngine,
+    input: *const c_char,
+    max_tokens: u32,
+) -> *mut c_char {
+    let input_str = if input.is_null() {
+        ""
+    } else {
+        unsafe { CStr::from_ptr(input) }.to_str().unwrap_or("")
+    };
+    let result = unsafe { &mut *engine }.generate_text_with_input(input_str, max_tokens as usize);
+    let json = serde_json::json!({
+        "text": result.text,
+        "num_tokens": result.num_tokens,
+        "eos_terminated": result.eos_terminated,
+    });
+    CString::new(json.to_string()).map_or(std::ptr::null_mut(), |c| c.into_raw())
+}
+
+/// Generate text using the full 20-channel embodied Broca pipeline.
+/// Returns richer output including coherence and veto data.
+/// Falls back to basic generate_text if broca-full is not compiled.
+///
+/// # Safety: `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn soma_engine_generate_embodied_text(
+    engine: *mut SomaEngine,
+) -> *mut c_char {
+    #[cfg(feature = "broca-full")]
+    {
+        let result = unsafe { &mut *engine }.generate_embodied_text();
+        let json = serde_json::json!({
+            "text": result.text,
+            "num_tokens": result.num_tokens,
+            "eos_terminated": result.eos_terminated,
+            "veto_triggered": result.veto_triggered,
+            "coherence": result.final_coherence,
+            "hallucination_flag": result.hallucination_flag,
+        });
+        CString::new(json.to_string()).map_or(std::ptr::null_mut(), |c| c.into_raw())
+    }
+    #[cfg(not(feature = "broca-full"))]
+    {
+        // Fall back to basic generation with 12 tokens
+        soma_engine_generate_text(engine, 12)
+    }
 }
 
 /// # Safety: `engine` must be valid.

@@ -149,8 +149,8 @@ impl BartBenchmark {
                 .copied()
                 .unwrap_or(0.5);
 
-            // FEP modulates target by +/- 20%
-            let fep_adjustment = (fep_pump_prob - 0.5) * 0.4;
+            // FEP modulates target by +/- 12%
+            let fep_adjustment = (fep_pump_prob - 0.5) * 0.24;
             let adjusted_target = ((target_pumps as f64 * (1.0 + fep_adjustment)).round() as usize)
                 .max(1)
                 .min(max_pumps);
@@ -159,9 +159,9 @@ impl BartBenchmark {
             rng_state ^= rng_state << 13;
             rng_state ^= rng_state >> 7;
             rng_state ^= rng_state << 17;
-            // Time pressure: base noise 7 pumps; +6/unit widens decision jitter, modeling impulsive
+            // Time pressure: base noise 4 pumps; +6/unit widens decision jitter, modeling impulsive
             // pump-to-target estimation under urgency (Lejuez et al., 2002 BART; Heitz, 2014 SAT).
-            let noise_range = 9 + (config.time_pressure * 6.0) as u64;
+            let noise_range = 6 + (config.time_pressure * 6.0) as u64;
             let noise = (rng_state % noise_range) as i64 - (noise_range as i64 / 2);
             let final_target = (adjusted_target as i64 + noise)
                 .max(1)

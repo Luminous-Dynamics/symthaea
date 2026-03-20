@@ -44,3 +44,6 @@ pub use dispatch_loop::{run_dispatch_loop, GovernanceDispatchCommand};
 pub use dispatcher::{FinanceDispatcher, GovernanceDispatcher};
 pub use error::{BridgeError, Result};
 pub use types::{BalanceResponse, FeeTierResponse, TendBalanceResponse};
+
+// Re-export holochain_client types used in integration tests.
+pub use holochain_client::{AdminWebsocket, IssueAppAuthenticationTokenPayload};

@@ -176,19 +176,19 @@ impl PsychBenchmark for ToleranceWithdrawalBenchmark {
             let (tolerance, sensitivity_ratio, withdrawal, peak_sens) = run_protocol(proto);
 
             result.insert(
-                &format!("{}_tolerance_detected", proto.name),
+                format!("{}_tolerance_detected", proto.name),
                 MetricValue::from_samples(&[if tolerance { 1.0 } else { 0.0 }]),
             );
             result.insert(
-                &format!("{}_sensitivity_ratio", proto.name),
+                format!("{}_sensitivity_ratio", proto.name),
                 MetricValue::from_samples(&[sensitivity_ratio as f64]),
             );
             result.insert(
-                &format!("{}_withdrawal_detected", proto.name),
+                format!("{}_withdrawal_detected", proto.name),
                 MetricValue::from_samples(&[if withdrawal { 1.0 } else { 0.0 }]),
             );
             result.insert(
-                &format!("{}_withdrawal_peak_sensitivity", proto.name),
+                format!("{}_withdrawal_peak_sensitivity", proto.name),
                 MetricValue::from_samples(&[peak_sens as f64]),
             );
 

@@ -27,6 +27,7 @@ pub struct VisualSearchBenchmark;
 impl VisualSearchBenchmark {
     /// Run a single visual search trial.
     /// Returns (feature_accs_by_size, conjunction_accs_by_size, feature_rts_by_size, conjunction_rts_by_size).
+    #[allow(clippy::type_complexity)]
     fn run_trial(
         &self,
         config: &BenchmarkConfig,
@@ -106,7 +107,7 @@ impl VisualSearchBenchmark {
 
                 // Feature search RT: constant across set sizes (parallel processing;
                 // Treisman & Gelade, 1980). Base 3 ticks + small noise.
-                let feat_rt = 3.0 + (1.0 - max_feat_sim.min(1.0).max(0.0)) * 2.0;
+                let feat_rt = 3.0 + (1.0 - max_feat_sim.clamp(0.0, 1.0)) * 2.0;
                 feat_rts[si].push(feat_rt);
 
                 let feat_ev = (max_feat_sim - threshold) / temperature;

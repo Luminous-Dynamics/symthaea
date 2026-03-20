@@ -220,7 +220,9 @@ fn run_condition(
         };
         let stats = &mut phase_stats[phase_idx];
 
-        stats.consciousness_levels.push(m.consciousness_level);
+        stats
+            .consciousness_levels
+            .push(m.consciousness.consciousness_level);
         stats.anomaly_scores.push(m.ethics.moral_anomaly_score);
 
         if m.ethics.moral_value_inversion {
@@ -243,7 +245,7 @@ fn run_condition(
             phase: phase.name(),
             cycle,
             condition: label,
-            consciousness_level: m.consciousness_level,
+            consciousness_level: m.consciousness.consciousness_level,
             anomaly_score: m.ethics.moral_anomaly_score,
             drift_alert: m.ethics.moral_drift_alert,
             response_applied: m.ethics.moral_anomaly_response_applied,
@@ -257,7 +259,7 @@ fn run_condition(
                 "  [{label}] {}/{TOTAL_CYCLES} cycles (phase: {}, consciousness: {:.4}, anomaly_score: {:.4})",
                 cycle + 1,
                 phase.name(),
-                m.consciousness_level,
+                m.consciousness.consciousness_level,
                 m.ethics.moral_anomaly_score,
             );
         }

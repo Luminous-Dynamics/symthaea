@@ -189,7 +189,12 @@ impl LayerExtractor {
         let is_safetensors = Self::is_safetensors_file(&weights_path)?;
 
         let vb = if is_safetensors {
-            super::model_integrity::verified_mmap_safetensors(&[weights_path], DType::F32, &device, None)?
+            super::model_integrity::verified_mmap_safetensors(
+                &[weights_path],
+                DType::F32,
+                &device,
+                None,
+            )?
         } else {
             VarBuilder::from_pth(&weights_path, DType::F32, &device)?
         };

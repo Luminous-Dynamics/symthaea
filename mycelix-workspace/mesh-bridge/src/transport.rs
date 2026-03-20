@@ -204,6 +204,13 @@ impl MeshTransport for BatmanTransport {
 // =============================================================================
 
 /// Create transport based on available features and environment.
+///
+/// Set `MESH_TRANSPORT` to one of:
+///   - `loopback` (default) — in-memory testing
+///   - `lora` — direct SX1276 SPI (feature: `lora`)
+///   - `batman` — B.A.T.M.A.N. UDP mesh (feature: `batman`)
+///   - `meshtastic` — Meshtastic device via serial/TCP (feature: `meshtastic`)
+///   - `mqtt` — MQTT broker gateway (feature: `mqtt`)
 pub fn create_transport() -> Result<Box<dyn MeshTransport>> {
     // Check env for transport preference
     let transport_type = std::env::var("MESH_TRANSPORT").unwrap_or_else(|_| "loopback".into());
@@ -224,8 +231,22 @@ pub fn create_transport() -> Result<Box<dyn MeshTransport>> {
             let transport = rt.block_on(BatmanTransport::new(9735, 9735))?;
             Ok(Box::new(transport))
         }
+        "meshtastic" => {
+            let config = crate::meshtastic::MeshtasticConfig::from_env();
+            let transport = crate::meshtastic::MeshtasticTransport::new(config)?;
+            Ok(Box::new(transport))
+        }
+        #[cfg(feature = "mqtt")]
+        "mqtt" => {
+            let config = crate::mqtt::MqttConfig::from_env();
+            let rt = tokio::runtime::Handle::current();
+            let transport = rt.block_on(crate::mqtt::MqttTransport::new(config))?;
+            Ok(Box::new(transport))
+        }
         _ => {
-            tracing::info!("Using loopback transport (set MESH_TRANSPORT=lora|batman for real mesh)");
+            tracing::info!(
+                "Using loopback transport (set MESH_TRANSPORT=lora|batman|meshtastic|mqtt for real mesh)"
+            );
             Ok(Box::new(LoopbackTransport::new()))
         }
     }

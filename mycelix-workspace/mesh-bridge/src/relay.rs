@@ -5,14 +5,16 @@
 //! as zome calls on the local Holochain conductor.
 
 use crate::serializer::{
-    self, CareCircleRelay, EmergencyRelay, FoodRelay, HearthAlertRelay, KnowledgeClaimRelay,
-    MutualAidRelay, PriceReportRelay, RelayPayload, RelayType, ShelterRelay, SupplyRelay,
-    TendRelay, WaterAlertRelay,
+    self, CareCircleRelay, ConsciousnessDeltaRelay, EmergencyRelay, FoodRelay, HearthAlertRelay,
+    KnowledgeClaimRelay, MutualAidRelay, PriceReportRelay, RelayPayload, RelayType,
+    ResourceForecastRelay, SensorReadingRelay, ShelterRelay, SupplyRelay, TendRelay,
+    ThreatSignatureRelay, WaterAlertRelay,
 };
 use crate::transport::MeshTransport;
 use crate::BridgeMetrics;
 use anyhow::Result;
-use holochain_client::{AgentSigner, AppWebsocket, ClientAgentSigner, ExternIO, ZomeCallTarget};
+use holochain_client::{AgentSigner, AppWebsocket, ClientAgentSigner, ZomeCallTarget};
+use holochain_types::prelude::ExternIO;
 use crate::dedup_cache::LruBinaryCache;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::Ordering;
@@ -319,6 +321,11 @@ fn cleanup_stale(reassembly: &mut HashMap<[u8; 4], ReassemblyBuffer>) {
     }
 }
 
+/// Encode a value as ExternIO, converting the error to anyhow.
+fn encode_extern_io<T: serde::Serialize + std::fmt::Debug>(val: T) -> Result<ExternIO> {
+    ExternIO::encode(val).map_err(|e| anyhow::anyhow!("{e}"))
+}
+
 /// Connect to the local Holochain conductor for replay.
 async fn connect_conductor(conductor_url: &str) -> Result<AppWebsocket> {
     let token: Vec<u8> = std::env::var("MESH_APP_TOKEN")
@@ -326,7 +333,9 @@ async fn connect_conductor(conductor_url: &str) -> Result<AppWebsocket> {
         .into_bytes();
     let signer: Arc<dyn AgentSigner + Send + Sync> =
         Arc::new(ClientAgentSigner::default());
-    let ws = AppWebsocket::connect(conductor_url, token, signer).await?;
+    let ws = AppWebsocket::connect(conductor_url, token, signer)
+        .await
+        .map_err(|e| anyhow::anyhow!("{e:?}"))?;
     Ok(ws)
 }
 
@@ -361,7 +370,7 @@ async fn replay_payload(
                 tend.hours
             );
 
-            let input = ExternIO::encode(serde_json::json!({
+            let input = encode_extern_io(serde_json::json!({
                 "receiver_did": tend.receiver_did,
                 "hours": tend.hours,
                 "service_description": tend.service_description,
@@ -374,7 +383,7 @@ async fn replay_payload(
                 "record_exchange".into(),
                 input,
             )
-            .await?;
+            .await.map_err(|e| anyhow::anyhow!("{e:?}"))?;
         }
         RelayType::FoodHarvest => {
             let food: FoodRelay = bincode::deserialize(&payload.data)?;
@@ -384,7 +393,7 @@ async fn replay_payload(
                 food.quality
             );
 
-            let input = ExternIO::encode(serde_json::json!({
+            let input = encode_extern_io(serde_json::json!({
                 "quantity_kg": food.quantity_kg,
                 "quality": food.quality,
                 "notes": "relayed via mesh",
@@ -395,7 +404,7 @@ async fn replay_payload(
                 "record_harvest".into(),
                 input,
             )
-            .await?;
+            .await.map_err(|e| anyhow::anyhow!("{e:?}"))?;
         }
         RelayType::EmergencyMessage => {
             let emergency: EmergencyRelay = bincode::deserialize(&payload.data)?;
@@ -405,7 +414,7 @@ async fn replay_payload(
                 &emergency.content[..emergency.content.len().min(50)]
             );
 
-            let input = ExternIO::encode(serde_json::json!({
+            let input = encode_extern_io(serde_json::json!({
                 "channel_id": emergency.channel_id,
                 "content": emergency.content,
                 "priority": emergency.priority,
@@ -416,83 +425,164 @@ async fn replay_payload(
                 "send_message".into(),
                 input,
             )
-            .await?;
+            .await.map_err(|e| anyhow::anyhow!("{e:?}"))?;
         }
         RelayType::WaterAlert => {
             let water: WaterAlertRelay = bincode::deserialize(&payload.data)?;
             tracing::info!("Replaying water alert: {} — {}", water.system_id, water.severity);
-            let input = ExternIO::encode(serde_json::json!({
+            let input = encode_extern_io(serde_json::json!({
                 "system_id": water.system_id, "alert_type": water.alert_type,
                 "severity": water.severity, "description": water.description,
             }))?;
             ws.call_zome(ZomeCallTarget::RoleName("commons_care".to_string().into()),
-                "water_purity".into(), "raise_alert".into(), input).await?;
+                "water_purity".into(), "raise_alert".into(), input).await.map_err(|e| anyhow::anyhow!("{e:?}"))?;
         }
         RelayType::HearthAlert => {
             let hearth: HearthAlertRelay = bincode::deserialize(&payload.data)?;
             tracing::info!("Replaying hearth alert: {}", hearth.hearth_id);
-            let input = ExternIO::encode(serde_json::json!({
+            let input = encode_extern_io(serde_json::json!({
                 "hearth_id": hearth.hearth_id, "alert_type": hearth.alert_type, "message": hearth.message,
             }))?;
             ws.call_zome(ZomeCallTarget::RoleName("hearth".to_string().into()),
-                "hearth_emergency".into(), "raise_alert".into(), input).await?;
+                "hearth_emergency".into(), "raise_alert".into(), input).await.map_err(|e| anyhow::anyhow!("{e:?}"))?;
         }
         RelayType::KnowledgeClaim => {
             let claim: KnowledgeClaimRelay = bincode::deserialize(&payload.data)?;
             tracing::info!("Replaying knowledge claim: {}...", &claim.claim_text[..claim.claim_text.len().min(40)]);
-            let input = ExternIO::encode(serde_json::json!({
+            let input = encode_extern_io(serde_json::json!({
                 "claim_text": claim.claim_text, "tags": claim.tags,
                 "empirical": claim.empirical, "normative": claim.normative, "materiality": claim.materiality,
             }))?;
             ws.call_zome(ZomeCallTarget::RoleName("knowledge".to_string().into()),
-                "claims".into(), "submit_claim".into(), input).await?;
+                "claims".into(), "submit_claim".into(), input).await.map_err(|e| anyhow::anyhow!("{e:?}"))?;
         }
         RelayType::CareCircleUpdate => {
             let circle: CareCircleRelay = bincode::deserialize(&payload.data)?;
             tracing::info!("Replaying care circle update: {}", circle.circle_id);
-            let input = ExternIO::encode(serde_json::json!({
+            let input = encode_extern_io(serde_json::json!({
                 "circle_id": circle.circle_id, "update_type": circle.update_type, "details": circle.details,
             }))?;
             ws.call_zome(ZomeCallTarget::RoleName("commons_care".to_string().into()),
-                "care_circles".into(), "post_update".into(), input).await?;
+                "care_circles".into(), "post_update".into(), input).await.map_err(|e| anyhow::anyhow!("{e:?}"))?;
         }
         RelayType::ShelterUpdate => {
             let shelter: ShelterRelay = bincode::deserialize(&payload.data)?;
             tracing::info!("Replaying shelter update: unit {}", shelter.unit_id);
-            let input = ExternIO::encode(serde_json::json!({
+            let input = encode_extern_io(serde_json::json!({
                 "unit_id": shelter.unit_id, "status": shelter.status, "bedrooms": shelter.bedrooms,
             }))?;
             ws.call_zome(ZomeCallTarget::RoleName("commons_care".to_string().into()),
-                "housing_units".into(), "update_status".into(), input).await?;
+                "housing_units".into(), "update_status".into(), input).await.map_err(|e| anyhow::anyhow!("{e:?}"))?;
         }
         RelayType::SupplyUpdate => {
             let supply: SupplyRelay = bincode::deserialize(&payload.data)?;
             tracing::info!("Replaying supply update: {} ({})", supply.item_name, supply.quantity);
-            let input = ExternIO::encode(serde_json::json!({
+            let input = encode_extern_io(serde_json::json!({
                 "item_id": supply.item_id, "item_name": supply.item_name,
                 "quantity": supply.quantity, "category": supply.category,
             }))?;
             ws.call_zome(ZomeCallTarget::RoleName("supplychain".to_string().into()),
-                "inventory_coordinator".into(), "update_stock".into(), input).await?;
+                "inventory_coordinator".into(), "update_stock".into(), input).await.map_err(|e| anyhow::anyhow!("{e:?}"))?;
         }
         RelayType::MutualAidOffer => {
             let aid: MutualAidRelay = bincode::deserialize(&payload.data)?;
             tracing::info!("Replaying mutual aid {}: {}", aid.offer_type, aid.title);
-            let input = ExternIO::encode(serde_json::json!({
+            let input = encode_extern_io(serde_json::json!({
                 "title": aid.title, "description": aid.description, "category": aid.category,
             }))?;
             let fn_name = if aid.offer_type == "Request" { "create_service_request" } else { "create_service_offer" };
             ws.call_zome(ZomeCallTarget::RoleName("commons_care".to_string().into()),
-                "mutualaid_timebank".into(), fn_name.into(), input).await?;
+                "mutualaid_timebank".into(), fn_name.into(), input).await.map_err(|e| anyhow::anyhow!("{e:?}"))?;
         }
         RelayType::PriceReport => {
             let price: PriceReportRelay = bincode::deserialize(&payload.data)?;
             tracing::info!("Replaying price report: {} = {} TEND", price.item_name, price.price_tend);
-            let input = ExternIO::encode(serde_json::json!({
+            let input = encode_extern_io(serde_json::json!({
                 "item_name": price.item_name, "price_tend": price.price_tend, "evidence": price.evidence,
             }))?;
             ws.call_zome(ZomeCallTarget::RoleName("finance".to_string().into()),
-                "price_oracle".into(), "report_price".into(), input).await?;
+                "price_oracle".into(), "report_price".into(), input).await.map_err(|e| anyhow::anyhow!("{e:?}"))?;
+        }
+        RelayType::SensorReading => {
+            let sensor: SensorReadingRelay = bincode::deserialize(&payload.data)?;
+            tracing::info!(
+                "Replaying sensor reading: {} = {} {}",
+                sensor.sensor_id,
+                sensor.value,
+                sensor.unit
+            );
+            let input = encode_extern_io(serde_json::json!({
+                "sensor_id": sensor.sensor_id,
+                "resource_type": sensor.resource_type,
+                "value": sensor.value,
+                "unit": sensor.unit,
+            }))?;
+            ws.call_zome(
+                ZomeCallTarget::RoleName("commons_care".to_string().into()),
+                "resource_mesh".into(),
+                "record_sensor_reading".into(),
+                input,
+            )
+            .await.map_err(|e| anyhow::anyhow!("{e:?}"))?;
+        }
+        RelayType::ConsciousnessDelta => {
+            let delta: ConsciousnessDeltaRelay = bincode::deserialize(&payload.data)?;
+            tracing::info!(
+                "Received consciousness delta: phi={:.3}, level={:.3}, cycle={}",
+                delta.phi,
+                delta.consciousness_level,
+                delta.cycle
+            );
+            // Consciousness deltas are consumed locally by the Symthaea daemon
+            // (if running), not replayed as zome calls. Log for telemetry.
+        }
+        RelayType::ResourceForecast => {
+            let forecast: ResourceForecastRelay = bincode::deserialize(&payload.data)?;
+            tracing::info!(
+                "Replaying resource forecast: {} — rate={:.2}/h, horizon={}h, conf={:.2}",
+                forecast.resource_type,
+                forecast.predicted_rate,
+                forecast.horizon_hours,
+                forecast.confidence
+            );
+            let input = encode_extern_io(serde_json::json!({
+                "resource_type": forecast.resource_type,
+                "horizon_hours": forecast.horizon_hours,
+                "predicted_rate": forecast.predicted_rate,
+                "confidence": forecast.confidence,
+            }))?;
+            ws.call_zome(
+                ZomeCallTarget::RoleName("commons_care".to_string().into()),
+                "resource_mesh".into(),
+                "publish_forecast".into(),
+                input,
+            )
+            .await.map_err(|e| anyhow::anyhow!("{e:?}"))?;
+        }
+        RelayType::ThreatSignature => {
+            let threat: ThreatSignatureRelay = bincode::deserialize(&payload.data)?;
+            tracing::warn!(
+                "Received threat signature: type={}, severity={:.2}, observations={}",
+                threat.threat_type,
+                threat.severity,
+                threat.observation_count
+            );
+            // Threat signatures are consumed locally by the Symthaea immune system.
+            // If a conductor bridge exists, we could also record them for audit:
+            let input = encode_extern_io(serde_json::json!({
+                "threat_type": threat.threat_type,
+                "severity": threat.severity,
+                "agent_hash": hex::encode(threat.agent_hash),
+                "observation_count": threat.observation_count,
+            }))?;
+            // Best-effort: some deployments may not have this zome
+            let _ = ws.call_zome(
+                ZomeCallTarget::RoleName("civic".to_string().into()),
+                "emergency_coordination".into(),
+                "record_threat_observation".into(),
+                input,
+            )
+            .await;
         }
         RelayType::Heartbeat => unreachable!(), // handled above
     }

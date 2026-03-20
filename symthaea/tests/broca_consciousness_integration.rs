@@ -427,3 +427,204 @@ fn test_checkpoint_roundtrip_preserves_generation() {
 
     let _ = std::fs::remove_file(&path);
 }
+
+// ============================================================================
+// Per-backend gating: MambaGatingOverrides scale epistemic/emotional gates
+// ============================================================================
+
+#[test]
+fn test_mamba_gating_overrides_default_scale() {
+    use symthaea_broca::gating::MambaGatingOverrides;
+
+    // Without overrides: all scales = 1.0
+    let config = GatingConfig::default();
+    assert_eq!(config.mamba_epistemic_scale(), 1.0);
+    assert_eq!(config.mamba_emotional_scale(), 1.0);
+    assert_eq!(config.mamba_veto_threshold_scale(), 1.0);
+
+    // With overrides: custom scales
+    let config = GatingConfig::with_mamba_overrides();
+    assert!((config.mamba_epistemic_scale() - 0.6).abs() < 1e-6);
+    assert!((config.mamba_emotional_scale() - 0.5).abs() < 1e-6);
+    assert!((config.mamba_veto_threshold_scale() - 1.5).abs() < 1e-6);
+
+    // Overrides are serializable
+    let overrides = MambaGatingOverrides::default();
+    let json = serde_json::to_string(&overrides).unwrap();
+    let decoded: MambaGatingOverrides = serde_json::from_str(&json).unwrap();
+    assert!((decoded.epistemic_scale - 0.6).abs() < 1e-6);
+}
+
+#[test]
+fn test_epistemic_gate_apply_scaled_reduces_effect() {
+    use symthaea_broca::gating::EpistemicGate;
+    use symthaea_broca::tokenizer::BpeTokenizer;
+
+    let tokenizer = BpeTokenizer::new(&test_genesis(), 4096);
+    let config = GatingConfig::default();
+    let gate = EpistemicGate::new(&tokenizer, &config);
+
+    let vocab_size = tokenizer.vocab_size();
+    let epistemic = 3.0; // Unknown
+
+    // Apply at full scale
+    let mut logits_full = vec![0.0f32; vocab_size];
+    gate.apply_scaled(&mut logits_full, epistemic, 0.0, 1.0);
+
+    // Apply at 0.5 scale (Mamba-like)
+    let mut logits_half = vec![0.0f32; vocab_size];
+    gate.apply_scaled(&mut logits_half, epistemic, 0.0, 0.5);
+
+    // Both should modify logits
+    let full_modified: f32 = logits_full.iter().map(|l| l.abs()).sum();
+    let half_modified: f32 = logits_half.iter().map(|l| l.abs()).sum();
+
+    assert!(full_modified > 0.0, "full scale should modify logits");
+    assert!(half_modified > 0.0, "half scale should modify logits");
+    // Half scale should produce roughly half the total modification
+    assert!(
+        (half_modified / full_modified - 0.5).abs() < 0.05,
+        "half scale should be ~50% of full, got {:.3}",
+        half_modified / full_modified,
+    );
+}
+
+// ============================================================================
+// Orthogonality regularization: decorrelates w_up rows
+// ============================================================================
+
+#[test]
+fn test_orthogonality_gradients_produce_nonzero_gradients() {
+    use symthaea_broca::projection::HdcSsmProjection;
+
+    let genesis = test_genesis();
+    let mut proj = HdcSsmProjection::new(&genesis, 16384, 256, 768);
+
+    // Before orthogonality: gradients are zero
+    let weights_before = proj.flatten_weights();
+
+    // Compute orthogonality gradients
+    proj.compute_orthogonality_gradients(0.05, 64);
+
+    // Apply with LR=1.0 to make the effect visible
+    let _metrics = proj.apply_gradients(1.0, 100.0);
+
+    let weights_after = proj.flatten_weights();
+
+    // Weights should have changed
+    let diff: f32 = weights_before
+        .iter()
+        .zip(weights_after.iter())
+        .map(|(a, b)| (a - b).abs())
+        .sum();
+    assert!(
+        diff > 0.0,
+        "orthogonality gradients should change w_up weights"
+    );
+}
+
+// ============================================================================
+// BrocaManager: consciousness signal flow (requires ssm_language feature)
+// ============================================================================
+
+#[test]
+#[cfg(feature = "ssm_language")]
+fn test_broca_manager_signal_flow() {
+    // Test the full BrocaManager pipeline without checkpoints
+    use symthaea::cognitive_loop::broca_bridge::{BrocaConsciousnessSignals, BrocaManager};
+
+    let genesis = test_genesis();
+    let config = BrocaConfig {
+        sampling: SamplingStrategy::Greedy,
+        enable_epistemic_gate: true,
+        enable_emotional_modulation: true,
+        enable_coherence_feedback: true,
+        enable_consciousness_gating: true,
+        ..Default::default()
+    };
+
+    let mut manager = BrocaManager::new(&genesis, config, None);
+
+    // High consciousness → should generate
+    let signals = BrocaConsciousnessSignals {
+        epistemic_confidence: 0.8,
+        emotional_valence: 0.3,
+        emotional_arousal: 0.4,
+        emotional_warmth: 0.7,
+        consciousness_level: 0.8,
+        meta_awareness: 0.6,
+        coherence: 0.7,
+        knowledge_grounding: 0.5,
+        ethics_blocked: false,
+        ..Default::default()
+    };
+
+    let result = manager.generate(signals);
+    assert!(result.is_some(), "high consciousness should generate");
+
+    let gen_result = result.unwrap();
+    assert!(gen_result.num_tokens > 0);
+
+    // Telemetry should be populated
+    let telem = manager.last_telemetry();
+    assert!(telem.generated);
+    assert!(!telem.consciousness_gated);
+    assert!(telem.generation_time_us > 0);
+
+    // Low consciousness → should NOT generate
+    let low_signals = BrocaConsciousnessSignals {
+        consciousness_level: 0.01,
+        ..Default::default()
+    };
+    let result = manager.generate(low_signals);
+    assert!(result.is_none(), "low consciousness should be gated");
+    assert!(manager.last_telemetry().consciousness_gated);
+
+    // Ethics blocked → should NOT generate
+    let ethics_signals = BrocaConsciousnessSignals {
+        consciousness_level: 0.9,
+        ethics_blocked: true,
+        ..Default::default()
+    };
+    let result = manager.generate(ethics_signals);
+    assert!(result.is_none(), "ethics block should prevent generation");
+    assert!(manager.last_telemetry().ethics_gated);
+}
+
+#[test]
+#[cfg(feature = "ssm_language")]
+fn test_broca_manager_multi_turn_context() {
+    use symthaea::cognitive_loop::broca_bridge::{BrocaConsciousnessSignals, BrocaManager};
+
+    let genesis = test_genesis();
+    let config = BrocaConfig {
+        sampling: SamplingStrategy::Greedy,
+        ..Default::default()
+    };
+
+    let mut manager = BrocaManager::new(&genesis, config, None);
+    manager.set_multi_turn_depth(3);
+
+    let signals = BrocaConsciousnessSignals {
+        consciousness_level: 0.8,
+        epistemic_confidence: 0.7,
+        ..Default::default()
+    };
+
+    // First generation: fresh state
+    let r1 = manager.generate(signals.clone()).unwrap();
+
+    // Second generation: continuing (CfC state preserved)
+    let r2 = manager.generate(signals.clone()).unwrap();
+
+    // Both should produce output
+    assert!(r1.num_tokens > 0);
+    assert!(r2.num_tokens > 0);
+
+    // Inject conversation context
+    manager.inject_conversation_context(&[
+        "Hello, how are you?".to_string(),
+        "I'm doing well, thanks for asking.".to_string(),
+    ]);
+    assert_eq!(manager.context_depth(), 2);
+}

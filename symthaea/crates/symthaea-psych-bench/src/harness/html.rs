@@ -8,6 +8,10 @@
 //!
 //! No external dependencies — pure `format!()` / `write!()` HTML generation.
 
+// HTML generation intentionally uses write!(...\n) to embed newlines inline with
+// multi-line format strings. Converting all to writeln! would reduce readability.
+#![allow(clippy::write_with_newline)]
+
 use super::cross_domain_prediction::CrossDomainMatrix;
 use super::normative_comparison::NormativeReport;
 use super::psychometric_report::PsychometricReport;
@@ -21,6 +25,7 @@ use std::fmt::Write;
 ///
 /// SAT curves and reliability data require pre-computation that can't be
 /// derived from `BenchmarkReport` alone, so they're provided separately.
+#[derive(Default)]
 pub struct ReportOptions<'a> {
     /// Include LLM baseline comparison columns.
     pub include_llm: bool,
@@ -28,16 +33,6 @@ pub struct ReportOptions<'a> {
     pub sat_curves: Option<&'a [SatCurve]>,
     /// Pre-computed reliability battery (from `ReliabilityBattery`).
     pub reliability: Option<&'a ReliabilityBattery>,
-}
-
-impl<'a> Default for ReportOptions<'a> {
-    fn default() -> Self {
-        Self {
-            include_llm: false,
-            sat_curves: None,
-            reliability: None,
-        }
-    }
 }
 
 /// Generate a self-contained HTML report from benchmark results.
@@ -171,7 +166,7 @@ fn write_profile_radar(html: &mut String, report: &BenchmarkReport) {
     }
 
     // Axes
-    for i in 0..n {
+    for (i, domain) in domains.iter().enumerate() {
         let angle = std::f64::consts::TAU * i as f64 / n as f64 - std::f64::consts::FRAC_PI_2;
         let x = cx + radius * angle.cos();
         let y = cy + radius * angle.sin();
@@ -195,7 +190,7 @@ fn write_profile_radar(html: &mut String, report: &BenchmarkReport) {
         let _ = write!(
             html,
             "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"{}\" font-size=\"11\" fill=\"#555\">{}</text>\n",
-            lx, ly + 4.0, anchor, escape_html(domains[i].0),
+            lx, ly + 4.0, anchor, escape_html(domain.0),
         );
     }
 
@@ -230,14 +225,14 @@ fn write_profile_radar(html: &mut String, report: &BenchmarkReport) {
         );
     }
 
-    let _ = write!(html, "</svg>\n</div>\n");
+    let _ = writeln!(html, "</svg>\n</div>");
 }
 
 fn write_domain_tables(html: &mut String, report: &BenchmarkReport, include_llm: bool) {
     use crate::harness::baselines::BaselineCollection;
     let bl = BaselineCollection::all();
 
-    let _ = write!(html, "<h2>Results by Domain</h2>\n");
+    let _ = writeln!(html, "<h2>Results by Domain</h2>");
 
     // Group by domain
     let mut domains: BTreeMap<String, Vec<usize>> = BTreeMap::new();
@@ -251,7 +246,7 @@ fn write_domain_tables(html: &mut String, report: &BenchmarkReport, include_llm:
         if include_llm {
             let _ = write!(html, "<th>LLM (GPT-4)</th><th>LLM %</th>");
         }
-        let _ = write!(html, "</tr>\n");
+        let _ = writeln!(html, "</tr>");
 
         for &i in indices {
             let result = &report.results[i];
@@ -319,9 +314,9 @@ fn write_domain_tables(html: &mut String, report: &BenchmarkReport, include_llm:
                 let _ = write!(html, "<td>{}</td><td>{}</td>", llm_val, llm_pct);
             }
 
-            let _ = write!(html, "</tr>\n");
+            let _ = writeln!(html, "</tr>");
         }
-        let _ = write!(html, "</table>\n");
+        let _ = writeln!(html, "</table>");
     }
 }
 
@@ -428,7 +423,7 @@ fn write_forest_plot_svg(html: &mut String, report: &BenchmarkReport) {
         );
     }
 
-    let _ = write!(html, "</svg>\n</div>\n");
+    let _ = writeln!(html, "</svg>\n</div>");
 }
 
 fn write_composite_scores(html: &mut String, report: &BenchmarkReport) {
@@ -437,7 +432,7 @@ fn write_composite_scores(html: &mut String, report: &BenchmarkReport) {
         return;
     }
 
-    let _ = write!(html, "<h2>Composite Scores</h2>\n<table>\n<tr><th>Domain</th><th>Mean z</th><th>n</th><th>Benchmarks</th></tr>\n");
+    let _ = writeln!(html, "<h2>Composite Scores</h2>\n<table>\n<tr><th>Domain</th><th>Mean z</th><th>n</th><th>Benchmarks</th></tr>");
 
     for (domain, cs) in &composites {
         let z_class = if cs.mean_z > 0.5 {
@@ -458,7 +453,7 @@ fn write_composite_scores(html: &mut String, report: &BenchmarkReport) {
         );
     }
 
-    let _ = write!(html, "</table>\n");
+    let _ = writeln!(html, "</table>");
 }
 
 /// Write a citations/provenance table section into the HTML report.
@@ -667,7 +662,7 @@ pub fn write_sat_curves(html: &mut String, curves: &[SatCurve]) {
         }
     }
 
-    let _ = write!(html, "</svg>\n</div>\n");
+    let _ = writeln!(html, "</svg>\n</div>");
 }
 
 /// Write a test-retest reliability table section into the HTML report.
@@ -680,7 +675,7 @@ pub fn write_reliability_section(html: &mut String, battery: &ReliabilityBattery
         return;
     }
 
-    let _ = write!(html, "<h2>Test-Retest Reliability</h2>\n");
+    let _ = writeln!(html, "<h2>Test-Retest Reliability</h2>");
 
     // Summary stats
     let mean_icc: f64 =
@@ -729,7 +724,7 @@ pub fn write_reliability_section(html: &mut String, battery: &ReliabilityBattery
         );
     }
 
-    let _ = write!(html, "</table>\n");
+    let _ = writeln!(html, "</table>");
 }
 
 fn write_psychometric_summary(html: &mut String, report: &BenchmarkReport) {
@@ -758,7 +753,7 @@ fn write_psychometric_summary(html: &mut String, report: &BenchmarkReport) {
         "<strong>Weakest:</strong> {}",
         escape_html(&pr.summary.weakest_domain)
     );
-    let _ = write!(html, "</div>\n");
+    let _ = writeln!(html, "</div>");
 
     // Benchmark details table
     let _ = write!(
@@ -776,7 +771,7 @@ fn write_psychometric_summary(html: &mut String, report: &BenchmarkReport) {
             d.elapsed_ms,
         );
     }
-    let _ = write!(html, "</table>\n");
+    let _ = writeln!(html, "</table>");
 }
 
 fn write_normative_section(html: &mut String, report: &BenchmarkReport) {
@@ -798,7 +793,7 @@ fn write_normative_section(html: &mut String, report: &BenchmarkReport) {
         "<strong>Mean z:</strong> {:+.2} | <strong>Percentile:</strong> {:.1}%",
         normative.overall_mean_z, normative.overall_percentile,
     );
-    let _ = write!(html, "</div>\n");
+    let _ = writeln!(html, "</div>");
 
     let _ = write!(
         html,
@@ -826,7 +821,7 @@ fn write_normative_section(html: &mut String, report: &BenchmarkReport) {
             escape_html(&s.interpretation),
         );
     }
-    let _ = write!(html, "</table>\n");
+    let _ = writeln!(html, "</table>");
 }
 
 fn write_cross_domain_section(html: &mut String, report: &BenchmarkReport) {
@@ -839,7 +834,7 @@ fn write_cross_domain_section(html: &mut String, report: &BenchmarkReport) {
         return;
     }
 
-    let _ = write!(html, "<h2>Cross-Domain Correlations</h2>\n");
+    let _ = writeln!(html, "<h2>Cross-Domain Correlations</h2>");
     let _ = write!(
         html,
         "<table>\n<tr><th>Domain A</th><th>Domain B</th><th>r</th><th>N</th><th>p</th><th>Mechanism</th></tr>\n"
@@ -862,12 +857,12 @@ fn write_cross_domain_section(html: &mut String, report: &BenchmarkReport) {
             mech_str,
         );
     }
-    let _ = write!(html, "</table>\n");
+    let _ = writeln!(html, "</table>");
 
     // Shared mechanisms
     let shared = matrix.shared_mechanisms();
     if !shared.is_empty() {
-        let _ = write!(html, "<h3>Shared Mechanisms (Moderate+)</h3>\n<ul>\n");
+        let _ = writeln!(html, "<h3>Shared Mechanisms (Moderate+)</h3>\n<ul>");
         for c in &shared {
             let _ = write!(
                 html,
@@ -877,7 +872,7 @@ fn write_cross_domain_section(html: &mut String, report: &BenchmarkReport) {
                 c.r,
             );
         }
-        let _ = write!(html, "</ul>\n");
+        let _ = writeln!(html, "</ul>");
     }
 }
 

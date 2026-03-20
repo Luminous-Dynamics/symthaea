@@ -128,6 +128,26 @@ impl SemanticMemory {
     pub fn stats(&self) -> &SemanticStats {
         &self.stats
     }
+
+    /// Iterate over all stored entries with their slot indices (for checkpoint serialization).
+    pub fn iter_entries(&self) -> impl Iterator<Item = (usize, &SemanticEntry)> {
+        self.entries
+            .iter()
+            .enumerate()
+            .filter_map(|(i, slot)| slot.as_ref().map(|e| (i, e)))
+    }
+
+    /// Restore entries from a checkpoint. Overwrites existing entries at the given slot indices.
+    pub fn restore_entries(&mut self, entries: Vec<(usize, SemanticEntry)>) {
+        for (idx, entry) in entries {
+            if idx < self.entries.len() {
+                self.entries[idx] = Some(entry);
+                if idx >= self.count {
+                    self.count = idx + 1;
+                }
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -244,6 +264,19 @@ impl EpisodicMemory {
 
     pub fn clear(&mut self) {
         self.episodes.clear();
+    }
+
+    /// Iterate over all stored episodes (for checkpoint serialization).
+    pub fn iter_episodes(&self) -> impl Iterator<Item = &Episode> {
+        self.episodes.iter()
+    }
+
+    /// Restore episodes from a checkpoint, replacing all existing episodes.
+    pub fn restore_episodes(&mut self, episodes: Vec<Episode>) {
+        self.episodes = episodes;
+        if self.episodes.len() > self.max_episodes {
+            self.episodes.truncate(self.max_episodes);
+        }
     }
 }
 

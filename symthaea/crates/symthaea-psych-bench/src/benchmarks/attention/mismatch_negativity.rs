@@ -103,9 +103,7 @@ impl MismatchNegativityBenchmark {
         let mut hits_with_load = 0u32;
         let mut deviants_with_load = 0u32;
 
-        for diff_level in 0..num_difficulty_levels {
-            let deviant_proto = &deviant_prototypes[diff_level];
-
+        for deviant_proto in deviant_prototypes.iter().take(num_difficulty_levels) {
             // Run two conditions: without and with attentional load
             for load_condition in 0..2u32 {
                 let with_load = load_condition == 1;

@@ -401,6 +401,26 @@ impl CognitiveLoopService {
         result
     }
 
+    // ── FHE Collective Wisdom accessors ──────────────────────────────
+
+    /// Total encrypted contributions made to the FHE collective wisdom pool.
+    #[cfg(feature = "fhe-wisdom")]
+    pub fn fhe_contributions_total(&self) -> usize {
+        self.swarm_manager.fhe_contributions_total()
+    }
+
+    /// Total aggregations completed this session.
+    #[cfg(feature = "fhe-wisdom")]
+    pub fn fhe_aggregations_total(&self) -> usize {
+        self.swarm_manager.fhe_aggregations_total()
+    }
+
+    /// Current pending contributions in the wisdom pool.
+    #[cfg(feature = "fhe-wisdom")]
+    pub fn fhe_pool_count(&self) -> usize {
+        self.swarm_manager.wisdom_pool_count()
+    }
+
     /// Inject Pareto context from a GuidedDesignExplorer into the physics bridge.
     /// The context is drained into telemetry on the next cycle.
     #[cfg(feature = "physics-bridge")]
@@ -457,16 +477,19 @@ impl CognitiveLoopService {
     }
 
     /// Get the math service for dispatching mathematical queries.
+    #[cfg(feature = "mathematics")]
     pub fn math_service(&self) -> &super::super::math_service::MathService {
         &self.math_service
     }
 
     /// Get a mutable reference to the math service.
+    #[cfg(feature = "mathematics")]
     pub fn math_service_mut(&mut self) -> &mut super::super::math_service::MathService {
         &mut self.math_service
     }
 
     /// Get the math service telemetry.
+    #[cfg(feature = "mathematics")]
     pub fn math_telemetry(&self) -> &super::super::math_service::MathServiceTelemetry {
         self.math_service.telemetry()
     }
@@ -866,7 +889,9 @@ impl CognitiveLoopService {
 
     /// Whether shadow surfacing is indicated (diagnostic only).
     pub fn shadow_surfacing_indicated(&self) -> bool {
-        self.therapeutic_manager.shadow_detector.surfacing_indicated()
+        self.therapeutic_manager
+            .shadow_detector
+            .surfacing_indicated()
     }
 
     /// Shadow dream queue depth.

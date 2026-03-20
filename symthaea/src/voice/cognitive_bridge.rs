@@ -1274,7 +1274,7 @@ mod tests {
     #[test]
     fn test_therapeutic_intent_validate_warms() {
         let validate = make_therapeutic_pacing(0.0, 0.5, 0.0); // intent 0
-        let neutral = make_therapeutic_pacing(0.0, 0.5, 1.0);  // intent 1 (no match)
+        let neutral = make_therapeutic_pacing(0.0, 0.5, 1.0); // intent 1 (no match)
         let valence_val = validate.effective_pacing().emotional_valence;
         let valence_neutral = neutral.effective_pacing().emotional_valence;
         assert!(

@@ -14,11 +14,7 @@ use super::phase_results::{
     FbReasoning, FbSelfModel, FbSupport, FeedbackPhaseResult, PerceptionPhaseResult,
 };
 use super::thresholds::{
-    AGREEMENT_COHERENCE_VELOCITY_THRESHOLD, AGREEMENT_CONFIDENCE_COUPLING_SCALE, HARMONIC_INTERFERENCE_FREE_CYCLES,
-    LIMITING_BINDING_CONFIDENCE_DELTA, LIMITING_COMPONENT_GRADIENT_THRESHOLD,
-    NEUROMOD_ATTENTION_SENSITIVITY_MAX, PIPELINE_CONSCIOUSNESS_CAUTION,
-    PIPELINE_CONSCIOUSNESS_CAUTION_SCALE, PIPELINE_CONSCIOUSNESS_RELAX,
-    PIPELINE_CONSCIOUSNESS_RELAX_SCALE, SOCIAL_LR_CHANGE_THRESHOLD,
+    AGREEMENT_COHERENCE_VELOCITY_THRESHOLD, AGREEMENT_CONFIDENCE_COUPLING_SCALE,
     AGREEMENT_CONFIDENCE_COUPLING_THRESHOLD, AGREEMENT_CRITICAL_CAUTION_SCALE,
     AGREEMENT_CRITICAL_THRESHOLD, AGREEMENT_EMA_DECAY, AGREEMENT_HIGH_CONFIDENCE_SCALE,
     AGREEMENT_LOW_CONFIDENCE_SCALE, AGREEMENT_LOW_EXPLORATION_SCALE,
@@ -34,23 +30,26 @@ use super::thresholds::{
     EVOLUTION_NEGATIVE_EXPLORATION_MAX, EVOLUTION_NEGATIVE_EXPLORATION_SCALE,
     EVOLUTION_PHI_THRESHOLD, EVOLUTION_POSITIVE_CONFIDENCE_MAX,
     EVOLUTION_POSITIVE_CONFIDENCE_SCALE, HARMONIC_ALL_CLEAR_BOOST, HARMONIC_INTERFERENCE_DAMPEN,
-    HARMONIC_INTERFERENCE_MAX_COUNT, HARMONIC_INTERFERENCE_MAX_DAMPEN,
-    LOVE_RESONANCE_CONFIDENCE_SCALE, LOVE_RESONANCE_LR_FRACTION, LOVE_RESONANCE_THRESHOLD,
-    LOW_QUALITY_EXPLORATION_DAMPEN, PHI_DIVERGENCE_MAX, PHI_DIVERGENCE_SCALE,
+    HARMONIC_INTERFERENCE_FREE_CYCLES, HARMONIC_INTERFERENCE_MAX_COUNT,
+    HARMONIC_INTERFERENCE_MAX_DAMPEN, LIMITING_BINDING_CONFIDENCE_DELTA,
+    LIMITING_COMPONENT_GRADIENT_THRESHOLD, LOVE_RESONANCE_CONFIDENCE_SCALE,
+    LOVE_RESONANCE_LR_FRACTION, LOVE_RESONANCE_THRESHOLD, LOW_QUALITY_EXPLORATION_DAMPEN,
+    NEUROMOD_ATTENTION_SENSITIVITY_MAX, PHI_DIVERGENCE_MAX, PHI_DIVERGENCE_SCALE,
     PHI_DIVERGENCE_THRESHOLD, PHI_RELATIONAL_OXY_SCALE, PHI_RELATIONAL_OXY_THRESHOLD,
-    QUALITY_EMA_DECAY, QUALITY_HIGH_LR_SCALE, QUALITY_LR_CLAMP_MAX, QUALITY_LR_CLAMP_MIN,
-    REASONING_CHAIN_BOOST_SCALE, REASONING_CHAIN_CONFIDENCE_THRESHOLD, REST_BINDING_DAMPEN,
-    REST_COHERENCE_WEIGHT, REST_MODULATION_BINDING_FRAC, REST_MODULATION_COHERENCE_FRAC,
-    SOCIAL_LR_BASE, SOCIAL_LR_RANGE, SPEECH_RATE_CLAMP_MAX, SPEECH_RATE_CLAMP_MIN,
+    PIPELINE_CONSCIOUSNESS_CAUTION, PIPELINE_CONSCIOUSNESS_CAUTION_SCALE,
+    PIPELINE_CONSCIOUSNESS_RELAX, PIPELINE_CONSCIOUSNESS_RELAX_SCALE, QUALITY_EMA_DECAY,
+    QUALITY_HIGH_LR_SCALE, QUALITY_LR_CLAMP_MAX, QUALITY_LR_CLAMP_MIN, REASONING_CHAIN_BOOST_SCALE,
+    REASONING_CHAIN_CONFIDENCE_THRESHOLD, REST_BINDING_DAMPEN, REST_COHERENCE_WEIGHT,
+    REST_MODULATION_BINDING_FRAC, REST_MODULATION_COHERENCE_FRAC, SOCIAL_LR_BASE,
+    SOCIAL_LR_CHANGE_THRESHOLD, SOCIAL_LR_RANGE, SPEECH_RATE_CLAMP_MAX, SPEECH_RATE_CLAMP_MIN,
     STRUCTURAL_BOTTLENECK_LR_SCALE, STRUCTURAL_BOTTLENECK_THRESHOLD,
     STRUCTURAL_EMERGENCE_CONFIDENCE_BOOST, STRUCTURAL_EMERGENCE_CONFIDENCE_THRESHOLD,
     SUBSYSTEM_LR_FACTOR_MAX, SUBSYSTEM_LR_FACTOR_MIN, SUPPORT_GRADUATION_INTERVAL,
-    SUPPORT_TELEMETRY_INTERVAL, TEMPORAL_CHAIN_DEEP_LR_SCALE,
-    TEMPORAL_CHAIN_DEEP_THRESHOLD, TEMPORAL_CHAIN_SHALLOW_LR_SCALE,
-    TEMPORAL_CHAIN_SHALLOW_THRESHOLD, TOM_ACCURACY_HIGH, TOM_ACCURACY_LOW, TOM_ACCURACY_SCALE,
-    TRUST_DECAY_FACTOR, TRUST_SIGNAL_MIDPOINT, TRUST_SIGNAL_RATE,
-    UNIFIED_QUALITY_AGREEMENT_WEIGHT,
-    UNIFIED_QUALITY_ANOMALY_WEIGHT, UNIFIED_QUALITY_PREDICTION_WEIGHT,
+    SUPPORT_TELEMETRY_INTERVAL, TEMPORAL_CHAIN_DEEP_LR_SCALE, TEMPORAL_CHAIN_DEEP_THRESHOLD,
+    TEMPORAL_CHAIN_SHALLOW_LR_SCALE, TEMPORAL_CHAIN_SHALLOW_THRESHOLD, TOM_ACCURACY_HIGH,
+    TOM_ACCURACY_LOW, TOM_ACCURACY_SCALE, TRUST_DECAY_FACTOR, TRUST_SIGNAL_MIDPOINT,
+    TRUST_SIGNAL_RATE, UNIFIED_QUALITY_AGREEMENT_WEIGHT, UNIFIED_QUALITY_ANOMALY_WEIGHT,
+    UNIFIED_QUALITY_PREDICTION_WEIGHT,
 };
 use super::{CognitiveLoopService, CycleState};
 
@@ -337,47 +336,47 @@ impl CognitiveLoopService {
         }
 
         // ── Phase 20: Harmonic interferences → LR feedback ───────────────────
-        let harmonic_interference_lr_mod: f32 =
-            if harmonic_interferences > HARMONIC_INTERFERENCE_MAX_COUNT {
-                let dampen = ((harmonic_interferences - HARMONIC_INTERFERENCE_MAX_COUNT) as f32
-                    * HARMONIC_INTERFERENCE_DAMPEN)
-                    .min(HARMONIC_INTERFERENCE_MAX_DAMPEN);
-                self.carryover.learning.subsystem_lr_factor *= 1.0 - dampen;
+        let harmonic_interference_lr_mod: f32 = if harmonic_interferences
+            > HARMONIC_INTERFERENCE_MAX_COUNT
+        {
+            let dampen = ((harmonic_interferences - HARMONIC_INTERFERENCE_MAX_COUNT) as f32
+                * HARMONIC_INTERFERENCE_DAMPEN)
+                .min(HARMONIC_INTERFERENCE_MAX_DAMPEN);
+            self.carryover.learning.subsystem_lr_factor *= 1.0 - dampen;
+            self.carryover.learning.subsystem_lr_factor = self
+                .carryover
+                .learning
+                .subsystem_lr_factor
+                .clamp(SUBSYSTEM_LR_FACTOR_MIN, SUBSYSTEM_LR_FACTOR_MAX);
+            self.stats.harmonic_interference_mod_count += 1;
+            self.carryover.quality.interference_free_cycles = 0;
+            -dampen
+        } else if harmonic_interferences == 0 {
+            self.carryover.quality.interference_free_cycles = self
+                .carryover
+                .quality
+                .interference_free_cycles
+                .saturating_add(1);
+            // Session 13 Item 2: Grace period before harmonic all-clear boost.
+            // Require 3 consecutive interference-free cycles to prevent LR whiplash.
+            // Science: Kelso (1995) — stability requires sustained absence of perturbation.
+            if self.carryover.quality.interference_free_cycles >= HARMONIC_INTERFERENCE_FREE_CYCLES
+            {
+                self.carryover.learning.subsystem_lr_factor *= 1.0 + HARMONIC_ALL_CLEAR_BOOST;
                 self.carryover.learning.subsystem_lr_factor = self
                     .carryover
                     .learning
                     .subsystem_lr_factor
                     .clamp(SUBSYSTEM_LR_FACTOR_MIN, SUBSYSTEM_LR_FACTOR_MAX);
                 self.stats.harmonic_interference_mod_count += 1;
-                self.carryover.quality.interference_free_cycles = 0;
-                -dampen
-            } else if harmonic_interferences == 0 {
-                self.carryover.quality.interference_free_cycles = self
-                    .carryover
-                    .quality
-                    .interference_free_cycles
-                    .saturating_add(1);
-                // Session 13 Item 2: Grace period before harmonic all-clear boost.
-                // Require 3 consecutive interference-free cycles to prevent LR whiplash.
-                // Science: Kelso (1995) — stability requires sustained absence of perturbation.
-                if self.carryover.quality.interference_free_cycles
-                    >= HARMONIC_INTERFERENCE_FREE_CYCLES
-                {
-                    self.carryover.learning.subsystem_lr_factor *= 1.0 + HARMONIC_ALL_CLEAR_BOOST;
-                    self.carryover.learning.subsystem_lr_factor = self
-                        .carryover
-                        .learning
-                        .subsystem_lr_factor
-                        .clamp(SUBSYSTEM_LR_FACTOR_MIN, SUBSYSTEM_LR_FACTOR_MAX);
-                    self.stats.harmonic_interference_mod_count += 1;
-                    HARMONIC_ALL_CLEAR_BOOST
-                } else {
-                    0.0
-                }
+                HARMONIC_ALL_CLEAR_BOOST
             } else {
-                self.carryover.quality.interference_free_cycles = 0;
                 0.0
-            };
+            }
+        } else {
+            self.carryover.quality.interference_free_cycles = 0;
+            0.0
+        };
 
         // ── Social trust → learning rate modulation (Decety & Chaminade 2003) ──
         let social_learning_rate_factor =
@@ -490,13 +489,21 @@ impl CognitiveLoopService {
         // Low pipeline consciousness → tighten caution (subsystems aren't coherent).
         // Science: Dehaene (2014) — global workspace ignition requires integrated processing.
         self.carryover.quality.last_pipeline_consciousness = pipeline_consciousness;
-        if pipeline_consciousness > PIPELINE_CONSCIOUSNESS_RELAX as f64 && self.stats.total_cycles > 15 {
-            self.scale_threshold("pipeline_conscious_relax", PIPELINE_CONSCIOUSNESS_RELAX_SCALE);
+        if pipeline_consciousness > PIPELINE_CONSCIOUSNESS_RELAX as f64
+            && self.stats.total_cycles > 15
+        {
+            self.scale_threshold(
+                "pipeline_conscious_relax",
+                PIPELINE_CONSCIOUSNESS_RELAX_SCALE,
+            );
         } else if pipeline_consciousness < PIPELINE_CONSCIOUSNESS_CAUTION as f64
             && pipeline_consciousness > 0.0
             && self.stats.total_cycles > 15
         {
-            self.scale_threshold("pipeline_conscious_caution", PIPELINE_CONSCIOUSNESS_CAUTION_SCALE);
+            self.scale_threshold(
+                "pipeline_conscious_caution",
+                PIPELINE_CONSCIOUSNESS_CAUTION_SCALE,
+            );
         }
 
         // ═══════════════════════════════════════════════════════════════════════

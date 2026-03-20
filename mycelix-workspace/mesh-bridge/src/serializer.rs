@@ -20,6 +20,14 @@ pub enum RelayType {
     SupplyUpdate = 9,
     MutualAidOffer = 10,
     PriceReport = 11,
+    /// IoT sensor reading from resource-mesh (water, power, temperature, etc.).
+    SensorReading = 12,
+    /// Compressed consciousness delta (XOR+RLE wisdom vector change).
+    ConsciousnessDelta = 13,
+    /// Resource demand forecast for predictive allocation.
+    ResourceForecast = 14,
+    /// Distributed threat signature for collective immune response.
+    ThreatSignature = 15,
     Heartbeat = 255,
 }
 
@@ -132,6 +140,81 @@ pub struct PriceReportRelay {
     pub item_name: String,
     pub price_tend: f32,
     pub evidence: String,
+}
+
+/// IoT sensor reading relay — maps to resource-mesh `SensorReading` entry.
+///
+/// Compact representation for LoRa: resource type + value + location hash.
+/// A water level sensor in a community tank, a solar panel voltage monitor,
+/// or an air quality station can all use this type.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SensorReadingRelay {
+    /// Sensor identifier (e.g., "tank-3-level", "solar-array-2-voltage").
+    pub sensor_id: String,
+    /// Resource type: "water", "power", "temperature", "humidity", "air_quality".
+    pub resource_type: String,
+    /// Measured value in natural units (liters, watts, °C, %, ppm).
+    pub value: f32,
+    /// Unit string (e.g., "liters", "W", "°C").
+    pub unit: String,
+    /// BLAKE3 hash of location string (8 bytes, saves bandwidth vs full GPS).
+    pub location_hash: [u8; 8],
+}
+
+/// Compressed consciousness delta relay — XOR+RLE encoded BinaryHV change.
+///
+/// Instead of transmitting the full 2,048-byte (16,384D) consciousness vector,
+/// we XOR the current state with the previous and RLE-encode the difference.
+/// Typical compression: 2,048B → 50-200B, fitting a single LoRa packet.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ConsciousnessDeltaRelay {
+    /// Phi (integrated information) of the originating node.
+    pub phi: f32,
+    /// Consciousness level [0.0, 1.0].
+    pub consciousness_level: f32,
+    /// Valence (emotional tone) [-1.0, 1.0].
+    pub valence: f32,
+    /// Arousal [0.0, 1.0].
+    pub arousal: f32,
+    /// Cycle number for ordering and delta application.
+    pub cycle: u32,
+    /// Whether this is a full vector (false = delta, true = keyframe).
+    pub is_keyframe: bool,
+    /// RLE-compressed XOR delta (or full vector if keyframe).
+    /// Format: [run_length: u16, byte: u8] pairs.
+    pub compressed_data: Vec<u8>,
+}
+
+/// Resource demand forecast relay — predictive allocation over mesh.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ResourceForecastRelay {
+    /// Resource type being forecast.
+    pub resource_type: String,
+    /// Forecast horizon in hours.
+    pub horizon_hours: u16,
+    /// Predicted consumption rate (units/hour).
+    pub predicted_rate: f32,
+    /// Confidence [0.0, 1.0].
+    pub confidence: f32,
+}
+
+/// Threat signature relay — distributed immune response.
+///
+/// When a node detects a threat (anomalous sensor readings, Byzantine behavior,
+/// governance attack), it shares a compact threat signature so other nodes can
+/// update their collective immunity.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ThreatSignatureRelay {
+    /// Threat type identifier (maps to SentinelManager's 7 threat types).
+    pub threat_type: u8,
+    /// Severity [0.0, 1.0].
+    pub severity: f32,
+    /// BLAKE3 hash of the offending agent's public key (8-byte prefix).
+    pub agent_hash: [u8; 8],
+    /// Compact threat descriptor (HDV signature, 32 bytes).
+    pub signature: [u8; 32],
+    /// Number of independent observations (weight for aggregation).
+    pub observation_count: u16,
 }
 
 impl RelayPayload {
@@ -429,6 +512,94 @@ mod tests {
         let emerg_inner: EmergencyRelay = bincode::deserialize(&emerg_decoded.data).unwrap();
         assert_eq!(emerg_inner.channel_id, "ward-7-alert");
         assert_eq!(emerg_inner.priority, "Immediate");
+    }
+
+    #[test]
+    fn test_sensor_reading_serialization() {
+        let sensor = SensorReadingRelay {
+            sensor_id: "tank-3-level".into(),
+            resource_type: "water".into(),
+            value: 847.5,
+            unit: "liters".into(),
+            location_hash: [1, 2, 3, 4, 5, 6, 7, 8],
+        };
+        let bytes = bincode::serialize(&sensor).unwrap();
+        let decoded: SensorReadingRelay = bincode::deserialize(&bytes).unwrap();
+        assert_eq!(decoded.sensor_id, "tank-3-level");
+        assert!((decoded.value - 847.5).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_consciousness_delta_serialization() {
+        let delta = ConsciousnessDeltaRelay {
+            phi: 0.72,
+            consciousness_level: 0.85,
+            valence: 0.3,
+            arousal: 0.6,
+            cycle: 12345,
+            is_keyframe: false,
+            compressed_data: vec![10, 0xFF, 5, 0x00, 3, 0xAB],
+        };
+        let bytes = bincode::serialize(&delta).unwrap();
+        let decoded: ConsciousnessDeltaRelay = bincode::deserialize(&bytes).unwrap();
+        assert!((decoded.phi - 0.72).abs() < f32::EPSILON);
+        assert_eq!(decoded.cycle, 12345);
+        assert!(!decoded.is_keyframe);
+        assert_eq!(decoded.compressed_data.len(), 6);
+    }
+
+    #[test]
+    fn test_threat_signature_serialization() {
+        let threat = ThreatSignatureRelay {
+            threat_type: 3,
+            severity: 0.85,
+            agent_hash: [0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE],
+            signature: [0x42; 32],
+            observation_count: 7,
+        };
+        let bytes = bincode::serialize(&threat).unwrap();
+        let decoded: ThreatSignatureRelay = bincode::deserialize(&bytes).unwrap();
+        assert_eq!(decoded.threat_type, 3);
+        assert!((decoded.severity - 0.85).abs() < f32::EPSILON);
+        assert_eq!(decoded.observation_count, 7);
+        assert_eq!(decoded.agent_hash[0], 0xDE);
+    }
+
+    #[test]
+    fn test_resource_forecast_serialization() {
+        let forecast = ResourceForecastRelay {
+            resource_type: "water".into(),
+            horizon_hours: 24,
+            predicted_rate: 12.5,
+            confidence: 0.82,
+        };
+        let bytes = bincode::serialize(&forecast).unwrap();
+        let decoded: ResourceForecastRelay = bincode::deserialize(&bytes).unwrap();
+        assert_eq!(decoded.horizon_hours, 24);
+        assert!((decoded.confidence - 0.82).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_consciousness_delta_fits_lora() {
+        // A typical compressed delta should fit in a single LoRa/Meshtastic frame.
+        // Meshtastic max payload ~200 bytes. Delta header ~21 bytes + compressed data.
+        let delta = ConsciousnessDeltaRelay {
+            phi: 0.5,
+            consciousness_level: 0.7,
+            valence: 0.0,
+            arousal: 0.5,
+            cycle: 99999,
+            is_keyframe: false,
+            compressed_data: vec![0u8; 150], // typical compressed HV delta
+        };
+        let bytes = bincode::serialize(&delta).unwrap();
+        let payload = RelayPayload::new(RelayType::ConsciousnessDelta, [0; 8], bytes);
+        let wire = payload.to_bytes();
+        assert!(
+            wire.len() < 255,
+            "consciousness delta payload {} bytes should fit single LoRa frame",
+            wire.len()
+        );
     }
 
     #[test]

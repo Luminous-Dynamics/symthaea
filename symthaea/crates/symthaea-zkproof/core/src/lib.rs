@@ -1,3 +1,8 @@
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
+use alloc::vec::Vec;
+
 use serde::{Deserialize, Serialize};
 
 /// Data passed from host to guest (zkVM)
@@ -14,4 +19,36 @@ pub struct EvolutionOutput {
     pub average_phi: f32,
     pub tau_scale: f32,
     pub episode_count: u32,
+}
+
+// ---------------------------------------------------------------------------
+// Balance proof types (tag = 1)
+// ---------------------------------------------------------------------------
+
+/// Private input for a ZK balance sufficiency proof.
+///
+/// The `balance` field is PRIVATE — it is consumed inside the zkVM guest
+/// but never appears in the committed journal output.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct BalanceProofInput {
+    /// Actual balance (PRIVATE — never revealed in the proof output).
+    pub balance: u64,
+    /// Minimum balance required (will be committed as public output).
+    pub required_minimum: u64,
+    /// Caller-chosen nonce to prevent proof replay (public output).
+    pub nonce: u64,
+}
+
+/// Public output committed by the guest for a balance proof.
+///
+/// The actual balance is NOT included — only the boolean result,
+/// the threshold, and the nonce are revealed.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub struct BalanceProofOutput {
+    /// Whether `balance >= required_minimum`.
+    pub sufficient: bool,
+    /// The minimum that was checked against (public).
+    pub required_minimum: u64,
+    /// Replay-prevention nonce (public).
+    pub nonce: u64,
 }

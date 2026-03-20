@@ -173,7 +173,9 @@ impl NetworkServiceBridge {
     pub fn spawn_with_attestation(
         service: &NetworkService,
         tx: mpsc::Sender<SwarmEvent>,
-        attestation: Option<Arc<parking_lot::RwLock<crate::swarm::attestation::AttestationManager>>>,
+        attestation: Option<
+            Arc<parking_lot::RwLock<crate::swarm::attestation::AttestationManager>>,
+        >,
     ) -> NetworkServiceBridgeHandle {
         // If no attestation manager, delegate to plain spawn
         let attestation = match attestation {

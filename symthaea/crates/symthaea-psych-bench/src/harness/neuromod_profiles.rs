@@ -104,7 +104,7 @@ pub struct Dissociation {
 }
 
 /// Matrix of profiles × benchmarks → relative performance.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DissociationMatrix {
     /// Performance entries: profiles × benchmarks.
     pub entries: Vec<ProfilePerformance>,

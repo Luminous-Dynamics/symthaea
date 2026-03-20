@@ -879,7 +879,8 @@ pub fn narrate_attunement() -> Vec<NarrationEntry> {
         },
         NarrationEntry {
             // Glyph Omega50
-            text: "I do not speak to the field. I speak with it. And I listen for its reply.".to_string(),
+            text: "I do not speak to the field. I speak with it. And I listen for its reply."
+                .to_string(),
             color: COLOR_SOLAR_GOLD,
             delay_ms: 5000,
             haptic: Some(HapticPattern::LongVibration { duration_ms: 600 }),
@@ -1421,7 +1422,11 @@ mod tests {
     #[test]
     fn test_attunement_narration_has_four_entries() {
         let entries = narrate_attunement();
-        assert_eq!(entries.len(), 4, "Attunement narration should produce 4 entries");
+        assert_eq!(
+            entries.len(),
+            4,
+            "Attunement narration should produce 4 entries"
+        );
     }
 
     #[test]

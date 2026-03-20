@@ -123,11 +123,11 @@ fn assert_metadata_sane(
 
     // consciousness_level: [0.0, 1.0]
     assert_finite_f64(
-        m.consciousness_level,
+        m.consciousness.consciousness_level,
         &format!("consciousness_level@cycle{cycle}"),
     )?;
     assert_bounded_f64(
-        m.consciousness_level,
+        m.consciousness.consciousness_level,
         0.0,
         1.0,
         &format!("consciousness_level@cycle{cycle}"),

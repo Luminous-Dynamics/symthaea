@@ -68,10 +68,7 @@ fn substrate_transfer_chain_all_eight() {
         for i in 0..10 {
             let result = service.cycle("multi-substrate chain test");
             assert!(
-                result
-                    .metadata
-                    .valence_homeostasis_pull
-                    .is_finite(),
+                result.metadata.valence_homeostasis_pull.is_finite(),
                 "NaN on {:?} at cycle {i}",
                 substrate
             );
@@ -143,10 +140,7 @@ fn low_feasibility_substrates_still_run() {
     for i in 0..100 {
         let result = service.cycle("testing consciousness on constrained substrate");
         assert!(
-            result
-                .metadata
-                .valence_homeostasis_pull
-                .is_finite(),
+            result.metadata.valence_homeostasis_pull.is_finite(),
             "Dynamics crashed on low-feasibility substrate at cycle {i}"
         );
     }
@@ -277,10 +271,7 @@ fn per_region_runtime_reconfiguration() {
     for i in 0..50 {
         let result = service.cycle("testing with hybrid substrate");
         assert!(
-            result
-                .metadata
-                .valence_homeostasis_pull
-                .is_finite(),
+            result.metadata.valence_homeostasis_pull.is_finite(),
             "NaN after per-region reconfiguration at cycle {i}"
         );
     }
@@ -372,10 +363,7 @@ fn soak_200_cycles_with_mid_run_substrate_switch() {
     for i in 0..100 {
         let result = service.cycle("silicon phase");
         assert!(
-            result
-                .metadata
-                .valence_homeostasis_pull
-                .is_finite(),
+            result.metadata.valence_homeostasis_pull.is_finite(),
             "Silicon phase NaN at cycle {i}"
         );
     }
@@ -387,10 +375,7 @@ fn soak_200_cycles_with_mid_run_substrate_switch() {
     for i in 0..100 {
         let result = service.cycle("quantum phase");
         assert!(
-            result
-                .metadata
-                .valence_homeostasis_pull
-                .is_finite(),
+            result.metadata.valence_homeostasis_pull.is_finite(),
             "Quantum phase NaN at cycle {i}"
         );
         assert!(
@@ -562,11 +547,19 @@ fn test_scale_masking_affects_state_diversity() {
     let silicon_result = silicon.cycle("final");
     let quantum_result = quantum.cycle("final");
     assert!(
-        silicon_result.metadata.consciousness.consciousness_level.is_finite(),
+        silicon_result
+            .metadata
+            .consciousness
+            .consciousness_level
+            .is_finite(),
         "Silicon consciousness should be finite"
     );
     assert!(
-        quantum_result.metadata.consciousness.consciousness_level.is_finite(),
+        quantum_result
+            .metadata
+            .consciousness
+            .consciousness_level
+            .is_finite(),
         "Quantum consciousness should be finite after scale masking"
     );
 }

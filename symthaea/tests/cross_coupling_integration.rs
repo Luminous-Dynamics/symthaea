@@ -87,10 +87,8 @@ fn test_boredom_boosts_lr() {
 
     // After 80 cycles, boredom coupling should have caused measurable divergence
     // in plasticity and/or prediction confidence between the two services.
-    let bored_late_plasticity: f32 =
-        bored_plasticity_values[60..].iter().sum::<f32>() / 20.0;
-    let active_late_plasticity: f32 =
-        active_plasticity_values[60..].iter().sum::<f32>() / 20.0;
+    let bored_late_plasticity: f32 = bored_plasticity_values[60..].iter().sum::<f32>() / 20.0;
+    let active_late_plasticity: f32 = active_plasticity_values[60..].iter().sum::<f32>() / 20.0;
 
     let bored_conf = bored.prediction_confidence();
     let active_conf = active.prediction_confidence();
@@ -106,7 +104,10 @@ fn test_boredom_boosts_lr() {
 
     // All values must be finite and bounded
     for &p in &bored_plasticity_values {
-        assert!(p.is_finite() && p >= 0.0 && p <= 1.0, "plasticity out of range: {p}");
+        assert!(
+            p.is_finite() && p >= 0.0 && p <= 1.0,
+            "plasticity out of range: {p}"
+        );
     }
 }
 
@@ -287,7 +288,8 @@ fn test_high_consolidation_pressure_boosts_lr() {
     let plasticity_diff = (high_pe_late_plasticity - low_pe_late_plasticity).abs();
 
     let conf_diff = (high_pe.prediction_confidence() - low_pe.prediction_confidence()).abs();
-    let learning_diff = (high_pe_learning_count as i32 - low_pe_learning_count as i32).unsigned_abs();
+    let learning_diff =
+        (high_pe_learning_count as i32 - low_pe_learning_count as i32).unsigned_abs();
 
     assert!(
         pressure_diff > 0.001 || plasticity_diff > 0.001 || conf_diff > 0.001 || learning_diff > 0,
@@ -375,14 +377,7 @@ fn test_low_recall_dampens_lr() {
 fn test_low_coherence_nudges_exploration() {
     // Chaotic input -> low perceptual coherence
     let mut chaotic = make_service();
-    let chaotic_inputs = [
-        "xyzzy",
-        "plugh",
-        "fnord",
-        "a",
-        "1",
-        "zz",
-    ];
+    let chaotic_inputs = ["xyzzy", "plugh", "fnord", "a", "1", "zz"];
 
     let mut chaotic_confidence = Vec::new();
     for i in 0..60 {
@@ -400,10 +395,8 @@ fn test_low_coherence_nudges_exploration() {
 
     // The chaotic service should have lower prediction confidence (nudged down by
     // perception->drive coupling) compared to the structured service.
-    let chaotic_late_conf: f32 =
-        chaotic_confidence[40..].iter().sum::<f32>() / 20.0;
-    let structured_late_conf: f32 =
-        structured_confidence[40..].iter().sum::<f32>() / 20.0;
+    let chaotic_late_conf: f32 = chaotic_confidence[40..].iter().sum::<f32>() / 20.0;
+    let structured_late_conf: f32 = structured_confidence[40..].iter().sum::<f32>() / 20.0;
 
     // Both must be valid
     assert!(

@@ -273,7 +273,11 @@ impl ProposalCollector {
 
         // Start from base or highest-priority Set (ties: last one wins)
         let mut value = if !sets.is_empty() {
-            let max_pri = sets.iter().map(|(_, _, p)| *p).max().expect("non-empty by guard");
+            let max_pri = sets
+                .iter()
+                .map(|(_, _, p)| *p)
+                .max()
+                .expect("non-empty by guard");
             sets.iter()
                 .rev()
                 .find(|(_, _, p)| *p == max_pri)
@@ -840,9 +844,10 @@ impl FeedbackState {
         seen.len()
     }
 
-    /// Feedback signal diversity: unique sources / total proposals.
-    /// High diversity (>0.7) = many subsystems contributing = healthy.
-    /// Low diversity (<0.3) = few subsystems dominating = potential bias.
+    // Feedback signal diversity: unique sources / total proposals.
+    // High diversity (>0.7) = many subsystems contributing = healthy.
+    // Low diversity (<0.3) = few subsystems dominating = potential bias.
+
     // ── Mid-cycle effective value accessors ─────────────────────────────
 
     /// Effective prediction_confidence from cycle-start + proposals so far.

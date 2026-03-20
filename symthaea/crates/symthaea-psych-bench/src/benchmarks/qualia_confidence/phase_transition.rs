@@ -192,11 +192,11 @@ impl PsychBenchmark for PhaseTransitionBenchmark {
 
             let noise_pct = (noise * 100.0) as usize;
             result.insert(
-                &format!("recognition_at_noise_{noise_pct:03}"),
+                format!("recognition_at_noise_{noise_pct:03}"),
                 MetricValue::from_samples(&[recognition_rate]),
             );
             result.insert(
-                &format!("raw_similarity_at_noise_{noise_pct:03}"),
+                format!("raw_similarity_at_noise_{noise_pct:03}"),
                 MetricValue::from_samples(&[raw_sim]),
             );
         }

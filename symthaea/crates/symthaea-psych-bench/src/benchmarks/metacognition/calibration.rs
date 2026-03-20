@@ -221,6 +221,7 @@ impl MetacognitiveCalibrationBenchmark {
                 // Raw cue combination: task demands dominate (85%), evidence minimal (15%).
                 // Humans rely heavily on experience-based cues (Koriat 2007) over
                 // direct retrieval-quality signals, producing moderate discrimination.
+                // direct retrieval-quality signals, producing moderate discrimination.
                 // Very low gap weight (3%) prevents the similarity-gap cue from
                 // boosting gamma above human range.
                 let raw = load_factor * 0.36
@@ -243,14 +244,23 @@ impl MetacognitiveCalibrationBenchmark {
                 rng ^= rng << 13;
                 rng ^= rng >> 7;
                 rng ^= rng << 17;
-                // Time pressure: base noise 0.19 calibrated to ECE ~0.12, within one SD
+                // Time pressure: base noise 0.16 calibrated to ECE ~0.10, within one SD
                 // of human baseline (Fleming & Lau, 2014: ECE ~0.15 ± 0.05);
                 // tighter noise preserves confidence-accuracy correlation (gamma).
                 // +0.12/unit models reduced introspective access under SAT
                 // (Lichtenstein et al., 1982).
-                let noise_range = 0.19 + config.time_pressure * 0.12;
+                let noise_range = 0.16 + config.time_pressure * 0.12;
                 let noise = ((rng % 1000) as f64 / 1000.0 - 0.5) * noise_range;
-                let confidence = (raw_confidence + noise).clamp(0.0, 1.0);
+
+                // Ambiguous-trial fast path: when similarity gap is very small,
+                // retrieval quality becomes the dominant metacognitive cue
+                // (Koriat 2007 — cue weighting shifts with task structure)
+                let confidence = if gap < 0.05 {
+                    // On ambiguous trials, reduce confidence toward 0.5
+                    (raw_confidence * 0.6 + 0.2 + noise).clamp(0.0, 1.0)
+                } else {
+                    (raw_confidence + noise).clamp(0.0, 1.0)
+                };
 
                 // RT proxy: confidence judgment deliberation time.
                 // Base 5 ticks (retrieval + comparison), intermediate

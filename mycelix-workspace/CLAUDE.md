@@ -74,12 +74,22 @@ Plugins: ConsciousnessAwareByzantinePlugin (consciousness score → weight), Met
 
 ## Version Compatibility
 
-| Component | Version |
-|-----------|---------|
-| holochain | 0.6.0 |
-| hdk | 0.6.0 |
-| hdi | 0.7.0 |
-| @holochain/client | 0.20.0 |
+**Single source of truth**: `nix/modules/holochain-versions.nix`
+
+All Holochain versions are declared in ONE file. When upgrading:
+1. Update `nix/modules/holochain-versions.nix`
+2. `nix flake lock --update-input holonix`
+3. `cargo update -p hdk -p hdi -p holochain_client`
+4. Verify: `nix develop --command holochain --version`
+
+| Component | Version | Source |
+|-----------|---------|--------|
+| holochain conductor | 0.6.0 | holonix commit in versions.nix |
+| hdk | 0.6.0 | versions.nix → workspace Cargo.toml |
+| hdi | 0.7.0 | versions.nix → workspace Cargo.toml |
+| holochain_client (Rust) | =0.6.0 | versions.nix (exact pin, prevents drift) |
+| @holochain/client (JS) | 0.20.0 | versions.nix |
+| lair-keystore | 0.6.3 | holonix |
 
 **Critical**: Use `getrandom v0.3` with `getrandom_backend="custom"` for WASM.
 Do NOT use `getrandom v0.2 features=["js"]` — it pulls in wasm-bindgen which is

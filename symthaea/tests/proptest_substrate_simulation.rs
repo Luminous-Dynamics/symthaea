@@ -68,7 +68,7 @@ proptest! {
         // Run 5 cycles post-switch
         for i in 0..5 {
             let result = service.cycle(&format!("post-switch {i}"));
-            let cl = result.metadata.consciousness_level;
+            let cl = result.metadata.consciousness.consciousness_level;
             prop_assert!(
                 cl.is_finite(),
                 "Consciousness NaN after {:?}->{:?} at cycle {}: {}",

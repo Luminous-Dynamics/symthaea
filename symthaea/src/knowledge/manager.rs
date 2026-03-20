@@ -974,7 +974,7 @@ impl KnowledgeManager {
                 } else {
                     0.0
                 };
-                r.similarity = r.similarity * (0.7 + 0.3 * recency);
+                r.similarity *= 0.7 + 0.3 * recency;
             }
         }
 

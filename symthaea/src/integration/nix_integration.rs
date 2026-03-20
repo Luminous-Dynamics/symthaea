@@ -16,6 +16,7 @@ use symthaea_nix::plugin::pipeline_integration::{
 };
 
 use crate::brain::actor_model::{ActorRole, ActorSystem};
+#[allow(deprecated)]
 use crate::memory::hippocampus::{EmotionalValence, HippocampusActor, RecallQuery};
 
 // =============================================================================
@@ -23,10 +24,12 @@ use crate::memory::hippocampus::{EmotionalValence, HippocampusActor, RecallQuery
 // =============================================================================
 
 /// Bridges NixOS episodic memory into the main Symthaea hippocampus.
+#[allow(deprecated)]
 pub struct NixHippocampusBridge {
     hippocampus: Arc<Mutex<HippocampusActor>>,
 }
 
+#[allow(deprecated)]
 impl NixHippocampusBridge {
     /// Create a new bridge wrapping a shared hippocampus.
     pub fn new(hippocampus: Arc<Mutex<HippocampusActor>>) -> Self {

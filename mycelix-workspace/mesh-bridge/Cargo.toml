@@ -14,7 +14,8 @@ path = "src/main.rs"
 
 [dependencies]
 # Holochain client for conductor communication
-holochain_client = "0.6"
+holochain_client = "=0.6.0" # Pin exact — must match conductor version. See nix/modules/holochain-versions.nix
+holochain_types = "0.4"     # For ExternIO (not re-exported from client 0.6.0)
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }
@@ -65,3 +66,13 @@ tempfile = "3"
 default = []
 lora = ["spidev"]
 batman = []
+meshtastic = ["dep:serialport"]
+mqtt = ["dep:rumqttc"]
+
+[dependencies.serialport]
+version = "4"
+optional = true
+
+[dependencies.rumqttc]
+version = "0.24"
+optional = true

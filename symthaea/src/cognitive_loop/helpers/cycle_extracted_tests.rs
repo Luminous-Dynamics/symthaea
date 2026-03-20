@@ -54,7 +54,7 @@ fn test_compute_unified_psi_clamped_at_one() {
     s.flow_state.in_flow = true;
     s.flow_state.intensity = 10.0; // very high
     s.social_mgr.social.relational_psi = 10.0; // very high
-    // body/embodied modulations far above neutral to maximize their contribution
+                                               // body/embodied modulations far above neutral to maximize their contribution
     s.carryover.consciousness.body_phi_modulation = 100.0;
     s.carryover.consciousness.embodied_phi_modulation = 100.0;
 
@@ -76,7 +76,10 @@ fn test_compute_unified_psi_nan_body_modulation_still_finite() {
     // arithmetic, so the final clamp(0.0, 1.0) may not save us. Document the
     // actual behavior.
     if psi.is_finite() {
-        assert!(psi >= 0.0 && psi <= 1.0, "if finite, must be in [0,1], got {psi}");
+        assert!(
+            psi >= 0.0 && psi <= 1.0,
+            "if finite, must be in [0,1], got {psi}"
+        );
     } else {
         // NaN propagation is the current behavior — document it.
         assert!(psi.is_nan(), "expected NaN propagation, got {psi}");
@@ -115,8 +118,10 @@ fn test_compute_unified_psi_weight_constants_are_positive() {
     );
     // Sum of explicit weights should be < 1.0 (there's also baseline_integration
     // and coherence/voice contributions).
-    let weight_sum =
-        FLOW_PSI_WEIGHT as f64 + RELATIONAL_PSI_WEIGHT as f64 + BODY_PSI_WEIGHT + EMBODIED_PSI_WEIGHT;
+    let weight_sum = FLOW_PSI_WEIGHT as f64
+        + RELATIONAL_PSI_WEIGHT as f64
+        + BODY_PSI_WEIGHT
+        + EMBODIED_PSI_WEIGHT;
     assert!(
         weight_sum < 1.0,
         "sum of psi weights ({weight_sum}) should be < 1.0 to leave room for baseline"
@@ -151,8 +156,7 @@ fn test_compute_unified_psi_flow_contribution_only_when_in_flow() {
 #[test]
 fn test_step_fep_returns_valid_action_index() {
     let mut s = make_service();
-    let (action_idx, probs, _is_surprised, _pragmatic) =
-        s.step_fep_active_inference(0.3, 0.5);
+    let (action_idx, probs, _is_surprised, _pragmatic) = s.step_fep_active_inference(0.3, 0.5);
     assert!(
         action_idx <= 3,
         "action index should be 0..=3, got {action_idx}"
@@ -166,8 +170,7 @@ fn test_step_fep_returns_valid_action_index() {
 #[test]
 fn test_step_fep_action_probabilities_sum_to_one() {
     let mut s = make_service();
-    let (_action_idx, probs, _is_surprised, _pragmatic) =
-        s.step_fep_active_inference(0.5, 0.5);
+    let (_action_idx, probs, _is_surprised, _pragmatic) = s.step_fep_active_inference(0.5, 0.5);
     let sum: f64 = probs.iter().sum();
     assert!(
         (sum - 1.0).abs() < 0.01,
@@ -211,8 +214,7 @@ fn test_step_fep_action1_resets_sensory_precision() {
 #[test]
 fn test_step_fep_is_surprised_is_bool() {
     let mut s = make_service();
-    let (_action_idx, _probs, is_surprised, _pragmatic) =
-        s.step_fep_active_inference(0.1, 0.9);
+    let (_action_idx, _probs, is_surprised, _pragmatic) = s.step_fep_active_inference(0.1, 0.9);
     // Just verify it doesn't panic and returns a boolean
     let _ = is_surprised;
 
@@ -225,8 +227,7 @@ fn test_step_fep_is_surprised_is_bool() {
 #[test]
 fn test_step_fep_pragmatic_value_is_finite() {
     let mut s = make_service();
-    let (_action_idx, _probs, _is_surprised, pragmatic) =
-        s.step_fep_active_inference(0.5, 0.5);
+    let (_action_idx, _probs, _is_surprised, pragmatic) = s.step_fep_active_inference(0.5, 0.5);
     assert!(
         pragmatic.is_finite(),
         "pragmatic_value should be finite, got {pragmatic}"
@@ -240,8 +241,7 @@ fn test_step_fep_repeated_calls_stable() {
     for i in 0..50 {
         let pe = (i as f32 % 10.0) / 10.0;
         let coh = 1.0 - pe;
-        let (action_idx, probs, _is_surprised, pragmatic) =
-            s.step_fep_active_inference(pe, coh);
+        let (action_idx, probs, _is_surprised, pragmatic) = s.step_fep_active_inference(pe, coh);
         assert!(action_idx <= 3, "action out of range at iteration {i}");
         assert!(!probs.is_empty(), "empty probs at iteration {i}");
         assert!(
@@ -275,7 +275,10 @@ fn test_compose_effective_lr_zero_factors_still_positive() {
     let mut s = make_service();
     // Zero factors should be clamped to 0.01 inside geometric_mean
     let lr = s.compose_effective_lr(0.0, 0.0);
-    assert!(lr.is_finite(), "lr must be finite with zero factors, got {lr}");
+    assert!(
+        lr.is_finite(),
+        "lr must be finite with zero factors, got {lr}"
+    );
     assert!(lr >= 0.0, "lr must be >= 0.0, got {lr}");
 }
 

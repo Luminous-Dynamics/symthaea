@@ -112,9 +112,7 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("SpatialUpdating") => Some(("spatial_updating_accuracy", &bl.worm)),
         // Binding domain — route to binding baselines, not worm
         name if name.contains("TemporalOrder") => Some(("discrimination_slope", &bl.binding)),
-        name if name.contains("CrossModal") => {
-            Some(("cross_modal_binding_accuracy", &bl.binding))
-        }
+        name if name.contains("CrossModal") => Some(("cross_modal_binding_accuracy", &bl.binding)),
         name if name.contains("Binding") => Some(("binding_accuracy", &bl.worm)),
         name if name.contains("DigitSpan") => Some(("digit_span_forward", &bl.worm)),
 

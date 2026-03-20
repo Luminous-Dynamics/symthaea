@@ -42,6 +42,11 @@ duckdb = { version = "1.1", features = ["bundled"], optional = true }
 # Tokio async runtime (required for async database operations)
 tokio = { version = "1.35", features = ["rt", "sync", "time"], optional = true }
 
+# ONNX Runtime for semantic encoder (requires `embeddings` feature)
+ort = { version = "2.0.0-rc.10", features = ["half", "load-dynamic", "ndarray"], optional = true }
+tokenizers = { version = "0.21", optional = true }
+hf-hub = { version = "0.4", optional = true }
+
 [dev-dependencies]
 proptest = "1.4"
 criterion = "0.5"
@@ -111,7 +116,7 @@ harness = false
 
 [features]
 default = ["simd", "parallel"]
-embeddings = []       # Enable embedding model integration
+embeddings = ["dep:ort", "dep:tokenizers", "dep:hf-hub"]  # Enable ONNX embedding model integration
 thread_local_cache = []  # Enable thread-local caching in Phi engine
 parallel = ["dep:rayon"]  # Enable parallel computation with rayon
 simd = []             # Enable SIMD-accelerated continuous HV operations (4x+ speedup)

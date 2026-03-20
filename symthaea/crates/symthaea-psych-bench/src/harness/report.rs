@@ -483,12 +483,9 @@ impl BenchmarkReport {
             ("valence_accuracy", "valence_accuracy", &bl.affect),
             ("congruence_ratio", "congruence_ratio", &bl.affect),
             ("fluency", "aut_fluency", &bl.creativity),
-            ("originality_score", "dt_originality_score", &bl.creativity),
-            ("flexibility_score", "dt_flexibility_score", &bl.creativity),
-            ("elaboration_score", "dt_elaboration_score", &bl.creativity),
             ("present_count", "present_count", &bl.butlin),
-            ("presence_ratio", "presence_ratio", &bl.butlin),
             ("mean_quality_score", "mean_quality_score", &bl.butlin),
+            ("presence_ratio", "presence_ratio", &bl.butlin),
             // Go/No-Go (Inhibition)
             ("go_accuracy", "go_accuracy", &bl.inhibition),
             ("nogo_accuracy", "nogo_accuracy", &bl.inhibition),
@@ -611,19 +608,6 @@ impl BenchmarkReport {
             ),
             ("boundary_width", "vot_boundary_width", &bl.speech),
             ("slope_at_boundary", "vot_slope_at_boundary", &bl.speech),
-            // Categorical Perception
-            ("boundary_slope", "cp_boundary_slope", &bl.speech),
-            (
-                "boundary_discrimination",
-                "cp_boundary_discrimination",
-                &bl.speech,
-            ),
-            (
-                "within_category_discrimination",
-                "cp_within_discrimination",
-                &bl.speech,
-            ),
-            ("categorical_index", "cp_categorical_index", &bl.speech),
             // Substrate Transfer
             ("transfer_fidelity", "transfer_fidelity", &bl.substrate),
             ("phi_preservation", "phi_preservation", &bl.substrate),
@@ -639,6 +623,80 @@ impl BenchmarkReport {
                 &bl.substrate,
             ),
             ("graceful_ratio", "substrate_graceful_ratio", &bl.substrate),
+            // Feature Conjunction (Binding)
+            ("conjunction_accuracy", "conjunction_accuracy", &bl.binding),
+            ("feature_accuracy", "feature_accuracy", &bl.binding),
+            ("conjunction_cost", "conjunction_cost", &bl.binding),
+            // Perceptual Crowding (Consciousness)
+            (
+                "unflanked_accuracy",
+                "crowding_unflanked_accuracy",
+                &bl.consciousness,
+            ),
+            (
+                "flanked_accuracy",
+                "crowding_flanked_accuracy",
+                &bl.consciousness,
+            ),
+            (
+                "crowding_magnitude",
+                "crowding_magnitude",
+                &bl.consciousness,
+            ),
+            // Divergent Thinking (Creativity)
+            ("originality_score", "originality_score", &bl.creativity),
+            ("flexibility_score", "flexibility_score", &bl.creativity),
+            ("elaboration_score", "elaboration_score", &bl.creativity),
+            // Flanker Inhibition (Inhibition)
+            (
+                "congruent_accuracy",
+                "flanker_congruent_accuracy",
+                &bl.inhibition,
+            ),
+            (
+                "incongruent_accuracy",
+                "flanker_incongruent_accuracy",
+                &bl.inhibition,
+            ),
+            (
+                "interference_suppression",
+                "interference_suppression",
+                &bl.inhibition,
+            ),
+            // Categorical Perception (Speech)
+            ("boundary_slope", "cp_boundary_slope", &bl.speech),
+            (
+                "boundary_discrimination",
+                "cp_boundary_discrimination",
+                &bl.speech,
+            ),
+            (
+                "within_category_discrimination",
+                "cp_within_category_discrimination",
+                &bl.speech,
+            ),
+            ("categorical_index", "cp_categorical_index", &bl.speech),
+            // Substrate Latency
+            (
+                "fast_substrate_accuracy",
+                "substrate_fast_accuracy",
+                &bl.substrate,
+            ),
+            (
+                "slow_substrate_accuracy",
+                "substrate_slow_accuracy",
+                &bl.substrate,
+            ),
+            (
+                "speed_accuracy_correlation",
+                "substrate_speed_accuracy_correlation",
+                &bl.substrate,
+            ),
+            (
+                "latency_gradient",
+                "substrate_latency_gradient",
+                &bl.substrate,
+            ),
             // Mathematics domain
             ("accuracy", "arithmetic_accuracy", &bl.mathematics),
             (
@@ -690,12 +748,6 @@ impl BenchmarkReport {
             (
                 "queens_8_accuracy",
                 "constraint_queens_8_accuracy",
-                &bl.mathematics,
-            ),
-            // StatisticalInference
-            (
-                "variance_estimation_accuracy",
-                "variance_estimation_accuracy",
                 &bl.mathematics,
             ),
             ("tautology_accuracy", "tautology_accuracy", &bl.mathematics),
@@ -862,6 +914,17 @@ impl BenchmarkReport {
                 &bl.clinical,
             ),
             ("mi_spirit_score", "mi_spirit_score", &bl.clinical),
+            // Security (HDC-FHE)
+            ("encrypted_accuracy", "encrypted_accuracy", &bl.security),
+            ("aggregation_fidelity", "aggregation_fidelity", &bl.security),
+            ("learning_accuracy", "learning_accuracy", &bl.security),
+            (
+                "cross_session_leakage",
+                "cross_session_leakage",
+                &bl.security,
+            ),
+            ("binding_preservation", "binding_preservation", &bl.security),
+            ("accuracy_at_scale", "accuracy_at_scale", &bl.security),
         ];
 
         for (metric_key, baseline_key, baselines) in &mappings {
@@ -921,7 +984,7 @@ impl BenchmarkReport {
                 &bl.executive,
             );
         }
-        if benchmark.contains("Flanker") {
+        if benchmark.contains("Flanker") && !benchmark.contains("FlankerInhibition") {
             push_specific(
                 "congruent_accuracy",
                 "flanker_congruent_accuracy",
@@ -1037,12 +1100,6 @@ impl BenchmarkReport {
         if benchmark.contains("Probabilistic") {
             push_specific("rt_ticks", "probabilistic_rt_ticks", &bl.cogbench);
         }
-        // LogicalDeduction: HDC encoding doesn't cleanly separate valid/invalid
-        // arguments yet — "overall_accuracy" pulls Math domain z-score down.
-        // TODO: improve logical_deduction.rs before wiring into composites.
-        // if benchmark.contains("LogicalDeduction") {
-        //     push_specific("overall_accuracy", "logical_overall_accuracy", &bl.mathematics);
-        // }
         // WorM RT mappings
         if benchmark.contains("ChangeDetection") {
             push_specific("rt_ticks", "change_detection_rt_ticks", &bl.worm);
@@ -1133,6 +1190,24 @@ impl BenchmarkReport {
             push_specific("sst_go_rt_ticks", "sst_go_rt_ticks", &bl.inhibition);
             push_specific("sst_stop_accuracy", "sst_stop_accuracy", &bl.inhibition);
             push_specific("ssrt_ticks", "ssrt_ticks", &bl.inhibition);
+        }
+        // Flanker Inhibition (Inhibition)
+        if benchmark.contains("FlankerInhibition") {
+            push_specific(
+                "congruent_accuracy",
+                "flanker_congruent_accuracy",
+                &bl.inhibition,
+            );
+            push_specific(
+                "incongruent_accuracy",
+                "flanker_incongruent_accuracy",
+                &bl.inhibition,
+            );
+            push_specific(
+                "interference_suppression",
+                "interference_suppression",
+                &bl.inhibition,
+            );
         }
         // Visual Search (Attention)
         if benchmark.contains("VisualSearch") {
@@ -1487,6 +1562,7 @@ impl BenchmarkReport {
             || benchmark.contains("Clinical")
             || benchmark.contains("Spatial")
             || benchmark.contains("CausalReasoning")
+            || benchmark.contains("Security")
         {
             comps
         } else {
@@ -1840,13 +1916,31 @@ impl BenchmarkReport {
             // Look up human SD for display
             let human_sd_str = {
                 let baseline_maps = [
-                    &bl.worm, &bl.cogbench, &bl.executive, &bl.tombench,
-                    &bl.memory_agent, &bl.metacognition, &bl.affect, &bl.creativity,
-                    &bl.butlin, &bl.inhibition, &bl.attention, &bl.reasoning,
-                    &bl.sustained_attention, &bl.motor, &bl.language, &bl.social,
-                    &bl.binding, &bl.spatial, &bl.causal_reasoning, &bl.speech,
-                    &bl.consciousness, &bl.substrate, &bl.clinical,
-                    &bl.institutional_reasoning, &bl.mathematics,
+                    &bl.worm,
+                    &bl.cogbench,
+                    &bl.executive,
+                    &bl.tombench,
+                    &bl.memory_agent,
+                    &bl.metacognition,
+                    &bl.affect,
+                    &bl.creativity,
+                    &bl.butlin,
+                    &bl.inhibition,
+                    &bl.attention,
+                    &bl.reasoning,
+                    &bl.sustained_attention,
+                    &bl.motor,
+                    &bl.language,
+                    &bl.social,
+                    &bl.binding,
+                    &bl.spatial,
+                    &bl.causal_reasoning,
+                    &bl.speech,
+                    &bl.consciousness,
+                    &bl.substrate,
+                    &bl.clinical,
+                    &bl.institutional_reasoning,
+                    &bl.mathematics,
                 ];
                 let mut sd_val = None;
                 for map in baseline_maps {
@@ -1920,22 +2014,60 @@ impl BenchmarkReport {
 pub fn calibration_class_of(benchmark: &str) -> &'static str {
     // A Priori benchmarks: established paradigms with well-documented parameters
     let a_priori = [
-        "Stroop", "Flanker", "WCST", "NBack", "N-back", "DigitSpan",
-        "StopSignal", "GoNoGo", "FalseBeliefBenchmark", "SerialRecall",
-        "VisualSearch", "AttentionalBlink", "SART", "PVT", "CPT",
-        "SRTT", "FittsLaw", "EmotionalStroop", "VotContinuum",
-        "BinocularRivalry", "ChangeBlindness", "FeelingOfKnowing",
-        "Calibration", "MismatchNegativity", "GardenPath", "SemanticPriming",
-        "LexicalDecision", "MentalRotation", "TemporalDiscounting",
-        "IowaGambling", "TowerOfLondon", "RavensProgressiveMatrices",
-        "TemporalOrder", "CrossModal", "CategoricalPerception", "RemoteAssociates", "AlternateUses", "DivergentThinking",
-        "WorM::Binding", "ChangeDetection",
+        "Stroop",
+        "Flanker",
+        "WCST",
+        "NBack",
+        "N-back",
+        "DigitSpan",
+        "StopSignal",
+        "GoNoGo",
+        "FalseBeliefBenchmark",
+        "SerialRecall",
+        "VisualSearch",
+        "AttentionalBlink",
+        "SART",
+        "PVT",
+        "CPT",
+        "SRTT",
+        "FittsLaw",
+        "EmotionalStroop",
+        "VotContinuum",
+        "BinocularRivalry",
+        "ChangeBlindness",
+        "FeelingOfKnowing",
+        "Calibration",
+        "MismatchNegativity",
+        "GardenPath",
+        "SemanticPriming",
+        "LexicalDecision",
+        "MentalRotation",
+        "TemporalDiscounting",
+        "IowaGambling",
+        "TowerOfLondon",
+        "RavensProgressiveMatrices",
+        "TemporalOrder",
+        "CrossModal",
+        "FeatureConjunction",
+        "RemoteAssociates",
+        "AlternateUses",
+        "DivergentThinking",
+        "FlankerInhibition",
+        "CategoricalPerception",
+        "PerceptualCrowding",
+        "WorM::Binding",
+        "ChangeDetection",
     ];
 
     // Theoretical benchmarks: novel paradigms or theoretical constructs
     let theoretical = [
-        "SubstrateTransfer", "SubstrateDegradation", "Blindsight",
-        "ButlinIndicator", "InstitutionalReasoning", "InstitutionalStability",
+        "SubstrateTransfer",
+        "SubstrateDegradation",
+        "SubstrateLatency",
+        "Blindsight",
+        "ButlinIndicator",
+        "InstitutionalReasoning",
+        "InstitutionalStability",
         "InstitutionalIsomorphism",
     ];
 
@@ -1967,16 +2099,31 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("SerialRecall") => "list_7::primacy_index",
         b if b.contains("SpatialUpdating") => "overall_accuracy",
         b if b.contains("TemporalOrder") => "discrimination_slope",
+        b if b.contains("FeatureConjunction") => "conjunction_accuracy",
         b if b.contains("CrossModal") => "binding_accuracy",
         // Spatial domain (must be before generic "Binding" arm)
-        b if b.contains("Spatial::MentalRotation") || (b.contains("MentalRotation") && b.contains("Spatial")) => "accuracy_mean",
+        b if b.contains("Spatial::MentalRotation")
+            || (b.contains("MentalRotation") && b.contains("Spatial")) =>
+        {
+            "accuracy_mean"
+        }
         b if b.contains("Spatial::PathUpdating") || b.contains("PathUpdating") => "simple_accuracy",
-        b if b.contains("Spatial::LandmarkBinding") || (b.contains("LandmarkBinding") && b.contains("Spatial")) => "retrieval_accuracy",
-        b if b.contains("Spatial::PerspectiveTaking") || (b.contains("PerspectiveTaking") && b.contains("Spatial")) => "perspective_accuracy",
+        b if b.contains("Spatial::LandmarkBinding")
+            || (b.contains("LandmarkBinding") && b.contains("Spatial")) =>
+        {
+            "retrieval_accuracy"
+        }
+        b if b.contains("Spatial::PerspectiveTaking")
+            || (b.contains("PerspectiveTaking") && b.contains("Spatial")) =>
+        {
+            "perspective_accuracy"
+        }
+        b if b.contains("EncryptedBinding") => "binding_preservation",
         b if b.contains("Binding") => "overall_binding_accuracy",
         b if b.contains("DigitSpan") => "forward_span",
-        b if b.contains("EmotionalStroop") => "emotional_interference",
-        b if b.contains("Stroop") && !b.contains("Strange") => "stroop_effect",
+        b if b.contains("EmotionalStroop") => "negative_accuracy",
+        b if b.contains("Stroop") && !b.contains("Strange") => "incongruent_accuracy",
+        b if b.contains("FlankerInhibition") => "interference_suppression",
         b if b.contains("Flanker") => "flanker_effect",
         b if b.contains("Wisconsin") || b.contains("WCST") => "categories_completed",
         b if b.contains("Iowa") || b.contains("IGT") => "overall_net_score",
@@ -2004,10 +2151,10 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("ValenceClassification") => "valence_accuracy",
         b if b.contains("MoodCongruent") => "congruence_ratio",
         b if b.contains("RemoteAssociates") => "overall_accuracy",
-        b if b.contains("DivergentThinking") => "originality_score",
         b if b.contains("AlternateUses") => "fluency",
+        b if b.contains("DivergentThinking") => "originality_score",
         b if b.contains("GoNoGo") => "nogo_accuracy",
-        b if b.contains("AttentionalBlink") => "blink_magnitude",
+        b if b.contains("AttentionalBlink") => "lag3_t2_accuracy",
         b if b.contains("ProspectiveMemory") => "pm_hit_rate",
         b if b.contains("StopSignal") => "ssrt_ticks",
         b if b.contains("VisualSearch") => "search_asymmetry",
@@ -2060,11 +2207,13 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("ChangeBlindness") => "detection_with_disruption",
         b if b.contains("ProprioceptiveDrift") => "drift_difference",
         b if b.contains("PhonemeDiscrimination") => "categorical_perception_index",
-        b if b.contains("CategoricalPerception") => "boundary_slope",
+        b if b.contains("CategoricalPerception") => "categorical_index",
         b if b.contains("VotContinuum") => "identification_accuracy",
+        b if b.contains("PerceptualCrowding") => "crowding_magnitude",
         b if b.contains("BinocularRivalry") => "dominance_ratio",
         b if b.contains("Substrate") && b.contains("Degradation") => "graceful_ratio",
         b if b.contains("Substrate") && b.contains("Transfer") => "transfer_fidelity",
+        b if b.contains("Substrate") && b.contains("Latency") => "speed_accuracy_correlation",
         // Mathematics domain
         b if b.contains("ArithmeticWordProblem") => "accuracy",
         b if b.contains("LinearSystemSolving") => "accuracy_2x2",
@@ -2077,9 +2226,21 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("ConstraintPuzzle") => "queens_4_accuracy",
         b if b.contains("ProofConstruction") => "tautology_accuracy",
         // CausalReasoning domain (must be before generic "CausalChain" arm below)
-        b if b.contains("CausalReasoning::CausalChain") || (b.contains("CausalChain") && b.contains("CausalReasoning")) => "chain_tracing_accuracy",
-        b if b.contains("CausalReasoning::ConfoundDetection") || b.contains("ConfoundDetection") => "confound_detection_accuracy",
-        b if b.contains("CausalReasoning::InterventionEffect") || (b.contains("InterventionEffect") && b.contains("CausalReasoning")) => "causal_score",
+        b if b.contains("CausalReasoning::CausalChain")
+            || (b.contains("CausalChain") && b.contains("CausalReasoning")) =>
+        {
+            "chain_tracing_accuracy"
+        }
+        b if b.contains("CausalReasoning::ConfoundDetection")
+            || b.contains("ConfoundDetection") =>
+        {
+            "confound_detection_accuracy"
+        }
+        b if b.contains("CausalReasoning::InterventionEffect")
+            || (b.contains("InterventionEffect") && b.contains("CausalReasoning")) =>
+        {
+            "causal_score"
+        }
         // Institutional Reasoning sub-benchmarks (specific before generic)
         b if b.contains("AnalogicalReasoning") => "analogical_transfer_accuracy",
         b if b.contains("CausalChain") => "causal_chain_coherence",
@@ -2095,6 +2256,13 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("CrisisDetection") => "crisis_sensitivity",
         b if b.contains("CognitiveDistortion") => "distortion_identification",
         b if b.contains("MotivationalInterviewing") => "mi_spirit_score",
+        // Security (HDC-FHE) domain
+        b if b.contains("EncryptedLearning") => "learning_accuracy",
+        b if b.contains("CrossMaskPrivacy") => "cross_session_leakage",
+        // EncryptedBinding handled above (before generic "Binding" arm)
+        b if b.contains("ScalingAnalysis") => "accuracy_at_scale",
+        b if b.contains("EncryptedClassification") => "encrypted_accuracy",
+        b if b.contains("CollectiveAggregation") => "aggregation_fidelity",
         _ => "overall_accuracy",
     }
 }
@@ -2147,6 +2315,8 @@ pub fn is_lower_better(metric_key: &str) -> bool {
             | "swap_error_rate"
             | "pm_cost"
             | "capacity_ratio"
+            | "interference_suppression"
+            | "cross_session_leakage"
     )
 }
 
@@ -2618,7 +2788,10 @@ mod tests {
         r1.insert("forward_span", MetricValue::from_samples(&[6.0, 6.5]));
         report.add(r1);
         let mut r2 = BenchmarkResult::new("Executive::Stroop", None);
-        r2.insert("stroop_effect", MetricValue::from_samples(&[0.08, 0.09]));
+        r2.insert(
+            "incongruent_accuracy",
+            MetricValue::from_samples(&[0.85, 0.88]),
+        );
         report.add(r2);
         let profile = report.cognitive_profile();
         assert!(profile.contains_key("WorM"), "profile: {:?}", profile);
@@ -2883,8 +3056,11 @@ mod tests {
         assert!(tex.contains("DigitSpan"), "tex: {}", tex);
     }
 
-    #[test]
-    fn test_print_all_domain_composites() {
+    /// Build the full benchmark suite used for domain composite scoring.
+    ///
+    /// Shared by `test_print_all_domain_composites` and `test_cross_seed_stability`
+    /// to avoid duplicating the ~100-benchmark vector.
+    fn all_benchmarks() -> Vec<Box<dyn crate::harness::PsychBenchmark>> {
         use crate::benchmarks::affect::*;
         use crate::benchmarks::attention::*;
         use crate::benchmarks::binding::*;
@@ -2903,6 +3079,7 @@ mod tests {
         use crate::benchmarks::metacognition::*;
         use crate::benchmarks::motor::*;
         use crate::benchmarks::reasoning::*;
+        use crate::benchmarks::security::*;
         use crate::benchmarks::social::*;
         use crate::benchmarks::spatial::*;
         use crate::benchmarks::speech::*;
@@ -2910,11 +3087,8 @@ mod tests {
         use crate::benchmarks::sustained_attention::*;
         use crate::benchmarks::tombench::*;
         use crate::benchmarks::worm::*;
-        use crate::harness::PsychBenchmark;
 
-        let config = crate::harness::config::BenchmarkConfig::default();
-
-        let benchmarks: Vec<Box<dyn PsychBenchmark>> = vec![
+        vec![
             // WorM
             Box::new(BindingBenchmark),
             Box::new(ChangeDetectionBenchmark),
@@ -2968,6 +3142,7 @@ mod tests {
             // Inhibition
             Box::new(GoNoGoBenchmark),
             Box::new(StopSignalBenchmark),
+            Box::new(FlankerInhibitionBenchmark),
             // Attention
             Box::new(AttentionalBlinkBenchmark),
             Box::new(VisualSearchBenchmark),
@@ -3009,6 +3184,7 @@ mod tests {
             // Binding
             Box::new(TemporalOrderBenchmark),
             Box::new(CrossModalBindingBenchmark),
+            Box::new(FeatureConjunctionBenchmark),
             // Spatial
             Box::new(MentalRotationBenchmark),
             Box::new(SpatialPathUpdatingBenchmark),
@@ -3025,9 +3201,11 @@ mod tests {
             // Consciousness
             Box::new(BlindSightBenchmark),
             Box::new(BinocularRivalryBenchmark),
+            Box::new(PerceptualCrowdingBenchmark),
             // Substrate
             Box::new(SubstrateTransferBenchmark),
             Box::new(SubstrateDegradationBenchmark),
+            Box::new(SubstrateLatencyBenchmark),
             // Clinical/Therapeutic
             Box::new(EmpathicAccuracyBenchmark),
             Box::new(TherapeuticResponseBenchmark),
@@ -3054,7 +3232,20 @@ mod tests {
             Box::new(ConstraintPuzzlesBenchmark),
             Box::new(ProofConstructionBenchmark),
             Box::new(DefiniteIntegralsBenchmark),
-        ];
+            // Security (HDC-FHE)
+            Box::new(EncryptedClassificationBenchmark),
+            Box::new(CollectiveAggregationBenchmark),
+            Box::new(EncryptedLearningBenchmark),
+            Box::new(CrossMaskPrivacyBenchmark),
+            Box::new(EncryptedBindingBenchmark),
+            Box::new(ScalingAnalysisBenchmark),
+        ]
+    }
+
+    #[test]
+    fn test_print_all_domain_composites() {
+        let config = crate::harness::config::BenchmarkConfig::default();
+        let benchmarks = all_benchmarks();
 
         let mut report = BenchmarkReport::new();
         for b in &benchmarks {
@@ -3075,6 +3266,68 @@ mod tests {
         eprintln!(
             "Grand mean z = {grand_mean:+.3} across {} domains\n",
             composites.len()
+        );
+    }
+
+    /// Cross-seed stability test: verifies that grand mean z-scores are stable
+    /// across different RNG seeds.
+    ///
+    /// Runs the full benchmark suite with 5 different seeds and asserts that the
+    /// standard deviation of grand means is < 0.10 (i.e., results are not
+    /// seed-dependent). This is a key reproducibility check.
+    ///
+    /// NOTE: This test takes ~5 minutes per seed (~25 minutes total).
+    /// Run explicitly with: `cargo test --lib test_cross_seed_stability -- --ignored`
+    #[test]
+    #[ignore]
+    fn test_cross_seed_stability() {
+        use crate::harness::config::BenchmarkConfig;
+
+        let seeds: [u64; 3] = [42, 123, 789];
+        let mut grand_means: Vec<f64> = Vec::with_capacity(seeds.len());
+
+        for &seed in &seeds {
+            let config = BenchmarkConfig {
+                seed,
+                ..Default::default()
+            };
+            let benchmarks = all_benchmarks();
+
+            let mut report = BenchmarkReport::new();
+            for b in &benchmarks {
+                report.add(b.run(&config));
+            }
+
+            let composites = report.composite_scores();
+            let n_domains = composites.len() as f64;
+            let total_z: f64 = composites.values().map(|c| c.mean_z).sum();
+            let grand_mean = total_z / n_domains;
+
+            eprintln!(
+                "seed={seed:>4}: grand mean z = {grand_mean:+.4} across {n} domains",
+                n = composites.len()
+            );
+            grand_means.push(grand_mean);
+        }
+
+        // Compute mean and SD of grand means across seeds
+        let n = grand_means.len() as f64;
+        let mean_of_means: f64 = grand_means.iter().sum::<f64>() / n;
+        let variance: f64 =
+            grand_means.iter().map(|x| (x - mean_of_means).powi(2)).sum::<f64>() / (n - 1.0);
+        let sd = variance.sqrt();
+
+        eprintln!("\n--- Cross-seed stability ---");
+        eprintln!("Seeds: {:?}", seeds);
+        eprintln!("Grand means: {:?}", grand_means);
+        eprintln!("Mean of grand means: {mean_of_means:+.4}");
+        eprintln!("SD of grand means:   {sd:.4}");
+        eprintln!("----------------------------\n");
+
+        assert!(
+            sd < 0.10,
+            "Grand mean z-score SD across seeds ({sd:.4}) exceeds stability threshold (0.10). \
+             Seeds produce inconsistent results."
         );
     }
 
@@ -3104,7 +3357,10 @@ mod tests {
 
         // Theoretical
         assert_eq!(calibration_class_of("Substrate::SubstrateTransfer"), "TH");
-        assert_eq!(calibration_class_of("Substrate::SubstrateDegradation"), "TH");
+        assert_eq!(
+            calibration_class_of("Substrate::SubstrateDegradation"),
+            "TH"
+        );
         assert_eq!(calibration_class_of("Consciousness::Blindsight"), "TH");
 
         // Post Hoc (everything else)
@@ -3170,8 +3426,8 @@ mod tests {
             ..Default::default()
         };
 
-        // 2 sessions, 5 subjects — minimal ICC design (keeps runtime <5 min)
-        let battery = ReliabilityBattery::run(&benchmarks, &config, 2, 5);
+        // 2 sessions, 8 subjects — gives ICC enough between-subject variance
+        let battery = ReliabilityBattery::run(&benchmarks, &config, 2, 8);
 
         eprintln!("\n{}", battery.to_markdown());
 
@@ -3182,8 +3438,18 @@ mod tests {
         let mut poor = 0u32;
 
         for r in &battery.results {
-            assert!(r.icc.is_finite(), "{} ICC not finite: {}", r.benchmark, r.icc);
-            assert!(r.sem.is_finite() && r.sem >= 0.0, "{} SEM invalid: {}", r.benchmark, r.sem);
+            assert!(
+                r.icc.is_finite(),
+                "{} ICC not finite: {}",
+                r.benchmark,
+                r.icc
+            );
+            assert!(
+                r.sem.is_finite() && r.sem >= 0.0,
+                "{} SEM invalid: {}",
+                r.benchmark,
+                r.sem
+            );
 
             match r.reliability_class {
                 crate::harness::reliability_analysis::ReliabilityClass::Excellent => excellent += 1,
@@ -3235,8 +3501,14 @@ mod tests {
         assert!(tex.contains(r"\toprule"), "tex: {}", tex);
         assert!(tex.contains(r"\bottomrule"), "tex: {}", tex);
         assert!(tex.contains("Stroop"), "Should contain Stroop");
-        assert!(tex.contains("AP") || tex.contains("PH"), "Should contain calibration class");
-        assert!(tex.contains("Grand mean"), "Should contain grand mean footer");
+        assert!(
+            tex.contains("AP") || tex.contains("PH"),
+            "Should contain calibration class"
+        );
+        assert!(
+            tex.contains("Grand mean"),
+            "Should contain grand mean footer"
+        );
 
         eprintln!("\n{}", tex);
     }

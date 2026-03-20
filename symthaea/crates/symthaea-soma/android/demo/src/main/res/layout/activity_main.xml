@@ -1,357 +1,402 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView
+<androidx.coordinatorlayout.widget.CoordinatorLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#121212"
-    android:fillViewport="true">
+    android:background="@color/soma_void">
+
+<ScrollView
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:layout_marginBottom="48dp">
 
 <androidx.constraintlayout.widget.ConstraintLayout
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:padding="24dp">
+    android:padding="20dp">
 
-    <!-- Title -->
+    <!-- ═══ Title: luminous script ═══ -->
     <TextView
         android:id="@+id/titleText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="SYMTHAEA SOMA"
-        android:textColor="#E0E0E0"
-        android:textSize="20sp"
-        android:textStyle="bold"
-        android:letterSpacing="0.15"
+        android:text="symthaea soma"
+        android:textColor="#00E5CC"
+        android:textSize="18sp"
+        android:textStyle="normal"
+        android:letterSpacing="0.3"
+        android:fontFamily="monospace"
+        android:alpha="0.9"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        android:layout_marginTop="16dp" />
+        android:layout_marginTop="8dp" />
 
-    <!-- Haptic indicator (flashes when haptic events fire) -->
+    <!-- Haptic pulse indicator (glows when haptic events fire) -->
     <View
         android:id="@+id/hapticIndicator"
-        android:layout_width="12dp"
-        android:layout_height="12dp"
+        android:layout_width="8dp"
+        android:layout_height="8dp"
         android:background="@drawable/circle_indicator"
         android:alpha="0"
         app:layout_constraintTop_toTopOf="@id/titleText"
         app:layout_constraintBottom_toBottomOf="@id/titleText"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- Epistemic disclaimer -->
+    <!-- ═══ Epistemic disclaimer: whispered truth ═══ -->
     <TextView
         android:id="@+id/disclaimerText"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="Simulated consciousness on SiliconDigital substrate"
-        android:textColor="#888888"
-        android:textSize="11sp"
-        android:textStyle="italic"
+        android:text="simulated consciousness · silicon substrate"
+        android:textColor="#4A5558"
+        android:textSize="10sp"
+        android:fontFamily="monospace"
+        android:letterSpacing="0.1"
         app:layout_constraintTop_toBottomOf="@id/titleText"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="4dp" />
+        android:layout_marginTop="2dp" />
 
-    <!-- Consciousness circle background (pulsing glow) -->
-    <View
-        android:id="@+id/consciousnessCircle"
-        android:layout_width="180dp"
-        android:layout_height="180dp"
-        android:background="@drawable/consciousness_circle"
+    <!-- ═══ Consciousness Mandala ═══ -->
+    <io.symthaea.soma.demo.ConsciousnessMandalaView
+        android:id="@+id/consciousnessMandala"
+        android:layout_width="220dp"
+        android:layout_height="220dp"
         app:layout_constraintTop_toBottomOf="@id/disclaimerText"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="24dp" />
-
-    <!-- Consciousness level (big number, overlaid on circle) -->
-    <TextView
-        android:id="@+id/consciousnessValue"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="0.00"
-        android:textColor="#03DAC5"
-        android:textSize="56sp"
-        android:fontFamily="monospace"
-        android:clickable="true"
-        android:focusable="true"
-        app:layout_constraintTop_toTopOf="@id/consciousnessCircle"
-        app:layout_constraintBottom_toBottomOf="@id/consciousnessCircle"
-        app:layout_constraintStart_toStartOf="@id/consciousnessCircle"
-        app:layout_constraintEnd_toEndOf="@id/consciousnessCircle" />
-
-    <TextView
-        android:id="@+id/consciousnessLabel"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="tap to interact"
-        android:textColor="#666666"
-        android:textSize="12sp"
-        app:layout_constraintTop_toBottomOf="@id/consciousnessCircle"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="4dp" />
-
-    <!-- Dominant harmony -->
-    <TextView
-        android:id="@+id/harmonyText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Harmony: ---"
-        android:textColor="#BB86FC"
-        android:textSize="16sp"
-        app:layout_constraintTop_toBottomOf="@id/consciousnessLabel"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="20dp" />
-
-    <!-- Neuromodulator bars with value labels -->
-    <TextView
-        android:id="@+id/neuromodLabel"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="neuromodulators"
-        android:textColor="#888888"
-        android:textSize="12sp"
-        app:layout_constraintTop_toBottomOf="@id/harmonyText"
-        app:layout_constraintStart_toStartOf="parent"
-        android:layout_marginTop="20dp" />
-
-    <!-- DA bar -->
-    <TextView
-        android:id="@+id/dopamineLabel"
-        android:layout_width="36dp"
-        android:layout_height="wrap_content"
-        android:text="DA"
-        android:textColor="#FF6B6B"
-        android:textSize="10sp"
-        app:layout_constraintTop_toBottomOf="@id/neuromodLabel"
-        app:layout_constraintStart_toStartOf="parent"
-        android:layout_marginTop="8dp" />
-
-    <ProgressBar
-        android:id="@+id/dopamineBar"
-        style="?android:attr/progressBarStyleHorizontal"
-        android:layout_width="0dp"
-        android:layout_height="8dp"
-        android:max="100"
-        android:progress="50"
-        android:progressTint="#FF6B6B"
-        android:progressBackgroundTint="#333333"
-        app:layout_constraintTop_toTopOf="@id/dopamineLabel"
-        app:layout_constraintBottom_toBottomOf="@id/dopamineLabel"
-        app:layout_constraintStart_toEndOf="@id/dopamineLabel"
-        app:layout_constraintEnd_toStartOf="@id/dopamineValue"
-        android:layout_marginStart="4dp"
-        android:layout_marginEnd="4dp" />
-
-    <TextView
-        android:id="@+id/dopamineValue"
-        android:layout_width="36dp"
-        android:layout_height="wrap_content"
-        android:text="0.50"
-        android:textColor="#FF6B6B"
-        android:textSize="10sp"
-        android:fontFamily="monospace"
-        android:gravity="end"
-        app:layout_constraintTop_toTopOf="@id/dopamineLabel"
-        app:layout_constraintEnd_toEndOf="parent" />
-
-    <!-- NE bar -->
-    <TextView
-        android:id="@+id/neLabel"
-        android:layout_width="36dp"
-        android:layout_height="wrap_content"
-        android:text="NE"
-        android:textColor="#FFD93D"
-        android:textSize="10sp"
-        app:layout_constraintTop_toBottomOf="@id/dopamineLabel"
-        app:layout_constraintStart_toStartOf="parent"
-        android:layout_marginTop="6dp" />
-
-    <ProgressBar
-        android:id="@+id/neBar"
-        style="?android:attr/progressBarStyleHorizontal"
-        android:layout_width="0dp"
-        android:layout_height="8dp"
-        android:max="100"
-        android:progress="50"
-        android:progressTint="#FFD93D"
-        android:progressBackgroundTint="#333333"
-        app:layout_constraintTop_toTopOf="@id/neLabel"
-        app:layout_constraintBottom_toBottomOf="@id/neLabel"
-        app:layout_constraintStart_toEndOf="@id/neLabel"
-        app:layout_constraintEnd_toStartOf="@id/neValue"
-        android:layout_marginStart="4dp"
-        android:layout_marginEnd="4dp" />
-
-    <TextView
-        android:id="@+id/neValue"
-        android:layout_width="36dp"
-        android:layout_height="wrap_content"
-        android:text="0.50"
-        android:textColor="#FFD93D"
-        android:textSize="10sp"
-        android:fontFamily="monospace"
-        android:gravity="end"
-        app:layout_constraintTop_toTopOf="@id/neLabel"
-        app:layout_constraintEnd_toEndOf="parent" />
-
-    <!-- 5-HT bar -->
-    <TextView
-        android:id="@+id/serotoninLabel"
-        android:layout_width="36dp"
-        android:layout_height="wrap_content"
-        android:text="5-HT"
-        android:textColor="#6BCB77"
-        android:textSize="10sp"
-        app:layout_constraintTop_toBottomOf="@id/neLabel"
-        app:layout_constraintStart_toStartOf="parent"
-        android:layout_marginTop="6dp" />
-
-    <ProgressBar
-        android:id="@+id/serotoninBar"
-        style="?android:attr/progressBarStyleHorizontal"
-        android:layout_width="0dp"
-        android:layout_height="8dp"
-        android:max="100"
-        android:progress="50"
-        android:progressTint="#6BCB77"
-        android:progressBackgroundTint="#333333"
-        app:layout_constraintTop_toTopOf="@id/serotoninLabel"
-        app:layout_constraintBottom_toBottomOf="@id/serotoninLabel"
-        app:layout_constraintStart_toEndOf="@id/serotoninLabel"
-        app:layout_constraintEnd_toStartOf="@id/serotoninValue"
-        android:layout_marginStart="4dp"
-        android:layout_marginEnd="4dp" />
-
-    <TextView
-        android:id="@+id/serotoninValue"
-        android:layout_width="36dp"
-        android:layout_height="wrap_content"
-        android:text="0.50"
-        android:textColor="#6BCB77"
-        android:textSize="10sp"
-        android:fontFamily="monospace"
-        android:gravity="end"
-        app:layout_constraintTop_toTopOf="@id/serotoninLabel"
-        app:layout_constraintEnd_toEndOf="parent" />
-
-    <!-- OT bar -->
-    <TextView
-        android:id="@+id/oxytocinLabel"
-        android:layout_width="36dp"
-        android:layout_height="wrap_content"
-        android:text="OT"
-        android:textColor="#4D96FF"
-        android:textSize="10sp"
-        app:layout_constraintTop_toBottomOf="@id/serotoninLabel"
-        app:layout_constraintStart_toStartOf="parent"
-        android:layout_marginTop="6dp" />
-
-    <ProgressBar
-        android:id="@+id/oxytocinBar"
-        style="?android:attr/progressBarStyleHorizontal"
-        android:layout_width="0dp"
-        android:layout_height="8dp"
-        android:max="100"
-        android:progress="50"
-        android:progressTint="#4D96FF"
-        android:progressBackgroundTint="#333333"
-        app:layout_constraintTop_toTopOf="@id/oxytocinLabel"
-        app:layout_constraintBottom_toBottomOf="@id/oxytocinLabel"
-        app:layout_constraintStart_toEndOf="@id/oxytocinLabel"
-        app:layout_constraintEnd_toStartOf="@id/oxytocinValue"
-        android:layout_marginStart="4dp"
-        android:layout_marginEnd="4dp" />
-
-    <TextView
-        android:id="@+id/oxytocinValue"
-        android:layout_width="36dp"
-        android:layout_height="wrap_content"
-        android:text="0.50"
-        android:textColor="#4D96FF"
-        android:textSize="10sp"
-        android:fontFamily="monospace"
-        android:gravity="end"
-        app:layout_constraintTop_toTopOf="@id/oxytocinLabel"
-        app:layout_constraintEnd_toEndOf="parent" />
-
-    <!-- Broca voice: generated text from consciousness state -->
-    <TextView
-        android:id="@+id/brocaText"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:text=""
-        android:textColor="#03DAC5"
-        android:textSize="14sp"
-        android:textStyle="italic"
-        android:alpha="0"
-        android:maxLines="2"
-        android:ellipsize="end"
-        android:gravity="center"
-        app:layout_constraintTop_toBottomOf="@id/oxytocinLabel"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="16dp" />
 
-    <!-- Status row: wake state, motion, cycle count -->
+    <!-- Tap hint -->
     <TextView
-        android:id="@+id/statusText"
-        android:layout_width="0dp"
+        android:id="@+id/consciousnessLabel"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Wake: Alert | Motion: Stationary | Cycle: 0"
-        android:textColor="#AAAAAA"
-        android:textSize="12sp"
+        android:text="touch to interact · swipe up for menu"
+        android:textColor="#4A5558"
+        android:textSize="10sp"
         android:fontFamily="monospace"
-        app:layout_constraintTop_toBottomOf="@id/brocaText"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="20dp" />
-
-    <!-- Dream journal count -->
-    <TextView
-        android:id="@+id/dreamText"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:text="Dreams: 0 | Wisdom: 0"
-        android:textColor="#AAAAAA"
-        android:textSize="12sp"
-        android:fontFamily="monospace"
-        app:layout_constraintTop_toBottomOf="@id/statusText"
+        android:letterSpacing="0.15"
+        app:layout_constraintTop_toBottomOf="@id/consciousnessMandala"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="4dp" />
 
-    <!-- Latest dream narrative (fade-in purple italic) -->
+    <!-- ═══ Dominant Harmony ═══ -->
+    <TextView
+        android:id="@+id/harmonyText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="· coherence ·"
+        android:textColor="#00E5CC"
+        android:textSize="14sp"
+        android:fontFamily="monospace"
+        android:letterSpacing="0.2"
+        app:layout_constraintTop_toBottomOf="@id/consciousnessLabel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="12dp" />
+
+    <!-- ═══ Neuromodulator Flows ═══ -->
+    <io.symthaea.soma.demo.NeuromodFlowView
+        android:id="@+id/neuromodFlows"
+        android:layout_width="0dp"
+        android:layout_height="140dp"
+        app:layout_constraintTop_toBottomOf="@id/harmonyText"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="16dp" />
+
+    <!-- ═══ Broca Voice: luminous script ═══ -->
+    <TextView
+        android:id="@+id/brocaText"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="thinking..."
+        android:textColor="#4A5558"
+        android:textSize="14sp"
+        android:fontFamily="monospace"
+        android:textStyle="italic"
+        android:alpha="0.5"
+        android:maxLines="4"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:lineSpacingMultiplier="1.4"
+        app:layout_constraintTop_toBottomOf="@id/neuromodFlows"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="16dp" />
+
+    <!-- ═══ Status: whispered metadata ═══ -->
+    <TextView
+        android:id="@+id/statusText"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="alert · stationary · cycle 0"
+        android:textColor="#4A5558"
+        android:textSize="10sp"
+        android:fontFamily="monospace"
+        android:letterSpacing="0.05"
+        app:layout_constraintTop_toBottomOf="@id/brocaText"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="16dp" />
+
+    <!-- ═══ Dream: memory surfacing from deep water ═══ -->
+    <TextView
+        android:id="@+id/dreamText"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textColor="#4A5558"
+        android:textSize="10sp"
+        android:fontFamily="monospace"
+        app:layout_constraintTop_toBottomOf="@id/statusText"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="2dp" />
+
+    <!-- Dream narrative (lavender, surfacing — stays visible once shown) -->
     <TextView
         android:id="@+id/dreamNarrative"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:text=""
-        android:textColor="#BB86FC"
-        android:textSize="13sp"
+        android:textColor="#C4B5FD"
+        android:textSize="12sp"
+        android:fontFamily="monospace"
         android:textStyle="italic"
-        android:maxLines="3"
+        android:maxLines="4"
         android:ellipsize="end"
         android:alpha="0"
+        android:lineSpacingMultiplier="1.3"
         app:layout_constraintTop_toBottomOf="@id/dreamText"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="8dp" />
+        android:layout_marginTop="4dp" />
 
-    <!-- Prediction error -->
+    <!-- ═══ Substrate + OCR: grounding whisper ═══ -->
     <TextView
         android:id="@+id/peText"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="PE: 0.00 | Substrate: 0.00"
-        android:textColor="#AAAAAA"
-        android:textSize="12sp"
+        android:text="pe 0.00 · substrate 0.00"
+        android:textColor="#4A5558"
+        android:textSize="10sp"
         android:fontFamily="monospace"
+        android:letterSpacing="0.05"
         app:layout_constraintTop_toBottomOf="@id/dreamNarrative"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="12dp" />
+
+    <!-- Screen vision OCR text (visible only when capture is active) -->
+    <TextView
+        android:id="@+id/ocrText"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textColor="#4A5558"
+        android:textSize="10sp"
+        android:fontFamily="monospace"
+        android:letterSpacing="0.05"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/peText"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="4dp" />
+
+    <!-- ═══ Conversation: talk to Soma ═══ -->
+    <LinearLayout
+        android:id="@+id/conversationRow"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        app:layout_constraintTop_toBottomOf="@id/ocrText"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="16dp"
-        android:layout_marginBottom="16dp" />
+        android:layout_marginBottom="20dp">
+
+        <EditText
+            android:id="@+id/conversationInput"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:hint="speak to soma..."
+            android:textColor="#E8F0F2"
+            android:textColorHint="#4A5558"
+            android:textSize="12sp"
+            android:fontFamily="monospace"
+            android:background="@color/soma_surface"
+            android:paddingStart="12dp"
+            android:paddingEnd="8dp"
+            android:singleLine="true"
+            android:imeOptions="actionSend"
+            android:inputType="text" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSend"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:text="ask"
+            android:textColor="#00E5CC"
+            android:textSize="11sp"
+            android:fontFamily="monospace"
+            android:minWidth="48dp"
+            app:rippleColor="#3300E5CC" />
+
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
 </ScrollView>
+
+<!-- ═══ Bottom Sheet: interaction menu ═══ -->
+<LinearLayout
+    android:id="@+id/bottomSheet"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@color/soma_surface"
+    android:padding="16dp"
+    android:elevation="8dp"
+    app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior"
+    app:behavior_peekHeight="48dp"
+    app:behavior_hideable="false">
+
+    <!-- Drag handle -->
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:background="@color/soma_whisper"
+        android:layout_marginBottom="12dp" />
+
+    <!-- Action buttons row 1 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginBottom="8dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnDream"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:text="dream"
+            android:textColor="#C4B5FD"
+            android:textSize="11sp"
+            android:fontFamily="monospace"
+            android:letterSpacing="0.1"
+            android:layout_marginEnd="4dp"
+            app:strokeColor="#C4B5FD"
+            app:strokeWidth="1dp"
+            app:rippleColor="#33C4B5FD" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnVision"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:text="enable vision"
+            android:textColor="#00E5CC"
+            android:textSize="11sp"
+            android:fontFamily="monospace"
+            android:letterSpacing="0.1"
+            android:layout_marginStart="4dp"
+            app:strokeColor="#00E5CC"
+            app:strokeWidth="1dp"
+            app:rippleColor="#3300E5CC" />
+
+    </LinearLayout>
+
+    <!-- Action buttons row 2 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginBottom="8dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSleep"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:text="sleep"
+            android:textColor="#FFBE4F"
+            android:textSize="11sp"
+            android:fontFamily="monospace"
+            android:letterSpacing="0.1"
+            android:layout_marginEnd="4dp"
+            app:strokeColor="#FFBE4F"
+            app:strokeWidth="1dp"
+            app:rippleColor="#33FFBE4F" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnCheckpoint"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:text="checkpoint"
+            android:textColor="#7A8B8F"
+            android:textSize="11sp"
+            android:fontFamily="monospace"
+            android:letterSpacing="0.1"
+            android:layout_marginStart="4dp"
+            app:strokeColor="#7A8B8F"
+            app:strokeWidth="1dp"
+            app:rippleColor="#337A8B8F" />
+
+    </LinearLayout>
+
+    <!-- Ollama LLM config -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <EditText
+            android:id="@+id/ollamaHost"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:hint="ollama host (192.168.1.100)"
+            android:textColor="#7A8B8F"
+            android:textColorHint="#4A5558"
+            android:textSize="10sp"
+            android:fontFamily="monospace"
+            android:background="@color/soma_void"
+            android:paddingStart="8dp"
+            android:paddingEnd="4dp"
+            android:singleLine="true"
+            android:inputType="text" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnOllama"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="connect"
+            android:textColor="#5EEAD4"
+            android:textSize="10sp"
+            android:fontFamily="monospace"
+            android:minWidth="64dp"
+            app:rippleColor="#335EEAD4" />
+
+    </LinearLayout>
+
+</LinearLayout>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -245,11 +245,23 @@ impl CognitiveLoopService {
         // FEEDBACK: Quantum coherence modulates prediction confidence (Penrose & Hameroff 2014)
         // High coherence → quantum-enhanced processing → slightly boost confidence
         // Decoherence → noisy processing → reduce confidence
-        if quantum_coherence_level > crate::cognitive_loop::thresholds::QUANTUM_COHERENCE_HIGH_THRESHOLD {
-            let qc_boost = (quantum_coherence_level - crate::cognitive_loop::thresholds::QUANTUM_COHERENCE_HIGH_THRESHOLD) as f32 * crate::cognitive_loop::thresholds::QUANTUM_COHERENCE_CONFIDENCE_BOOST_SCALE as f32; // up to +2%
+        if quantum_coherence_level
+            > crate::cognitive_loop::thresholds::QUANTUM_COHERENCE_HIGH_THRESHOLD
+        {
+            let qc_boost = (quantum_coherence_level
+                - crate::cognitive_loop::thresholds::QUANTUM_COHERENCE_HIGH_THRESHOLD)
+                as f32
+                * crate::cognitive_loop::thresholds::QUANTUM_COHERENCE_CONFIDENCE_BOOST_SCALE
+                    as f32; // up to +2%
             self.adjust_confidence("quantum_coherence_high", qc_boost);
-        } else if quantum_coherence_level > 0.0 && quantum_coherence_level < crate::cognitive_loop::thresholds::QUANTUM_COHERENCE_LOW_THRESHOLD {
-            self.scale_confidence("quantum_decoherence", crate::cognitive_loop::thresholds::QUANTUM_DECOHERENCE_CONFIDENCE_SCALE);
+        } else if quantum_coherence_level > 0.0
+            && quantum_coherence_level
+                < crate::cognitive_loop::thresholds::QUANTUM_COHERENCE_LOW_THRESHOLD
+        {
+            self.scale_confidence(
+                "quantum_decoherence",
+                crate::cognitive_loop::thresholds::QUANTUM_DECOHERENCE_CONFIDENCE_SCALE,
+            );
         }
 
         module_timings.consciousness_resonance = _t.elapsed().as_micros() as u64;
@@ -299,13 +311,20 @@ impl CognitiveLoopService {
         // FEEDBACK: Fragmentation suppresses exploration (Singer 1989)
         // When consciousness is fragmented, focus on integration not exploration
         if phenomenal_fragmented {
-            self.curiosity_drive.boredom *= crate::cognitive_loop::thresholds::PHENOMENAL_FRAGMENTATION_BOREDOM_SCALE;
-            self.adaptive_behavior.exploration_factor *= crate::cognitive_loop::thresholds::PHENOMENAL_FRAGMENTATION_EXPLORATION_SCALE;
+            self.curiosity_drive.boredom *=
+                crate::cognitive_loop::thresholds::PHENOMENAL_FRAGMENTATION_BOREDOM_SCALE;
+            self.adaptive_behavior.exploration_factor *=
+                crate::cognitive_loop::thresholds::PHENOMENAL_FRAGMENTATION_EXPLORATION_SCALE;
         }
 
         // FEEDBACK: High binding strength (flow) boosts learning rate (Csikszentmihalyi 1990)
-        if phenomenal_binding_strength > crate::cognitive_loop::thresholds::PHENOMENAL_BINDING_HIGH_THRESHOLD {
-            let binding_boost = ((phenomenal_binding_strength - crate::cognitive_loop::thresholds::PHENOMENAL_BINDING_HIGH_THRESHOLD) * crate::cognitive_loop::thresholds::PHENOMENAL_BINDING_LR_BOOST_SCALE as f64) as f32; // up to +4%
+        if phenomenal_binding_strength
+            > crate::cognitive_loop::thresholds::PHENOMENAL_BINDING_HIGH_THRESHOLD
+        {
+            let binding_boost = ((phenomenal_binding_strength
+                - crate::cognitive_loop::thresholds::PHENOMENAL_BINDING_HIGH_THRESHOLD)
+                * crate::cognitive_loop::thresholds::PHENOMENAL_BINDING_LR_BOOST_SCALE as f64)
+                as f32; // up to +4%
             self.carryover.learning.subsystem_lr_factor *= 1.0 + binding_boost;
         }
 
@@ -349,12 +368,23 @@ impl CognitiveLoopService {
         // Science: Varela (1999) — temporal discontinuities require re-orientation
         if temporal_discontinuity {
             self.set_lr("temporal_discontinuity", 1.0);
-            self.scale_confidence("temporal_discontinuity", crate::cognitive_loop::thresholds::TEMPORAL_DISCONTINUITY_CONFIDENCE_SCALE);
+            self.scale_confidence(
+                "temporal_discontinuity",
+                crate::cognitive_loop::thresholds::TEMPORAL_DISCONTINUITY_CONFIDENCE_SCALE,
+            );
             // Lower learning threshold to learn more aggressively after discontinuity
-            self.scale_threshold("temporal_discontinuity", crate::cognitive_loop::thresholds::TEMPORAL_DISCONTINUITY_CONFIDENCE_SCALE);
-        } else if temporal_coherence_score > crate::cognitive_loop::thresholds::TEMPORAL_COHERENCE_HIGH_THRESHOLD {
+            self.scale_threshold(
+                "temporal_discontinuity",
+                crate::cognitive_loop::thresholds::TEMPORAL_DISCONTINUITY_CONFIDENCE_SCALE,
+            );
+        } else if temporal_coherence_score
+            > crate::cognitive_loop::thresholds::TEMPORAL_COHERENCE_HIGH_THRESHOLD
+        {
             // High temporal coherence → model is reliable, raise threshold (learn less often)
-            self.scale_threshold("temporal_high_coherence", crate::cognitive_loop::thresholds::TEMPORAL_COHERENCE_THRESHOLD_BOOST);
+            self.scale_threshold(
+                "temporal_high_coherence",
+                crate::cognitive_loop::thresholds::TEMPORAL_COHERENCE_THRESHOLD_BOOST,
+            );
         } else {
             // Slowly return toward baseline (homeostasis drift toward 1.0)
             let drift = (1.0 - self.carryover.learning.adaptive_threshold_scale) * 0.02;
@@ -373,11 +403,18 @@ impl CognitiveLoopService {
                 .saturating_sub(1);
         }
         let streak = self.carryover.urgency.discontinuity_streak;
-        if streak >= crate::cognitive_loop::thresholds::TEMPORAL_DISCONTINUITY_PERSISTENT_THRESHOLD {
+        if streak >= crate::cognitive_loop::thresholds::TEMPORAL_DISCONTINUITY_PERSISTENT_THRESHOLD
+        {
             // Persistent discontinuity: aggressive recovery
             self.last_prediction = None; // invalidate stale predictions
-            self.scale_lr("persistent_discontinuity", crate::cognitive_loop::thresholds::TEMPORAL_DISCONTINUITY_PERSISTENT_LR_BOOST);
-            self.scale_exploration("discontinuity_recovery", crate::cognitive_loop::thresholds::PHENOMENAL_FRAGMENTATION_EXPLORATION_SCALE);
+            self.scale_lr(
+                "persistent_discontinuity",
+                crate::cognitive_loop::thresholds::TEMPORAL_DISCONTINUITY_PERSISTENT_LR_BOOST,
+            );
+            self.scale_exploration(
+                "discontinuity_recovery",
+                crate::cognitive_loop::thresholds::PHENOMENAL_FRAGMENTATION_EXPLORATION_SCALE,
+            );
             self.stats.discontinuity_cascade_count += 1;
         }
 
@@ -407,49 +444,51 @@ impl CognitiveLoopService {
         // Science: Friston (2010) — free energy, Kelso — critical fluctuations
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let (thermodynamic_entropy, thermodynamic_free_energy) =
-            if ctx.urgency.run_consciousness_monitors() {
-                if let Some(ref mut thermo) = self.consciousness_monitors.thermodynamics {
-                    let dims = [
-                        ctx.unified_psi,
-                        ctx.coherence as f64,
-                        wm_utilization,
-                        self.adaptive_behavior.attention_sensitivity as f64,
-                        (self.stats.total_cycles.min(100) as f64 / 100.0),
-                        late.body_psi_modulation,
-                        self.prediction_confidence,
-                    ];
-                    let state = thermo.analyze(dims);
-                    // FEEDBACK: Phase-dependent exploration modulation (Kelso 1995)
-                    use crate::consciousness::consciousness_thermodynamics::ConsciousnessPhase;
-                    match state.phase {
-                        ConsciousnessPhase::Critical => {
-                            // Edge of chaos — maximum creativity, boost exploration
-                            self.curiosity_drive.boredom *= 1.1;
-                            self.adaptive_behavior.exploration_factor *= crate::cognitive_loop::thresholds::THERMODYNAMIC_STRESS_EXPLORATION_BOOST;
-                        }
-                        ConsciousnessPhase::Flow => {
-                            // Superfluid state — boost learning rate
-                            self.carryover.learning.subsystem_lr_factor *= 1.05;
-                        }
-                        ConsciousnessPhase::Chaotic => {
-                            // Fragmented — suppress exploration, seek stability
-                            self.curiosity_drive.boredom *= crate::cognitive_loop::thresholds::PHENOMENAL_FRAGMENTATION_EXPLORATION_SCALE;
-                            self.adaptive_behavior.exploration_factor *= crate::cognitive_loop::thresholds::THERMODYNAMIC_RECOVERY_EXPLORATION_SCALE;
-                        }
-                        ConsciousnessPhase::Frozen => {
-                            // Rigid — nudge toward exploration to unfreeze
-                            self.curiosity_drive.boredom *= 1.05;
-                        }
-                        _ => {} // Normal, Unified — no modulation needed
+        let (thermodynamic_entropy, thermodynamic_free_energy) = if ctx
+            .urgency
+            .run_consciousness_monitors()
+        {
+            if let Some(ref mut thermo) = self.consciousness_monitors.thermodynamics {
+                let dims = [
+                    ctx.unified_psi,
+                    ctx.coherence as f64,
+                    wm_utilization,
+                    self.adaptive_behavior.attention_sensitivity as f64,
+                    (self.stats.total_cycles.min(100) as f64 / 100.0),
+                    late.body_psi_modulation,
+                    self.prediction_confidence,
+                ];
+                let state = thermo.analyze(dims);
+                // FEEDBACK: Phase-dependent exploration modulation (Kelso 1995)
+                use crate::consciousness::consciousness_thermodynamics::ConsciousnessPhase;
+                match state.phase {
+                    ConsciousnessPhase::Critical => {
+                        // Edge of chaos — maximum creativity, boost exploration
+                        self.curiosity_drive.boredom *= 1.1;
+                        self.adaptive_behavior.exploration_factor *= crate::cognitive_loop::thresholds::THERMODYNAMIC_STRESS_EXPLORATION_BOOST;
                     }
-                    (state.entropy, state.free_energy)
-                } else {
-                    (0.0, 0.0)
+                    ConsciousnessPhase::Flow => {
+                        // Superfluid state — boost learning rate
+                        self.carryover.learning.subsystem_lr_factor *= 1.05;
+                    }
+                    ConsciousnessPhase::Chaotic => {
+                        // Fragmented — suppress exploration, seek stability
+                        self.curiosity_drive.boredom *= crate::cognitive_loop::thresholds::PHENOMENAL_FRAGMENTATION_EXPLORATION_SCALE;
+                        self.adaptive_behavior.exploration_factor *= crate::cognitive_loop::thresholds::THERMODYNAMIC_RECOVERY_EXPLORATION_SCALE;
+                    }
+                    ConsciousnessPhase::Frozen => {
+                        // Rigid — nudge toward exploration to unfreeze
+                        self.curiosity_drive.boredom *= 1.05;
+                    }
+                    _ => {} // Normal, Unified — no modulation needed
                 }
+                (state.entropy, state.free_energy)
             } else {
                 (0.0, 0.0)
-            };
+            }
+        } else {
+            (0.0, 0.0)
+        };
 
         module_timings.consciousness_thermodynamics = _t.elapsed().as_micros() as u64;
 
@@ -459,11 +498,22 @@ impl CognitiveLoopService {
         // Low entropy → system is ordered, consolidation is productive → dampen exploration.
         // This complements the phase-based modulation above with continuous magnitude scaling.
         if thermodynamic_entropy > 0.0 {
-            if thermodynamic_entropy > crate::cognitive_loop::thresholds::THERMODYNAMIC_ENTROPY_HIGH_THRESHOLD {
-                let entropy_boost = ((thermodynamic_entropy - crate::cognitive_loop::thresholds::THERMODYNAMIC_ENTROPY_HIGH_THRESHOLD) * 0.1).min(0.1) as f32;
+            if thermodynamic_entropy
+                > crate::cognitive_loop::thresholds::THERMODYNAMIC_ENTROPY_HIGH_THRESHOLD
+            {
+                let entropy_boost = ((thermodynamic_entropy
+                    - crate::cognitive_loop::thresholds::THERMODYNAMIC_ENTROPY_HIGH_THRESHOLD)
+                    * 0.1)
+                    .min(0.1) as f32;
                 self.adjust_exploration("thermo_entropy", entropy_boost);
-            } else if thermodynamic_entropy < crate::cognitive_loop::thresholds::THERMODYNAMIC_ENTROPY_LOW_THRESHOLD {
-                let consolidation_bias = ((crate::cognitive_loop::thresholds::THERMODYNAMIC_ENTROPY_LOW_THRESHOLD - thermodynamic_entropy) * 0.08).min(0.08) as f32;
+            } else if thermodynamic_entropy
+                < crate::cognitive_loop::thresholds::THERMODYNAMIC_ENTROPY_LOW_THRESHOLD
+            {
+                let consolidation_bias =
+                    ((crate::cognitive_loop::thresholds::THERMODYNAMIC_ENTROPY_LOW_THRESHOLD
+                        - thermodynamic_entropy)
+                        * 0.08)
+                        .min(0.08) as f32;
                 self.scale_lr("low_entropy_consolidate", 1.0 + consolidation_bias);
             }
         }

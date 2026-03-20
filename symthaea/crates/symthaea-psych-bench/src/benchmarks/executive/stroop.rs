@@ -118,11 +118,21 @@ impl StroopBenchmark {
             };
 
             // Compute similarity to each color candidate
-            // Encoding noise degrades color discrimination
-            let noise_degrade = config.effective_noise() as f32 * 0.4;
+            // Encoding noise adds per-comparison noise (individual differences in
+            // perceptual discrimination; Lu & Dosher, 1998 noise exclusion model).
+            let enc_noise = config.effective_noise() as f32;
             let sims: Vec<f64> = color_hvs
                 .iter()
-                .map(|c| (combined.similarity(c) * (1.0 - noise_degrade)) as f64)
+                .enumerate()
+                .map(|(ci, c)| {
+                    let raw = combined.similarity(c);
+                    // Per-comparison noise: hash-based deterministic noise per color×trial
+                    let noise_seed = seed.wrapping_add(5000 + trial as u64 * 7 + ci as u64 * 31);
+                    let noise_val = ((noise_seed.wrapping_mul(0x9E3779B97F4A7C15) >> 33) as f32
+                        / (1u64 << 31) as f32)
+                        - 0.5;
+                    (raw + noise_val * enc_noise * 0.15) as f64
+                })
                 .collect();
 
             // Softmax response selection with temperature
@@ -145,6 +155,23 @@ impl StroopBenchmark {
                     break;
                 }
             }
+
+            // Attention lapse: incongruent trials are more vulnerable because
+            // response conflict demands sustained attention (Botvinick et al., 2001).
+            let unique_trial = trial_idx * (trials_per_condition * 3) + trial;
+            let conflict_boost = match condition {
+                Condition::Incongruent => config.lapse_rate * 0.6,
+                Condition::Neutral => config.lapse_rate * 0.2,
+                Condition::Congruent => 0.0,
+            };
+            let effective_lapse = config.lapse_rate + conflict_boost;
+            let lapse_seed = config.trial_seed("stroop", "lapse", unique_trial);
+            response_idx = if (lapse_seed % 10000) as f64 / 10000.0 < effective_lapse {
+                let h = config.trial_seed("stroop", "lapse_choice", unique_trial);
+                h as usize % 4
+            } else {
+                response_idx
+            };
 
             // RT proxy: deliberation ticks based on decision margin
             let decision_margin = (sims[ink_idx] - max_sim + sims[ink_idx]).abs()

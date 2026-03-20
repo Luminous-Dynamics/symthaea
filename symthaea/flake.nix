@@ -275,11 +275,11 @@
             echo "  CC:   ${ndkToolchain}/bin/aarch64-linux-android24-clang"
             echo ""
             echo "  Build commands:"
-            echo "    cargo build --target aarch64-linux-android --release -p symthaea-spore --features native-ffi"
-            echo "    ./crates/symthaea-spore/build-android.sh"
+            echo "    cargo build --target aarch64-linux-android --release -p symthaea-soma --features native-ffi"
+            echo "    ./crates/symthaea-soma/android/build-jni.sh"
             echo ""
             echo "  Deploy to Pixel:"
-            echo "    adb push target/aarch64-linux-android/release/libsymthaea_spore.so /data/local/tmp/"
+            echo "    adb push target/aarch64-linux-android/release/libsymthaea_soma.so /data/local/tmp/"
             echo ""
           '';
         };

@@ -8,6 +8,7 @@ plugins {
 android {
     namespace = "io.symthaea.soma"
     compileSdk = 34
+    buildToolsVersion = "36.1.0"  // Match Nix-provided SDK (read-only store can't install 34.0.0)
     ndkVersion = "27.0.12077973"
 
     defaultConfig {

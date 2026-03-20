@@ -162,11 +162,7 @@ impl PqcHandshakeManager {
     ///
     /// Called when the initiator receives the responder's `KemExchange`
     /// (which contains their KEM public key but no ciphertext yet).
-    pub fn receive_kem_public_key(
-        &mut self,
-        peer_id: &str,
-        kem_public_key: &[u8],
-    ) {
+    pub fn receive_kem_public_key(&mut self, peer_id: &str, kem_public_key: &[u8]) {
         self.pending_kem
             .insert(peer_id.to_string(), kem_public_key.to_vec());
     }
@@ -184,29 +180,30 @@ impl PqcHandshakeManager {
         peer_id: &str,
         classical_nonce: &[u8],
     ) -> SwarmResult<Vec<u8>> {
-        let kem_pk_bytes = self.pending_kem.remove(peer_id).ok_or_else(|| {
-            SwarmError::TrustVerificationError {
-                reason: format!("No KEM public key stored for peer '{peer_id}'"),
-            }
-        })?;
+        let kem_pk_bytes =
+            self.pending_kem
+                .remove(peer_id)
+                .ok_or_else(|| SwarmError::TrustVerificationError {
+                    reason: format!("No KEM public key stored for peer '{peer_id}'"),
+                })?;
 
         // Build TaggedPublicKey for the responder
-        let tagged_pk = TaggedPublicKey::new(AlgorithmId::MlKem768, kem_pk_bytes)
-        .map_err(|e| SwarmError::TrustVerificationError {
-            reason: format!("Invalid KEM public key: {e}"),
+        let tagged_pk = TaggedPublicKey::new(AlgorithmId::MlKem768, kem_pk_bytes).map_err(|e| {
+            SwarmError::TrustVerificationError {
+                reason: format!("Invalid KEM public key: {e}"),
+            }
         })?;
 
         // Encapsulate shared secret
         let (ciphertext, kem_shared_secret) =
-            self.kem_keypair
-                .encapsulate(&tagged_pk)
-                .map_err(|e| SwarmError::TrustVerificationError {
+            self.kem_keypair.encapsulate(&tagged_pk).map_err(|e| {
+                SwarmError::TrustVerificationError {
                     reason: format!("ML-KEM-768 encapsulation failed: {e}"),
-                })?;
+                }
+            })?;
 
         // Derive session key: HKDF(classical_nonce || kem_shared_secret)
-        let session_key =
-            Self::hkdf_derive(classical_nonce, &kem_shared_secret);
+        let session_key = Self::hkdf_derive(classical_nonce, &kem_shared_secret);
 
         self.session_keys.insert(
             peer_id.to_string(),
@@ -236,16 +233,14 @@ impl PqcHandshakeManager {
         classical_nonce: &[u8],
     ) -> SwarmResult<[u8; 32]> {
         // Decapsulate shared secret
-        let kem_shared_secret = self
-            .kem_keypair
-            .decapsulate(kem_ciphertext)
-            .map_err(|e| SwarmError::TrustVerificationError {
+        let kem_shared_secret = self.kem_keypair.decapsulate(kem_ciphertext).map_err(|e| {
+            SwarmError::TrustVerificationError {
                 reason: format!("ML-KEM-768 decapsulation failed: {e}"),
-            })?;
+            }
+        })?;
 
         // Derive session key: HKDF(classical_nonce || kem_shared_secret)
-        let session_key =
-            Self::hkdf_derive(classical_nonce, &kem_shared_secret);
+        let session_key = Self::hkdf_derive(classical_nonce, &kem_shared_secret);
 
         self.session_keys.insert(
             peer_id.to_string(),
@@ -430,7 +425,11 @@ mod tests {
         let _ = initiator.encapsulate_for_peer("peer-B", &nonce).unwrap();
 
         let key = initiator.session_key("peer-B").unwrap();
-        assert_eq!(key.len(), 32, "Session key must be 32 bytes for ChaCha20-Poly1305");
+        assert_eq!(
+            key.len(),
+            32,
+            "Session key must be 32 bytes for ChaCha20-Poly1305"
+        );
     }
 
     #[test]

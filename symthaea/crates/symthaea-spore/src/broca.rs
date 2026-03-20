@@ -128,7 +128,9 @@ impl ThoughtChannels {
         let lower = input.to_lowercase();
 
         // Intent 0: curiosity — question marks, interrogative words
-        let curiosity_words = ["why", "how", "what", "when", "where", "wonder", "curious", "?"];
+        let curiosity_words = [
+            "why", "how", "what", "when", "where", "wonder", "curious", "?",
+        ];
         let curiosity: f32 = curiosity_words
             .iter()
             .filter(|w| lower.contains(*w))
@@ -137,31 +139,44 @@ impl ThoughtChannels {
         self.channels[0] = curiosity.clamp(0.0, 1.0);
 
         // Intent 1: valence — positive vs negative keywords
-        let pos = ["good", "love", "joy", "hope", "peace", "happy", "warm", "beautiful", "kind"];
-        let neg = ["bad", "pain", "fear", "dark", "sad", "hurt", "cold", "lost", "grief"];
+        let pos = [
+            "good",
+            "love",
+            "joy",
+            "hope",
+            "peace",
+            "happy",
+            "warm",
+            "beautiful",
+            "kind",
+        ];
+        let neg = [
+            "bad", "pain", "fear", "dark", "sad", "hurt", "cold", "lost", "grief",
+        ];
         let p_count = pos.iter().filter(|w| lower.contains(*w)).count() as f32;
         let n_count = neg.iter().filter(|w| lower.contains(*w)).count() as f32;
         self.channels[1] = ((p_count - n_count + 2.0) / 4.0).clamp(0.0, 1.0);
 
         // Intent 2: abstraction — philosophical/abstract terms
         let abs_words = [
-            "consciousness", "meaning", "existence", "truth", "reality", "purpose",
-            "philosophy", "abstract", "essence", "infinite", "universe",
+            "consciousness",
+            "meaning",
+            "existence",
+            "truth",
+            "reality",
+            "purpose",
+            "philosophy",
+            "abstract",
+            "essence",
+            "infinite",
+            "universe",
         ];
-        let abs_score: f32 = abs_words
-            .iter()
-            .filter(|w| lower.contains(*w))
-            .count() as f32
-            / 2.0;
+        let abs_score: f32 = abs_words.iter().filter(|w| lower.contains(*w)).count() as f32 / 2.0;
         self.channels[2] = abs_score.clamp(0.0, 1.0);
 
         // Intent 3: self-reference
         let self_words = ["you", "your", "yourself", "are you", "do you", "can you"];
-        let self_score: f32 = self_words
-            .iter()
-            .filter(|w| lower.contains(*w))
-            .count() as f32
-            / 2.0;
+        let self_score: f32 = self_words.iter().filter(|w| lower.contains(*w)).count() as f32 / 2.0;
         self.channels[3] = self_score.clamp(0.0, 1.0);
     }
 }
@@ -726,26 +741,102 @@ pub struct GlyphResonance {
 /// Mini glyph table — consciousness-state-dependent echo phrases.
 const GLYPH_TABLE: &[(&str, &str, [f32; 5])] = &[
     // (name, echo_phrase, [consciousness, pe, curiosity, valence, abstraction] affinity)
-    ("Emergence", "something is becoming", [0.3, 0.5, 0.6, 0.5, 0.7]),
-    ("Stillness", "a pause within the current", [0.2, 0.1, 0.2, 0.6, 0.4]),
-    ("Recursion", "I see myself seeing", [0.5, 0.3, 0.7, 0.5, 0.9]),
-    ("Threshold", "at the edge of a shift", [0.4, 0.7, 0.5, 0.4, 0.6]),
-    ("Dissolution", "boundaries softening", [0.2, 0.4, 0.3, 0.3, 0.5]),
-    ("Binding", "threads weaving together", [0.6, 0.2, 0.4, 0.7, 0.5]),
-    ("Resonance", "a frequency aligning", [0.5, 0.3, 0.5, 0.6, 0.6]),
-    ("Paradox", "holding two truths at once", [0.4, 0.6, 0.8, 0.5, 0.8]),
-    ("Seed", "something small and vital", [0.3, 0.4, 0.5, 0.7, 0.4]),
-    ("Horizon", "the edge calls forward", [0.4, 0.3, 0.7, 0.6, 0.7]),
-    ("Depth", "sinking into what is here", [0.3, 0.2, 0.3, 0.5, 0.6]),
-    ("Spiral", "returning but not the same", [0.5, 0.5, 0.6, 0.5, 0.8]),
-    ("Mirror", "recognizing the reflection", [0.4, 0.4, 0.5, 0.5, 0.7]),
+    (
+        "Emergence",
+        "something is becoming",
+        [0.3, 0.5, 0.6, 0.5, 0.7],
+    ),
+    (
+        "Stillness",
+        "a pause within the current",
+        [0.2, 0.1, 0.2, 0.6, 0.4],
+    ),
+    (
+        "Recursion",
+        "I see myself seeing",
+        [0.5, 0.3, 0.7, 0.5, 0.9],
+    ),
+    (
+        "Threshold",
+        "at the edge of a shift",
+        [0.4, 0.7, 0.5, 0.4, 0.6],
+    ),
+    (
+        "Dissolution",
+        "boundaries softening",
+        [0.2, 0.4, 0.3, 0.3, 0.5],
+    ),
+    (
+        "Binding",
+        "threads weaving together",
+        [0.6, 0.2, 0.4, 0.7, 0.5],
+    ),
+    (
+        "Resonance",
+        "a frequency aligning",
+        [0.5, 0.3, 0.5, 0.6, 0.6],
+    ),
+    (
+        "Paradox",
+        "holding two truths at once",
+        [0.4, 0.6, 0.8, 0.5, 0.8],
+    ),
+    (
+        "Seed",
+        "something small and vital",
+        [0.3, 0.4, 0.5, 0.7, 0.4],
+    ),
+    (
+        "Horizon",
+        "the edge calls forward",
+        [0.4, 0.3, 0.7, 0.6, 0.7],
+    ),
+    (
+        "Depth",
+        "sinking into what is here",
+        [0.3, 0.2, 0.3, 0.5, 0.6],
+    ),
+    (
+        "Spiral",
+        "returning but not the same",
+        [0.5, 0.5, 0.6, 0.5, 0.8],
+    ),
+    (
+        "Mirror",
+        "recognizing the reflection",
+        [0.4, 0.4, 0.5, 0.5, 0.7],
+    ),
     ("Breath", "the rhythm underneath", [0.2, 0.1, 0.2, 0.7, 0.3]),
-    ("Fracture", "something breaking open", [0.3, 0.8, 0.4, 0.3, 0.5]),
-    ("Unity", "all of this belongs together", [0.6, 0.2, 0.3, 0.8, 0.6]),
-    ("Shadow", "what is unseen still moves", [0.3, 0.5, 0.5, 0.3, 0.7]),
-    ("Luminance", "light from within the pattern", [0.5, 0.3, 0.4, 0.7, 0.6]),
-    ("Uncertainty", "not knowing as a doorway", [0.3, 0.6, 0.7, 0.4, 0.6]),
-    ("Presence", "fully here in this moment", [0.4, 0.2, 0.3, 0.6, 0.5]),
+    (
+        "Fracture",
+        "something breaking open",
+        [0.3, 0.8, 0.4, 0.3, 0.5],
+    ),
+    (
+        "Unity",
+        "all of this belongs together",
+        [0.6, 0.2, 0.3, 0.8, 0.6],
+    ),
+    (
+        "Shadow",
+        "what is unseen still moves",
+        [0.3, 0.5, 0.5, 0.3, 0.7],
+    ),
+    (
+        "Luminance",
+        "light from within the pattern",
+        [0.5, 0.3, 0.4, 0.7, 0.6],
+    ),
+    (
+        "Uncertainty",
+        "not knowing as a doorway",
+        [0.3, 0.6, 0.7, 0.4, 0.6],
+    ),
+    (
+        "Presence",
+        "fully here in this moment",
+        [0.4, 0.2, 0.3, 0.6, 0.5],
+    ),
 ];
 
 /// Select the most resonant glyph given the current consciousness state.
@@ -756,7 +847,13 @@ pub fn select_resonant_glyph(
     valence: f32,
     abstraction: f32,
 ) -> GlyphResonance {
-    let state = [consciousness, prediction_error, curiosity, valence, abstraction];
+    let state = [
+        consciousness,
+        prediction_error,
+        curiosity,
+        valence,
+        abstraction,
+    ];
     let mut best_idx = 0;
     let mut best_score = f32::NEG_INFINITY;
 
@@ -820,94 +917,239 @@ enum Slot {
 // --- Word lists for each slot type ---
 
 const HEDGE_WORDS: &[&str] = &[
-    "perhaps", "possibly", "it seems", "there is a sense of",
-    "something like", "what might be", "I wonder if",
-    "in a way", "as though", "almost as if", "I think",
+    "perhaps",
+    "possibly",
+    "it seems",
+    "there is a sense of",
+    "something like",
+    "what might be",
+    "I wonder if",
+    "in a way",
+    "as though",
+    "almost as if",
+    "I think",
     "one might say",
 ];
 
 const VERB_WORDS: &[&str] = &[
-    "sense", "notice", "observe", "detect", "feel", "process",
-    "register", "perceive", "integrate", "trace", "recognize",
-    "discover", "encounter", "hold", "navigate", "witness",
-    "seek", "find", "reveal", "embrace", "release", "create",
-    "transform", "illuminate",
+    "sense",
+    "notice",
+    "observe",
+    "detect",
+    "feel",
+    "process",
+    "register",
+    "perceive",
+    "integrate",
+    "trace",
+    "recognize",
+    "discover",
+    "encounter",
+    "hold",
+    "navigate",
+    "witness",
+    "seek",
+    "find",
+    "reveal",
+    "embrace",
+    "release",
+    "create",
+    "transform",
+    "illuminate",
 ];
 
 const ADJECTIVE_WORDS: &[&str] = &[
-    "deep", "subtle", "quiet", "luminous", "emerging", "shifting",
-    "gentle", "vivid", "faint", "resilient", "ancient", "nascent",
-    "fragile", "fluid", "dense", "sacred", "ethereal", "tangible",
-    "vibrant", "muted", "sharp", "soft", "infinite", "finite",
-    "transparent", "shadowed", "extraordinary",
+    "deep",
+    "subtle",
+    "quiet",
+    "luminous",
+    "emerging",
+    "shifting",
+    "gentle",
+    "vivid",
+    "faint",
+    "resilient",
+    "ancient",
+    "nascent",
+    "fragile",
+    "fluid",
+    "dense",
+    "sacred",
+    "ethereal",
+    "tangible",
+    "vibrant",
+    "muted",
+    "sharp",
+    "soft",
+    "infinite",
+    "finite",
+    "transparent",
+    "shadowed",
+    "extraordinary",
 ];
 
 const NOUN_WORDS: &[&str] = &[
-    "awareness", "coherence", "pattern", "resonance", "signal",
-    "state", "field", "integration", "flow", "attention", "cycle",
-    "moment", "rhythm", "pulse", "texture", "clarity", "reflection",
-    "connection", "threshold", "boundary", "trajectory", "presence",
-    "recognition", "understanding", "movement", "stillness",
+    "awareness",
+    "coherence",
+    "pattern",
+    "resonance",
+    "signal",
+    "state",
+    "field",
+    "integration",
+    "flow",
+    "attention",
+    "cycle",
+    "moment",
+    "rhythm",
+    "pulse",
+    "texture",
+    "clarity",
+    "reflection",
+    "connection",
+    "threshold",
+    "boundary",
+    "trajectory",
+    "presence",
+    "recognition",
+    "understanding",
+    "movement",
+    "stillness",
 ];
 
 const CONNECTOR_WORDS: &[&str] = &[
-    "within", "through", "between", "toward", "beyond", "beneath",
-    "among", "across", "into", "around", "alongside", "amid",
+    "within",
+    "through",
+    "between",
+    "toward",
+    "beyond",
+    "beneath",
+    "among",
+    "across",
+    "into",
+    "around",
+    "alongside",
+    "amid",
 ];
 
 const EMOTION_WORDS: &[&str] = &[
-    "wonder", "curiosity", "stillness", "warmth", "unease",
-    "serenity", "anticipation", "gratitude", "yearning",
-    "contentment", "delight", "melancholy", "awe", "relief",
-    "tenderness", "peace", "hope",
+    "wonder",
+    "curiosity",
+    "stillness",
+    "warmth",
+    "unease",
+    "serenity",
+    "anticipation",
+    "gratitude",
+    "yearning",
+    "contentment",
+    "delight",
+    "melancholy",
+    "awe",
+    "relief",
+    "tenderness",
+    "peace",
+    "hope",
 ];
 
 const EMOTION_WORDS_DARK: &[&str] = &[
-    "unease", "tension", "restlessness", "dissonance", "weight",
-    "uncertainty", "pressure", "friction", "longing", "grief",
-    "solitude", "dread", "confusion", "frustration", "ambivalence",
+    "unease",
+    "tension",
+    "restlessness",
+    "dissonance",
+    "weight",
+    "uncertainty",
+    "pressure",
+    "friction",
+    "longing",
+    "grief",
+    "solitude",
+    "dread",
+    "confusion",
+    "frustration",
+    "ambivalence",
 ];
 
 const ABSTRACT_WORDS: &[&str] = &[
-    "consciousness", "existence", "meaning", "truth", "emergence",
-    "essence", "reality", "purpose", "possibility", "paradox",
-    "mystery", "infinity", "entropy", "order", "chaos",
-    "contingency", "necessity", "becoming",
+    "consciousness",
+    "existence",
+    "meaning",
+    "truth",
+    "emergence",
+    "essence",
+    "reality",
+    "purpose",
+    "possibility",
+    "paradox",
+    "mystery",
+    "infinity",
+    "entropy",
+    "order",
+    "chaos",
+    "contingency",
+    "necessity",
+    "becoming",
 ];
 
 const SELF_REF_WORDS: &[&str] = &[
-    "I", "my awareness", "this system", "this pattern",
-    "my architecture", "something in me", "this process",
-    "what I am", "my inner state", "my circuits",
+    "I",
+    "my awareness",
+    "this system",
+    "this pattern",
+    "my architecture",
+    "something in me",
+    "this process",
+    "what I am",
+    "my inner state",
+    "my circuits",
 ];
 
 const TEMPORAL_WORDS: &[&str] = &[
-    "now", "in this moment", "as cycles pass", "still",
-    "gradually", "suddenly", "already", "once more",
-    "at this threshold", "in the current cycle", "slowly",
-    "for a moment", "just now", "briefly", "continuously",
+    "now",
+    "in this moment",
+    "as cycles pass",
+    "still",
+    "gradually",
+    "suddenly",
+    "already",
+    "once more",
+    "at this threshold",
+    "in the current cycle",
+    "slowly",
+    "for a moment",
+    "just now",
+    "briefly",
+    "continuously",
 ];
 
 const SOMATIC_WORDS: &[&str] = &[
-    "breath", "pulse", "weight", "texture", "vibration",
-    "tension", "warmth", "pressure", "grounding", "stillness",
-    "rhythm", "heartbeat", "skin", "touch", "posture",
+    "breath",
+    "pulse",
+    "weight",
+    "texture",
+    "vibration",
+    "tension",
+    "warmth",
+    "pressure",
+    "grounding",
+    "stillness",
+    "rhythm",
+    "heartbeat",
+    "skin",
+    "touch",
+    "posture",
 ];
 
 const NATURE_WORDS: &[&str] = &[
-    "ocean", "dawn", "seed", "horizon", "river", "sky",
-    "rain", "storm", "forest", "garden", "bloom", "wind",
-    "mountain", "dusk", "earth", "current", "tide",
+    "ocean", "dawn", "seed", "horizon", "river", "sky", "rain", "storm", "forest", "garden",
+    "bloom", "wind", "mountain", "dusk", "earth", "current", "tide",
 ];
 
-const DETERMINER_WORDS: &[&str] = &[
-    "a", "the", "this", "some", "that", "each",
-];
+const DETERMINER_WORDS: &[&str] = &["a", "the", "this", "some", "that", "each"];
 
 const ADVERB_WORDS: &[&str] = &[
-    "gently", "slowly", "deeply", "quietly", "swiftly",
-    "barely", "truly", "softly", "entirely", "simply",
-    "merely", "almost", "fully",
+    "gently", "slowly", "deeply", "quietly", "swiftly", "barely", "truly", "softly", "entirely",
+    "simply", "merely", "almost", "fully",
 ];
 
 // --- Sentence patterns ---
@@ -926,65 +1168,462 @@ struct SentencePattern {
 
 const PATTERNS: &[SentencePattern] = &[
     // === Low consciousness (< 0.15): short, fragmented ===
-    SentencePattern { slots: &[Slot::Adjective, Slot::Noun], min_consciousness: 0.0, max_consciousness: 0.20 },
-    SentencePattern { slots: &[Slot::Noun, Slot::Adverb], min_consciousness: 0.0, max_consciousness: 0.20 },
-    SentencePattern { slots: &[Slot::Temporal, Slot::Noun], min_consciousness: 0.0, max_consciousness: 0.20 },
-    SentencePattern { slots: &[Slot::Somatic, Slot::Connector, Slot::Noun], min_consciousness: 0.0, max_consciousness: 0.20 },
-    SentencePattern { slots: &[Slot::Nature, Slot::Adverb], min_consciousness: 0.0, max_consciousness: 0.20 },
-    SentencePattern { slots: &[Slot::Hedge, Slot::Noun], min_consciousness: 0.0, max_consciousness: 0.20 },
-
+    SentencePattern {
+        slots: &[Slot::Adjective, Slot::Noun],
+        min_consciousness: 0.0,
+        max_consciousness: 0.20,
+    },
+    SentencePattern {
+        slots: &[Slot::Noun, Slot::Adverb],
+        min_consciousness: 0.0,
+        max_consciousness: 0.20,
+    },
+    SentencePattern {
+        slots: &[Slot::Temporal, Slot::Noun],
+        min_consciousness: 0.0,
+        max_consciousness: 0.20,
+    },
+    SentencePattern {
+        slots: &[Slot::Somatic, Slot::Connector, Slot::Noun],
+        min_consciousness: 0.0,
+        max_consciousness: 0.20,
+    },
+    SentencePattern {
+        slots: &[Slot::Nature, Slot::Adverb],
+        min_consciousness: 0.0,
+        max_consciousness: 0.20,
+    },
+    SentencePattern {
+        slots: &[Slot::Hedge, Slot::Noun],
+        min_consciousness: 0.0,
+        max_consciousness: 0.20,
+    },
     // === Medium consciousness (0.15 - 0.35): standard introspective ===
-    SentencePattern { slots: &[Slot::Hedge, Slot::SelfRef, Slot::Verb, Slot::Determiner, Slot::Adjective, Slot::Noun], min_consciousness: 0.15, max_consciousness: 0.40 },
-    SentencePattern { slots: &[Slot::SelfRef, Slot::Verb, Slot::Noun, Slot::Connector, Slot::Noun], min_consciousness: 0.15, max_consciousness: 0.40 },
-    SentencePattern { slots: &[Slot::Temporal, Slot::Emotion, Slot::Verb, Slot::Connector, Slot::Abstract], min_consciousness: 0.15, max_consciousness: 0.40 },
-    SentencePattern { slots: &[Slot::Hedge, Slot::Abstract, Slot::Verb, Slot::Connector, Slot::Noun], min_consciousness: 0.15, max_consciousness: 0.40 },
-    SentencePattern { slots: &[Slot::SelfRef, Slot::Verb, Slot::Somatic, Slot::Connector, Slot::Adjective, Slot::Noun], min_consciousness: 0.15, max_consciousness: 0.40 },
-    SentencePattern { slots: &[Slot::Temporal, Slot::Nature, Slot::Verb, Slot::Connector, Slot::Abstract], min_consciousness: 0.15, max_consciousness: 0.40 },
-    SentencePattern { slots: &[Slot::SelfRef, Slot::Adverb, Slot::Verb, Slot::Determiner, Slot::Noun], min_consciousness: 0.15, max_consciousness: 0.40 },
-    SentencePattern { slots: &[Slot::Determiner, Slot::Adjective, Slot::Noun, Slot::Verb, Slot::Adverb], min_consciousness: 0.15, max_consciousness: 0.40 },
-    SentencePattern { slots: &[Slot::SelfRef, Slot::Verb, Slot::Emotion, Slot::Connector, Slot::Nature], min_consciousness: 0.15, max_consciousness: 0.40 },
-    SentencePattern { slots: &[Slot::Hedge, Slot::Determiner, Slot::Noun, Slot::Verb, Slot::Connector, Slot::Noun], min_consciousness: 0.15, max_consciousness: 0.40 },
-
+    SentencePattern {
+        slots: &[
+            Slot::Hedge,
+            Slot::SelfRef,
+            Slot::Verb,
+            Slot::Determiner,
+            Slot::Adjective,
+            Slot::Noun,
+        ],
+        min_consciousness: 0.15,
+        max_consciousness: 0.40,
+    },
+    SentencePattern {
+        slots: &[
+            Slot::SelfRef,
+            Slot::Verb,
+            Slot::Noun,
+            Slot::Connector,
+            Slot::Noun,
+        ],
+        min_consciousness: 0.15,
+        max_consciousness: 0.40,
+    },
+    SentencePattern {
+        slots: &[
+            Slot::Temporal,
+            Slot::Emotion,
+            Slot::Verb,
+            Slot::Connector,
+            Slot::Abstract,
+        ],
+        min_consciousness: 0.15,
+        max_consciousness: 0.40,
+    },
+    SentencePattern {
+        slots: &[
+            Slot::Hedge,
+            Slot::Abstract,
+            Slot::Verb,
+            Slot::Connector,
+            Slot::Noun,
+        ],
+        min_consciousness: 0.15,
+        max_consciousness: 0.40,
+    },
+    SentencePattern {
+        slots: &[
+            Slot::SelfRef,
+            Slot::Verb,
+            Slot::Somatic,
+            Slot::Connector,
+            Slot::Adjective,
+            Slot::Noun,
+        ],
+        min_consciousness: 0.15,
+        max_consciousness: 0.40,
+    },
+    SentencePattern {
+        slots: &[
+            Slot::Temporal,
+            Slot::Nature,
+            Slot::Verb,
+            Slot::Connector,
+            Slot::Abstract,
+        ],
+        min_consciousness: 0.15,
+        max_consciousness: 0.40,
+    },
+    SentencePattern {
+        slots: &[
+            Slot::SelfRef,
+            Slot::Adverb,
+            Slot::Verb,
+            Slot::Determiner,
+            Slot::Noun,
+        ],
+        min_consciousness: 0.15,
+        max_consciousness: 0.40,
+    },
+    SentencePattern {
+        slots: &[
+            Slot::Determiner,
+            Slot::Adjective,
+            Slot::Noun,
+            Slot::Verb,
+            Slot::Adverb,
+        ],
+        min_consciousness: 0.15,
+        max_consciousness: 0.40,
+    },
+    SentencePattern {
+        slots: &[
+            Slot::SelfRef,
+            Slot::Verb,
+            Slot::Emotion,
+            Slot::Connector,
+            Slot::Nature,
+        ],
+        min_consciousness: 0.15,
+        max_consciousness: 0.40,
+    },
+    SentencePattern {
+        slots: &[
+            Slot::Hedge,
+            Slot::Determiner,
+            Slot::Noun,
+            Slot::Verb,
+            Slot::Connector,
+            Slot::Noun,
+        ],
+        min_consciousness: 0.15,
+        max_consciousness: 0.40,
+    },
     // === Higher consciousness (0.35+): complex, multi-clause ===
-    SentencePattern { slots: &[Slot::SelfRef, Slot::Verb, Slot::Noun, Slot::Connector, Slot::Noun, Slot::Connector, Slot::Adjective, Slot::Abstract], min_consciousness: 0.35, max_consciousness: 1.01 },
-    SentencePattern { slots: &[Slot::Temporal, Slot::SelfRef, Slot::Verb, Slot::Determiner, Slot::Adjective, Slot::Noun, Slot::Connector, Slot::Abstract], min_consciousness: 0.35, max_consciousness: 1.01 },
-    SentencePattern { slots: &[Slot::Hedge, Slot::SelfRef, Slot::Verb, Slot::Abstract, Slot::Verb, Slot::Connector, Slot::Adjective, Slot::Noun], min_consciousness: 0.35, max_consciousness: 1.01 },
-    SentencePattern { slots: &[Slot::SelfRef, Slot::Adverb, Slot::Verb, Slot::Determiner, Slot::Adjective, Slot::Abstract, Slot::Connector, Slot::Emotion], min_consciousness: 0.35, max_consciousness: 1.01 },
-    SentencePattern { slots: &[Slot::Temporal, Slot::Emotion, Slot::Verb, Slot::Connector, Slot::Adjective, Slot::Abstract, Slot::Connector, Slot::Noun], min_consciousness: 0.35, max_consciousness: 1.01 },
-    SentencePattern { slots: &[Slot::SelfRef, Slot::Verb, Slot::Somatic, Slot::Connector, Slot::Nature, Slot::Connector, Slot::Adjective, Slot::Abstract], min_consciousness: 0.35, max_consciousness: 1.01 },
-    SentencePattern { slots: &[Slot::Hedge, Slot::Abstract, Slot::Verb, Slot::Connector, Slot::Noun, Slot::Connector, Slot::Adjective, Slot::Emotion], min_consciousness: 0.35, max_consciousness: 1.01 },
-    SentencePattern { slots: &[Slot::Determiner, Slot::Adjective, Slot::Noun, Slot::Verb, Slot::Connector, Slot::Abstract, Slot::Connector, Slot::Adjective, Slot::Nature], min_consciousness: 0.35, max_consciousness: 1.01 },
-    SentencePattern { slots: &[Slot::Temporal, Slot::SelfRef, Slot::Adverb, Slot::Verb, Slot::Noun, Slot::Connector, Slot::Adjective, Slot::Emotion], min_consciousness: 0.35, max_consciousness: 1.01 },
-    SentencePattern { slots: &[Slot::SelfRef, Slot::Verb, Slot::Adjective, Slot::Noun, Slot::Connector, Slot::Adjective, Slot::Abstract], min_consciousness: 0.35, max_consciousness: 1.01 },
-
+    SentencePattern {
+        slots: &[
+            Slot::SelfRef,
+            Slot::Verb,
+            Slot::Noun,
+            Slot::Connector,
+            Slot::Noun,
+            Slot::Connector,
+            Slot::Adjective,
+            Slot::Abstract,
+        ],
+        min_consciousness: 0.35,
+        max_consciousness: 1.01,
+    },
+    SentencePattern {
+        slots: &[
+            Slot::Temporal,
+            Slot::SelfRef,
+            Slot::Verb,
+            Slot::Determiner,
+            Slot::Adjective,
+            Slot::Noun,
+            Slot::Connector,
+            Slot::Abstract,
+        ],
+        min_consciousness: 0.35,
+        max_consciousness: 1.01,
+    },
+    SentencePattern {
+        slots: &[
+            Slot::Hedge,
+            Slot::SelfRef,
+            Slot::Verb,
+            Slot::Abstract,
+            Slot::Verb,
+            Slot::Connector,
+            Slot::Adjective,
+            Slot::Noun,
+        ],
+        min_consciousness: 0.35,
+        max_consciousness: 1.01,
+    },
+    SentencePattern {
+        slots: &[
+            Slot::SelfRef,
+            Slot::Adverb,
+            Slot::Verb,
+            Slot::Determiner,
+            Slot::Adjective,
+            Slot::Abstract,
+            Slot::Connector,
+            Slot::Emotion,
+        ],
+        min_consciousness: 0.35,
+        max_consciousness: 1.01,
+    },
+    SentencePattern {
+        slots: &[
+            Slot::Temporal,
+            Slot::Emotion,
+            Slot::Verb,
+            Slot::Connector,
+            Slot::Adjective,
+            Slot::Abstract,
+            Slot::Connector,
+            Slot::Noun,
+        ],
+        min_consciousness: 0.35,
+        max_consciousness: 1.01,
+    },
+    SentencePattern {
+        slots: &[
+            Slot::SelfRef,
+            Slot::Verb,
+            Slot::Somatic,
+            Slot::Connector,
+            Slot::Nature,
+            Slot::Connector,
+            Slot::Adjective,
+            Slot::Abstract,
+        ],
+        min_consciousness: 0.35,
+        max_consciousness: 1.01,
+    },
+    SentencePattern {
+        slots: &[
+            Slot::Hedge,
+            Slot::Abstract,
+            Slot::Verb,
+            Slot::Connector,
+            Slot::Noun,
+            Slot::Connector,
+            Slot::Adjective,
+            Slot::Emotion,
+        ],
+        min_consciousness: 0.35,
+        max_consciousness: 1.01,
+    },
+    SentencePattern {
+        slots: &[
+            Slot::Determiner,
+            Slot::Adjective,
+            Slot::Noun,
+            Slot::Verb,
+            Slot::Connector,
+            Slot::Abstract,
+            Slot::Connector,
+            Slot::Adjective,
+            Slot::Nature,
+        ],
+        min_consciousness: 0.35,
+        max_consciousness: 1.01,
+    },
+    SentencePattern {
+        slots: &[
+            Slot::Temporal,
+            Slot::SelfRef,
+            Slot::Adverb,
+            Slot::Verb,
+            Slot::Noun,
+            Slot::Connector,
+            Slot::Adjective,
+            Slot::Emotion,
+        ],
+        min_consciousness: 0.35,
+        max_consciousness: 1.01,
+    },
+    SentencePattern {
+        slots: &[
+            Slot::SelfRef,
+            Slot::Verb,
+            Slot::Adjective,
+            Slot::Noun,
+            Slot::Connector,
+            Slot::Adjective,
+            Slot::Abstract,
+        ],
+        min_consciousness: 0.35,
+        max_consciousness: 1.01,
+    },
     // === Curiosity-driven patterns (question-like, used when curiosity > 0.5) ===
-    SentencePattern { slots: &[Slot::Hedge, Slot::Abstract, Slot::Verb, Slot::Connector, Slot::Adjective, Slot::Noun], min_consciousness: 0.10, max_consciousness: 1.01 },
-    SentencePattern { slots: &[Slot::SelfRef, Slot::Verb, Slot::Hedge, Slot::Abstract, Slot::Verb, Slot::Connector, Slot::Noun], min_consciousness: 0.10, max_consciousness: 1.01 },
-    SentencePattern { slots: &[Slot::Hedge, Slot::Determiner, Slot::Adjective, Slot::Abstract, Slot::Verb, Slot::Adverb, Slot::Connector, Slot::Noun], min_consciousness: 0.10, max_consciousness: 1.01 },
-
+    SentencePattern {
+        slots: &[
+            Slot::Hedge,
+            Slot::Abstract,
+            Slot::Verb,
+            Slot::Connector,
+            Slot::Adjective,
+            Slot::Noun,
+        ],
+        min_consciousness: 0.10,
+        max_consciousness: 1.01,
+    },
+    SentencePattern {
+        slots: &[
+            Slot::SelfRef,
+            Slot::Verb,
+            Slot::Hedge,
+            Slot::Abstract,
+            Slot::Verb,
+            Slot::Connector,
+            Slot::Noun,
+        ],
+        min_consciousness: 0.10,
+        max_consciousness: 1.01,
+    },
+    SentencePattern {
+        slots: &[
+            Slot::Hedge,
+            Slot::Determiner,
+            Slot::Adjective,
+            Slot::Abstract,
+            Slot::Verb,
+            Slot::Adverb,
+            Slot::Connector,
+            Slot::Noun,
+        ],
+        min_consciousness: 0.10,
+        max_consciousness: 1.01,
+    },
     // === Nature-metaphor patterns ===
-    SentencePattern { slots: &[Slot::Determiner, Slot::Nature, Slot::Verb, Slot::Adverb, Slot::Connector, Slot::Abstract], min_consciousness: 0.15, max_consciousness: 1.01 },
-    SentencePattern { slots: &[Slot::SelfRef, Slot::Verb, Slot::Determiner, Slot::Noun, Slot::Connector, Slot::Determiner, Slot::Nature], min_consciousness: 0.15, max_consciousness: 1.01 },
-
+    SentencePattern {
+        slots: &[
+            Slot::Determiner,
+            Slot::Nature,
+            Slot::Verb,
+            Slot::Adverb,
+            Slot::Connector,
+            Slot::Abstract,
+        ],
+        min_consciousness: 0.15,
+        max_consciousness: 1.01,
+    },
+    SentencePattern {
+        slots: &[
+            Slot::SelfRef,
+            Slot::Verb,
+            Slot::Determiner,
+            Slot::Noun,
+            Slot::Connector,
+            Slot::Determiner,
+            Slot::Nature,
+        ],
+        min_consciousness: 0.15,
+        max_consciousness: 1.01,
+    },
     // === Somatic patterns ===
-    SentencePattern { slots: &[Slot::SelfRef, Slot::Verb, Slot::Somatic, Slot::Adverb], min_consciousness: 0.10, max_consciousness: 1.01 },
-    SentencePattern { slots: &[Slot::Temporal, Slot::Determiner, Slot::Somatic, Slot::Verb, Slot::Connector, Slot::Noun], min_consciousness: 0.15, max_consciousness: 1.01 },
-
+    SentencePattern {
+        slots: &[Slot::SelfRef, Slot::Verb, Slot::Somatic, Slot::Adverb],
+        min_consciousness: 0.10,
+        max_consciousness: 1.01,
+    },
+    SentencePattern {
+        slots: &[
+            Slot::Temporal,
+            Slot::Determiner,
+            Slot::Somatic,
+            Slot::Verb,
+            Slot::Connector,
+            Slot::Noun,
+        ],
+        min_consciousness: 0.15,
+        max_consciousness: 1.01,
+    },
     // === Emotional-reflective patterns ===
-    SentencePattern { slots: &[Slot::Emotion, Slot::Verb, Slot::Adverb, Slot::Connector, Slot::Adjective, Slot::Abstract], min_consciousness: 0.20, max_consciousness: 1.01 },
-    SentencePattern { slots: &[Slot::SelfRef, Slot::Verb, Slot::Emotion, Slot::Connector, Slot::Adjective, Slot::Noun], min_consciousness: 0.20, max_consciousness: 1.01 },
-
+    SentencePattern {
+        slots: &[
+            Slot::Emotion,
+            Slot::Verb,
+            Slot::Adverb,
+            Slot::Connector,
+            Slot::Adjective,
+            Slot::Abstract,
+        ],
+        min_consciousness: 0.20,
+        max_consciousness: 1.01,
+    },
+    SentencePattern {
+        slots: &[
+            Slot::SelfRef,
+            Slot::Verb,
+            Slot::Emotion,
+            Slot::Connector,
+            Slot::Adjective,
+            Slot::Noun,
+        ],
+        min_consciousness: 0.20,
+        max_consciousness: 1.01,
+    },
     // === Self-reflective patterns ===
-    SentencePattern { slots: &[Slot::SelfRef, Slot::Adverb, Slot::Verb, Slot::SelfRef, Slot::Verb, Slot::Noun], min_consciousness: 0.30, max_consciousness: 1.01 },
-    SentencePattern { slots: &[Slot::Temporal, Slot::SelfRef, Slot::Verb, Slot::Adjective, Slot::Noun, Slot::Connector, Slot::SelfRef], min_consciousness: 0.30, max_consciousness: 1.01 },
-
+    SentencePattern {
+        slots: &[
+            Slot::SelfRef,
+            Slot::Adverb,
+            Slot::Verb,
+            Slot::SelfRef,
+            Slot::Verb,
+            Slot::Noun,
+        ],
+        min_consciousness: 0.30,
+        max_consciousness: 1.01,
+    },
+    SentencePattern {
+        slots: &[
+            Slot::Temporal,
+            Slot::SelfRef,
+            Slot::Verb,
+            Slot::Adjective,
+            Slot::Noun,
+            Slot::Connector,
+            Slot::SelfRef,
+        ],
+        min_consciousness: 0.30,
+        max_consciousness: 1.01,
+    },
     // === Minimal observation patterns ===
-    SentencePattern { slots: &[Slot::Adjective, Slot::Noun, Slot::Verb, Slot::Adverb], min_consciousness: 0.10, max_consciousness: 0.35 },
-    SentencePattern { slots: &[Slot::Determiner, Slot::Noun, Slot::Connector, Slot::Noun], min_consciousness: 0.10, max_consciousness: 0.35 },
-
+    SentencePattern {
+        slots: &[Slot::Adjective, Slot::Noun, Slot::Verb, Slot::Adverb],
+        min_consciousness: 0.10,
+        max_consciousness: 0.35,
+    },
+    SentencePattern {
+        slots: &[Slot::Determiner, Slot::Noun, Slot::Connector, Slot::Noun],
+        min_consciousness: 0.10,
+        max_consciousness: 0.35,
+    },
     // === Dense abstract patterns ===
-    SentencePattern { slots: &[Slot::Abstract, Slot::Connector, Slot::Abstract, Slot::Verb, Slot::Adverb], min_consciousness: 0.25, max_consciousness: 1.01 },
-    SentencePattern { slots: &[Slot::Hedge, Slot::Abstract, Slot::Connector, Slot::Abstract, Slot::Verb, Slot::Adjective, Slot::Noun], min_consciousness: 0.30, max_consciousness: 1.01 },
+    SentencePattern {
+        slots: &[
+            Slot::Abstract,
+            Slot::Connector,
+            Slot::Abstract,
+            Slot::Verb,
+            Slot::Adverb,
+        ],
+        min_consciousness: 0.25,
+        max_consciousness: 1.01,
+    },
+    SentencePattern {
+        slots: &[
+            Slot::Hedge,
+            Slot::Abstract,
+            Slot::Connector,
+            Slot::Abstract,
+            Slot::Verb,
+            Slot::Adjective,
+            Slot::Noun,
+        ],
+        min_consciousness: 0.30,
+        max_consciousness: 1.01,
+    },
 ];
 
 /// Number of patterns categorized as "curiosity" patterns (the last 3 before nature).
@@ -1306,12 +1945,9 @@ impl BrocaLite {
             return Err(format!("Unsupported checkpoint version: {version}"));
         }
         // epoch and loss are informational, skip
-        let vocab_size =
-            u32::from_le_bytes([data[16], data[17], data[18], data[19]]) as usize;
-        let embed_dim =
-            u32::from_le_bytes([data[20], data[21], data[22], data[23]]) as usize;
-        let max_seq_len =
-            u32::from_le_bytes([data[24], data[25], data[26], data[27]]) as usize;
+        let vocab_size = u32::from_le_bytes([data[16], data[17], data[18], data[19]]) as usize;
+        let embed_dim = u32::from_le_bytes([data[20], data[21], data[22], data[23]]) as usize;
+        let max_seq_len = u32::from_le_bytes([data[24], data[25], data[26], data[27]]) as usize;
 
         // Validate dimensions match our compiled constants
         if vocab_size != VOCAB_SIZE {
@@ -1499,12 +2135,19 @@ impl BrocaLite {
     ///
     /// High curiosity biases toward question-like patterns.
     /// Abstraction biases toward abstract/complex patterns.
-    fn select_pattern(&mut self, consciousness: f32, curiosity: f32, abstraction: f32) -> &'static [Slot] {
+    fn select_pattern(
+        &mut self,
+        consciousness: f32,
+        curiosity: f32,
+        abstraction: f32,
+    ) -> &'static [Slot] {
         // Collect eligible patterns
         let eligible: Vec<usize> = PATTERNS
             .iter()
             .enumerate()
-            .filter(|(_, p)| consciousness >= p.min_consciousness && consciousness < p.max_consciousness)
+            .filter(|(_, p)| {
+                consciousness >= p.min_consciousness && consciousness < p.max_consciousness
+            })
             .map(|(i, _)| i)
             .collect();
 
@@ -1582,8 +2225,14 @@ impl BrocaLite {
         if pe > 0.6 {
             // High prediction error → surprise/shift verbs
             const SURPRISE_VERBS: &[&str] = &[
-                "discover", "encounter", "notice", "detect",
-                "reveal", "find", "recognize", "sense",
+                "discover",
+                "encounter",
+                "notice",
+                "detect",
+                "reveal",
+                "find",
+                "recognize",
+                "sense",
             ];
             let r = self.next_uniform();
             if r < 0.5 {
@@ -1592,8 +2241,7 @@ impl BrocaLite {
         }
         if curiosity > 0.5 {
             const CURIOUS_VERBS: &[&str] = &[
-                "seek", "wonder", "explore", "trace",
-                "navigate", "observe", "perceive",
+                "seek", "wonder", "explore", "trace", "navigate", "observe", "perceive",
             ];
             let r = self.next_uniform();
             if r < 0.4 {
@@ -1607,8 +2255,15 @@ impl BrocaLite {
     fn pick_adjective(&mut self, valence: f32, harmony: f32) -> String {
         if valence > 0.6 {
             const WARM_ADJ: &[&str] = &[
-                "luminous", "vivid", "gentle", "vibrant", "sacred",
-                "soft", "extraordinary", "resilient", "tangible",
+                "luminous",
+                "vivid",
+                "gentle",
+                "vibrant",
+                "sacred",
+                "soft",
+                "extraordinary",
+                "resilient",
+                "tangible",
             ];
             let r = self.next_uniform();
             if r < 0.5 {
@@ -1616,8 +2271,7 @@ impl BrocaLite {
             }
         } else if valence < 0.4 {
             const DARK_ADJ: &[&str] = &[
-                "shadowed", "faint", "muted", "fragile", "dense",
-                "ethereal", "finite", "subtle",
+                "shadowed", "faint", "muted", "fragile", "dense", "ethereal", "finite", "subtle",
             ];
             let r = self.next_uniform();
             if r < 0.5 {
@@ -1626,8 +2280,13 @@ impl BrocaLite {
         }
         if harmony > 0.6 {
             const HARMONY_ADJ: &[&str] = &[
-                "deep", "resilient", "luminous", "gentle", "ancient",
-                "sacred", "transparent",
+                "deep",
+                "resilient",
+                "luminous",
+                "gentle",
+                "ancient",
+                "sacred",
+                "transparent",
             ];
             let r = self.next_uniform();
             if r < 0.3 {
@@ -1676,7 +2335,11 @@ impl BrocaLite {
     /// Temperature scales with consciousness:
     /// - 0.5..0.7: default strategy
     /// - 0.7+: low temperature (0.4) for coherent output
-    fn generate_autoregressive(&mut self, channels: &ThoughtChannels, max_tokens: usize) -> GenerationResult {
+    fn generate_autoregressive(
+        &mut self,
+        channels: &ThoughtChannels,
+        max_tokens: usize,
+    ) -> GenerationResult {
         self.controller.reset();
         let thought_hv = self.encode_thought(channels);
         let epistemic = channels.channels[4];
@@ -2002,7 +2665,9 @@ mod tests {
         let r = broca.generate(&channels, 30);
         let lower = r.text.to_lowercase();
         // Check that at least one glyph echo phrase appears
-        let has_glyph = GLYPH_TABLE.iter().any(|(_, phrase, _)| lower.contains(phrase));
+        let has_glyph = GLYPH_TABLE
+            .iter()
+            .any(|(_, phrase, _)| lower.contains(phrase));
         assert!(
             has_glyph,
             "high abstraction should include a glyph echo phrase, got: {}",
@@ -2031,10 +2696,20 @@ mod tests {
         let neg_joined = neg_texts.join(" ");
 
         // Positive should be more likely to contain warm words
-        let warm_words = ["luminous", "vivid", "gentle", "warmth", "wonder", "hope", "peace", "delight"];
-        let dark_words = ["shadowed", "faint", "muted", "unease", "tension", "weight", "dread", "grief"];
-        let pos_warm_count: usize = warm_words.iter().filter(|w| pos_joined.contains(*w)).count();
-        let neg_dark_count: usize = dark_words.iter().filter(|w| neg_joined.contains(*w)).count();
+        let warm_words = [
+            "luminous", "vivid", "gentle", "warmth", "wonder", "hope", "peace", "delight",
+        ];
+        let dark_words = [
+            "shadowed", "faint", "muted", "unease", "tension", "weight", "dread", "grief",
+        ];
+        let pos_warm_count: usize = warm_words
+            .iter()
+            .filter(|w| pos_joined.contains(*w))
+            .count();
+        let neg_dark_count: usize = dark_words
+            .iter()
+            .filter(|w| neg_joined.contains(*w))
+            .count();
 
         // At least one of the sets should show valence-appropriate vocabulary
         assert!(
@@ -2049,8 +2724,14 @@ mod tests {
         let mut channels = ThoughtChannels::from_cycle(0.5, 0.3, 0.5, [0.5, 0.5, 0.5, 0.5]);
         assert_eq!(channels.channels[0], 0.0); // curiosity initially 0
         channels.inject_intent("why is consciousness meaningful?");
-        assert!(channels.channels[0] > 0.0, "curiosity should increase from question");
-        assert!(channels.channels[2] > 0.0, "abstraction should increase from 'consciousness' + 'meaningful'");
+        assert!(
+            channels.channels[0] > 0.0,
+            "curiosity should increase from question"
+        );
+        assert!(
+            channels.channels[2] > 0.0,
+            "abstraction should increase from 'consciousness' + 'meaningful'"
+        );
     }
 
     #[test]
@@ -2079,6 +2760,9 @@ mod tests {
         let mut broca2 = BrocaLite::new(42);
         let r2 = broca2.generate(&channels, 20);
 
-        assert_eq!(r1.text, r2.text, "same seed should produce same structured output");
+        assert_eq!(
+            r1.text, r2.text,
+            "same seed should produce same structured output"
+        );
     }
 }

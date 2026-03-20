@@ -160,7 +160,11 @@ impl CodingExperienceStore {
                         record.metadata.clone()
                     };
                     // Avoid duplicates
-                    if !self.error_hints_cache.iter().any(|(k, _)| k == &record.content) {
+                    if !self
+                        .error_hints_cache
+                        .iter()
+                        .any(|(k, _)| k == &record.content)
+                    {
                         self.error_hints_cache
                             .push((record.content.clone(), strategy));
                     }
@@ -175,8 +179,7 @@ impl CodingExperienceStore {
                     {
                         self.success_cache[pos].1 = code;
                     } else {
-                        self.success_cache
-                            .push((record.content.clone(), code));
+                        self.success_cache.push((record.content.clone(), code));
                     }
                 } else if record.valence < 0.0 {
                     // Generic error experience: content = error pattern, metadata = fix hint
@@ -387,11 +390,7 @@ impl CodingExperienceStore {
         // Store in error_hints_cache with a "fix:" prefix to distinguish from generic hints
         let key = format!("fix:{}", error_signature);
         // Avoid duplicates: if we already have this exact fix, skip
-        if self
-            .error_hints_cache
-            .iter()
-            .any(|(k, _)| k == &key)
-        {
+        if self.error_hints_cache.iter().any(|(k, _)| k == &key) {
             return;
         }
         self.error_hints_cache
@@ -867,22 +866,31 @@ mod tests {
 
         // Store a fix strategy in one store instance
         {
-            let mut store =
-                CodingExperienceStore::persistent(&db_path.to_string_lossy()).await.unwrap();
+            let mut store = CodingExperienceStore::persistent(&db_path.to_string_lossy())
+                .await
+                .unwrap();
             store.store_fix_strategy("error[E0308]: mismatched types", "cast with `as u32`");
             store.flush().await; // Persist queued writes to DB
             assert_eq!(
-                store.cached_error_hints().iter().filter(|(k, _)| k.starts_with("fix:")).count(),
+                store
+                    .cached_error_hints()
+                    .iter()
+                    .filter(|(k, _)| k.starts_with("fix:"))
+                    .count(),
                 1
             );
         }
 
         // Create a new store from the same DB — should hydrate
         {
-            let store =
-                CodingExperienceStore::persistent(&db_path.to_string_lossy()).await.unwrap();
+            let store = CodingExperienceStore::persistent(&db_path.to_string_lossy())
+                .await
+                .unwrap();
             let fix = store.lookup_fix_strategy("error[E0308]: different wording");
-            assert!(fix.is_some(), "Fix strategy should survive across store instances");
+            assert!(
+                fix.is_some(),
+                "Fix strategy should survive across store instances"
+            );
             assert!(fix.unwrap().contains("as u32"));
         }
     }
@@ -893,8 +901,9 @@ mod tests {
         let db_path = dir.path().join("test_templates.db");
 
         {
-            let mut store =
-                CodingExperienceStore::persistent(&db_path.to_string_lossy()).await.unwrap();
+            let mut store = CodingExperienceStore::persistent(&db_path.to_string_lossy())
+                .await
+                .unwrap();
             store.store_learned_template(
                 "implement binary search",
                 "pub fn binary_search(arr: &[i32], target: i32) -> Option<usize> { todo!() }",
@@ -903,8 +912,9 @@ mod tests {
         }
 
         {
-            let store =
-                CodingExperienceStore::persistent(&db_path.to_string_lossy()).await.unwrap();
+            let store = CodingExperienceStore::persistent(&db_path.to_string_lossy())
+                .await
+                .unwrap();
             let template = store.lookup_learned_template("implement binary search");
             assert!(
                 template.is_some(),

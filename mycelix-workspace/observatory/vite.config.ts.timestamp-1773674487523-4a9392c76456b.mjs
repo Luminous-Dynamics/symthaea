@@ -1,0 +1,18 @@
+// vite.config.ts
+import { sveltekit } from "file:///srv/luminous-dynamics/mycelix-workspace/observatory/node_modules/.pnpm/@sveltejs+kit@2.55.0_@sveltejs+vite-plugin-svelte@3.1.2_svelte@4.2.20_vite@5.4.21_light_fd23d82fce577b17bbeee1073e2cdcc6/node_modules/@sveltejs/kit/src/exports/vite/index.js";
+import { defineConfig } from "file:///srv/luminous-dynamics/mycelix-workspace/observatory/node_modules/.pnpm/vitest@2.1.9_jsdom@29.0.0_lightningcss@1.31.1/node_modules/vitest/dist/config.js";
+var vite_config_default = defineConfig({
+  plugins: [sveltekit()],
+  server: {
+    port: 5173,
+    host: "0.0.0.0"
+  },
+  test: {
+    include: ["src/**/*.test.ts"],
+    environment: "jsdom"
+  }
+});
+export {
+  vite_config_default as default
+};
+//# sourceMappingURL=data:application/json;base64,ewogICJ2ZXJzaW9uIjogMywKICAic291cmNlcyI6IFsidml0ZS5jb25maWcudHMiXSwKICAic291cmNlc0NvbnRlbnQiOiBbImNvbnN0IF9fdml0ZV9pbmplY3RlZF9vcmlnaW5hbF9kaXJuYW1lID0gXCIvc3J2L2x1bWlub3VzLWR5bmFtaWNzL215Y2VsaXgtd29ya3NwYWNlL29ic2VydmF0b3J5XCI7Y29uc3QgX192aXRlX2luamVjdGVkX29yaWdpbmFsX2ZpbGVuYW1lID0gXCIvc3J2L2x1bWlub3VzLWR5bmFtaWNzL215Y2VsaXgtd29ya3NwYWNlL29ic2VydmF0b3J5L3ZpdGUuY29uZmlnLnRzXCI7Y29uc3QgX192aXRlX2luamVjdGVkX29yaWdpbmFsX2ltcG9ydF9tZXRhX3VybCA9IFwiZmlsZTovLy9zcnYvbHVtaW5vdXMtZHluYW1pY3MvbXljZWxpeC13b3Jrc3BhY2Uvb2JzZXJ2YXRvcnkvdml0ZS5jb25maWcudHNcIjtpbXBvcnQgeyBzdmVsdGVraXQgfSBmcm9tICdAc3ZlbHRlanMva2l0L3ZpdGUnO1xuaW1wb3J0IHsgZGVmaW5lQ29uZmlnIH0gZnJvbSAndml0ZXN0L2NvbmZpZyc7XG5cbmV4cG9ydCBkZWZhdWx0IGRlZmluZUNvbmZpZyh7XG5cdHBsdWdpbnM6IFtzdmVsdGVraXQoKV0sXG5cdHNlcnZlcjoge1xuXHRcdHBvcnQ6IDUxNzMsXG5cdFx0aG9zdDogJzAuMC4wLjAnLFxuXHR9LFxuXHR0ZXN0OiB7XG5cdFx0aW5jbHVkZTogWydzcmMvKiovKi50ZXN0LnRzJ10sXG5cdFx0ZW52aXJvbm1lbnQ6ICdqc2RvbScsXG5cdH0sXG59KTtcbiJdLAogICJtYXBwaW5ncyI6ICI7QUFBOFUsU0FBUyxpQkFBaUI7QUFDeFcsU0FBUyxvQkFBb0I7QUFFN0IsSUFBTyxzQkFBUSxhQUFhO0FBQUEsRUFDM0IsU0FBUyxDQUFDLFVBQVUsQ0FBQztBQUFBLEVBQ3JCLFFBQVE7QUFBQSxJQUNQLE1BQU07QUFBQSxJQUNOLE1BQU07QUFBQSxFQUNQO0FBQUEsRUFDQSxNQUFNO0FBQUEsSUFDTCxTQUFTLENBQUMsa0JBQWtCO0FBQUEsSUFDNUIsYUFBYTtBQUFBLEVBQ2Q7QUFDRCxDQUFDOyIsCiAgIm5hbWVzIjogW10KfQo=

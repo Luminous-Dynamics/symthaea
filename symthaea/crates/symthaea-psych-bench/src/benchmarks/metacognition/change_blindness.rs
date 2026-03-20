@@ -53,7 +53,7 @@ impl ChangeBlindnessBenchmark {
 
         // Detection temperature: higher = noisier decisions.
         // Time pressure makes detection harder (less careful comparison).
-        let temperature: f64 = (0.10 + config.time_pressure * 0.10)
+        let temperature: f64 = (0.08 + config.time_pressure * 0.10)
             * diff_model.temperature_multiplier(config.difficulty);
 
         // Scene parameters
@@ -167,8 +167,7 @@ impl ChangeBlindnessBenchmark {
                     let change_signal = 1.0 - scene_similarity;
 
                     // Detection decision: softmax of change signal vs threshold
-                    // The threshold represents the criterion for reporting "change"
-                    let threshold = 0.10; // Base detection threshold
+                    let threshold = 0.10;
                     let signal_ev = change_signal / temperature;
                     let threshold_ev = threshold / temperature;
                     let max_ev = signal_ev.max(threshold_ev);
@@ -214,10 +213,25 @@ impl ChangeBlindnessBenchmark {
                         search_total += 1;
                         let mut found = false;
 
+                        // Saliency-weighted search: attend to most-changed objects first
+                        // (Rensink 1997 — change blindness is strongest in low-salience regions)
+                        let mut saliency: Vec<(usize, f64)> = (0..num_objects)
+                            .map(|i| {
+                                let pre_obj = objects[i].bind(&position_hvs[i]);
+                                let post_obj = if i == change_idx {
+                                    replacement.bind(&position_hvs[i])
+                                } else {
+                                    objects[i].bind(&position_hvs[i])
+                                };
+                                let sim = pre_obj.similarity(&post_obj);
+                                (i, 1.0 - sim as f64) // lower similarity = higher saliency
+                            })
+                            .collect();
+                        saliency.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+
                         for look in 0..max_looks {
-                            // Each look attends to a different object
-                            // On each look, the attended object gets a boost
-                            let attended_obj_idx = (look as usize) % num_objects;
+                            // Saliency-ordered search: attend to most-changed objects first
+                            let attended_obj_idx = saliency[look as usize % num_objects].0;
 
                             // Check if this look attends to the changed object
                             if attended_obj_idx == change_idx {

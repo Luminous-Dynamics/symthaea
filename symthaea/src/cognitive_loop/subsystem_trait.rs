@@ -674,7 +674,7 @@ impl CycleSnapshot {
     /// Called once at the start of each cycle (Phase A: OBSERVE).
     /// Copies all observable state into fixed-size buffers.
     #[allow(clippy::too_many_arguments)]
-    pub fn build(
+    pub(crate) fn build(
         cycle_number: u64,
         prediction_confidence: f64,
         fep_lr_boost: f64,

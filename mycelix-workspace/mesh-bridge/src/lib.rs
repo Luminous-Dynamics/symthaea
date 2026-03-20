@@ -9,6 +9,10 @@ pub mod transport;
 
 pub mod dedup_cache;
 pub mod encryption;
+pub mod meshtastic;
+
+#[cfg(feature = "mqtt")]
+pub mod mqtt;
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;

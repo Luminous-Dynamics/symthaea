@@ -24,6 +24,20 @@
 
 pub mod accelerator;
 pub mod cmod_adapter;
+#[allow(
+    clippy::useless_format,
+    clippy::single_char_add_str,
+    clippy::manual_is_multiple_of,
+    clippy::needless_range_loop
+)]
+pub mod cmod_evaluation;
+#[allow(
+    clippy::useless_format,
+    clippy::single_char_add_str,
+    clippy::manual_is_multiple_of,
+    clippy::needless_range_loop
+)]
+pub mod cross_machine_evaluation;
 pub mod datacenter;
 pub mod fission;
 pub mod fusion_twin;
@@ -102,6 +116,21 @@ pub use datacenter::{
     DatacenterFepAction, DatacenterFepAgent, DatacenterHdcEncoder, DatacenterOutput,
     DatacenterPredictor, DatacenterReading, DatacenterSafetyLevel, DatacenterTwin,
     DATACENTER_HORIZONS, DATACENTER_HORIZON_LABELS,
+};
+
+pub use cmod_evaluation::{
+    compute_auc, compute_roc_curve, evaluate_density_limit, evaluate_density_limit_v2,
+    evaluate_density_limit_v3, greenwald_fraction, load_density_limit_csv, ConfusionMatrix,
+    DensityLimitEncoder, DensityLimitEncoderV3, DensityLimitSample, DensityLimitShot,
+    EvaluationConfig, EvaluationConfigV2, EvaluationConfigV3, EvaluationReport, LeadTimeStats,
+    NormalizationRanges, RocPoint,
+};
+
+pub use cross_machine_evaluation::{
+    evaluate_cross_machine, evaluate_machine, generate_cross_machine_report,
+    generate_synthetic_machine, load_generic_csv, CrossMachineResult, GenericEvalConfig,
+    GenericHdcEncoder, GenericNormRanges, GenericSample, GenericShot, MachineDatasetConfig,
+    MachineEvaluationResult,
 };
 
 pub use cmod_adapter::{

@@ -77,7 +77,7 @@ echo
 # --- Verify stubs exist in standalone ----------------------------------------
 
 STUBS_OK=true
-for stub in mycelix-fl-core mycelix-sdk; do
+for stub in mycelix-fl-core mycelix-sdk mycelix-crypto; do
     if [ ! -f "${STANDALONE_REPO}/stubs/${stub}/Cargo.toml" ]; then
         warn "Stub missing: stubs/${stub}/Cargo.toml"
         STUBS_OK=false
@@ -119,6 +119,7 @@ RSYNC_EXCLUDE=(
     --exclude='target/'
     --exclude='__pyphi_cache__/'
     --exclude='.DS_Store'
+    --exclude='broca-pipeline.bin'
 )
 RSYNC_OPTS=(-a --delete "${RSYNC_EXCLUDE[@]}")
 if $DRY_RUN; then
@@ -249,6 +250,9 @@ if ! $DRY_RUN; then
     sed -i 's|^\(mycelix-sdk\s*=\s*{\s*path\s*=\s*\)"[^"]*"|\1"stubs/mycelix-sdk"|' \
         "${STANDALONE_REPO}/Cargo.toml"
 
+    sed -i 's|^\(mycelix-crypto\s*=\s*{\s*path\s*=\s*\)"[^"]*"|\1"stubs/mycelix-crypto"|' \
+        "${STANDALONE_REPO}/Cargo.toml"
+
     # Verify the rewrites actually happened
     REWRITE_OK=true
     if ! grep -q 'mycelix-fl-core.*stubs/mycelix-fl-core' "${STANDALONE_REPO}/Cargo.toml"; then
@@ -257,6 +261,10 @@ if ! $DRY_RUN; then
     fi
     if ! grep -q 'mycelix-sdk.*stubs/mycelix-sdk' "${STANDALONE_REPO}/Cargo.toml"; then
         warn "Failed to rewrite mycelix-sdk path"
+        REWRITE_OK=false
+    fi
+    if ! grep -q 'mycelix-crypto.*stubs/mycelix-crypto' "${STANDALONE_REPO}/Cargo.toml"; then
+        warn "Failed to rewrite mycelix-crypto path"
         REWRITE_OK=false
     fi
 
@@ -356,12 +364,27 @@ echo
 # --- Post-sync cargo check ---------------------------------------------------
 
 if ! $DRY_RUN && ! $SKIP_CHECK; then
+    SYNC_CHECK_FAILED=false
+
+    info "Running cargo fmt --check in standalone repo..."
+    if (cd "${STANDALONE_REPO}" && cargo fmt --check 2>&1 | head -20); then
+        ok "cargo fmt passed"
+    else
+        warn "cargo fmt --check failed — unformatted code detected"
+        SYNC_CHECK_FAILED=true
+    fi
+
     info "Running cargo check in standalone repo (default features)..."
     if (cd "${STANDALONE_REPO}" && cargo check 2>&1 | tail -5); then
         ok "cargo check passed"
     else
         warn "cargo check failed — the sync may have issues"
-        warn "Run with --skip-check to bypass, or investigate manually:"
+        SYNC_CHECK_FAILED=true
+    fi
+
+    if $SYNC_CHECK_FAILED; then
+        warn "Pre-push checks failed. Run with --skip-check to bypass, or investigate:"
+        echo "  cd ${STANDALONE_REPO} && cargo fmt --check"
         echo "  cd ${STANDALONE_REPO} && cargo check"
     fi
     echo

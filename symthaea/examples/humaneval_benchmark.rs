@@ -62,7 +62,9 @@ fn load_humaneval(path: &std::path::Path) -> Vec<HumanEvalProblem> {
     let mut problems = Vec::new();
 
     for line in content.lines() {
-        if line.trim().is_empty() { continue; }
+        if line.trim().is_empty() {
+            continue;
+        }
         let v: serde_json::Value = serde_json::from_str(line)
             .unwrap_or_else(|e| panic!("Failed to parse JSONL line: {e}"));
         problems.push(HumanEvalProblem {
@@ -172,25 +174,30 @@ fn clean_python_output(source: &str) -> String {
     // Step 2: Find the first line that looks like Python code
     // (skip prose, bare language tags like "python", "Here's the solution:")
     let lines: Vec<&str> = defenced.lines().collect();
-    let code_start = lines.iter().position(|l| {
-        let t = l.trim();
-        // Must be a non-empty Python construct (NOT blank lines or bare words)
-        t.starts_with("def ")
-            || t.starts_with("class ")
-            || t.starts_with("import ")
-            || t.starts_with("from ")
-            || t.starts_with("@")
-            || t.starts_with("# ")
-            || (t.starts_with("    ") && t.len() > 4) // indented code body
-    }).unwrap_or(0);
+    let code_start = lines
+        .iter()
+        .position(|l| {
+            let t = l.trim();
+            // Must be a non-empty Python construct (NOT blank lines or bare words)
+            t.starts_with("def ")
+                || t.starts_with("class ")
+                || t.starts_with("import ")
+                || t.starts_with("from ")
+                || t.starts_with("@")
+                || t.starts_with("# ")
+                || (t.starts_with("    ") && t.len() > 4) // indented code body
+        })
+        .unwrap_or(0);
 
     // Step 3: Take everything from code_start to end (including blank lines in functions)
     let code_lines = &lines[code_start..];
 
     // Step 4: Trim trailing prose (lines after the last line that looks like code)
-    let last_code = code_lines.iter().rposition(|l| {
-        let t = l.trim();
-        t.is_empty()  // blank lines are OK inside functions
+    let last_code = code_lines
+        .iter()
+        .rposition(|l| {
+            let t = l.trim();
+            t.is_empty()  // blank lines are OK inside functions
             || t.starts_with("def ")
             || t.starts_with("class ")
             || t.starts_with("return ")
@@ -202,7 +209,9 @@ fn clean_python_output(source: &str) -> String {
             || t.ends_with(':')
             || t.ends_with(')')
             || t.ends_with(']')
-    }).map(|i| i + 1).unwrap_or(code_lines.len());
+        })
+        .map(|i| i + 1)
+        .unwrap_or(code_lines.len());
 
     code_lines[..last_code].join("\n")
 }
@@ -235,7 +244,9 @@ fn run_test(problem: &HumanEvalProblem, solution: &str) -> (bool, bool, Option<S
         let err = result.runtime_error.or_else(|| {
             if !result.test_output.is_empty() {
                 // Extract the last line of the traceback (most informative)
-                let last_meaningful = result.test_output.lines()
+                let last_meaningful = result
+                    .test_output
+                    .lines()
                     .filter(|l| !l.trim().is_empty())
                     .last()
                     .unwrap_or("Test failed");
@@ -246,7 +257,11 @@ fn run_test(problem: &HumanEvalProblem, solution: &str) -> (bool, bool, Option<S
         });
         (false, true, err)
     } else {
-        (false, false, Some(result.compile_errors.first().cloned().unwrap_or_default()))
+        (
+            false,
+            false,
+            Some(result.compile_errors.first().cloned().unwrap_or_default()),
+        )
     }
 }
 
@@ -272,7 +287,9 @@ fn main() {
     } else {
         BenchMode::Native
     };
-    let limit = args.iter().position(|a| a == "--limit")
+    let limit = args
+        .iter()
+        .position(|a| a == "--limit")
         .and_then(|i| args.get(i + 1))
         .and_then(|s| s.parse::<usize>().ok())
         .unwrap_or(164);
@@ -302,8 +319,11 @@ fn main() {
         eprintln!("Verifying canonical solutions...");
         let mut canonical_pass = 0;
         for p in &problems {
-            if verify_canonical(p) { canonical_pass += 1; }
-            else { eprintln!("  WARN: canonical fails for {}", p.task_id); }
+            if verify_canonical(p) {
+                canonical_pass += 1;
+            } else {
+                eprintln!("  WARN: canonical fails for {}", p.task_id);
+            }
         }
         eprintln!("  Canonical: {}/{} pass\n", canonical_pass, problems.len());
     }
@@ -321,8 +341,20 @@ fn main() {
         let (passed, compiled, error) = run_test(problem, &solution);
         let elapsed = start.elapsed().as_millis();
 
-        let status = if passed { "✓" } else if compiled { "◐" } else { "✗" };
-        eprint!("\r  [{:>3}/{}] {} {} ", i + 1, problems.len(), status, problem.task_id);
+        let status = if passed {
+            "✓"
+        } else if compiled {
+            "◐"
+        } else {
+            "✗"
+        };
+        eprint!(
+            "\r  [{:>3}/{}] {} {} ",
+            i + 1,
+            problems.len(),
+            status,
+            problem.task_id
+        );
         if let Some(ref e) = error {
             let short: String = e.chars().take(50).collect();
             eprint!("— {}", short);
@@ -333,7 +365,8 @@ fn main() {
         results.push(EvalResult {
             task_id: problem.task_id.clone(),
             entry_point: problem.entry_point.clone(),
-            passed, compiled,
+            passed,
+            compiled,
             error,
             mode: format!("{:?}", mode),
             elapsed_ms: elapsed,
@@ -352,29 +385,53 @@ fn main() {
     println!("╚══════════════════════════════════════════════════════════╝\n");
 
     println!("── Mode: {} ──", mode_str);
-    println!("  Pass@1:   {}/{} ({:.1}%)", passed, total, 100.0 * passed as f64 / total as f64);
-    println!("  Compiled: {}/{} ({:.1}%)", compiled, total, 100.0 * compiled as f64 / total as f64);
-    println!("  Time:     {:.1}s ({:.0}ms/problem)", total_time as f64 / 1000.0, total_time as f64 / total as f64);
+    println!(
+        "  Pass@1:   {}/{} ({:.1}%)",
+        passed,
+        total,
+        100.0 * passed as f64 / total as f64
+    );
+    println!(
+        "  Compiled: {}/{} ({:.1}%)",
+        compiled,
+        total,
+        100.0 * compiled as f64 / total as f64
+    );
+    println!(
+        "  Time:     {:.1}s ({:.0}ms/problem)",
+        total_time as f64 / 1000.0,
+        total_time as f64 / total as f64
+    );
     println!();
 
     let failures: Vec<&EvalResult> = results.iter().filter(|r| !r.passed).collect();
     if !failures.is_empty() && failures.len() <= 30 {
-        println!("── Failures ({}) ───────────────────────────────────────", failures.len());
+        println!(
+            "── Failures ({}) ───────────────────────────────────────",
+            failures.len()
+        );
         for f in failures.iter().take(20) {
-            let err: String = f.error.as_ref().map(|e| e.chars().take(60).collect()).unwrap_or_default();
+            let err: String = f
+                .error
+                .as_ref()
+                .map(|e| e.chars().take(60).collect())
+                .unwrap_or_default();
             println!("  {} ({}) — {}", f.task_id, f.entry_point, err);
         }
     }
 
     // JSON report
-    let json_results: Vec<serde_json::Value> = results.iter().map(|r| {
-        serde_json::json!({
-            "task_id": r.task_id, "entry_point": r.entry_point,
-            "passed": r.passed, "compiled": r.compiled,
-            "error": r.error, "mode": r.mode,
-            "elapsed_ms": r.elapsed_ms, "code_len": r.code_len,
+    let json_results: Vec<serde_json::Value> = results
+        .iter()
+        .map(|r| {
+            serde_json::json!({
+                "task_id": r.task_id, "entry_point": r.entry_point,
+                "passed": r.passed, "compiled": r.compiled,
+                "error": r.error, "mode": r.mode,
+                "elapsed_ms": r.elapsed_ms, "code_len": r.code_len,
+            })
         })
-    }).collect();
+        .collect();
 
     let json_report = serde_json::json!({
         "benchmark": "humaneval",
@@ -387,6 +444,9 @@ fn main() {
     });
 
     let report_path = std::env::temp_dir().join("symthaea_humaneval.json");
-    let _ = std::fs::write(&report_path, serde_json::to_string_pretty(&json_report).unwrap());
+    let _ = std::fs::write(
+        &report_path,
+        serde_json::to_string_pretty(&json_report).unwrap(),
+    );
     eprintln!("\nJSON report: {}", report_path.display());
 }

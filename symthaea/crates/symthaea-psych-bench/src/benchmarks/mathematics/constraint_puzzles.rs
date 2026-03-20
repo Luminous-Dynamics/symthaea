@@ -42,7 +42,7 @@ fn count_queens_violations(queens: &[usize]) -> u32 {
             // Same diagonal
             let row_diff = (queens[i] as isize - queens[j] as isize).unsigned_abs();
             let col_diff = j - i;
-            if row_diff == col_diff as usize {
+            if row_diff == col_diff {
                 violations += 1;
             }
         }

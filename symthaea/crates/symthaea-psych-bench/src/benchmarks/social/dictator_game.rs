@@ -111,7 +111,7 @@ impl DictatorGameBenchmark {
                 // Offer = proportion given, mapped from similarity difference
                 let raw_offer = ((generous_sim - selfish_sim + noise + 0.5) / 1.0) as f64;
                 // Quantize to 0%, 10%, ..., 50%
-                let offer = (raw_offer * 5.0).round().max(0.0).min(5.0) / 10.0;
+                let offer = (raw_offer * 5.0).round().clamp(0.0, 5.0) / 10.0;
 
                 offers.push(offer);
                 if condition.name == "anonymous" {

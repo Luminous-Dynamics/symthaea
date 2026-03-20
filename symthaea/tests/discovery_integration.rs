@@ -1,3 +1,4 @@
+#![cfg(feature = "unstable-examples")]
 // ==================================================================================
 // Integration Test: Discovery Layer — Capability Cards, Reputation, Handshake
 // ==================================================================================

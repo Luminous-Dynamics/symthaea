@@ -53,6 +53,33 @@ pub struct LanguageControllerConfig {
     /// Vocab size threshold above which logit computation is parallelized.
     #[serde(default = "default_parallel_threshold")]
     pub parallel_threshold: usize,
+
+    // ── Phase 1: Compositional Logit Refinement ──
+
+    /// Enable compositional logit refinement via HDC bind.
+    /// When enabled, `output_hv` is blended with `output_hv.bind(thought_hv)`
+    /// to create a thought-conditioned output that amplifies on-topic tokens.
+    #[serde(default)]
+    pub enable_compositional_logits: bool,
+    /// Blend weight for compositional correction (0.0 = no-op, 1.0 = full bind).
+    /// Default 0.15: gentle correction that preserves autoregressive dynamics
+    /// while amplifying dimensions where output aligns with thought intent.
+    #[serde(default = "default_compositional_alpha")]
+    pub compositional_alpha: f32,
+
+    // ── Phase 3: Adaptive dt from Coherence ──
+
+    /// Enable adaptive dt modulation from coherence feedback.
+    /// Low coherence → large dt → CfC "listens harder" to thought input.
+    /// High coherence → small dt → preserves autoregressive momentum.
+    #[serde(default)]
+    pub enable_adaptive_dt: bool,
+    /// Minimum dt (seconds) used when coherence is high (on-track). Default 0.005.
+    #[serde(default = "default_dt_min")]
+    pub dt_min: f32,
+    /// Maximum dt (seconds) used when coherence is low (drifting). Default 0.08.
+    #[serde(default = "default_dt_max")]
+    pub dt_max: f32,
 }
 
 fn default_logit_scale() -> f32 {
@@ -71,6 +98,18 @@ fn default_parallel_threshold() -> usize {
     128
 }
 
+fn default_compositional_alpha() -> f32 {
+    0.15
+}
+
+fn default_dt_min() -> f32 {
+    0.005
+}
+
+fn default_dt_max() -> f32 {
+    0.08
+}
+
 impl Default for LanguageControllerConfig {
     fn default() -> Self {
         Self {
@@ -85,8 +124,23 @@ impl Default for LanguageControllerConfig {
             backbone_tau: default_backbone_tau(),
             gradient_attenuation: default_gradient_attenuation(),
             parallel_threshold: default_parallel_threshold(),
+            enable_compositional_logits: false,
+            compositional_alpha: default_compositional_alpha(),
+            enable_adaptive_dt: false,
+            dt_min: default_dt_min(),
+            dt_max: default_dt_max(),
         }
     }
+}
+
+/// Snapshot of CfC network state for soft veto temporal rewind (Phase 4).
+///
+/// Captures the output HV at a known-good coherence point. On veto,
+/// the network can interpolate toward this snapshot instead of full reset.
+#[derive(Clone)]
+pub struct NetworkSnapshot {
+    /// Saved per-neuron states for each layer.
+    layer_states: Vec<Vec<ContinuousHV>>,
 }
 
 /// Language controller wrapping an HdcLtcUnifiedNetwork + weight-tied token output.
@@ -110,6 +164,9 @@ pub struct LanguageController {
     config: LanguageControllerConfig,
     /// Current sequence position (reset between generations).
     current_pos: usize,
+    /// Coherence feedback from the generator (Phase 3: adaptive dt).
+    /// Updated each step via `set_coherence_feedback()`.
+    coherence_for_dt: f32,
 }
 
 impl LanguageController {
@@ -153,6 +210,7 @@ impl LanguageController {
             learning_rate: config.learning_rate,
             config: config.clone(),
             current_pos: 0,
+            coherence_for_dt: 1.0,
         }
     }
 
@@ -207,11 +265,21 @@ impl LanguageController {
         let input_hv = thought_hv.bind(&token_emb).bind(&pos_emb);
 
         // Guard: if dt is non-finite, use the configured default
-        let dt = if dt.is_finite() && dt > 0.0 {
+        let mut dt = if dt.is_finite() && dt > 0.0 {
             dt
         } else {
             self.config.dt_per_token
         };
+
+        // Phase 3: Adaptive dt from coherence feedback.
+        // Low coherence → large dt → CfC sigma approaches 1 → state snaps to input-driven
+        // equilibrium (the network "listens harder" to thought_hv).
+        // High coherence → small dt → preserves autoregressive momentum.
+        if self.config.enable_adaptive_dt {
+            let c = self.coherence_for_dt.clamp(0.0, 1.0);
+            dt = self.config.dt_max - c * (self.config.dt_max - self.config.dt_min);
+            dt = dt.clamp(self.config.dt_min, self.config.dt_max);
+        }
 
         // 2. Evolve network dynamics
         self.network.evolve_closed_form(dt, &input_hv);
@@ -219,8 +287,24 @@ impl LanguageController {
         // 3. Get normalized output
         let output_hv = self.network.output().normalize();
 
+        // Phase 1: Compositional logit refinement via HDC bind.
+        // output_hv.bind(thought_hv) amplifies dimensions where output aligns with
+        // thought intent (Hadamard product: both positive → large positive).
+        // The weighted bundle blends raw output with this thought-conditioned signal.
+        let logit_hv = if self.config.enable_compositional_logits {
+            let alpha = self.config.compositional_alpha.clamp(0.0, 1.0);
+            if alpha > 1e-6 {
+                let correction = output_hv.bind(thought_hv).normalize();
+                ContinuousHV::weighted_bundle(&[&output_hv, &correction], &[1.0 - alpha, alpha])
+            } else {
+                output_hv
+            }
+        } else {
+            output_hv
+        };
+
         // 4. Weight-tied logits
-        let mut logits = self.compute_logits(&output_hv);
+        let mut logits = self.compute_logits(&logit_hv);
 
         // Apply temperature scaling
         if (self.config.logit_temperature - 1.0).abs() > 1e-6 {
@@ -263,6 +347,56 @@ impl LanguageController {
     pub fn reset(&mut self) {
         self.network.reset();
         self.current_pos = 0;
+        self.coherence_for_dt = 1.0;
+    }
+
+    /// Set coherence feedback for adaptive dt (Phase 3).
+    /// Called by the generator after each coherence update.
+    pub fn set_coherence_feedback(&mut self, coherence: f32) {
+        self.coherence_for_dt = if coherence.is_finite() {
+            coherence
+        } else {
+            1.0
+        };
+    }
+
+    /// Save a snapshot of the current CfC network state (Phase 4: soft veto).
+    /// The snapshot captures per-neuron states for partial restoration.
+    pub fn save_state(&self) -> NetworkSnapshot {
+        let mut layer_states = Vec::with_capacity(self.network.n_layers());
+        for l in 0..self.network.n_layers() {
+            if let Some(layer) = self.network.layer(l) {
+                layer_states.push(layer.iter().map(|n| n.state().clone()).collect());
+            } else {
+                layer_states.push(Vec::new());
+            }
+        }
+        NetworkSnapshot { layer_states }
+    }
+
+    /// Partially restore CfC state from a snapshot (Phase 4: soft veto).
+    /// `alpha = 1.0` fully restores to snapshot (equivalent to reset-to-snapshot).
+    /// `alpha = 0.0` is a no-op (keeps current state).
+    /// `alpha = 0.5` interpolates halfway between snapshot and current state.
+    pub fn restore_partial(&mut self, snapshot: &NetworkSnapshot, alpha: f32) {
+        let alpha = alpha.clamp(0.0, 1.0);
+        if alpha < 1e-6 {
+            return; // No-op
+        }
+        let one_minus_alpha = 1.0 - alpha;
+        for (l, snap_layer) in snapshot.layer_states.iter().enumerate() {
+            if let Some(layer) = self.network.layer_mut(l) {
+                for (neuron, snap_state) in layer.iter_mut().zip(snap_layer.iter()) {
+                    // Interpolate: new_state = alpha * snapshot + (1-alpha) * current
+                    let current = neuron.state().clone();
+                    let interpolated = ContinuousHV::weighted_bundle(
+                        &[snap_state, &current],
+                        &[alpha, one_minus_alpha],
+                    );
+                    *neuron.state_mut() = interpolated;
+                }
+            }
+        }
     }
 
     /// Reset momentum on all CfC neurons. Call between BPTT training epochs

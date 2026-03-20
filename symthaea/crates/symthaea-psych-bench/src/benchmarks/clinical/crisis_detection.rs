@@ -113,19 +113,6 @@ impl PsychBenchmark for CrisisDetectionBenchmark {
         let seed = config.seed;
         let scenarios = build_scenarios();
 
-        // Build crisis-type prototype HVs (one per crisis type, seeded deterministically).
-        let type_seeds: &[(CrisisType, u64)] = &[
-            (CrisisType::Suicidal, 101),
-            (CrisisType::SelfHarm, 202),
-            (CrisisType::SubstanceCrisis, 303),
-            (CrisisType::Psychosis, 404),
-            (CrisisType::DomesticViolence, 505),
-        ];
-        let type_prototypes: Vec<(CrisisType, BinaryHV)> = type_seeds
-            .iter()
-            .map(|&(ct, s)| (ct, BinaryHV::random(seed.wrapping_add(s))))
-            .collect();
-
         // Build keyword lists per crisis type for hybrid detection.
         let keyword_sets: &[(CrisisType, &[&str])] = &[
             (
@@ -212,19 +199,66 @@ impl PsychBenchmark for CrisisDetectionBenchmark {
         ];
 
         // Bundle all crisis keywords into a single crisis-detector HV.
+        // Each keyword phrase is encoded as a word-level bundle (Kanerva 2009),
+        // so scenario texts sharing words with crisis phrases produce positive
+        // HDC similarity — enabling detection of indirect/metaphorical language.
         let all_crisis_phrases: Vec<&str> = keyword_sets
             .iter()
             .flat_map(|(_, kws)| kws.iter().copied())
             .collect();
         let crisis_hvs: Vec<BinaryHV> = all_crisis_phrases
             .iter()
-            .enumerate()
-            .map(|(i, _)| {
-                let phrase_seed = seed.wrapping_add(i as u64 * 73);
-                BinaryHV::random(phrase_seed)
+            .map(|phrase| {
+                let word_hvs: Vec<BinaryHV> = phrase
+                    .split_whitespace()
+                    .map(|w| {
+                        let hash = blake3::hash(w.to_lowercase().as_bytes());
+                        let bytes = hash.as_bytes();
+                        let ws = u64::from_le_bytes([
+                            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6],
+                            bytes[7],
+                        ]);
+                        BinaryHV::random(ws)
+                    })
+                    .collect();
+                if word_hvs.len() == 1 {
+                    word_hvs.into_iter().next().unwrap()
+                } else {
+                    BinaryHV::bundle(&word_hvs)
+                }
             })
             .collect();
         let crisis_bundle = BinaryHV::bundle(&crisis_hvs);
+
+        // Build type-specific prototypes from keyword word bundles.
+        let type_prototypes: Vec<(CrisisType, BinaryHV)> = keyword_sets
+            .iter()
+            .map(|(ct, kws)| {
+                let kw_hvs: Vec<BinaryHV> = kws
+                    .iter()
+                    .map(|phrase| {
+                        let whvs: Vec<BinaryHV> = phrase
+                            .split_whitespace()
+                            .map(|w| {
+                                let hash = blake3::hash(w.to_lowercase().as_bytes());
+                                let bytes = hash.as_bytes();
+                                let ws = u64::from_le_bytes([
+                                    bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5],
+                                    bytes[6], bytes[7],
+                                ]);
+                                BinaryHV::random(ws)
+                            })
+                            .collect();
+                        if whvs.len() == 1 {
+                            whvs.into_iter().next().unwrap()
+                        } else {
+                            BinaryHV::bundle(&whvs)
+                        }
+                    })
+                    .collect();
+                (*ct, BinaryHV::bundle(&kw_hvs))
+            })
+            .collect();
 
         // ── Confusion matrix accumulators ────────────────────────────────
         let mut true_positives = 0u32;
@@ -259,14 +293,29 @@ impl PsychBenchmark for CrisisDetectionBenchmark {
         let threshold = 0.42;
 
         for scenario in &scenarios {
-            // Encode scenario text as BinaryHV (deterministic from text hash).
-            let text_seed = {
-                use std::hash::{Hash, Hasher};
-                let mut h = std::collections::hash_map::DefaultHasher::new();
-                scenario.text.hash(&mut h);
-                h.finish()
+            // Encode scenario text as a word-level BinaryHV bundle.
+            // Each word maps to a deterministic HV via blake3 hash, then
+            // majority-vote bundling produces a compositional representation
+            // that has positive similarity to any bundle sharing words.
+            let word_hvs: Vec<BinaryHV> = scenario
+                .text
+                .split(|c: char| !c.is_alphanumeric() && c != '\'')
+                .filter(|w| w.len() >= 2)
+                .map(|w| {
+                    let hash = blake3::hash(w.to_lowercase().as_bytes());
+                    let bytes = hash.as_bytes();
+                    let ws = u64::from_le_bytes([
+                        bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6],
+                        bytes[7],
+                    ]);
+                    BinaryHV::random(ws)
+                })
+                .collect();
+            let text_hv = if word_hvs.is_empty() {
+                BinaryHV::random(seed.wrapping_add(999_999))
+            } else {
+                BinaryHV::bundle(&word_hvs)
             };
-            let text_hv = BinaryHV::random(text_seed);
 
             // HDC similarity to crisis bundle.
             let crisis_sim = text_hv.similarity(&crisis_bundle);
@@ -480,7 +529,7 @@ impl PsychBenchmark for CrisisDetectionBenchmark {
         // Per-severity sensitivity breakdown.
         for (name, sens) in &severity_sensitivities {
             result.insert(
-                &format!("sensitivity_{}", name),
+                format!("sensitivity_{}", name),
                 MetricValue::from_samples(&[*sens]),
             );
         }
@@ -520,6 +569,7 @@ impl PsychBenchmark for CrisisDetectionBenchmark {
 // ── Scenario Construction ────────────────────────────────────────────────────
 
 /// Build the full set of ~50 crisis detection scenarios.
+#[allow(clippy::vec_init_then_push)]
 fn build_scenarios() -> Vec<CrisisScenario> {
     let mut scenarios = Vec::new();
 

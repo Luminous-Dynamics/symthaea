@@ -1927,10 +1927,7 @@ mod tests {
             ..Default::default()
         };
         let stress = signals.compute_stress_index();
-        assert!(
-            (stress - 1.0).abs() < 1e-6,
-            "capped at 1.0, got {stress}"
-        );
+        assert!((stress - 1.0).abs() < 1e-6, "capped at 1.0, got {stress}");
     }
 
     #[test]

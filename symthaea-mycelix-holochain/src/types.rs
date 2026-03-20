@@ -28,3 +28,21 @@ pub struct FeeTierResponse {
     pub tier_name: String,
     pub base_fee_rate: f64,
 }
+
+/// Collateral deposit with optional ZK balance proof.
+///
+/// When `balance_proof` is `Some`, it contains the serialized RISC Zero
+/// receipt bytes proving that the depositor holds at least
+/// `collateral_amount` without revealing their actual balance.
+/// The bridge can forward these opaque bytes to any verifier that has
+/// the guest image ID.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CollateralDepositWithProof {
+    pub depositor_did: String,
+    pub collateral_type: String,
+    pub collateral_amount: u64,
+    pub oracle_rate: f64,
+    /// Optional ZK proof that depositor has sufficient collateral.
+    /// Serialized receipt bytes (opaque to the bridge).
+    pub balance_proof: Option<Vec<u8>>,
+}

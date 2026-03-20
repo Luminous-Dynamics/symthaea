@@ -91,9 +91,20 @@ impl EmotionalStroopBenchmark {
             };
 
             // Compute similarity to each color candidate
+            // Encoding noise adds per-comparison noise that degrades color
+            // discrimination (Lu & Dosher, 1998 noise exclusion model).
+            let enc_noise = config.effective_noise() as f32;
             let sims: Vec<f64> = color_hvs
                 .iter()
-                .map(|c| combined.similarity(c) as f64)
+                .enumerate()
+                .map(|(ci, c)| {
+                    let raw = combined.similarity(c);
+                    let noise_seed = seed.wrapping_add(5000 + trial as u64 * 7 + ci as u64 * 31);
+                    let noise_val = ((noise_seed.wrapping_mul(0x9E3779B97F4A7C15) >> 33) as f32
+                        / (1u64 << 31) as f32)
+                        - 0.5;
+                    (raw + noise_val * enc_noise * 0.15) as f64
+                })
                 .collect();
 
             // Softmax response selection
@@ -115,6 +126,24 @@ impl EmotionalStroopBenchmark {
                     break;
                 }
             }
+
+            // Attention lapse: negative-valence trials capture attention more,
+            // increasing lapse vulnerability (Williams et al., 1996). The boost
+            // scales with base lapse_rate so it only activates during reliability testing.
+            let unique_trial = trial_idx * (trials_per_condition * 2) + trial;
+            let emotional_boost = if is_negative {
+                config.lapse_rate * 0.6
+            } else {
+                0.0
+            };
+            let effective_lapse = config.lapse_rate + emotional_boost;
+            let lapse_seed = config.trial_seed("emotional_stroop", "lapse", unique_trial);
+            response_idx = if (lapse_seed % 10000) as f64 / 10000.0 < effective_lapse {
+                let h = config.trial_seed("emotional_stroop", "lapse_choice", unique_trial);
+                h as usize % 4
+            } else {
+                response_idx
+            };
 
             // RT proxy: deliberation ticks based on decision margin
             let probs: Vec<f64> = exp_sims.iter().map(|e| e / exp_sum).collect();

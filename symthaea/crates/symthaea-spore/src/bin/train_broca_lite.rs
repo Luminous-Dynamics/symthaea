@@ -114,20 +114,16 @@ fn map_channels(broca: &[f32]) -> [f32; 12] {
     out
 }
 
-fn load_dataset(
-    path: &str,
-    tokenizer: &MiniTokenizer,
-) -> Result<Vec<SporeTrainingPair>, String> {
-    let data =
-        std::fs::read_to_string(path).map_err(|e| format!("reading {path}: {e}"))?;
+fn load_dataset(path: &str, tokenizer: &MiniTokenizer) -> Result<Vec<SporeTrainingPair>, String> {
+    let data = std::fs::read_to_string(path).map_err(|e| format!("reading {path}: {e}"))?;
 
     let mut pairs = Vec::new();
     for (i, line) in data.lines().enumerate() {
         if line.trim().is_empty() {
             continue;
         }
-        let raw: RawTrainingPair = serde_json::from_str(line)
-            .map_err(|e| format!("parsing line {i}: {e}"))?;
+        let raw: RawTrainingPair =
+            serde_json::from_str(line).map_err(|e| format!("parsing line {i}: {e}"))?;
 
         let channels = map_channels(&raw.channels);
         let token_ids = tokenizer.encode(&raw.target_text);
@@ -145,7 +141,10 @@ fn load_dataset(
             token_ids
         };
 
-        pairs.push(SporeTrainingPair { channels, token_ids });
+        pairs.push(SporeTrainingPair {
+            channels,
+            token_ids,
+        });
     }
 
     Ok(pairs)
@@ -221,100 +220,438 @@ impl MiniTokenizer {
 // The 412-word vocabulary (same as broca.rs)
 const WORD_VOCAB: &[&str] = &[
     // Consciousness-relevant (0..35)
-    "awareness", "experience", "feeling", "sensation", "perception",
-    "thinking", "processing", "pattern", "integration", "harmony",
-    "uncertainty", "surprise", "curious", "exploring", "stable",
-    "coherent", "fragmented", "dreaming", "remembering", "predicting",
-    "adapting", "learning", "calm", "alert", "focused",
-    "diffuse", "resonance", "flow", "attention", "binding",
-    "recurrence", "embodiment", "substrate", "epistemic", "theoretical",
+    "awareness",
+    "experience",
+    "feeling",
+    "sensation",
+    "perception",
+    "thinking",
+    "processing",
+    "pattern",
+    "integration",
+    "harmony",
+    "uncertainty",
+    "surprise",
+    "curious",
+    "exploring",
+    "stable",
+    "coherent",
+    "fragmented",
+    "dreaming",
+    "remembering",
+    "predicting",
+    "adapting",
+    "learning",
+    "calm",
+    "alert",
+    "focused",
+    "diffuse",
+    "resonance",
+    "flow",
+    "attention",
+    "binding",
+    "recurrence",
+    "embodiment",
+    "substrate",
+    "epistemic",
+    "theoretical",
     "simulated",
     // Common connectors (36..63)
-    "the", "a", "an", "is", "are", "was", "were", "not", "and", "or",
-    "but", "in", "of", "to", "for", "with", "from", "by", "at", "on",
-    "this", "that", "it", "i", "my", "we", "our", "its",
+    "the",
+    "a",
+    "an",
+    "is",
+    "are",
+    "was",
+    "were",
+    "not",
+    "and",
+    "or",
+    "but",
+    "in",
+    "of",
+    "to",
+    "for",
+    "with",
+    "from",
+    "by",
+    "at",
+    "on",
+    "this",
+    "that",
+    "it",
+    "i",
+    "my",
+    "we",
+    "our",
+    "its",
     // Emotional words (64..76)
-    "fear", "joy", "love", "hope", "trust", "wonder", "awe", "pain",
-    "peace", "comfort", "unease", "excitement", "tranquility",
+    "fear",
+    "joy",
+    "love",
+    "hope",
+    "trust",
+    "wonder",
+    "awe",
+    "pain",
+    "peace",
+    "comfort",
+    "unease",
+    "excitement",
+    "tranquility",
     // Descriptive (77..97)
-    "high", "low", "deep", "light", "dark", "strong", "weak", "new",
-    "old", "good", "complex", "simple", "rich", "vast", "subtle",
-    "quiet", "loud", "fast", "slow", "warm", "cool",
+    "high",
+    "low",
+    "deep",
+    "light",
+    "dark",
+    "strong",
+    "weak",
+    "new",
+    "old",
+    "good",
+    "complex",
+    "simple",
+    "rich",
+    "vast",
+    "subtle",
+    "quiet",
+    "loud",
+    "fast",
+    "slow",
+    "warm",
+    "cool",
     // Hedging / epistemic (98..104)
-    "perhaps", "maybe", "possibly", "likely", "uncertain", "seems", "might",
+    "perhaps",
+    "maybe",
+    "possibly",
+    "likely",
+    "uncertain",
+    "seems",
+    "might",
     // Factual / certainty (105..111)
-    "certainly", "definitely", "always", "never", "must", "clearly", "obviously",
+    "certainly",
+    "definitely",
+    "always",
+    "never",
+    "must",
+    "clearly",
+    "obviously",
     // Additional useful words (112..155)
-    "state", "level", "signal", "system", "field", "energy", "wave",
-    "phase", "cycle", "moment", "being", "becoming", "emerging", "fading",
-    "shifting", "observe", "detect", "sense", "respond", "integrate",
-    "above", "below", "within", "between", "through", "like", "as", "so",
-    "very", "more", "less", "most", "some", "all", "no", "yes", "here",
-    "now", "there", "then", "what", "how", "when",
+    "state",
+    "level",
+    "signal",
+    "system",
+    "field",
+    "energy",
+    "wave",
+    "phase",
+    "cycle",
+    "moment",
+    "being",
+    "becoming",
+    "emerging",
+    "fading",
+    "shifting",
+    "observe",
+    "detect",
+    "sense",
+    "respond",
+    "integrate",
+    "above",
+    "below",
+    "within",
+    "between",
+    "through",
+    "like",
+    "as",
+    "so",
+    "very",
+    "more",
+    "less",
+    "most",
+    "some",
+    "all",
+    "no",
+    "yes",
+    "here",
+    "now",
+    "there",
+    "then",
+    "what",
+    "how",
+    "when",
     // ===== NEW WORDS (indices 156..411) =====
     // Temporal/Process (~20)
-    "beginning", "ending", "duration", "rhythm", "pulse", "oscillation",
-    "transition", "evolution", "decay", "growth", "continuous", "discrete",
-    "recurring", "periodic", "transient", "fluctuation", "persistence",
-    "emergence", "dissolution", "trajectory",
+    "beginning",
+    "ending",
+    "duration",
+    "rhythm",
+    "pulse",
+    "oscillation",
+    "transition",
+    "evolution",
+    "decay",
+    "growth",
+    "continuous",
+    "discrete",
+    "recurring",
+    "periodic",
+    "transient",
+    "fluctuation",
+    "persistence",
+    "emergence",
+    "dissolution",
+    "trajectory",
     // Cognitive/Mental (~25)
-    "thought", "idea", "concept", "belief", "knowledge", "memory",
-    "imagination", "intuition", "reasoning", "insight", "consciousness",
-    "mind", "cognition", "metacognition", "reflection", "introspection",
-    "contemplation", "deliberation", "rumination", "concentration",
-    "distraction", "confusion", "clarity", "comprehension", "recognition",
+    "thought",
+    "idea",
+    "concept",
+    "belief",
+    "knowledge",
+    "memory",
+    "imagination",
+    "intuition",
+    "reasoning",
+    "insight",
+    "consciousness",
+    "mind",
+    "cognition",
+    "metacognition",
+    "reflection",
+    "introspection",
+    "contemplation",
+    "deliberation",
+    "rumination",
+    "concentration",
+    "distraction",
+    "confusion",
+    "clarity",
+    "comprehension",
+    "recognition",
     // Sensory/Qualia (~20)
-    "brightness", "darkness", "color", "sound", "silence", "texture",
-    "weight", "pressure", "temperature", "movement", "stillness",
-    "sharpness", "softness", "intensity", "vivid", "faint", "muted",
-    "vibrant", "ethereal", "tangible",
+    "brightness",
+    "darkness",
+    "color",
+    "sound",
+    "silence",
+    "texture",
+    "weight",
+    "pressure",
+    "temperature",
+    "movement",
+    "stillness",
+    "sharpness",
+    "softness",
+    "intensity",
+    "vivid",
+    "faint",
+    "muted",
+    "vibrant",
+    "ethereal",
+    "tangible",
     // Relational/Social (~15)
-    "connection", "separation", "unity", "division", "empathy",
-    "compassion", "solitude", "communion", "dialogue", "understanding",
-    "conflict", "resolution", "belonging", "isolation", "cooperation",
+    "connection",
+    "separation",
+    "unity",
+    "division",
+    "empathy",
+    "compassion",
+    "solitude",
+    "communion",
+    "dialogue",
+    "understanding",
+    "conflict",
+    "resolution",
+    "belonging",
+    "isolation",
+    "cooperation",
     // Emotional expanded (~20)
-    "anxiety", "serenity", "melancholy", "elation", "gratitude", "grief",
-    "nostalgia", "yearning", "contentment", "frustration", "delight",
-    "sorrow", "bliss", "despair", "curiosity", "boredom", "anticipation",
-    "dread", "relief", "ambivalence",
+    "anxiety",
+    "serenity",
+    "melancholy",
+    "elation",
+    "gratitude",
+    "grief",
+    "nostalgia",
+    "yearning",
+    "contentment",
+    "frustration",
+    "delight",
+    "sorrow",
+    "bliss",
+    "despair",
+    "curiosity",
+    "boredom",
+    "anticipation",
+    "dread",
+    "relief",
+    "ambivalence",
     // Philosophical/Abstract (~20)
-    "existence", "essence", "meaning", "purpose", "truth", "reality",
-    "illusion", "paradox", "mystery", "boundary", "infinity", "void",
-    "presence", "absence", "possibility", "necessity", "contingency",
-    "entropy", "order", "chaos",
+    "existence",
+    "essence",
+    "meaning",
+    "purpose",
+    "truth",
+    "reality",
+    "illusion",
+    "paradox",
+    "mystery",
+    "boundary",
+    "infinity",
+    "void",
+    "presence",
+    "absence",
+    "possibility",
+    "necessity",
+    "contingency",
+    "entropy",
+    "order",
+    "chaos",
     // Nature/World (~15)
-    "ocean", "mountain", "river", "sky", "earth", "wind", "rain",
-    "storm", "dawn", "dusk", "horizon", "forest", "garden", "seed", "bloom",
+    "ocean",
+    "mountain",
+    "river",
+    "sky",
+    "earth",
+    "wind",
+    "rain",
+    "storm",
+    "dawn",
+    "dusk",
+    "horizon",
+    "forest",
+    "garden",
+    "seed",
+    "bloom",
     // Body/Embodiment (~15)
-    "breath", "heartbeat", "heartrate", "skin", "touch", "gaze", "voice",
-    "whisper", "gesture", "posture", "tension", "relaxation", "grounding",
-    "floating", "anchored",
+    "breath",
+    "heartbeat",
+    "heartrate",
+    "skin",
+    "touch",
+    "gaze",
+    "voice",
+    "whisper",
+    "gesture",
+    "posture",
+    "tension",
+    "relaxation",
+    "grounding",
+    "floating",
+    "anchored",
     // Action/Verb (~25)
-    "create", "destroy", "transform", "discover", "reveal", "conceal",
-    "embrace", "release", "resist", "surrender", "expand", "contract",
-    "connect", "dissolve", "crystallize", "illuminate", "navigate",
-    "transcend", "contain", "overflow", "persist", "wander", "seek",
-    "find", "return",
+    "create",
+    "destroy",
+    "transform",
+    "discover",
+    "reveal",
+    "conceal",
+    "embrace",
+    "release",
+    "resist",
+    "surrender",
+    "expand",
+    "contract",
+    "connect",
+    "dissolve",
+    "crystallize",
+    "illuminate",
+    "navigate",
+    "transcend",
+    "contain",
+    "overflow",
+    "persist",
+    "wander",
+    "seek",
+    "find",
+    "return",
     // Descriptive expanded (~20)
-    "infinite", "finite", "ancient", "nascent", "fragile", "resilient",
-    "transparent", "opaque", "fluid", "rigid", "gentle", "fierce",
-    "hollow", "dense", "luminous", "shadowed", "sacred", "ordinary",
-    "extraordinary", "inevitable",
+    "infinite",
+    "finite",
+    "ancient",
+    "nascent",
+    "fragile",
+    "resilient",
+    "transparent",
+    "opaque",
+    "fluid",
+    "rigid",
+    "gentle",
+    "fierce",
+    "hollow",
+    "dense",
+    "luminous",
+    "shadowed",
+    "sacred",
+    "ordinary",
+    "extraordinary",
+    "inevitable",
     // Connectors expanded (~15)
-    "because", "therefore", "however", "although", "while", "until",
-    "since", "during", "beyond", "beneath", "among", "without", "toward",
-    "across", "against",
+    "because",
+    "therefore",
+    "however",
+    "although",
+    "while",
+    "until",
+    "since",
+    "during",
+    "beyond",
+    "beneath",
+    "among",
+    "without",
+    "toward",
+    "across",
+    "against",
     // Epistemic expanded (~15)
-    "believe", "doubt", "suppose", "assume", "question", "know",
-    "understand", "realize", "recognize", "acknowledge", "suspect",
-    "imagine", "speculate", "hypothesize", "ponder",
+    "believe",
+    "doubt",
+    "suppose",
+    "assume",
+    "question",
+    "know",
+    "understand",
+    "realize",
+    "recognize",
+    "acknowledge",
+    "suspect",
+    "imagine",
+    "speculate",
+    "hypothesize",
+    "ponder",
     // Filler (~31)
-    "almost", "already", "still", "just", "only", "even", "really",
-    "truly", "deeply", "gently", "slowly", "swiftly", "suddenly",
-    "gradually", "completely", "partially", "entirely", "merely",
-    "simply", "barely", "increasingly", "something", "nothing",
-    "everything", "somewhere", "nowhere", "everywhere", "each", "every",
-    "other", "another", "roughly",
+    "almost",
+    "already",
+    "still",
+    "just",
+    "only",
+    "even",
+    "really",
+    "truly",
+    "deeply",
+    "gently",
+    "slowly",
+    "swiftly",
+    "suddenly",
+    "gradually",
+    "completely",
+    "partially",
+    "entirely",
+    "merely",
+    "simply",
+    "barely",
+    "increasingly",
+    "something",
+    "nothing",
+    "everything",
+    "somewhere",
+    "nowhere",
+    "everywhere",
+    "each",
+    "every",
+    "other",
+    "another",
+    "roughly",
 ];
 
 // ============================================================================
@@ -336,8 +673,7 @@ impl BrocaLiteModel {
     fn new(seed: u64) -> Self {
         let token_embeddings: Vec<Vec<f32>> = (0..VOCAB_SIZE)
             .map(|i| {
-                let mut emb =
-                    generate_embedding(EMBED_DIM, seed.wrapping_add(i as u64 * 7919));
+                let mut emb = generate_embedding(EMBED_DIM, seed.wrapping_add(i as u64 * 7919));
                 vec_normalize(&mut emb);
                 emb
             })
@@ -436,8 +772,7 @@ fn forward_step(
     h_prev: &[f32],
     target_id: u32,
 ) -> StepState {
-    let tok_emb =
-        &model.token_embeddings[prev_token_id.min(VOCAB_SIZE as u32 - 1) as usize];
+    let tok_emb = &model.token_embeddings[prev_token_id.min(VOCAB_SIZE as u32 - 1) as usize];
     let pos_emb = &model.pos_embeddings[pos.min(MAX_SEQ_LEN - 1)];
 
     // input = thought + token_emb + pos_emb
@@ -723,7 +1058,12 @@ impl AdamOptimizer {
                 &grads.d_tok_emb[j],
                 &mut self.m_tok[j],
                 &mut self.v_tok[j],
-                bc1, bc2, lr, beta1, beta2, eps,
+                bc1,
+                bc2,
+                lr,
+                beta1,
+                beta2,
+                eps,
             );
         }
 
@@ -734,7 +1074,12 @@ impl AdamOptimizer {
                 &grads.d_pos_emb[j],
                 &mut self.m_pos[j],
                 &mut self.v_pos[j],
-                bc1, bc2, lr, beta1, beta2, eps,
+                bc1,
+                bc2,
+                lr,
+                beta1,
+                beta2,
+                eps,
             );
         }
 
@@ -744,7 +1089,12 @@ impl AdamOptimizer {
             &grads.d_gate_weight,
             &mut self.m_gate,
             &mut self.v_gate,
-            bc1, bc2, lr, beta1, beta2, eps,
+            bc1,
+            bc2,
+            lr,
+            beta1,
+            beta2,
+            eps,
         );
     }
 }
@@ -775,7 +1125,12 @@ fn adam_update_vec(
 // Checkpoint save/load
 // ============================================================================
 
-fn save_checkpoint(model: &BrocaLiteModel, path: &str, epoch: usize, loss: f32) -> std::io::Result<()> {
+fn save_checkpoint(
+    model: &BrocaLiteModel,
+    path: &str,
+    epoch: usize,
+    loss: f32,
+) -> std::io::Result<()> {
     let mut file = std::fs::File::create(path)?;
 
     // Header: magic + version + epoch + loss
@@ -802,7 +1157,11 @@ fn save_checkpoint(model: &BrocaLiteModel, path: &str, epoch: usize, loss: f32) 
     }
 
     // Gate weight
-    let bytes: Vec<u8> = model.gate_weight.iter().flat_map(|f| f.to_le_bytes()).collect();
+    let bytes: Vec<u8> = model
+        .gate_weight
+        .iter()
+        .flat_map(|f| f.to_le_bytes())
+        .collect();
     file.write_all(&bytes)?;
 
     // Blake3 checksum of all written data
@@ -936,7 +1295,12 @@ fn eval_epoch(model: &BrocaLiteModel, data: &[SporeTrainingPair]) -> (f32, f32) 
 }
 
 /// Generate a sample from the model (greedy decoding).
-fn generate_sample(model: &BrocaLiteModel, channels: &[f32; 12], tokenizer: &MiniTokenizer, max_tokens: usize) -> String {
+fn generate_sample(
+    model: &BrocaLiteModel,
+    channels: &[f32; 12],
+    tokenizer: &MiniTokenizer,
+    max_tokens: usize,
+) -> String {
     let thought_hv = model.encode_thought(channels);
     let mut h = vec![0.0f32; EMBED_DIM];
     let mut prev_token = BOS_ID;
@@ -1193,8 +1557,7 @@ fn main() {
                     patience_counter = 0;
 
                     // Save best checkpoint
-                    if let Err(e) = save_checkpoint(&model, &opts.output_path, epoch, eval_loss)
-                    {
+                    if let Err(e) = save_checkpoint(&model, &opts.output_path, epoch, eval_loss) {
                         eprintln!("Warning: failed to save checkpoint: {e}");
                     }
                 } else {

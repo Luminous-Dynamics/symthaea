@@ -279,17 +279,24 @@ impl ReliabilityBattery {
                 let subject_noise = base_config.encoding_noise + t * 0.30;
                 let subject_wm = 4 + ((1.0 - t) * 5.0) as usize; // 9 down to 4
                 let subject_dim = 256 + ((1.0 - t) * 768.0) as usize; // 1024 down to 256
-                for s in 0..n_sessions {
+                                                                      // Attention lapse rate: models individual differences in sustained
+                                                                      // attention (Wichmann & Hill, 2001). This is the primary driver of
+                                                                      // between-subject variance in psychometric reliability. Ranges from
+                                                                      // 0% (perfect attention) to 20% (high lapse rate), creating stable
+                                                                      // individual differences that persist across sessions.
+                let subject_lapse = t * 0.25; // 0.0 to 0.25
+                for (s, session) in session_data.iter_mut().enumerate().take(n_sessions) {
                     let config = BenchmarkConfig {
                         seed: family_base + s as u64 * 100,
                         encoding_noise: subject_noise,
                         working_memory_capacity: subject_wm,
                         dimension: subject_dim,
+                        lapse_rate: subject_lapse,
                         ..base_config.clone()
                     };
                     let result = bench.run(&config);
                     if let Some(mv) = result.metrics.get(metric_name) {
-                        session_data[s].push(mv.mean);
+                        session.push(mv.mean);
                     }
                 }
             }

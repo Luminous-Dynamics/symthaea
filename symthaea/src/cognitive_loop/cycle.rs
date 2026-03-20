@@ -403,6 +403,39 @@ impl CognitiveLoopService {
             );
         }
 
+        // ── FHE Collective Wisdom: encrypt & contribute local state ──────
+        // Imani et al. (2019): privacy-preserving HDC — XOR-OTP encryption
+        // preserves Hamming distance, enabling homomorphic classification.
+        // Each cycle contributes the encoded BinaryHV to the collective pool.
+        // Aggregation is attempted when enough contributions accumulate.
+        #[cfg(feature = "fhe-wisdom")]
+        if self.config.fhe_wisdom_enabled {
+            // Contribute local consciousness state (encrypted with session mask)
+            self.swarm_manager
+                .contribute_local_wisdom(&perception.encoding.hv16_cached);
+
+            // Try aggregation at configured interval
+            if self.stats.total_cycles as usize % self.config.fhe_aggregation_interval == 0 {
+                if let Some(collective_wisdom) = self.swarm_manager.try_aggregate_and_decrypt() {
+                    // Integrate collective wisdom: blend into the encoder's codebook
+                    // via similarity-weighted update. The decrypted aggregate carries
+                    // the majority-vote consensus of recent peer states.
+                    let sim = perception
+                        .encoding
+                        .hv16_cached
+                        .similarity(&collective_wisdom);
+                    tracing::debug!(
+                        target: "cognitive_loop::fhe",
+                        pool_count = self.swarm_manager.wisdom_pool_count(),
+                        contributions = self.swarm_manager.fhe_contributions_total(),
+                        aggregations = self.swarm_manager.fhe_aggregations_total(),
+                        local_collective_sim = %format!("{sim:.4}"),
+                        "FHE collective wisdom aggregated"
+                    );
+                }
+            }
+        }
+
         // ═══════════════════════════════════════════════════════════════════
         // PHASE 4: OUTPUT
         // Metadata assembly, telemetry, CycleResult construction

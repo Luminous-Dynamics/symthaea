@@ -648,6 +648,7 @@ pub fn train(
 /// Returns (metrics, final AdamState if Adam was used, optional GradientDiagnostics,
 /// optional AnomalyReport if anomaly response was enabled,
 /// optional TrainingValidation if smoke test was enabled).
+#[allow(clippy::type_complexity)]
 pub fn train_with_adam(
     generator: &mut BrocaGenerator,
     dataset: &TrainingDataset,
@@ -1336,8 +1337,7 @@ fn apply_weight_tied_gradient_adam(
         let grad: Vec<f32> = (0..dim)
             .map(|j| {
                 let raw = scale * error * output_slice[j];
-                let clamped = raw.clamp(-grad_clip, grad_clip);
-                clamped
+                raw.clamp(-grad_clip, grad_clip)
             })
             .collect();
 

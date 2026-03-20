@@ -19,9 +19,10 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
 
-    # Holochain from holonix
+    # Holochain from holonix — version pinned in nix/modules/holochain-versions.nix
+    # To upgrade: update holochain-versions.nix, then `nix flake lock --update-input holonix`
     holonix = {
-      url = "github:holochain/holonix/d21b3543";
+      url = "github:holochain/holonix/d21b3543"; # Must match holonixCommit in holochain-versions.nix
       inputs.nixpkgs.follows = "nixpkgs";
     };
 

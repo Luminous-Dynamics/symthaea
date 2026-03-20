@@ -182,7 +182,7 @@ fn all_managers_coexist_without_interference() {
             r.prediction_error
         );
         assert!(
-            r.metadata.consciousness_level.is_finite(),
+            r.metadata.consciousness.consciousness_level.is_finite(),
             "Consciousness not finite at cycle {i}"
         );
     }
@@ -190,9 +190,9 @@ fn all_managers_coexist_without_interference() {
     // After 100 cycles, system should have settled into a stable regime
     let last = results.last().unwrap();
     assert!(
-        (0.0..=1.0).contains(&last.metadata.consciousness_level),
+        (0.0..=1.0).contains(&last.metadata.consciousness.consciousness_level),
         "Consciousness level out of bounds: {}",
-        last.metadata.consciousness_level
+        last.metadata.consciousness.consciousness_level
     );
 }
 

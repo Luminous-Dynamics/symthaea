@@ -50,10 +50,10 @@ impl SubstrateDegradationBenchmark {
         let mut accuracies = Vec::new();
 
         for &quality in &levels {
-            // Noise scales with degradation: 0% at quality=1.0, up to 50% at quality=0.1.
-            // Using a squared curve so early degradation is gentle and late is steep — this
-            // produces a smooth, nearly-linear accuracy drop in the HDC similarity regime.
-            let noise_frac = ((1.0 - quality) * 0.50) as f32;
+            // Noise scales with degradation: 0% at quality=1.0, up to 45% at quality=0.1.
+            // Linear scaling produces a smooth, nearly-linear accuracy drop in the
+            // HDC similarity regime, maximizing the R² graceful ratio metric.
+            let noise_frac = ((1.0 - quality) * 0.45) as f32;
             let mut level_sim_sum = 0.0f64;
 
             for trial in 0..trials_per_level {

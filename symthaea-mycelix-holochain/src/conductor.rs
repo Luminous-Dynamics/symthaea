@@ -4,7 +4,8 @@
 //! with automatic reconnection and exponential backoff on failure.
 
 use crate::error::{BridgeError, Result};
-use holochain_client::{AgentSigner, AppWebsocket, ClientAgentSigner, ExternIO, ZomeCallTarget};
+use holochain_client::{AgentSigner, AppWebsocket, ClientAgentSigner, ZomeCallTarget};
+use holochain_types::prelude::ExternIO;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -95,7 +96,7 @@ impl HolochainConductor {
             }
             Err(e) => {
                 let count = self.consecutive_failures.fetch_add(1, Ordering::Relaxed) + 1;
-                let msg = format!("{e}");
+                let msg = format!("{e:?}");
                 if count >= MAX_CONSECUTIVE_FAILURES {
                     tracing::error!(
                         app_id = %self.app_id,
@@ -189,7 +190,7 @@ impl HolochainConductor {
                 let count = self.consecutive_failures.fetch_add(1, Ordering::Relaxed) + 1;
                 // Drop the connection so next call reconnects
                 *guard = None;
-                let msg = format!("{e}");
+                let msg = format!("{e:?}");
                 tracing::warn!(
                     app_id = %self.app_id,
                     role,

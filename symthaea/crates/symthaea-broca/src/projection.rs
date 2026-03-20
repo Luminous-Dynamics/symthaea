@@ -1601,6 +1601,61 @@ impl HdcSsmProjection {
         let (normed, _, _) = layer_norm(&hidden_pre, &self.ln_fwd_gamma, &self.ln_fwd_beta);
         normed.into_iter().map(activation).collect()
     }
+
+    /// Compute orthogonality regularization gradients for `w_up` rows.
+    ///
+    /// Penalizes cosine similarity between random pairs of `w_up` rows to prevent
+    /// rank collapse in the bottleneck→SSM projection. When rows become correlated,
+    /// effective rank drops toward 1 (the bottleneck dimension becomes degenerate).
+    ///
+    /// This is the spatial projection analog of `TemporalProjection::compute_rank_regularization_gradients`.
+    ///
+    /// # Arguments
+    /// * `weight` — Regularization strength (0.01–0.1 typical). Gradients are scaled by `weight / num_samples`.
+    /// * `num_samples` — Number of random row pairs to sample per call (32–128 typical).
+    pub fn compute_orthogonality_gradients(&mut self, weight: f32, num_samples: usize) {
+        if weight <= 0.0 || self.ssm_dim < 2 {
+            return;
+        }
+
+        let scale = weight / num_samples.max(1) as f32;
+        let b = self.bottleneck;
+
+        // Deterministic but varying seed from current weight state
+        let seed_val = (self.w_up[0].to_bits() as u64).wrapping_add(self.w_up.len() as u64)
+            ^ 0x9E3779B97F4A7C15;
+        let mut rng_state = seed_val | 1;
+        let total_pairs = self.ssm_dim * self.ssm_dim;
+
+        for _ in 0..num_samples {
+            // xorshift64
+            rng_state ^= rng_state << 13;
+            rng_state ^= rng_state >> 7;
+            rng_state ^= rng_state << 17;
+            let pair_idx = (rng_state as usize) % total_pairs;
+            let j1 = pair_idx / self.ssm_dim;
+            let j2 = pair_idx % self.ssm_dim;
+            if j1 == j2 {
+                continue;
+            }
+
+            // w_up is [ssm_dim × bottleneck], row j starts at j * bottleneck
+            let row1_start = j1 * b;
+            let row2_start = j2 * b;
+
+            // Compute dot product (unnormalized cosine for efficiency)
+            let mut dot = 0.0f32;
+            for k in 0..b {
+                dot += self.w_up[row1_start + k] * self.w_up[row2_start + k];
+            }
+
+            // Push apart: gradient of dot² w.r.t. each row
+            for k in 0..b {
+                self.grad_up[row1_start + k] -= scale * dot * self.w_up[row2_start + k];
+                self.grad_up[row2_start + k] -= scale * dot * self.w_up[row1_start + k];
+            }
+        }
+    }
 }
 
 #[cfg(test)]

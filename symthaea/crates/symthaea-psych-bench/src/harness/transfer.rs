@@ -63,7 +63,7 @@ impl TransferScore {
 }
 
 /// A matrix of transfer scores for multiple A→B pairs.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TransferMatrix {
     /// All computed transfer scores.
     pub scores: Vec<TransferScore>,

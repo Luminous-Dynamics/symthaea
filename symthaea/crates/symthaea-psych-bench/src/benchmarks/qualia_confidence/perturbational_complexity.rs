@@ -68,10 +68,10 @@ impl MiniRecurrentNet {
         // Weight 0.85 means perturbations decay with half-life ~4 steps.
         // Slight variation per dim prevents trivial symmetry.
         let mut self_weights = [0.0f64; 4];
-        for i in 0..4 {
+        for (i, w) in self_weights.iter_mut().enumerate() {
             let w_seed = seed.wrapping_mul(0x100000001b3).wrapping_add(i as u64 * 10);
             let variation = float_from_seed(w_seed) * 0.06 - 0.03; // ±0.03
-            self_weights[i] = 0.85 + variation;
+            *w = 0.85 + variation;
         }
 
         MiniRecurrentNet {
@@ -83,8 +83,8 @@ impl MiniRecurrentNet {
     /// Step the network forward with optional external input.
     fn step(&mut self, input: [f64; 4]) {
         let mut new_state = [0.0f64; 4];
-        for i in 0..4 {
-            new_state[i] = (self.self_weights[i] * self.state[i] + input[i]).tanh();
+        for (i, ns) in new_state.iter_mut().enumerate() {
+            *ns = (self.self_weights[i] * self.state[i] + input[i]).tanh();
         }
         self.state = new_state;
     }
@@ -202,10 +202,10 @@ fn run_pci_condition(config: &BenchmarkConfig, broadcasting_enabled: bool) -> (f
 
         // Compute per-dimension medians for binarization
         let mut medians = [0.0f64; 4];
-        for dim in 0..4 {
+        for (dim, med) in medians.iter_mut().enumerate() {
             let mut values: Vec<f64> = post_trajectory.iter().map(|s| s[dim]).collect();
             values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-            medians[dim] = values[values.len() / 2];
+            *med = values[values.len() / 2];
         }
 
         // Concatenated spatiotemporal binarization (how real PCI works):
@@ -215,8 +215,8 @@ fn run_pci_condition(config: &BenchmarkConfig, broadcasting_enabled: bool) -> (f
         // Unconscious: repetitive or local patterns → low LZ.
         let mut binary_sequence = Vec::with_capacity(post_trajectory.len() * 4);
         for state in post_trajectory {
-            for dim in 0..4 {
-                binary_sequence.push(state[dim] > medians[dim]);
+            for (dim, &med) in medians.iter().enumerate() {
+                binary_sequence.push(state[dim] > med);
             }
         }
 
@@ -279,15 +279,15 @@ impl PsychBenchmark for PerturbationalComplexityBenchmark {
         if conscious_traj.len() >= BASELINE_CYCLES {
             let baseline_traj = &conscious_traj[..BASELINE_CYCLES];
             let mut medians = [0.0f64; 4];
-            for dim in 0..4 {
+            for (dim, med) in medians.iter_mut().enumerate() {
                 let mut values: Vec<f64> = baseline_traj.iter().map(|s| s[dim]).collect();
                 values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-                medians[dim] = values[values.len() / 2];
+                *med = values[values.len() / 2];
             }
             let mut binary_seq = Vec::with_capacity(baseline_traj.len() * 4);
             for state in baseline_traj {
-                for dim in 0..4 {
-                    binary_seq.push(state[dim] > medians[dim]);
+                for (dim, &med) in medians.iter().enumerate() {
+                    binary_seq.push(state[dim] > med);
                 }
             }
             result.insert(
@@ -300,6 +300,7 @@ impl PsychBenchmark for PerturbationalComplexityBenchmark {
         if conscious_traj.len() > BASELINE_CYCLES + 1 {
             let pre_state = conscious_traj[BASELINE_CYCLES - 1];
             let mut propagation_depth = 0;
+            #[allow(clippy::needless_range_loop)]
             for i in BASELINE_CYCLES..conscious_traj.len() {
                 let delta: f64 = (0..4)
                     .map(|d| (conscious_traj[i][d] - pre_state[d]).abs())
@@ -318,6 +319,7 @@ impl PsychBenchmark for PerturbationalComplexityBenchmark {
         if unconscious_traj.len() > BASELINE_CYCLES + 1 {
             let pre_state = unconscious_traj[BASELINE_CYCLES - 1];
             let mut propagation_depth = 0;
+            #[allow(clippy::needless_range_loop)]
             for i in BASELINE_CYCLES..unconscious_traj.len() {
                 let delta: f64 = (0..4)
                     .map(|d| (unconscious_traj[i][d] - pre_state[d]).abs())
