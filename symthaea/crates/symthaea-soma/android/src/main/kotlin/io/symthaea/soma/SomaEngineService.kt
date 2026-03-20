@@ -241,6 +241,24 @@ class SomaEngineService : Service() {
             Log.d(TAG, "Service loop resumed — background consciousness")
         }
 
+        /**
+         * Upgrade the foreground service to include MEDIA_PROJECTION type.
+         * Must be called before getMediaProjection() on Android 14+.
+         */
+        fun upgradeForMediaProjection(context: Context) {
+            val svc = instance ?: return
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                // Android 14+: re-call startForeground with the combined type
+                svc.startForeground(
+                    NOTIFICATION_ID,
+                    svc.buildNotification(0f, "enabling vision..."),
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+                        or android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                )
+                Log.i(TAG, "Upgraded foreground service for media projection")
+            }
+        }
+
         /** Update notification from the ViewModel engine (when service is paused). */
         fun updateNotification(consciousnessLevel: Float, harmony: String) {
             val svc = instance ?: return

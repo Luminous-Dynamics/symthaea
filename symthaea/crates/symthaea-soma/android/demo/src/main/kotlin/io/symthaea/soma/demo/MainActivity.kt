@@ -23,6 +23,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.google.android.material.bottomsheet.BottomSheetBehavior
+import io.symthaea.soma.SomaEngineService
 import io.symthaea.soma.SomaTouchBridge
 import io.symthaea.soma.WakeSignal
 import io.symthaea.soma.demo.databinding.ActivityMainBinding
@@ -197,13 +198,23 @@ class MainActivity : AppCompatActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == SCREEN_CAPTURE_REQUEST) {
-            val granted = viewModel.screenCapture?.onPermissionResult(resultCode, data) ?: false
-            if (granted) {
-                viewModel.startScreenCapture()
-                screenCaptureActive = true
-                binding.btnVision.text = "disable vision"
-                binding.ocrText.visibility = View.VISIBLE
-                binding.ocrText.text = "sees: initializing..."
+            if (resultCode != RESULT_OK || data == null) return
+            try {
+                // Android 14+: foreground service must declare mediaProjection type
+                // before getMediaProjection() is called. Upgrade the running service.
+                SomaEngineService.upgradeForMediaProjection(this)
+
+                val granted = viewModel.screenCapture?.onPermissionResult(resultCode, data) ?: false
+                if (granted) {
+                    viewModel.startScreenCapture()
+                    screenCaptureActive = true
+                    binding.btnVision.text = "disable vision"
+                    binding.ocrText.visibility = View.VISIBLE
+                    binding.ocrText.text = "sees: initializing..."
+                }
+            } catch (ex: Exception) {
+                android.util.Log.e("MainActivity", "Screen capture failed", ex)
+                binding.btnVision.text = "vision failed"
             }
         }
     }
