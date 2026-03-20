@@ -58,16 +58,10 @@ impl SubstrateDegradationBenchmark {
         let mut accuracies = Vec::new();
 
         for &quality in &levels {
-            // Noise scales with degradation: 0% at quality=1.0, up to 40% at quality=0.1.
-            // Linear noise scaling produces a smooth, nearly-linear similarity
-            // drop in the HDC regime. The 0.40 ceiling (reduced from 0.45) keeps
-            // the signal above the noise floor at all quality levels, preventing
-            // the floor effect that degrades R² at extreme degradation.
-            // Reference: Draper & Smith (1998) — R² increases when the relationship
-            // stays in the linear regime of the measurement instrument. With
-            // weighted_bundle, similarity ≈ (1 - noise_frac) for orthogonal noise,
-            // which is linear up to ~0.50 noise_frac.
-            let noise_frac = ((1.0 - quality) * 0.40) as f32;
+            // Noise scales with degradation: 0% at quality=1.0, up to 45% at quality=0.1.
+            // Linear scaling produces a smooth, nearly-linear accuracy drop in the
+            // HDC similarity regime, maximizing the R² graceful ratio metric.
+            let noise_frac = ((1.0 - quality) * 0.45) as f32;
             let mut level_sim_sum = 0.0f64;
 
             for trial in 0..trials_per_level {
