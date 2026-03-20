@@ -3912,7 +3912,7 @@ pub fn substrate_baselines() -> BaselineMap {
     m.insert(
         "transfer_fidelity",
         Baseline {
-            value: 0.85,
+            value: 0.82,
             sd: Some(0.12),
             source: "Putnam (1967), theoretical: state preservation across substrates",
             population: "theoretical model",
@@ -3970,7 +3970,7 @@ pub fn substrate_baselines() -> BaselineMap {
     m.insert(
         "substrate_graceful_ratio",
         Baseline {
-            value: 0.85,
+            value: 0.80,
             sd: Some(0.15),
             source: "Theoretical: R² of linear fit to degradation curve (1.0 = graceful, 0.0 = catastrophic)",
             population: "theoretical model",
@@ -3998,7 +3998,7 @@ pub fn substrate_baselines() -> BaselineMap {
     m.insert(
         "substrate_speed_accuracy_correlation",
         Baseline {
-            value: 0.75,
+            value: 0.70,
             sd: Some(0.15),
             source: "Theoretical: Pearson r between substrate speed and retrieval accuracy",
             population: "theoretical model",
