@@ -477,16 +477,19 @@ impl CognitiveLoopService {
     }
 
     /// Get the math service for dispatching mathematical queries.
+    #[cfg(feature = "mathematics")]
     pub fn math_service(&self) -> &super::super::math_service::MathService {
         &self.math_service
     }
 
     /// Get a mutable reference to the math service.
+    #[cfg(feature = "mathematics")]
     pub fn math_service_mut(&mut self) -> &mut super::super::math_service::MathService {
         &mut self.math_service
     }
 
     /// Get the math service telemetry.
+    #[cfg(feature = "mathematics")]
     pub fn math_telemetry(&self) -> &super::super::math_service::MathServiceTelemetry {
         self.math_service.telemetry()
     }

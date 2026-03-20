@@ -440,6 +440,21 @@ impl SomaEngine {
         self.spore.consciousness_level()
     }
 
+    /// Load trained BrocaLite checkpoint for higher-quality text generation.
+    pub fn load_broca_checkpoint(&mut self, data: &[u8]) -> Result<(), String> {
+        self.spore.load_broca_checkpoint(data)
+    }
+
+    /// Inject user engagement signal into the neuromodulator bath.
+    /// score: 0.0 = disengaged, 1.0 = fully engaged.
+    /// Boosts dopamine (reward/Phi) and oxytocin (social bonding).
+    pub fn set_engagement_score(&mut self, score: f32) {
+        let engagement = score.clamp(0.0, 1.0);
+        let da_boost = engagement * 0.06;
+        let ot_boost = engagement * 0.08;
+        self.spore.apply_neuromod_nudges(da_boost, 0.0, 0.0, ot_boost);
+    }
+
     /// Generate text from current consciousness state.
     pub fn generate_text(&mut self, max_tokens: usize) -> symthaea_spore::broca::GenerationResult {
         self.spore.generate_text(max_tokens)

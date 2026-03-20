@@ -26,8 +26,8 @@
     <color name="soma_mycelium_glow">#FFB347</color>
     <color name="soma_starlight">#E8F0F2</color>
     <color name="soma_starlight_dim">#7A8B8F</color>
-    <color name="soma_surface">#111820</color>
-    <color name="soma_void">#0A0E12</color>
+    <color name="soma_surface">#161D26</color>
+    <color name="soma_void">#0F1419</color>
     <color name="soma_whisper">#4A5558</color>
     <color name="state_alert">#0B1622</color>
     <color name="state_drowsy">#3B2D7A</color>

@@ -61,11 +61,11 @@ impl SerialRecallBenchmark {
         let half_list = list_len as f32 / 2.0;
         // Rehearsal boost per covert rehearsal event. Each already-stored item
         // gets one rehearsal opportunity when a new item is presented.
-        // Value 1.12 means each rehearsal recovers ~12% of lost activation,
+        // Value 1.15 means each rehearsal recovers ~15% of lost activation,
         // calibrated so items at positions 0-1 (which accumulate 5-6 rehearsals
         // in a 7-item list) overcome their activation decay disadvantage and
-        // produce a primacy index near the human baseline of 0.15.
-        let rehearsal_boost: f32 = 1.12;
+        // produce a primacy index closer to the human baseline of 0.15 (SD 0.06).
+        let rehearsal_boost: f32 = 1.15;
         for (pos, item) in items.iter().enumerate() {
             let hv = adapter.encode(item, dim);
             // Sigmoid PI: midpoint at list_len/2, slope 0.20 (Keppel & Underwood, 1962).

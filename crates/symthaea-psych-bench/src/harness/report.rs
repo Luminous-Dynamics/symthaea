@@ -3056,8 +3056,11 @@ mod tests {
         assert!(tex.contains("DigitSpan"), "tex: {}", tex);
     }
 
-    #[test]
-    fn test_print_all_domain_composites() {
+    /// Build the full benchmark suite used for domain composite scoring.
+    ///
+    /// Shared by `test_print_all_domain_composites` and `test_cross_seed_stability`
+    /// to avoid duplicating the ~100-benchmark vector.
+    fn all_benchmarks() -> Vec<Box<dyn crate::harness::PsychBenchmark>> {
         use crate::benchmarks::affect::*;
         use crate::benchmarks::attention::*;
         use crate::benchmarks::binding::*;
@@ -3084,11 +3087,8 @@ mod tests {
         use crate::benchmarks::sustained_attention::*;
         use crate::benchmarks::tombench::*;
         use crate::benchmarks::worm::*;
-        use crate::harness::PsychBenchmark;
 
-        let config = crate::harness::config::BenchmarkConfig::default();
-
-        let benchmarks: Vec<Box<dyn PsychBenchmark>> = vec![
+        vec![
             // WorM
             Box::new(BindingBenchmark),
             Box::new(ChangeDetectionBenchmark),
@@ -3239,7 +3239,13 @@ mod tests {
             Box::new(CrossMaskPrivacyBenchmark),
             Box::new(EncryptedBindingBenchmark),
             Box::new(ScalingAnalysisBenchmark),
-        ];
+        ]
+    }
+
+    #[test]
+    fn test_print_all_domain_composites() {
+        let config = crate::harness::config::BenchmarkConfig::default();
+        let benchmarks = all_benchmarks();
 
         let mut report = BenchmarkReport::new();
         for b in &benchmarks {
@@ -3260,6 +3266,68 @@ mod tests {
         eprintln!(
             "Grand mean z = {grand_mean:+.3} across {} domains\n",
             composites.len()
+        );
+    }
+
+    /// Cross-seed stability test: verifies that grand mean z-scores are stable
+    /// across different RNG seeds.
+    ///
+    /// Runs the full benchmark suite with 5 different seeds and asserts that the
+    /// standard deviation of grand means is < 0.10 (i.e., results are not
+    /// seed-dependent). This is a key reproducibility check.
+    ///
+    /// NOTE: This test takes ~5 minutes per seed (~25 minutes total).
+    /// Run explicitly with: `cargo test --lib test_cross_seed_stability -- --ignored`
+    #[test]
+    #[ignore]
+    fn test_cross_seed_stability() {
+        use crate::harness::config::BenchmarkConfig;
+
+        let seeds: [u64; 3] = [42, 123, 789];
+        let mut grand_means: Vec<f64> = Vec::with_capacity(seeds.len());
+
+        for &seed in &seeds {
+            let config = BenchmarkConfig {
+                seed,
+                ..Default::default()
+            };
+            let benchmarks = all_benchmarks();
+
+            let mut report = BenchmarkReport::new();
+            for b in &benchmarks {
+                report.add(b.run(&config));
+            }
+
+            let composites = report.composite_scores();
+            let n_domains = composites.len() as f64;
+            let total_z: f64 = composites.values().map(|c| c.mean_z).sum();
+            let grand_mean = total_z / n_domains;
+
+            eprintln!(
+                "seed={seed:>4}: grand mean z = {grand_mean:+.4} across {n} domains",
+                n = composites.len()
+            );
+            grand_means.push(grand_mean);
+        }
+
+        // Compute mean and SD of grand means across seeds
+        let n = grand_means.len() as f64;
+        let mean_of_means: f64 = grand_means.iter().sum::<f64>() / n;
+        let variance: f64 =
+            grand_means.iter().map(|x| (x - mean_of_means).powi(2)).sum::<f64>() / (n - 1.0);
+        let sd = variance.sqrt();
+
+        eprintln!("\n--- Cross-seed stability ---");
+        eprintln!("Seeds: {:?}", seeds);
+        eprintln!("Grand means: {:?}", grand_means);
+        eprintln!("Mean of grand means: {mean_of_means:+.4}");
+        eprintln!("SD of grand means:   {sd:.4}");
+        eprintln!("----------------------------\n");
+
+        assert!(
+            sd < 0.10,
+            "Grand mean z-score SD across seeds ({sd:.4}) exceeds stability threshold (0.10). \
+             Seeds produce inconsistent results."
         );
     }
 

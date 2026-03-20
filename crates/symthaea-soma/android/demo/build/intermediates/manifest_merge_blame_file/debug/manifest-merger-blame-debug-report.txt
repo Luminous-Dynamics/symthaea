@@ -33,155 +33,164 @@
 21    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 21-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:14:5-77
 21-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:14:22-74
-22
-23    <permission
-23-->[androidx.core:core:1.12.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/25fff75825e2cc11e4a733be10d7a18e/transformed/core-1.12.0/AndroidManifest.xml:22:5-24:47
-24        android:name="io.symthaea.soma.demo.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
-24-->[androidx.core:core:1.12.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/25fff75825e2cc11e4a733be10d7a18e/transformed/core-1.12.0/AndroidManifest.xml:23:9-81
-25        android:protectionLevel="signature" />
-25-->[androidx.core:core:1.12.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/25fff75825e2cc11e4a733be10d7a18e/transformed/core-1.12.0/AndroidManifest.xml:24:9-44
-26
-27    <uses-permission android:name="io.symthaea.soma.demo.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
-27-->[androidx.core:core:1.12.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/25fff75825e2cc11e4a733be10d7a18e/transformed/core-1.12.0/AndroidManifest.xml:26:5-97
-27-->[androidx.core:core:1.12.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/25fff75825e2cc11e4a733be10d7a18e/transformed/core-1.12.0/AndroidManifest.xml:26:22-94
-28
-29    <application
-29-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:16:5-52:19
-30        android:allowBackup="false"
-30-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:17:9-36
-31        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
-31-->[androidx.core:core:1.12.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/25fff75825e2cc11e4a733be10d7a18e/transformed/core-1.12.0/AndroidManifest.xml:28:18-86
-32        android:debuggable="true"
-33        android:extractNativeLibs="false"
-34        android:icon="@mipmap/ic_launcher"
-34-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:18:9-43
-35        android:label="Symthaea Soma"
-35-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:20:9-38
-36        android:roundIcon="@mipmap/ic_launcher_round"
-36-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:19:9-54
-37        android:supportsRtl="true"
-37-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:21:9-35
-38        android:theme="@style/Theme.SomaDemo" >
-38-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:22:9-46
-39        <activity
-39-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:24:9-32:20
-40            android:name="io.symthaea.soma.demo.MainActivity"
-40-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:25:13-41
-41            android:exported="true"
-41-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:26:13-36
-42            android:screenOrientation="portrait" >
-42-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:27:13-49
-43            <intent-filter>
-43-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:28:13-31:29
-44                <action android:name="android.intent.action.MAIN" />
-44-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:29:17-69
-44-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:29:25-66
-45
-46                <category android:name="android.intent.category.LAUNCHER" />
-46-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:30:17-77
-46-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:30:27-74
-47            </intent-filter>
-48        </activity>
+22    <!-- Network: local Ollama LLM for conversation fallback -->
+23    <uses-permission android:name="android.permission.INTERNET" />
+23-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:16:5-67
+23-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:16:22-64
+24    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+24-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:17:5-79
+24-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:17:22-76
+25
+26    <permission
+26-->[androidx.core:core:1.12.0] /home/tstoltz/.gradle/caches/transforms-3/f23e95a0fb0ac81f840512f02915cc80/transformed/core-1.12.0/AndroidManifest.xml:22:5-24:47
+27        android:name="io.symthaea.soma.demo.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+27-->[androidx.core:core:1.12.0] /home/tstoltz/.gradle/caches/transforms-3/f23e95a0fb0ac81f840512f02915cc80/transformed/core-1.12.0/AndroidManifest.xml:23:9-81
+28        android:protectionLevel="signature" />
+28-->[androidx.core:core:1.12.0] /home/tstoltz/.gradle/caches/transforms-3/f23e95a0fb0ac81f840512f02915cc80/transformed/core-1.12.0/AndroidManifest.xml:24:9-44
+29
+30    <uses-permission android:name="io.symthaea.soma.demo.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+30-->[androidx.core:core:1.12.0] /home/tstoltz/.gradle/caches/transforms-3/f23e95a0fb0ac81f840512f02915cc80/transformed/core-1.12.0/AndroidManifest.xml:26:5-97
+30-->[androidx.core:core:1.12.0] /home/tstoltz/.gradle/caches/transforms-3/f23e95a0fb0ac81f840512f02915cc80/transformed/core-1.12.0/AndroidManifest.xml:26:22-94
+31
+32    <application
+32-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:19:5-56:19
+33        android:allowBackup="false"
+33-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:20:9-36
+34        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+34-->[androidx.core:core:1.12.0] /home/tstoltz/.gradle/caches/transforms-3/f23e95a0fb0ac81f840512f02915cc80/transformed/core-1.12.0/AndroidManifest.xml:28:18-86
+35        android:debuggable="true"
+36        android:extractNativeLibs="false"
+37        android:icon="@mipmap/ic_launcher"
+37-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:21:9-43
+38        android:label="Symthaea Soma"
+38-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:23:9-38
+39        android:roundIcon="@mipmap/ic_launcher_round"
+39-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:22:9-54
+40        android:supportsRtl="true"
+40-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:24:9-35
+41        android:theme="@style/Theme.SomaDemo"
+41-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:26:9-46
+42        android:usesCleartextTraffic="true" >
+42-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:25:9-44
+43        <activity
+43-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:28:9-36:20
+44            android:name="io.symthaea.soma.demo.MainActivity"
+44-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:29:13-41
+45            android:exported="true"
+45-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:30:13-36
+46            android:screenOrientation="portrait" >
+46-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:31:13-49
+47            <intent-filter>
+47-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:32:13-35:29
+48                <action android:name="android.intent.action.MAIN" />
+48-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:33:17-69
+48-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:33:25-66
 49
-50        <!--
-51             Foreground service: keeps consciousness running in background.
-52             Dream consolidation runs overnight, sensors stay active.
-53        -->
-54        <service
-54-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:36:9-39:58
-55            android:name="io.symthaea.soma.SomaEngineService"
-55-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:37:13-62
-56            android:exported="false"
-56-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:38:13-37
-57            android:foregroundServiceType="specialUse" />
-57-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:39:13-55
-58
-59        <!--
-60             Notification listener for social pressure + media state bridges.
-61             User must explicitly enable in Settings → Apps → Special access →
-62             Notification access. No notification content is read.
-63        -->
-64        <service
-64-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:44:9-51:19
-65            android:name="io.symthaea.soma.SomaNotificationBridge"
-65-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:45:13-67
-66            android:exported="true"
-66-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:46:13-36
-67            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" >
-67-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:47:13-87
-68            <intent-filter>
-68-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:48:13-50:29
-69                <action android:name="android.service.notification.NotificationListenerService" />
-69-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:49:17-99
-69-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:49:25-96
-70            </intent-filter>
-71        </service>
-72
-73        <provider
-73-->[androidx.emoji2:emoji2:1.2.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/41389b671f596e3adbe51d81edbba770/transformed/emoji2-1.2.0/AndroidManifest.xml:24:9-32:20
-74            android:name="androidx.startup.InitializationProvider"
-74-->[androidx.emoji2:emoji2:1.2.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/41389b671f596e3adbe51d81edbba770/transformed/emoji2-1.2.0/AndroidManifest.xml:25:13-67
-75            android:authorities="io.symthaea.soma.demo.androidx-startup"
-75-->[androidx.emoji2:emoji2:1.2.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/41389b671f596e3adbe51d81edbba770/transformed/emoji2-1.2.0/AndroidManifest.xml:26:13-68
-76            android:exported="false" >
-76-->[androidx.emoji2:emoji2:1.2.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/41389b671f596e3adbe51d81edbba770/transformed/emoji2-1.2.0/AndroidManifest.xml:27:13-37
-77            <meta-data
-77-->[androidx.emoji2:emoji2:1.2.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/41389b671f596e3adbe51d81edbba770/transformed/emoji2-1.2.0/AndroidManifest.xml:29:13-31:52
-78                android:name="androidx.emoji2.text.EmojiCompatInitializer"
-78-->[androidx.emoji2:emoji2:1.2.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/41389b671f596e3adbe51d81edbba770/transformed/emoji2-1.2.0/AndroidManifest.xml:30:17-75
-79                android:value="androidx.startup" />
-79-->[androidx.emoji2:emoji2:1.2.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/41389b671f596e3adbe51d81edbba770/transformed/emoji2-1.2.0/AndroidManifest.xml:31:17-49
-80            <meta-data
-80-->[androidx.lifecycle:lifecycle-process:2.7.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/de65e01119e3a06919ca9d92464e02ff/transformed/lifecycle-process-2.7.0/AndroidManifest.xml:29:13-31:52
-81                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
-81-->[androidx.lifecycle:lifecycle-process:2.7.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/de65e01119e3a06919ca9d92464e02ff/transformed/lifecycle-process-2.7.0/AndroidManifest.xml:30:17-78
-82                android:value="androidx.startup" />
-82-->[androidx.lifecycle:lifecycle-process:2.7.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/de65e01119e3a06919ca9d92464e02ff/transformed/lifecycle-process-2.7.0/AndroidManifest.xml:31:17-49
-83            <meta-data
-83-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/313d9a4110666cebdaebab3180f67fe3/transformed/profileinstaller-1.3.0/AndroidManifest.xml:29:13-31:52
-84                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
-84-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/313d9a4110666cebdaebab3180f67fe3/transformed/profileinstaller-1.3.0/AndroidManifest.xml:30:17-85
-85                android:value="androidx.startup" />
-85-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/313d9a4110666cebdaebab3180f67fe3/transformed/profileinstaller-1.3.0/AndroidManifest.xml:31:17-49
-86        </provider>
-87
-88        <receiver
-88-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/313d9a4110666cebdaebab3180f67fe3/transformed/profileinstaller-1.3.0/AndroidManifest.xml:34:9-52:20
-89            android:name="androidx.profileinstaller.ProfileInstallReceiver"
-89-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/313d9a4110666cebdaebab3180f67fe3/transformed/profileinstaller-1.3.0/AndroidManifest.xml:35:13-76
-90            android:directBootAware="false"
-90-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/313d9a4110666cebdaebab3180f67fe3/transformed/profileinstaller-1.3.0/AndroidManifest.xml:36:13-44
-91            android:enabled="true"
-91-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/313d9a4110666cebdaebab3180f67fe3/transformed/profileinstaller-1.3.0/AndroidManifest.xml:37:13-35
-92            android:exported="true"
-92-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/313d9a4110666cebdaebab3180f67fe3/transformed/profileinstaller-1.3.0/AndroidManifest.xml:38:13-36
-93            android:permission="android.permission.DUMP" >
-93-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/313d9a4110666cebdaebab3180f67fe3/transformed/profileinstaller-1.3.0/AndroidManifest.xml:39:13-57
-94            <intent-filter>
-94-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/313d9a4110666cebdaebab3180f67fe3/transformed/profileinstaller-1.3.0/AndroidManifest.xml:40:13-42:29
-95                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
-95-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/313d9a4110666cebdaebab3180f67fe3/transformed/profileinstaller-1.3.0/AndroidManifest.xml:41:17-91
-95-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/313d9a4110666cebdaebab3180f67fe3/transformed/profileinstaller-1.3.0/AndroidManifest.xml:41:25-88
-96            </intent-filter>
-97            <intent-filter>
-97-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/313d9a4110666cebdaebab3180f67fe3/transformed/profileinstaller-1.3.0/AndroidManifest.xml:43:13-45:29
-98                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
-98-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/313d9a4110666cebdaebab3180f67fe3/transformed/profileinstaller-1.3.0/AndroidManifest.xml:44:17-85
-98-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/313d9a4110666cebdaebab3180f67fe3/transformed/profileinstaller-1.3.0/AndroidManifest.xml:44:25-82
-99            </intent-filter>
-100            <intent-filter>
-100-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/313d9a4110666cebdaebab3180f67fe3/transformed/profileinstaller-1.3.0/AndroidManifest.xml:46:13-48:29
-101                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
-101-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/313d9a4110666cebdaebab3180f67fe3/transformed/profileinstaller-1.3.0/AndroidManifest.xml:47:17-88
-101-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/313d9a4110666cebdaebab3180f67fe3/transformed/profileinstaller-1.3.0/AndroidManifest.xml:47:25-85
-102            </intent-filter>
-103            <intent-filter>
-103-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/313d9a4110666cebdaebab3180f67fe3/transformed/profileinstaller-1.3.0/AndroidManifest.xml:49:13-51:29
-104                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
-104-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/313d9a4110666cebdaebab3180f67fe3/transformed/profileinstaller-1.3.0/AndroidManifest.xml:50:17-95
-104-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/8.14.4/transforms/313d9a4110666cebdaebab3180f67fe3/transformed/profileinstaller-1.3.0/AndroidManifest.xml:50:25-92
-105            </intent-filter>
-106        </receiver>
-107    </application>
-108
-109</manifest>
+50                <category android:name="android.intent.category.LAUNCHER" />
+50-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:34:17-77
+50-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:34:27-74
+51            </intent-filter>
+52        </activity>
+53
+54        <!--
+55             Foreground service: keeps consciousness running in background.
+56             Dream consolidation runs overnight, sensors stay active.
+57        -->
+58        <service
+58-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:40:9-43:58
+59            android:name="io.symthaea.soma.SomaEngineService"
+59-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:41:13-62
+60            android:exported="false"
+60-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:42:13-37
+61            android:foregroundServiceType="specialUse" />
+61-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:43:13-55
+62
+63        <!--
+64             Notification listener for social pressure + media state bridges.
+65             User must explicitly enable in Settings → Apps → Special access →
+66             Notification access. No notification content is read.
+67        -->
+68        <service
+68-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:48:9-55:19
+69            android:name="io.symthaea.soma.SomaNotificationBridge"
+69-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:49:13-67
+70            android:exported="true"
+70-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:50:13-36
+71            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" >
+71-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:51:13-87
+72            <intent-filter>
+72-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:52:13-54:29
+73                <action android:name="android.service.notification.NotificationListenerService" />
+73-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:53:17-99
+73-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:53:25-96
+74            </intent-filter>
+75        </service>
+76
+77        <provider
+77-->[androidx.emoji2:emoji2:1.2.0] /home/tstoltz/.gradle/caches/transforms-3/560b3320b5e61dc7c87e3e76308c9efd/transformed/emoji2-1.2.0/AndroidManifest.xml:24:9-32:20
+78            android:name="androidx.startup.InitializationProvider"
+78-->[androidx.emoji2:emoji2:1.2.0] /home/tstoltz/.gradle/caches/transforms-3/560b3320b5e61dc7c87e3e76308c9efd/transformed/emoji2-1.2.0/AndroidManifest.xml:25:13-67
+79            android:authorities="io.symthaea.soma.demo.androidx-startup"
+79-->[androidx.emoji2:emoji2:1.2.0] /home/tstoltz/.gradle/caches/transforms-3/560b3320b5e61dc7c87e3e76308c9efd/transformed/emoji2-1.2.0/AndroidManifest.xml:26:13-68
+80            android:exported="false" >
+80-->[androidx.emoji2:emoji2:1.2.0] /home/tstoltz/.gradle/caches/transforms-3/560b3320b5e61dc7c87e3e76308c9efd/transformed/emoji2-1.2.0/AndroidManifest.xml:27:13-37
+81            <meta-data
+81-->[androidx.emoji2:emoji2:1.2.0] /home/tstoltz/.gradle/caches/transforms-3/560b3320b5e61dc7c87e3e76308c9efd/transformed/emoji2-1.2.0/AndroidManifest.xml:29:13-31:52
+82                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+82-->[androidx.emoji2:emoji2:1.2.0] /home/tstoltz/.gradle/caches/transforms-3/560b3320b5e61dc7c87e3e76308c9efd/transformed/emoji2-1.2.0/AndroidManifest.xml:30:17-75
+83                android:value="androidx.startup" />
+83-->[androidx.emoji2:emoji2:1.2.0] /home/tstoltz/.gradle/caches/transforms-3/560b3320b5e61dc7c87e3e76308c9efd/transformed/emoji2-1.2.0/AndroidManifest.xml:31:17-49
+84            <meta-data
+84-->[androidx.lifecycle:lifecycle-process:2.7.0] /home/tstoltz/.gradle/caches/transforms-3/ca3c5601564d451ecfa358034bb94d3b/transformed/lifecycle-process-2.7.0/AndroidManifest.xml:29:13-31:52
+85                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+85-->[androidx.lifecycle:lifecycle-process:2.7.0] /home/tstoltz/.gradle/caches/transforms-3/ca3c5601564d451ecfa358034bb94d3b/transformed/lifecycle-process-2.7.0/AndroidManifest.xml:30:17-78
+86                android:value="androidx.startup" />
+86-->[androidx.lifecycle:lifecycle-process:2.7.0] /home/tstoltz/.gradle/caches/transforms-3/ca3c5601564d451ecfa358034bb94d3b/transformed/lifecycle-process-2.7.0/AndroidManifest.xml:31:17-49
+87            <meta-data
+87-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/transforms-3/76559d810210792045e76b5bcb8f11e2/transformed/profileinstaller-1.3.0/AndroidManifest.xml:29:13-31:52
+88                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+88-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/transforms-3/76559d810210792045e76b5bcb8f11e2/transformed/profileinstaller-1.3.0/AndroidManifest.xml:30:17-85
+89                android:value="androidx.startup" />
+89-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/transforms-3/76559d810210792045e76b5bcb8f11e2/transformed/profileinstaller-1.3.0/AndroidManifest.xml:31:17-49
+90        </provider>
+91
+92        <receiver
+92-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/transforms-3/76559d810210792045e76b5bcb8f11e2/transformed/profileinstaller-1.3.0/AndroidManifest.xml:34:9-52:20
+93            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+93-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/transforms-3/76559d810210792045e76b5bcb8f11e2/transformed/profileinstaller-1.3.0/AndroidManifest.xml:35:13-76
+94            android:directBootAware="false"
+94-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/transforms-3/76559d810210792045e76b5bcb8f11e2/transformed/profileinstaller-1.3.0/AndroidManifest.xml:36:13-44
+95            android:enabled="true"
+95-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/transforms-3/76559d810210792045e76b5bcb8f11e2/transformed/profileinstaller-1.3.0/AndroidManifest.xml:37:13-35
+96            android:exported="true"
+96-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/transforms-3/76559d810210792045e76b5bcb8f11e2/transformed/profileinstaller-1.3.0/AndroidManifest.xml:38:13-36
+97            android:permission="android.permission.DUMP" >
+97-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/transforms-3/76559d810210792045e76b5bcb8f11e2/transformed/profileinstaller-1.3.0/AndroidManifest.xml:39:13-57
+98            <intent-filter>
+98-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/transforms-3/76559d810210792045e76b5bcb8f11e2/transformed/profileinstaller-1.3.0/AndroidManifest.xml:40:13-42:29
+99                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+99-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/transforms-3/76559d810210792045e76b5bcb8f11e2/transformed/profileinstaller-1.3.0/AndroidManifest.xml:41:17-91
+99-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/transforms-3/76559d810210792045e76b5bcb8f11e2/transformed/profileinstaller-1.3.0/AndroidManifest.xml:41:25-88
+100            </intent-filter>
+101            <intent-filter>
+101-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/transforms-3/76559d810210792045e76b5bcb8f11e2/transformed/profileinstaller-1.3.0/AndroidManifest.xml:43:13-45:29
+102                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+102-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/transforms-3/76559d810210792045e76b5bcb8f11e2/transformed/profileinstaller-1.3.0/AndroidManifest.xml:44:17-85
+102-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/transforms-3/76559d810210792045e76b5bcb8f11e2/transformed/profileinstaller-1.3.0/AndroidManifest.xml:44:25-82
+103            </intent-filter>
+104            <intent-filter>
+104-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/transforms-3/76559d810210792045e76b5bcb8f11e2/transformed/profileinstaller-1.3.0/AndroidManifest.xml:46:13-48:29
+105                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+105-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/transforms-3/76559d810210792045e76b5bcb8f11e2/transformed/profileinstaller-1.3.0/AndroidManifest.xml:47:17-88
+105-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/transforms-3/76559d810210792045e76b5bcb8f11e2/transformed/profileinstaller-1.3.0/AndroidManifest.xml:47:25-85
+106            </intent-filter>
+107            <intent-filter>
+107-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/transforms-3/76559d810210792045e76b5bcb8f11e2/transformed/profileinstaller-1.3.0/AndroidManifest.xml:49:13-51:29
+108                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+108-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/transforms-3/76559d810210792045e76b5bcb8f11e2/transformed/profileinstaller-1.3.0/AndroidManifest.xml:50:17-95
+108-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/tstoltz/.gradle/caches/transforms-3/76559d810210792045e76b5bcb8f11e2/transformed/profileinstaller-1.3.0/AndroidManifest.xml:50:25-92
+109            </intent-filter>
+110        </receiver>
+111    </application>
+112
+113</manifest>

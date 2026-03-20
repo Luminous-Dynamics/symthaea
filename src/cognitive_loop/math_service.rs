@@ -148,6 +148,10 @@ pub struct MathServiceTelemetry {
     pub average_phi: f64,
     /// Total Phi accumulated
     pub total_phi: f64,
+    /// Average confidence across all solutions (0.0–1.0)
+    pub average_confidence: f64,
+    /// Total confidence accumulated (for running average computation)
+    pub total_confidence: f64,
 }
 
 // ─── Math Service ────────────────────────────────────────────────────────────
@@ -1004,6 +1008,9 @@ impl MathService {
 
     /// Store a solved problem as an HDC-encoded episode for future analogical retrieval
     fn store_episode(&mut self, response: &MathResponse, description: &str) {
+        // Track confidence for telemetry
+        self.record_confidence(response.confidence);
+
         if self.memory.len() >= self.memory_capacity {
             // Evict lowest-Phi episode
             if let Some(min_idx) = self
@@ -1047,6 +1054,13 @@ impl MathService {
 
         let type_name = problem_type.as_str();
         *self.telemetry.by_type.entry(type_name.into()).or_insert(0) += 1;
+    }
+
+    /// Track confidence from a solved response for telemetry.
+    fn record_confidence(&mut self, confidence: f64) {
+        self.telemetry.total_confidence += confidence;
+        self.telemetry.average_confidence =
+            self.telemetry.total_confidence / self.telemetry.problems_solved.max(1) as f64;
     }
 }
 

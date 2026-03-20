@@ -241,6 +241,16 @@ pub struct LiquidMambaConfig {
     #[serde(default = "default_e2e_grad_chunks")]
     pub e2e_grad_chunks: usize,
 
+    /// Weight for orthogonality regularization on the spatial projection's `w_up` rows
+    /// (default 0.0 = disabled). Penalizes row cosine similarity to prevent rank collapse.
+    /// Good starting values: 0.01–0.05.
+    #[serde(default)]
+    pub orthogonality_weight: f32,
+
+    /// Number of random row pairs to sample per orthogonality regularization step (default 64).
+    #[serde(default = "default_orthogonality_samples")]
+    pub orthogonality_samples: usize,
+
     /// Gating configuration (epistemic boost strengths, coherence thresholds, etc.).
     /// Override to strengthen or weaken consciousness-gated generation control.
     #[serde(default)]
@@ -288,6 +298,9 @@ fn default_lora_lr() -> f32 {
 }
 fn default_e2e_grad_chunks() -> usize {
     1
+}
+fn default_orthogonality_samples() -> usize {
+    64
 }
 
 impl Default for LiquidMambaConfig {
@@ -351,6 +364,8 @@ impl Default for LiquidMambaConfig {
             lora_lr: 0.0001,
             embedding_stats_path: None,
             e2e_grad_chunks: 1,
+            orthogonality_weight: 0.0,
+            orthogonality_samples: 64,
             gating_config: GatingConfig::default(),
         }
     }
@@ -698,20 +713,25 @@ impl LiquidMambaGenerator {
 
                 // 7c. Epistemic gating (apply to Mamba's large vocab logits)
                 //     Per-token PE feedback: if last token had low coherence with thought,
-                //     boost epistemic gate by shifting toward higher uncertainty
+                //     boost epistemic gate by shifting toward higher uncertainty.
+                //     Uses per-backend scale to account for Mamba's different logit distribution.
                 if self.config.enable_gating {
                     let effective_epistemic =
                         (channels.epistemic_ordinal() + token_pe_boost).clamp(0.0, 4.0);
-                    self.epistemic_gate.apply_with_familiarity(
+                    let ep_scale = self.config.gating_config.mamba_epistemic_scale();
+                    self.epistemic_gate.apply_scaled(
                         &mut logits,
                         effective_epistemic,
                         channels.domain_familiarity(),
+                        ep_scale,
                     );
                 }
 
-                // 7d. Emotional modulation
+                // 7d. Emotional modulation (with backend-specific scale)
                 if self.config.enable_gating {
-                    self.emotional_modulator.apply(&mut logits, channels, pos);
+                    let em_scale = self.config.gating_config.mamba_emotional_scale();
+                    self.emotional_modulator
+                        .apply_scaled(&mut logits, channels, pos, em_scale);
                 }
 
                 // 7e. Top-k sampling
@@ -1375,6 +1395,14 @@ impl LiquidMambaGenerator {
                         );
                     }
                 }
+            }
+
+            // Orthogonality regularization: decorrelate w_up rows to prevent rank collapse
+            if self.config.orthogonality_weight > 0.0 {
+                self.projection.compute_orthogonality_gradients(
+                    self.config.orthogonality_weight,
+                    self.config.orthogonality_samples,
+                );
             }
 
             // Gradient accumulation: only apply every N steps

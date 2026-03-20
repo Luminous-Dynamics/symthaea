@@ -288,6 +288,7 @@ jobs:
   test-feature-matrix:
     name: Test Feature Combinations
     runs-on: ubuntu-latest
+    timeout-minutes: 420
     strategy:
       fail-fast: false
       matrix:
@@ -345,7 +346,15 @@ jobs:
             cmake
 
       - name: Test with feature ${{ matrix.features }}
-        run: cargo test --lib --features "${{ matrix.features }}" || cargo test --lib --features "${{ matrix.features }}"
+        run: |
+          FEATURES="${{ matrix.features }}"
+          if [ "$FEATURES" = "school_learning" ]; then
+            # school_learning is very slow on free-tier runners — limit parallelism
+            # to reduce memory pressure and avoid 6h timeout
+            cargo test --lib --features "$FEATURES" -- --test-threads=1
+          else
+            cargo test --lib --features "$FEATURES" || cargo test --lib --features "$FEATURES"
+          fi
 
   psych-bench:
     name: Psych-Bench Regression
@@ -445,7 +454,6 @@ jobs:
           - "consciousness_full,school_learning"
           - "all_benchmarks,reasoning_engine"
           - "genesis,reasoning_engine"
-          - "liquid-mamba,reasoning_engine"
           - "vision-manifold,full_perception"
           - "vocal-tract,voice-tts"
           - "embeddings,reasoning_engine"

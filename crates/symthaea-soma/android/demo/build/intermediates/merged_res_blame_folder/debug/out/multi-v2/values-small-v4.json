@@ -4,7 +4,7 @@
             "outputFile": "io.symthaea.soma.demo-mergeDebugResources-33:/values-small-v4/values-small-v4.xml",
             "map": [
                 {
-                    "source": "/home/tstoltz/.gradle/caches/8.14.4/transforms/4264fe18651fa9ed5ab3abeedd6a8394/transformed/material-1.11.0/res/values-small-v4/values-small-v4.xml",
+                    "source": "/home/tstoltz/.gradle/caches/transforms-3/98043702de691ac8dbaa52ee602a69df/transformed/material-1.11.0/res/values-small-v4/values-small-v4.xml",
                     "from": {
                         "startLines": "2,3,4,5",
                         "startColumns": "4,4,4,4",

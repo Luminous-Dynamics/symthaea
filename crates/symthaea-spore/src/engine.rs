@@ -419,7 +419,17 @@ impl SporeEngine {
             network,
             text_encoder,
             bath: NeuromodulatorBath::default(),
-            equation: MasterConsciousnessEquation::new(MasterEquationConfig::default()),
+            equation: MasterConsciousnessEquation::new(MasterEquationConfig {
+                // Disable embodiment/narrative/social factors in SporeEngine:
+                // these require full CognitiveLoopService infrastructure to feed
+                // sensor data, episode recording, and social interactions.
+                // Without updates they stay at low defaults (0.25, 0.15, 0.35)
+                // and act as multiplicative dampeners, crushing consciousness to ~0.05.
+                enable_embodiment_factor: false,
+                enable_narrative_factor: false,
+                enable_social_factor: false,
+                ..MasterEquationConfig::default()
+            }),
             substrate_type,
             substrate_feasibility,
             raw_feasibility,

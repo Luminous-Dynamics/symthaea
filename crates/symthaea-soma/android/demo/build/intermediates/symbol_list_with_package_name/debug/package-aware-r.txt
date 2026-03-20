@@ -3205,11 +3205,18 @@ id beginning
 id bestChoice
 id blocking
 id bottom
+id bottomSheet
 id bounce
 id bounceBoth
 id bounceEnd
 id bounceStart
 id brocaText
+id btnCheckpoint
+id btnDream
+id btnOllama
+id btnSend
+id btnSleep
+id btnVision
 id buttonPanel
 id cache_measures
 id callMeasure
@@ -3243,6 +3250,8 @@ id content
 id contentPanel
 id contiguous
 id continuousVelocity
+id conversationInput
+id conversationRow
 id coordinator
 id cos
 id counterclockwise
@@ -3438,7 +3447,9 @@ id north
 id notification_background
 id notification_main_column
 id notification_main_column_container
+id ocrText
 id off
+id ollamaHost
 id on
 id onInterceptTouchReturnSwipe
 id open_search_bar_text_view

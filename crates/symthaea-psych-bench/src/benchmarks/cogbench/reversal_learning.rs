@@ -44,8 +44,8 @@ impl ReversalLearningBenchmark {
 
         let criterion = 8; // consecutive correct to trigger reversal
         let max_trials = 200;
-        let learning_rate = 0.40f32; // how fast associations update
-        let loss_learning_rate = 0.95f32; // asymmetric: losses update much faster (Behrens et al. 2007)
+        let learning_rate = 0.35f32; // how fast associations update
+        let loss_learning_rate = 0.90f32; // asymmetric: losses update much faster (Behrens et al. 2007)
 
         // Current contingency: true = A rewarded, false = B rewarded
         let mut a_rewarded = true;
@@ -57,6 +57,7 @@ impl ReversalLearningBenchmark {
         let mut perseverative_errors = 0u32;
         let mut total_errors = 0u32;
         let mut in_reversal = false; // are we in a post-reversal phase?
+        let mut post_reversal_countdown: u32 = 0; // trials remaining in post-reversal adaptation
         let mut consecutive_errors = 0u32; // for surprise-driven belief reset
 
         // Win-stay / lose-shift tracking
@@ -70,6 +71,9 @@ impl ReversalLearningBenchmark {
 
         for _trial in 0..max_trials {
             trials_since_event += 1;
+            if post_reversal_countdown > 0 {
+                post_reversal_countdown -= 1;
+            }
 
             // Score each stimulus: similarity of its learned association to reward_hv
             let score_a = assoc_a.similarity(&reward_hv) as f64;
@@ -146,13 +150,17 @@ impl ReversalLearningBenchmark {
             prev_choice = Some(chose_a);
             prev_rewarded = Some(rewarded);
 
-            // Asymmetric learning: losses update much faster than wins
-            // (Behrens et al. 2007 — loss-driven flexibility)
-            let lr = if rewarded {
-                learning_rate
+            // Context-dependent learning rates: post-reversal phase increases
+            // win LR and counterfactual LR while decreasing loss LR, reducing
+            // perseveration by balancing the asymmetry during reversal adaptation
+            // (Behrens et al. 2007 — volatility-sensitive learning rates).
+            let in_post_reversal = post_reversal_countdown > 0;
+            let (eff_win_lr, eff_loss_lr, cf_lr) = if in_post_reversal {
+                (0.55f32, 0.70f32, 0.20f32)
             } else {
-                loss_learning_rate
+                (learning_rate, loss_learning_rate, 0.10f32)
             };
+            let lr = if rewarded { eff_win_lr } else { eff_loss_lr };
             if chose_a {
                 if rewarded {
                     assoc_a =
@@ -171,7 +179,6 @@ impl ReversalLearningBenchmark {
             // Counterfactual learning: in a binary choice task, punishment
             // for one stimulus implies reward for the other (Li & Daw, 2011).
             // Boost the unchosen stimulus's reward association after a loss.
-            let cf_lr = 0.10f32;
             if !rewarded {
                 if chose_a {
                     assoc_b = ContinuousHV::weighted_bundle(
@@ -200,6 +207,7 @@ impl ReversalLearningBenchmark {
                 consecutive_correct = 0;
                 trials_since_event = 0;
                 in_reversal = true;
+                post_reversal_countdown = 8;
             }
         }
 

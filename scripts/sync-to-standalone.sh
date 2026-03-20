@@ -119,6 +119,7 @@ RSYNC_EXCLUDE=(
     --exclude='target/'
     --exclude='__pyphi_cache__/'
     --exclude='.DS_Store'
+    --exclude='broca-pipeline.bin'
 )
 RSYNC_OPTS=(-a --delete "${RSYNC_EXCLUDE[@]}")
 if $DRY_RUN; then
@@ -363,12 +364,27 @@ echo
 # --- Post-sync cargo check ---------------------------------------------------
 
 if ! $DRY_RUN && ! $SKIP_CHECK; then
+    SYNC_CHECK_FAILED=false
+
+    info "Running cargo fmt --check in standalone repo..."
+    if (cd "${STANDALONE_REPO}" && cargo fmt --check 2>&1 | head -20); then
+        ok "cargo fmt passed"
+    else
+        warn "cargo fmt --check failed — unformatted code detected"
+        SYNC_CHECK_FAILED=true
+    fi
+
     info "Running cargo check in standalone repo (default features)..."
     if (cd "${STANDALONE_REPO}" && cargo check 2>&1 | tail -5); then
         ok "cargo check passed"
     else
         warn "cargo check failed — the sync may have issues"
-        warn "Run with --skip-check to bypass, or investigate manually:"
+        SYNC_CHECK_FAILED=true
+    fi
+
+    if $SYNC_CHECK_FAILED; then
+        warn "Pre-push checks failed. Run with --skip-check to bypass, or investigate:"
+        echo "  cd ${STANDALONE_REPO} && cargo fmt --check"
         echo "  cd ${STANDALONE_REPO} && cargo check"
     fi
     echo

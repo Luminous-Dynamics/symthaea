@@ -45,6 +45,7 @@ members = [
     "crates/symthaea-genomics",
     "crates/symthaea-nurture",
     "crates/symthaea-population",
+    "crates/symthaea-neuroevolution",
     "crates/symthaea-materials",
     "crates/symthaea-nuclear-forensics",
     "crates/symthaea-memory",
@@ -62,6 +63,8 @@ members = [
     "crates/symthaea-hdc-store",
     # DRM/KMS boot animation — needs Linux DRM headers; not in default-members.
     "crates/symthaea-quicken-fb",
+    # Leptos CSR web frontend — WASM target, not in default-members.
+    "crates/symthaea-web",
 ]
 exclude = [
     # RISC Zero guest/host crates need the rzup toolchain (RISC-V cross-compiler);
@@ -225,6 +228,7 @@ symthaea-cell-foundry = { path = "crates/symthaea-cell-foundry", optional = true
 symthaea-ectogenesis = { path = "crates/symthaea-ectogenesis", optional = true }
 symthaea-nurture = { path = "crates/symthaea-nurture", optional = true }
 symthaea-population = { path = "crates/symthaea-population", optional = true }
+symthaea-neuroevolution = { path = "crates/symthaea-neuroevolution", optional = true }
 symthaea-materials = { path = "crates/symthaea-materials", optional = true }
 symthaea-nuclear-forensics = { path = "crates/symthaea-nuclear-forensics", optional = true }
 symthaea-fabrication-kernel = { path = "crates/symthaea-fabrication-kernel", optional = true }
@@ -488,6 +492,7 @@ ssm-power = ["dep:symthaea-ssm", "mesh", "school_learning"]  # Diagonal SSM sens
 ssm-power-hal = ["ssm-power", "hal", "symthaea-hal/linux", "dep:linux-embedded-hal"]
 ssm_language = ["dep:symthaea-broca"]          # Native CfC-HDC language center (SSM Broca's area)
 canvas = ["dep:symthaea-canvas"]               # Living topology UI: cognitive geometry → animated SVG
+neuroevolution = ["dep:symthaea-neuroevolution"]  # CfC-HDC neuroevolution: evolve neural organisms via Free Energy minimization
 therapeutic = ["dep:symthaea-clinical", "dep:symthaea-therapeutic", "ssm_language", "symthaea-broca/therapeutic"]
 liquid-mamba = ["ssm_language", "symthaea-broca/mamba-cpu"]  # Liquid-Mamba fusion: pre-trained Mamba SSM + HDC consciousness gating (CPU; use symthaea-broca/mamba for GPU)
 humanoid-mujoco = ["humanoid", "symthaea-humanoid/mujoco"]  # Humanoid with MuJoCo physics

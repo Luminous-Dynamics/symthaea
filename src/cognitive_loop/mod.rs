@@ -177,7 +177,7 @@ pub(crate) mod virtual_body;
 pub(crate) mod voice_coherence_bridge;
 
 #[cfg(feature = "ssm_language")]
-pub(crate) mod broca_bridge;
+pub mod broca_bridge;
 
 #[cfg(feature = "canvas")]
 pub(crate) mod canvas_bridge;
@@ -205,6 +205,7 @@ pub use managers::{
 };
 
 pub mod calibration;
+#[cfg(feature = "mathematics")]
 pub mod math_service;
 
 #[cfg(feature = "nurture")]
@@ -766,6 +767,11 @@ pub struct CognitiveLoopService {
     #[cfg(feature = "integrity")]
     integrity_manager: crate::integrity::IntegrityManager,
 
+    /// Neuroevolution Manager: evolves CfC-HDC neural organisms via FEP fitness.
+    /// Interval 71 (co-prime). Feature-gated behind `neuroevolution`.
+    #[cfg(feature = "neuroevolution")]
+    pub(crate) neuroevolution_manager: managers::NeuroevolutionManager,
+
     /// Cantor dream: broadcast buffer, cleanup engine, activation, surprise, resonance.
     pub(crate) cantor_dream: cantor_dream_manager::CantorDreamManager,
 
@@ -787,6 +793,7 @@ pub struct CognitiveLoopService {
     /// (linear algebra, root finding, quadrature, statistics, optimization, FFT,
     /// logic engine, constraint solver, geometry, graphs, differential equations).
     /// Tracks telemetry and stores solved-problem episodes for analogical retrieval.
+    #[cfg(feature = "mathematics")]
     math_service: math_service::MathService,
 
     /// Epistemic Auditor: DuckDB-backed consciousness telemetry audit trail.

@@ -90,12 +90,12 @@ impl SubstrateLatencyBenchmark {
         for (speed, _name) in &speed_tiers {
             // Latency-induced noise: slower substrates accumulate more noise
             // during the processing window. With 12 items bundled in 512D,
-            // the base retrieval accuracy is ~0.87 (no noise). A 0.70×
-            // multiplier yields ~0.63 noise for biochemical (speed=0.1),
-            // degrading accuracy to ~0.57. The 8-tier design gives enough
-            // data points for a stable Pearson r ≈ 0.75.
+            // the base retrieval accuracy is ~0.87 (no noise). A 0.60×
+            // multiplier yields ~0.54 noise for biochemical (speed=0.1),
+            // creating a cleaner gradient for higher Pearson r. The 8-tier
+            // design gives enough data points for a stable correlation.
             let latency_noise =
-                ((1.0 - speed) * 0.70) as f32 + config.effective_noise() as f32 * 0.05;
+                ((1.0 - speed) * 0.60) as f32 + config.effective_noise() as f32 * 0.05;
 
             let mut correct = 0u32;
             let mut total = 0u32;

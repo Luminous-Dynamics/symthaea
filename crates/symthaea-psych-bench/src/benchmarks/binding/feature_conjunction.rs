@@ -59,7 +59,7 @@ impl FeatureConjunctionBenchmark {
         let role_shape = ContinuousHV::random(dim, seed.wrapping_add(1001));
 
         let noise_frac =
-            0.02 + config.time_pressure as f32 * 0.08 + config.effective_noise() as f32 * 0.05;
+            0.015 + config.time_pressure as f32 * 0.08 + config.effective_noise() as f32 * 0.05;
 
         let set_sizes = [4usize, 8, 12];
         let trials_per_size = 20;

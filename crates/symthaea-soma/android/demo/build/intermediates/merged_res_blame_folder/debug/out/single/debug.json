@@ -1,66 +1,66 @@
 [
     {
-        "merged": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-merged_res-35:/mipmap-xhdpi_ic_launcher.png.flat",
-        "source": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-main-37:/mipmap-xhdpi/ic_launcher.png"
+        "merged": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-merged_res-35:/mipmap-mdpi_ic_launcher.png.flat",
+        "source": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-main-37:/mipmap-mdpi/ic_launcher.png"
     },
     {
-        "merged": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-merged_res-35:/drawable_ic_soma_background.xml.flat",
-        "source": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-main-37:/drawable/ic_soma_background.xml"
+        "merged": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-merged_res-35:/mipmap-hdpi_ic_launcher_round.png.flat",
+        "source": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-main-37:/mipmap-hdpi/ic_launcher_round.png"
     },
     {
-        "merged": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-merged_res-35:/mipmap-xxxhdpi_ic_launcher_round.png.flat",
-        "source": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-main-37:/mipmap-xxxhdpi/ic_launcher_round.png"
+        "merged": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-merged_res-35:/drawable_ic_soma_foreground.xml.flat",
+        "source": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-main-37:/drawable/ic_soma_foreground.xml"
     },
     {
-        "merged": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-merged_res-35:/mipmap-mdpi_ic_launcher_round.png.flat",
-        "source": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-main-37:/mipmap-mdpi/ic_launcher_round.png"
+        "merged": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-merged_res-35:/mipmap-xxxhdpi_ic_launcher_round.png.flat",
+        "source": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-main-37:/mipmap-xxxhdpi/ic_launcher_round.png"
     },
     {
-        "merged": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-merged_res-35:/mipmap-mdpi_ic_launcher.png.flat",
-        "source": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-main-37:/mipmap-mdpi/ic_launcher.png"
-    },
-    {
-        "merged": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-merged_res-35:/mipmap-hdpi_ic_launcher_round.png.flat",
-        "source": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-main-37:/mipmap-hdpi/ic_launcher_round.png"
+        "merged": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-merged_res-35:/mipmap-hdpi_ic_launcher.png.flat",
+        "source": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-main-37:/mipmap-hdpi/ic_launcher.png"
     },
     {
         "merged": "io.symthaea.soma.demo-merged_res-35:/layout_activity_main.xml.flat",
         "source": "io.symthaea.soma.demo-main-37:/layout/activity_main.xml"
     },
     {
-        "merged": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-merged_res-35:/drawable_circle_indicator.xml.flat",
-        "source": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-main-37:/drawable/circle_indicator.xml"
+        "merged": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-merged_res-35:/layout_activity_main.xml.flat",
+        "source": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-main-37:/layout/activity_main.xml"
     },
     {
-        "merged": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-merged_res-35:/mipmap-xxxhdpi_ic_launcher.png.flat",
-        "source": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-main-37:/mipmap-xxxhdpi/ic_launcher.png"
+        "merged": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-merged_res-35:/mipmap-xxhdpi_ic_launcher_round.png.flat",
+        "source": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-main-37:/mipmap-xxhdpi/ic_launcher_round.png"
     },
     {
-        "merged": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-merged_res-35:/mipmap-xhdpi_ic_launcher_round.png.flat",
-        "source": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-main-37:/mipmap-xhdpi/ic_launcher_round.png"
+        "merged": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-merged_res-35:/drawable_ic_soma_background.xml.flat",
+        "source": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-main-37:/drawable/ic_soma_background.xml"
     },
     {
-        "merged": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-merged_res-35:/mipmap-hdpi_ic_launcher.png.flat",
-        "source": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-main-37:/mipmap-hdpi/ic_launcher.png"
+        "merged": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-merged_res-35:/mipmap-mdpi_ic_launcher_round.png.flat",
+        "source": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-main-37:/mipmap-mdpi/ic_launcher_round.png"
     },
     {
-        "merged": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-merged_res-35:/mipmap-xxhdpi_ic_launcher.png.flat",
-        "source": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-main-37:/mipmap-xxhdpi/ic_launcher.png"
+        "merged": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-merged_res-35:/mipmap-xhdpi_ic_launcher.png.flat",
+        "source": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-main-37:/mipmap-xhdpi/ic_launcher.png"
     },
     {
-        "merged": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-merged_res-35:/mipmap-xxhdpi_ic_launcher_round.png.flat",
-        "source": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-main-37:/mipmap-xxhdpi/ic_launcher_round.png"
+        "merged": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-merged_res-35:/drawable_consciousness_circle.xml.flat",
+        "source": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-main-37:/drawable/consciousness_circle.xml"
     },
     {
-        "merged": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-merged_res-35:/drawable_consciousness_circle.xml.flat",
-        "source": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-main-37:/drawable/consciousness_circle.xml"
+        "merged": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-merged_res-35:/mipmap-xxxhdpi_ic_launcher.png.flat",
+        "source": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-main-37:/mipmap-xxxhdpi/ic_launcher.png"
     },
     {
-        "merged": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-merged_res-35:/layout_activity_main.xml.flat",
-        "source": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-main-37:/layout/activity_main.xml"
+        "merged": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-merged_res-35:/mipmap-xhdpi_ic_launcher_round.png.flat",
+        "source": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-main-37:/mipmap-xhdpi/ic_launcher_round.png"
     },
     {
-        "merged": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-merged_res-35:/drawable_ic_soma_foreground.xml.flat",
-        "source": "/home/tstoltz/.gradle/daemon/8.14.4/io.symthaea.soma.demo-main-37:/drawable/ic_soma_foreground.xml"
+        "merged": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-merged_res-35:/drawable_circle_indicator.xml.flat",
+        "source": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-main-37:/drawable/circle_indicator.xml"
+    },
+    {
+        "merged": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-merged_res-35:/mipmap-xxhdpi_ic_launcher.png.flat",
+        "source": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-main-37:/mipmap-xxhdpi/ic_launcher.png"
     }
 ]

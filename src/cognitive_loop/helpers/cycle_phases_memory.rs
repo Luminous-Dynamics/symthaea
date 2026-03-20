@@ -103,7 +103,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let mut resonator_promotions: usize = 0;
         let mut codebook_evictions: usize = 0;
-        if self.stats.total_cycles % 97 == 0 && self.stats.total_cycles > 0 {
+        if self.stats.total_cycles % crate::cognitive_loop::thresholds::MEMORY_HIGH_PHI_PROMOTION_CADENCE == 0 && self.stats.total_cycles > 0 {
             let top_eps = self
                 .episodic_persistence
                 .replay
@@ -169,7 +169,7 @@ impl CognitiveLoopService {
         // Track 3e: Codebook diversity metric
         // Science: competitive learning — low diversity = redundant representations
         // Compute average pairwise cosine distance (every 50 cycles to amortize cost)
-        let codebook_diversity: f32 = if self.stats.total_cycles % 50 == 0 {
+        let codebook_diversity: f32 = if self.stats.total_cycles % crate::cognitive_loop::thresholds::MEMORY_CODEBOOK_DIVERSITY_INTERVAL == 0 {
             if let Some(ref res_mem) = self.memory_consol.resonator_memory {
                 if let Some(semantic_cb) = res_mem.resonator.codebooks.first() {
                     let n = semantic_cb.symbols.len();
@@ -208,7 +208,7 @@ impl CognitiveLoopService {
         // Science: Kohonen (1982) — self-organizing maps need active symbol usage
         // Compute fraction of codebook symbols that match recent input (similarity > 0.2).
         // Low utilization → too many dead symbols → slow codebook growth.
-        let codebook_utilization_rate: f32 = if self.stats.total_cycles % 50 == 0 {
+        let codebook_utilization_rate: f32 = if self.stats.total_cycles % crate::cognitive_loop::thresholds::MEMORY_CODEBOOK_UTILIZATION_INTERVAL == 0 {
             if let Some(ref res_mem) = self.memory_consol.resonator_memory {
                 if let Some(semantic_cb) = res_mem.resonator.codebooks.first() {
                     let n = semantic_cb.symbols.len();
@@ -221,15 +221,15 @@ impl CognitiveLoopService {
                         let rate = utilized as f32 / n as f32;
                         // EMA update
                         self.stats.codebook_utilization_rate =
-                            self.stats.codebook_utilization_rate * 0.8 + rate * 0.2;
+                            self.stats.codebook_utilization_rate * crate::cognitive_loop::thresholds::MEMORY_CODEBOOK_UTIL_EMA_DECAY + rate * crate::cognitive_loop::thresholds::MEMORY_CODEBOOK_UTIL_EMA_NEW;
                         // Low utilization → increase novelty threshold (harder to add)
-                        if rate < 0.2 && self.config.resonator_novelty_threshold < 0.9 {
+                        if rate < crate::cognitive_loop::thresholds::MEMORY_CODEBOOK_LOW_UTILIZATION && self.config.resonator_novelty_threshold < 0.9 {
                             self.config.resonator_novelty_threshold =
-                                (self.config.resonator_novelty_threshold + 0.02).min(0.9);
-                        } else if rate > 0.6 && self.config.resonator_novelty_threshold > 0.3 {
+                                (self.config.resonator_novelty_threshold + crate::cognitive_loop::thresholds::MEMORY_NOVELTY_THRESHOLD_INCREASE).min(0.9);
+                        } else if rate > crate::cognitive_loop::thresholds::MEMORY_CODEBOOK_HIGH_UTILIZATION && self.config.resonator_novelty_threshold > 0.3 {
                             // High utilization → lower novelty threshold (easier to add)
                             self.config.resonator_novelty_threshold =
-                                (self.config.resonator_novelty_threshold - 0.01).max(0.3);
+                                (self.config.resonator_novelty_threshold - crate::cognitive_loop::thresholds::MEMORY_NOVELTY_THRESHOLD_DECREASE).max(0.3);
                         }
                         rate
                     } else {

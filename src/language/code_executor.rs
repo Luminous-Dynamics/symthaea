@@ -570,6 +570,12 @@ pub enum ErrorCategory {
     UnusedCode,
     /// Missing trait impl (E0277 for Display/Debug/Clone)
     MissingImpl,
+    /// Undeclared generic type parameter (E0412 for single-letter types like T, U, V)
+    /// Fixable by inserting `<T>` on the enclosing item.
+    UndeclaredGeneric,
+    /// Unwanted `fn main()` in library crate (E0601)
+    /// Fixable by stripping the main wrapper.
+    UnwantedMain,
     /// Syntax error — code is malformed
     SyntaxError,
     /// Timeout — execution took too long
@@ -642,7 +648,20 @@ impl CompileError {
                 "E0308" => ErrorCategory::TypeMismatch,
                 "E0277" if message.contains("expected") => ErrorCategory::TypeMismatch,
                 "E0277" => ErrorCategory::MissingImpl,
-                "E0412" | "E0433" | "E0432" => ErrorCategory::MissingImport,
+                "E0412" => {
+                    // Single-letter type names (T, U, V, K, V) are undeclared generics,
+                    // not missing imports. Extract the type name from the message.
+                    let is_generic = Self::extract_unresolved_type(message)
+                        .map(|t| t.len() == 1 && t.chars().next().map_or(false, |c| c.is_ascii_uppercase()))
+                        .unwrap_or(false);
+                    if is_generic {
+                        ErrorCategory::UndeclaredGeneric
+                    } else {
+                        ErrorCategory::MissingImport
+                    }
+                }
+                "E0433" | "E0432" => ErrorCategory::MissingImport,
+                "E0601" => ErrorCategory::UnwantedMain,
                 "E0382" | "E0502" | "E0505" | "E0596" | "E0507" => ErrorCategory::BorrowError,
                 "E0106" | "E0621" => ErrorCategory::LifetimeError,
                 _ => ErrorCategory::Other,

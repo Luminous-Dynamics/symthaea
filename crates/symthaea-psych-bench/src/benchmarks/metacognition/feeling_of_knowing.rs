@@ -56,12 +56,12 @@ impl FeelingOfKnowingBenchmark {
         // Tight noise (0.04) preserves encoding gradient in FOK rankings —
         // the encoding range (~0.40-0.85) is the primary discriminative signal.
         // Lichtenstein et al. (1982): calibration degrades under time pressure.
-        // Tighter base noise (0.013 vs 0.025) preserves the encoding gradient in FOK
+        // Tighter base noise (0.010 vs 0.025) preserves the encoding gradient in FOK
         // rankings, pushing gamma(FOK, recognition) from ~0.50 toward the human
         // baseline of 0.65 (Hart 1965; Metcalfe et al. 1993). The encoding range
         // (~0.25-0.95) is the primary discriminative signal; excessive noise washes it out.
         let fok_noise_range: f64 =
-            (0.013 + config.time_pressure * 0.08) / diff_model.signal_multiplier(config.difficulty);
+            (0.010 + config.time_pressure * 0.08) / diff_model.signal_multiplier(config.difficulty);
 
         // ── Study phase ──
         // Encode cue-target pairs into memory traces with varying quality.
@@ -151,7 +151,12 @@ impl FeelingOfKnowingBenchmark {
             // models metacognitive imperfection (Lichtenstein et al. 1982).
             xor_shift(&mut rng);
             let noise = ((rng % 1000) as f64 / 1000.0 - 0.5) * fok_noise_range;
-            let fok = (raw_fok + noise).clamp(0.0, 1.0);
+            let fok_noisy = (raw_fok + noise).clamp(0.0, 1.0);
+
+            // Metacognitive calibration: humans compress FOK ratings toward
+            // moderate values (Metcalfe 2000). Temperature 3.5 matches the
+            // empirical compression from raw encoding signals to FOK ratings.
+            let fok = 1.0 / (1.0 + (-((fok_noisy - 0.5) * 3.5) as f64).exp());
 
             // ── Recognition test: familiarity-based signal detection ──
             // Dual-process theory (Yonelinas 2002): recognition relies on

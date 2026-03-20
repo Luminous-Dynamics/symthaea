@@ -91,6 +91,54 @@ pub const CANONICAL_SOFTENING_WORDS: &[&str] = &["unfortunately", "sorry", "howe
 // GatingConfig
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/// Per-backend gating scale factors for Liquid-Mamba path.
+///
+/// Mamba generates through GPT-NeoX 50K vocab in a different representational
+/// space than CfC-HDC's 4K BPE vocab. The same epistemic/emotional gating
+/// parameters can over- or under-correct depending on the logit distribution.
+///
+/// These multipliers scale the base `GatingConfig` values when applied to
+/// Mamba logits. A value of 1.0 means "same as CfC", 0.5 means "half strength".
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct MambaGatingOverrides {
+    /// Scale factor for epistemic penalties/boosts (default 0.6).
+    /// Mamba's larger vocab distributes probability more thinly, so
+    /// the same absolute logit penalty has a larger relative effect.
+    #[serde(default = "default_mamba_epistemic_scale")]
+    pub epistemic_scale: f32,
+    /// Scale factor for emotional modulation (default 0.5).
+    /// Mamba logits have different dynamic range than CfC cosine-scaled logits.
+    #[serde(default = "default_mamba_emotional_scale")]
+    pub emotional_scale: f32,
+    /// Scale factor for veto threshold (default 1.5).
+    /// Mamba coherence scores live in a different range — veto threshold
+    /// needs to be more permissive to avoid excessive mid-sentence corrections.
+    #[serde(default = "default_mamba_veto_scale")]
+    pub veto_threshold_scale: f32,
+}
+
+impl Default for MambaGatingOverrides {
+    fn default() -> Self {
+        Self {
+            epistemic_scale: 0.6,
+            emotional_scale: 0.5,
+            veto_threshold_scale: 1.5,
+        }
+    }
+}
+
+fn default_mamba_epistemic_scale() -> f32 {
+    0.6
+}
+
+fn default_mamba_emotional_scale() -> f32 {
+    0.5
+}
+
+fn default_mamba_veto_scale() -> f32 {
+    1.5
+}
+
 /// Configuration for the gating system.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct GatingConfig {
@@ -155,28 +203,58 @@ pub struct GatingConfig {
     /// At confidence=1.0, veto threshold is scaled by (1 - this value). Default 0.3.
     #[serde(default = "default_confidence_veto_scale")]
     pub confidence_veto_scale: f32,
+
+    // ── Per-backend overrides ──
+    /// Optional per-backend gating scale factors for Liquid-Mamba path.
+    /// When set, Mamba gating multiplies the base penalties/boosts by these factors.
+    /// CfC-HDC path always uses the base values unscaled.
+    #[serde(default)]
+    pub mamba_gating_overrides: Option<MambaGatingOverrides>,
+
+    // ── Phase 2: Algebraic Coherence Correction ──
+    /// Enable algebraic (HDC subtract) coherence correction instead of scalar scaling.
+    /// When enabled, drift is surgically removed from the thought vector using
+    /// vector subtraction rather than uniform amplitude scaling.
+    #[serde(default)]
+    pub enable_algebraic_correction: bool,
+    /// Correction strength for algebraic mode (0.0-1.0). Default 0.3.
+    /// Higher values apply stronger corrections but risk oscillation.
+    #[serde(default = "default_algebraic_correction_strength")]
+    pub algebraic_correction_strength: f32,
+
+    // ── Phase 4: Soft Veto via Temporal Rewind ──
+    /// Enable soft veto (partial CfC state restore) instead of hard reset.
+    /// When enabled, veto interpolates toward a saved "known-good" snapshot
+    /// rather than zeroing all network state.
+    #[serde(default)]
+    pub enable_soft_veto: bool,
+    /// Interpolation weight for soft veto (0.0 = no-op, 1.0 = full restore to snapshot).
+    /// Default 0.5: halfway between snapshot and current state.
+    #[serde(default = "default_veto_rewind_alpha")]
+    pub veto_rewind_alpha: f32,
 }
 
 impl Default for GatingConfig {
     fn default() -> Self {
         Self {
-            // Epistemic gating — reduced from original values (5.0/2.5) which
-            // dominated generation with hedging words ("maybe", "seems", "likely").
-            // These values still enforce epistemic honesty but let content through.
-            unknown_factual_penalty: -5.0,
-            unknown_hedging_boost: 1.5,
-            uncertain_factual_penalty: -2.0,
-            uncertain_hedging_boost: 1.0,
+            // Epistemic gating — v3 reduction (Mar 2026). Previous -5.0/1.5 still
+            // dominated generation (broca-compare: 100% gating words for OOD/Unknown).
+            // These gentler values nudge output toward hedging without drowning content.
+            unknown_factual_penalty: -3.0,
+            unknown_hedging_boost: 0.75,
+            uncertain_factual_penalty: -1.5,
+            uncertain_hedging_boost: 0.5,
             coherence_drift_threshold: 0.3,
             high_arousal_threshold: 0.7,
             arousal_position_threshold: 10,
             low_warmth_threshold: 0.3,
             base_max_tokens: 128,
-            // Semantic veto — lowered from 0.15 to 0.003. After BPTT training,
-            // CfC output is in a different representational space than thought input,
-            // giving baseline coherence of ~0.006. A threshold of 0.003 fires only
-            // when coherence drops to half its normal level (genuine drift).
-            veto_threshold: 0.003,
+            // Semantic veto — disabled by default (0.0). After BPTT training,
+            // CfC output lives in a completely different representational space
+            // than the input thought HV, giving baseline coherence ≈ 0.000.
+            // Any positive threshold fires on every token. Use adaptive veto
+            // (adaptive_veto_warmup > 0) or set explicitly for untrained models.
+            veto_threshold: 0.0,
             min_veto_position: 2,
             max_vetoes: 1,
             veto_refractory: 8,
@@ -189,7 +267,47 @@ impl Default for GatingConfig {
             domain_familiarity_hedging_scale: 1.0,
             social_context_formality_scale: 1.0,
             confidence_veto_scale: 0.3,
+            mamba_gating_overrides: None,
+            enable_algebraic_correction: false,
+            algebraic_correction_strength: 0.3,
+            enable_soft_veto: false,
+            veto_rewind_alpha: 0.5,
         }
+    }
+}
+
+impl GatingConfig {
+    /// Create a config with default Mamba gating overrides enabled.
+    ///
+    /// Equivalent to `default()` but with `mamba_gating_overrides = Some(MambaGatingOverrides::default())`.
+    pub fn with_mamba_overrides() -> Self {
+        let mut config = Self::default();
+        config.mamba_gating_overrides = Some(MambaGatingOverrides::default());
+        config
+    }
+
+    /// Get the effective epistemic penalty/boost scale for the Mamba backend.
+    /// Returns 1.0 if no overrides are set.
+    pub fn mamba_epistemic_scale(&self) -> f32 {
+        self.mamba_gating_overrides
+            .as_ref()
+            .map_or(1.0, |o| o.epistemic_scale)
+    }
+
+    /// Get the effective emotional modulation scale for the Mamba backend.
+    /// Returns 1.0 if no overrides are set.
+    pub fn mamba_emotional_scale(&self) -> f32 {
+        self.mamba_gating_overrides
+            .as_ref()
+            .map_or(1.0, |o| o.emotional_scale)
+    }
+
+    /// Get the effective veto threshold scale for the Mamba backend.
+    /// Returns 1.0 if no overrides are set.
+    pub fn mamba_veto_threshold_scale(&self) -> f32 {
+        self.mamba_gating_overrides
+            .as_ref()
+            .map_or(1.0, |o| o.veto_threshold_scale)
     }
 }
 
@@ -243,6 +361,14 @@ fn default_social_context_formality_scale() -> f32 {
 
 fn default_confidence_veto_scale() -> f32 {
     0.3
+}
+
+fn default_algebraic_correction_strength() -> f32 {
+    0.3
+}
+
+fn default_veto_rewind_alpha() -> f32 {
+    0.5
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -404,6 +530,76 @@ impl EpistemicGate {
             }
         }
     }
+
+    /// Apply epistemic gating with a backend-specific scale factor.
+    ///
+    /// For Liquid-Mamba: pass `config.mamba_epistemic_scale()` as `backend_scale`.
+    /// For CfC-HDC: pass 1.0 (or just call `apply_with_familiarity` directly).
+    pub fn apply_scaled(
+        &self,
+        logits: &mut [f32],
+        epistemic_ordinal: f32,
+        domain_familiarity: f32,
+        backend_scale: f32,
+    ) {
+        if backend_scale == 1.0 {
+            self.apply_with_familiarity(logits, epistemic_ordinal, domain_familiarity);
+            return;
+        }
+        if epistemic_ordinal < 1.5 {
+            return;
+        }
+
+        let df = domain_familiarity.clamp(0.0, 1.0);
+        let familiarity_scale =
+            1.0 - df * self.config.domain_familiarity_hedging_scale.clamp(0.0, 1.0);
+
+        if epistemic_ordinal > 3.5 {
+            for &id in &self.factual_token_ids {
+                if let Some(l) = logits.get_mut(id as usize) {
+                    *l += self.config.unknown_factual_penalty * backend_scale;
+                }
+            }
+            for &id in &self.ood_token_ids {
+                if let Some(l) = logits.get_mut(id as usize) {
+                    *l += self.config.unknown_hedging_boost
+                        * self.config.ood_boost_multiplier
+                        * familiarity_scale
+                        * backend_scale;
+                }
+            }
+            for &id in &self.hedging_token_ids {
+                if let Some(l) = logits.get_mut(id as usize) {
+                    *l += self.config.unknown_hedging_boost * familiarity_scale * backend_scale;
+                }
+            }
+            return;
+        }
+
+        if epistemic_ordinal > 2.5 {
+            for &id in &self.factual_token_ids {
+                if let Some(l) = logits.get_mut(id as usize) {
+                    *l += self.config.unknown_factual_penalty * backend_scale;
+                }
+            }
+            for &id in &self.hedging_token_ids {
+                if let Some(l) = logits.get_mut(id as usize) {
+                    *l += self.config.unknown_hedging_boost * familiarity_scale * backend_scale;
+                }
+            }
+        } else {
+            for &id in &self.factual_token_ids {
+                if let Some(l) = logits.get_mut(id as usize) {
+                    *l += self.config.uncertain_factual_penalty * backend_scale;
+                }
+            }
+            for &id in &self.hedging_token_ids {
+                if let Some(l) = logits.get_mut(id as usize) {
+                    *l += self.config.uncertain_hedging_boost * familiarity_scale * backend_scale;
+                }
+            }
+        }
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -538,6 +734,85 @@ impl EmotionalModulator {
             }
         }
     }
+
+    /// Apply emotional modulation with a backend-specific scale factor.
+    ///
+    /// For Liquid-Mamba: pass `config.mamba_emotional_scale()` as `backend_scale`.
+    /// For CfC-HDC: pass 1.0 (or just call `apply` directly).
+    pub fn apply_scaled(
+        &self,
+        logits: &mut [f32],
+        channels: &ThoughtChannels,
+        position: usize,
+        backend_scale: f32,
+    ) {
+        if backend_scale == 1.0 {
+            self.apply(logits, channels, position);
+            return;
+        }
+
+        let arousal = channels.arousal();
+        let warmth = channels.warmth();
+        let valence = channels.valence();
+
+        if arousal > self.config.high_arousal_threshold
+            && position > self.config.arousal_position_threshold
+        {
+            let boost = (arousal - self.config.high_arousal_threshold)
+                * self.config.arousal_boost_multiplier
+                * backend_scale;
+            for &id in &self.sentence_end_ids {
+                if let Some(l) = logits.get_mut(id as usize) {
+                    *l += boost;
+                }
+            }
+        }
+
+        if arousal > self.config.high_arousal_threshold
+            && valence < self.config.negative_valence_threshold
+            && position > self.config.arousal_position_threshold
+        {
+            let interaction_boost = (arousal - self.config.high_arousal_threshold)
+                * (-valence - (-self.config.negative_valence_threshold))
+                * self.config.valence_boost_multiplier
+                * backend_scale;
+            for &id in &self.sentence_end_ids {
+                if let Some(l) = logits.get_mut(id as usize) {
+                    *l += interaction_boost * 0.5;
+                }
+            }
+            for &id in &self.softening_ids {
+                if let Some(l) = logits.get_mut(id as usize) {
+                    *l += interaction_boost;
+                }
+            }
+        }
+
+        let social = channels.social_context().clamp(0.0, 1.0);
+        let formality_scale = 1.0 + social * self.config.social_context_formality_scale;
+        if warmth < self.config.low_warmth_threshold {
+            let penalty = (self.config.low_warmth_threshold - warmth)
+                * self.config.warmth_penalty_multiplier
+                * formality_scale
+                * backend_scale;
+            for &id in &self.informal_ids {
+                if let Some(l) = logits.get_mut(id as usize) {
+                    *l += penalty;
+                }
+            }
+        }
+
+        if valence < self.config.negative_valence_threshold {
+            let boost = (-valence - (-self.config.negative_valence_threshold))
+                * self.config.valence_boost_multiplier
+                * backend_scale;
+            for &id in &self.softening_ids {
+                if let Some(l) = logits.get_mut(id as usize) {
+                    *l += boost;
+                }
+            }
+        }
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -557,6 +832,10 @@ pub struct CoherenceFeedback {
     veto_triggered: bool,
     /// Semantic veto threshold (more aggressive than drift).
     veto_threshold: f32,
+    /// Enable algebraic (HDC subtract) correction instead of scalar scaling (Phase 2).
+    enable_algebraic: bool,
+    /// Correction strength for algebraic mode (0.0-1.0). Default 0.3.
+    algebraic_strength: f32,
 }
 
 impl CoherenceFeedback {
@@ -572,7 +851,53 @@ impl CoherenceFeedback {
             current_coherence: 1.0,
             veto_triggered: false,
             veto_threshold,
+            enable_algebraic: false,
+            algebraic_strength: 0.3,
         }
+    }
+
+    /// Enable algebraic coherence correction (Phase 2).
+    /// Instead of scalar scaling, uses HDC subtract to surgically remove
+    /// drifting dimensions from the thought vector.
+    pub fn set_algebraic(&mut self, enable: bool, strength: f32) {
+        self.enable_algebraic = enable;
+        self.algebraic_strength = strength.clamp(0.0, 1.0);
+    }
+
+    /// Whether algebraic mode is enabled.
+    pub fn is_algebraic(&self) -> bool {
+        self.enable_algebraic
+    }
+
+    /// Compute algebraic correction: surgically remove drift from thought_hv.
+    ///
+    /// Instead of `thought_hv.scale(weight)` (uniform amplification),
+    /// this computes the error vector between output and thought, then
+    /// subtracts a fraction of it. This is gradient descent in HDC space.
+    ///
+    /// Returns the corrected thought HV (or the original if no correction needed).
+    pub fn algebraic_correct(
+        &self,
+        output_hv: &symthaea_core::hdc::ContinuousHV,
+        thought_hv: &symthaea_core::hdc::ContinuousHV,
+    ) -> symthaea_core::hdc::ContinuousHV {
+        if self.current_coherence >= self.threshold {
+            return thought_hv.clone();
+        }
+        // drift = output - thought (the error vector in HDC space)
+        let drift = output_hv.subtract(thought_hv);
+        let drift_norm = drift.norm();
+        let thought_norm = thought_hv.norm();
+        if drift_norm < 1e-8 || thought_norm < 1e-8 {
+            return thought_hv.clone();
+        }
+        // Correction magnitude scales with how far below threshold we are
+        let urgency = ((self.threshold - self.current_coherence) / self.threshold).clamp(0.0, 1.0);
+        let effective_strength = self.algebraic_strength * urgency;
+        // corrected = thought - strength * drift (move thought away from drift direction)
+        let correction = drift.scale(effective_strength);
+        let corrected = thought_hv.subtract(&correction);
+        corrected.normalize().scale(thought_norm) // Preserve original norm
     }
 
     /// Update coherence score from the current network output and thought HV.

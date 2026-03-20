@@ -10,7 +10,7 @@ use rand::rngs::StdRng;
 use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
 
-use crate::controller::{LanguageController, LanguageControllerConfig};
+use crate::controller::{LanguageController, LanguageControllerConfig, NetworkSnapshot};
 use crate::encoder::{ThoughtChannels, ThoughtLanguageEncoder};
 #[cfg(feature = "therapeutic")]
 use crate::gating::TherapeuticGate;
@@ -176,9 +176,14 @@ impl BrocaGenerator {
         let encoder = ThoughtLanguageEncoder::new(genesis);
         let epistemic_gate = EpistemicGate::new(&tokenizer, &config.gating);
         let emotional_modulator = EmotionalModulator::new(&tokenizer, &config.gating);
-        let coherence_feedback = CoherenceFeedback::with_veto_threshold(
+        let mut coherence_feedback = CoherenceFeedback::with_veto_threshold(
             config.gating.coherence_drift_threshold,
             config.gating.veto_threshold,
+        );
+        // Phase 2: Enable algebraic coherence correction if configured
+        coherence_feedback.set_algebraic(
+            config.gating.enable_algebraic_correction,
+            config.gating.algebraic_correction_strength,
         );
         let sampling_rng = config.sampling_seed.map(StdRng::seed_from_u64);
 
@@ -217,9 +222,14 @@ impl BrocaGenerator {
         let encoder = ThoughtLanguageEncoder::new(genesis);
         let epistemic_gate = EpistemicGate::new(&tokenizer, &config.gating);
         let emotional_modulator = EmotionalModulator::new(&tokenizer, &config.gating);
-        let coherence_feedback = CoherenceFeedback::with_veto_threshold(
+        let mut coherence_feedback = CoherenceFeedback::with_veto_threshold(
             config.gating.coherence_drift_threshold,
             config.gating.veto_threshold,
+        );
+        // Phase 2: Enable algebraic coherence correction if configured
+        coherence_feedback.set_algebraic(
+            config.gating.enable_algebraic_correction,
+            config.gating.algebraic_correction_strength,
         );
         let sampling_rng = config.sampling_seed.map(StdRng::seed_from_u64);
 
@@ -317,6 +327,8 @@ impl BrocaGenerator {
         let mut gating_trace = Vec::new();
         let mut consecutive_low_coherence = 0usize;
         let mut hallucination_flag = false;
+        // Phase 4: Soft veto snapshot — saved at each high-coherence step
+        let mut good_snapshot: Option<NetworkSnapshot> = None;
 
         for pos in 0..max_tokens {
             // Forward step
@@ -402,6 +414,9 @@ impl BrocaGenerator {
                 let coherence = self.coherence_feedback.coherence();
                 coherence_dynamics.push(coherence);
 
+                // Phase 3: Feed coherence to controller for adaptive dt
+                self.controller.set_coherence_feedback(coherence);
+
                 // Hallucination detection: track consecutive low-coherence tokens
                 if coherence < 0.05 {
                     consecutive_low_coherence += 1;
@@ -412,8 +427,16 @@ impl BrocaGenerator {
                     consecutive_low_coherence = 0;
                 }
 
-                if binding_weight > 1.0 + 1e-6 {
+                // Phase 2: Algebraic coherence correction vs scalar scaling
+                if self.coherence_feedback.is_algebraic() {
+                    thought_hv = self.coherence_feedback.algebraic_correct(&output_hv, &thought_hv);
+                } else if binding_weight > 1.0 + 1e-6 {
                     thought_hv = thought_hv.scale(binding_weight);
+                }
+
+                // Phase 4: Save snapshot at high-coherence steps for soft veto
+                if self.config.gating.enable_soft_veto && coherence >= self.config.gating.coherence_drift_threshold {
+                    good_snapshot = Some(self.controller.save_state());
                 }
 
                 // Semantic veto: mid-sentence self-correction
@@ -433,15 +456,29 @@ impl BrocaGenerator {
                     tokens_since_veto = 0;
                     text_bytes.extend_from_slice(self.config.veto_hesitation.as_bytes());
                     on_token(&self.config.veto_hesitation);
-                    // Reset network state
-                    self.controller.reset();
-                    // Re-inject thought context: do a forward step with <thought> token
-                    // so the CfC network recovers the thought context before continuing
-                    let _ = self.controller.forward_step(
-                        &thought_hv_original,
-                        self.tokenizer.thought_id,
-                        0,
-                    );
+
+                    // Phase 4: Soft veto — partial restore instead of hard reset
+                    if self.config.gating.enable_soft_veto {
+                        if let Some(ref snapshot) = good_snapshot {
+                            self.controller.restore_partial(snapshot, self.config.gating.veto_rewind_alpha);
+                        } else {
+                            // No snapshot saved yet — fall back to hard reset
+                            self.controller.reset();
+                            let _ = self.controller.forward_step(
+                                &thought_hv_original,
+                                self.tokenizer.thought_id,
+                                0,
+                            );
+                        }
+                    } else {
+                        // Original hard veto: full reset + re-inject
+                        self.controller.reset();
+                        let _ = self.controller.forward_step(
+                            &thought_hv_original,
+                            self.tokenizer.thought_id,
+                            0,
+                        );
+                    }
                     // Restore thought_hv from original (undo any drift scaling)
                     thought_hv = thought_hv_original.clone();
                 }

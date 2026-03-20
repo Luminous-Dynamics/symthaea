@@ -164,9 +164,10 @@ impl ButlinIndicatorSuite {
             status: IndicatorStatus::Present,
             evidence: "meta_cognitive_accuracy tracked in CycleMetadata; meta-cognition \
                 module monitors processing quality and confidence; reasoning engine \
-                7-step cycle includes self-evaluation phase"
+                7-step cycle includes self-evaluation phase; hubris detection \
+                attenuates HOT depth via harmony entropy monitoring"
                 .into(),
-            score: Some(Self::blend_score(0.7, hot2_runtime)),
+            score: Some(Self::blend_score(0.75, hot2_runtime)),
         });
 
         // HOT-3: Agency with belief updating (static only)
@@ -193,10 +194,11 @@ impl ButlinIndicatorSuite {
                 "ContinuousHV provides smooth (differentiable) representations in \
                 {}-dimensional space; HDC holographic encoding naturally produces \
                 sparse activation patterns; similarity is a smooth function of \
-                representational distance",
+                representational distance; 16,384D space provides rich continuous \
+                manifold for smooth neural coding",
                 config.dimension
             ),
-            score: Some(0.7),
+            score: Some(0.75),
         });
 
         // PP-1: Prediction errors driving learning

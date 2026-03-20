@@ -2038,6 +2038,239 @@ impl CodingAgent {
         code.to_string()
     }
 
+    /// Post-generation sanitizer: fixes two systematic code generation bugs.
+    ///
+    /// 1. **`fn main()` stripping**: When the code generator wraps library code in
+    ///    `fn main() { ... }`, extract the inner content. Library crates compiled
+    ///    via `cargo check` fail with E0601 if they contain a `main` function.
+    ///
+    /// 2. **Generic parameter declaration**: When code uses type parameter `T` in
+    ///    struct fields/function bodies but forgets to declare `<T>` on the item
+    ///    signature, the compiler emits E0412. Detects and inserts `<T>` declarations.
+    fn sanitize_generated_code(code: &str) -> String {
+        let mut result = code.to_string();
+
+        // ── 1. Strip fn main() wrapper ──────────────────────────────────────
+        // Match: fn main() { <body> } where <body> contains struct/fn/impl/pub items
+        result = Self::strip_main_wrapper(&result);
+
+        // ── 2. Fix undeclared generic type parameters ───────────────────────
+        result = Self::fix_undeclared_generics(&result);
+
+        result
+    }
+
+    /// Strip `fn main() { ... }` wrapper if the body contains library items.
+    ///
+    /// Only strips when the main function wraps struct/fn/impl/enum/trait/pub
+    /// definitions — if the code genuinely needs main (e.g., a binary), leave it.
+    fn strip_main_wrapper(code: &str) -> String {
+        let trimmed = code.trim();
+
+        // Quick check: does it start with fn main()?
+        if !trimmed.starts_with("fn main()") {
+            return code.to_string();
+        }
+
+        // Find the opening brace
+        let Some(open_brace) = trimmed.find('{') else {
+            return code.to_string();
+        };
+
+        // Extract the body between the outermost braces
+        let after_brace = &trimmed[open_brace + 1..];
+        // Find matching closing brace (track nesting depth)
+        let mut depth = 1usize;
+        let mut close_pos = None;
+        for (i, ch) in after_brace.char_indices() {
+            match ch {
+                '{' => depth += 1,
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        close_pos = Some(i);
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        let Some(pos) = close_pos else {
+            return code.to_string();
+        };
+
+        let body = after_brace[..pos].trim();
+
+        // Only strip if the body contains library items (struct, fn, impl, pub, enum, trait)
+        let has_lib_items = body.contains("pub fn ")
+            || body.contains("pub struct ")
+            || body.contains("struct ")
+            || body.contains("impl ")
+            || body.contains("pub enum ")
+            || body.contains("enum ")
+            || body.contains("pub trait ")
+            || body.contains("trait ");
+
+        if has_lib_items {
+            // Dedent by one level (4 spaces or 1 tab)
+            let dedented: Vec<String> = body
+                .lines()
+                .map(|line| {
+                    if let Some(rest) = line.strip_prefix("    ") {
+                        rest.to_string()
+                    } else if let Some(rest) = line.strip_prefix('\t') {
+                        rest.to_string()
+                    } else {
+                        line.to_string()
+                    }
+                })
+                .collect();
+            dedented.join("\n")
+        } else {
+            code.to_string()
+        }
+    }
+
+    /// Fix undeclared generic type parameters (E0412).
+    ///
+    /// Scans for struct/enum/fn/impl items that use `T` in their body or field
+    /// types but don't declare `<T>` on the item signature. Inserts `<T>` where
+    /// needed.
+    fn fix_undeclared_generics(code: &str) -> String {
+        let lines: Vec<&str> = code.lines().collect();
+        let mut result: Vec<String> = Vec::with_capacity(lines.len());
+
+        for (i, line) in lines.iter().enumerate() {
+            let trimmed = line.trim();
+
+            // Check struct/enum declarations without <T> that use T in subsequent fields
+            if (trimmed.starts_with("pub struct ") || trimmed.starts_with("struct ")
+                || trimmed.starts_with("pub enum ") || trimmed.starts_with("enum "))
+                && !trimmed.contains('<')
+                && trimmed.ends_with('{')
+            {
+                // Look ahead in the body for uses of generic type T
+                if Self::body_uses_generic_t(&lines, i + 1) {
+                    // Insert <T> before the opening brace or after the name
+                    let fixed = Self::insert_generic_param_on_item(trimmed);
+                    result.push(line.replace(trimmed, &fixed));
+                    continue;
+                }
+            }
+
+            // Check fn declarations without <T> that use T in signature or body
+            if (trimmed.starts_with("pub fn ") || trimmed.starts_with("fn ")
+                || trimmed.starts_with("pub(crate) fn "))
+                && !trimmed.contains('<')
+                && Self::signature_uses_t(trimmed)
+            {
+                let fixed = Self::insert_generic_param_on_fn(trimmed);
+                result.push(line.replace(trimmed, &fixed));
+                continue;
+            }
+
+            // Check impl blocks without <T> that use T
+            if (trimmed.starts_with("impl ") || trimmed.starts_with("pub impl "))
+                && !trimmed.starts_with("impl<")
+                && Self::impl_uses_t(trimmed)
+            {
+                let fixed = trimmed.replacen("impl ", "impl<T> ", 1);
+                result.push(line.replace(trimmed, &fixed));
+                continue;
+            }
+
+            result.push((*line).to_string());
+        }
+
+        result.join("\n")
+    }
+
+    /// Check if subsequent lines (inside a struct/enum body) reference type `T`.
+    fn body_uses_generic_t(lines: &[&str], start: usize) -> bool {
+        let mut depth = 1usize;
+        for line in &lines[start..] {
+            let t = line.trim();
+            for ch in t.chars() {
+                match ch {
+                    '{' => depth += 1,
+                    '}' => {
+                        depth -= 1;
+                        if depth == 0 {
+                            return false;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            // Look for T as a type: `: T`, `<T>`, `Vec<T>`, `Option<T>`, `Box<T>`
+            if Self::line_references_type_t(t) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Check if a line references `T` as a type parameter (not part of a longer word).
+    fn line_references_type_t(line: &str) -> bool {
+        // Match T surrounded by non-alphanumeric chars (type position)
+        let bytes = line.as_bytes();
+        for (i, &b) in bytes.iter().enumerate() {
+            if b == b'T' {
+                let before_ok = i == 0 || !bytes[i - 1].is_ascii_alphanumeric();
+                let after_ok = i + 1 >= bytes.len() || !bytes[i + 1].is_ascii_alphanumeric();
+                // Must not be part of "True", "Type", "Test", etc.
+                if before_ok && after_ok {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// Check if a function signature uses `T` as a type parameter.
+    fn signature_uses_t(sig: &str) -> bool {
+        // Check parameter types and return type for standalone `T`
+        if let Some(paren_start) = sig.find('(') {
+            let rest = &sig[paren_start..];
+            if Self::line_references_type_t(rest) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Check if an impl line uses `T` (e.g., `impl Foo<T>` or `impl Trait for Bar<T>`)
+    fn impl_uses_t(line: &str) -> bool {
+        // Skip "impl " prefix and check the rest
+        let rest = line.strip_prefix("pub ").unwrap_or(line);
+        let rest = rest.strip_prefix("impl ").unwrap_or(rest);
+        Self::line_references_type_t(rest)
+    }
+
+    /// Insert `<T>` on a struct/enum declaration line.
+    /// "pub struct Foo {" → "pub struct Foo<T> {"
+    fn insert_generic_param_on_item(line: &str) -> String {
+        // Find the item name (word after struct/enum keyword) and insert <T> after it
+        if let Some(brace_pos) = line.find('{') {
+            let before_brace = line[..brace_pos].trim_end();
+            format!("{}<T> {{", before_brace)
+        } else {
+            line.to_string()
+        }
+    }
+
+    /// Insert `<T>` on a function declaration line.
+    /// "pub fn foo(x: T) -> T {" → "pub fn foo<T>(x: T) -> T {"
+    fn insert_generic_param_on_fn(line: &str) -> String {
+        // Insert <T> right before the opening parenthesis
+        if let Some(paren_pos) = line.find('(') {
+            format!("{}<T>{}", &line[..paren_pos], &line[paren_pos..])
+        } else {
+            line.to_string()
+        }
+    }
+
     /// HDC verification gate: checks generated code against codebase patterns.
     ///
     /// Returns `true` if the code passes verification (safe to write).
@@ -2090,6 +2323,7 @@ impl CodingAgent {
 
     fn write_code_to_disk(&mut self, target: &PathBuf, code: &str) {
         let code = Self::strip_code_fences(code);
+        let code = Self::sanitize_generated_code(&code);
 
         // HDC verification gate
         let (verified, surprise) = self.verify_generated_code_hdc(&code);
@@ -5845,6 +6079,139 @@ assertion `left == right` failed
             CodingAgent::strip_code_fences("  ```rust\n  fn main() {}\n  ```  "),
             "fn main() {}"
         );
+    }
+
+    // ── Sanitizer Tests ──────────────────────────────────────────────
+
+    #[test]
+    fn test_strip_main_wrapper_with_lib_items() {
+        let code = "fn main() {\n    pub fn fibonacci(n: u64) -> u64 {\n        n\n    }\n}";
+        let result = CodingAgent::strip_main_wrapper(code);
+        assert!(
+            result.contains("pub fn fibonacci"),
+            "Should extract lib items: {}",
+            result
+        );
+        assert!(
+            !result.contains("fn main()"),
+            "Should strip main wrapper: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_strip_main_wrapper_preserves_real_main() {
+        let code = "fn main() {\n    println!(\"hello\");\n}";
+        let result = CodingAgent::strip_main_wrapper(code);
+        assert!(
+            result.contains("fn main()"),
+            "Should preserve genuine main: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_strip_main_wrapper_with_struct() {
+        let code = "fn main() {\n    struct Node {\n        val: i32,\n    }\n    impl Node {\n        fn new(v: i32) -> Self { Node { val: v } }\n    }\n}";
+        let result = CodingAgent::strip_main_wrapper(code);
+        assert!(
+            result.contains("struct Node"),
+            "Should extract struct: {}",
+            result
+        );
+        assert!(
+            !result.contains("fn main()"),
+            "Should strip main: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_strip_main_wrapper_no_main() {
+        let code = "pub fn foo() -> i32 { 42 }";
+        let result = CodingAgent::strip_main_wrapper(code);
+        assert_eq!(result, code, "Should leave non-main code unchanged");
+    }
+
+    #[test]
+    fn test_fix_undeclared_generics_struct() {
+        let code = "pub struct Stack {\n    items: Vec<T>,\n}\n";
+        let result = CodingAgent::fix_undeclared_generics(code);
+        assert!(
+            result.contains("pub struct Stack<T>"),
+            "Should add <T> to struct: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_fix_undeclared_generics_fn() {
+        let code = "pub fn identity(x: T) -> T {\n    x\n}\n";
+        let result = CodingAgent::fix_undeclared_generics(code);
+        assert!(
+            result.contains("pub fn identity<T>(x: T)"),
+            "Should add <T> to fn: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_fix_undeclared_generics_already_declared() {
+        let code = "pub struct Stack<T> {\n    items: Vec<T>,\n}\n";
+        let result = CodingAgent::fix_undeclared_generics(code);
+        assert_eq!(result, code.trim_end_matches('\n'), "Should not double-declare <T>");
+    }
+
+    #[test]
+    fn test_fix_undeclared_generics_impl() {
+        let code = "impl Stack<T> {\n    fn push(&mut self, item: T) {}\n}\n";
+        let result = CodingAgent::fix_undeclared_generics(code);
+        assert!(
+            result.contains("impl<T> Stack<T>"),
+            "Should add impl<T>: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_fix_undeclared_generics_no_false_positive() {
+        // "True", "Test", "Type" should NOT be detected as generic T
+        let code = "pub struct Config {\n    test_mode: bool,\n    type_name: String,\n}\n";
+        let result = CodingAgent::fix_undeclared_generics(code);
+        assert!(
+            !result.contains("<T>"),
+            "Should not add <T> for words containing T: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_sanitize_full_pipeline() {
+        // fn main() wrapping a generic struct — both bugs at once
+        let code = "fn main() {\n    struct BTree {\n        value: T,\n        children: Vec<BTree>,\n    }\n}";
+        let result = CodingAgent::sanitize_generated_code(code);
+        assert!(
+            !result.contains("fn main()"),
+            "Should strip main: {}",
+            result
+        );
+        assert!(
+            result.contains("struct BTree<T>"),
+            "Should add <T>: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_line_references_type_t() {
+        assert!(CodingAgent::line_references_type_t("value: T,"));
+        assert!(CodingAgent::line_references_type_t("Vec<T>"));
+        assert!(CodingAgent::line_references_type_t("x: T"));
+        assert!(CodingAgent::line_references_type_t("T"));
+        assert!(!CodingAgent::line_references_type_t("Test"));
+        assert!(!CodingAgent::line_references_type_t("True"));
+        assert!(!CodingAgent::line_references_type_t("Type"));
+        assert!(!CodingAgent::line_references_type_t("let total = 0;"));
     }
 
     // ── Plan Evaluation Tests ────────────────────────────────────────

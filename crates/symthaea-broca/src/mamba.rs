@@ -154,6 +154,15 @@ pub trait MambaBackend: Send {
     /// `b_scale` modulates the input matrix B (input sensitivity).
     /// Both default to 1.0 (no modulation). Consumed after each forward pass.
     fn set_cfc_modulation(&mut self, _delta_scale: f32, _b_scale: f32) {}
+
+    /// Set per-layer delta modulation conditioned on HDC coherence (Phase 5).
+    ///
+    /// Each entry in `modulation` scales the Δ (step-size) for the corresponding
+    /// Mamba layer. Early layers (syntax) get stronger modulation, later layers
+    /// (semantics) get less. Length must equal `n_layer()`.
+    ///
+    /// Default: no-op (all layers use the global delta_scale).
+    fn set_per_layer_delta_modulation(&mut self, _modulation: &[f32]) {}
 }
 
 /// Wrapper around candle-transformers' Mamba model with Symthaea integration.

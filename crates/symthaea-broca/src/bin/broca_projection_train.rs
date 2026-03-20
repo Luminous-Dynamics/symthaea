@@ -83,6 +83,8 @@ fn main() {
         lora_lr: opts.lora_lr,
         embedding_stats_path: opts.embedding_stats.clone(),
         e2e_grad_chunks: opts.e2e_grad_chunks,
+        orthogonality_weight: opts.orthogonality_weight,
+        orthogonality_samples: opts.orthogonality_samples,
         gating_config,
         temperature: opts.temperature.unwrap_or(0.8),
         top_k: opts.top_k.unwrap_or(40),
@@ -645,6 +647,8 @@ struct ProjectionTrainOpts {
     lora_lr: f32,
     embedding_stats: Option<String>,
     e2e_grad_chunks: usize,
+    orthogonality_weight: f32,
+    orthogonality_samples: usize,
     // ─── Gate + sampling overrides ───
     hedging_boost: Option<f32>,
     temperature: Option<f32>,
@@ -693,6 +697,8 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
         lora_lr: 0.0001,
         embedding_stats: None,
         e2e_grad_chunks: 1,
+        orthogonality_weight: 0.0,
+        orthogonality_samples: 64,
         hedging_boost: None,
         temperature: None,
         top_k: None,
@@ -961,6 +967,22 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
                     .ok_or("--patience requires a number")?
                     .parse()
                     .map_err(|_| "--patience must be a non-negative integer")?;
+            }
+            "--orthogonality" | "--orth-weight" => {
+                i += 1;
+                opts.orthogonality_weight = args
+                    .get(i)
+                    .ok_or("--orthogonality requires a number")?
+                    .parse()
+                    .map_err(|_| "--orthogonality must be a float")?;
+            }
+            "--orth-samples" => {
+                i += 1;
+                opts.orthogonality_samples = args
+                    .get(i)
+                    .ok_or("--orth-samples requires a number")?
+                    .parse()
+                    .map_err(|_| "--orth-samples must be a positive integer")?;
             }
             "--help" | "-h" => {
                 print_usage();

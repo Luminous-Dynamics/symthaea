@@ -7,6 +7,7 @@ plugins {
 android {
     namespace = "io.symthaea.soma.demo"
     compileSdk = 34
+    buildToolsVersion = "36.1.0"  // Match Nix-provided SDK
 
     defaultConfig {
         applicationId = "io.symthaea.soma.demo"

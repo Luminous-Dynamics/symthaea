@@ -2870,6 +2870,165 @@ pub const MOTOR_PHI_CONFIRMATION_BONUS: f64 = 0.2;
 pub const MOTOR_PHI_DESTRUCTIVE_BONUS: f64 = 0.3;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// DRIVE MANAGER — BOREDOM, FLOW & CURIOSITY DYNAMICS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Boredom increment per low-error cycle (linear ramp to MAX_BOREDOM).
+/// Basis: Berlyne (1960) — arousal potential theory; monotony → exploration drive.
+pub const DRIVE_BOREDOM_INCREMENT: f32 = 0.03;
+
+/// Boredom level that triggers exploration boost.
+/// Basis: Berlyne (1960) — above this, boredom generates exploration urge.
+pub const DRIVE_BOREDOM_EXPLORATION_THRESHOLD: f32 = 0.3;
+
+/// Boredom→exploration coupling scale.
+pub const DRIVE_BOREDOM_EXPLORATION_SCALE: f64 = 0.1;
+
+/// Minimum arousal for flow state (below this, system is disengaged).
+/// Basis: Csikszentmihalyi (1990) — flow requires optimal arousal.
+pub const DRIVE_FLOW_AROUSAL_MIN: f32 = 0.3;
+
+/// Maximum arousal for flow state (above this, system is over-stimulated).
+pub const DRIVE_FLOW_AROUSAL_MAX: f32 = 0.8;
+
+/// Flow→learning rate boost scale.
+/// Basis: Csikszentmihalyi (1990) — peak plasticity during flow.
+pub const DRIVE_FLOW_LR_BOOST: f64 = 0.1;
+
+/// Flow→exploration dampening scale.
+pub const DRIVE_FLOW_EXPLORATION_DAMPEN: f64 = 0.05;
+
+/// Flow→confidence boost scale.
+pub const DRIVE_FLOW_CONFIDENCE_BOOST: f64 = 0.01;
+
+/// Boredom reset factor when entering flow.
+pub const DRIVE_FLOW_BOREDOM_RESET: f32 = 0.5;
+
+/// Surprise→exploration coupling scale (positive PE excess drives exploration).
+/// Basis: Yerkes-Dodson (1908) — moderate arousal optimal for exploration.
+pub const DRIVE_SURPRISE_EXPLORATION_SCALE: f64 = 0.15;
+
+/// Surprise→arousal coupling scale.
+pub const DRIVE_SURPRISE_AROUSAL_SCALE: f32 = 0.05;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PERCEPTION MANAGER — ATTENTION BUDGET & COHERENCE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// EMA decay for attention budget utilization tracking.
+pub const PERCEPTION_BUDGET_EMA_DECAY: f32 = 0.8;
+
+/// EMA weight for new budget utilization data (1 - decay).
+pub const PERCEPTION_BUDGET_EMA_NEW: f32 = 0.2;
+
+/// Exploration reduction when attention budget consistently exceeded.
+pub const PERCEPTION_BUDGET_EXPLORATION_DAMPEN: f64 = 0.02;
+
+/// LR dampen factor when budget utilization exceeds warning threshold.
+pub const PERCEPTION_BUDGET_LR_DAMPEN: f64 = 0.95;
+
+/// Coherence→confidence boost coupling scale.
+/// Basis: Friston (2010) — precision-weighted prediction error.
+pub const PERCEPTION_COHERENCE_CONFIDENCE_SCALE: f64 = 0.015;
+
+/// Low coherence→exploration boost coupling scale.
+pub const PERCEPTION_COHERENCE_EXPLORATION_SCALE: f64 = 0.02;
+
+/// Arousal correction gain (Yerkes-Dodson homeostasis).
+/// Basis: Yerkes & Dodson (1908) — inverted-U performance curve.
+pub const PERCEPTION_AROUSAL_CORRECTION_GAIN: f32 = 0.03;
+
+/// Vigilance mode attention amplification factor.
+pub const PERCEPTION_VIGILANCE_AMPLIFY: f32 = 1.2;
+
+/// Vigilance exit attention recovery factor.
+pub const PERCEPTION_VIGILANCE_RECOVERY: f32 = 0.9;
+
+/// Phenomenal binding→confidence modulation scale.
+/// Basis: Treisman & Gelade (1980) — feature integration theory.
+pub const PERCEPTION_BINDING_CONFIDENCE_SCALE: f64 = 0.01;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LEARNING MANAGER — PLASTICITY & CONSOLIDATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Surprise threshold above which plasticity increases.
+/// Basis: BCM metaplasticity (Bienenstock, Cooper & Munro 1982).
+pub const LEARNING_PLASTICITY_HIGH_SURPRISE: f32 = 0.3;
+
+/// Surprise threshold below which plasticity decreases.
+pub const LEARNING_PLASTICITY_LOW_SURPRISE: f32 = 0.1;
+
+/// LR modulation floor (minimum learning rate multiplier from plasticity).
+pub const LEARNING_LR_FLOOR: f64 = 0.8;
+
+/// Plasticity→LR scaling range (plasticity [0.1,0.95] maps to [floor, floor+scale]).
+pub const LEARNING_LR_PLASTICITY_SCALE: f64 = 0.4;
+
+/// Exploration suppression during dream consolidation.
+/// Basis: Walker & Stickgold (2006) — sleep consolidation suppresses external seeking.
+pub const LEARNING_DREAM_EXPLORATION_DAMPEN: f64 = 0.03;
+
+/// LR boost during dream consolidation phase.
+/// Basis: Walker & Stickgold (2006) — enhanced synaptic consolidation.
+pub const LEARNING_DREAM_LR_BOOST: f64 = 1.1;
+
+/// Error trend→exploration coupling scale.
+/// Basis: Friston (2010) — increasing prediction error drives active inference.
+pub const LEARNING_ERROR_TREND_EXPLORATION: f64 = 0.1;
+
+/// Error trend→LR boost (increasing errors need faster adaptation).
+pub const LEARNING_ERROR_TREND_LR_BOOST: f64 = 1.05;
+
+/// Error trend→confidence coupling on decreasing errors.
+pub const LEARNING_ERROR_TREND_CONFIDENCE: f64 = 0.01;
+
+/// Dissipative health threshold for learning dampening.
+pub const LEARNING_DISSIPATIVE_HEALTH_THRESHOLD: f64 = 0.5;
+
+/// Dissipative health→LR dampening sensitivity.
+pub const LEARNING_DISSIPATIVE_HEALTH_SENSITIVITY: f64 = 0.4;
+
+/// Somatic stress threshold for plasticity dampening.
+pub const LEARNING_SOMATIC_STRESS_THRESHOLD: f64 = 0.5;
+
+/// Somatic stress→LR dampening sensitivity.
+pub const LEARNING_SOMATIC_STRESS_SENSITIVITY: f64 = 0.2;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MEMORY PHASE — CODEBOOK & RESONATOR DYNAMICS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Co-prime cadence for high-Phi episode→codebook promotion.
+/// Basis: Dehaene (2014) — conscious access creates durable representations.
+pub const MEMORY_HIGH_PHI_PROMOTION_CADENCE: usize = 97;
+
+/// Codebook diversity computation amortization interval (cycles).
+/// Basis: Kohonen (1982) — periodic reorganization of self-organizing maps.
+pub const MEMORY_CODEBOOK_DIVERSITY_INTERVAL: usize = 50;
+
+/// Codebook utilization rate update interval (cycles).
+pub const MEMORY_CODEBOOK_UTILIZATION_INTERVAL: usize = 50;
+
+/// Codebook utilization EMA decay.
+pub const MEMORY_CODEBOOK_UTIL_EMA_DECAY: f32 = 0.8;
+
+/// Codebook utilization EMA new-data weight.
+pub const MEMORY_CODEBOOK_UTIL_EMA_NEW: f32 = 0.2;
+
+/// Novelty threshold increase rate when codebook utilization is low.
+pub const MEMORY_NOVELTY_THRESHOLD_INCREASE: f32 = 0.02;
+
+/// Novelty threshold decrease rate when codebook utilization is high.
+pub const MEMORY_NOVELTY_THRESHOLD_DECREASE: f32 = 0.01;
+
+/// Low utilization trigger (below this, increase novelty threshold).
+pub const MEMORY_CODEBOOK_LOW_UTILIZATION: f32 = 0.2;
+
+/// High utilization trigger (above this, decrease novelty threshold).
+pub const MEMORY_CODEBOOK_HIGH_UTILIZATION: f32 = 0.6;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // GLYPH CODEX — SYMBOLIC CONSCIOUSNESS COUPLING
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -4764,6 +4923,227 @@ pub const DEFENSE_PEER_QUARANTINE_THRESHOLD: f32 = 0.7;
 pub const DEFENSE_REPUTATION_SLASH_FACTOR: f32 = 0.5;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// NEUROEVOLUTION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Bits encoding tau_base in the neural genome.
+/// Hasani et al. (2021) — LTC time constant is the primary evolutionary target.
+pub const NEUROEVO_TAU_BASE_BITS: usize = 16;
+
+/// Maximum CfC network layers in the evolved topology.
+pub const NEUROEVO_MAX_LAYERS: usize = 5;
+
+/// Maximum neurons per layer in evolved topology.
+pub const NEUROEVO_MAX_NEURONS_PER_LAYER: usize = 32;
+
+/// FEP hidden state dimension (projected from 16,384D via strided sampling).
+/// Friston (2010) — 32D sufficient for belief state dynamics.
+pub const NEUROEVO_FEP_STATE_DIM: usize = 32;
+
+/// Maximum organism age before death eligibility.
+pub const NEUROEVO_MAX_AGE_CYCLES: u32 = 500;
+
+/// Floor for fitness to prevent -inf domination.
+/// Stanley & Miikkulainen (2002) — capped negative fitness.
+pub const NEUROEVO_FITNESS_FLOOR: f64 = -10.0;
+
+/// Evaluation steps per organism (after warmup).
+/// Hasani et al. (2021) — 100 steps sufficient for LTC dynamics characterization.
+pub const NEUROEVO_EVAL_STEPS: usize = 100;
+
+/// Warmup steps excluded from fitness computation.
+/// LTC dynamics need ~20τ to settle.
+pub const NEUROEVO_WARMUP_STEPS: usize = 20;
+
+/// Default free energy fitness weight.
+/// Friston (2010) — free energy as primary fitness signal.
+pub const NEUROEVO_FE_FITNESS_WEIGHT: f64 = 0.3;
+
+/// Default Phi fitness weight.
+/// Tononi (2004) — information integration as consciousness measure.
+pub const NEUROEVO_PHI_FITNESS_WEIGHT: f64 = 0.3;
+
+/// Default population size.
+/// Stanley & Miikkulainen (2002) — 50 balances diversity vs compute.
+pub const NEUROEVO_POPULATION_SIZE: usize = 50;
+
+/// Default tournament selection size.
+/// Goldberg & Deb (1991) — 3 gives moderate selection pressure.
+pub const NEUROEVO_TOURNAMENT_SIZE: usize = 3;
+
+/// Default elitism fraction.
+/// De Jong (1975) — 10% elite preservation.
+pub const NEUROEVO_ELITISM_FRACTION: f32 = 0.1;
+
+/// Default per-bit mutation rate.
+/// Back (1993) — ~0.02 balances exploration and stability.
+pub const NEUROEVO_MUTATION_RATE: f32 = 0.02;
+
+/// Default crossover probability.
+/// Holland (1975) — 0.7 crossover rate for GA.
+pub const NEUROEVO_CROSSOVER_RATE: f32 = 0.7;
+
+/// Generations without improvement before convergence declared.
+pub const NEUROEVO_CONVERGENCE_PATIENCE: usize = 10;
+
+/// Hamming distance threshold for speciation.
+pub const NEUROEVO_SPECIATION_THRESHOLD: f32 = 0.15;
+
+/// Manager trigger interval (co-prime with other managers).
+pub const NEUROEVO_MANAGER_INTERVAL: usize = 71;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MEMORY MANAGER — Consolidation, retrieval, Phi-weighted encoding
+// Basis: Tulving (2002) — episodic consolidation; Cowan (2001) — capacity limits
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Exploration dampening during active consolidation.
+/// Basis: Wixted (2004) — consolidation benefits from reduced interference.
+pub const MEMORY_CONSOLIDATION_EXPLORATION_DAMPEN: f64 = 0.02;
+
+/// Learning rate boost during consolidation (slight integration bonus).
+/// Basis: McClelland et al. (1995) — complementary learning systems.
+pub const MEMORY_CONSOLIDATION_LR_BOOST: f64 = 1.05;
+
+/// Weight of prediction confidence in retrieval signal blend.
+/// Basis: Cowan (2001) — confidence + coherence jointly index memory quality.
+pub const MEMORY_RETRIEVAL_CONFIDENCE_WEIGHT: f64 = 0.5;
+
+/// Weight of coherence in retrieval signal blend.
+pub const MEMORY_RETRIEVAL_COHERENCE_WEIGHT: f64 = 0.5;
+
+/// Retrieval quality threshold for confidence boost.
+/// Basis: Koriat (2000) — high-confidence retrieval signals reliable encoding.
+pub const MEMORY_RETRIEVAL_HIGH_QUALITY: f32 = 0.7;
+
+/// Confidence gain per unit of above-threshold retrieval quality.
+pub const MEMORY_RETRIEVAL_CONFIDENCE_GAIN: f64 = 0.02;
+
+/// Retrieval quality threshold below which exploration is boosted.
+pub const MEMORY_RETRIEVAL_LOW_QUALITY: f32 = 0.3;
+
+/// Exploration gain per unit of below-threshold retrieval quality.
+pub const MEMORY_RETRIEVAL_EXPLORATION_GAIN: f64 = 0.03;
+
+/// Unified Ψ threshold above which episodic consolidation is prioritized.
+/// Basis: Tononi & Cirelli (2014) — high-consciousness moments deserve priority encoding.
+pub const MEMORY_PSI_CONSOLIDATION_THRESHOLD: f64 = 0.6;
+
+/// LR scale for Ψ-driven consolidation bonus.
+pub const MEMORY_PSI_LR_SCALE: f64 = 0.1;
+
+/// Consolidation pressure threshold for exploration gating.
+/// Basis: Wixted (2004) — "digest before exploring" principle.
+pub const MEMORY_PRESSURE_EXPLORATION_THRESHOLD: f64 = 0.5;
+
+/// Exploration dampening scale per unit of excess consolidation pressure.
+pub const MEMORY_PRESSURE_EXPLORATION_DAMPEN: f64 = 0.1;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SWARM MANAGER — Peer consciousness, social buffering, collective Φ
+// Basis: Heinrichs (2003) — social support; Hatfield (1993) — emotional contagion
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Trust-scaled initial Φ for newly-joined peers.
+/// Basis: Dunbar (1998) — conservative initial assessment.
+pub const SWARM_PEER_PHI_TRUST_SCALE: f64 = 0.5;
+
+/// Arousal center for affective sync (neutral arousal baseline).
+/// Basis: Yerkes-Dodson (1908) — 0.5 as optimal midpoint.
+pub const SWARM_AFFECTIVE_AROUSAL_CENTER: f64 = 0.5;
+
+/// Per-corroboration confidence boost for shared knowledge.
+/// Basis: Surowiecki (2004) — wisdom of crowds via independent confirmation.
+pub const SWARM_CORROBORATION_BOOST: f32 = 0.05;
+
+/// Maximum corroboration confidence bonus.
+pub const SWARM_CORROBORATION_CAP: f32 = 0.3;
+
+/// Maximum confidence delta from social buffering.
+/// Basis: Heinrichs (2003) — social support has diminishing returns.
+pub const SWARM_SOCIAL_BUFFERING_CAP: f64 = 0.05;
+
+/// Collective Φ threshold above which learning rate is boosted.
+/// Basis: Woolley et al. (2010) — collective intelligence emerges above threshold.
+pub const SWARM_COLLECTIVE_PHI_THRESHOLD: f64 = 0.3;
+
+/// Scale for collective Φ → LR boost.
+pub const SWARM_COLLECTIVE_PHI_LR_SCALE: f64 = 0.2;
+
+/// Maximum LR boost from collective Φ.
+pub const SWARM_COLLECTIVE_PHI_LR_CAP: f64 = 0.1;
+
+/// Multiplier for federated boost calculation.
+/// Basis: McMahan et al. (2017) — federated rounds amplify gradient quality.
+pub const SWARM_FEDERATED_BOOST_MULTIPLIER: f64 = 2.0;
+
+/// Per-streak exploration boost from network anomaly.
+/// Basis: Aston-Jones & Cohen (2005) — unexpected events trigger exploration.
+pub const SWARM_ANOMALY_EXPLORATION: f64 = 0.03;
+
+/// Per-streak confidence penalty from sustained anomaly.
+pub const SWARM_ANOMALY_CONFIDENCE: f64 = 0.02;
+
+/// Connectivity EMA threshold for isolation detection.
+pub const SWARM_ISOLATION_THRESHOLD: f64 = 0.2;
+
+/// Exploration boost when isolated (no connected peers).
+pub const SWARM_ISOLATION_EXPLORATION_BOOST: f64 = 0.05;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TRUST MANAGER — Violation response, anomaly detection
+// Basis: Zak (2012) — trust/oxytocin; Dunbar (1998) — social brain
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Trust slashing factor on violation (multiplied against current trust).
+/// Basis: Zak (2012) — betrayal triggers steep trust loss.
+pub const TRUST_VIOLATION_SLASH_FACTOR: f64 = 0.5;
+
+/// Maximum arousal delta from trust violations (NE cap).
+pub const TRUST_VIOLATION_AROUSAL_CAP: f32 = 0.1;
+
+/// Negative valence per violation event (betrayal penalty).
+/// Basis: Zak (2012) — cortisol-mediated aversive response.
+pub const TRUST_BETRAYAL_VALENCE_PENALTY: f32 = 0.02;
+
+/// Arousal spike from trust anomaly detection.
+pub const TRUST_ANOMALY_AROUSAL: f32 = 0.03;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SOCIAL FABRIC MANAGER — Resonance, diversity, echo-chamber detection
+// Basis: Woolley et al. (2010) — collective intelligence factor
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Resonance threshold for oxytocin-mediated valence boost.
+/// Basis: Woolley (2010) — high resonance signals productive collaboration.
+pub const SOCIAL_RESONANCE_HIGH_THRESHOLD: f64 = 0.6;
+
+/// Range denominator for normalizing resonance excess.
+pub const SOCIAL_RESONANCE_RANGE: f64 = 0.4;
+
+/// Maximum arousal from resonance drop (NE cap).
+pub const SOCIAL_RESONANCE_DROP_AROUSAL_CAP: f64 = 0.05;
+
+/// Diversity threshold for dopamine-mediated curiosity boost.
+/// Basis: Page (2007) — cognitive diversity drives innovation.
+pub const SOCIAL_DIVERSITY_THRESHOLD: f64 = 0.3;
+
+/// Echo chamber risk threshold triggering anomaly flag.
+/// Basis: Sunstein (2001) — group polarization above critical homogeneity.
+pub const SOCIAL_ECHO_CHAMBER_THRESHOLD: f64 = 0.85;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TIME MANAGER — Drift surprise, consensus stability
+// Basis: Mills (1985) — NTP; Aston-Jones & Cohen (2005) — temporal alertness
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Maximum arousal delta from drift surprise (NE cap).
+pub const TIME_DRIFT_AROUSAL_CAP: f64 = 0.05;
+
+/// Normalization divisor for drift surprise → arousal conversion.
+pub const TIME_DRIFT_SURPRISE_DIVISOR: f64 = 100.0;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -6319,5 +6699,58 @@ mod tests {
         assert!(SAFETY_ORANGE_EXPLORATION_DAMPEN < SAFETY_YELLOW_EXPLORATION_DAMPEN);
         assert!(DEFENSE_QUARANTINE_MAX_CYCLES > 0);
         assert!(DEFENSE_MAX_MORAL_SEVERITY > 0.0 && DEFENSE_MAX_MORAL_SEVERITY <= 1.0);
+
+        // Neuroevolution
+        assert!(NEUROEVO_TAU_BASE_BITS > 0 && NEUROEVO_TAU_BASE_BITS <= 32);
+        assert!(NEUROEVO_MAX_LAYERS > 0 && NEUROEVO_MAX_LAYERS <= 10);
+        assert!(NEUROEVO_MAX_NEURONS_PER_LAYER > 0);
+        assert!(NEUROEVO_FEP_STATE_DIM > 0);
+        assert!(NEUROEVO_MAX_AGE_CYCLES > 0);
+        assert!(NEUROEVO_FITNESS_FLOOR < 0.0);
+        assert!(NEUROEVO_EVAL_STEPS > 0);
+        assert!(NEUROEVO_WARMUP_STEPS > 0 && NEUROEVO_WARMUP_STEPS < NEUROEVO_EVAL_STEPS);
+        assert!(NEUROEVO_FE_FITNESS_WEIGHT > 0.0 && NEUROEVO_FE_FITNESS_WEIGHT <= 1.0);
+        assert!(NEUROEVO_PHI_FITNESS_WEIGHT > 0.0 && NEUROEVO_PHI_FITNESS_WEIGHT <= 1.0);
+        assert!(NEUROEVO_POPULATION_SIZE >= 5);
+        assert!(NEUROEVO_TOURNAMENT_SIZE >= 2 && NEUROEVO_TOURNAMENT_SIZE <= NEUROEVO_POPULATION_SIZE);
+        assert!(NEUROEVO_ELITISM_FRACTION > 0.0 && NEUROEVO_ELITISM_FRACTION < 1.0);
+        assert!(NEUROEVO_MUTATION_RATE > 0.0 && NEUROEVO_MUTATION_RATE < 1.0);
+        assert!(NEUROEVO_CROSSOVER_RATE > 0.0 && NEUROEVO_CROSSOVER_RATE <= 1.0);
+        assert!(NEUROEVO_CONVERGENCE_PATIENCE > 0);
+        assert!(NEUROEVO_SPECIATION_THRESHOLD > 0.0 && NEUROEVO_SPECIATION_THRESHOLD < 1.0);
+        assert!(NEUROEVO_MANAGER_INTERVAL > 0);
+
+        // Memory manager
+        assert!(MEMORY_CONSOLIDATION_EXPLORATION_DAMPEN > 0.0);
+        assert!(MEMORY_CONSOLIDATION_LR_BOOST >= 1.0);
+        assert!(MEMORY_RETRIEVAL_CONFIDENCE_WEIGHT + MEMORY_RETRIEVAL_COHERENCE_WEIGHT == 1.0);
+        assert!(MEMORY_RETRIEVAL_LOW_QUALITY < MEMORY_RETRIEVAL_HIGH_QUALITY);
+        assert!(MEMORY_PSI_CONSOLIDATION_THRESHOLD > 0.0 && MEMORY_PSI_CONSOLIDATION_THRESHOLD < 1.0);
+        assert!(MEMORY_PRESSURE_EXPLORATION_THRESHOLD > 0.0 && MEMORY_PRESSURE_EXPLORATION_THRESHOLD < 1.0);
+
+        // Swarm manager
+        assert!(SWARM_PEER_PHI_TRUST_SCALE > 0.0 && SWARM_PEER_PHI_TRUST_SCALE <= 1.0);
+        assert!(SWARM_CORROBORATION_BOOST > 0.0);
+        assert!(SWARM_CORROBORATION_CAP >= SWARM_CORROBORATION_BOOST);
+        assert!(SWARM_SOCIAL_BUFFERING_CAP > 0.0);
+        assert!(SWARM_COLLECTIVE_PHI_THRESHOLD > 0.0 && SWARM_COLLECTIVE_PHI_THRESHOLD < 1.0);
+        assert!(SWARM_COLLECTIVE_PHI_LR_CAP > 0.0);
+        assert!(SWARM_ISOLATION_THRESHOLD > 0.0 && SWARM_ISOLATION_THRESHOLD < 1.0);
+
+        // Trust manager
+        assert!(TRUST_VIOLATION_SLASH_FACTOR > 0.0 && TRUST_VIOLATION_SLASH_FACTOR < 1.0);
+        assert!(TRUST_VIOLATION_AROUSAL_CAP > 0.0);
+        assert!(TRUST_BETRAYAL_VALENCE_PENALTY > 0.0);
+        assert!(TRUST_ANOMALY_AROUSAL > 0.0);
+
+        // Social fabric manager
+        assert!(SOCIAL_RESONANCE_HIGH_THRESHOLD > 0.0 && SOCIAL_RESONANCE_HIGH_THRESHOLD < 1.0);
+        assert!(SOCIAL_RESONANCE_RANGE > 0.0);
+        assert!(SOCIAL_DIVERSITY_THRESHOLD > 0.0 && SOCIAL_DIVERSITY_THRESHOLD < 1.0);
+        assert!(SOCIAL_ECHO_CHAMBER_THRESHOLD > 0.0 && SOCIAL_ECHO_CHAMBER_THRESHOLD < 1.0);
+
+        // Time manager
+        assert!(TIME_DRIFT_AROUSAL_CAP > 0.0);
+        assert!(TIME_DRIFT_SURPRISE_DIVISOR > 0.0);
     }
 }

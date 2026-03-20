@@ -47,9 +47,13 @@ impl RestlessBanditBenchmark {
         let mut unconfident_correct = 0u64;
         let mut unconfident_total = 0u64;
 
-        // Higher alpha EMA tracks drift faster
-        let mut arm_ema: Vec<f64> = vec![0.5; num_arms];
-        let ema_alpha = 0.6; // High alpha = fast drift tracking
+        // Dual-horizon EMA: fast tracks drift, slow provides stability.
+        // Blending catches non-stationary shifts faster while reducing
+        // noisy overreaction (cf. Behrens et al. 2007 volatility estimation).
+        let mut arm_ema_fast: Vec<f64> = vec![0.5; num_arms];
+        let mut arm_ema_slow: Vec<f64> = vec![0.5; num_arms];
+        let ema_alpha_fast = 0.8;
+        let ema_alpha_slow = 0.45;
                              // Track last-pull time per arm (recency-aware exploration)
         let mut arm_pulls: Vec<u64> = vec![0; num_arms];
         let mut arm_last_pull: Vec<usize> = vec![0; num_arms];
@@ -76,10 +80,9 @@ impl RestlessBanditBenchmark {
                 // Phase 2: UCB with recency bonus
                 let total_pulls: u64 = arm_pulls.iter().sum();
                 let ln_total = (total_pulls as f64).ln();
-                arm_ema
-                    .iter()
-                    .enumerate()
-                    .map(|(i, &ema)| {
+                (0..num_arms)
+                    .map(|i| {
+                        let ema = 0.65 * arm_ema_fast[i] + 0.35 * arm_ema_slow[i];
                         let count_bonus = if arm_pulls[i] > 0 {
                             (2.0 * ln_total / arm_pulls[i] as f64).sqrt()
                         } else {
@@ -102,10 +105,13 @@ impl RestlessBanditBenchmark {
             arm_pulls[chosen_arm] += 1;
             arm_last_pull[chosen_arm] = trial;
 
-            // RT proxy: decision difficulty from EMA margin between best and
+            // RT proxy: decision difficulty from blended EMA margin between best and
             // second-best arm — smaller margin = harder deliberation (Daw et al., 2006).
-            let chosen_val = arm_ema[chosen_arm];
-            let best_alt = arm_ema
+            let arm_blended: Vec<f64> = (0..num_arms)
+                .map(|i| 0.65 * arm_ema_fast[i] + 0.35 * arm_ema_slow[i])
+                .collect();
+            let chosen_val = arm_blended[chosen_arm];
+            let best_alt = arm_blended
                 .iter()
                 .enumerate()
                 .filter(|(i, _)| *i != chosen_arm)
@@ -127,10 +133,10 @@ impl RestlessBanditBenchmark {
                 correct_count += 1;
             }
 
-            // Confidence = margin between chosen arm's EMA and the best alternative
+            // Confidence = margin between chosen arm's blended EMA and the best alternative
             // Large margin → agent chose a clearly dominant arm → should be more accurate
-            let chosen_ema = arm_ema[chosen_arm];
-            let best_other_ema = arm_ema
+            let chosen_ema = arm_blended[chosen_arm];
+            let best_other_ema = arm_blended
                 .iter()
                 .enumerate()
                 .filter(|(i, _)| *i != chosen_arm)
@@ -161,8 +167,11 @@ impl RestlessBanditBenchmark {
             let noise = ((rng_state % 200) as f64 - 100.0) / 500.0;
             let reward = (arm_values[chosen_arm] + noise).clamp(0.0, 1.0);
 
-            // Update EMA for chosen arm
-            arm_ema[chosen_arm] = ema_alpha * reward + (1.0 - ema_alpha) * arm_ema[chosen_arm];
+            // Update dual-horizon EMAs for chosen arm
+            arm_ema_fast[chosen_arm] =
+                ema_alpha_fast * reward + (1.0 - ema_alpha_fast) * arm_ema_fast[chosen_arm];
+            arm_ema_slow[chosen_arm] =
+                ema_alpha_slow * reward + (1.0 - ema_alpha_slow) * arm_ema_slow[chosen_arm];
 
             // FEP agent still perceives for belief-state tracking
             let mut obs_vec = vec![0.0; num_arms];

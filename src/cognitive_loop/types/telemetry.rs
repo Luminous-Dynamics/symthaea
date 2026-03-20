@@ -724,6 +724,15 @@ pub struct CycleMetadata {
     /// Evolution coordinator Phi delta from last evolution step (0.0 when off).
     pub evolution_phi_delta: f64,
 
+    /// Neuroevolution generation count (0 when off or feature disabled).
+    pub neuroevo_generation: u32,
+    /// Neuroevolution best fitness (0.0 when off).
+    pub neuroevo_best_fitness: f64,
+    /// Neuroevolution population diversity (0.0 when off).
+    pub neuroevo_diversity: f64,
+    /// Neuroevolution species count (0 when off).
+    pub neuroevo_species_count: usize,
+
     /// Total value-aligned embeddings created by semantic value embedder (0 when off).
     pub value_embeddings_created: u64,
     /// Semantic value embedder cache hit rate (0.0 when off).
@@ -1625,6 +1634,18 @@ pub struct CycleMetadata {
     #[serde(default)]
     pub sovereign_survival_alert_count: usize,
 
+    // ── Math Service Telemetry ──────────────────────────────────────────
+    /// Total math problems solved by the math service since startup.
+    #[serde(default)]
+    pub math_problems_solved: usize,
+    /// Multi-path verification rate (0.0–1.0): fraction of solved problems
+    /// that were independently verified by multiple solver paths.
+    #[serde(default)]
+    pub math_verification_rate: f64,
+    /// Average confidence across all math solutions this session (0.0–1.0).
+    #[serde(default)]
+    pub math_avg_confidence: f64,
+
     // ── FHE Collective Wisdom ─────────────────────────────────────────
     /// Total encrypted contributions made to the collective wisdom pool.
     #[serde(default)]
@@ -1638,6 +1659,20 @@ pub struct CycleMetadata {
     /// Cycles since last aggregation.
     #[serde(default)]
     pub fhe_cycles_since_aggregation: usize,
+
+    // ── Scientific Method Telemetry ──────────────────────────────────────
+    /// Number of active hypotheses in the scientific method engine (0 when disabled).
+    #[cfg(feature = "scientific_method")]
+    #[serde(default)]
+    pub scientific_hypotheses_active: usize,
+    /// Total experiments run by the scientific method engine (0 when disabled).
+    #[cfg(feature = "scientific_method")]
+    #[serde(default)]
+    pub scientific_experiments_run: usize,
+    /// Average prediction accuracy (match_score) across experiments (0.0 when disabled).
+    #[cfg(feature = "scientific_method")]
+    #[serde(default)]
+    pub scientific_avg_prediction_accuracy: f64,
 }
 
 /// Therapeutic subsystem telemetry for CycleMetadata.

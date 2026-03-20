@@ -67,7 +67,7 @@ pub mod projection;
 pub mod temporal_projection;
 
 pub use checkpoint::{AdamState, BrocaCheckpoint};
-pub use controller::{LanguageController, LanguageControllerConfig};
+pub use controller::{LanguageController, LanguageControllerConfig, NetworkSnapshot};
 pub use encoder::{ThoughtChannels, ThoughtLanguageEncoder};
 pub use evaluation::{EvalConfig, EvalResult, IntentScore};
 pub use gating::{CoherenceFeedback, EmotionalModulator, EpistemicGate, GatingConfig};
