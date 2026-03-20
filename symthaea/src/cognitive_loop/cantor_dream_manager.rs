@@ -14,7 +14,7 @@ use symthaea_core::hdc::cantor_resonator_cleanup::CantorCleanupEngine;
 ///
 /// Holds fractal broadcast, cleanup engine, and dream telemetry fields
 /// that were previously scattered across `CognitiveLoopService`.
-pub struct CantorDreamManager {
+pub(crate) struct CantorDreamManager {
     /// CRHVs created from GWT broadcasts for dream consolidation.
     /// When a thought becomes "conscious" (enters workspace and is broadcast), it gets
     /// wrapped as a Cantor Recursive Hypervector preserving multi-scale structure.

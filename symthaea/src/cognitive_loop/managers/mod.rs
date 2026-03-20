@@ -102,12 +102,17 @@ pub use fabrication_manager::{
 };
 
 #[cfg(feature = "sentinel")]
-pub use sentinel_manager::{
+pub(crate) use sentinel_manager::{
     SentinelEvent, SentinelManager, SentinelTelemetry, ThreatSignal, ThreatSignalKind,
 };
 
 #[cfg(feature = "neuroevolution")]
 pub use neuroevolution_manager::{NeuroevolutionManager, NeuroevolutionTelemetry};
+
+#[cfg(feature = "reasoning_engine")]
+pub mod reasoning_manager;
+#[cfg(feature = "reasoning_engine")]
+pub use reasoning_manager::ReasoningManager;
 
 // Sovereign Inoculation managers
 #[cfg(feature = "mesh")]

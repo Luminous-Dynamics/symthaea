@@ -216,7 +216,7 @@ impl PrimitiveTierManager {
             ContextAwareOptimizer::new(
                 crate::consciousness::primitive_evolution::EvolutionConfig::default(),
             )
-            .map_err(|e| tracing::warn!("ContextAwareOptimizer init failed: {e}"))
+            .map_err(|e| tracing::warn!(err = %e, "ContextAwareOptimizer init failed"))
             .ok()
         } else {
             None
@@ -251,7 +251,7 @@ impl PrimitiveTierManager {
             let cd = ConflictDetector::new();
             let tc = TheoryCalibrator::new();
             let hltc = HierarchicalLTC::minimal_network()
-                .map_err(|e| tracing::warn!("HierarchicalLTC init failed: {e}"))
+                .map_err(|e| tracing::warn!(err = %e, "HierarchicalLTC init failed"))
                 .ok();
             (Some(dc), Some(cd), Some(tc), hltc)
         } else {
@@ -288,7 +288,7 @@ impl PrimitiveTierManager {
                 crate::consciousness::primitive_evolution::EvolutionConfig::default(),
                 crate::consciousness::meta_reasoning::MetaReasoningConfig::default(),
             )
-            .map_err(|e| tracing::warn!("MetaCognitiveReasoner init failed: {e}"))
+            .map_err(|e| tracing::warn!(err = %e, "MetaCognitiveReasoner init failed"))
             .ok()
         } else {
             None
@@ -328,7 +328,7 @@ impl PrimitiveTierManager {
             MultiObjectiveEvolution::new(
                 crate::consciousness::primitive_evolution::EvolutionConfig::default(),
             )
-            .map_err(|e| tracing::warn!("MultiObjectiveEvolution init failed: {e}"))
+            .map_err(|e| tracing::warn!(err = %e, "MultiObjectiveEvolution init failed"))
             .ok()
         } else {
             None

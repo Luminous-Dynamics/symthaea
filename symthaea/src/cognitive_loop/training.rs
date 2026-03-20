@@ -90,7 +90,7 @@ impl AsyncTrainerHandle {
             }) {
             Ok(_) => {}
             Err(e) => {
-                tracing::error!("failed to spawn trainer thread: {e} — training will be disabled");
+                tracing::error!(err = %e, "Failed to spawn trainer thread — training will be disabled");
             }
         }
 

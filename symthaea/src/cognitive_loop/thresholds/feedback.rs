@@ -1086,3 +1086,55 @@ pub const PHYSICS_EXPLORE_THRESHOLD: f32 = 0.2;
 /// Exploration boost scale for uncharted physics domain.
 /// Basis: Schmidhuber (2010) — novelty-proportional exploration drive.
 pub const PHYSICS_EXPLORE_SCALE: f32 = 0.5;
+
+// ─── Psi → neuromodulator coupling (Arnsten 2009; Schultz 1997) ─────────────
+
+/// Psi threshold above which dopamine is released (high consciousness → reward).
+/// Basis: Schultz (1997) — DA neurons fire at reward-prediction error.
+pub const PSI_DA_THRESHOLD: f64 = 0.7;
+
+/// Dopamine production scale from psi surplus.
+/// Basis: Schultz (1997) — proportional reward signal.
+pub const PSI_DA_SCALE: f64 = 0.15;
+
+/// Maximum dopamine injection per cycle from psi coupling.
+pub const PSI_DA_CAP: f32 = 0.1;
+
+/// Psi threshold above which serotonin is released (moderate consciousness → wellbeing).
+/// Basis: Arnsten (2009) — 5-HT stabilises prefrontal function.
+pub const PSI_5HT_THRESHOLD: f64 = 0.5;
+
+/// Serotonin production scale from psi surplus.
+pub const PSI_5HT_SCALE: f64 = 0.1;
+
+/// Maximum serotonin injection per cycle from psi coupling.
+pub const PSI_5HT_CAP: f32 = 0.05;
+
+/// Psi threshold below which noradrenaline is released (low consciousness → alerting).
+/// Basis: Arnsten (2009) — NE fires under uncertainty / low arousal.
+pub const PSI_NE_THRESHOLD: f64 = 0.3;
+
+/// Noradrenaline production scale from psi deficit.
+pub const PSI_NE_SCALE: f64 = 0.12;
+
+/// Maximum noradrenaline injection per cycle from psi coupling.
+pub const PSI_NE_CAP: f32 = 0.08;
+
+// ─── Epistemic gate & scale boost ──────────────────────────────────────────
+
+/// Maximum rejection strength when epistemic gate rejects input.
+/// Basis: Friston (2010) — precision-weighted prediction error gating.
+pub const EPISTEMIC_REJECTION_CLAMP_MAX: f32 = 0.5;
+
+/// Micro-phi scale boost dampening factor for substrate bandwidth.
+/// Basis: Tononi (2004) — information integration scales with bandwidth.
+pub const MICRO_PHI_SCALE_BOOST_FACTOR: f64 = 0.5;
+
+// ─── HOT depth default ──────────────────────────────────────────────────────
+
+/// Default higher-order thought depth when metacognition is disabled.
+/// Basis: Lau & Rosenthal (2011) — moderate HOT baseline.
+pub const HOT_DEPTH_DEFAULT: f64 = 0.5;
+
+/// Default CPG sync index when CPG feature is disabled.
+pub const CPG_SYNC_DEFAULT: f64 = 0.5;

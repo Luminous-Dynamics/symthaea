@@ -118,7 +118,7 @@ pub struct ThreatPattern {
 ///
 /// Stores encoded threat patterns and provides similarity-based lookup.
 /// Bounded to prevent unbounded growth (FIFO eviction of oldest patterns).
-pub struct ThreatMemory {
+pub(crate) struct ThreatMemory {
     /// Stored threat patterns.
     patterns: VecDeque<ThreatPattern>,
     /// Maximum stored patterns (prevents unbounded memory growth).
