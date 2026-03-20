@@ -946,10 +946,10 @@ impl CognitiveLoopService {
                 let scale_boost =
                     if let Some(taus) = self.temporal_network.hierarchical_effective_taus() {
                         let mean_tau = taus.iter().sum::<f32>() / taus.len().max(1) as f32;
-                        if mean_tau > 0.0 {
+                        if mean_tau > 0.0 && mean_tau.is_finite() {
                             let var = taus.iter().map(|t| (t - mean_tau).powi(2)).sum::<f32>()
                                 / taus.len().max(1) as f32;
-                            let cv = var.sqrt() / mean_tau;
+                            let cv = if var.is_finite() { var.sqrt() / mean_tau } else { 0.0 };
                             // CV for default taus [0.01,0.1,1.0,10.0] ~ 1.7
                             // Map to 0-15% boost via sigmoid
                             (0.15 * (1.0 / (1.0 + (-2.0 * (cv - 1.0)).exp()))) as f64
@@ -1257,15 +1257,20 @@ impl CognitiveLoopService {
             moral_confidence,
             mcts_confidence,
         ];
+        // Guard: NaN in any signal would propagate through mean/variance/sqrt
+        let all_finite = signals.iter().all(|s| s.is_finite());
         let mean_signal: f32 = signals.iter().sum::<f32>() / signals.len() as f32;
         let variance: f32 = signals
             .iter()
             .map(|s| (s - mean_signal).powi(2))
             .sum::<f32>()
             / signals.len() as f32;
-        let cross_module_agreement: f32 = (1.0_f32
-            - (variance * CROSS_MODULE_VARIANCE_AMPLIFICATION as f32).sqrt())
-        .clamp(0.0, 1.0);
+        let cross_module_agreement: f32 = if all_finite {
+            (1.0_f32 - (variance * CROSS_MODULE_VARIANCE_AMPLIFICATION as f32).sqrt())
+                .clamp(0.0, 1.0)
+        } else {
+            0.5 // neutral agreement on non-finite input
+        };
         if cross_module_agreement > CROSS_MODULE_AGREEMENT_HIGH {
             self.adjust_confidence(
                 "cross_mod_agree",

@@ -574,7 +574,7 @@ impl CognitiveSubsystem for CpgManager {
 
         // Critical desync during active motor → arousal boost + flag
         if desync_alert {
-            output.arousal_delta = 0.1;
+            output.arousal_delta = crate::cognitive_loop::thresholds::CPG_DESYNC_AROUSAL_DELTA;
             output.flags |= crate::cognitive_loop::subsystem_trait::output_flags::ANOMALY_DETECTED;
         }
 

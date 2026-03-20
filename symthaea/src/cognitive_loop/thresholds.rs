@@ -4314,6 +4314,10 @@ pub const CPG_DESYNC_EXPLORATION_BOOST: f32 = 0.02;
 /// CPG subsystem firing interval (co-prime with 7, 11, 13, 19, 29, 37, 41, 53).
 pub const CPG_INTERVAL: u32 = 59;
 
+/// Arousal delta during critical motor desynchronization alert.
+/// Basis: Grillner (2006) — desync during locomotion triggers corrective arousal.
+pub const CPG_DESYNC_AROUSAL_DELTA: f32 = 0.1;
+
 // ── Complex CfC Neuron (Phase 3) ────────────────────────────────────────────
 
 /// Minimum real part of eigenvalues (stability bound — must be negative).
@@ -4370,6 +4374,18 @@ pub const SPECTRAL_PAC_THRESHOLD: f32 = 0.3;
 
 /// Confidence boost when theta-gamma PAC exceeds threshold.
 pub const SPECTRAL_PAC_CONFIDENCE_BOOST: f32 = 0.015;
+
+/// Relative gamma power threshold for consciousness boost.
+/// Basis: Engel & Singer (2001) — gamma binding indicates active integration.
+pub const SPECTRAL_GAMMA_THRESHOLD: f64 = 0.3;
+
+/// Arousal delta during delta-band dominance (calming toward rest).
+/// Basis: Buzsaki (2006) — delta dominance signals deep consolidation.
+pub const SPECTRAL_DELTA_AROUSAL_DELTA: f32 = -0.05;
+
+/// Spectral entropy threshold above which exploration is boosted.
+/// Basis: Buzsaki (2006) — high entropy = rich broadband = diverse content.
+pub const SPECTRAL_ENTROPY_THRESHOLD: f64 = 3.0;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // REASONING ENGINE → CONSCIOUSNESS FEEDBACK
@@ -5142,6 +5158,31 @@ pub const TIME_DRIFT_AROUSAL_CAP: f64 = 0.05;
 
 /// Normalization divisor for drift surprise → arousal conversion.
 pub const TIME_DRIFT_SURPRISE_DIVISOR: f64 = 100.0;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SENTINEL MANAGER — Threat detection, vigilance, immune response
+// Basis: Aston-Jones & Cohen (2005) — LC-NE vigilance; immune system analogy
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Arousal scaling for low-level threat (proportional vigilance).
+/// Basis: Aston-Jones & Cohen (2005) — LC-NE governs arousal/vigilance.
+pub const SENTINEL_AROUSAL_SCALE_NORMAL: f32 = 0.05;
+
+/// Threat level threshold for moderate response (exploration dampening).
+pub const SENTINEL_THREAT_MODERATE: f32 = 0.3;
+
+/// Exploration dampening scale per unit of threat level.
+pub const SENTINEL_EXPLORATION_DAMPEN_SCALE: f64 = 0.1;
+
+/// Arousal scaling for moderate threat (heightened vigilance).
+pub const SENTINEL_AROUSAL_SCALE_HEIGHTENED: f32 = 0.08;
+
+/// Threat level threshold for critical response (confidence reduction).
+pub const SENTINEL_THREAT_CRITICAL: f32 = 0.6;
+
+/// Confidence dampening scale per unit of critical threat level.
+/// Basis: epistemic caution under significant threat.
+pub const SENTINEL_CONFIDENCE_DAMPEN_SCALE: f64 = 0.05;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
@@ -6759,5 +6800,21 @@ mod tests {
         // Time manager
         assert!(TIME_DRIFT_AROUSAL_CAP > 0.0);
         assert!(TIME_DRIFT_SURPRISE_DIVISOR > 0.0);
+
+        // Sentinel manager
+        assert!(SENTINEL_AROUSAL_SCALE_NORMAL > 0.0);
+        assert!(SENTINEL_AROUSAL_SCALE_HEIGHTENED > SENTINEL_AROUSAL_SCALE_NORMAL);
+        assert!(SENTINEL_THREAT_MODERATE > 0.0 && SENTINEL_THREAT_MODERATE < 1.0);
+        assert!(SENTINEL_THREAT_CRITICAL > SENTINEL_THREAT_MODERATE);
+        assert!(SENTINEL_EXPLORATION_DAMPEN_SCALE > 0.0);
+        assert!(SENTINEL_CONFIDENCE_DAMPEN_SCALE > 0.0);
+
+        // Spectral manager (additional)
+        assert!(SPECTRAL_GAMMA_THRESHOLD > 0.0 && SPECTRAL_GAMMA_THRESHOLD < 1.0);
+        assert!(SPECTRAL_DELTA_AROUSAL_DELTA < 0.0); // calming
+        assert!(SPECTRAL_ENTROPY_THRESHOLD > 0.0);
+
+        // CPG manager (additional)
+        assert!(CPG_DESYNC_AROUSAL_DELTA > 0.0);
     }
 }

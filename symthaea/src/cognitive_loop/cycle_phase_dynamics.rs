@@ -1080,7 +1080,11 @@ impl CognitiveLoopService {
         let post_pull_valence = self.emotion_contagion.valence;
         let pre_dist = pre_pull_valence.abs().max(0.01);
         let post_dist = post_pull_valence.abs();
-        let cycle_efficiency = post_dist / pre_dist;
+        let cycle_efficiency = if pre_dist.is_finite() && post_dist.is_finite() {
+            post_dist / pre_dist
+        } else {
+            1.0 // neutral efficiency on NaN input
+        };
         // EMA smooth (alpha=0.2), clamped to [0.5, 1.5] to prevent unbounded drift.
         // Session 15 Item 6: Clamp homeostasis efficiency.
         // Science: Cannon (1929) — regulation has bounded operating range.
@@ -3301,7 +3305,8 @@ impl CognitiveLoopService {
                     / n;
                 mean_var += var;
             }
-            let aleatoric = (mean_var / dim as f32).sqrt().clamp(0.0, 1.0);
+            let aleatoric_raw = mean_var / dim as f32;
+            let aleatoric = if aleatoric_raw.is_finite() { aleatoric_raw.sqrt().clamp(0.0, 1.0) } else { 0.0 };
             (epistemic, aleatoric)
         } else {
             (EPISTEMIC_UNCERTAINTY_DEFAULT, ALEATORIC_UNCERTAINTY_DEFAULT) // defaults when insufficient data
