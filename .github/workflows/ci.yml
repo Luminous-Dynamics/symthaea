@@ -822,22 +822,22 @@ jobs:
           sudo apt-get install -y pkg-config libssl-dev
 
       - name: Safety Agent (unit tests)
-        run: cargo test --lib --features "safety-agents" -- safety_agent --nocapture
+        run: cargo test --lib --features "safety-agents" -- safety::agent --nocapture
 
       - name: Safety Agent (escalation soak)
-        run: cargo test --test safety_escalation_soak --features "safety-agents" -- --nocapture
+        run: cargo test --test safety_agent_escalation_soak --features "safety-agents" -- --nocapture
 
       - name: Safety Audit Report
-        run: cargo test --test safety_audit_report --features "safety-agents,sentinel" -- --nocapture
+        run: cargo test --lib --features "safety-agents" -- safety::audit --nocapture
 
       - name: Adversarial Moral Algebra
         run: cargo test --test adversarial_moral_algebra -- --nocapture
 
       - name: Moral Algebra (unit tests)
-        run: cargo test -p symthaea-core --lib -- moral_algebra --nocapture
+        run: cargo test --lib -- hdc::moral_algebra --nocapture
 
       - name: Ethics Engine
-        run: cargo test --lib -- ethics_engine --nocapture
+        run: cargo test --lib -- cognitive_loop::ethics_engine --nocapture
 
   compliance-consciousness:
     name: Compliance (Consciousness & Substrate)

@@ -412,7 +412,7 @@ wait-timeout = "0.2"
 # libsystemd removed: systemd feature was never implemented (no cfg gates, no code using libsystemd)
 
 [features]
-default = []
+default = ["default-mind"]
 parallel = []  # Rayon parallelism in cognitive loop (gate for WASM compat)
 
 # ── Binary build gates ──────────────────────────────────────────────
