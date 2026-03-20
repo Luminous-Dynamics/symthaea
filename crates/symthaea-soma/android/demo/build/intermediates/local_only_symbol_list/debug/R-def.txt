@@ -43,6 +43,7 @@ id brocaText
 id btnCheckpoint
 id btnDream
 id btnHolon
+id btnMic
 id btnOllama
 id btnSend
 id btnSleep

@@ -99,6 +99,11 @@ use crate::cognitive_loop::thresholds::{
     PFE_SURPRISE_DAMPEN_SCALE,
     PFE_SURPRISE_HIGH_THRESHOLD,
     PFE_SURPRISE_LOW_THRESHOLD,
+    PHYSICS_EXPLOIT_SCALE,
+    // Physics exploration
+    PHYSICS_EXPLOIT_THRESHOLD,
+    PHYSICS_EXPLORE_SCALE,
+    PHYSICS_EXPLORE_THRESHOLD,
     // Self-reflection
     REFLECTION_CONFIDENCE_THRESHOLD,
     REFLECTION_EXPLORATION_DECREASE,
@@ -112,6 +117,8 @@ use crate::cognitive_loop::thresholds::{
     // Reward computation
     REWARD_GOOD_BASE,
     REWARD_GOOD_CONFIDENCE_SCALE,
+    // Reward boundary
+    REWARD_HIGH_ERROR_THRESHOLD,
     REWARD_MID_BASE,
     REWARD_MID_SCALE,
     STRATEGY_CLARIFYING_FACTOR,
@@ -123,13 +130,6 @@ use crate::cognitive_loop::thresholds::{
     // Surprise & exploration
     SURPRISE_BOREDOM_DAMPEN,
     SURPRISE_EXPLORATION_FACTOR_SCALE,
-    // Reward boundary
-    REWARD_HIGH_ERROR_THRESHOLD,
-    // Physics exploration
-    PHYSICS_EXPLOIT_THRESHOLD,
-    PHYSICS_EXPLOIT_SCALE,
-    PHYSICS_EXPLORE_THRESHOLD,
-    PHYSICS_EXPLORE_SCALE,
 };
 
 impl CognitiveLoopService {

@@ -250,6 +250,15 @@
                 android:inputType="text" />
 
             <ImageView
+                android:id="@+id/btnMic"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@android:drawable/ic_btn_speak_now"
+                android:alpha="0.5"
+                android:padding="6dp"
+                android:contentDescription="voice input" />
+
+            <ImageView
                 android:id="@+id/btnSend"
                 android:layout_width="36dp"
                 android:layout_height="36dp"

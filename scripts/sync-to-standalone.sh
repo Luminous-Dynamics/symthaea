@@ -393,6 +393,18 @@ elif $SKIP_CHECK; then
     echo
 fi
 
+# --- Format with CI toolchain -------------------------------------------------
+# CI uses dtolnay/rust-toolchain@1.93.0, so format with the same version
+# to avoid spurious diffs from different rustfmt versions.
+
+if command -v rustup >/dev/null 2>&1 && rustup run 1.93.0 rustfmt --version >/dev/null 2>&1; then
+    info "Formatting with rustfmt 1.93.0 (CI toolchain)..."
+    (cd "${STANDALONE_REPO}" && rustup run 1.93.0 cargo fmt 2>/dev/null) && ok "Formatted" || warn "cargo fmt failed (non-fatal)"
+else
+    warn "rustup 1.93.0 not available — skipping CI-toolchain format"
+fi
+echo
+
 # --- Show diff summary --------------------------------------------------------
 
 info "Changes in standalone repo:"
