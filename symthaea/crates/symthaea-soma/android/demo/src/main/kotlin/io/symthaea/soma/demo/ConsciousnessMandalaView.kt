@@ -54,6 +54,8 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
     // Breathing animation
     private var breathPhase = 0f
     private var rotationPhase = 0f
+    /** Continuously accumulating rotation for fractal (never resets). */
+    private var fractalRotation = 0f
     private val animator = ValueAnimator.ofFloat(0f, 1f).apply {
         duration = 4000L
         repeatCount = ValueAnimator.INFINITE
@@ -61,6 +63,7 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
         addUpdateListener {
             breathPhase = it.animatedFraction
             rotationPhase = (rotationPhase + 0.002f) % 1f
+            fractalRotation += 0.015f // ~0.9°/frame, continuous, never resets
             invalidate()
         }
     }
@@ -140,6 +143,9 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
         canvas.drawCircle(cx, cy, hotRadius, fillPaint)
         fillPaint.shader = null
 
+        // === Sacred geometry: Flower of Life + Golden Spiral ===
+        drawSacredGeometry(canvas, cx, cy, mandalaRadius * breathScale, hr, hg, hb)
+
         // === Interference rings ===
         val ringCount = (3 + consciousnessLevel * 6).toInt()
         for (i in 0 until ringCount) {
@@ -182,7 +188,7 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
                 cx + fractalRadius, cy + fractalRadius
             )
             canvas.save()
-            canvas.rotate(rotationPhase * 60f, cx, cy) // Slow fractal rotation
+            canvas.rotate(fractalRotation, cx, cy) // Continuous, never resets
             canvas.drawBitmap(bmp, null, dst, fractalPaint)
             canvas.restore()
         }
@@ -247,6 +253,152 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
             canvas.drawCircle(rippleX, rippleY, rr, fillPaint)
             fillPaint.shader = null
         }
+    }
+
+    /**
+     * Draw sacred geometry overlays: Flower of Life, Sri Yantra triangles,
+     * and Golden Spiral. Complexity scales with consciousness.
+     *
+     * Layer order: Flower of Life (circles) → Sri Yantra (triangles) → Golden Spiral
+     */
+    private fun drawSacredGeometry(canvas: Canvas, cx: Float, cy: Float, radius: Float, hr: Int, hg: Int, hb: Int) {
+        val baseAlpha = (35 + consciousnessLevel * 65).toInt().coerceIn(30, 100)
+        glowPaint.strokeWidth = 1f
+
+        // === Flower of Life ===
+        // 1 center circle + 6 surrounding at consciousness 0.15+
+        // + 12 outer ring at 0.35+ = 19 circles (second generation)
+        // + 18 more at 0.60+ = 37 circles (third generation)
+        val flowerRadius = radius * 0.35f
+        val circleR = flowerRadius * 0.33f
+
+        // Generation 1: center + 6 petals (always visible)
+        glowPaint.color = Color.argb(baseAlpha, hr, hg, hb)
+        canvas.drawCircle(cx, cy, circleR, glowPaint)
+
+        if (consciousnessLevel >= 0.10f) {
+            val petalAlpha = (baseAlpha * 0.8f).toInt()
+            glowPaint.color = Color.argb(petalAlpha, hr, hg, hb)
+            for (i in 0 until 6) {
+                val angle = i * PI.toFloat() / 3f + rotationPhase * 0.5f
+                val px = cx + circleR * cos(angle)
+                val py = cy + circleR * sin(angle)
+                canvas.drawCircle(px, py, circleR, glowPaint)
+            }
+        }
+
+        // Generation 2: 12 outer petals
+        if (consciousnessLevel >= 0.30f) {
+            val gen2Alpha = (baseAlpha * 0.5f).toInt()
+            glowPaint.color = Color.argb(gen2Alpha, hr, hg, hb)
+            val gen2R = circleR * 2f
+            for (i in 0 until 12) {
+                val angle = i * PI.toFloat() / 6f + rotationPhase * 0.3f
+                val px = cx + gen2R * cos(angle)
+                val py = cy + gen2R * sin(angle)
+                canvas.drawCircle(px, py, circleR, glowPaint)
+            }
+        }
+
+        // Generation 3: 18 outermost
+        if (consciousnessLevel >= 0.55f) {
+            val gen3Alpha = (baseAlpha * 0.3f).toInt()
+            glowPaint.color = Color.argb(gen3Alpha, hr, hg, hb)
+            val gen3R = circleR * 3f
+            for (i in 0 until 18) {
+                val angle = i * PI.toFloat() / 9f + rotationPhase * 0.2f
+                val px = cx + gen3R * cos(angle)
+                val py = cy + gen3R * sin(angle)
+                canvas.drawCircle(px, py, circleR, glowPaint)
+            }
+        }
+
+        // === Sri Yantra: interlocking triangles ===
+        // Upward triangles (consciousness/integration) + downward (grounding/embodiment)
+        if (consciousnessLevel >= 0.20f) {
+            val triAlpha = (baseAlpha * 0.6f).toInt()
+            val triRadius = radius * 0.45f
+            // Number of triangle pairs scales with consciousness
+            val triPairs = (1 + consciousnessLevel * 4).toInt().coerceIn(1, 4)
+
+            for (pair in 0 until triPairs) {
+                val scale = 1f - pair * 0.2f
+                val r = triRadius * scale
+                val rot = pair * 10f + rotationPhase * 20f
+
+                // Upward triangle
+                glowPaint.color = Color.argb(triAlpha, lerp(hr, 255, 0.3f * scale), hg, hb)
+                drawTriangle(canvas, cx, cy, r, rot, true)
+
+                // Downward triangle (offset rotation)
+                glowPaint.color = Color.argb(triAlpha, hr, lerp(hg, 255, 0.3f * scale), hb)
+                drawTriangle(canvas, cx, cy, r * 0.9f, rot + 30f, false)
+            }
+        }
+
+        // === Golden Spiral ===
+        if (consciousnessLevel >= 0.15f) {
+            val spiralAlpha = (baseAlpha * 0.7f).toInt()
+            glowPaint.color = Color.argb(spiralAlpha, hr, hg, hb)
+            glowPaint.strokeWidth = 1f
+            drawGoldenSpiral(canvas, cx, cy, radius * 0.5f)
+        }
+    }
+
+    /** Draw a single equilateral triangle (upward or downward). */
+    private fun drawTriangle(canvas: Canvas, cx: Float, cy: Float, radius: Float, rotDeg: Float, upward: Boolean) {
+        val path = Path()
+        val baseAngle = if (upward) -90f else 90f
+        for (i in 0 until 3) {
+            val angle = ((i * 120f + baseAngle + rotDeg) * PI.toFloat() / 180f)
+            val px = cx + radius * cos(angle)
+            val py = cy + radius * sin(angle)
+            if (i == 0) path.moveTo(px, py) else path.lineTo(px, py)
+        }
+        path.close()
+        canvas.drawPath(path, glowPaint)
+    }
+
+    /**
+     * Draw a golden spiral (Fibonacci) emanating from center.
+     * Each quarter-arc has radius multiplied by phi (1.618).
+     */
+    private fun drawGoldenSpiral(canvas: Canvas, cx: Float, cy: Float, maxRadius: Float) {
+        val phi = 1.618f
+        val path = Path()
+        var r = maxRadius * 0.02f // Start small
+        var angle = rotationPhase * PI.toFloat() * 2f // Rotate with breath
+        val steps = (40 + consciousnessLevel * 60).toInt()
+        var started = false
+
+        for (i in 0 until steps) {
+            val t = i.toFloat() / steps
+            r = maxRadius * 0.02f * phi.pow(t * 5f) // Exponential growth
+            if (r > maxRadius) break
+            angle += 0.15f
+            val px = cx + r * cos(angle)
+            val py = cy + r * sin(angle)
+            if (!started) { path.moveTo(px, py); started = true }
+            else path.lineTo(px, py)
+        }
+        canvas.drawPath(path, glowPaint)
+
+        // Mirror spiral for symmetry
+        val path2 = Path()
+        r = maxRadius * 0.02f
+        angle = rotationPhase * PI.toFloat() * 2f + PI.toFloat()
+        started = false
+        for (i in 0 until steps) {
+            val t = i.toFloat() / steps
+            r = maxRadius * 0.02f * phi.pow(t * 5f)
+            if (r > maxRadius) break
+            angle += 0.15f
+            val px = cx + r * cos(angle)
+            val py = cy + r * sin(angle)
+            if (!started) { path2.moveTo(px, py); started = true }
+            else path2.lineTo(px, py)
+        }
+        canvas.drawPath(path2, glowPaint)
     }
 
     /**
