@@ -225,7 +225,7 @@ pub fn delete_epistemic_entry(input: GetInput) -> ExternResult<bool> {
         return Ok(false);
     }
 
-    let mut entry = existing.unwrap();
+    let mut entry = existing.expect("existence verified by is_none check above");
 
     // Check if E3+ (immutable)
     if entry.metadata.classification.empirical >= 3 {

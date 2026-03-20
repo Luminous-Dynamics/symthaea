@@ -286,7 +286,7 @@ impl SlashingManager {
     pub fn report_offense(&mut self, offense: SlashableOffense, reporter: String) -> &SlashingEvent {
         let event = SlashingEvent::new(offense, reporter);
         self.pending.push(event);
-        self.pending.last().unwrap()
+        self.pending.last().expect("event just pushed above")
     }
 
     /// Add confirmation to a pending event

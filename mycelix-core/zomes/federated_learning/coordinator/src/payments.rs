@@ -258,7 +258,7 @@ pub(crate) fn compute_shapley_values_from_gradients(
         && hv_data.as_ref().map_or(false, |hvs| !hvs.is_empty());
 
     if use_real_shapley {
-        let hvs = hv_data.as_ref().unwrap();
+        let hvs = hv_data.as_ref().expect("use_real_shapley guard ensures hv_data is Some");
 
         // Build gradient_map: convert HV16 bytes to bipolar f32 for Shapley
         let mut gradient_map: std::collections::HashMap<String, Vec<f32>> =

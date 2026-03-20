@@ -4,6 +4,7 @@
 //! pools, contributions, and disbursements within the Mycelix network.
 
 use hdi::prelude::*;
+use mycelix_bridge_entry_types::{check_author_match, check_link_author_match};
 
 /// Anchor entry type for string-based link bases
 #[hdk_entry_helper]
@@ -635,11 +636,12 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             link_type, action, ..
         } => {
             let original_action = must_get_action(action.link_add_address.clone())?;
-            let original_author = original_action.action().author().clone();
-            if action.author != original_author {
-                return Ok(ValidateCallbackResult::Invalid(
-                    "Only the original author can delete this link".into(),
-                ));
+            let result = check_link_author_match(
+                original_action.action().author(),
+                &action.author,
+            );
+            if result != ValidateCallbackResult::Valid {
+                return Ok(result);
             }
             match link_type {
                 LinkTypes::AnchorToPool
@@ -664,22 +666,19 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 | OpUpdate::CapGrant { action, .. } => action,
             };
             let original = must_get_action(action.original_action_address.clone())?;
-            if *original.action().author() != action.author {
-                return Ok(ValidateCallbackResult::Invalid(
-                    "Only the original entry author can update their entries".into(),
-                ));
-            }
-            Ok(ValidateCallbackResult::Valid)
+            Ok(check_author_match(
+                original.action().author(),
+                &action.author,
+                "update",
+            ))
         }
         FlatOp::RegisterDelete(OpDelete { action, .. }) => {
             let original_action = must_get_action(action.deletes_address.clone())?;
-            let original_author = original_action.action().author().clone();
-            if action.author != original_author {
-                return Ok(ValidateCallbackResult::Invalid(
-                    "Only the original author can delete this entry".into(),
-                ));
-            }
-            Ok(ValidateCallbackResult::Valid)
+            Ok(check_author_match(
+                original_action.action().author(),
+                &action.author,
+                "delete",
+            ))
         }
     }
 }

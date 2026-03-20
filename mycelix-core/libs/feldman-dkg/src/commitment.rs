@@ -56,7 +56,7 @@ impl Commitment {
 
         let point = AffinePoint::from_bytes(&arr.into());
         if point.is_some().into() {
-            Ok(Self(point.unwrap().into()))
+            Ok(Self(point.expect("point is_some check passed but unwrap failed").into()))
         } else {
             Err(DkgError::SerializationError("Invalid curve point".into()))
         }

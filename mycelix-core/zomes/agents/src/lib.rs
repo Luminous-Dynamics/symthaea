@@ -381,7 +381,7 @@ pub fn submit_model_update(input: SubmitUpdateInput) -> ExternResult<ActionHash>
             format!("Agent not found: {}", input.agent_id)
         )));
     }
-    let agent = agent.unwrap();
+    let agent = agent.expect("agent existence verified by is_none check above");
     if !agent.active {
         return Err(wasm_error!(WasmErrorInner::Guest(
             format!("Agent is not active: {}", input.agent_id)

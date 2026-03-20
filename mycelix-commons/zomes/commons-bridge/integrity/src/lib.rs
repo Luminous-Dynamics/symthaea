@@ -10,6 +10,7 @@
 use hdi::prelude::*;
 pub use mycelix_bridge_entry_types::CachedCredentialEntry;
 use mycelix_bridge_entry_types::{
+    check_author_match, check_link_author_match,
     validate_cached_credential, validate_event_fields, validate_query_fields, BridgeEventEntry,
     BridgeQueryEntry,
 };
@@ -89,21 +90,19 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 | OpUpdate::CapGrant { action, .. } => action,
             };
             let original = must_get_action(action.original_action_address.clone())?;
-            if *original.action().author() != action.author {
-                return Ok(ValidateCallbackResult::Invalid(
-                    "Only the original entry author can update their entries".into(),
-                ));
-            }
-            Ok(ValidateCallbackResult::Valid)
+            Ok(check_author_match(
+                original.action().author(),
+                &action.author,
+                "update",
+            ))
         }
-        FlatOp::RegisterDelete(OpDelete { action }) => {
+        FlatOp::RegisterDelete(OpDelete { action, .. }) => {
             let original = must_get_action(action.deletes_address.clone())?;
-            if *original.action().author() != action.author {
-                return Ok(ValidateCallbackResult::Invalid(
-                    "Only the original entry author can delete their entries".into(),
-                ));
-            }
-            Ok(ValidateCallbackResult::Valid)
+            Ok(check_author_match(
+                original.action().author(),
+                &action.author,
+                "delete",
+            ))
         }
         _ => Ok(ValidateCallbackResult::Valid),
     }

@@ -49,7 +49,7 @@ impl ByzantineDetector {
         let mut median = vec![0.0; dim];
         for i in 0..dim {
             let mut values: Vec<f64> = all_gradients.iter().map(|g| g[i]).collect();
-            values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
             let mid = values.len() / 2;
             median[i] = if values.len() % 2 == 0 {
                 (values[mid - 1] + values[mid]) / 2.0

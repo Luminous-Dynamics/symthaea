@@ -122,7 +122,7 @@ pub fn resolve_did(did: String) -> ExternResult<Option<DIDDocument>> {
     }
 
     // 3. Get most recent DID document (last link)
-    let action_hash = links.last().unwrap().target.clone().into_action_hash()
+    let action_hash = links.last().expect("links verified non-empty above").target.clone().into_action_hash()
         .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
 
     let record = get(action_hash, GetOptions::default())?;

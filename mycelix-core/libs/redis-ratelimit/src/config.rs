@@ -156,7 +156,7 @@ impl FixedWindowConfig {
     pub fn current_window_start(&self) -> u64 {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .expect("system clock before UNIX epoch")
             .as_secs();
         (now / self.window_secs) * self.window_secs
     }

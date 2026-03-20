@@ -2,6 +2,7 @@
 //! Democratic decision-making for mutual aid circles.
 
 use hdi::prelude::*;
+use mycelix_bridge_entry_types::{check_author_match, check_link_author_match};
 use mutualaid_common::*;
 
 #[hdk_entry_types]
@@ -87,21 +88,26 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 | OpUpdate::CapGrant { action, .. } => action,
             };
             let original = must_get_action(action.original_action_address.clone())?;
-            if *original.action().author() != action.author {
-                return Ok(ValidateCallbackResult::Invalid(
-                    "Only the original entry author can update their entries".into(),
-                ));
-            }
-            Ok(ValidateCallbackResult::Valid)
+            Ok(check_author_match(
+                original.action().author(),
+                &action.author,
+                "update",
+            ))
         }
-        FlatOp::RegisterDelete(OpDelete { action }) => {
+        FlatOp::RegisterDeleteLink { action, .. } => {
+            let original_action = must_get_action(action.link_add_address.clone())?;
+            Ok(check_link_author_match(
+                original_action.action().author(),
+                &action.author,
+            ))
+        }
+        FlatOp::RegisterDelete(OpDelete { action, .. }) => {
             let original = must_get_action(action.deletes_address.clone())?;
-            if *original.action().author() != action.author {
-                return Ok(ValidateCallbackResult::Invalid(
-                    "Only the original entry author can delete their entries".into(),
-                ));
-            }
-            Ok(ValidateCallbackResult::Valid)
+            Ok(check_author_match(
+                original.action().author(),
+                &action.author,
+                "delete",
+            ))
         }
         _ => Ok(ValidateCallbackResult::Valid),
     }

@@ -272,7 +272,7 @@ impl AdaptiveClipper {
     /// Adapt the clipping threshold based on recent norms
     fn adapt_threshold(&mut self) {
         let mut sorted = self.norm_history.clone();
-        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         let idx = ((self.target_quantile * sorted.len() as f64) as usize)
             .min(sorted.len().saturating_sub(1));

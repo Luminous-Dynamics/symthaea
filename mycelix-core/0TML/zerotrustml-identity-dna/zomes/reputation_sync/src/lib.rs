@@ -216,7 +216,7 @@ pub fn get_aggregated_reputation(did: String) -> ExternResult<Option<AggregatedR
     }
 
     // Get most recent aggregated reputation
-    let action_hash = links.last().unwrap().target.clone().into_action_hash()
+    let action_hash = links.last().expect("links verified non-empty above").target.clone().into_action_hash()
         .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
 
     if let Some(record) = get(action_hash, GetOptions::default())? {

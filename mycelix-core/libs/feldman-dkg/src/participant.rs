@@ -147,7 +147,7 @@ impl Participant {
         }
 
         self.init_dealer(rng)?;
-        let deal = self.dealer.as_ref().unwrap().generate_deal();
+        let deal = self.dealer.as_ref().expect("dealer initialized by init_dealer above").generate_deal();
         self.state = ParticipantState::Dealt;
         Ok(deal)
     }

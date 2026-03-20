@@ -159,11 +159,11 @@ pub fn get_balance(holder: AgentPubKey) -> ExternResult<u64> {
         match credit.earned_from {
             EarnReason::Transfer { from, to } => {
                 // If this is a debit (from us), subtract
-                if from.is_some() && from.as_ref().unwrap() == &credit.holder {
+                if from.as_ref().map_or(false, |f| f == &credit.holder) {
                     balance -= credit.amount as i64;
                 }
                 // If this is a credit (to us), add
-                else if to.is_some() && to.as_ref().unwrap() == &credit.holder {
+                else if to.as_ref().map_or(false, |t| t == &credit.holder) {
                     balance += credit.amount as i64;
                 }
             }

@@ -150,7 +150,8 @@ impl TCDMTracker {
         if !self.states.contains_key(agent_id) {
             self.states.insert(agent_id.to_string(), TCDMState::initial());
         }
-        self.states.get_mut(agent_id).unwrap()
+        self.states.get_mut(agent_id)
+            .expect("agent_id entry just inserted above")
     }
 
     /// Get trust state for an agent (read-only)

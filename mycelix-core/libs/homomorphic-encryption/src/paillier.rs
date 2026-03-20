@@ -149,9 +149,9 @@ impl PaillierKeyPair {
 
         // Handle negative numbers (values > n/2 are negative)
         let n_half = &self.public_key.n / 2u32;
-        let n_int = self.public_key.n.to_bigint().unwrap();
+        let n_int = self.public_key.n.to_bigint().expect("BigUint always converts to BigInt");
 
-        let adjusted = if result > n_half.to_bigint().unwrap() {
+        let adjusted = if result > n_half.to_bigint().expect("BigUint always converts to BigInt") {
             &result - &n_int
         } else {
             result
@@ -176,10 +176,10 @@ impl PaillierPublicKey {
 
         // Handle negative values by adding n
         let m = if value.is_negative() {
-            let n_int = self.n.to_bigint().unwrap();
-            (value + &n_int).to_biguint().unwrap()
+            let n_int = self.n.to_bigint().expect("BigUint always converts to BigInt");
+            (value + &n_int).to_biguint().expect("negative value + n must be non-negative")
         } else {
-            value.to_biguint().unwrap()
+            value.to_biguint().expect("non-negative BigInt converts to BigUint")
         };
 
         // Generate random r ∈ Z*_n
@@ -215,7 +215,7 @@ impl PaillierPrivateKey {
         // m = L(c^λ mod n^2) * μ mod n
         let m = (&l_u * &self.mu) % &self.n;
 
-        m.to_bigint().unwrap()
+        m.to_bigint().expect("BigUint always converts to BigInt")
     }
 }
 
@@ -363,8 +363,8 @@ fn mod_pow(base: &BigUint, exp: &BigUint, modulus: &BigUint) -> BigUint {
 
 /// Extended Euclidean algorithm for modular inverse
 fn mod_inverse(a: &BigUint, modulus: &BigUint) -> Option<BigUint> {
-    let a_int = a.to_bigint().unwrap();
-    let m_int = modulus.to_bigint().unwrap();
+    let a_int = a.to_bigint().expect("BigUint always converts to BigInt");
+    let m_int = modulus.to_bigint().expect("BigUint always converts to BigInt");
 
     let (gcd, x, _) = extended_gcd(&a_int, &m_int);
 

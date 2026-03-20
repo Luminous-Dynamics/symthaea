@@ -137,7 +137,8 @@ impl MatlBridge {
         }
 
         {
-            let state = self.agent_states.get_mut(&agent_id).unwrap();
+            let state = self.agent_states.get_mut(&agent_id)
+                .expect("agent_states entry just inserted above");
             state.last_pogq_score = pogq_metrics.quality_score;
             state.contributions_count += 1;
         }
@@ -146,7 +147,8 @@ impl MatlBridge {
         let trust = self.compute_trust(&agent_id)?;
 
         // Update K-Vector from trust (needs mutable borrow)
-        let state = self.agent_states.get_mut(&agent_id).unwrap();
+        let state = self.agent_states.get_mut(&agent_id)
+            .expect("agent_states entry inserted above");
         state.k_vector.k_r = trust.total;
         state.k_vector.k_p = pogq_metrics.quality_score;
 

@@ -204,7 +204,7 @@ impl OptimizedKVectorProver {
     pub fn new() -> Self {
         Self {
             security_level: SecurityLevel::Fast, // Default to fast for throughput
-            cache: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(100).unwrap()))),
+            cache: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(100).expect("100 is non-zero")))),
             enable_caching: true,
         }
     }
@@ -213,7 +213,7 @@ impl OptimizedKVectorProver {
     pub fn with_security_level(level: SecurityLevel) -> Self {
         Self {
             security_level: level,
-            cache: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(100).unwrap()))),
+            cache: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(100).expect("100 is non-zero")))),
             enable_caching: true,
         }
     }
@@ -221,7 +221,7 @@ impl OptimizedKVectorProver {
     /// Set cache size
     pub fn with_cache_size(mut self, size: usize) -> Self {
         self.cache = Arc::new(Mutex::new(LruCache::new(
-            NonZeroUsize::new(size.max(1)).unwrap(),
+            NonZeroUsize::new(size.max(1)).expect("max(1) guarantees non-zero"),
         )));
         self
     }

@@ -181,7 +181,7 @@ pub mod quantization {
         }
 
         let mut sorted: Vec<f64> = values.to_vec();
-        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         let low_idx = ((1.0 - percentile) / 2.0 * sorted.len() as f64) as usize;
         let high_idx = ((1.0 + percentile) / 2.0 * sorted.len() as f64) as usize;

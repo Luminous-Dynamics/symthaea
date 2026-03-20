@@ -50,14 +50,14 @@ fn greet(name: &str) -> String {
 // Get app status
 #[tauri::command]
 fn get_status(state: State<AppState>) -> String {
-    let status = state.status.lock().unwrap();
+    let status = state.status.lock().expect("status mutex poisoned");
     status.clone()
 }
 
 // Update app status
 #[tauri::command]
 fn set_status(state: State<AppState>, new_status: String) -> Result<String, String> {
-    let mut status = state.status.lock().unwrap();
+    let mut status = state.status.lock().expect("status mutex poisoned");
     *status = new_status.clone();
     Ok(format!("Status updated to: {}", new_status))
 }
@@ -67,7 +67,7 @@ fn set_status(state: State<AppState>, new_status: String) -> Result<String, Stri
 async fn start_holochain(state: State<'_, AppState>) -> Result<String, String> {
     // Check if conductor is already running
     {
-        let process_guard = state.holochain_process.lock().unwrap();
+        let process_guard = state.holochain_process.lock().expect("holochain_process mutex poisoned");
         if process_guard.is_some() {
             return Ok("Holochain conductor already running".to_string());
         }
@@ -107,7 +107,7 @@ async fn start_holochain(state: State<'_, AppState>) -> Result<String, String> {
             }
 
             // Store the process handle
-            let mut process_guard = state.holochain_process.lock().unwrap();
+            let mut process_guard = state.holochain_process.lock().expect("holochain_process mutex poisoned");
             *process_guard = Some(child);
 
             Ok(format!(
@@ -127,7 +127,7 @@ async fn start_holochain(state: State<'_, AppState>) -> Result<String, String> {
 // Stop Holochain conductor
 #[tauri::command]
 async fn stop_holochain(state: State<'_, AppState>) -> Result<String, String> {
-    let mut process_guard = state.holochain_process.lock().unwrap();
+    let mut process_guard = state.holochain_process.lock().expect("holochain_process mutex poisoned");
 
     match process_guard.take() {
         Some(mut child) => {
@@ -143,7 +143,7 @@ async fn stop_holochain(state: State<'_, AppState>) -> Result<String, String> {
 // Check if Holochain is running
 #[tauri::command]
 fn check_holochain_status(state: State<'_, AppState>) -> Result<String, String> {
-    let mut process_guard = state.holochain_process.lock().unwrap();
+    let mut process_guard = state.holochain_process.lock().expect("holochain_process mutex poisoned");
 
     match process_guard.as_mut() {
         Some(child) => {
@@ -175,7 +175,7 @@ pub struct NetworkInfo {
 // Connect to P2P network via Holochain conductor
 #[tauri::command]
 async fn connect_to_network(state: State<'_, AppState>) -> Result<String, String> {
-    let port = *state.admin_port.lock().unwrap();
+    let port = *state.admin_port.lock().expect("admin_port mutex poisoned");
 
     // Step 1: Check if conductor is running by listing apps
     let apps_result = send_admin_request(port, "list_apps", serde_json::json!({})).await;
@@ -315,7 +315,7 @@ async fn send_admin_request(
 // Get list of installed apps
 #[tauri::command]
 async fn get_installed_apps(state: State<'_, AppState>) -> Result<String, String> {
-    let port = *state.admin_port.lock().unwrap();
+    let port = *state.admin_port.lock().expect("admin_port mutex poisoned");
 
     let result = send_admin_request(port, "list_apps", serde_json::json!({})).await?;
 
@@ -326,7 +326,7 @@ async fn get_installed_apps(state: State<'_, AppState>) -> Result<String, String
 // Get list of cells
 #[tauri::command]
 async fn get_cells(state: State<'_, AppState>) -> Result<String, String> {
-    let port = *state.admin_port.lock().unwrap();
+    let port = *state.admin_port.lock().expect("admin_port mutex poisoned");
 
     let result = send_admin_request(port, "list_cell_ids", serde_json::json!({})).await?;
 
@@ -337,7 +337,7 @@ async fn get_cells(state: State<'_, AppState>) -> Result<String, String> {
 // Enable an app
 #[tauri::command]
 async fn enable_app(state: State<'_, AppState>, app_id: String) -> Result<String, String> {
-    let port = *state.admin_port.lock().unwrap();
+    let port = *state.admin_port.lock().expect("admin_port mutex poisoned");
 
     let params = serde_json::json!({
         "installed_app_id": app_id
@@ -351,7 +351,7 @@ async fn enable_app(state: State<'_, AppState>, app_id: String) -> Result<String
 // Disable an app
 #[tauri::command]
 async fn disable_app(state: State<'_, AppState>, app_id: String) -> Result<String, String> {
-    let port = *state.admin_port.lock().unwrap();
+    let port = *state.admin_port.lock().expect("admin_port mutex poisoned");
 
     let params = serde_json::json!({
         "installed_app_id": app_id
@@ -365,7 +365,7 @@ async fn disable_app(state: State<'_, AppState>, app_id: String) -> Result<Strin
 // Get app info with details
 #[tauri::command]
 async fn get_app_info(state: State<'_, AppState>, app_id: String) -> Result<String, String> {
-    let port = *state.admin_port.lock().unwrap();
+    let port = *state.admin_port.lock().expect("admin_port mutex poisoned");
 
     let params = serde_json::json!({
         "installed_app_id": app_id
@@ -419,7 +419,7 @@ async fn call_zome_function(
     let app_port = 8889; // App interface port
 
     let payload_value: serde_json::Value = if let Some(p) = payload {
-        serde_json::from_str(&p).unwrap_or(serde_json::Value::Null)
+        serde_json::from_str(&p).unwrap_or_default()
     } else {
         serde_json::Value::Null
     };

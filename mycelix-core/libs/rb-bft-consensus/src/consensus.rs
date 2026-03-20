@@ -537,7 +537,7 @@ impl RbBftConsensus {
             }
 
             // Check for double voting (check against existing votes)
-            let round = self.rounds.active_round().unwrap();
+            let round = self.rounds.active_round().expect("active round exists during vote processing");
             if round.votes.has_voted(&vote.voter) {
                 rejected.push((vote.voter.clone(), "Already voted".to_string()));
                 continue;
@@ -556,7 +556,7 @@ impl RbBftConsensus {
 
             // Process verification results
             let mut accepted_count = 0;
-            let round = self.rounds.active_round_mut().unwrap();
+            let round = self.rounds.active_round_mut().expect("active round exists during vote processing");
 
             for (i, vote) in valid_votes.into_iter().enumerate() {
                 if batch_result.is_valid_by_index(i) {

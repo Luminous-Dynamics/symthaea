@@ -62,7 +62,7 @@ impl Scalar {
     pub fn invert(&self) -> DkgResult<Self> {
         let inv = self.0.invert();
         if inv.is_some().into() {
-            Ok(Self(inv.unwrap()))
+            Ok(Self(inv.expect("invert check passed but unwrap failed")))
         } else {
             Err(DkgError::CryptoError("Cannot invert zero".into()))
         }

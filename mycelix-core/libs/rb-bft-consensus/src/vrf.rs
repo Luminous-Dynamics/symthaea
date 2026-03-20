@@ -182,12 +182,12 @@ impl VrfOutput {
 
     /// Get the output as a u128 for comparison (lower = higher priority)
     pub fn output_as_u128(&self) -> u128 {
-        u128::from_le_bytes(self.output[..16].try_into().unwrap())
+        u128::from_le_bytes(self.output[..16].try_into().expect("16-byte slice always fits u128"))
     }
 
     /// Get the output as a u64 for simpler comparison
     pub fn output_as_u64(&self) -> u64 {
-        u64::from_le_bytes(self.output[..8].try_into().unwrap())
+        u64::from_le_bytes(self.output[..8].try_into().expect("8-byte slice always fits u64"))
     }
 
     /// Convert output to a normalized f64 in [0, 1)

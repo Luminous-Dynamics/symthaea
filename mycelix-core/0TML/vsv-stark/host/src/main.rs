@@ -25,16 +25,16 @@ fn main() {
     let input: u32 = 15 * u32::pow(2, 27) + 1;
     let env = ExecutorEnv::builder()
         .write(&input)
-        .unwrap()
+        .expect("failed to write input to executor env")
         .build()
-        .unwrap();
+        .expect("failed to build executor env");
 
     // Obtain the default prover.
     let prover = default_prover();
 
     // Proof information by proving the specified ELF binary.
     // This struct contains the receipt along with statistics about execution of the guest
-    let prove_info = prover.prove(env, METHOD_ELF).unwrap();
+    let prove_info = prover.prove(env, METHOD_ELF).expect("proving failed");
 
     // extract the receipt.
     let receipt = prove_info.receipt;
@@ -42,9 +42,9 @@ fn main() {
     // TODO: Implement code for retrieving receipt journal here.
 
     // For example:
-    let _output: u32 = receipt.journal.decode().unwrap();
+    let _output: u32 = receipt.journal.decode().expect("failed to decode journal output");
 
     // The receipt was verified at the end of proving, but the below code is an
     // example of how someone else could verify this receipt.
-    receipt.verify(METHOD_ID).unwrap();
+    receipt.verify(METHOD_ID).expect("receipt verification failed");
 }

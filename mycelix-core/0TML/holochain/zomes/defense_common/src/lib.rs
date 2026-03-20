@@ -312,18 +312,18 @@ impl MemoryLogger {
     }
 
     pub fn get_entries(&self) -> Vec<LogEntry> {
-        self.entries.lock().unwrap().clone()
+        self.entries.lock().expect("logger mutex poisoned").clone()
     }
 
     pub fn clear(&self) {
-        self.entries.lock().unwrap().clear();
+        self.entries.lock().expect("logger mutex poisoned").clear();
     }
 }
 
 impl DefenseLogger for MemoryLogger {
     fn log(&self, entry: LogEntry) {
         if entry.level >= self.min_level {
-            self.entries.lock().unwrap().push(entry);
+            self.entries.lock().expect("logger mutex poisoned").push(entry);
         }
     }
 }

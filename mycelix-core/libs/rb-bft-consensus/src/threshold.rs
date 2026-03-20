@@ -203,7 +203,8 @@ pub fn generate_shares_with_dealer(
             ValidatorKeyShare {
                 identifier: id,
                 signing_share: secret_share.signing_share().clone(),
-                verifying_share: pubkey_package.verifying_shares().get(&id).unwrap().clone(),
+                verifying_share: pubkey_package.verifying_shares().get(&id)
+                    .expect("verifying share must exist for every generated share id").clone(),
                 group_public_key: pubkey_package.verifying_key().clone(),
                 min_signers: config.threshold,
             }

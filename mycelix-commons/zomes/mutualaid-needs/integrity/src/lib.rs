@@ -4,6 +4,7 @@
 //! in the Mycelix Mutual Aid hApp. Supports needs, offers, matches, and fulfillments.
 
 use hdi::prelude::*;
+use mycelix_bridge_entry_types::{check_author_match, check_link_author_match};
 use mutualaid_common::*;
 
 /// Entry types for the needs zome
@@ -71,9 +72,12 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             tag,
             ..
         } => validate_create_link(link_type, base_address, target_address, tag),
-        FlatOp::RegisterDeleteLink { link_type, .. } => {
-            let _ = link_type;
-            Ok(ValidateCallbackResult::Valid)
+        FlatOp::RegisterDeleteLink { action, .. } => {
+            let original_action = must_get_action(action.link_add_address.clone())?;
+            Ok(check_link_author_match(
+                original_action.action().author(),
+                &action.author,
+            ))
         }
         FlatOp::RegisterUpdate(update) => {
             let action = match &update {
@@ -84,21 +88,19 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 | OpUpdate::CapGrant { action, .. } => action,
             };
             let original = must_get_action(action.original_action_address.clone())?;
-            if *original.action().author() != action.author {
-                return Ok(ValidateCallbackResult::Invalid(
-                    "Only the original entry author can update their entries".into(),
-                ));
-            }
-            Ok(ValidateCallbackResult::Valid)
+            Ok(check_author_match(
+                original.action().author(),
+                &action.author,
+                "update",
+            ))
         }
-        FlatOp::RegisterDelete(OpDelete { action }) => {
+        FlatOp::RegisterDelete(OpDelete { action, .. }) => {
             let original = must_get_action(action.deletes_address.clone())?;
-            if *original.action().author() != action.author {
-                return Ok(ValidateCallbackResult::Invalid(
-                    "Only the original entry author can delete their entries".into(),
-                ));
-            }
-            Ok(ValidateCallbackResult::Valid)
+            Ok(check_author_match(
+                original.action().author(),
+                &action.author,
+                "delete",
+            ))
         }
         _ => Ok(ValidateCallbackResult::Valid),
     }

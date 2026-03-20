@@ -149,7 +149,7 @@ pub fn get_identity_factors(did: String) -> ExternResult<Option<IdentityFactors>
     }
 
     // Get most recent (last link)
-    let action_hash = links.last().unwrap().target.clone().into_action_hash()
+    let action_hash = links.last().expect("links verified non-empty above").target.clone().into_action_hash()
         .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
 
     let record = get(action_hash, GetOptions::default())?;
@@ -425,7 +425,7 @@ pub fn get_credential_revocation(credential_id: String) -> ExternResult<Option<C
         return Ok(None);
     }
 
-    let action_hash = links.first().unwrap().target.clone().into_action_hash()
+    let action_hash = links.first().expect("links verified non-empty above").target.clone().into_action_hash()
         .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
 
     if let Some(record) = get(action_hash, GetOptions::default())? {
@@ -615,7 +615,7 @@ pub fn get_identity_signals(did: String) -> ExternResult<Option<IdentitySignals>
     }
 
     // Get most recent signals
-    let action_hash = links.last().unwrap().target.clone().into_action_hash()
+    let action_hash = links.last().expect("links verified non-empty above").target.clone().into_action_hash()
         .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
 
     let record = get(action_hash, GetOptions::default())?;

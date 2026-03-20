@@ -459,6 +459,51 @@ where
 }
 
 // ============================================================================
+// Author validation helpers
+// ============================================================================
+
+/// Check that the author of an update/delete matches the original entry author.
+///
+/// Returns `ValidateCallbackResult::Valid` if authors match, or
+/// `ValidateCallbackResult::Invalid` with a descriptive message if they don't.
+///
+/// # Arguments
+/// * `original_author` - The author of the original entry/action
+/// * `action_author` - The author of the update/delete action
+/// * `operation` - Human-readable operation name (e.g., "update", "delete")
+pub fn check_author_match(
+    original_author: &AgentPubKey,
+    action_author: &AgentPubKey,
+    operation: &str,
+) -> ValidateCallbackResult {
+    if action_author != original_author {
+        ValidateCallbackResult::Invalid(format!(
+            "Only the original entry author can {} their entries",
+            operation,
+        ))
+    } else {
+        ValidateCallbackResult::Valid
+    }
+}
+
+/// Check that the author of a delete-link matches the original link author.
+///
+/// Returns `ValidateCallbackResult::Valid` if authors match, or
+/// `ValidateCallbackResult::Invalid` with a descriptive message if they don't.
+pub fn check_link_author_match(
+    original_author: &AgentPubKey,
+    action_author: &AgentPubKey,
+) -> ValidateCallbackResult {
+    if action_author != original_author {
+        ValidateCallbackResult::Invalid(
+            "Only the original author can delete this link".into(),
+        )
+    } else {
+        ValidateCallbackResult::Valid
+    }
+}
+
+// ============================================================================
 // Validation helpers
 // ============================================================================
 
@@ -1265,5 +1310,53 @@ mod tests {
         let entry = Entry::Agent(fake_agent());
         let err = read_with_migration::<BridgeQueryEntry>(&entry).unwrap_err();
         assert!(err.contains("failed"));
+    }
+
+    // ---- Author validation helpers ----
+
+    fn fake_agent_2() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![1u8; 36])
+    }
+
+    #[test]
+    fn check_author_match_same_author_valid() {
+        let agent = fake_agent();
+        let result = check_author_match(&agent, &agent, "delete");
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn check_author_match_different_author_invalid() {
+        let agent1 = fake_agent();
+        let agent2 = fake_agent_2();
+        let result = check_author_match(&agent1, &agent2, "delete");
+        match result {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert!(msg.contains("original"), "got: {msg}");
+                assert!(msg.contains("delete"), "got: {msg}");
+            }
+            other => panic!("Expected Invalid, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn check_link_author_match_same_author_valid() {
+        let agent = fake_agent();
+        let result = check_link_author_match(&agent, &agent);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn check_link_author_match_different_author_invalid() {
+        let agent1 = fake_agent();
+        let agent2 = fake_agent_2();
+        let result = check_link_author_match(&agent1, &agent2);
+        match result {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert!(msg.contains("original author"), "got: {msg}");
+                assert!(msg.contains("link"), "got: {msg}");
+            }
+            other => panic!("Expected Invalid, got {other:?}"),
+        }
     }
 }

@@ -243,7 +243,7 @@ impl RoundManager {
         round.start();
 
         self.active_round = Some(round);
-        Ok(self.active_round.as_ref().unwrap())
+        Ok(self.active_round.as_ref().expect("active_round set to Some on line above"))
     }
 
     /// Archive a completed round

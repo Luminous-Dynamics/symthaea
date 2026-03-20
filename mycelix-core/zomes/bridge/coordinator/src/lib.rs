@@ -531,7 +531,7 @@ pub fn aggregate_cross_happ_reputation(agent: String) -> ExternResult<CrossHappR
     let mut latest_by_happ: HashMap<String, ReputationRecord> = HashMap::new();
     for record in records {
         let existing = latest_by_happ.get(&record.happ_id);
-        if existing.is_none() || existing.unwrap().updated_at < record.updated_at {
+        if existing.map_or(true, |e| e.updated_at < record.updated_at) {
             latest_by_happ.insert(record.happ_id.clone(), record);
         }
     }

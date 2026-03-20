@@ -399,7 +399,7 @@ pub fn generate_nonce() -> Vec<u8> {
 pub fn current_timestamp() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .unwrap()
+        .expect("system clock before UNIX epoch")
         .as_secs()
 }
 

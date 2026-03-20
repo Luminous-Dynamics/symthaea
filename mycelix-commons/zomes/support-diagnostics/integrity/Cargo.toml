@@ -13,3 +13,4 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 holochain_serialized_bytes = { workspace = true }
 support-types = { workspace = true }
+mycelix-bridge-entry-types = { workspace = true }
