@@ -281,9 +281,10 @@ impl GatingConfig {
     ///
     /// Equivalent to `default()` but with `mamba_gating_overrides = Some(MambaGatingOverrides::default())`.
     pub fn with_mamba_overrides() -> Self {
-        let mut config = Self::default();
-        config.mamba_gating_overrides = Some(MambaGatingOverrides::default());
-        config
+        Self {
+            mamba_gating_overrides: Some(MambaGatingOverrides::default()),
+            ..Self::default()
+        }
     }
 
     /// Get the effective epistemic penalty/boost scale for the Mamba backend.
