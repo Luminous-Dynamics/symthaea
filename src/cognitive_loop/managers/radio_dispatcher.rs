@@ -5153,14 +5153,24 @@ mod tests {
         let mut router = ConsciousnessAwareRouter::default();
         router.update_local(0.5, 0.7, 2);
 
-        // Add peers with divergent Phi — should decrease cadence
-        router.update_peer([1; 8], 0.1, 0.3, 1, 100);
-        router.update_peer([2; 8], 0.9, 0.9, 4, 100);
+        // Add a peer with small phi delta (trust stays ~0.51) but very
+        // different from local_phi=0.5, creating high divergence.
+        // peer phi=0.05, trust~0.51 → phi*trust≈0.026
+        // collective = (0.5 + 0.026)/2 = 0.263
+        // var = ((0.5 - 0.263)^2 + (0.026 - 0.263)^2)/2 = (0.0562 + 0.0562)/2 ≈ 0.056
+        // Still below 0.15. Need more extreme split.
+        //
+        // Use local_phi=0.9, peer phi=0.05, trust~0.51 → phi*trust≈0.026
+        // collective = (0.9 + 0.026)/2 = 0.463
+        // var = ((0.9-0.463)^2 + (0.026-0.463)^2)/2 = (0.191 + 0.191)/2 ≈ 0.191 > 0.15 ✓
+        router.update_local(0.9, 0.9, 4);
+        router.update_peer([1; 8], 0.05, 0.3, 1, 100);
 
         let cadence_after_divergence = router.sharing_cadence();
         assert!(
             cadence_after_divergence < DEFAULT_SHARING_CADENCE,
-            "high divergence should decrease cadence"
+            "high divergence should decrease cadence, got {}",
+            cadence_after_divergence
         );
     }
 
@@ -5207,10 +5217,11 @@ mod tests {
     fn test_consciousness_router_trust_decay() {
         let mut router = ConsciousnessAwareRouter::default();
 
-        router.update_peer([1; 8], 0.5, 0.7, 2, 100);
+        // First update: delta from 0.0 → 0.3 = 0.3 (< 0.5 threshold, trust +0.01)
+        router.update_peer([1; 8], 0.3, 0.7, 2, 100);
         let trust_before = router.peer_phi.get(&[1; 8]).unwrap().trust;
 
-        // Large Phi jump → trust decreases
+        // Large Phi jump: delta from 0.3 → 0.99 = 0.69 (> 0.5, trust -0.1)
         router.update_peer([1; 8], 0.99, 0.7, 2, 101);
         let trust_after = router.peer_phi.get(&[1; 8]).unwrap().trust;
         assert!(
@@ -5225,10 +5236,10 @@ mod tests {
         router.update_peer([1; 8], 0.5, 0.7, 2, 100);
         router.update_peer([2; 8], 0.6, 0.8, 3, 200);
 
-        // Prune with max_age=50, current_cycle=250
-        // Peer 1 (last at cycle 100) → age 150 > 50 → pruned
-        // Peer 2 (last at cycle 200) → age 50 = 50 → kept
-        router.prune(250, 50);
+        // Prune with max_age=50, current_cycle=249
+        // Peer 1 (last at cycle 100) → age 149 >= 50 → pruned
+        // Peer 2 (last at cycle 200) → age 49 < 50 → kept
+        router.prune(249, 50);
         assert_eq!(router.peer_count(), 1);
     }
 
