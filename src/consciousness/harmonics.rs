@@ -48,7 +48,7 @@ use std::fmt;
 /// - UniversalInterconnectedness: fundamental unity → ALL + TOGETHER + ONE + FEEL
 /// - SacredReciprocity: generous flow → DO + GIVE + OTHER + GOOD + WANT
 /// - EvolutionaryProgression: wise becoming → BECOME + MORE + GOOD + AFTER + CHANGE
-#[allow(dead_code)]
+#[allow(dead_code)] // RESERVED(nsm-grounding): fiduciary harmonic primitive grounding
 #[derive(Debug, Clone)]
 pub(crate) struct FiduciaryHarmonicPrimitiveGrounding {
     /// The harmonic being grounded
@@ -70,7 +70,7 @@ pub(crate) struct FiduciaryHarmonicPrimitiveGrounding {
     pub growth_dimension: f32,
 }
 
-#[allow(dead_code)]
+#[allow(dead_code)] // RESERVED(nsm-grounding): impl block for harmonic grounding
 impl FiduciaryHarmonicPrimitiveGrounding {
     /// Get NSM grounding for a specific fiduciary harmonic
     pub(crate) fn for_harmonic(
@@ -203,7 +203,7 @@ impl FiduciaryHarmonicPrimitiveGrounding {
 /// - EncourageExploration: seek new → MOVE + SEE + MAYBE + DO
 /// - RestoreBoundaries: protect self → I + NOT + OTHER + NEAR + DO
 /// - HierarchicalBalance: order by priority → ALL + SAME + PART + BIG + SMALL
-#[allow(dead_code)]
+#[allow(dead_code)] // RESERVED(nsm-grounding): resolution strategy primitive grounding
 #[derive(Debug, Clone)]
 pub(crate) struct ResolutionStrategyPrimitiveGrounding {
     /// The resolution strategy being grounded
@@ -232,7 +232,7 @@ pub enum ResolutionStrategyType {
     HierarchicalBalance,
 }
 
-#[allow(dead_code)]
+#[allow(dead_code)] // RESERVED(nsm-grounding): impl block for strategy grounding
 impl ResolutionStrategyPrimitiveGrounding {
     /// Get NSM grounding for a specific resolution strategy
     pub(crate) fn for_strategy(
@@ -322,7 +322,7 @@ impl ResolutionStrategyPrimitiveGrounding {
 ///
 /// Provides access to all harmonic concept groundings for
 /// cross-domain semantic reasoning about consciousness values.
-#[allow(dead_code)]
+#[allow(dead_code)] // RESERVED(nsm-grounding): unified harmonics grounding system
 #[derive(Debug, Clone)]
 pub(crate) struct HarmonicsNSMGrounding {
     /// Fiduciary harmonic groundings
@@ -332,7 +332,7 @@ pub(crate) struct HarmonicsNSMGrounding {
     pub strategies: HashMap<ResolutionStrategyType, ResolutionStrategyPrimitiveGrounding>,
 }
 
-#[allow(dead_code)]
+#[allow(dead_code)] // RESERVED(nsm-grounding): impl block for unified grounding
 impl HarmonicsNSMGrounding {
     /// Create complete harmonics NSM grounding system
     pub(crate) fn new(primitive_system: &PrimitiveSystem) -> Self {

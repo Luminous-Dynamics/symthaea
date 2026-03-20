@@ -1569,7 +1569,7 @@ impl SimpleG2P {
     }
 
     /// Legacy simple fallback G2P for unknown words
-    #[allow(dead_code)]
+    #[allow(dead_code)] // RESERVED(fallback): legacy simple G2P for unknown words
     fn simple_g2p(&self, word: &str) -> Vec<&'static str> {
         let mut phonemes = Vec::new();
         let chars: Vec<char> = word.chars().collect();

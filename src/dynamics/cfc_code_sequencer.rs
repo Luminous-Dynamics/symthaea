@@ -23,7 +23,7 @@ use symthaea_core::hdc::ContinuousHV;
 const MAX_PLAN_STEPS: usize = 32;
 
 /// HDC dimension used for algorithm pattern prototype encoding
-#[allow(dead_code)]
+#[allow(dead_code)] // RESERVED(code-generation): CfC code sequencer config
 const ALGORITHM_PATTERN_DIM: usize = 512;
 
 /// Recognized algorithm patterns with their template plan steps
@@ -260,7 +260,7 @@ impl AlgorithmPattern {
 }
 
 /// Detects algorithm patterns from intent HVs using HDC similarity
-#[allow(dead_code)]
+#[allow(dead_code)] // RESERVED(code-generation): code action types
 struct AlgorithmPatternDetector {
     dim: usize,
     sorting_prototype: ContinuousHV,
@@ -271,7 +271,7 @@ struct AlgorithmPatternDetector {
     string_prototype: ContinuousHV,
 }
 
-#[allow(dead_code)]
+#[allow(dead_code)] // RESERVED(code-generation): generated code result
 impl AlgorithmPatternDetector {
     /// Minimum similarity to consider a pattern match
     const MIN_SIMILARITY: f32 = 0.15;

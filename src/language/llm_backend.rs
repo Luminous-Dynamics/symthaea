@@ -183,7 +183,7 @@ struct OllamaOptions {
 #[derive(Deserialize)]
 struct OllamaResponse {
     response: String,
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Used by serde deserialization
     done: bool,
 }
 

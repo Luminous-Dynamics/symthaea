@@ -129,7 +129,7 @@ pub struct ServiceStats {
 /// The main network service for swarm integration
 pub struct NetworkService {
     /// Configuration
-    #[allow(dead_code)]
+    #[allow(dead_code)] // RESERVED(mesh): swarm service connection state
     config: SwarmConfig,
 
     /// Iroh node for P2P transport

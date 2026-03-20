@@ -736,7 +736,7 @@ fn add_gaussian_noise(gradient: &mut [f32], sigma: f32) {
 }
 
 #[cfg(feature = "mycelix")]
-#[allow(dead_code)]
+#[allow(dead_code)] // RESERVED(federated-learning): FL aggregation parameters
 fn l2_norm(v: &[f32]) -> f32 {
     mycelix_fl_core::privacy::l2_norm(v)
 }
@@ -766,7 +766,7 @@ fn add_gaussian_noise(gradient: &mut [f32], sigma: f32) {
 }
 
 #[cfg(not(feature = "mycelix"))]
-#[allow(dead_code)]
+#[allow(dead_code)] // RESERVED(federated-learning): FL privacy parameters
 fn l2_norm(v: &[f32]) -> f32 {
     v.iter().map(|x| x * x).sum::<f32>().sqrt()
 }
