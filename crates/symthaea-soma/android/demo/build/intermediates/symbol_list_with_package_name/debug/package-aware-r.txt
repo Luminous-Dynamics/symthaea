@@ -3198,6 +3198,7 @@ id auto
 id autoComplete
 id autoCompleteToEnd
 id autoCompleteToStart
+id avatarRow
 id barrier
 id baseline
 id beginOnFirstDraw
@@ -3213,6 +3214,7 @@ id bounceStart
 id brocaText
 id btnCheckpoint
 id btnDream
+id btnHolon
 id btnOllama
 id btnSend
 id btnSleep
@@ -3342,6 +3344,7 @@ id harmonyText
 id header_title
 id hide_ime_id
 id hideable
+id holonHost
 id home
 id homeAsUp
 id honorRequest

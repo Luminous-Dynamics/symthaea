@@ -607,20 +607,7 @@ impl CognitiveSubsystem for CpgManager {
         // Re-derive coupling from restored config
         let gait = config.gait;
         let n = config.n_oscillators;
-        let coupling_8x8 = gait.coupling_matrix(config.coupling_k);
-        self.coupling = (0..n)
-            .map(|i| {
-                (0..n)
-                    .map(|j| {
-                        if i < 8 && j < 8 {
-                            coupling_8x8[i][j]
-                        } else {
-                            0.0
-                        }
-                    })
-                    .collect()
-            })
-            .collect();
+        self.coupling = gait.coupling_matrix(n);
         self.config = config;
         tracing::debug!(
             "CpgManager restored: {} oscillators, sim_time={sim_time:.2}s",

@@ -150,24 +150,6 @@ pub struct GatingConfig {
     pub uncertain_factual_penalty: f32,
     /// Logit boost for hedging tokens when epistemic status is Uncertain.
     pub uncertain_hedging_boost: f32,
-
-    // ── Temperature-based epistemic gating (v4) ──
-    /// Enable temperature-based epistemic gating instead of additive logit penalties.
-    /// When true, epistemic uncertainty increases sampling temperature (flatter distribution)
-    /// with only mild additive adjustments, preventing vocabulary collapse.
-    /// When false, uses legacy additive penalty/boost approach.
-    #[serde(default = "default_epistemic_temperature_mode")]
-    pub epistemic_temperature_mode: bool,
-    /// Temperature multiplier at epistemic=Uncertain (2.0). Default 1.3.
-    /// Logits are divided by this before sampling, making distribution flatter.
-    #[serde(default = "default_uncertain_temperature")]
-    pub uncertain_temperature: f32,
-    /// Temperature multiplier at epistemic=Unknown (3.0). Default 1.5.
-    #[serde(default = "default_unknown_temperature")]
-    pub unknown_temperature: f32,
-    /// Temperature multiplier at epistemic=OutOfDomain (4.0). Default 1.8.
-    #[serde(default = "default_ood_temperature")]
-    pub ood_temperature: f32,
     /// Coherence drift threshold (below this, boost thought binding).
     pub coherence_drift_threshold: f32,
     /// Arousal threshold above which sentence-ending tokens are boosted.
@@ -255,19 +237,13 @@ pub struct GatingConfig {
 impl Default for GatingConfig {
     fn default() -> Self {
         Self {
-            // Epistemic gating — v4 temperature mode (Mar 2026). Previous additive
-            // penalties (-3.0/-1.5) collapsed vocabulary to ~25 hedging words when
-            // epistemic >= 2.0. Temperature mode spreads the distribution instead.
-            // Legacy additive values kept for backward compatibility when
-            // epistemic_temperature_mode = false.
+            // Epistemic gating — v3 reduction (Mar 2026). Previous -5.0/1.5 still
+            // dominated generation (broca-compare: 100% gating words for OOD/Unknown).
+            // These gentler values nudge output toward hedging without drowning content.
             unknown_factual_penalty: -3.0,
             unknown_hedging_boost: 0.75,
             uncertain_factual_penalty: -1.5,
             uncertain_hedging_boost: 0.5,
-            epistemic_temperature_mode: true,
-            uncertain_temperature: 1.3,
-            unknown_temperature: 1.5,
-            ood_temperature: 1.8,
             coherence_drift_threshold: 0.3,
             high_arousal_threshold: 0.7,
             arousal_position_threshold: 10,
@@ -334,22 +310,6 @@ impl GatingConfig {
             .as_ref()
             .map_or(1.0, |o| o.veto_threshold_scale)
     }
-}
-
-fn default_epistemic_temperature_mode() -> bool {
-    true
-}
-
-fn default_uncertain_temperature() -> f32 {
-    1.3
-}
-
-fn default_unknown_temperature() -> f32 {
-    1.5
-}
-
-fn default_ood_temperature() -> f32 {
-    1.8
 }
 
 fn default_veto_threshold() -> f32 {
@@ -506,14 +466,6 @@ impl EpistemicGate {
     ///
     /// When `domain_familiarity` is high (expert domain), hedging boost is reduced —
     /// the system is more willing to make direct assertions about well-known topics.
-    ///
-    /// **Temperature mode** (v4, default): Instead of additive logit penalties that
-    /// collapse vocabulary to ~25 hedging words, divides all logits by an epistemic
-    /// temperature factor. Higher uncertainty → flatter distribution → more diverse
-    /// sampling. Mild additive boosts still gently steer toward hedging.
-    ///
-    /// **Legacy mode** (`epistemic_temperature_mode = false`): Additive logit
-    /// penalties/boosts. Can cause vocabulary collapse at epistemic >= 2.0.
     pub fn apply_with_familiarity(
         &self,
         logits: &mut [f32],
@@ -531,106 +483,6 @@ impl EpistemicGate {
         let familiarity_scale =
             1.0 - df * self.config.domain_familiarity_hedging_scale.clamp(0.0, 1.0);
 
-        if self.config.epistemic_temperature_mode {
-            self.apply_temperature_gating(
-                logits,
-                epistemic_ordinal,
-                familiarity_scale,
-            );
-        } else {
-            self.apply_additive_gating(
-                logits,
-                epistemic_ordinal,
-                familiarity_scale,
-            );
-        }
-    }
-
-    /// Temperature-based epistemic gating (v4).
-    ///
-    /// Instead of killing factual tokens with large negative penalties, this:
-    /// 1. Divides ALL logits by an epistemic temperature (flatter = more diverse)
-    /// 2. Applies mild additive boosts to hedging tokens (not penalties on factual)
-    /// 3. Only at OOD (4.0) applies moderate factual suppression
-    ///
-    /// This preserves the full vocabulary distribution while gently steering
-    /// toward appropriate epistemic hedging.
-    fn apply_temperature_gating(
-        &self,
-        logits: &mut [f32],
-        epistemic_ordinal: f32,
-        familiarity_scale: f32,
-    ) {
-        // Determine temperature based on epistemic level
-        let temperature = if epistemic_ordinal > 3.5 {
-            self.config.ood_temperature
-        } else if epistemic_ordinal > 2.5 {
-            self.config.unknown_temperature
-        } else {
-            self.config.uncertain_temperature
-        };
-
-        // Apply temperature scaling to ALL logits (flatter distribution)
-        if temperature > 1.0 + 1e-6 {
-            let inv_temp = 1.0 / temperature;
-            for l in logits.iter_mut() {
-                *l *= inv_temp;
-            }
-        }
-
-        // Mild additive adjustments — much gentler than legacy mode.
-        // Temperature already reduces confidence; these just nudge direction.
-        if epistemic_ordinal > 3.5 {
-            // OOD: moderate factual suppression + OOD word boost
-            for &id in &self.factual_token_ids {
-                if let Some(l) = logits.get_mut(id as usize) {
-                    *l -= 1.0; // Was -3.0 in legacy — much gentler now
-                }
-            }
-            for &id in &self.ood_token_ids {
-                if let Some(l) = logits.get_mut(id as usize) {
-                    *l += 0.5 * familiarity_scale;
-                }
-            }
-            for &id in &self.hedging_token_ids {
-                if let Some(l) = logits.get_mut(id as usize) {
-                    *l += 0.3 * familiarity_scale;
-                }
-            }
-        } else if epistemic_ordinal > 2.5 {
-            // Unknown: mild factual suppression + hedging boost
-            for &id in &self.factual_token_ids {
-                if let Some(l) = logits.get_mut(id as usize) {
-                    *l -= 0.5; // Was -3.0 in legacy
-                }
-            }
-            for &id in &self.hedging_token_ids {
-                if let Some(l) = logits.get_mut(id as usize) {
-                    *l += 0.3 * familiarity_scale;
-                }
-            }
-        } else {
-            // Uncertain: hedging boost only, no factual penalty
-            for &id in &self.hedging_token_ids {
-                if let Some(l) = logits.get_mut(id as usize) {
-                    *l += 0.2 * familiarity_scale;
-                }
-            }
-        }
-    }
-
-    /// Legacy additive epistemic gating (v3).
-    ///
-    /// Applies large additive logit penalties/boosts to specific token sets.
-    /// Can cause vocabulary collapse when epistemic >= 2.0 because +0.5-0.75
-    /// boosts on 25 hedging tokens dominate the near-uniform CfC-HDC logit
-    /// distribution.
-    fn apply_additive_gating(
-        &self,
-        logits: &mut [f32],
-        epistemic_ordinal: f32,
-        familiarity_scale: f32,
-    ) {
         if epistemic_ordinal > 3.5 {
             // OutOfDomain: suppress all content tokens, boost OOD tokens
             for &id in &self.factual_token_ids {
@@ -684,10 +536,6 @@ impl EpistemicGate {
     ///
     /// For Liquid-Mamba: pass `config.mamba_epistemic_scale()` as `backend_scale`.
     /// For CfC-HDC: pass 1.0 (or just call `apply_with_familiarity` directly).
-    ///
-    /// In temperature mode, `backend_scale` modulates the temperature:
-    /// `effective_temp = 1.0 + (base_temp - 1.0) * backend_scale`
-    /// A scale of 0.6 means 60% of the temperature increase.
     pub fn apply_scaled(
         &self,
         logits: &mut [f32],
@@ -707,109 +555,48 @@ impl EpistemicGate {
         let familiarity_scale =
             1.0 - df * self.config.domain_familiarity_hedging_scale.clamp(0.0, 1.0);
 
-        if self.config.epistemic_temperature_mode {
-            // Temperature mode with backend scaling
-            let base_temp = if epistemic_ordinal > 3.5 {
-                self.config.ood_temperature
-            } else if epistemic_ordinal > 2.5 {
-                self.config.unknown_temperature
-            } else {
-                self.config.uncertain_temperature
-            };
-
-            // Scale the temperature increase by backend_scale
-            let temperature = 1.0 + (base_temp - 1.0) * backend_scale;
-
-            if temperature > 1.0 + 1e-6 {
-                let inv_temp = 1.0 / temperature;
-                for l in logits.iter_mut() {
-                    *l *= inv_temp;
+        if epistemic_ordinal > 3.5 {
+            for &id in &self.factual_token_ids {
+                if let Some(l) = logits.get_mut(id as usize) {
+                    *l += self.config.unknown_factual_penalty * backend_scale;
                 }
             }
+            for &id in &self.ood_token_ids {
+                if let Some(l) = logits.get_mut(id as usize) {
+                    *l += self.config.unknown_hedging_boost
+                        * self.config.ood_boost_multiplier
+                        * familiarity_scale
+                        * backend_scale;
+                }
+            }
+            for &id in &self.hedging_token_ids {
+                if let Some(l) = logits.get_mut(id as usize) {
+                    *l += self.config.unknown_hedging_boost * familiarity_scale * backend_scale;
+                }
+            }
+            return;
+        }
 
-            // Mild additive adjustments scaled by backend
-            if epistemic_ordinal > 3.5 {
-                for &id in &self.factual_token_ids {
-                    if let Some(l) = logits.get_mut(id as usize) {
-                        *l -= 1.0 * backend_scale;
-                    }
+        if epistemic_ordinal > 2.5 {
+            for &id in &self.factual_token_ids {
+                if let Some(l) = logits.get_mut(id as usize) {
+                    *l += self.config.unknown_factual_penalty * backend_scale;
                 }
-                for &id in &self.ood_token_ids {
-                    if let Some(l) = logits.get_mut(id as usize) {
-                        *l += 0.5 * familiarity_scale * backend_scale;
-                    }
-                }
-                for &id in &self.hedging_token_ids {
-                    if let Some(l) = logits.get_mut(id as usize) {
-                        *l += 0.3 * familiarity_scale * backend_scale;
-                    }
-                }
-            } else if epistemic_ordinal > 2.5 {
-                for &id in &self.factual_token_ids {
-                    if let Some(l) = logits.get_mut(id as usize) {
-                        *l -= 0.5 * backend_scale;
-                    }
-                }
-                for &id in &self.hedging_token_ids {
-                    if let Some(l) = logits.get_mut(id as usize) {
-                        *l += 0.3 * familiarity_scale * backend_scale;
-                    }
-                }
-            } else {
-                for &id in &self.hedging_token_ids {
-                    if let Some(l) = logits.get_mut(id as usize) {
-                        *l += 0.2 * familiarity_scale * backend_scale;
-                    }
+            }
+            for &id in &self.hedging_token_ids {
+                if let Some(l) = logits.get_mut(id as usize) {
+                    *l += self.config.unknown_hedging_boost * familiarity_scale * backend_scale;
                 }
             }
         } else {
-            // Legacy additive mode with backend scaling
-            if epistemic_ordinal > 3.5 {
-                for &id in &self.factual_token_ids {
-                    if let Some(l) = logits.get_mut(id as usize) {
-                        *l += self.config.unknown_factual_penalty * backend_scale;
-                    }
+            for &id in &self.factual_token_ids {
+                if let Some(l) = logits.get_mut(id as usize) {
+                    *l += self.config.uncertain_factual_penalty * backend_scale;
                 }
-                for &id in &self.ood_token_ids {
-                    if let Some(l) = logits.get_mut(id as usize) {
-                        *l += self.config.unknown_hedging_boost
-                            * self.config.ood_boost_multiplier
-                            * familiarity_scale
-                            * backend_scale;
-                    }
-                }
-                for &id in &self.hedging_token_ids {
-                    if let Some(l) = logits.get_mut(id as usize) {
-                        *l += self.config.unknown_hedging_boost
-                            * familiarity_scale
-                            * backend_scale;
-                    }
-                }
-            } else if epistemic_ordinal > 2.5 {
-                for &id in &self.factual_token_ids {
-                    if let Some(l) = logits.get_mut(id as usize) {
-                        *l += self.config.unknown_factual_penalty * backend_scale;
-                    }
-                }
-                for &id in &self.hedging_token_ids {
-                    if let Some(l) = logits.get_mut(id as usize) {
-                        *l += self.config.unknown_hedging_boost
-                            * familiarity_scale
-                            * backend_scale;
-                    }
-                }
-            } else {
-                for &id in &self.factual_token_ids {
-                    if let Some(l) = logits.get_mut(id as usize) {
-                        *l += self.config.uncertain_factual_penalty * backend_scale;
-                    }
-                }
-                for &id in &self.hedging_token_ids {
-                    if let Some(l) = logits.get_mut(id as usize) {
-                        *l += self.config.uncertain_hedging_boost
-                            * familiarity_scale
-                            * backend_scale;
-                    }
+            }
+            for &id in &self.hedging_token_ids {
+                if let Some(l) = logits.get_mut(id as usize) {
+                    *l += self.config.uncertain_hedging_boost * familiarity_scale * backend_scale;
                 }
             }
         }
@@ -1881,10 +1668,15 @@ mod tests {
         for &word in CANONICAL_HEDGING_WORDS {
             let id = tok.token_id(word);
             if id != tok.unk_id {
-                let novel_val = logits_novel[id as usize];
-                let expert_val = logits_expert[id as usize];
-                if novel_val > expert_val + 1e-6 {
+                let novel_boost = logits_novel[id as usize] - 0.5;
+                let expert_boost = logits_expert[id as usize] - 0.5;
+                if novel_boost > expert_boost + 1e-6 {
                     found_difference = true;
+                    // Expert should still have non-negative boost (just smaller)
+                    assert!(
+                        expert_boost >= -1e-6,
+                        "Expert domain hedging boost should be non-negative, got {expert_boost}"
+                    );
                     break;
                 }
             }
@@ -2225,112 +2017,6 @@ mod tests {
     }
 
     // ── Therapeutic gating tests ─────────────────────────────────────────────
-
-    // ── Temperature-based epistemic gating tests ─────────────────────────
-
-    #[test]
-    fn test_temperature_mode_preserves_vocab_diversity() {
-        let tok = test_tokenizer();
-        let config = GatingConfig {
-            epistemic_temperature_mode: true,
-            ..GatingConfig::default()
-        };
-        let gate = EpistemicGate::new(&tok, &config);
-
-        // All logits start at 0.5 (simulating uniform CfC-HDC output)
-        let mut logits = vec![0.5; tok.vocab_size()];
-        gate.apply(&mut logits, 2.0); // Uncertain
-
-        // Count how many tokens are still "viable" (logit > 0.0)
-        let viable = logits.iter().filter(|&&l| l > 0.0).count();
-        let total = logits.len();
-
-        // Temperature mode should preserve most of the vocabulary
-        // (legacy mode with -1.5 penalty would kill factual tokens)
-        assert!(
-            viable > total * 90 / 100,
-            "Temperature mode should preserve >90% viable tokens, got {viable}/{total}"
-        );
-    }
-
-    #[test]
-    fn test_temperature_mode_vs_legacy_more_diverse() {
-        let tok = test_tokenizer();
-
-        // Temperature mode
-        let config_temp = GatingConfig {
-            epistemic_temperature_mode: true,
-            ..GatingConfig::default()
-        };
-        let gate_temp = EpistemicGate::new(&tok, &config_temp);
-
-        // Legacy mode
-        let config_legacy = GatingConfig {
-            epistemic_temperature_mode: false,
-            ..GatingConfig::default()
-        };
-        let gate_legacy = EpistemicGate::new(&tok, &config_legacy);
-
-        let mut logits_temp = vec![0.5; tok.vocab_size()];
-        let mut logits_legacy = vec![0.5; tok.vocab_size()];
-
-        gate_temp.apply(&mut logits_temp, 3.0); // Unknown
-        gate_legacy.apply(&mut logits_legacy, 3.0); // Unknown
-
-        // Compute variance of logit distributions — temperature mode should be flatter
-        let mean_temp: f32 = logits_temp.iter().sum::<f32>() / logits_temp.len() as f32;
-        let var_temp: f32 = logits_temp
-            .iter()
-            .map(|l| (l - mean_temp).powi(2))
-            .sum::<f32>()
-            / logits_temp.len() as f32;
-
-        let mean_legacy: f32 = logits_legacy.iter().sum::<f32>() / logits_legacy.len() as f32;
-        let var_legacy: f32 = logits_legacy
-            .iter()
-            .map(|l| (l - mean_legacy).powi(2))
-            .sum::<f32>()
-            / logits_legacy.len() as f32;
-
-        // Legacy has larger variance (some tokens boosted +0.75, others penalized -3.0)
-        // Temperature mode has smaller variance (all scaled uniformly, mild adjustments)
-        assert!(
-            var_temp < var_legacy,
-            "Temperature mode should produce lower variance than legacy: temp={var_temp:.4} vs legacy={var_legacy:.4}"
-        );
-    }
-
-    #[test]
-    fn test_temperature_mode_still_boosts_hedging() {
-        let tok = test_tokenizer();
-        let config = GatingConfig {
-            epistemic_temperature_mode: true,
-            ..GatingConfig::default()
-        };
-        let gate = EpistemicGate::new(&tok, &config);
-
-        let mut logits = vec![0.5; tok.vocab_size()];
-        gate.apply(&mut logits, 3.0); // Unknown
-
-        // Hedging tokens should still be relatively boosted compared to average
-        let avg: f32 = logits.iter().sum::<f32>() / logits.len() as f32;
-        let perhaps_id = tok.token_id("perhaps");
-        if perhaps_id != tok.unk_id {
-            assert!(
-                logits[perhaps_id as usize] > avg,
-                "Hedging token 'perhaps' should be above average in temperature mode"
-            );
-        }
-    }
-
-    #[test]
-    fn test_temperature_mode_default_enabled() {
-        let config = GatingConfig::default();
-        assert!(
-            config.epistemic_temperature_mode,
-            "Temperature mode should be enabled by default"
-        );
-    }
 
     #[cfg(feature = "therapeutic")]
     mod therapeutic_gate_tests {

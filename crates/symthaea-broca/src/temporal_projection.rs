@@ -494,8 +494,6 @@ pub struct TemporalProjection {
     // Dimensions
     hdc_dim: usize, // 16384
     ssm_dim: usize, // 768
-    // W3.2: Cross-chunk temporal binding
-    enable_cross_chunk_binding: bool,
 }
 
 impl TemporalProjection {
@@ -609,7 +607,6 @@ impl TemporalProjection {
             adapter: None,
             hdc_dim,
             ssm_dim,
-            enable_cross_chunk_binding: false,
         }
     }
 
@@ -685,20 +682,11 @@ impl TemporalProjection {
 
     // ─── Forward projection ──────────────────────────────────────────────
 
-    /// W3.2: Enable cross-chunk temporal binding.
-    /// When enabled, each chunk is element-wise multiplied with a cyclic-permuted
-    /// version of the previous chunk before up-projection, carrying sequential
-    /// context across chunks (analogous to HDC bind_temporal).
-    pub fn set_cross_chunk_binding(&mut self, enable: bool) {
-        self.enable_cross_chunk_binding = enable;
-    }
-
     /// Project a 16384D thought to a sequence of N × 768D SSM embeddings.
     ///
     /// Steps per chunk:
     /// 1. Extract chunk_dim slice from thought vector
     /// 2. LayerNorm the chunk
-    /// 2b. (W3.2) Cross-chunk binding: multiply with permuted previous chunk
     /// 3. Linear up-projection via per-group `group_w_up`
     /// 4. Add sinusoidal positional encoding
     /// 5. Apply adapter MLP (if enabled)
@@ -713,8 +701,6 @@ impl TemporalProjection {
         );
 
         let mut sequence = Vec::with_capacity(self.num_chunks);
-        // W3.2: Track previous chunk for cross-chunk binding
-        let mut prev_normed: Option<Vec<f32>> = None;
 
         for chunk_idx in 0..self.num_chunks {
             let start = chunk_idx * self.stride;
@@ -723,20 +709,7 @@ impl TemporalProjection {
             let w_up = &self.group_w_up[g];
 
             // LayerNorm
-            let mut normed = self.layer_norm(chunk);
-
-            // W3.2: Cross-chunk temporal binding — Hadamard product with permuted
-            // previous chunk. This carries sequential context across chunks,
-            // analogous to HDC bind_temporal (permute + elementwise multiply).
-            if self.enable_cross_chunk_binding {
-                if let Some(ref prev) = prev_normed {
-                    for k in 0..self.chunk_size {
-                        // Cyclic permute by 1: prev[(k+1) % size] * normed[k]
-                        normed[k] *= prev[(k + 1) % self.chunk_size];
-                    }
-                }
-                prev_normed = Some(normed.clone());
-            }
+            let normed = self.layer_norm(chunk);
 
             // Up-project: chunk_size → ssm_dim
             let mut ssm_vec = vec![0.0f32; self.ssm_dim];

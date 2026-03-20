@@ -791,12 +791,6 @@ pub(crate) mod tests {
         pub last_context_magnitude: f32,
         /// Number of resets performed.
         pub reset_count: usize,
-        /// W1.2: Last per-layer delta modulation received (Phase 5 testing).
-        pub per_layer_delta: Option<Vec<f32>>,
-        /// W1.2: Last CfC delta_scale received.
-        pub cfc_delta_scale: f32,
-        /// W1.2: Last CfC b_scale received.
-        pub cfc_b_scale: f32,
     }
 
     impl MockMamba {
@@ -808,9 +802,6 @@ pub(crate) mod tests {
                 injection_count: 0,
                 last_context_magnitude: 0.0,
                 reset_count: 0,
-                per_layer_delta: None,
-                cfc_delta_scale: 1.0,
-                cfc_b_scale: 1.0,
             }
         }
 
@@ -882,9 +873,6 @@ pub(crate) mod tests {
             self.forward_count = 0;
             self.scale_factor = 1.0;
             self.last_context_magnitude = 0.0;
-            self.per_layer_delta = None;
-            self.cfc_delta_scale = 1.0;
-            self.cfc_b_scale = 1.0;
         }
 
         fn vocab_size(&self) -> usize {
@@ -961,15 +949,6 @@ pub(crate) mod tests {
 
         fn enable_lora(&mut self, _rank: usize, _alpha: f32, _lr: f32) {
             // No-op in mock
-        }
-
-        fn set_cfc_modulation(&mut self, delta_scale: f32, b_scale: f32) {
-            self.cfc_delta_scale = delta_scale;
-            self.cfc_b_scale = b_scale;
-        }
-
-        fn set_per_layer_delta_modulation(&mut self, modulation: &[f32]) {
-            self.per_layer_delta = Some(modulation.to_vec());
         }
     }
 

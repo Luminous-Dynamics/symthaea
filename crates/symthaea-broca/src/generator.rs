@@ -65,21 +65,10 @@ pub struct BrocaConfig {
     /// If `None`, uses thread-local RNG (stochastic).
     #[serde(default)]
     pub sampling_seed: Option<u64>,
-    /// Enable automatic space insertion between word tokens during generation.
-    /// When true, if the last byte in the output is alphanumeric and the next
-    /// token starts with an alphanumeric character, a space is inserted.
-    /// This compensates for BPE vocabularies where spaces are separate tokens
-    /// that untrained models may not learn to emit.
-    #[serde(default = "default_auto_spacing")]
-    pub enable_auto_spacing: bool,
 }
 
 fn default_repetition_penalty() -> f32 {
     1.5
-}
-
-fn default_auto_spacing() -> bool {
-    true
 }
 
 impl Default for BrocaConfig {
@@ -96,7 +85,6 @@ impl Default for BrocaConfig {
             veto_hesitation: "-- wait, ".to_string(),
             repetition_penalty: default_repetition_penalty(),
             sampling_seed: None,
-            enable_auto_spacing: true,
         }
     }
 }
@@ -535,19 +523,6 @@ impl BrocaGenerator {
                         text_bytes.extend_from_slice(token_str.as_bytes());
                     }
                 } else {
-                    // Auto-spacing: insert space between alphanumeric tokens
-                    if self.config.enable_auto_spacing {
-                        if let (Some(&last_byte), Some(&first_byte)) =
-                            (text_bytes.last(), token_str.as_bytes().first())
-                        {
-                            if last_byte.is_ascii_alphanumeric()
-                                && first_byte.is_ascii_alphanumeric()
-                            {
-                                text_bytes.push(b' ');
-                                on_token(" ");
-                            }
-                        }
-                    }
                     text_bytes.extend_from_slice(token_str.as_bytes());
                 }
                 on_token(token_str);

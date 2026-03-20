@@ -78,17 +78,6 @@ pub struct LanguageControllerConfig {
     /// Maximum dt (seconds) used when coherence is low (drifting). Default 0.08.
     #[serde(default = "default_dt_max")]
     pub dt_max: f32,
-
-    // ── W3.1: Fourier Positional Encoding ──
-    /// Replace cyclic permutation with Gram-Schmidt orthogonal position bases.
-    /// Gives truly independent position vectors instead of rotated copies.
-    /// Better position separation for long sequences (>50 tokens).
-    #[serde(default)]
-    pub enable_orthogonal_positions: bool,
-    /// Number of orthogonal position vectors to generate. Default 512.
-    /// Positions beyond this wrap around (modular indexing).
-    #[serde(default = "default_orthogonal_position_count")]
-    pub orthogonal_position_count: usize,
 }
 
 fn default_logit_scale() -> f32 {
@@ -119,10 +108,6 @@ fn default_dt_max() -> f32 {
     0.08
 }
 
-fn default_orthogonal_position_count() -> usize {
-    512
-}
-
 impl Default for LanguageControllerConfig {
     fn default() -> Self {
         Self {
@@ -142,8 +127,6 @@ impl Default for LanguageControllerConfig {
             enable_adaptive_dt: false,
             dt_min: default_dt_min(),
             dt_max: default_dt_max(),
-            enable_orthogonal_positions: false,
-            orthogonal_position_count: default_orthogonal_position_count(),
         }
     }
 }
@@ -173,8 +156,6 @@ pub struct LanguageController {
     token_embeddings: Vec<ContinuousHV>,
     /// Position base vector — permute(base, pos) for positional encoding.
     position_base: ContinuousHV,
-    /// W3.1: Orthogonal position vectors (Gram-Schmidt). Used when enable_orthogonal_positions.
-    orthogonal_positions: Option<Vec<ContinuousHV>>,
     /// Current learning rate.
     learning_rate: f32,
     /// Configuration.
@@ -184,12 +165,6 @@ pub struct LanguageController {
     /// Coherence feedback from the generator (Phase 3: adaptive dt).
     /// Updated each step via `set_coherence_feedback()`.
     coherence_for_dt: f32,
-    /// W1.3: Last effective dt used in forward_step_with_dt (for BPTT consistency).
-    last_effective_dt: f32,
-    /// W1.4: Cached refined output HV from last forward_step (for coherence measurement).
-    /// When compositional logits are enabled, this is the thought-conditioned output;
-    /// otherwise it equals the raw normalized network output.
-    last_logit_hv: Option<ContinuousHV>,
 }
 
 impl LanguageController {
@@ -226,27 +201,14 @@ impl LanguageController {
         let position_base =
             ContinuousHV::from_genesis(genesis, "broca::position_base", HDC_DIMENSION);
 
-        // W3.1: Generate orthogonal position bases if enabled
-        let orthogonal_positions = if config.enable_orthogonal_positions {
-            let count = config.orthogonal_position_count.max(1);
-            use rand::RngCore;
-            let seed: u64 = genesis.domain("broca::orthogonal_positions").next_u64();
-            Some(ContinuousHV::orthogonal_set(HDC_DIMENSION, count, seed))
-        } else {
-            None
-        };
-
         Self {
             network,
             token_embeddings,
             position_base,
-            orthogonal_positions,
             learning_rate: config.learning_rate,
             config: config.clone(),
             current_pos: 0,
             coherence_for_dt: 1.0,
-            last_effective_dt: config.dt_per_token,
-            last_logit_hv: None,
         }
     }
 
@@ -295,14 +257,9 @@ impl LanguageController {
         pos: usize,
         dt: f32,
     ) -> Vec<f32> {
-        // 1. Compose input: thought_hv ⊗ token_emb[prev_token] ⊗ pos_emb
+        // 1. Compose input: thought_hv ⊗ token_emb[prev_token] ⊗ permute(pos_base, pos)
         let token_emb = self.get_token_embedding(prev_token_id);
-        // W3.1: Use orthogonal position bases when enabled, fall back to cyclic permute
-        let pos_emb = if let Some(ref positions) = self.orthogonal_positions {
-            positions[pos % positions.len()].clone()
-        } else {
-            self.position_base.permute(pos)
-        };
+        let pos_emb = self.position_base.permute(pos);
         let input_hv = thought_hv.bind(&token_emb).bind(&pos_emb);
 
         // Guard: if dt is non-finite, use the configured default
@@ -321,9 +278,6 @@ impl LanguageController {
             dt = self.config.dt_max - c * (self.config.dt_max - self.config.dt_min);
             dt = dt.clamp(self.config.dt_min, self.config.dt_max);
         }
-
-        // W1.3: Cache the effective dt for BPTT consistency
-        self.last_effective_dt = dt;
 
         // 2. Evolve network dynamics
         self.network.evolve_closed_form(dt, &input_hv);
@@ -346,9 +300,6 @@ impl LanguageController {
         } else {
             output_hv
         };
-
-        // W1.4: Cache the refined output for coherence measurement
-        self.last_logit_hv = Some(logit_hv.clone());
 
         // 4. Weight-tied logits
         let mut logits = self.compute_logits(&logit_hv);
@@ -395,25 +346,6 @@ impl LanguageController {
         self.network.reset();
         self.current_pos = 0;
         self.coherence_for_dt = 1.0;
-        self.last_effective_dt = self.config.dt_per_token;
-        self.last_logit_hv = None;
-    }
-
-    /// W1.3: Get the effective dt used in the last forward_step_with_dt call.
-    /// When adaptive dt is enabled, this returns the coherence-modulated dt;
-    /// otherwise returns the static config value. Use this for BPTT consistency.
-    pub fn last_effective_dt(&self) -> f32 {
-        self.last_effective_dt
-    }
-
-    /// W1.4: Get the refined output HV from the last forward step.
-    /// When compositional logits are enabled, this returns the thought-conditioned
-    /// output used for logit computation. Otherwise returns the raw network output.
-    /// Use this for coherence measurement to measure what the model actually outputs.
-    pub fn refined_output_hv(&self) -> ContinuousHV {
-        self.last_logit_hv
-            .clone()
-            .unwrap_or_else(|| self.network.output().normalize())
     }
 
     /// Set coherence feedback for adaptive dt (Phase 3).
@@ -517,11 +449,7 @@ impl LanguageController {
     ) -> Vec<f32> {
         // 1. Compose input (same as forward_step)
         let token_emb = self.get_token_embedding(prev_token_id);
-        let pos_emb = if let Some(ref positions) = self.orthogonal_positions {
-            positions[pos % positions.len()].clone()
-        } else {
-            self.position_base.permute(pos)
-        };
+        let pos_emb = self.position_base.permute(pos);
         let input_hv = thought_hv.bind(&token_emb).bind(&pos_emb);
 
         let dt = if self.config.dt_per_token.is_finite() && self.config.dt_per_token > 0.0 {
@@ -639,11 +567,7 @@ impl LanguageController {
     ) {
         // Reconstruct the composed input from the forward step
         let token_emb = self.get_token_embedding(prev_token_id);
-        let pos_emb = if let Some(ref positions) = self.orthogonal_positions {
-            positions[pos % positions.len()].clone()
-        } else {
-            self.position_base.permute(pos)
-        };
+        let pos_emb = self.position_base.permute(pos);
         let input_hv = thought_hv.bind(&token_emb).bind(&pos_emb);
 
         let dt = if dt.is_finite() && dt > 0.0 {

@@ -681,9 +681,9 @@ impl CognitiveLoopService {
                 0.0
             };
             metadata.consolidation_threshold = (self.carryover.history.consciousness_ema
-                - 0.1
+                - CONSOLIDATION_CONSCIOUSNESS_OFFSET
                 - metadata.moral_consolidation_ease as f64)
-                .max(0.2) as f32;
+                .max(CONSOLIDATION_THRESHOLD_MIN) as f32;
             metadata.modulation.mce_bottleneck_lr_applied =
                 !self.carryover.consciousness.mce_bottleneck_name.is_empty();
             let eff = self.carryover.quality.homeostasis_efficiency;
@@ -1398,7 +1398,7 @@ impl CognitiveLoopService {
                 .values
                 .chunks(chunk_size)
                 .take(32)
-                .map(|chunk: &[f32]| (chunk.iter().sum::<f32>() / chunk.len() as f32).clamp(-1.0, 1.0))
+                .map(|chunk: &[f32]| chunk.iter().sum::<f32>() / chunk.len() as f32)
                 .collect()
         };
 

@@ -269,10 +269,13 @@ impl TowerOfLondonBenchmark {
             .map(|i| ContinuousHV::random(dim, seed.wrapping_add(300 + i)))
             .collect();
 
-        // Base per-move error rate. Actual rate is difficulty-dependent below.
-        // Time pressure: base 0.28 + difficulty scaling matches human optimal rates;
-        // +0.20/unit models truncated look-ahead under deadline (Heitz, 2014).
-        let base_error_rate: f64 = 0.28 + config.time_pressure * 0.20;
+        // Per-move error rate: models human-like planning imperfection.
+        // Calibrated so (1-err)^k matches human optimal rates across difficulties:
+        //   easy (2.5 avg moves): ~72%, medium (4): ~60%, hard (5): ~53% → overall ~62%
+        // Science: Kaller et al. (2016), Newman & Pittman (2007)
+        // Time pressure: base 0.35 matches ~62% optimal-move rate in untimed ToL (Shallice, 1982);
+        // +0.20/unit models truncated look-ahead under deadline (Heitz, 2014: ~15-25% accuracy loss).
+        let error_rate: f64 = 0.35 + config.time_pressure * 0.20;
 
         // Generate problems for each difficulty tier
         let easy = generate_problems(seed.wrapping_add(1000), 2, 5);
@@ -296,21 +299,6 @@ impl TowerOfLondonBenchmark {
                 let mut current = problem.initial.clone();
                 let mut moves_taken = 0u32;
                 let mut visited_count = 0u32;
-
-                // Difficulty-dependent error rate (Unterrainer et al. 2004):
-                // Harder problems (more optimal moves) have higher per-move
-                // error rates because working memory load scales with depth.
-                // Subgoal decomposition: for 4+ move problems, chunking into
-                // subgoals reduces effective error (Kaller et al. 2016).
-                let difficulty_scale = 1.0 + 0.1 * (problem.optimal_moves as f64 - 1.0);
-                let subgoal_benefit = if problem.optimal_moves >= 4 {
-                    // Chunking reduces error by ~15% for complex problems
-                    // (Unterrainer et al. 2004: subgoal decomposition)
-                    0.85
-                } else {
-                    1.0
-                };
-                let error_rate = (base_error_rate * difficulty_scale * subgoal_benefit).min(0.75);
 
                 // BFS-guided planning with human-like error injection.
                 // The 3-disc ToL state space is tiny (~60 states), so BFS

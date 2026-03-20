@@ -236,31 +236,19 @@ impl CognitiveLoopService {
             let q = guiding_question.to_lowercase();
             let cat = if q.contains("know") || q.contains("learn") || q.contains("understand") {
                 // Epistemic question → boost prediction confidence sensitivity
-                self.adjust_exploration(
-                    "guiding_epistemic",
-                    thresholds::GUIDING_EPISTEMIC_EXPLORATION_BOOST as f32,
-                );
+                self.adjust_exploration("guiding_epistemic", thresholds::GUIDING_EPISTEMIC_EXPLORATION_BOOST as f32);
                 "epistemic"
             } else if q.contains("feel") || q.contains("emotion") || q.contains("care") {
                 // Affective question → boost emotional processing sensitivity
-                self.adjust_confidence(
-                    "guide_affective",
-                    thresholds::GUIDING_AFFECTIVE_CONFIDENCE_BOOST as f32,
-                );
+                self.adjust_confidence("guide_affective", thresholds::GUIDING_AFFECTIVE_CONFIDENCE_BOOST as f32);
                 "affective"
             } else if q.contains("do") || q.contains("act") || q.contains("make") {
                 // Pragmatic question → boost action-oriented processing
-                self.scale_lr(
-                    "guide_pragmatic",
-                    thresholds::GUIDING_PRAGMATIC_LR_FACTOR as f32,
-                );
+                self.scale_lr("guide_pragmatic", thresholds::GUIDING_PRAGMATIC_LR_FACTOR as f32);
                 "pragmatic"
             } else if q.contains("connect") || q.contains("relate") || q.contains("together") {
                 // Social question → boost coherence sensitivity
-                self.adjust_confidence(
-                    "guide_social",
-                    thresholds::GUIDING_SOCIAL_CONFIDENCE_BOOST as f32,
-                );
+                self.adjust_confidence("guide_social", thresholds::GUIDING_SOCIAL_CONFIDENCE_BOOST as f32);
                 "social"
             } else {
                 "general"

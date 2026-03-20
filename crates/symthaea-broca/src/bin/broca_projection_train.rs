@@ -83,7 +83,6 @@ fn main() {
         lora_lr: opts.lora_lr,
         embedding_stats_path: opts.embedding_stats.clone(),
         e2e_grad_chunks: opts.e2e_grad_chunks,
-        bottleneck_dim: opts.bottleneck_dim,
         orthogonality_weight: opts.orthogonality_weight,
         orthogonality_samples: opts.orthogonality_samples,
         gating_config,
@@ -648,18 +647,14 @@ struct ProjectionTrainOpts {
     lora_lr: f32,
     embedding_stats: Option<String>,
     e2e_grad_chunks: usize,
+    orthogonality_weight: f32,
+    orthogonality_samples: usize,
     // ─── Gate + sampling overrides ───
     hedging_boost: Option<f32>,
     temperature: Option<f32>,
     top_k: Option<usize>,
     /// Early stopping patience: stop if PE doesn't improve for this many epochs (0=disabled).
     patience: usize,
-    /// Bottleneck dimension for spatial projection (default: 256).
-    bottleneck_dim: usize,
-    /// Orthogonality regularization weight for w_up decorrelation (default: 0.0 = disabled).
-    orthogonality_weight: f32,
-    /// Number of random row pairs to sample for orthogonality gradient (default: 64).
-    orthogonality_samples: usize,
 }
 
 fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
@@ -702,13 +697,12 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
         lora_lr: 0.0001,
         embedding_stats: None,
         e2e_grad_chunks: 1,
+        orthogonality_weight: 0.0,
+        orthogonality_samples: 64,
         hedging_boost: None,
         temperature: None,
         top_k: None,
         patience: 3,
-        bottleneck_dim: 256,
-        orthogonality_weight: 0.0,
-        orthogonality_samples: 64,
     };
 
     let mut i = 1;
@@ -974,19 +968,11 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
                     .parse()
                     .map_err(|_| "--patience must be a non-negative integer")?;
             }
-            "--bottleneck" => {
-                i += 1;
-                opts.bottleneck_dim = args
-                    .get(i)
-                    .ok_or("--bottleneck requires a number")?
-                    .parse()
-                    .map_err(|_| "--bottleneck must be a positive integer")?;
-            }
             "--orthogonality" | "--orth-weight" => {
                 i += 1;
                 opts.orthogonality_weight = args
                     .get(i)
-                    .ok_or("--orthogonality requires a float")?
+                    .ok_or("--orthogonality requires a number")?
                     .parse()
                     .map_err(|_| "--orthogonality must be a float")?;
             }
@@ -1073,11 +1059,6 @@ fn print_usage() {
     eprintln!("  --lora-lr LR                LoRA learning rate (default: 0.0001)");
     eprintln!("  --embedding-stats PATH      Pre-computed embedding stats for manifold moment matching adapter init");
     eprintln!("  --e2e-grad-chunks K         Simultaneous E2E gradient positions per step (default: 1 = legacy rotating)");
-    eprintln!("  --bottleneck N              Spatial projection bottleneck dimension (default: 256, try 384 or 512)");
-    eprintln!("  --orthogonality W           Orthogonality regularization weight for w_up rows (default: 0, try 0.01-0.05)");
-    eprintln!(
-        "  --orth-samples N            Row pairs sampled per orthogonality step (default: 64)"
-    );
     eprintln!();
     eprintln!("Gate + sampling overrides:");
     eprintln!("  --hedging-boost N      Override epistemic hedging boost (default: 5.0, Unknown=N, Uncertain=N/2)");

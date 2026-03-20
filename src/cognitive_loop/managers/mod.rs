@@ -8,10 +8,10 @@
 //! | Manager | Subsystems | Interval | Science |
 //! |---------|-----------|----------|---------|
 //! | [`DriveManager`] | curiosity, flow, boredom, exploration | 7 | Berlyne (1960), Csikszentmihalyi (1990) |
+//! | [`SoulManager`] | value alignment, dissonance, coherence | 43 | Schwartz (1992), Festinger (1957) |
 //! | [`MemoryManager`] | episodic, semantic, resonator, coordinator | 11 | Tulving (2002), Cowan (2001) |
 //! | [`LearningManager`] | FEP, dream, school, evolution | 13 | Friston (2010), Walker (2017) |
 //! | [`PerceptionManager`] | attention, multi-modal, social | 19 | Posner (1980), Baron-Cohen (1995) |
-//! | [`SoulManager`] | value alignment, dissonance, coherence | 43 | Schwartz (1992), Festinger (1957) |
 //! | [`GovernanceManager`] | governance events, neuromod contagion | 37 | Schultz (1997), Zak (2012) | `mycelix` |
 //! | [`FabricationManager`] | Cincinnati quality, twin readings, PoGF | 47 | Aston-Jones (2005), Schultz (1997) | `advanced-manufacturing` |
 //! | [`SentinelManager`] | governance anomaly, Sybil, dispatch loop | 67 | Aston-Jones & Cohen (2005) | `sentinel` |
@@ -34,6 +34,7 @@ pub mod learning_manager;
 pub mod memory_manager;
 pub mod network_service_bridge;
 pub mod perception_manager;
+pub mod soul_manager;
 pub mod swarm_manager;
 
 #[cfg(feature = "mycelix")]
@@ -45,6 +46,7 @@ pub mod radio_dispatcher;
 pub use drive_manager::DriveManager;
 pub use learning_manager::LearningManager;
 pub use memory_manager::MemoryManager;
+pub use soul_manager::{SoulManager, SoulTelemetry};
 pub use network_service_bridge::{
     forward_affective_state, forward_federated_round, NetworkServiceBridge,
     NetworkServiceBridgeHandle,
@@ -88,9 +90,6 @@ pub use therapeutic_manager::TherapeuticManager;
 
 #[cfg(feature = "advanced-manufacturing")]
 pub mod fabrication_manager;
-
-pub mod soul_manager;
-pub use soul_manager::{SoulManager, SoulTelemetry};
 
 #[cfg(feature = "sentinel")]
 pub mod sentinel_manager;

@@ -242,16 +242,6 @@ pub struct TrainingConfig {
     /// When mean epoch coherence drops below this, triggers `CoherenceCollapse` anomaly.
     /// Only active when `enable_anomaly_response` is true. Default: 0.05.
     pub coherence_collapse_threshold: f32,
-    /// Coherence alignment loss weight (0.0 = disabled).
-    /// When > 0, adds `alignment_weight × (1 - coherence)` to the per-token loss,
-    /// where coherence = cosine_similarity(output_hv, thought_hv).
-    /// This trains the CfC network to keep its output aligned with the input thought,
-    /// fixing the "representational drift" problem where output HVs end up orthogonal
-    /// to thought HVs after BPTT training (cosine similarity ≈ 0.000).
-    /// Recommended: 0.1-0.3 (balances CE loss with alignment pressure).
-    /// Higher values may reduce token prediction quality but improve coherence monitoring,
-    /// veto, and hallucination detection.
-    pub coherence_alignment_weight: f32,
 }
 
 impl Default for TrainingConfig {
@@ -281,7 +271,6 @@ impl Default for TrainingConfig {
             enable_smoke_test: false,
             smoke_test_coherence_threshold: 0.05,
             coherence_collapse_threshold: 0.05,
-            coherence_alignment_weight: 0.0,
         }
     }
 }
@@ -744,7 +733,6 @@ pub fn train_with_adam(
 
     // Track whether coherence telemetry is needed
     let track_coherence = config.coherence_loss_weight > 0.0
-        || config.coherence_alignment_weight > 0.0
         || config.enable_diagnostics
         || config.enable_anomaly_response;
 
@@ -839,32 +827,21 @@ pub fn train_with_adam(
                 // Cross-entropy loss: -log(softmax[target])
                 let raw_loss = cross_entropy_loss(&logits, target_id as usize);
 
-                // Coherence tracking + gated loss weighting + alignment loss
+                // Coherence tracking + gated loss weighting
                 // (Bengio et al. 2009 — curriculum learning: focus on learnable examples)
-                let track_alignment = config.coherence_alignment_weight > 0.0;
-                let loss = if effective_coherence_weight > 0.0 || track_coherence || track_alignment
-                {
+                let loss = if effective_coherence_weight > 0.0 || track_coherence {
                     let output_hv = generator.controller().output_hv();
                     let coherence = output_hv.similarity(&thought_hv);
                     coherence_sum += coherence;
                     coherence_count += 1;
-                    let mut adjusted_loss = raw_loss;
-                    // Coherence-gated loss weighting
                     if effective_coherence_weight > 0.0 {
                         // weight = 1.0 when coherence=1.0, lower when coherence drops
                         let weight =
                             (1.0 - effective_coherence_weight * (1.0 - coherence)).max(0.05);
-                        adjusted_loss *= weight;
+                        raw_loss * weight
+                    } else {
+                        raw_loss
                     }
-                    // Coherence alignment loss: penalizes output-thought misalignment.
-                    // Adds (1 - coherence) * weight to the loss, training CfC to keep
-                    // its hidden state representationally aligned with the input thought.
-                    if track_alignment {
-                        let alignment_penalty =
-                            config.coherence_alignment_weight * (1.0 - coherence).max(0.0);
-                        adjusted_loss += alignment_penalty;
-                    }
-                    adjusted_loss
                 } else {
                     raw_loss
                 };

@@ -107,21 +107,12 @@ impl CognitiveLoopService {
             let base_err = self.config.scene_memory_error_threshold;
             let base_damp = self.config.scene_memory_dampen_factor;
             bridge.manifold_mut().set_scene_store_thresholds(
-                (base_coh / ach_factor).clamp(
-                    super::thresholds::VISION_COHERENCE_CLAMP_MIN,
-                    super::thresholds::VISION_COHERENCE_CLAMP_MAX,
-                ),
-                (base_err * ach_factor.min(super::thresholds::VISION_ACH_SCALE_CAP)).clamp(
-                    super::thresholds::VISION_ERROR_CLAMP_MIN,
-                    super::thresholds::VISION_ERROR_CLAMP_MAX,
-                ),
+                (base_coh / ach_factor).clamp(super::thresholds::VISION_COHERENCE_CLAMP_MIN, super::thresholds::VISION_COHERENCE_CLAMP_MAX),
+                (base_err * ach_factor.min(super::thresholds::VISION_ACH_SCALE_CAP)).clamp(super::thresholds::VISION_ERROR_CLAMP_MIN, super::thresholds::VISION_ERROR_CLAMP_MAX),
             );
-            bridge.manifold_mut().set_scene_dampen_factor(
-                (base_damp * ach_factor.min(super::thresholds::VISION_ACH_SCALE_CAP)).clamp(
-                    super::thresholds::VISION_DAMPEN_CLAMP_MIN,
-                    super::thresholds::VISION_DAMPEN_CLAMP_MAX,
-                ),
-            );
+            bridge
+                .manifold_mut()
+                .set_scene_dampen_factor((base_damp * ach_factor.min(super::thresholds::VISION_ACH_SCALE_CAP)).clamp(super::thresholds::VISION_DAMPEN_CLAMP_MIN, super::thresholds::VISION_DAMPEN_CLAMP_MAX));
         }
 
         // ═══════════════════════════════════════════════════════════════════════

@@ -727,6 +727,54 @@ impl CognitiveLoopService {
         }
     }
 
+    /// Drain fabrication manager's neuromod queues and apply each injection/baseline
+    /// to the neuromodulator bath. Called after fabrication processing.
+    #[cfg(feature = "advanced-manufacturing")]
+    pub(crate) fn apply_fabrication_neuromod(&mut self) {
+        let injections = self.fabrication_manager.drain_injections();
+        for inj in injections {
+            self.neuromod
+                .bath
+                .inject(inj.target, inj.dose, inj.half_life);
+        }
+
+        let baselines = self.fabrication_manager.drain_baselines();
+        for bl in baselines {
+            match bl.target {
+                "dopamine" => {
+                    self.neuromod
+                        .bath
+                        .dopamine
+                        .adjust_baseline(bl.nudge, 0.2, 0.8);
+                }
+                "norepinephrine" => {
+                    self.neuromod
+                        .bath
+                        .noradrenaline
+                        .adjust_baseline(bl.nudge, 0.2, 0.8);
+                }
+                "serotonin" => {
+                    self.neuromod
+                        .bath
+                        .serotonin
+                        .adjust_baseline(bl.nudge, 0.2, 0.8);
+                }
+                "oxytocin" => {
+                    self.neuromod
+                        .bath
+                        .oxytocin
+                        .adjust_baseline(bl.nudge, 0.2, 0.8);
+                }
+                _ => {
+                    tracing::warn!(
+                        target = bl.target,
+                        "Unknown neuromod target in fabrication baseline"
+                    );
+                }
+            }
+        }
+    }
+
     /// Inject a Mycelix ConsciousnessProfile back into the cognitive loop,
     /// closing the bidirectional consciousness bridge.
     ///

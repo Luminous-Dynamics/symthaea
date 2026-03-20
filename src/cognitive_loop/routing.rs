@@ -406,11 +406,7 @@ impl ThalamicRouter {
         emotional_valence: f32,
     ) -> CognitiveDepth {
         // Novelty from prediction error (high error = novel)
-        let novelty = if prediction_error.is_finite() {
-            prediction_error.min(1.0)
-        } else {
-            0.5
-        };
+        let novelty = if prediction_error.is_finite() { prediction_error.min(1.0) } else { 0.5 };
 
         // Complexity from pattern
         let complexity = match pattern {

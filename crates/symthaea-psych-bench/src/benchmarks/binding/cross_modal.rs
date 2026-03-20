@@ -120,17 +120,24 @@ impl CrossModalBindingBenchmark {
                 let probe_idx = rng as usize % set_size;
                 let (correct_color, _correct_shape, probe_loc) = objects[probe_idx];
 
-                // Retrieval via candidate matching with location-indexed encoding.
-                // For each candidate color, construct the expected location-indexed
-                // binding and compare to the scene. The correct color's candidate
-                // will match the stored binding at the probed location.
+                // Retrieval via two-stage unbinding (Kanerva 2009; Plate 2003):
+                // 1. Unbind location from scene to recover the feature bundle
+                //    at the probed location: scene.bind(location) → features
+                // 2. Unbind color-role from recovered features to get the color:
+                //    features.bind(role_color) → color_hv
+                // This two-stage approach recovers the full role-bound feature
+                // bundle before querying the specific role, preserving more signal
+                // than the single-step candidate matching used previously.
+                // The previous approach compared color_role.bind(location) against
+                // the scene, which is a partial pattern match that loses signal
+                // from the bundled shape component.
+                let recovered_features = noisy_scene.bind(&location_hvs[probe_loc]);
+                let recovered_color = recovered_features.bind(&role_color);
+
                 let mut best_color = 0;
                 let mut best_sim = f32::NEG_INFINITY;
                 for (i, chv) in color_hvs.iter().enumerate() {
-                    let bound_c = chv.bind(&role_color);
-                    // Candidate: color-role bound to probed location
-                    let candidate = bound_c.bind(&location_hvs[probe_loc]);
-                    let sim = noisy_scene.similarity(&candidate);
+                    let sim = recovered_color.similarity(chv);
                     if sim > best_sim {
                         best_sim = sim;
                         best_color = i;

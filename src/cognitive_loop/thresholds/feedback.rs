@@ -928,6 +928,7 @@ pub const CONFLICT_EXPLORATION_INCREMENT: f64 = 0.02;
 /// Basis: Schultz (2016) — rising confidence at this rate warrants caution.
 pub const CONFIDENCE_VELOCITY_RISING_THRESHOLD: f64 = 0.02;
 
+
 /// FEP accuracy threshold for efficiency detection.
 /// Basis: Friston (2010) — accurate prediction signals good model fit.
 pub const FEP_ACCURACY_EFFICIENCY_THRESHOLD: f64 = 0.5;
@@ -992,61 +993,54 @@ pub const ERROR_SLOPE_CONSOLIDATION_THRESHOLD: f64 = 0.03;
 pub const EPISTEMIC_PHI_HIGH: f64 = 0.6;
 /// Epistemic Phi effectiveness low threshold.
 pub const EPISTEMIC_PHI_LOW: f64 = 0.2;
-
 /// Phenomenal binding strength high threshold.
 pub const PHENOMENAL_BINDING_HIGH: f64 = 0.7;
 /// Phenomenal binding strength low threshold.
 pub const PHENOMENAL_BINDING_LOW: f64 = 0.15;
-
 /// Temporal coherence score high threshold.
 pub const TEMPORAL_COHERENCE_HIGH: f64 = 0.75;
 /// Temporal coherence score low threshold.
 pub const TEMPORAL_COHERENCE_LOW: f64 = 0.15;
-
 /// Holographic unity high threshold.
 pub const HOLOGRAPHIC_UNITY_HIGH: f64 = 0.7;
 /// Holographic unity low threshold.
 pub const HOLOGRAPHIC_UNITY_LOW: f64 = 0.15;
-
 /// Harmonies alignment high threshold.
 pub const HARMONIES_ALIGNMENT_HIGH: f64 = 0.8;
 /// Harmonies alignment low threshold.
 pub const HARMONIES_ALIGNMENT_LOW: f64 = 0.2;
-
 /// Consciousness gradient LR modulation threshold.
 pub const CONSCIOUSNESS_GRADIENT_LR_MOD_THRESHOLD: f64 = 0.05;
-
 /// Value cache hit rate low threshold (below = modulated).
 pub const VALUE_CACHE_HIT_RATE_LOW: f64 = 0.3;
 /// Value cache hit rate high threshold (above = modulated).
 pub const VALUE_CACHE_HIT_RATE_HIGH: f64 = 0.9;
-
 /// Consciousness state level high threshold.
 pub const CONSCIOUSNESS_STATE_LEVEL_HIGH: f64 = 0.7;
 /// Consciousness state level low threshold.
 pub const CONSCIOUSNESS_STATE_LEVEL_LOW: f64 = 0.2;
-
 /// Living mind vitality modulation high threshold.
 pub const LIVING_MIND_VITALITY_MOD_HIGH: f64 = 0.7;
 /// Living mind vitality modulation low threshold.
 pub const LIVING_MIND_VITALITY_MOD_LOW: f64 = 0.3;
-
 /// Living mind coherence modulation high threshold.
 pub const LIVING_MIND_COHERENCE_MOD_HIGH: f64 = 0.7;
 /// Living mind coherence modulation low threshold.
 pub const LIVING_MIND_COHERENCE_MOD_LOW: f64 = 0.3;
-
 /// MCTS effectiveness high threshold.
 pub const MCTS_EFFECTIVENESS_MOD_HIGH: f64 = 0.6;
 /// MCTS effectiveness low threshold.
 pub const MCTS_EFFECTIVENESS_MOD_LOW: f64 = 0.2;
-
 /// Resonator semantic similarity high threshold for telemetry.
 pub const RESONATOR_SIMILARITY_HIGH: f64 = 0.8;
 /// Resonator semantic similarity low threshold for telemetry.
 pub const RESONATOR_SIMILARITY_LOW: f64 = 0.3;
-
 /// Binding strength high threshold for telemetry.
 pub const BINDING_STRENGTH_TELEMETRY_HIGH: f64 = 0.7;
 /// Binding strength low threshold for telemetry.
 pub const BINDING_STRENGTH_TELEMETRY_LOW: f64 = 0.3;
+/// Pipeline consciousness high threshold for telemetry gating.
+/// Basis: Dehaene (2014) — global workspace ignition threshold.
+pub const PIPELINE_CONSCIOUSNESS_HIGH_THRESHOLD: f64 = 0.7;
+/// Pipeline consciousness low threshold for telemetry gating.
+pub const PIPELINE_CONSCIOUSNESS_LOW_THRESHOLD: f64 = 0.3;

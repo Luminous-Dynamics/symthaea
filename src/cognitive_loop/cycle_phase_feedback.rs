@@ -1001,9 +1001,6 @@ impl CognitiveLoopService {
         // High prediction error → faster ontology adaptation (Rescorla-Wagner 1972).
         if let Some(ref mut km) = self.knowledge_manager {
             km.set_ontology_lr_from_pe(prediction_error as f32);
-            // Consciousness → Knowledge: scale learning by unified Psi.
-            // High consciousness → boosted plasticity (conscious access enhances encoding).
-            // Science: Dehaene et al. (2006) — conscious moments produce stronger memory traces.
             km.modulate_lr_from_consciousness(self.stats.unified_psi);
         }
 
@@ -1055,7 +1052,7 @@ impl CognitiveLoopService {
                         let var = taus.iter().map(|t| (t - mean_tau).powi(2)).sum::<f32>()
                             / taus.len().max(1) as f32;
                         let cv = if var.is_finite() {
-                            (var.sqrt() / mean_tau).clamp(0.0, 5.0)
+                            var.sqrt() / mean_tau
                         } else {
                             0.0
                         };
@@ -1341,27 +1338,17 @@ impl CognitiveLoopService {
 
         // ── Consciousness → Neuromod reverse coupling ────────────────────
         // Science: Dehaene & Changeux (2011) — conscious access modulates
-        // catecholamine release; high integration produces reward signal (DA),
-        // sustained consciousness stabilizes mood (5-HT).
+        // catecholamine release.
         {
             let psi = self.stats.unified_psi;
-
-            // High consciousness → dopamine (reward for integration)
-            // Schultz (1997): unexpected positive state → phasic DA burst
             if psi > 0.7 {
                 let da_signal = ((psi - 0.7) * 0.15).min(0.1) as f32;
                 self.neuromod.bath.dopamine.produce(da_signal);
             }
-
-            // Moderate consciousness → serotonin (mood stabilization)
-            // Cools et al. (2008): sustained cognitive engagement → tonic 5-HT
             if psi > 0.5 {
                 let sht_signal = ((psi - 0.5) * 0.1).min(0.05) as f32;
                 self.neuromod.bath.serotonin.produce(sht_signal);
             }
-
-            // Low consciousness → norepinephrine (alerting signal)
-            // Aston-Jones & Cohen (2005): low integration → phasic NE for reorienting
             if psi < 0.3 && psi > 0.0 {
                 let ne_signal = ((0.3 - psi) * 0.12).min(0.08) as f32;
                 self.neuromod.bath.noradrenaline.produce(ne_signal);

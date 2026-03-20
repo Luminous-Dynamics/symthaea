@@ -25,10 +25,11 @@ use super::thresholds::{
     SOUL_ALIGNMENT_BOOST_THRESHOLD, SOUL_ALIGNMENT_DAMPEN_LR_MAX, SOUL_ALIGNMENT_DAMPEN_LR_MIN,
     SOUL_ALIGNMENT_DAMPEN_SCALE, SOUL_ALIGNMENT_DAMPEN_THRESHOLD, STILLNESS_TOTAL_CLAMP_MAX,
     SUBSTRATE_NOISE_FRACTION_DIVISOR, SUBSTRATE_NOISE_MAX_PRESSURE, SUBSTRATE_NOISE_STD_DIVISOR,
-    SURPRISE_PE_EXCESS_CAP, SURPRISE_PE_SCALE_FACTOR, SURPRISE_PE_THRESHOLD,
-    THETA_BINDING_BOOST_THRESHOLD, THETA_BINDING_CLAMP_MAX, THETA_BINDING_CLAMP_MIN,
-    THETA_DEFAULT_SALIENCE, THETA_SALIENCE_CLAMP_MIN, TOM_MISMATCH_EMA_DECAY,
-    TOM_MISMATCH_EXPLORE_SCALE, TOM_MISMATCH_THRESHOLD,
+    SURPRISE_PE_EXCESS_CAP,
+    SURPRISE_PE_SCALE_FACTOR, SURPRISE_PE_THRESHOLD, THETA_BINDING_BOOST_THRESHOLD,
+    THETA_BINDING_CLAMP_MAX, THETA_BINDING_CLAMP_MIN, THETA_DEFAULT_SALIENCE,
+    THETA_SALIENCE_CLAMP_MIN, TOM_MISMATCH_EMA_DECAY, TOM_MISMATCH_EXPLORE_SCALE,
+    TOM_MISMATCH_THRESHOLD,
 };
 use super::{CognitiveLoopService, ModuleTimings, ResponseStrategy};
 
@@ -352,8 +353,7 @@ impl CognitiveLoopService {
         if self.config.enable_substrate_encoding_noise
             && self.substrate_manager.scale_pressure < 0.0
         {
-            let noise_fraction = (-self.substrate_manager.scale_pressure)
-                .min(SUBSTRATE_NOISE_MAX_PRESSURE)
+            let noise_fraction = (-self.substrate_manager.scale_pressure).min(SUBSTRATE_NOISE_MAX_PRESSURE)
                 / SUBSTRATE_NOISE_FRACTION_DIVISOR; // [0.0, 0.1]
             let seed = self.stats.total_cycles as u64;
             hv16_cached = hv16_cached.add_noise(noise_fraction, seed);
@@ -427,6 +427,7 @@ impl CognitiveLoopService {
                     soul.stats().experiences_integrated,
                 );
             }
+
             alignment.overall_alignment
         } else {
             0.0
@@ -518,9 +519,8 @@ impl CognitiveLoopService {
         let compressed_state = if self.config.enable_substrate_encoding_noise
             && self.substrate_manager.scale_pressure < 0.0
         {
-            let noise_std = (-self.substrate_manager.scale_pressure)
-                .min(SUBSTRATE_NOISE_MAX_PRESSURE)
-                / SUBSTRATE_NOISE_STD_DIVISOR; // [0.0, 0.2]
+            let noise_std =
+                (-self.substrate_manager.scale_pressure).min(SUBSTRATE_NOISE_MAX_PRESSURE) / SUBSTRATE_NOISE_STD_DIVISOR; // [0.0, 0.2]
             let seed = self.stats.total_cycles as u64;
             compressed_state
                 .into_iter()

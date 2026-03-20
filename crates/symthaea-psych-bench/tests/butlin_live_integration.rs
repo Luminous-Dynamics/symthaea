@@ -2,9 +2,7 @@
 //!
 //! Verifies: structural Phi → CycleMetadata → RuntimeConsciousnessData → Butlin indicators.
 //!
-//! All tests require `symthaea-backend` feature (full cognitive loop needed).
-//! The module-level `#![cfg(feature = "symthaea-backend")]` gate ensures these
-//! only compile and run when the feature is active.
+//! All tests require `symthaea-backend` feature and `#[ignore]` (full cognitive loop needed).
 #![cfg(feature = "symthaea-backend")]
 
 use symthaea::cognitive_loop::{CognitiveLoopConfig, ConsciousnessProfile};

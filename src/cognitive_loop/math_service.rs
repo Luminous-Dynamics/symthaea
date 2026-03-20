@@ -25,6 +25,16 @@ use symthaea_core::hdc::quadrature::QuadratureEngine;
 use symthaea_core::hdc::root_finding::RootFindingEngine;
 use symthaea_core::hdc::statistics;
 
+use super::thresholds::{
+    MATH_DEFAULT_TELEMETRY_CONFIDENCE, MATH_DEFAULT_TELEMETRY_PHI,
+    MATH_INTEGRATION_UNVERIFIED_CONFIDENCE, MATH_INTEGRATION_VERIFIED_CONFIDENCE,
+    MATH_LINEAR_UNVERIFIED_CONFIDENCE, MATH_LINEAR_VERIFIED_CONFIDENCE, MATH_MULTIPATH_PHI_BOOST,
+    MATH_OPTIMIZATION_CONVERGED_CONFIDENCE, MATH_OPTIMIZATION_FAILED_CONFIDENCE,
+    MATH_ROOT_FINDING_CONVERGED_CONFIDENCE, MATH_ROOT_FINDING_FAILED_CONFIDENCE,
+    MATH_ROOT_FINDING_VERIFIED_CONFIDENCE, MATH_STATISTICS_CONFIDENCE,
+    MATH_STATISTICS_PHI_BASELINE,
+};
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 /// Classification of a math problem type
@@ -133,162 +143,6 @@ pub struct MathEpisode {
     pub phi: f64,
     /// Brief description
     pub description: String,
-    /// Method used to solve (Phase 7c)
-    pub method: String,
-    /// Timestamp (cycle count) when solved (Phase 7c)
-    pub timestamp: u64,
-}
-
-// ─── Phase 7a: Phi-Ranked Solution ─────────────────────────────────────────
-
-/// A solution ranked by Phi (information integration measure).
-///
-/// When multiple solution paths exist for a math problem, each path
-/// produces a different Phi score. Higher Phi indicates more elegant,
-/// more integrated reasoning — shorter proofs with more verification
-/// paths that agree with other methods.
-///
-/// Science: Dehaene (2007) — mathematical beauty correlates with
-/// neural integration; Rota (1997) — elegance as information compression.
-#[derive(Debug, Clone)]
-pub struct PhiRankedSolution {
-    /// The computed result.
-    pub result: f64,
-    /// Method name used for this solution path.
-    pub method: String,
-    /// Phi score for this solution (integration measure).
-    pub phi: f64,
-    /// Number of proof/computation steps.
-    pub proof_steps: usize,
-    /// Number of independent verification paths that confirmed this result.
-    pub verification_paths: usize,
-}
-
-// ─── Phase 7c: Mathematical Memory ─────────────────────────────────────────
-
-/// HDC-encoded mathematical memory for analogical retrieval (Phase 7c).
-///
-/// Stores solved problems as HDC-encoded episodes. When new problems
-/// arrive, searches for similar past problems and transfers solution
-/// strategies (analogical reasoning).
-///
-/// Science: Gentner (1983) — structure-mapping theory of analogy;
-/// Hofstadter & Sander (2013) — analogy as core of cognition.
-pub struct MathMemory {
-    /// HDC-encoded problem-solution pairs.
-    episodes: Vec<MathEpisode>,
-    /// Maximum episodes to retain.
-    capacity: usize,
-}
-
-impl MathMemory {
-    /// Create a new mathematical memory with the given capacity.
-    pub fn new(capacity: usize) -> Self {
-        Self {
-            episodes: Vec::new(),
-            capacity,
-        }
-    }
-
-    /// Find the most similar past problem by HDC cosine similarity.
-    ///
-    /// Returns `None` if memory is empty or no episode exceeds
-    /// the similarity threshold (0.1).
-    pub fn recall(&self, query: &BinaryHV) -> Option<&MathEpisode> {
-        if self.episodes.is_empty() {
-            return None;
-        }
-        let mut best: Option<(usize, f64)> = None;
-        for (i, ep) in self.episodes.iter().enumerate() {
-            let sim = query.similarity(&ep.problem_encoding) as f64;
-            if sim > 0.1 {
-                if let Some((_, best_sim)) = best {
-                    if sim > best_sim {
-                        best = Some((i, sim));
-                    }
-                } else {
-                    best = Some((i, sim));
-                }
-            }
-        }
-        best.map(|(i, _)| &self.episodes[i])
-    }
-
-    /// Find the top-k most similar episodes.
-    pub fn recall_top_k(&self, query: &BinaryHV, k: usize) -> Vec<&MathEpisode> {
-        let mut scored: Vec<(usize, f64)> = self
-            .episodes
-            .iter()
-            .enumerate()
-            .map(|(i, ep)| (i, query.similarity(&ep.problem_encoding) as f64))
-            .filter(|(_, sim)| *sim > 0.1)
-            .collect();
-        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        scored
-            .iter()
-            .take(k)
-            .map(|(i, _)| &self.episodes[*i])
-            .collect()
-    }
-
-    /// Store a new solved problem. Evicts lowest-Phi episode if at capacity.
-    pub fn remember(&mut self, episode: MathEpisode) {
-        if self.episodes.len() >= self.capacity {
-            // Evict lowest-Phi episode
-            if let Some(min_idx) = self
-                .episodes
-                .iter()
-                .enumerate()
-                .min_by(|a, b| {
-                    a.1.phi
-                        .partial_cmp(&b.1.phi)
-                        .unwrap_or(std::cmp::Ordering::Equal)
-                })
-                .map(|(i, _)| i)
-            {
-                if episode.phi > self.episodes[min_idx].phi {
-                    self.episodes.swap_remove(min_idx);
-                } else {
-                    return; // New episode isn't worth storing
-                }
-            }
-        }
-        self.episodes.push(episode);
-    }
-
-    /// Transfer: suggest method from most similar past problem.
-    ///
-    /// Performs analogical reasoning: if a similar problem was solved
-    /// successfully by a certain method, suggest that method for the new one.
-    pub fn suggest_method(&self, problem_encoding: &BinaryHV) -> Option<String> {
-        self.recall(problem_encoding).map(|ep| ep.method.clone())
-    }
-
-    /// Number of stored episodes.
-    pub fn len(&self) -> usize {
-        self.episodes.len()
-    }
-
-    /// Whether memory is empty.
-    pub fn is_empty(&self) -> bool {
-        self.episodes.is_empty()
-    }
-
-    /// Maximum capacity.
-    pub fn capacity(&self) -> usize {
-        self.capacity
-    }
-
-    /// All stored episodes (read-only).
-    pub fn episodes(&self) -> &[MathEpisode] {
-        &self.episodes
-    }
-}
-
-impl Default for MathMemory {
-    fn default() -> Self {
-        Self::new(256)
-    }
 }
 
 /// Telemetry from the math service
@@ -493,7 +347,11 @@ impl MathService {
             vector_result: Some(x.data),
             encoding: result.encoding,
             phi: result.phi,
-            confidence: if result.verified { 0.95 } else { 0.5 },
+            confidence: if result.verified {
+                MATH_LINEAR_VERIFIED_CONFIDENCE
+            } else {
+                MATH_LINEAR_UNVERIFIED_CONFIDENCE
+            },
             multipath_verified: result.verified,
             problem_type: MathProblemType::LinearSystem,
             epistemic_caveat: if !result.verified {
@@ -523,7 +381,7 @@ impl MathService {
             data.len(), m, v, s, med, q1, q3, sk, ku
         );
 
-        let phi = 0.3;
+        let phi = MATH_STATISTICS_PHI_BASELINE;
         self.record_solve(MathProblemType::Statistics, phi);
 
         let encoding = BinaryHV::random(seed_from_name(&format!("STATS_{}", m.to_bits())));
@@ -534,7 +392,7 @@ impl MathService {
             vector_result: None,
             encoding,
             phi,
-            confidence: 0.99,
+            confidence: MATH_STATISTICS_CONFIDENCE,
             multipath_verified: false,
             problem_type: MathProblemType::Statistics,
             epistemic_caveat: if data.len() < 30 {
@@ -687,7 +545,7 @@ impl MathService {
 
         // Use Brent as primary (faster convergence), boost phi if verified
         let phi = if multipath_verified {
-            (brent_result.phi + bisect_result.phi) / 2.0 * 1.2
+            (brent_result.phi + bisect_result.phi) / 2.0 * MATH_MULTIPATH_PHI_BOOST
         } else {
             brent_result.phi
         };
@@ -708,11 +566,11 @@ impl MathService {
             encoding: brent_result.encoding,
             phi,
             confidence: if multipath_verified {
-                0.99
+                MATH_ROOT_FINDING_VERIFIED_CONFIDENCE
             } else if brent_result.converged {
-                0.9
+                MATH_ROOT_FINDING_CONVERGED_CONFIDENCE
             } else {
-                0.3
+                MATH_ROOT_FINDING_FAILED_CONFIDENCE
             },
             multipath_verified,
             problem_type: MathProblemType::RootFinding,
@@ -737,7 +595,7 @@ impl MathService {
         let multipath_verified = agreement < 1e-6;
 
         let phi = if multipath_verified {
-            (simpson.phi + gauss.phi) / 2.0 * 1.2
+            (simpson.phi + gauss.phi) / 2.0 * MATH_MULTIPATH_PHI_BOOST
         } else {
             simpson.phi
         };
@@ -754,7 +612,11 @@ impl MathService {
             vector_result: None,
             encoding: simpson.encoding,
             phi,
-            confidence: if multipath_verified { 0.99 } else { 0.9 },
+            confidence: if multipath_verified {
+                MATH_INTEGRATION_VERIFIED_CONFIDENCE
+            } else {
+                MATH_INTEGRATION_UNVERIFIED_CONFIDENCE
+            },
             multipath_verified,
             problem_type: MathProblemType::Integration,
             epistemic_caveat: if !multipath_verified {
@@ -794,7 +656,11 @@ impl MathService {
             vector_result: Some(result.x),
             encoding: result.encoding,
             phi,
-            confidence: if result.converged { 0.9 } else { 0.4 },
+            confidence: if result.converged {
+                MATH_OPTIMIZATION_CONVERGED_CONFIDENCE
+            } else {
+                MATH_OPTIMIZATION_FAILED_CONFIDENCE
+            },
             multipath_verified: false,
             problem_type: MathProblemType::Optimization,
             epistemic_caveat: if !result.converged {
@@ -1075,7 +941,7 @@ impl MathService {
         let multipath_verified =
             candidates.len() >= 2 && (candidates[0].0 - candidates[1].0).abs() < 1e-6;
         let phi = if multipath_verified {
-            best.1 * 1.2
+            best.1 * MATH_MULTIPATH_PHI_BOOST
         } else {
             best.1
         };
@@ -1148,8 +1014,8 @@ impl MathService {
             numerical_result: Some(det),
             vector_result: None,
             encoding: BinaryHV::random(42),
-            phi: 0.4,
-            confidence: 0.9,
+            phi: MATH_DEFAULT_TELEMETRY_PHI,
+            confidence: MATH_DEFAULT_TELEMETRY_CONFIDENCE,
             multipath_verified: false,
             problem_type: MathProblemType::MatrixAnalysis,
             epistemic_caveat: None,
@@ -1158,142 +1024,6 @@ impl MathService {
         self.store_episode(&response, &format!("matrix_determinant(n={n})"));
         self.telemetry.problems_solved += 1;
         response
-    }
-
-    // ─── Phase 7a: Phi-Ranked Proof Search ─────────────────────────────
-
-    /// Solve a root-finding problem via multiple methods, rank by Phi
-    /// (integration measure). Higher Phi = more information integration
-    /// = more elegant solution.
-    ///
-    /// The Phi for each solution path is computed as:
-    /// `phi = agreement_bonus * (1.0 / proof_steps.max(1)) * verification_paths`
-    ///
-    /// Solutions that agree with other methods get a bonus. Shorter proofs
-    /// with more verification paths score higher.
-    ///
-    /// Science: Dehaene (2007) — mathematical elegance correlates with neural
-    /// integration; Rota (1997) — beauty in mathematics as information compression.
-    pub fn solve_with_phi_ranking<F: Fn(f64) -> f64>(
-        &mut self,
-        f: &F,
-        a: f64,
-        b: f64,
-    ) -> Vec<PhiRankedSolution> {
-        let tol = 1e-10;
-
-        // Try multiple methods
-        let brent = RootFindingEngine::brent(f, a, b, tol);
-        let bisect = RootFindingEngine::bisection(f, a, b, tol);
-        let df = |x: f64| {
-            let h = 1e-8;
-            (f(x + h) - f(x - h)) / (2.0 * h)
-        };
-        let newton = RootFindingEngine::newton_raphson(f, &df, (a + b) / 2.0, tol);
-
-        // Collect converged results
-        struct RawCandidate {
-            root: f64,
-            iterations: usize,
-            converged: bool,
-            method: &'static str,
-        }
-
-        let mut raw = Vec::new();
-        if brent.converged {
-            raw.push(RawCandidate {
-                root: brent.root,
-                iterations: brent.iterations,
-                converged: true,
-                method: "brent",
-            });
-        }
-        if bisect.converged {
-            raw.push(RawCandidate {
-                root: bisect.root,
-                iterations: bisect.iterations,
-                converged: true,
-                method: "bisection",
-            });
-        }
-        if newton.converged {
-            raw.push(RawCandidate {
-                root: newton.root,
-                iterations: newton.iterations,
-                converged: true,
-                method: "newton_raphson",
-            });
-        }
-
-        if raw.is_empty() {
-            return Vec::new();
-        }
-
-        let total_methods = raw.len();
-
-        // For each candidate, count how many others agree (within 1e-6)
-        let mut solutions: Vec<PhiRankedSolution> = raw
-            .iter()
-            .map(|candidate| {
-                let agreeing = raw
-                    .iter()
-                    .filter(|other| (other.root - candidate.root).abs() < 1e-6)
-                    .count();
-
-                let agreement_bonus = if agreeing > 1 {
-                    1.0 + 0.2 * (agreeing - 1) as f64
-                } else {
-                    1.0
-                };
-
-                let proof_steps = candidate.iterations.max(1);
-                let verification_paths = agreeing;
-
-                let phi = agreement_bonus
-                    * (1.0 / proof_steps as f64)
-                    * verification_paths as f64;
-
-                PhiRankedSolution {
-                    result: candidate.root,
-                    method: candidate.method.to_string(),
-                    phi,
-                    proof_steps,
-                    verification_paths,
-                }
-            })
-            .collect();
-
-        // Sort by Phi descending
-        solutions.sort_by(|a, b| b.phi.partial_cmp(&a.phi).unwrap_or(std::cmp::Ordering::Equal));
-
-        // Record telemetry
-        if let Some(best) = solutions.first() {
-            self.record_solve(MathProblemType::RootFinding, best.phi);
-        }
-
-        solutions
-    }
-
-    // ─── Phase 7c: Mathematical Memory Accessors ─────────────────────────
-
-    /// Get a reference to the structured mathematical memory (Phase 7c).
-    pub fn math_memory(&self) -> MathMemory {
-        // Build a MathMemory view from our internal Vec
-        let mut mm = MathMemory::new(self.memory_capacity);
-        for ep in &self.memory {
-            mm.episodes.push(ep.clone());
-        }
-        mm
-    }
-
-    /// Suggest a method for a new problem based on past experience (Phase 7c).
-    ///
-    /// Encodes the problem text as an HDC vector and searches memory
-    /// for similar past problems, returning the method used.
-    pub fn suggest_method_for(&self, problem_text: &str) -> Option<String> {
-        let query = BinaryHV::random(seed_from_name(&format!("QUERY_{}", problem_text)));
-        let mm = self.math_memory();
-        mm.suggest_method(&query)
     }
 
     // ─── Internal ────────────────────────────────────────────────────────
@@ -1335,8 +1065,6 @@ impl MathService {
             problem_type: response.problem_type,
             phi: response.phi,
             description: description.to_string(),
-            method: description.to_string(),
-            timestamp: self.telemetry.problems_solved as u64,
         });
     }
 
@@ -1741,225 +1469,5 @@ mod tests {
             root
         );
         assert!(response.answer.contains("methods converged"));
-    }
-
-    // ══════════════════════════════════════════════════════════════════════
-    // Phase 7a: Phi-Ranked Proof Search Tests
-    // ══════════════════════════════════════════════════════════════════════
-
-    #[test]
-    fn test_phi_ranking_prefers_elegant() {
-        let mut service = MathService::new();
-
-        // x² - 4 = 0 in [0, 3] → root at 2.0
-        // All 3 methods should converge; ranking should prefer the one
-        // with fewest steps (most elegant).
-        let solutions = service.solve_with_phi_ranking(&|x: f64| x * x - 4.0, 0.0, 3.0);
-        assert!(!solutions.is_empty(), "Should have at least one solution");
-
-        // Solutions should be sorted by Phi descending
-        for pair in solutions.windows(2) {
-            assert!(
-                pair[0].phi >= pair[1].phi,
-                "Solutions not sorted: {} >= {} failed",
-                pair[0].phi,
-                pair[1].phi
-            );
-        }
-
-        // Best solution should be correct
-        let best = &solutions[0];
-        assert!(
-            (best.result - 2.0).abs() < 1e-6,
-            "Best result should be 2.0, got {}",
-            best.result
-        );
-    }
-
-    #[test]
-    fn test_multi_method_agreement_bonus() {
-        let mut service = MathService::new();
-
-        // x - 1 = 0 in [0, 2] → simple root at 1.0, all methods converge
-        let solutions = service.solve_with_phi_ranking(&|x: f64| x - 1.0, 0.0, 2.0);
-
-        // All methods should agree on x=1.0
-        for sol in &solutions {
-            assert!(
-                (sol.result - 1.0).abs() < 1e-6,
-                "Method {} got {}, expected 1.0",
-                sol.method,
-                sol.result
-            );
-            // Verification paths should be > 1 due to agreement
-            assert!(
-                sol.verification_paths > 1,
-                "Method {} should have >1 verification paths, got {}",
-                sol.method,
-                sol.verification_paths
-            );
-        }
-    }
-
-    #[test]
-    fn test_single_method_fallback() {
-        let mut service = MathService::new();
-
-        // A tricky function where maybe only 1-2 methods converge
-        // tanh(100*(x-1)) has a root at x=1 but is very steep
-        let solutions = service.solve_with_phi_ranking(
-            &|x: f64| (100.0 * (x - 1.0)).tanh(),
-            0.5,
-            1.5,
-        );
-        // Should still return solutions (at least Brent/bisection converge)
-        assert!(!solutions.is_empty(), "Should have at least one solution");
-        let best = &solutions[0];
-        assert!(
-            (best.result - 1.0).abs() < 0.01,
-            "Should find root near 1.0, got {}",
-            best.result
-        );
-    }
-
-    #[test]
-    fn test_phi_ranking_empty_problem() {
-        let mut service = MathService::new();
-
-        // Function with no root in [2, 3]: x² + 1 > 0 everywhere
-        let solutions = service.solve_with_phi_ranking(&|x: f64| x * x + 1.0, 2.0, 3.0);
-        // No method should converge since there's no root → empty
-        // (Brent/bisection need sign change; f(2)=5, f(3)=10, both positive)
-        assert!(
-            solutions.is_empty(),
-            "No convergent solutions expected for x²+1 on [2,3]"
-        );
-    }
-
-    #[test]
-    fn test_proof_step_penalty() {
-        let mut service = MathService::new();
-
-        // Simple linear root: x - 5 = 0 in [0, 10]
-        let solutions = service.solve_with_phi_ranking(&|x: f64| x - 5.0, 0.0, 10.0);
-        assert!(!solutions.is_empty());
-
-        // Phi formula includes 1/proof_steps — fewer steps → higher Phi
-        // All solutions should have proof_steps >= 1
-        for sol in &solutions {
-            assert!(
-                sol.proof_steps >= 1,
-                "proof_steps should be >= 1, got {}",
-                sol.proof_steps
-            );
-            assert!(sol.phi > 0.0, "Phi should be positive for converged solution");
-        }
-    }
-
-    // ══════════════════════════════════════════════════════════════════════
-    // Phase 7c: Mathematical Memory Tests
-    // ══════════════════════════════════════════════════════════════════════
-
-    #[test]
-    fn test_math_memory_recall() {
-        let mut mm = MathMemory::new(10);
-
-        // Store an episode
-        let encoding = BinaryHV::random(seed_from_name("test_problem_1"));
-        mm.remember(MathEpisode {
-            problem_encoding: encoding.clone(),
-            solution_encoding: BinaryHV::random(seed_from_name("test_solution_1")),
-            problem_type: MathProblemType::RootFinding,
-            phi: 0.5,
-            description: "root finding test".to_string(),
-            method: "brent".to_string(),
-            timestamp: 1,
-        });
-
-        // Recall with the exact same encoding → should find it
-        let recalled = mm.recall(&encoding);
-        assert!(recalled.is_some(), "Should recall the stored episode");
-        assert_eq!(recalled.unwrap().description, "root finding test");
-    }
-
-    #[test]
-    fn test_math_memory_capacity_limit() {
-        let mut mm = MathMemory::new(3);
-
-        // Store 4 episodes (capacity = 3)
-        for i in 0..4 {
-            mm.remember(MathEpisode {
-                problem_encoding: BinaryHV::random(seed_from_name(&format!("cap_prob_{}", i))),
-                solution_encoding: BinaryHV::random(seed_from_name(&format!("cap_sol_{}", i))),
-                problem_type: MathProblemType::Arithmetic,
-                phi: i as f64 * 0.1 + 0.1,
-                description: format!("episode_{}", i),
-                method: "test".to_string(),
-                timestamp: i as u64,
-            });
-        }
-
-        // Should not exceed capacity
-        assert!(
-            mm.len() <= 3,
-            "Memory should not exceed capacity 3, got {}",
-            mm.len()
-        );
-    }
-
-    #[test]
-    fn test_method_suggestion() {
-        let mut mm = MathMemory::new(10);
-
-        let encoding = BinaryHV::random(seed_from_name("suggest_prob"));
-        mm.remember(MathEpisode {
-            problem_encoding: encoding.clone(),
-            solution_encoding: BinaryHV::random(42),
-            problem_type: MathProblemType::RootFinding,
-            phi: 0.8,
-            description: "root test".to_string(),
-            method: "newton_raphson".to_string(),
-            timestamp: 1,
-        });
-
-        // Query with same encoding → should suggest "newton_raphson"
-        let suggestion = mm.suggest_method(&encoding);
-        assert_eq!(suggestion, Some("newton_raphson".to_string()));
-    }
-
-    #[test]
-    fn test_memory_similarity_threshold() {
-        let mut mm = MathMemory::new(10);
-
-        // Store an episode with a specific encoding
-        mm.remember(MathEpisode {
-            problem_encoding: BinaryHV::random(seed_from_name("sim_prob_1")),
-            solution_encoding: BinaryHV::random(42),
-            problem_type: MathProblemType::Statistics,
-            phi: 0.3,
-            description: "stats test".to_string(),
-            method: "descriptive".to_string(),
-            timestamp: 1,
-        });
-
-        // Query with a completely different random encoding — similarity
-        // should be near 0.5 for random BinaryHVs (Hamming distance ~50%).
-        // The threshold is 0.1, so random vectors DO pass it typically.
-        // Use a zero vector (all false) to get more predictable similarity.
-        let recalled = mm.recall(&BinaryHV::random(seed_from_name("sim_prob_1")));
-        assert!(recalled.is_some(), "Same-seed encoding should match");
-    }
-
-    #[test]
-    fn test_empty_memory_returns_none() {
-        let mm = MathMemory::new(10);
-        let query = BinaryHV::random(42);
-        assert!(mm.recall(&query).is_none(), "Empty memory should return None");
-        assert!(
-            mm.suggest_method(&query).is_none(),
-            "Empty memory should suggest None"
-        );
-        assert!(mm.is_empty());
-        assert_eq!(mm.len(), 0);
     }
 }

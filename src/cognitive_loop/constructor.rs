@@ -995,9 +995,10 @@ impl CognitiveLoopService {
             #[cfg(feature = "mesh")]
             spectrum_manager: super::managers::SpectrumManager::default(),
             #[cfg(feature = "mesh")]
-            consciousness_router: super::ConsciousnessAwareRouter::default(),
+            consciousness_router:
+                super::managers::radio_dispatcher::ConsciousnessAwareRouter::default(),
             #[cfg(feature = "mesh")]
-            store_and_forward: super::StoreAndForward::default(),
+            store_and_forward: super::managers::radio_dispatcher::StoreAndForward::default(),
             #[cfg(feature = "cpg")]
             cpg_manager: super::managers::CpgManager::new(
                 super::managers::cpg_manager::CpgConfig::default(),
@@ -1013,6 +1014,8 @@ impl CognitiveLoopService {
                     .set_threshold(therapeutic_crisis_threshold);
                 tm
             },
+            #[cfg(feature = "advanced-manufacturing")]
+            fabrication_manager: super::managers::FabricationManager::default(),
             cantor_dream: super::cantor_dream_manager::CantorDreamManager::new(
                 super::thresholds::CANTOR_CODEBOOK_MAX_ENTRIES,
             ),

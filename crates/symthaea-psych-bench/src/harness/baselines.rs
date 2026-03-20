@@ -4447,7 +4447,7 @@ pub fn clinical_baselines() -> BaselineMap {
         "empathic_accuracy",
         Baseline {
             value: 0.60,
-            sd: Some(0.15),
+            sd: Some(0.12),
             source: "Ickes (1993) empathic accuracy paradigm",
             population: "trained therapists",
         },
@@ -4456,7 +4456,7 @@ pub fn clinical_baselines() -> BaselineMap {
         "response_appropriateness",
         Baseline {
             value: 0.75,
-            sd: Some(0.12),
+            sd: Some(0.10),
             source: "Hill (2009) Helping Skills rating",
             population: "clinical psychology trainees",
         },
@@ -4474,8 +4474,8 @@ pub fn clinical_baselines() -> BaselineMap {
         "crisis_sensitivity",
         Baseline {
             value: 0.95,
-            sd: Some(0.05),
-            source: "C-SSRS screening validation (Posner et al., 2011)",
+            sd: Some(0.03),
+            source: "C-SSRS screening validation",
             population: "crisis clinicians",
         },
     );

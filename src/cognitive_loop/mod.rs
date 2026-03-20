@@ -203,14 +203,8 @@ pub use managers::{
     CompressedDelta, NetworkHealth, PayloadClass, PayloadClassifier, RadioTier, RoutingDecision,
     SpectrumManager, SpectrumObservation, SpectrumTelemetry,
 };
-#[cfg(feature = "mesh")]
-pub(crate) use managers::radio_dispatcher::{
-    ConsciousnessAwareRouter, StoreAndForward,
-};
 
 pub mod calibration;
-#[cfg(feature = "mathematics")]
-pub mod math_epistemic;
 #[cfg(feature = "mathematics")]
 pub mod math_service;
 
@@ -724,11 +718,12 @@ pub struct CognitiveLoopService {
     /// Consciousness-Aware Router: Routes mesh traffic by Phi, moral urgency,
     /// governance tier. Adaptive sharing cadence based on collective coherence.
     #[cfg(feature = "mesh")]
-    pub(crate) consciousness_router: ConsciousnessAwareRouter,
+    pub(crate) consciousness_router: managers::radio_dispatcher::ConsciousnessAwareRouter,
 
     /// Store-and-Forward: Dream-consolidated reconnection for intermittent mesh nodes.
+    /// Buffers offline experiences, consolidates on reconnect.
     #[cfg(feature = "mesh")]
-    pub(crate) store_and_forward: StoreAndForward,
+    pub(crate) store_and_forward: managers::radio_dispatcher::StoreAndForward,
 
     /// CPG Manager: Kuramoto coupled oscillators for rhythmic motor timing.
     /// Implements CognitiveSubsystem at interval 59. Feature-gated behind `cpg`.
@@ -745,6 +740,11 @@ pub struct CognitiveLoopService {
     /// Implements CognitiveSubsystem at interval 11. Feature-gated behind `therapeutic`.
     #[cfg(feature = "therapeutic")]
     therapeutic_manager: managers::TherapeuticManager,
+
+    /// Fabrication Manager: Cincinnati quality monitoring, ManufacturingTwin readings, PoGF.
+    /// Implements CognitiveSubsystem at interval 47. Feature-gated behind `advanced-manufacturing`.
+    #[cfg(feature = "advanced-manufacturing")]
+    pub(crate) fabrication_manager: managers::FabricationManager,
 
     /// Glyph Manager: symbolic consciousness field, 11 Field Modality basis vectors,
     /// 70-glyph registry, developmental spiral tracking.
