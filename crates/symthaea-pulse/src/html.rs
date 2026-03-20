@@ -2192,7 +2192,7 @@ fn write_mesh_consciousness_pane(
             "<span style=\"font-size:0.75em;color:#8a9a8a\">&Phi; Convergence</span><br>",
         );
         let data: Vec<f64> = mesh.phi_history.iter().map(|&v| v as f64).collect();
-        write_sparkline_svg(html, &data, 180, 30, "#e8c547");
+        write_sparkline(html, &data, "#e8c547", 180, 30);
         html.push_str("</div>");
     }
 

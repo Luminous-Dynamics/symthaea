@@ -981,10 +981,10 @@ fn main() {
         );
 
         // Phi values
-        let phi_str = if let Some(phi) = m.spectral_mip_phi {
+        let phi_str = if let Some(phi) = m.structural.spectral_mip_phi {
             format!("PHI: {:.4}", phi)
         } else {
-            format!("PHI: {:.4} (STRUCT)", m.structural_macro_phi)
+            format!("PHI: {:.4} (STRUCT)", m.structural.structural_macro_phi)
         };
         draw_text(
             &mut frame,

@@ -8,7 +8,7 @@ use super::scheduling::CycleUrgency;
 
 /// Cached consciousness integration scores carried between cycles.
 #[derive(Debug, Clone)]
-pub(crate) struct ConsciousnessCache {
+pub struct ConsciousnessCache {
     /// Predictive processing phi modulation (1.0 = neutral)
     pub(crate) predictive_phi_modulation: f64,
     /// Cross-modal Phi (fed back into confidence)
@@ -84,7 +84,7 @@ impl Default for ConsciousnessCache {
 
 /// Urgency state for adaptive subsystem scheduling.
 #[derive(Debug, Clone)]
-pub(crate) struct UrgencyState {
+pub struct UrgencyState {
     /// Urgency level (hysteresis — prevents jitter)
     pub(crate) urgency: CycleUrgency,
     /// Consecutive cycles with error below threshold (Cruise mode trigger)
@@ -132,22 +132,22 @@ impl Default for UrgencyState {
 
 /// Learning rate modulation state.
 #[derive(Debug, Clone)]
-pub(crate) struct LearningState {
+pub struct LearningState {
     /// Prediction confidence snapshot at cycle start (drift clamping)
-    pub(crate) prediction_confidence: f64,
+    pub prediction_confidence: f64,
     /// MCE consciousness-level LR boost (decays 10%/cycle between MCE firings)
-    pub(crate) mce_lr_boost: f32,
+    pub mce_lr_boost: f32,
     /// Adaptive learning threshold multiplier (1.0 = config value as-is)
-    pub(crate) adaptive_threshold_scale: f64,
+    pub adaptive_threshold_scale: f64,
     /// Subsystem LR modulation factor (accumulated post-training, consumed next cycle).
-    pub(crate) subsystem_lr_factor: f32,
+    pub subsystem_lr_factor: f32,
     // ── Phase 17: Predictive Self-Tuning ──────────────────────────────
     /// Self-model accuracy EMA (how well past predictions matched outcomes)
-    pub(crate) self_model_accuracy: f32,
+    pub self_model_accuracy: f32,
     /// Cognitive group geometric mean (flow x semantic x reasoning x curiosity)
-    pub(crate) lr_cognitive_mod: f32,
+    pub lr_cognitive_mod: f32,
     /// Meta-learning group geometric mean (FEP x MCE x subsystem)
-    pub(crate) lr_meta_mod: f32,
+    pub lr_meta_mod: f32,
 }
 
 impl Default for LearningState {
@@ -166,7 +166,7 @@ impl Default for LearningState {
 
 /// Cached quality and diagnostic metrics.
 #[derive(Debug, Clone)]
-pub(crate) struct QualityMetrics {
+pub struct QualityMetrics {
     /// Number of detected causal chains (cached from last analysis, every 50 cycles).
     pub(crate) causal_chain_count: usize,
     /// Temporal continuity ratio (0.0–1.0, cached from last analysis, every 100 cycles).
@@ -374,7 +374,7 @@ impl Default for QualityMetrics {
 
 /// Historical state for cycle-to-cycle continuity.
 #[derive(Debug, Clone)]
-pub(crate) struct CycleHistory {
+pub struct CycleHistory {
     /// MCTS plan action (action_idx, confidence) for next cycle
     pub(crate) mcts_plan: Option<(usize, f32)>,
     /// Body arousal (fed back into CfC tau modulation)
@@ -450,17 +450,17 @@ impl Default for CycleHistory {
 #[derive(Debug, Clone, Default)]
 pub struct CycleCarryover {
     /// Cached consciousness integration scores
-    pub(crate) consciousness: ConsciousnessCache,
+    pub consciousness: ConsciousnessCache,
     /// Urgency scheduling state
-    pub(crate) urgency: UrgencyState,
+    pub urgency: UrgencyState,
     /// Learning rate modulation
-    pub(crate) learning: LearningState,
+    pub learning: LearningState,
     /// Cached quality/diagnostic metrics
-    pub(crate) quality: QualityMetrics,
+    pub quality: QualityMetrics,
     /// Historical state for continuity
-    pub(crate) history: CycleHistory,
+    pub history: CycleHistory,
     /// Whether GWT broadcast occurred in the previous cycle
-    pub(crate) gwt_broadcast_occurred: bool,
+    pub gwt_broadcast_occurred: bool,
     /// GWT winning coalition size from previous cycle (0 if no broadcast)
-    pub(crate) gwt_coalition_size: u32,
+    pub gwt_coalition_size: u32,
 }
