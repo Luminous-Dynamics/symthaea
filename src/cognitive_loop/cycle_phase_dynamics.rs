@@ -1009,7 +1009,7 @@ impl CognitiveLoopService {
                     Some((made_at, pred_confidence, pred_urgency));
             }
         }
-        if self.stats.total_cycles as u64 % super::thresholds::SELF_MODEL_PREDICTION_INTERVAL == 0
+        if self.stats.total_cycles % super::thresholds::SELF_MODEL_PREDICTION_INTERVAL == 0
             && self.carryover.history.self_model_prediction.is_none()
         {
             self.carryover.history.self_model_prediction =
@@ -3493,7 +3493,7 @@ impl CognitiveLoopService {
         // Return the buffer to CLS for reuse next cycle (zero-alloc swap)
         self.cfc_input_buffer = input_array;
 
-        let prediction_coherence = if self.stats.total_cycles as u64 % super::thresholds::PREDICTION_COHERENCE_INTERVAL == 0 {
+        let prediction_coherence = if self.stats.total_cycles % super::thresholds::PREDICTION_COHERENCE_INTERVAL == 0 {
             let coh = Self::compute_prediction_coherence_from_cache(&raw_predictions);
             self.stats.avg_prediction_coherence = self.stats.avg_prediction_coherence
                 * COHERENCE_PREDICTION_EMA
@@ -3560,7 +3560,7 @@ impl CognitiveLoopService {
         } else {
             epistemic_uncertainty
         };
-        if eu_for_exploration > EPISTEMIC_EXPLORE_THRESHOLD && self.stats.total_cycles as u64 % super::thresholds::EPISTEMIC_MODULATION_INTERVAL == 0 {
+        if eu_for_exploration > EPISTEMIC_EXPLORE_THRESHOLD && self.stats.total_cycles % super::thresholds::EPISTEMIC_MODULATION_INTERVAL == 0 {
             let mut epistemic_explore =
                 (eu_for_exploration - EPISTEMIC_EXPLORE_THRESHOLD) * EPISTEMIC_EXPLORE_SCALE;
             // Oscillation + high uncertainty = confused AND unstable → stronger exploration.
@@ -3569,7 +3569,7 @@ impl CognitiveLoopService {
                 epistemic_explore *= EPISTEMIC_OSCILLATION_MULTIPLIER;
             }
             self.adjust_exploration("epistemic_uncertainty", epistemic_explore);
-        } else if eu_for_exploration < EPISTEMIC_LOW_THRESHOLD && self.stats.total_cycles as u64 % super::thresholds::EPISTEMIC_MODULATION_INTERVAL == 0 {
+        } else if eu_for_exploration < EPISTEMIC_LOW_THRESHOLD && self.stats.total_cycles % super::thresholds::EPISTEMIC_MODULATION_INTERVAL == 0 {
             // Low epistemic uncertainty → dampen exploration (model is confident).
             self.adjust_exploration("epistemic_low", -EPISTEMIC_LOW_DAMPEN);
         }
@@ -3595,7 +3595,7 @@ impl CognitiveLoopService {
 
         // Incorporate causal structure into world model (every 41 cycles, co-prime).
         // Pearl (2009): causal knowledge provides structural priors beyond correlation.
-        if self.stats.total_cycles as u64 % super::thresholds::CAUSAL_STRUCTURE_INTERVAL == 0 {
+        if self.stats.total_cycles % super::thresholds::CAUSAL_STRUCTURE_INTERVAL == 0 {
             if let Some(ref enhancer) = self.causal_enhancer {
                 let graph = enhancer.current_graph();
                 if !graph.is_empty() {
@@ -3856,7 +3856,7 @@ impl CognitiveLoopService {
             self.language_comm.voice_coherence.bridge.phi_contribution();
 
         #[cfg(feature = "school_learning")]
-        let school_predicted_phi_gain = if self.stats.total_cycles as u64 % super::thresholds::SCHOOL_LEARNING_INTERVAL == 0 {
+        let school_predicted_phi_gain = if self.stats.total_cycles % super::thresholds::SCHOOL_LEARNING_INTERVAL == 0 {
             if let Some(ref school) = self.feature_integ.school_bridge {
                 match school.recommend_next() {
                     Ok(r) if r.predicted_phi_gain > 0.001 => r.predicted_phi_gain,
@@ -3875,7 +3875,7 @@ impl CognitiveLoopService {
         #[cfg(not(feature = "school_learning"))]
         let school_predicted_phi_gain = 0.0f32;
 
-        let causal_attention_boost = if self.stats.total_cycles as u64 % super::thresholds::CAUSAL_STRUCTURE_INTERVAL == 0 {
+        let causal_attention_boost = if self.stats.total_cycles % super::thresholds::CAUSAL_STRUCTURE_INTERVAL == 0 {
             if let Some(ref mut cc) = self.feature_integ.causal_consciousness {
                 let vars: Vec<Vec<f64>> = perception
                     .encoding

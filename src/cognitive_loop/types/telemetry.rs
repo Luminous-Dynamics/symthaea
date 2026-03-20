@@ -1708,6 +1708,20 @@ pub struct CycleMetadata {
     #[cfg(feature = "scientific_method")]
     #[serde(default)]
     pub scientific_avg_prediction_accuracy: f64,
+
+    // ── Mathematics Phase 7 Telemetry ──────────────────────────────────
+    /// Count of multi-method Phi-ranked solutions produced this cycle (Phase 7a).
+    #[cfg(feature = "mathematics")]
+    #[serde(default)]
+    pub math_phi_ranked_solutions: usize,
+    /// Count of uncertain epistemic results this cycle (Phase 7b).
+    #[cfg(feature = "mathematics")]
+    #[serde(default)]
+    pub math_epistemic_uncertain_count: usize,
+    /// Count of successful memory recalls this cycle (Phase 7c).
+    #[cfg(feature = "mathematics")]
+    #[serde(default)]
+    pub math_memory_hits: usize,
 }
 
 /// Therapeutic subsystem telemetry for CycleMetadata.

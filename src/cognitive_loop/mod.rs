@@ -206,6 +206,8 @@ pub use managers::{
 
 pub mod calibration;
 #[cfg(feature = "mathematics")]
+pub mod math_epistemic;
+#[cfg(feature = "mathematics")]
 pub mod math_service;
 
 #[cfg(feature = "nurture")]

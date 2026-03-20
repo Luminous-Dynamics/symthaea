@@ -841,32 +841,32 @@ pub const CPG_TAU_CLAMP_MAX: f32 = 2.0;
 /// Self-model prediction interval (cycles). Every N cycles, generate a
 /// prediction about own future state for metacognitive calibration.
 /// Basis: Friston (2010) — interoceptive prediction requires periodic sampling.
-pub const SELF_MODEL_PREDICTION_INTERVAL: u64 = 7;
+pub const SELF_MODEL_PREDICTION_INTERVAL: usize = 7;
 
 /// Prediction coherence evaluation interval (cycles). Measures inter-scale
 /// agreement across multi-scale CfC predictions.
 /// Basis: Clark (2013) — multi-scale coherence assessed at slower timescale.
-pub const PREDICTION_COHERENCE_INTERVAL: u64 = 11;
+pub const PREDICTION_COHERENCE_INTERVAL: usize = 11;
 
 /// Epistemic exploration modulation interval (cycles). Controls how often
 /// epistemic uncertainty adjusts exploration factor.
 /// Basis: Depeweg et al. (2018) — epistemic uncertainty drives active learning.
-pub const EPISTEMIC_MODULATION_INTERVAL: u64 = 7;
+pub const EPISTEMIC_MODULATION_INTERVAL: usize = 7;
 
 /// Causal structure incorporation interval (cycles). Feeds Pearl-style causal
 /// graph edges into the FEP world model.
 /// Basis: Pearl (2009) — causal priors require periodic structural updates.
-pub const CAUSAL_STRUCTURE_INTERVAL: u64 = 41;
+pub const CAUSAL_STRUCTURE_INTERVAL: usize = 41;
 
 /// School learning recommendation interval (cycles). Queries the curriculum
 /// learning bridge for next-task recommendations.
 /// Basis: Schmidhuber (2010) — curiosity-driven curriculum at co-prime rate.
-pub const SCHOOL_LEARNING_INTERVAL: u64 = 53;
+pub const SCHOOL_LEARNING_INTERVAL: usize = 53;
 
 /// Causal attention computation interval (cycles). Runs causal consciousness
 /// attention analysis over compressed input state.
 /// Basis: Tononi (2004) — causal analysis requires sufficient data accumulation.
-pub const CAUSAL_ATTENTION_INTERVAL: u64 = 41;
+pub const CAUSAL_ATTENTION_INTERVAL: usize = 41;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // BUFFER CAPACITIES
