@@ -135,11 +135,11 @@ fn assert_metadata_sane(
 
     // thermodynamic_load: [0.0, 1.0]
     assert_finite_f32(
-        m.thermodynamic_load,
+        m.temporal.thermodynamic_load,
         &format!("thermodynamic_load@cycle{cycle}"),
     )?;
     assert_bounded_f32(
-        m.thermodynamic_load,
+        m.temporal.thermodynamic_load,
         0.0,
         1.0,
         &format!("thermodynamic_load@cycle{cycle}"),
@@ -157,11 +157,11 @@ fn assert_metadata_sane(
     );
 
     // somatic_stress: >= 0
-    assert_finite_f64(m.somatic_stress, &format!("somatic_stress@cycle{cycle}"))?;
+    assert_finite_f64(m.embodied.somatic_stress, &format!("somatic_stress@cycle{cycle}"))?;
     prop_assert!(
-        m.somatic_stress >= 0.0,
+        m.embodied.somatic_stress >= 0.0,
         "somatic_stress negative at cycle {cycle}: {}",
-        m.somatic_stress
+        m.embodied.somatic_stress
     );
 
     // prediction_error: finite
@@ -190,8 +190,8 @@ fn assert_metadata_sane(
     )?;
 
     // body telemetry: finite
-    assert_finite_f32(m.body_valence, &format!("body_valence@cycle{cycle}"))?;
-    assert_finite_f32(m.body_arousal, &format!("body_arousal@cycle{cycle}"))?;
+    assert_finite_f32(m.embodied.body_valence, &format!("body_valence@cycle{cycle}"))?;
+    assert_finite_f32(m.embodied.body_arousal, &format!("body_arousal@cycle{cycle}"))?;
 
     // cycle_reward: bounded [-1, 1]
     assert_finite_f32(m.cycle_reward, &format!("cycle_reward@cycle{cycle}"))?;

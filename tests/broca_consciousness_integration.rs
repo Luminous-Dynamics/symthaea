@@ -494,6 +494,7 @@ fn test_epistemic_gate_apply_scaled_reduces_effect() {
 // ============================================================================
 
 #[test]
+#[cfg(feature = "mamba-cpu")]
 fn test_orthogonality_gradients_produce_nonzero_gradients() {
     use symthaea_broca::projection::HdcSsmProjection;
 

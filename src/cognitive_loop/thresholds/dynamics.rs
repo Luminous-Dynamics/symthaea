@@ -482,6 +482,18 @@ pub const CPG_DESYNC_AROUSAL_DELTA: f32 = 0.1;
 /// Science: Buzsáki (2006) — neural oscillation synchrony gates information integration rate.
 pub const CPG_SYNC_TAU_FLOOR: f32 = 0.7;
 
+/// CPG synchronization → consciousness (Phi) modulation amplitude (±5%).
+/// sync_index=1.0 → +5% consciousness, sync_index=0.0 → −5%.
+/// Science: Varela et al. (2001) — large-scale neural synchrony is a
+/// correlate of conscious awareness; Engel & Singer (2001) — binding-by-synchrony.
+pub const CPG_SYNC_PHI_MODULATION_AMPLITUDE: f32 = 0.05;
+
+/// Spectral entropy masking floor — minimum fraction of CfC hidden state
+/// dimensions retained even under high spectral entropy.
+/// Used to prevent total masking when spectral entropy is very high.
+/// Science: Buzsáki (2006) — broadband entropy constrains processing depth.
+pub const SPECTRAL_ENTROPY_MASK_FLOOR: f32 = 0.3;
+
 // ── Complex CfC Neuron (Phase 3) ────────────────────────────────────────────
 
 /// Minimum real part of eigenvalues (stability bound — must be negative).

@@ -897,6 +897,13 @@ impl CognitiveLoopService {
                         raw_hot
                     }
                 },
+                // CPG sync → consciousness coupling (Varela et al. 2001)
+                cpg_sync_index: {
+                    #[cfg(feature = "cpg")]
+                    { self.cpg_manager.sync_index() }
+                    #[cfg(not(feature = "cpg"))]
+                    { 0.5 } // Neutral: no modulation when CPG disabled
+                },
                 // Cantor metacognitive depth: derived from dream surprise EMA
                 // Higher surprise = richer fractal structure = deeper self-reference
                 cantor_metacognitive_depth: (self.cantor_dream.dream_surprise as f64)

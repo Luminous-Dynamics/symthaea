@@ -3451,6 +3451,36 @@ impl CognitiveLoopService {
             }
         }
 
+        // ── Spectral entropy → CfC hidden state masking (Phase B) ───────────────
+        // High spectral entropy means the CfC dynamics are too broadband — mask
+        // out a fraction of dimensions to force focused processing.
+        // Science: Buzsáki (2006) — broadband entropy constrains processing depth.
+        #[cfg(feature = "spectral_state")]
+        if self.config.enable_substrate_encoding_noise {
+            let spectral_entropy = self.spectral_manager.telemetry().spectral_entropy;
+            if spectral_entropy > super::thresholds::SPECTRAL_ENTROPY_THRESHOLD {
+                let overflow = (spectral_entropy - super::thresholds::SPECTRAL_ENTROPY_THRESHOLD)
+                    / super::thresholds::SPECTRAL_ENTROPY_THRESHOLD;
+                // spectral_frac: 1.0 at threshold, MASK_FLOOR at 2× threshold
+                let spectral_frac = (1.0 - overflow as f32)
+                    .max(super::thresholds::SPECTRAL_ENTROPY_MASK_FLOOR);
+                // Don't over-mask: use the maximum of substrate and spectral fractions
+                let substrate_frac = self.substrate_manager.effective_dim_fraction();
+                let frac = substrate_frac.max(spectral_frac);
+                if frac < 1.0 {
+                    if let Ok(mut state) = self.temporal_network.read_state() {
+                        let mask_start = (frac * state.len() as f32) as usize;
+                        for h in state.as_slice_mut().unwrap_or(&mut [])[mask_start..].iter_mut() {
+                            *h = 0.0;
+                        }
+                        if let Err(e) = self.temporal_network.inject(&state) {
+                            tracing::warn!(err = %e, "spectral entropy mask inject failed");
+                        }
+                    }
+                }
+            }
+        }
+
         module_timings.core_cfc_step = _t_core.elapsed().as_micros() as u64;
 
         // 5. Get multi-scale predictions

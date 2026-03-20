@@ -1862,9 +1862,11 @@ mod tests {
         assert!(SPECTRAL_GAMMA_THRESHOLD > 0.0 && SPECTRAL_GAMMA_THRESHOLD < 1.0);
         assert!(SPECTRAL_DELTA_AROUSAL_DELTA < 0.0); // calming
         assert!(SPECTRAL_ENTROPY_THRESHOLD > 0.0);
+        assert!(SPECTRAL_ENTROPY_MASK_FLOOR > 0.0 && SPECTRAL_ENTROPY_MASK_FLOOR < 1.0);
 
         // CPG manager (additional)
         assert!(CPG_DESYNC_AROUSAL_DELTA > 0.0);
+        assert!(CPG_SYNC_PHI_MODULATION_AMPLITUDE > 0.0 && CPG_SYNC_PHI_MODULATION_AMPLITUDE <= 0.1);
 
         // Guiding question
         assert!(GUIDING_EPISTEMIC_EXPLORATION_BOOST > 0.0);
