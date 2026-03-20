@@ -10,9 +10,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use symthaea_core::hdc::binary_hv::BinaryHV;
-use symthaea_core::hdc::hdc_ltc_unified::{
-    HdcLtcUnifiedNetwork, UnifiedNetworkConfig,
-};
+use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNetwork, UnifiedNetworkConfig};
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 
 // When the neuroevolution feature is enabled, use the shared genome decoder
@@ -98,18 +96,11 @@ pub enum EvalPhase {
 #[derive(Debug, Clone)]
 pub enum TickResult {
     /// Evaluation still in progress.
-    InProgress {
-        evaluated: usize,
-        remaining: usize,
-    },
+    InProgress { evaluated: usize, remaining: usize },
     /// A full generation just completed.
-    GenerationComplete {
-        snapshot: MicroSnapshot,
-    },
+    GenerationComplete { snapshot: MicroSnapshot },
     /// Champion was swapped — SporeEngine should update its CfC config.
-    ChampionSwapped {
-        new_config: UnifiedNetworkConfig,
-    },
+    ChampionSwapped { new_config: UnifiedNetworkConfig },
 }
 
 /// Snapshot of a micro-generation.
@@ -203,8 +194,8 @@ impl MicroEvolver {
             if current_step >= self.config.warmup_steps {
                 let output = network.output();
                 // Simple fitness: mean absolute value (higher activity = lower free energy proxy)
-                let activity: f32 = output.values.iter().map(|v| v.abs()).sum::<f32>()
-                    / output.dim() as f32;
+                let activity: f32 =
+                    output.values.iter().map(|v| v.abs()).sum::<f32>() / output.dim() as f32;
                 accumulated_error += activity as f64;
             }
 
@@ -269,8 +260,8 @@ impl MicroEvolver {
             .unwrap_or(0);
 
         let best_fitness = self.population[best_idx].fitness;
-        let mean_fitness = self.population.iter().map(|o| o.fitness).sum::<f64>()
-            / self.population.len() as f64;
+        let mean_fitness =
+            self.population.iter().map(|o| o.fitness).sum::<f64>() / self.population.len() as f64;
 
         let snapshot = MicroSnapshot {
             generation: self.generation,
@@ -323,10 +314,9 @@ impl MicroEvolver {
         while new_pop.len() < self.population.len() {
             let parent_idx = indices[(child_seed as usize) % top_half.max(1)];
             child_seed = child_seed.wrapping_mul(6364136223846793005).wrapping_add(1);
-            let child_genome =
-                self.population[parent_idx]
-                    .genome
-                    .add_noise(self.config.mutation_rate, child_seed);
+            let child_genome = self.population[parent_idx]
+                .genome
+                .add_noise(self.config.mutation_rate, child_seed);
             new_pop.push(MicroOrganism {
                 genome: child_genome,
                 fitness: 0.0,

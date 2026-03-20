@@ -452,7 +452,8 @@ impl SomaEngine {
         let engagement = score.clamp(0.0, 1.0);
         let da_boost = engagement * 0.06;
         let ot_boost = engagement * 0.08;
-        self.spore.apply_neuromod_nudges(da_boost, 0.0, 0.0, ot_boost);
+        self.spore
+            .apply_neuromod_nudges(da_boost, 0.0, 0.0, ot_boost);
     }
 
     /// Generate text from current consciousness state.

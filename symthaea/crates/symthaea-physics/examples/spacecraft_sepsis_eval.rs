@@ -132,8 +132,16 @@ fn compute_roc_curve(scored: &[(f64, bool)]) -> Vec<RocPoint> {
 
     if total_pos < 1.0 || total_neg < 1.0 {
         return vec![
-            RocPoint { fpr: 0.0, tpr: 0.0, threshold: 1.0 },
-            RocPoint { fpr: 1.0, tpr: 1.0, threshold: 0.0 },
+            RocPoint {
+                fpr: 0.0,
+                tpr: 0.0,
+                threshold: 1.0,
+            },
+            RocPoint {
+                fpr: 1.0,
+                tpr: 1.0,
+                threshold: 0.0,
+            },
         ];
     }
 
@@ -169,10 +177,18 @@ fn compute_roc_curve(scored: &[(f64, bool)]) -> Vec<RocPoint> {
         let tpr = tp as f64 / total_pos;
         let fpr = fp as f64 / total_neg;
 
-        points.push(RocPoint { fpr, tpr, threshold: thresh });
+        points.push(RocPoint {
+            fpr,
+            tpr,
+            threshold: thresh,
+        });
     }
 
-    points.sort_by(|a, b| a.fpr.partial_cmp(&b.fpr).unwrap_or(std::cmp::Ordering::Equal));
+    points.sort_by(|a, b| {
+        a.fpr
+            .partial_cmp(&b.fpr)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     points
 }
 
@@ -210,14 +226,26 @@ fn find_best_f1(scored: &[(f64, bool)]) -> f64 {
 
         for &(score, is_pos) in scored {
             if score >= thresh {
-                if is_pos { tp += 1; } else { fp += 1; }
+                if is_pos {
+                    tp += 1;
+                } else {
+                    fp += 1;
+                }
             } else if is_pos {
                 fn_ += 1;
             }
         }
 
-        let precision = if tp + fp > 0 { tp as f64 / (tp + fp) as f64 } else { 0.0 };
-        let recall = if tp + fn_ > 0 { tp as f64 / (tp + fn_) as f64 } else { 0.0 };
+        let precision = if tp + fp > 0 {
+            tp as f64 / (tp + fp) as f64
+        } else {
+            0.0
+        };
+        let recall = if tp + fn_ > 0 {
+            tp as f64 / (tp + fn_) as f64
+        } else {
+            0.0
+        };
         let f1 = if precision + recall > 0.0 {
             2.0 * precision * recall / (precision + recall)
         } else {
@@ -260,14 +288,24 @@ struct DomainResult {
 // ── A. SMAP Satellite ────────────────────────────────────────────────────────
 
 fn load_spacecraft_csv(path: &str, n_features: usize) -> anyhow::Result<Vec<(Vec<f32>, bool)>> {
-    let mut rdr = csv::ReaderBuilder::new().has_headers(true).from_path(path)?;
+    let mut rdr = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .from_path(path)?;
     let headers = rdr.headers()?.clone();
-    let label_idx = headers.iter().position(|h| h == "label").unwrap_or(headers.len() - 1);
+    let label_idx = headers
+        .iter()
+        .position(|h| h == "label")
+        .unwrap_or(headers.len() - 1);
 
     let mut data: Vec<(Vec<f32>, bool)> = Vec::with_capacity(150_000);
     for result in rdr.records() {
         let record = result?;
-        let label: i32 = record.get(label_idx).unwrap_or("0").trim().parse().unwrap_or(0);
+        let label: i32 = record
+            .get(label_idx)
+            .unwrap_or("0")
+            .trim()
+            .parse()
+            .unwrap_or(0);
         let is_anomaly = label == 1;
 
         let mut features = Vec::with_capacity(n_features);
@@ -275,7 +313,10 @@ fn load_spacecraft_csv(path: &str, n_features: usize) -> anyhow::Result<Vec<(Vec
         for i in 0..n_features {
             match record.get(i).unwrap_or("0").trim().parse::<f32>() {
                 Ok(v) if v.is_finite() => features.push(v),
-                _ => { valid = false; break; }
+                _ => {
+                    valid = false;
+                    break;
+                }
             }
         }
         if valid && features.len() == n_features {
@@ -301,7 +342,8 @@ fn evaluate_smap() -> anyhow::Result<DomainResult> {
     eprintln!("  Loading training data...");
     let train_data = load_spacecraft_csv(train_path, n_features)?;
     let n_train = train_data.len();
-    let train_normal: Vec<Vec<f32>> = train_data.iter()
+    let train_normal: Vec<Vec<f32>> = train_data
+        .iter()
         .filter(|(_, a)| !*a)
         .map(|(f, _)| f.clone())
         .collect();
@@ -311,7 +353,12 @@ fn evaluate_smap() -> anyhow::Result<DomainResult> {
     let test_data = load_spacecraft_csv(test_path, n_features)?;
     let n_test = test_data.len();
     let n_anom = test_data.iter().filter(|(_, a)| *a).count();
-    eprintln!("  Test: {} rows ({} anomalous = {:.1}%)", n_test, n_anom, n_anom as f64 / n_test as f64 * 100.0);
+    eprintln!(
+        "  Test: {} rows ({} anomalous = {:.1}%)",
+        n_test,
+        n_anom,
+        n_anom as f64 / n_test as f64 * 100.0
+    );
 
     let mut evaluator = SimpleHdcEvaluator::new(n_features, 0x5AAA0001);
 
@@ -326,7 +373,14 @@ fn evaluate_smap() -> anyhow::Result<DomainResult> {
     let (auc, f1) = evaluator.evaluate(&reference, &test_data);
 
     eprintln!("  AUC: {:.4} | Best F1: {:.4}", auc, f1);
-    Ok(DomainResult { name: "SMAP (satellite)", train: n_train, test: n_test, features: n_features, auc, f1 })
+    Ok(DomainResult {
+        name: "SMAP (satellite)",
+        train: n_train,
+        test: n_test,
+        features: n_features,
+        auc,
+        f1,
+    })
 }
 
 // ── B. MSL Mars Rover ────────────────────────────────────────────────────────
@@ -347,7 +401,8 @@ fn evaluate_msl() -> anyhow::Result<DomainResult> {
     eprintln!("  Loading training data...");
     let train_data = load_spacecraft_csv(train_path, n_features)?;
     let n_train = train_data.len();
-    let train_normal: Vec<Vec<f32>> = train_data.iter()
+    let train_normal: Vec<Vec<f32>> = train_data
+        .iter()
         .filter(|(_, a)| !*a)
         .map(|(f, _)| f.clone())
         .collect();
@@ -357,7 +412,12 @@ fn evaluate_msl() -> anyhow::Result<DomainResult> {
     let test_data = load_spacecraft_csv(test_path, n_features)?;
     let n_test = test_data.len();
     let n_anom = test_data.iter().filter(|(_, a)| *a).count();
-    eprintln!("  Test: {} rows ({} anomalous = {:.1}%)", n_test, n_anom, n_anom as f64 / n_test as f64 * 100.0);
+    eprintln!(
+        "  Test: {} rows ({} anomalous = {:.1}%)",
+        n_test,
+        n_anom,
+        n_anom as f64 / n_test as f64 * 100.0
+    );
 
     let mut evaluator = SimpleHdcEvaluator::new(n_features, 0x4510001);
 
@@ -370,7 +430,14 @@ fn evaluate_msl() -> anyhow::Result<DomainResult> {
     let (auc, f1) = evaluator.evaluate(&reference, &test_data);
 
     eprintln!("  AUC: {:.4} | Best F1: {:.4}", auc, f1);
-    Ok(DomainResult { name: "MSL (Mars rover)", train: n_train, test: n_test, features: n_features, auc, f1 })
+    Ok(DomainResult {
+        name: "MSL (Mars rover)",
+        train: n_train,
+        test: n_test,
+        features: n_features,
+        auc,
+        f1,
+    })
 }
 
 // ── C. Sepsis ICU ────────────────────────────────────────────────────────────
@@ -392,7 +459,9 @@ fn evaluate_sepsis() -> anyhow::Result<DomainResult> {
     let n_features = feature_cols.len(); // 7
 
     eprintln!("  Loading sepsis data...");
-    let mut rdr = csv::ReaderBuilder::new().has_headers(true).from_path(csv_path)?;
+    let mut rdr = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .from_path(csv_path)?;
 
     struct SepsisRow {
         patient_id: String,
@@ -411,18 +480,30 @@ fn evaluate_sepsis() -> anyhow::Result<DomainResult> {
         for &col in &feature_cols {
             match record.get(col).unwrap_or("0").trim().parse::<f32>() {
                 Ok(v) if v.is_finite() => features.push(v),
-                _ => { valid = false; break; }
+                _ => {
+                    valid = false;
+                    break;
+                }
             }
         }
         if valid && features.len() == n_features {
-            rows.push(SepsisRow { patient_id, features, label: label == 1 });
+            rows.push(SepsisRow {
+                patient_id,
+                features,
+                label: label == 1,
+            });
         }
     }
 
     let total = rows.len();
     let n_sepsis = rows.iter().filter(|r| r.label).count();
-    eprintln!("  Loaded {} rows: {} sepsis-positive, {} normal ({:.1}%)",
-        total, n_sepsis, total - n_sepsis, n_sepsis as f64 / total as f64 * 100.0);
+    eprintln!(
+        "  Loaded {} rows: {} sepsis-positive, {} normal ({:.1}%)",
+        total,
+        n_sepsis,
+        total - n_sepsis,
+        n_sepsis as f64 / total as f64 * 100.0
+    );
 
     // Group by patient_id, preserve order (consecutive rows share patient_id)
     let mut patient_ids_ordered: Vec<String> = Vec::new();
@@ -435,13 +516,18 @@ fn evaluate_sepsis() -> anyhow::Result<DomainResult> {
 
     let n_patients = patient_ids_ordered.len();
     let train_patient_count = (n_patients as f64 * 0.8) as usize;
-    let train_patients: std::collections::HashSet<&str> = patient_ids_ordered[..train_patient_count]
+    let train_patients: std::collections::HashSet<&str> = patient_ids_ordered
+        [..train_patient_count]
         .iter()
         .map(|s| s.as_str())
         .collect();
 
-    eprintln!("  {} unique patients, {} train / {} test",
-        n_patients, train_patient_count, n_patients - train_patient_count);
+    eprintln!(
+        "  {} unique patients, {} train / {} test",
+        n_patients,
+        train_patient_count,
+        n_patients - train_patient_count
+    );
 
     let mut train_rows: Vec<(Vec<f32>, bool)> = Vec::new();
     let mut test_rows: Vec<(Vec<f32>, bool)> = Vec::new();
@@ -454,7 +540,8 @@ fn evaluate_sepsis() -> anyhow::Result<DomainResult> {
         }
     }
 
-    let train_normal: Vec<Vec<f32>> = train_rows.iter()
+    let train_normal: Vec<Vec<f32>> = train_rows
+        .iter()
         .filter(|(_, lab)| !*lab)
         .map(|(f, _)| f.clone())
         .collect();
@@ -462,8 +549,13 @@ fn evaluate_sepsis() -> anyhow::Result<DomainResult> {
     let n_train = train_rows.len();
     let n_test = test_rows.len();
     let test_pos = test_rows.iter().filter(|(_, lab)| *lab).count();
-    eprintln!("  Train: {} ({} normal) | Test: {} ({} sepsis)",
-        n_train, train_normal.len(), n_test, test_pos);
+    eprintln!(
+        "  Train: {} ({} normal) | Test: {} ({} sepsis)",
+        n_train,
+        train_normal.len(),
+        n_test,
+        test_pos
+    );
 
     let mut evaluator = SimpleHdcEvaluator::new(n_features, 0x5E9510001);
 
@@ -477,7 +569,14 @@ fn evaluate_sepsis() -> anyhow::Result<DomainResult> {
     let (auc, f1) = evaluator.evaluate(&reference, &test_rows);
 
     eprintln!("  AUC: {:.4} | Best F1: {:.4}", auc, f1);
-    Ok(DomainResult { name: "Sepsis (ICU)", train: n_train, test: n_test, features: n_features, auc, f1 })
+    Ok(DomainResult {
+        name: "Sepsis (ICU)",
+        train: n_train,
+        test: n_test,
+        features: n_features,
+        auc,
+        f1,
+    })
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
@@ -497,7 +596,10 @@ fn main() -> anyhow::Result<()> {
     println!();
     println!("================================================================");
     println!("     Spacecraft + Sepsis — Zero-Training HDC Evaluation");
-    println!("     Architecture: HDC {}D | Encoding: ContinuousHV", HDC_DIMENSION);
+    println!(
+        "     Architecture: HDC {}D | Encoding: ContinuousHV",
+        HDC_DIMENSION
+    );
     println!("================================================================");
     println!(
         "{:<22}| {:<9}| {:<9}| {:<9}| {:<7}| {}",

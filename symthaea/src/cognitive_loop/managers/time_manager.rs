@@ -177,8 +177,11 @@ impl CognitiveSubsystem for TimeManager {
 
         // Neuromod: drift surprise → arousal (NE pathway)
         if self.drift_surprise_ema > DRIFT_SURPRISE_THRESHOLD_PPM {
-            let surprise_excess = (self.drift_surprise_ema - DRIFT_SURPRISE_THRESHOLD_PPM) / crate::cognitive_loop::thresholds::TIME_DRIFT_SURPRISE_DIVISOR;
-            output.arousal_delta += (surprise_excess * DRIFT_SURPRISE_NE_GAIN).min(crate::cognitive_loop::thresholds::TIME_DRIFT_AROUSAL_CAP) as f32;
+            let surprise_excess = (self.drift_surprise_ema - DRIFT_SURPRISE_THRESHOLD_PPM)
+                / crate::cognitive_loop::thresholds::TIME_DRIFT_SURPRISE_DIVISOR;
+            output.arousal_delta += (surprise_excess * DRIFT_SURPRISE_NE_GAIN)
+                .min(crate::cognitive_loop::thresholds::TIME_DRIFT_AROUSAL_CAP)
+                as f32;
         }
 
         // Neuromod: stable consensus → calm (5-HT pathway)

@@ -652,7 +652,10 @@ impl CompileError {
                     // Single-letter type names (T, U, V, K, V) are undeclared generics,
                     // not missing imports. Extract the type name from the message.
                     let is_generic = Self::extract_unresolved_type(message)
-                        .map(|t| t.len() == 1 && t.chars().next().map_or(false, |c| c.is_ascii_uppercase()))
+                        .map(|t| {
+                            t.len() == 1
+                                && t.chars().next().map_or(false, |c| c.is_ascii_uppercase())
+                        })
                         .unwrap_or(false);
                     if is_generic {
                         ErrorCategory::UndeclaredGeneric

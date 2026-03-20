@@ -243,7 +243,10 @@ fn main() {
     println!("║  OTP encryption:        Perfect secrecy (Shannon 1949)     ║");
     println!("║  Similarity preserved:  Exactly (XOR is isometry)          ║");
     println!("║  Homomorphic binding:   Exact (XOR distributes over XOR)   ║");
-    println!("║  Collective aggregation: >{:.0}% fidelity (5 peers)         ║", fidelity * 100.0);
+    println!(
+        "║  Collective aggregation: >{:.0}% fidelity (5 peers)         ║",
+        fidelity * 100.0
+    );
     println!("║  Threshold recovery:    3-of-5 shares required             ║");
     println!("║  Overhead vs plaintext: {overhead:.1}× (vs ~10,000× for CKKS)     ║");
     println!("║  Cross-session privacy: No leakage across mask rotations   ║");

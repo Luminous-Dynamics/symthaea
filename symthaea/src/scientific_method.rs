@@ -736,7 +736,14 @@ impl ConfigurableScientificMethodEngine {
         let active_count = self
             .hypotheses
             .iter()
-            .filter(|h| matches!(h.status, HypothesisStatus::Proposed | HypothesisStatus::Testing | HypothesisStatus::Inconclusive))
+            .filter(|h| {
+                matches!(
+                    h.status,
+                    HypothesisStatus::Proposed
+                        | HypothesisStatus::Testing
+                        | HypothesisStatus::Inconclusive
+                )
+            })
             .count();
         if active_count >= self.config.max_hypotheses {
             return None;
@@ -825,8 +832,7 @@ impl ConfigurableScientificMethodEngine {
         // Update running average prediction accuracy.
         let n = self.telemetry.experiments_run as f64;
         self.telemetry.average_prediction_accuracy =
-            self.telemetry.average_prediction_accuracy * ((n - 1.0) / n)
-                + match_score / n;
+            self.telemetry.average_prediction_accuracy * ((n - 1.0) / n) + match_score / n;
 
         Some(result)
     }
@@ -885,9 +891,11 @@ impl ConfigurableScientificMethodEngine {
 
     /// Return the hypothesis with the highest posterior, or `None` if empty.
     pub fn best_hypothesis(&self) -> Option<&ConfigurableHypothesis> {
-        self.hypotheses
-            .iter()
-            .max_by(|a, b| a.posterior.partial_cmp(&b.posterior).unwrap_or(std::cmp::Ordering::Equal))
+        self.hypotheses.iter().max_by(|a, b| {
+            a.posterior
+                .partial_cmp(&b.posterior)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
     }
 
     // ── 8. Competing Hypotheses ─────────────────────────────────────────────
@@ -924,7 +932,10 @@ impl ConfigurableScientificMethodEngine {
 
         for h in &self.hypotheses {
             // Skip resolved hypotheses.
-            if matches!(h.status, HypothesisStatus::Supported | HypothesisStatus::Refuted) {
+            if matches!(
+                h.status,
+                HypothesisStatus::Supported | HypothesisStatus::Refuted
+            ) {
                 continue;
             }
             // Uncertainty: maximal at posterior=0.5, zero at 0 or 1.
@@ -1401,7 +1412,9 @@ mod tests {
 
         // 2. Hypothesize
         let h_hv = BinaryHV::random(seed_from_name("hypothesis_alpha"));
-        let hid = engine.hypothesize("Temperature drives reaction rate", h_hv).unwrap();
+        let hid = engine
+            .hypothesize("Temperature drives reaction rate", h_hv)
+            .unwrap();
 
         // 3. Predict — the hypothesis predicts we'll see obs_hv
         engine.predict(hid, obs_hv.clone(), 0.8, 0.3);
@@ -1499,7 +1512,11 @@ mod tests {
         engine.hypothesize("Hypothesis B", hv2).unwrap();
 
         let pairs = engine.competing_hypotheses();
-        assert_eq!(pairs.len(), 1, "two hypotheses with same posterior should compete");
+        assert_eq!(
+            pairs.len(),
+            1,
+            "two hypotheses with same posterior should compete"
+        );
     }
 
     // ── 23. Most informative experiment selection
@@ -1519,7 +1536,10 @@ mod tests {
         engine.predict(h2, pred_hv, 0.2, 0.5);
 
         let (best_id, best_idx) = engine.most_informative_experiment().unwrap();
-        assert_eq!(best_id, h1, "higher confidence prediction should be more informative");
+        assert_eq!(
+            best_id, h1,
+            "higher confidence prediction should be more informative"
+        );
         assert_eq!(best_idx, 0);
     }
 
@@ -1582,7 +1602,10 @@ mod tests {
         engine.bayesian_update(h2, 10.0);
 
         let best = engine.best_hypothesis().unwrap();
-        assert_eq!(best.id, h2, "h2 should have highest posterior after strong update");
+        assert_eq!(
+            best.id, h2,
+            "h2 should have highest posterior after strong update"
+        );
     }
 
     // ── 27. Experiment with mismatched vectors produces low match_score
@@ -1604,7 +1627,10 @@ mod tests {
             "orthogonal vectors should have low similarity, got {}",
             result.match_score
         );
-        assert!(!result.confirmed, "tight tolerance should reject orthogonal vectors");
+        assert!(
+            !result.confirmed,
+            "tight tolerance should reject orthogonal vectors"
+        );
     }
 
     // ── 28. Evaluate requires min_experiments

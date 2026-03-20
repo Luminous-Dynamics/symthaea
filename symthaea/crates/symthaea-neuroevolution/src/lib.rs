@@ -27,14 +27,14 @@
 //! - Friston (2010). The free-energy principle: a unified brain theory?
 //! - Tononi (2004). An information integration theory of consciousness.
 
+pub mod fitness;
 pub mod genome;
 pub mod organism;
-pub mod fitness;
 pub mod tournament;
 
+pub use fitness::{FepFitnessBridge, FepFitnessConfig, FitnessWeights, InputStrategy};
 pub use genome::{NeuralGenome, NeuralPhenotype};
 pub use organism::{NeuralOrganism, OrganismFitness, StepResult};
-pub use fitness::{FepFitnessBridge, FepFitnessConfig, FitnessWeights, InputStrategy};
 pub use tournament::{
-    GenerationSnapshot, NeuroevolutionConfig, NeuroevolutionEngine, EvolutionResult, SpeciesInfo,
+    EvolutionResult, GenerationSnapshot, NeuroevolutionConfig, NeuroevolutionEngine, SpeciesInfo,
 };

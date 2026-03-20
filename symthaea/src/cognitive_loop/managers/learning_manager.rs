@@ -165,7 +165,8 @@ impl CognitiveSubsystem for LearningManager {
 
         // Plasticity → LR modulation
         // High plasticity = higher learning rate
-        output.lr_modulation = thresholds::LEARNING_LR_FLOOR + self.plasticity as f64 * thresholds::LEARNING_LR_PLASTICITY_SCALE;
+        output.lr_modulation = thresholds::LEARNING_LR_FLOOR
+            + self.plasticity as f64 * thresholds::LEARNING_LR_PLASTICITY_SCALE;
 
         // ── 3. Dream consolidation phase ──────────────────────────────────
         if snapshot.arousal < Self::DREAM_AROUSAL_THRESHOLD {
@@ -186,24 +187,30 @@ impl CognitiveSubsystem for LearningManager {
         // ── 4. Error trend → adaptive response ───────────────────────────
         if self.error_trend > 0.05 {
             // Errors increasing → need more exploration
-            output.exploration_delta += self.error_trend as f64 * thresholds::LEARNING_ERROR_TREND_EXPLORATION;
+            output.exploration_delta +=
+                self.error_trend as f64 * thresholds::LEARNING_ERROR_TREND_EXPLORATION;
             // Also boost plasticity to learn from errors
             output.lr_modulation *= thresholds::LEARNING_ERROR_TREND_LR_BOOST;
         } else if self.error_trend < -0.05 {
             // Errors decreasing → stabilize (things are working)
-            output.confidence_delta += (-self.error_trend) as f64 * thresholds::LEARNING_ERROR_TREND_CONFIDENCE;
+            output.confidence_delta +=
+                (-self.error_trend) as f64 * thresholds::LEARNING_ERROR_TREND_CONFIDENCE;
         }
 
         // ── 5. Dissipative health → learning gate ─────────────────────────
         // Low dissipative health means the system is stressed, reduce learning
         if snapshot.dissipative_health < thresholds::LEARNING_DISSIPATIVE_HEALTH_THRESHOLD {
-            let dampen = 1.0 - (thresholds::LEARNING_DISSIPATIVE_HEALTH_THRESHOLD - snapshot.dissipative_health) * thresholds::LEARNING_DISSIPATIVE_HEALTH_SENSITIVITY;
+            let dampen = 1.0
+                - (thresholds::LEARNING_DISSIPATIVE_HEALTH_THRESHOLD - snapshot.dissipative_health)
+                    * thresholds::LEARNING_DISSIPATIVE_HEALTH_SENSITIVITY;
             output.lr_modulation *= dampen.max(0.7);
         }
 
         // ── 6. Somatic stress → plasticity dampening ──────────────────────
         if snapshot.somatic_stress > thresholds::LEARNING_SOMATIC_STRESS_THRESHOLD {
-            output.lr_modulation *= 1.0 - (snapshot.somatic_stress - thresholds::LEARNING_SOMATIC_STRESS_THRESHOLD) * thresholds::LEARNING_SOMATIC_STRESS_SENSITIVITY;
+            output.lr_modulation *= 1.0
+                - (snapshot.somatic_stress - thresholds::LEARNING_SOMATIC_STRESS_THRESHOLD)
+                    * thresholds::LEARNING_SOMATIC_STRESS_SENSITIVITY;
         }
 
         output

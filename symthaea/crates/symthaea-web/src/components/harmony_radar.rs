@@ -7,9 +7,7 @@ use leptos::prelude::*;
 #[component]
 pub fn HarmonyRadar() -> impl IntoView {
     // The eight harmonies: MC, RC, DC, WE, AR, EA, AM, SS
-    let labels = [
-        "MC", "RC", "DC", "WE", "AR", "EA", "AM", "SS",
-    ];
+    let labels = ["MC", "RC", "DC", "WE", "AR", "EA", "AM", "SS"];
     // Default values (will become reactive once worker is wired)
     let values = [0.5_f32; 8];
 
@@ -22,8 +20,7 @@ pub fn HarmonyRadar() -> impl IntoView {
         .iter()
         .enumerate()
         .map(|(i, v)| {
-            let angle =
-                (i as f32 / 8.0) * std::f32::consts::TAU - std::f32::consts::FRAC_PI_2;
+            let angle = (i as f32 / 8.0) * std::f32::consts::TAU - std::f32::consts::FRAC_PI_2;
             let x = cx + angle.cos() * r * v;
             let y = cy + angle.sin() * r * v;
             format!("{x:.1},{y:.1}")
@@ -36,8 +33,7 @@ pub fn HarmonyRadar() -> impl IntoView {
         .iter()
         .enumerate()
         .map(|(i, label)| {
-            let angle =
-                (i as f32 / 8.0) * std::f32::consts::TAU - std::f32::consts::FRAC_PI_2;
+            let angle = (i as f32 / 8.0) * std::f32::consts::TAU - std::f32::consts::FRAC_PI_2;
             let x = cx + angle.cos() * (r + 14.0);
             let y = cy + angle.sin() * (r + 14.0);
             (x, y, *label)

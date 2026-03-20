@@ -272,8 +272,12 @@ fn compute_phi_proxy(output: &ContinuousHV) -> f32 {
     }
 
     let mean: f32 = output.values.iter().sum::<f32>() / n;
-    let variance: f32 =
-        output.values.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / n;
+    let variance: f32 = output
+        .values
+        .iter()
+        .map(|v| (v - mean).powi(2))
+        .sum::<f32>()
+        / n;
     let mean_abs: f32 = output.values.iter().map(|v| v.abs()).sum::<f32>() / n;
 
     // Phi proxy = sqrt(variance) * mean_activity, clamped to [0, 1]
@@ -295,7 +299,12 @@ mod tests {
         GenesisSeed::from_phrase("test-organism")
     }
 
-    fn spawn_fast(id: u64, genome: NeuralGenome, genesis: &GenesisSeed, gen: u32) -> NeuralOrganism {
+    fn spawn_fast(
+        id: u64,
+        genome: NeuralGenome,
+        genesis: &GenesisSeed,
+        gen: u32,
+    ) -> NeuralOrganism {
         NeuralOrganism::spawn_with_dim(id, genome, genesis, gen, FAST_TEST_DIM)
     }
 

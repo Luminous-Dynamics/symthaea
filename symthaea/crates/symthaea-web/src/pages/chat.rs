@@ -135,9 +135,7 @@ pub fn ChatPage() -> impl IntoView {
                                 state.consciousness_level.set(v as f32);
                             }
                         }
-                        if let Ok(pe) =
-                            js_sys::Reflect::get(&result, &"prediction_error".into())
-                        {
+                        if let Ok(pe) = js_sys::Reflect::get(&result, &"prediction_error".into()) {
                             if let Some(v) = pe.as_f64() {
                                 last_pe = v;
                                 state.prediction_error.set(v as f32);
@@ -175,9 +173,7 @@ pub fn ChatPage() -> impl IntoView {
                 Ok(result) => {
                     if result.is_string() {
                         result.as_string().unwrap_or_default()
-                    } else if let Ok(text_val) =
-                        js_sys::Reflect::get(&result, &"text".into())
-                    {
+                    } else if let Ok(text_val) = js_sys::Reflect::get(&result, &"text".into()) {
                         text_val.as_string().unwrap_or_else(|| {
                             format!("[Phi: {:.3}, PE: {:.3}]", last_phi, last_pe)
                         })

@@ -613,7 +613,7 @@ mod tests {
             .map(|i| {
                 let base = 0.5 + i as f64 * 0.1; // 0.5, 0.6, 0.7, 0.8, 0.9
                 make_report_with_benchmarks(&[
-                    ("Executive::Stroop", "stroop_effect", base),
+                    ("Executive::Stroop", "incongruent_accuracy", base),
                     ("Executive::WCST", "categories_completed", base * 0.9 + 0.05),
                     ("WorM::N-back", "nback_2::accuracy", base * 0.8),
                     ("WorM::DigitSpan", "forward_span", 4.0 + i as f64),
@@ -769,7 +769,7 @@ mod tests {
 
         report.results.push(make_result_with_trace(
             "Executive::Stroop",
-            "stroop_effect",
+            "incongruent_accuracy",
             0.8,
             50,
             0.8,
@@ -804,7 +804,7 @@ mod tests {
     fn test_key_metric_for_benchmark() {
         assert_eq!(
             key_metric_for_benchmark("Executive::Stroop"),
-            "stroop_effect"
+            "incongruent_accuracy"
         );
         assert_eq!(
             key_metric_for_benchmark("Executive::WCST"),

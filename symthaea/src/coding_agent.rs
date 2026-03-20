@@ -2145,8 +2145,10 @@ impl CodingAgent {
             let trimmed = line.trim();
 
             // Check struct/enum declarations without <T> that use T in subsequent fields
-            if (trimmed.starts_with("pub struct ") || trimmed.starts_with("struct ")
-                || trimmed.starts_with("pub enum ") || trimmed.starts_with("enum "))
+            if (trimmed.starts_with("pub struct ")
+                || trimmed.starts_with("struct ")
+                || trimmed.starts_with("pub enum ")
+                || trimmed.starts_with("enum "))
                 && !trimmed.contains('<')
                 && trimmed.ends_with('{')
             {
@@ -2160,7 +2162,8 @@ impl CodingAgent {
             }
 
             // Check fn declarations without <T> that use T in signature or body
-            if (trimmed.starts_with("pub fn ") || trimmed.starts_with("fn ")
+            if (trimmed.starts_with("pub fn ")
+                || trimmed.starts_with("fn ")
                 || trimmed.starts_with("pub(crate) fn "))
                 && !trimmed.contains('<')
                 && Self::signature_uses_t(trimmed)
@@ -6159,7 +6162,11 @@ assertion `left == right` failed
     fn test_fix_undeclared_generics_already_declared() {
         let code = "pub struct Stack<T> {\n    items: Vec<T>,\n}\n";
         let result = CodingAgent::fix_undeclared_generics(code);
-        assert_eq!(result, code.trim_end_matches('\n'), "Should not double-declare <T>");
+        assert_eq!(
+            result,
+            code.trim_end_matches('\n'),
+            "Should not double-declare <T>"
+        );
     }
 
     #[test]

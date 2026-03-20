@@ -59,8 +59,7 @@ pub struct EngineWorker {
 
 impl EngineWorker {
     pub fn new() -> Self {
-        let pending: Arc<Mutex<HashMap<u32, ResolverFn>>> =
-            Arc::new(Mutex::new(HashMap::new()));
+        let pending: Arc<Mutex<HashMap<u32, ResolverFn>>> = Arc::new(Mutex::new(HashMap::new()));
 
         // Attempt to create the worker; gracefully degrade if the
         // spore-worker.js asset is not present (e.g. during dev builds).
@@ -90,8 +89,7 @@ impl EngineWorker {
                             let err = js_sys::Reflect::get(&data, &"error".into())
                                 .unwrap_or(JsValue::from_str("unknown worker error"));
                             let obj = js_sys::Object::new();
-                            let _ =
-                                js_sys::Reflect::set(&obj, &"_error".into(), &err);
+                            let _ = js_sys::Reflect::set(&obj, &"_error".into(), &err);
                             resolver.call(&obj.into());
                         } else {
                             let result = js_sys::Reflect::get(&data, &"result".into())

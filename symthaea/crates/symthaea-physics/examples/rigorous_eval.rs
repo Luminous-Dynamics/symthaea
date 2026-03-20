@@ -205,8 +205,16 @@ fn compute_roc_curve(scored: &[(f64, bool)]) -> Vec<RocPoint> {
 
     if total_pos < 1.0 || total_neg < 1.0 {
         return vec![
-            RocPoint { fpr: 0.0, tpr: 0.0, threshold: 1.0 },
-            RocPoint { fpr: 1.0, tpr: 1.0, threshold: 0.0 },
+            RocPoint {
+                fpr: 0.0,
+                tpr: 0.0,
+                threshold: 1.0,
+            },
+            RocPoint {
+                fpr: 1.0,
+                tpr: 1.0,
+                threshold: 0.0,
+            },
         ];
     }
 
@@ -242,10 +250,18 @@ fn compute_roc_curve(scored: &[(f64, bool)]) -> Vec<RocPoint> {
         let tpr = tp as f64 / total_pos;
         let fpr = fp as f64 / total_neg;
 
-        points.push(RocPoint { fpr, tpr, threshold: thresh });
+        points.push(RocPoint {
+            fpr,
+            tpr,
+            threshold: thresh,
+        });
     }
 
-    points.sort_by(|a, b| a.fpr.partial_cmp(&b.fpr).unwrap_or(std::cmp::Ordering::Equal));
+    points.sort_by(|a, b| {
+        a.fpr
+            .partial_cmp(&b.fpr)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     points
 }
 
@@ -283,14 +299,26 @@ fn find_best_f1(scored: &[(f64, bool)]) -> f64 {
 
         for &(score, is_pos) in scored {
             if score >= thresh {
-                if is_pos { tp += 1; } else { fp += 1; }
+                if is_pos {
+                    tp += 1;
+                } else {
+                    fp += 1;
+                }
             } else if is_pos {
                 fn_ += 1;
             }
         }
 
-        let precision = if tp + fp > 0 { tp as f64 / (tp + fp) as f64 } else { 0.0 };
-        let recall = if tp + fn_ > 0 { tp as f64 / (tp + fn_) as f64 } else { 0.0 };
+        let precision = if tp + fp > 0 {
+            tp as f64 / (tp + fp) as f64
+        } else {
+            0.0
+        };
+        let recall = if tp + fn_ > 0 {
+            tp as f64 / (tp + fn_) as f64
+        } else {
+            0.0
+        };
         let f1 = if precision + recall > 0.0 {
             2.0 * precision * recall / (precision + recall)
         } else {
@@ -327,7 +355,9 @@ fn load_eeg() -> anyhow::Result<Option<DomainData>> {
         return Ok(None);
     }
 
-    let mut rdr = csv::ReaderBuilder::new().has_headers(true).from_path(csv_path)?;
+    let mut rdr = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .from_path(csv_path)?;
     let headers = rdr.headers()?.clone();
     let y_idx = headers.len() - 1;
     let feature_start = 1;
@@ -337,15 +367,30 @@ fn load_eeg() -> anyhow::Result<Option<DomainData>> {
     let mut data: Vec<(Vec<f32>, bool)> = Vec::with_capacity(12000);
     for result in rdr.records() {
         let record = result?;
-        let y: i32 = record.get(y_idx).unwrap_or("0").trim().trim_matches('"').parse().unwrap_or(0);
+        let y: i32 = record
+            .get(y_idx)
+            .unwrap_or("0")
+            .trim()
+            .trim_matches('"')
+            .parse()
+            .unwrap_or(0);
         let is_seizure = y == 1;
 
         let mut features = Vec::with_capacity(n_features);
         let mut valid = true;
         for i in feature_start..feature_end {
-            match record.get(i).unwrap_or("0").trim().trim_matches('"').parse::<f32>() {
+            match record
+                .get(i)
+                .unwrap_or("0")
+                .trim()
+                .trim_matches('"')
+                .parse::<f32>()
+            {
                 Ok(v) if v.is_finite() => features.push(v),
-                _ => { valid = false; break; }
+                _ => {
+                    valid = false;
+                    break;
+                }
             }
         }
         if valid && features.len() == n_features {
@@ -354,10 +399,19 @@ fn load_eeg() -> anyhow::Result<Option<DomainData>> {
     }
 
     let n_anom = data.iter().filter(|(_, s)| *s).count();
-    eprintln!("  EEG: {} samples ({} seizure, {} normal), {} features",
-        data.len(), n_anom, data.len() - n_anom, n_features);
+    eprintln!(
+        "  EEG: {} samples ({} seizure, {} normal), {} features",
+        data.len(),
+        n_anom,
+        data.len() - n_anom,
+        n_features
+    );
 
-    Ok(Some(DomainData { name: "EEG Seizure", samples: data, n_features }))
+    Ok(Some(DomainData {
+        name: "EEG Seizure",
+        samples: data,
+        n_features,
+    }))
 }
 
 fn load_turbofan() -> anyhow::Result<Option<DomainData>> {
@@ -380,7 +434,9 @@ fn load_turbofan() -> anyhow::Result<Option<DomainData>> {
     for line in reader.lines() {
         let line = line?;
         let parts: Vec<&str> = line.split_whitespace().collect();
-        if parts.len() < 26 { continue; }
+        if parts.len() < 26 {
+            continue;
+        }
 
         let unit_id: u32 = parts[0].parse().unwrap_or(0);
         let cycle: u32 = parts[1].parse().unwrap_or(0);
@@ -390,32 +446,53 @@ fn load_turbofan() -> anyhow::Result<Option<DomainData>> {
         for i in 5..26 {
             match parts[i].parse::<f32>() {
                 Ok(v) if v.is_finite() => sensors.push(v),
-                _ => { valid = false; break; }
+                _ => {
+                    valid = false;
+                    break;
+                }
             }
         }
         if valid && sensors.len() == 21 {
-            rows.push(TurbofanRow { unit_id, cycle, sensors });
+            rows.push(TurbofanRow {
+                unit_id,
+                cycle,
+                sensors,
+            });
         }
     }
 
     let mut max_cycles: HashMap<u32, u32> = HashMap::new();
     for r in &rows {
         let entry = max_cycles.entry(r.unit_id).or_insert(0);
-        if r.cycle > *entry { *entry = r.cycle; }
+        if r.cycle > *entry {
+            *entry = r.cycle;
+        }
     }
 
     let n_features = 21;
-    let data: Vec<(Vec<f32>, bool)> = rows.iter().map(|r| {
-        let max_c = max_cycles[&r.unit_id];
-        let is_degraded = r.cycle > max_c.saturating_sub(30);
-        (r.sensors.clone(), is_degraded)
-    }).collect();
+    let data: Vec<(Vec<f32>, bool)> = rows
+        .iter()
+        .map(|r| {
+            let max_c = max_cycles[&r.unit_id];
+            let is_degraded = r.cycle > max_c.saturating_sub(30);
+            (r.sensors.clone(), is_degraded)
+        })
+        .collect();
 
     let n_anom = data.iter().filter(|(_, a)| *a).count();
-    eprintln!("  Turbofan: {} samples ({} degraded, {} normal), {} features",
-        data.len(), n_anom, data.len() - n_anom, n_features);
+    eprintln!(
+        "  Turbofan: {} samples ({} degraded, {} normal), {} features",
+        data.len(),
+        n_anom,
+        data.len() - n_anom,
+        n_features
+    );
 
-    Ok(Some(DomainData { name: "Turbofan RUL", samples: data, n_features }))
+    Ok(Some(DomainData {
+        name: "Turbofan RUL",
+        samples: data,
+        n_features,
+    }))
 }
 
 fn load_intrusion() -> anyhow::Result<Option<DomainData>> {
@@ -425,9 +502,7 @@ fn load_intrusion() -> anyhow::Result<Option<DomainData>> {
         return Ok(None);
     }
 
-    let numeric_cols: Vec<usize> = std::iter::once(0)
-        .chain(4..=40)
-        .collect();
+    let numeric_cols: Vec<usize> = std::iter::once(0).chain(4..=40).collect();
     let n_features = numeric_cols.len(); // 38
 
     let file = std::fs::File::open(path)?;
@@ -437,7 +512,9 @@ fn load_intrusion() -> anyhow::Result<Option<DomainData>> {
     for line in reader.lines() {
         let line = line?;
         let parts: Vec<&str> = line.split(',').collect();
-        if parts.len() < 42 { continue; }
+        if parts.len() < 42 {
+            continue;
+        }
 
         let label = parts[41].trim();
         let is_attack = label != "normal";
@@ -447,7 +524,10 @@ fn load_intrusion() -> anyhow::Result<Option<DomainData>> {
         for &col in &numeric_cols {
             match parts[col].trim().parse::<f32>() {
                 Ok(v) if v.is_finite() => features.push(v),
-                _ => { valid = false; break; }
+                _ => {
+                    valid = false;
+                    break;
+                }
             }
         }
         if valid && features.len() == n_features {
@@ -456,10 +536,19 @@ fn load_intrusion() -> anyhow::Result<Option<DomainData>> {
     }
 
     let n_anom = data.iter().filter(|(_, a)| *a).count();
-    eprintln!("  Intrusion: {} samples ({} attacks, {} normal), {} features",
-        data.len(), n_anom, data.len() - n_anom, n_features);
+    eprintln!(
+        "  Intrusion: {} samples ({} attacks, {} normal), {} features",
+        data.len(),
+        n_anom,
+        data.len() - n_anom,
+        n_features
+    );
 
-    Ok(Some(DomainData { name: "Network Intrusion", samples: data, n_features }))
+    Ok(Some(DomainData {
+        name: "Network Intrusion",
+        samples: data,
+        n_features,
+    }))
 }
 
 fn load_power_grid() -> anyhow::Result<Option<DomainData>> {
@@ -482,42 +571,72 @@ fn load_power_grid() -> anyhow::Result<Option<DomainData>> {
     for line in reader.lines() {
         let line = line?;
         line_count += 1;
-        if line_count == 1 { continue; }
+        if line_count == 1 {
+            continue;
+        }
 
         let parts: Vec<&str> = line.split(';').collect();
-        if parts.len() < 9 { continue; }
+        if parts.len() < 9 {
+            continue;
+        }
 
         let mut features = Vec::with_capacity(n_features);
         let mut valid = true;
         for i in 2..9 {
             match parts[i].trim().parse::<f32>() {
                 Ok(v) if v.is_finite() => features.push(v),
-                _ => { valid = false; break; }
+                _ => {
+                    valid = false;
+                    break;
+                }
             }
         }
-        if !valid || features.len() != n_features { continue; }
+        if !valid || features.len() != n_features {
+            continue;
+        }
 
         feature_rows.push(features);
-        if feature_rows.len() >= max_rows { break; }
+        if feature_rows.len() >= max_rows {
+            break;
+        }
     }
 
     // Compute voltage stats for anomaly labeling
-    let voltage_values: Vec<f32> = feature_rows.iter().map(|r| r[voltage_feature_offset]).collect();
-    let mean_v: f64 = voltage_values.iter().map(|&v| v as f64).sum::<f64>() / voltage_values.len() as f64;
-    let std_v: f64 = (voltage_values.iter().map(|&v| { let d = v as f64 - mean_v; d * d }).sum::<f64>() / voltage_values.len() as f64).sqrt();
+    let voltage_values: Vec<f32> = feature_rows
+        .iter()
+        .map(|r| r[voltage_feature_offset])
+        .collect();
+    let mean_v: f64 =
+        voltage_values.iter().map(|&v| v as f64).sum::<f64>() / voltage_values.len() as f64;
+    let std_v: f64 = (voltage_values
+        .iter()
+        .map(|&v| {
+            let d = v as f64 - mean_v;
+            d * d
+        })
+        .sum::<f64>()
+        / voltage_values.len() as f64)
+        .sqrt();
     let anomaly_threshold = 3.0;
 
-    let data: Vec<(Vec<f32>, bool)> = feature_rows.into_iter().map(|r| {
-        let voltage = r[voltage_feature_offset] as f64;
-        let is_anomaly = (voltage - mean_v).abs() > std_v * anomaly_threshold;
-        (r, is_anomaly)
-    }).collect();
+    let data: Vec<(Vec<f32>, bool)> = feature_rows
+        .into_iter()
+        .map(|r| {
+            let voltage = r[voltage_feature_offset] as f64;
+            let is_anomaly = (voltage - mean_v).abs() > std_v * anomaly_threshold;
+            (r, is_anomaly)
+        })
+        .collect();
 
     let n_anom = data.iter().filter(|(_, a)| *a).count();
     eprintln!("  Power Grid: {} samples ({} anomalous, {} normal), {} features (V: mean={:.1}, std={:.1})",
         data.len(), n_anom, data.len() - n_anom, n_features, mean_v, std_v);
 
-    Ok(Some(DomainData { name: "Power Grid", samples: data, n_features }))
+    Ok(Some(DomainData {
+        name: "Power Grid",
+        samples: data,
+        n_features,
+    }))
 }
 
 fn load_battery() -> anyhow::Result<Option<DomainData>> {
@@ -527,12 +646,19 @@ fn load_battery() -> anyhow::Result<Option<DomainData>> {
         return Ok(None);
     }
 
-    let mut rdr = csv::ReaderBuilder::new().has_headers(true).from_path(csv_path)?;
+    let mut rdr = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .from_path(csv_path)?;
     let headers = rdr.headers()?.clone();
     let col_map: HashMap<&str, usize> = headers.iter().enumerate().map(|(i, h)| (h, i)).collect();
 
-    let feature_names = ["Voltage_measured", "Current_measured", "Temperature_measured"];
-    let feature_indices: Vec<usize> = feature_names.iter()
+    let feature_names = [
+        "Voltage_measured",
+        "Current_measured",
+        "Temperature_measured",
+    ];
+    let feature_indices: Vec<usize> = feature_names
+        .iter()
         .filter_map(|n| col_map.get(n).copied())
         .collect();
     let n_features = feature_indices.len();
@@ -558,41 +684,74 @@ fn load_battery() -> anyhow::Result<Option<DomainData>> {
         for &idx in &feature_indices {
             match record.get(idx).unwrap_or("").trim().parse::<f32>() {
                 Ok(v) if v.is_finite() => features.push(v),
-                _ => { valid = false; break; }
+                _ => {
+                    valid = false;
+                    break;
+                }
             }
         }
-        if !valid || features.len() != n_features { continue; }
+        if !valid || features.len() != n_features {
+            continue;
+        }
 
-        let battery = battery_idx.and_then(|i| record.get(i)).unwrap_or("").trim().to_string();
-        let cycle: u32 = cycle_idx.and_then(|i| record.get(i).and_then(|s| s.trim().parse().ok())).unwrap_or(0);
+        let battery = battery_idx
+            .and_then(|i| record.get(i))
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        let cycle: u32 = cycle_idx
+            .and_then(|i| record.get(i).and_then(|s| s.trim().parse().ok()))
+            .unwrap_or(0);
 
-        rows.push(BatteryRow { features, battery, cycle });
+        rows.push(BatteryRow {
+            features,
+            battery,
+            cycle,
+        });
     }
 
     let mut max_cycles: HashMap<String, u32> = HashMap::new();
     for r in &rows {
         let entry = max_cycles.entry(r.battery.clone()).or_insert(0);
-        if r.cycle > *entry { *entry = r.cycle; }
+        if r.cycle > *entry {
+            *entry = r.cycle;
+        }
     }
 
-    let mut data: Vec<(Vec<f32>, bool)> = rows.iter().map(|r| {
-        let max_c = *max_cycles.get(&r.battery).unwrap_or(&1);
-        let threshold = (max_c as f64 * 0.75) as u32;
-        let is_degraded = r.cycle > threshold;
-        (r.features.clone(), is_degraded)
-    }).collect();
+    let mut data: Vec<(Vec<f32>, bool)> = rows
+        .iter()
+        .map(|r| {
+            let max_c = *max_cycles.get(&r.battery).unwrap_or(&1);
+            let threshold = (max_c as f64 * 0.75) as u32;
+            let is_degraded = r.cycle > threshold;
+            (r.features.clone(), is_degraded)
+        })
+        .collect();
 
     // Sample down to 50K
     if data.len() > 50_000 {
         let indices = shuffle_indices(data.len(), 999);
-        data = indices.iter().take(50_000).map(|&i| data[i].clone()).collect();
+        data = indices
+            .iter()
+            .take(50_000)
+            .map(|&i| data[i].clone())
+            .collect();
     }
 
     let n_anom = data.iter().filter(|(_, a)| *a).count();
-    eprintln!("  Battery: {} samples ({} degraded, {} normal), {} features",
-        data.len(), n_anom, data.len() - n_anom, n_features);
+    eprintln!(
+        "  Battery: {} samples ({} degraded, {} normal), {} features",
+        data.len(),
+        n_anom,
+        data.len() - n_anom,
+        n_features
+    );
 
-    Ok(Some(DomainData { name: "Battery", samples: data, n_features }))
+    Ok(Some(DomainData {
+        name: "Battery",
+        samples: data,
+        n_features,
+    }))
 }
 
 // ── Evaluation Helpers ───────────────────────────────────────────────────────
@@ -613,7 +772,10 @@ fn run_hdc_eval(
 }
 
 /// Split data by seed: shuffle, then 80/20
-fn split_by_seed(data: &[(Vec<f32>, bool)], seed: u64) -> (Vec<(Vec<f32>, bool)>, Vec<(Vec<f32>, bool)>) {
+fn split_by_seed(
+    data: &[(Vec<f32>, bool)],
+    seed: u64,
+) -> (Vec<(Vec<f32>, bool)>, Vec<(Vec<f32>, bool)>) {
     let indices = shuffle_indices(data.len(), seed);
     let shuffled = apply_shuffle(data, &indices);
     let split = (shuffled.len() as f64 * 0.8) as usize;
@@ -623,7 +785,10 @@ fn split_by_seed(data: &[(Vec<f32>, bool)], seed: u64) -> (Vec<(Vec<f32>, bool)>
 }
 
 fn extract_normal(data: &[(Vec<f32>, bool)]) -> Vec<Vec<f32>> {
-    data.iter().filter(|(_, a)| !*a).map(|(f, _)| f.clone()).collect()
+    data.iter()
+        .filter(|(_, a)| !*a)
+        .map(|(f, _)| f.clone())
+        .collect()
 }
 
 fn extract_features(data: &[(Vec<f32>, bool)]) -> Vec<Vec<f32>> {
@@ -650,18 +815,31 @@ fn main() -> anyhow::Result<()> {
 
     // Load all domains
     let mut domains: Vec<DomainData> = Vec::new();
-    if let Some(d) = load_eeg()? { domains.push(d); }
-    if let Some(d) = load_turbofan()? { domains.push(d); }
-    if let Some(d) = load_intrusion()? { domains.push(d); }
-    if let Some(d) = load_power_grid()? { domains.push(d); }
-    if let Some(d) = load_battery()? { domains.push(d); }
+    if let Some(d) = load_eeg()? {
+        domains.push(d);
+    }
+    if let Some(d) = load_turbofan()? {
+        domains.push(d);
+    }
+    if let Some(d) = load_intrusion()? {
+        domains.push(d);
+    }
+    if let Some(d) = load_power_grid()? {
+        domains.push(d);
+    }
+    if let Some(d) = load_battery()? {
+        domains.push(d);
+    }
 
     if domains.is_empty() {
         eprintln!("No datasets found. Exiting.");
         return Ok(());
     }
 
-    eprintln!("\nLoaded {} domains. Starting evaluations...\n", domains.len());
+    eprintln!(
+        "\nLoaded {} domains. Starting evaluations...\n",
+        domains.len()
+    );
 
     // ═══════════════════════════════════════════════════════════════════════
     // Analysis 1: Multi-Seed Evaluation
@@ -680,7 +858,12 @@ fn main() -> anyhow::Result<()> {
     let mut multi_seed_results: Vec<MultiSeedResult> = Vec::new();
 
     for domain in &domains {
-        eprintln!("\n  [{}] {} samples, {} features", domain.name, domain.samples.len(), domain.n_features);
+        eprintln!(
+            "\n  [{}] {} samples, {} features",
+            domain.name,
+            domain.samples.len(),
+            domain.n_features
+        );
         let mut aucs = Vec::with_capacity(SEEDS.len());
         let mut f1s = Vec::with_capacity(SEEDS.len());
 
@@ -689,13 +872,24 @@ fn main() -> anyhow::Result<()> {
             let train_normal = extract_normal(&train);
             let all_train = extract_features(&train);
 
-            let (auc, f1) = run_hdc_eval(&train_normal, &all_train, &test, domain.n_features, 16384, 0xEE60001);
+            let (auc, f1) = run_hdc_eval(
+                &train_normal,
+                &all_train,
+                &test,
+                domain.n_features,
+                16384,
+                0xEE60001,
+            );
             eprintln!("    Seed {}: AUC={:.4}, F1={:.4}", seed, auc, f1);
             aucs.push(auc);
             f1s.push(f1);
         }
 
-        multi_seed_results.push(MultiSeedResult { name: domain.name, aucs, f1s });
+        multi_seed_results.push(MultiSeedResult {
+            name: domain.name,
+            aucs,
+            f1s,
+        });
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -722,12 +916,22 @@ fn main() -> anyhow::Result<()> {
         let mut dim_aucs = Vec::with_capacity(DIMS.len());
 
         for &dim in &DIMS {
-            let (auc, _f1) = run_hdc_eval(&train_normal, &all_train, &test, domain.n_features, dim, 0xEE60001);
+            let (auc, _f1) = run_hdc_eval(
+                &train_normal,
+                &all_train,
+                &test,
+                domain.n_features,
+                dim,
+                0xEE60001,
+            );
             eprintln!("    D={:>5}: AUC={:.4}", dim, auc);
             dim_aucs.push((dim, auc));
         }
 
-        dim_results.push(DimAblationResult { name: domain.name, dim_aucs });
+        dim_results.push(DimAblationResult {
+            name: domain.name,
+            dim_aucs,
+        });
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -752,15 +956,29 @@ fn main() -> anyhow::Result<()> {
         let all_train = extract_features(&train);
 
         // HDC
-        let (hdc_auc, _) = run_hdc_eval(&train_normal, &all_train, &test, domain.n_features, 16384, 0xEE60001);
+        let (hdc_auc, _) = run_hdc_eval(
+            &train_normal,
+            &all_train,
+            &test,
+            domain.n_features,
+            16384,
+            0xEE60001,
+        );
 
         // Mahalanobis
         let mahal = MahalanobisBaseline::fit(&train_normal);
         let (mahal_auc, _) = mahal.evaluate(&test);
 
-        eprintln!("  [{}] HDC AUC={:.4}, Mahalanobis AUC={:.4}", domain.name, hdc_auc, mahal_auc);
+        eprintln!(
+            "  [{}] HDC AUC={:.4}, Mahalanobis AUC={:.4}",
+            domain.name, hdc_auc, mahal_auc
+        );
 
-        baseline_results.push(BaselineResult { name: domain.name, hdc_auc, mahal_auc });
+        baseline_results.push(BaselineResult {
+            name: domain.name,
+            hdc_auc,
+            mahal_auc,
+        });
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -783,9 +1001,12 @@ fn main() -> anyhow::Result<()> {
 
     for r in &multi_seed_results {
         let mean_auc = r.aucs.iter().sum::<f64>() / r.aucs.len() as f64;
-        let std_auc = (r.aucs.iter().map(|&a| (a - mean_auc).powi(2)).sum::<f64>() / r.aucs.len() as f64).sqrt();
+        let std_auc = (r.aucs.iter().map(|&a| (a - mean_auc).powi(2)).sum::<f64>()
+            / r.aucs.len() as f64)
+            .sqrt();
         let mean_f1 = r.f1s.iter().sum::<f64>() / r.f1s.len() as f64;
-        let std_f1 = (r.f1s.iter().map(|&f| (f - mean_f1).powi(2)).sum::<f64>() / r.f1s.len() as f64).sqrt();
+        let std_f1 =
+            (r.f1s.iter().map(|&f| (f - mean_f1).powi(2)).sum::<f64>() / r.f1s.len() as f64).sqrt();
         let min_auc = r.aucs.iter().cloned().fold(f64::MAX, f64::min);
         let max_auc = r.aucs.iter().cloned().fold(f64::MIN, f64::max);
 
@@ -805,7 +1026,11 @@ fn main() -> anyhow::Result<()> {
     println!("----------------------|-------|-------|-------|-------|-------|-------|-------");
 
     for r in &dim_results {
-        let vals: Vec<String> = r.dim_aucs.iter().map(|(_, auc)| format!("{:.3}", auc)).collect();
+        let vals: Vec<String> = r
+            .dim_aucs
+            .iter()
+            .map(|(_, auc)| format!("{:.3}", auc))
+            .collect();
         println!(
             "{:<22}| {:<7}| {:<7}| {:<7}| {:<7}| {:<7}| {:<7}| {}",
             r.name,
@@ -841,12 +1066,21 @@ fn main() -> anyhow::Result<()> {
     // Summary
     println!();
     let n = multi_seed_results.len();
-    let grand_mean_auc: f64 = multi_seed_results.iter()
+    let grand_mean_auc: f64 = multi_seed_results
+        .iter()
         .map(|r| r.aucs.iter().sum::<f64>() / r.aucs.len() as f64)
-        .sum::<f64>() / n as f64;
-    let hdc_wins = baseline_results.iter().filter(|r| r.hdc_auc > r.mahal_auc).count();
+        .sum::<f64>()
+        / n as f64;
+    let hdc_wins = baseline_results
+        .iter()
+        .filter(|r| r.hdc_auc > r.mahal_auc)
+        .count();
     println!("Grand mean AUC (10 seeds, D=16384): {:.3}", grand_mean_auc);
-    println!("HDC wins vs Mahalanobis baseline: {}/{}", hdc_wins, baseline_results.len());
+    println!(
+        "HDC wins vs Mahalanobis baseline: {}/{}",
+        hdc_wins,
+        baseline_results.len()
+    );
 
     Ok(())
 }

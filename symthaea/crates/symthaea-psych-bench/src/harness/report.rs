@@ -3313,8 +3313,11 @@ mod tests {
         // Compute mean and SD of grand means across seeds
         let n = grand_means.len() as f64;
         let mean_of_means: f64 = grand_means.iter().sum::<f64>() / n;
-        let variance: f64 =
-            grand_means.iter().map(|x| (x - mean_of_means).powi(2)).sum::<f64>() / (n - 1.0);
+        let variance: f64 = grand_means
+            .iter()
+            .map(|x| (x - mean_of_means).powi(2))
+            .sum::<f64>()
+            / (n - 1.0);
         let sd = variance.sqrt();
 
         eprintln!("\n--- Cross-seed stability ---");

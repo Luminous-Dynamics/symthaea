@@ -173,14 +173,19 @@ impl NeuroevolutionEngine {
         self.generation += 1;
 
         // 1. Evaluate all organisms
-        self.fitness_bridge.evaluate_population(&mut self.population);
+        self.fitness_bridge
+            .evaluate_population(&mut self.population);
 
         // 2. Assign species
         self.assign_species();
 
         // 3. Sort by fitness (descending)
-        self.population
-            .sort_by(|a, b| b.fitness.composite.partial_cmp(&a.fitness.composite).unwrap_or(std::cmp::Ordering::Equal));
+        self.population.sort_by(|a, b| {
+            b.fitness
+                .composite
+                .partial_cmp(&a.fitness.composite)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // 4. Track best ever
         if let Some(best) = self.population.first() {
@@ -193,7 +198,11 @@ impl NeuroevolutionEngine {
         }
 
         // 5. Check convergence
-        let current_best = self.population.first().map(|o| o.fitness.composite).unwrap_or(f64::NEG_INFINITY);
+        let current_best = self
+            .population
+            .first()
+            .map(|o| o.fitness.composite)
+            .unwrap_or(f64::NEG_INFINITY);
         if current_best > self.last_best_fitness + 1e-6 {
             self.patience_counter = 0;
             self.last_best_fitness = current_best;
@@ -407,7 +416,9 @@ impl NeuroevolutionEngine {
             seed += 1;
             let j = blake3_usize(seed, n);
             if i != j {
-                total_dist += self.population[i].genome.distance(&self.population[j].genome) as f64;
+                total_dist += self.population[i]
+                    .genome
+                    .distance(&self.population[j].genome) as f64;
                 count += 1;
             }
         }
@@ -474,12 +485,20 @@ impl NeuroevolutionEngine {
             })
             .collect();
 
-        infos.sort_by(|a, b| b.mean_fitness.partial_cmp(&a.mean_fitness).unwrap_or(std::cmp::Ordering::Equal));
+        infos.sort_by(|a, b| {
+            b.mean_fitness
+                .partial_cmp(&a.mean_fitness)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         infos
     }
 
     fn create_snapshot(&self) -> GenerationSnapshot {
-        let fitnesses: Vec<f64> = self.population.iter().map(|o| o.fitness.composite).collect();
+        let fitnesses: Vec<f64> = self
+            .population
+            .iter()
+            .map(|o| o.fitness.composite)
+            .collect();
         let best = fitnesses.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
         let worst = fitnesses.iter().cloned().fold(f64::INFINITY, f64::min);
         let mean = if fitnesses.is_empty() {
@@ -752,7 +771,10 @@ mod tests {
         engine.initialize();
         // 10 organisms x 2KB genome = 20KB genome storage
         let genome_bytes = engine.population.len() * 2048;
-        assert!(genome_bytes <= 200_000, "Genome storage: {genome_bytes} bytes");
+        assert!(
+            genome_bytes <= 200_000,
+            "Genome storage: {genome_bytes} bytes"
+        );
     }
 
     #[test]

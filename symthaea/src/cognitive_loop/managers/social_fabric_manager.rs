@@ -133,13 +133,19 @@ impl CognitiveSubsystem for SocialFabricManager {
 
         // Neuromod: high resonance -> oxytocin (calm connection)
         if mean_resonance > crate::cognitive_loop::thresholds::SOCIAL_RESONANCE_HIGH_THRESHOLD {
-            output.valence_delta += (RESONANCE_OXY_GAIN * (mean_resonance - crate::cognitive_loop::thresholds::SOCIAL_RESONANCE_HIGH_THRESHOLD) / crate::cognitive_loop::thresholds::SOCIAL_RESONANCE_RANGE) as f32;
+            output.valence_delta += (RESONANCE_OXY_GAIN
+                * (mean_resonance
+                    - crate::cognitive_loop::thresholds::SOCIAL_RESONANCE_HIGH_THRESHOLD)
+                / crate::cognitive_loop::thresholds::SOCIAL_RESONANCE_RANGE)
+                as f32;
         }
 
         // Neuromod: resonance drop -> NE (social alertness)
         let resonance_drop = self.prev_mean_resonance - mean_resonance;
         if resonance_drop > RESONANCE_DROP_THRESHOLD {
-            output.arousal_delta += (RESONANCE_DROP_NE_GAIN * resonance_drop).min(crate::cognitive_loop::thresholds::SOCIAL_RESONANCE_DROP_AROUSAL_CAP) as f32;
+            output.arousal_delta += (RESONANCE_DROP_NE_GAIN * resonance_drop)
+                .min(crate::cognitive_loop::thresholds::SOCIAL_RESONANCE_DROP_AROUSAL_CAP)
+                as f32;
         }
 
         // Neuromod: diversity -> DA (curiosity boost)

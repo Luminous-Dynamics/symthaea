@@ -129,7 +129,8 @@ impl CognitiveSubsystem for PerceptionManager {
         } else {
             0.5
         };
-        self.budget_utilization = self.budget_utilization * thresholds::PERCEPTION_BUDGET_EMA_DECAY + budget_frac * thresholds::PERCEPTION_BUDGET_EMA_NEW;
+        self.budget_utilization = self.budget_utilization * thresholds::PERCEPTION_BUDGET_EMA_DECAY
+            + budget_frac * thresholds::PERCEPTION_BUDGET_EMA_NEW;
 
         if snapshot.attention_budget_exceeded != 0 {
             self.budget_exceeded_streak += 1;
@@ -157,12 +158,14 @@ impl CognitiveSubsystem for PerceptionManager {
 
         // High coherence → perceptual confidence boost
         if mean_coh > PERCEPTION_COHERENCE_HIGH {
-            output.confidence_delta += f64::from(mean_coh - PERCEPTION_COHERENCE_HIGH) * thresholds::PERCEPTION_COHERENCE_CONFIDENCE_SCALE;
+            output.confidence_delta += f64::from(mean_coh - PERCEPTION_COHERENCE_HIGH)
+                * thresholds::PERCEPTION_COHERENCE_CONFIDENCE_SCALE;
         }
 
         // Low coherence → signal exploration (might need different perspective)
         if mean_coh < PERCEPTION_COHERENCE_LOW {
-            output.exploration_delta += f64::from(PERCEPTION_COHERENCE_LOW - mean_coh) * thresholds::PERCEPTION_COHERENCE_EXPLORATION_SCALE;
+            output.exploration_delta += f64::from(PERCEPTION_COHERENCE_LOW - mean_coh)
+                * thresholds::PERCEPTION_COHERENCE_EXPLORATION_SCALE;
             output.flags |= output_flags::REQUEST_EXPLORATION;
         }
 
@@ -181,12 +184,14 @@ impl CognitiveSubsystem for PerceptionManager {
             && snapshot.prediction_error > PERCEPTION_VIGILANCE_PE;
         if should_be_vigilant && !self.vigilant {
             self.vigilant = true;
-            self.attention_sensitivity =
-                (self.attention_sensitivity * thresholds::PERCEPTION_VIGILANCE_AMPLIFY).min(PERCEPTION_SENSITIVITY_MAX);
+            self.attention_sensitivity = (self.attention_sensitivity
+                * thresholds::PERCEPTION_VIGILANCE_AMPLIFY)
+                .min(PERCEPTION_SENSITIVITY_MAX);
         } else if !should_be_vigilant && self.vigilant {
             self.vigilant = false;
-            self.attention_sensitivity =
-                (self.attention_sensitivity * thresholds::PERCEPTION_VIGILANCE_RECOVERY).max(PERCEPTION_SENSITIVITY_MIN);
+            self.attention_sensitivity = (self.attention_sensitivity
+                * thresholds::PERCEPTION_VIGILANCE_RECOVERY)
+                .max(PERCEPTION_SENSITIVITY_MIN);
         }
 
         // ── 5. Phenomenal binding → confidence modulation ─────────────────
@@ -194,9 +199,11 @@ impl CognitiveSubsystem for PerceptionManager {
         let high = f64::from(PERCEPTION_BINDING_HIGH);
         let low = f64::from(PERCEPTION_BINDING_LOW);
         if binding > high {
-            output.confidence_delta += (binding - high) * thresholds::PERCEPTION_BINDING_CONFIDENCE_SCALE;
+            output.confidence_delta +=
+                (binding - high) * thresholds::PERCEPTION_BINDING_CONFIDENCE_SCALE;
         } else if binding < low {
-            output.confidence_delta -= (low - binding) * thresholds::PERCEPTION_BINDING_CONFIDENCE_SCALE;
+            output.confidence_delta -=
+                (low - binding) * thresholds::PERCEPTION_BINDING_CONFIDENCE_SCALE;
         }
 
         output

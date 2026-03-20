@@ -128,7 +128,10 @@ impl FepFitnessBridge {
             InputStrategy::Random { seed } => {
                 ContinuousHV::random(self.config.input_dim, *seed + step as u64)
             }
-            InputStrategy::Temporal { frequencies, seed: _ } => {
+            InputStrategy::Temporal {
+                frequencies,
+                seed: _,
+            } => {
                 let t = step as f32 * self.config.dt;
                 let mut values = vec![0.0f32; self.config.input_dim];
                 for (i, val) in values.iter_mut().enumerate() {
@@ -191,11 +194,11 @@ impl FepFitnessBridge {
     }
 
     /// Evaluate a population of organisms sequentially.
-    pub fn evaluate_population(&mut self, organisms: &mut [NeuralOrganism]) -> Vec<OrganismFitness> {
-        organisms
-            .iter_mut()
-            .map(|org| self.evaluate(org))
-            .collect()
+    pub fn evaluate_population(
+        &mut self,
+        organisms: &mut [NeuralOrganism],
+    ) -> Vec<OrganismFitness> {
+        organisms.iter_mut().map(|org| self.evaluate(org)).collect()
     }
 
     /// NSGA-II non-dominated sort. Returns fronts (front 0 = Pareto-optimal).
@@ -227,9 +230,7 @@ impl FepFitnessBridge {
         }
 
         let mut fronts: Vec<Vec<usize>> = Vec::new();
-        let mut current_front: Vec<usize> = (0..n)
-            .filter(|&i| domination_count[i] == 0)
-            .collect();
+        let mut current_front: Vec<usize> = (0..n).filter(|&i| domination_count[i] == 0).collect();
 
         while !current_front.is_empty() {
             let mut next_front = Vec::new();
@@ -249,10 +250,7 @@ impl FepFitnessBridge {
     }
 
     /// Crowding distance for diversity preservation within a Pareto front.
-    pub fn crowding_distance(
-        organisms: &[NeuralOrganism],
-        front: &[usize],
-    ) -> Vec<f64> {
+    pub fn crowding_distance(organisms: &[NeuralOrganism], front: &[usize]) -> Vec<f64> {
         let n = front.len();
         if n <= 2 {
             return vec![f64::INFINITY; n];
@@ -402,7 +400,7 @@ mod tests {
                 let mut org = NeuralOrganism::spawn(i as u64, genome, &genesis, 0);
                 org.fitness = OrganismFitness {
                     composite: i as f64,
-                    free_energy: -(i as f64),    // Lower FE for higher index
+                    free_energy: -(i as f64), // Lower FE for higher index
                     phi: i as f64 * 0.5,
                     consciousness: i as f64 * 0.3,
                     prediction_accuracy: 0.5,

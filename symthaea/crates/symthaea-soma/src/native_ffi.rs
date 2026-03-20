@@ -358,10 +358,7 @@ pub unsafe extern "C" fn soma_engine_load_broca_checkpoint(
 ///
 /// # Safety: `engine` must be valid.
 #[no_mangle]
-pub unsafe extern "C" fn soma_engine_set_engagement_score(
-    engine: *mut SomaEngine,
-    score: f32,
-) {
+pub unsafe extern "C" fn soma_engine_set_engagement_score(engine: *mut SomaEngine, score: f32) {
     unsafe { &mut *engine }.set_engagement_score(score);
 }
 

@@ -55,7 +55,6 @@ pub struct LanguageControllerConfig {
     pub parallel_threshold: usize,
 
     // ── Phase 1: Compositional Logit Refinement ──
-
     /// Enable compositional logit refinement via HDC bind.
     /// When enabled, `output_hv` is blended with `output_hv.bind(thought_hv)`
     /// to create a thought-conditioned output that amplifies on-topic tokens.
@@ -68,7 +67,6 @@ pub struct LanguageControllerConfig {
     pub compositional_alpha: f32,
 
     // ── Phase 3: Adaptive dt from Coherence ──
-
     /// Enable adaptive dt modulation from coherence feedback.
     /// Low coherence → large dt → CfC "listens harder" to thought input.
     /// High coherence → small dt → preserves autoregressive momentum.
