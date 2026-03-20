@@ -67,6 +67,25 @@ pub enum DefenseActionKind {
     HaltMotor,
 }
 
+impl std::fmt::Display for DefenseActionKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::IncreasePeerScoring { .. } => f.write_str("IncreasePeerScoring"),
+            Self::RateLimitProposals { .. } => f.write_str("RateLimitProposals"),
+            Self::BoostVigilance { .. } => f.write_str("BoostVigilance"),
+            Self::QuarantinePeer { .. } => f.write_str("QuarantinePeer"),
+            Self::SuspendNonGuardianProposals => f.write_str("SuspendNonGuardianProposals"),
+            Self::RestrictMotorToReadOnly => f.write_str("RestrictMotorToReadOnly"),
+            Self::StressResponse { .. } => f.write_str("StressResponse"),
+            Self::EmergencyGovernanceFreeze => f.write_str("EmergencyGovernanceFreeze"),
+            Self::DisconnectUntrusted => f.write_str("DisconnectUntrusted"),
+            Self::PhysicalSafePosition => f.write_str("PhysicalSafePosition"),
+            Self::EmergencyBeacon => f.write_str("EmergencyBeacon"),
+            Self::HaltMotor => f.write_str("HaltMotor"),
+        }
+    }
+}
+
 impl DefenseActionKind {
     /// Moral severity of this action (used by moral algebra evaluation).
     ///

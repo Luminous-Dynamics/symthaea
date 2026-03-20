@@ -312,6 +312,12 @@ pub enum ResponseStrategy {
     Exploratory,
 }
 
+impl std::fmt::Display for ResponseStrategy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 impl ResponseStrategy {
     /// Return the strategy name as a static string, matching Debug output.
     /// Avoids `format!("{:?}", strategy)` allocation on the hot path.

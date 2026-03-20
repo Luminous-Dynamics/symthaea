@@ -73,6 +73,18 @@ pub enum CrisisType {
     Unknown,
 }
 
+impl std::fmt::Display for CrisisType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Infrastructure => f.write_str("Infrastructure"),
+            Self::CyberAttack => f.write_str("CyberAttack"),
+            Self::ConsciousnessFailure => f.write_str("ConsciousnessFailure"),
+            Self::CommunityStress => f.write_str("CommunityStress"),
+            Self::Unknown => f.write_str("Unknown"),
+        }
+    }
+}
+
 /// Individual signals that contribute to crisis detection.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrisisSignal {
