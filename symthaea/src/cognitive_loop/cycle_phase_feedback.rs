@@ -14,41 +14,136 @@ use super::phase_results::{
     FbReasoning, FbSelfModel, FbSupport, FeedbackPhaseResult, PerceptionPhaseResult,
 };
 use super::thresholds::{
-    AGREEMENT_COHERENCE_VELOCITY_THRESHOLD, AGREEMENT_CONFIDENCE_COUPLING_SCALE,
-    AGREEMENT_CONFIDENCE_COUPLING_THRESHOLD, AGREEMENT_CRITICAL_CAUTION_SCALE,
-    AGREEMENT_CRITICAL_THRESHOLD, AGREEMENT_EMA_DECAY, AGREEMENT_HIGH_CONFIDENCE_SCALE,
-    AGREEMENT_LOW_CONFIDENCE_SCALE, AGREEMENT_LOW_EXPLORATION_SCALE,
-    AGREEMENT_VELOCITY_DROP_EXPLORATION, AGREEMENT_VELOCITY_DROP_LR,
-    AGREEMENT_VELOCITY_DROP_THRESHOLD, ATTENTION_BUDGET_GATED_LR_SCALE, CAUSAL_URGENCY_CONFIDENCE,
-    COMPOUND_INSTABILITY_ERROR_SLOPE, COMPOUND_INSTABILITY_EXPLORATION,
-    COMPOUND_INSTABILITY_LR_SCALE, COMPOUND_INSTABILITY_VELOCITY, CONTEXT_PHI_SCALE_BASE,
-    CONTEXT_PHI_SCALE_RANGE, CROSS_MODULE_AGREEMENT_HIGH, CROSS_MODULE_AGREEMENT_LOW,
-    CROSS_MODULE_VARIANCE_AMPLIFICATION, EMPATHIC_TONE_RATE_SCALE, EMPATHIC_TONE_THRESHOLD,
-    ENTROPY_LR_MIN, ENTROPY_LR_RANGE, EPISTEMIC_APPROVAL_LR_SCALE, EPISTEMIC_APPROVAL_THRESHOLD,
-    EPISTEMIC_CAUTION_SCALE, EPISTEMIC_CAUTION_THRESHOLD, EPISTEMIC_REJECTION_CONFIDENCE_SCALE,
-    EPISTEMIC_REJECTION_LR_SCALE, EPISTEMIC_TRUST_SCALE, EPISTEMIC_TRUST_THRESHOLD,
-    EVOLUTION_NEGATIVE_EXPLORATION_MAX, EVOLUTION_NEGATIVE_EXPLORATION_SCALE,
-    EVOLUTION_PHI_THRESHOLD, EVOLUTION_POSITIVE_CONFIDENCE_MAX,
-    EVOLUTION_POSITIVE_CONFIDENCE_SCALE, HARMONIC_ALL_CLEAR_BOOST, HARMONIC_INTERFERENCE_DAMPEN,
-    HARMONIC_INTERFERENCE_FREE_CYCLES, HARMONIC_INTERFERENCE_MAX_COUNT,
-    HARMONIC_INTERFERENCE_MAX_DAMPEN, LIMITING_BINDING_CONFIDENCE_DELTA,
-    LIMITING_COMPONENT_GRADIENT_THRESHOLD, LOVE_RESONANCE_CONFIDENCE_SCALE,
-    LOVE_RESONANCE_LR_FRACTION, LOVE_RESONANCE_THRESHOLD, LOW_QUALITY_EXPLORATION_DAMPEN,
-    NEUROMOD_ATTENTION_SENSITIVITY_MAX, PHI_DIVERGENCE_MAX, PHI_DIVERGENCE_SCALE,
-    PHI_DIVERGENCE_THRESHOLD, PHI_RELATIONAL_OXY_SCALE, PHI_RELATIONAL_OXY_THRESHOLD,
-    PIPELINE_CONSCIOUSNESS_CAUTION, PIPELINE_CONSCIOUSNESS_CAUTION_SCALE,
-    PIPELINE_CONSCIOUSNESS_RELAX, PIPELINE_CONSCIOUSNESS_RELAX_SCALE, QUALITY_EMA_DECAY,
-    QUALITY_HIGH_LR_SCALE, QUALITY_LR_CLAMP_MAX, QUALITY_LR_CLAMP_MIN, REASONING_CHAIN_BOOST_SCALE,
-    REASONING_CHAIN_CONFIDENCE_THRESHOLD, REST_BINDING_DAMPEN, REST_COHERENCE_WEIGHT,
-    REST_MODULATION_BINDING_FRAC, REST_MODULATION_COHERENCE_FRAC, SOCIAL_LR_BASE,
-    SOCIAL_LR_CHANGE_THRESHOLD, SOCIAL_LR_RANGE, SPEECH_RATE_CLAMP_MAX, SPEECH_RATE_CLAMP_MIN,
-    STRUCTURAL_BOTTLENECK_LR_SCALE, STRUCTURAL_BOTTLENECK_THRESHOLD,
-    STRUCTURAL_EMERGENCE_CONFIDENCE_BOOST, STRUCTURAL_EMERGENCE_CONFIDENCE_THRESHOLD,
-    SUBSYSTEM_LR_FACTOR_MAX, SUBSYSTEM_LR_FACTOR_MIN, SUPPORT_GRADUATION_INTERVAL,
-    SUPPORT_TELEMETRY_INTERVAL, TEMPORAL_CHAIN_DEEP_LR_SCALE, TEMPORAL_CHAIN_DEEP_THRESHOLD,
-    TEMPORAL_CHAIN_SHALLOW_LR_SCALE, TEMPORAL_CHAIN_SHALLOW_THRESHOLD, TOM_ACCURACY_HIGH,
-    TOM_ACCURACY_LOW, TOM_ACCURACY_SCALE, TRUST_DECAY_FACTOR, TRUST_SIGNAL_MIDPOINT,
-    TRUST_SIGNAL_RATE, UNIFIED_QUALITY_AGREEMENT_WEIGHT, UNIFIED_QUALITY_ANOMALY_WEIGHT,
+    AGREEMENT_COHERENCE_VELOCITY_THRESHOLD,
+    AGREEMENT_CONFIDENCE_COUPLING_SCALE,
+    AGREEMENT_CONFIDENCE_COUPLING_THRESHOLD,
+    AGREEMENT_CRITICAL_CAUTION_SCALE,
+    AGREEMENT_CRITICAL_THRESHOLD,
+    AGREEMENT_EMA_DECAY,
+    AGREEMENT_HIGH_CONFIDENCE_SCALE,
+    AGREEMENT_LOW_CONFIDENCE_SCALE,
+    AGREEMENT_LOW_EXPLORATION_SCALE,
+    AGREEMENT_VELOCITY_DROP_EXPLORATION,
+    AGREEMENT_VELOCITY_DROP_LR,
+    AGREEMENT_VELOCITY_DROP_THRESHOLD,
+    ATTENTION_BUDGET_GATED_LR_SCALE,
+    CAUSAL_URGENCY_CONFIDENCE,
+    COHERENCE_TRUST_CENTER,
+    COMPOUND_INSTABILITY_ERROR_SLOPE,
+    COMPOUND_INSTABILITY_EXPLORATION,
+    COMPOUND_INSTABILITY_LR_SCALE,
+    COMPOUND_INSTABILITY_VELOCITY,
+    // Round 17: feedback magic number extraction
+    CONSCIOUSNESS_GRADIENT_STABILITY_THRESHOLD,
+    CONTEXT_PHI_SCALE_BASE,
+    CONTEXT_PHI_SCALE_RANGE,
+    CROSS_MODAL_BINDING_ALPHA,
+    CROSS_MODAL_BINDING_HIGH_SCALE,
+    CROSS_MODAL_BINDING_HIGH_THRESHOLD,
+    CROSS_MODAL_BINDING_LOW_FLOOR,
+    CROSS_MODAL_BINDING_LOW_SCALE,
+    CROSS_MODAL_BINDING_LOW_THRESHOLD,
+    CROSS_MODAL_BINDING_MOMENTUM,
+    CROSS_MODULE_AGREEMENT_ADJUSTMENT_CENTER,
+    CROSS_MODULE_AGREEMENT_HIGH,
+    CROSS_MODULE_AGREEMENT_LOW,
+    CROSS_MODULE_AGREEMENT_NEUTRAL,
+    CROSS_MODULE_VARIANCE_AMPLIFICATION,
+    EFFICACY_ATTENTION_BOOST,
+    EFFICACY_LR_BOOST,
+    EMPATHIC_TONE_RATE_SCALE,
+    EMPATHIC_TONE_THRESHOLD,
+    ENTROPY_LR_MIN,
+    ENTROPY_LR_RANGE,
+    EPISTEMIC_APPROVAL_LR_SCALE,
+    EPISTEMIC_APPROVAL_THRESHOLD,
+    EPISTEMIC_CAUTION_SCALE,
+    EPISTEMIC_CAUTION_THRESHOLD,
+    EPISTEMIC_CONFLICT_EXPLORATION_SCALE,
+    EPISTEMIC_REJECTION_CONFIDENCE_SCALE,
+    EPISTEMIC_REJECTION_LR_SCALE,
+    EPISTEMIC_TRUST_SCALE,
+    EPISTEMIC_TRUST_THRESHOLD,
+    EVOLUTION_NEGATIVE_EXPLORATION_MAX,
+    EVOLUTION_NEGATIVE_EXPLORATION_SCALE,
+    EVOLUTION_PHI_THRESHOLD,
+    EVOLUTION_POSITIVE_CONFIDENCE_MAX,
+    EVOLUTION_POSITIVE_CONFIDENCE_SCALE,
+    FLOW_STATE_LR_BOOST_MULTIPLIER,
+    HARMONIC_ALL_CLEAR_BOOST,
+    HARMONIC_INTERFERENCE_DAMPEN,
+    HARMONIC_INTERFERENCE_FREE_CYCLES,
+    HARMONIC_INTERFERENCE_MAX_COUNT,
+    HARMONIC_INTERFERENCE_MAX_DAMPEN,
+    HOT_HUBRIS_CONFIDENCE_DAMPEN,
+    KNOWLEDGE_CONTRADICTION_FACTOR_DENOM,
+    KNOWLEDGE_REASONING_LOG_SCALE,
+    LIMITING_BINDING_CONFIDENCE_DELTA,
+    LIMITING_COMPONENT_GRADIENT_THRESHOLD,
+    LOVE_RESONANCE_CONFIDENCE_SCALE,
+    LOVE_RESONANCE_LR_FRACTION,
+    LOVE_RESONANCE_THRESHOLD,
+    LOW_QUALITY_EXPLORATION_DAMPEN,
+    MORAL_SCORE_NORMALIZE_OFFSET,
+    MORAL_SCORE_NORMALIZE_SCALE,
+    NEUROMOD_ATTENTION_SENSITIVITY_MAX,
+    PHENOMENAL_FRAGMENTED_CONFIDENCE_DAMPEN,
+    PHENOMENAL_FRAGMENTED_EXPLORATION_BOOST,
+    PHI_DIVERGENCE_MAX,
+    PHI_DIVERGENCE_SCALE,
+    PHI_DIVERGENCE_THRESHOLD,
+    PHI_RELATIONAL_OXY_SCALE,
+    PHI_RELATIONAL_OXY_THRESHOLD,
+    PIPELINE_CONSCIOUSNESS_CAUTION,
+    PIPELINE_CONSCIOUSNESS_CAUTION_SCALE,
+    PIPELINE_CONSCIOUSNESS_RELAX,
+    PIPELINE_CONSCIOUSNESS_RELAX_SCALE,
+    QUALITY_EMA_DECAY,
+    QUALITY_FLOOR_EXPLORATION_ADJUSTMENT,
+    QUALITY_HIGH_LR_SCALE,
+    QUALITY_LR_CLAMP_MAX,
+    QUALITY_LR_CLAMP_MIN,
+    REASONING_CHAIN_BOOST_SCALE,
+    REASONING_CHAIN_CONFIDENCE_THRESHOLD,
+    REASONING_GATE_SUCCESS_LR_SCALE,
+    REASONING_RELIABILITY_CENTER,
+    REST_BINDING_DAMPEN,
+    REST_COHERENCE_WEIGHT,
+    REST_MODULATION_BINDING_FRAC,
+    REST_MODULATION_COHERENCE_FRAC,
+    SCALE_BOOST_SIGMOID_AMPLITUDE,
+    SCALE_BOOST_SIGMOID_EXPONENT,
+    SOCIAL_LR_BASE,
+    SOCIAL_LR_CHANGE_THRESHOLD,
+    SOCIAL_LR_RANGE,
+    SOCIAL_MODEL_TRUST_MODE_THRESHOLD,
+    SOCIAL_MODEL_TURN_TAKING_DEFAULT,
+    SPEECH_RATE_CLAMP_MAX,
+    SPEECH_RATE_CLAMP_MIN,
+    STRUCTURAL_BOTTLENECK_LR_SCALE,
+    STRUCTURAL_BOTTLENECK_THRESHOLD,
+    STRUCTURAL_EMERGENCE_CONFIDENCE_BOOST,
+    STRUCTURAL_EMERGENCE_CONFIDENCE_THRESHOLD,
+    SUBSYSTEM_LR_FACTOR_MAX,
+    SUBSYSTEM_LR_FACTOR_MIN,
+    SUPPORT_GRADUATION_INTERVAL,
+    SUPPORT_TELEMETRY_INTERVAL,
+    TEMPORAL_BINDING_HIGH_EXPLORATION_SCALE,
+    TEMPORAL_CHAIN_DEEP_LR_SCALE,
+    TEMPORAL_CHAIN_DEEP_THRESHOLD,
+    TEMPORAL_CHAIN_SHALLOW_LR_SCALE,
+    TEMPORAL_CHAIN_SHALLOW_THRESHOLD,
+    TEMPORAL_DISCONTINUITY_EXPLORATION_BOOST,
+    TEMPORAL_DISCONTINUITY_LR_DAMPEN,
+    TOM_ACCURACY_HIGH,
+    TOM_ACCURACY_LOW,
+    TOM_ACCURACY_SCALE,
+    TRUST_DECAY_FACTOR,
+    TRUST_SIGNAL_MIDPOINT,
+    TRUST_SIGNAL_RATE,
+    UNIFIED_QUALITY_AGREEMENT_WEIGHT,
+    UNIFIED_QUALITY_ANOMALY_WEIGHT,
+    UNIFIED_QUALITY_HIGH_THRESHOLD,
     UNIFIED_QUALITY_PREDICTION_WEIGHT,
 };
 use super::{CognitiveLoopService, CycleState};
@@ -252,7 +347,7 @@ impl CognitiveLoopService {
             match consciousness_limiting_component.as_str() {
                 "Attention" => {
                     self.adaptive_behavior.attention_sensitivity =
-                        (self.adaptive_behavior.attention_sensitivity * 1.05)
+                        (self.adaptive_behavior.attention_sensitivity * EFFICACY_ATTENTION_BOOST)
                             .min(NEUROMOD_ATTENTION_SENSITIVITY_MAX);
                     self.stats.limiting_component_boost_count += 1;
                     "Attention"
@@ -263,7 +358,7 @@ impl CognitiveLoopService {
                     "Binding"
                 }
                 "Efficacy" => {
-                    self.scale_lr("limit_efficacy", 1.05);
+                    self.scale_lr("limit_efficacy", EFFICACY_LR_BOOST);
                     self.stats.limiting_component_boost_count += 1;
                     "Efficacy"
                 }
@@ -287,7 +382,9 @@ impl CognitiveLoopService {
             {
                 self.scale_lr("gradient_caution", CONSCIOUSNESS_GRADIENT_LR_SCALE);
                 self.carryover.quality.consecutive_stable_gradient = 0;
-            } else if consciousness_gradient_magnitude < 0.01 {
+            } else if consciousness_gradient_magnitude
+                < CONSCIOUSNESS_GRADIENT_STABILITY_THRESHOLD as f64
+            {
                 self.carryover.quality.consecutive_stable_gradient = self
                     .carryover
                     .quality
@@ -795,7 +892,7 @@ impl CognitiveLoopService {
                                          // Hubris attenuates HOT: can't claim deep self-knowledge while
                                          // morally overconfident. 0.7× during hubris, 1.0× otherwise.
                     if self.ethics_engine.last_anomaly_report().moral_hubris {
-                        raw_hot * 0.7
+                        raw_hot * HOT_HUBRIS_CONFIDENCE_DAMPEN as f64
                     } else {
                         raw_hot
                     }
@@ -841,7 +938,10 @@ impl CognitiveLoopService {
                     let size_factor =
                         ((t.graph_size as f64 + 1.0).log2() / log_scale).clamp(0.0, 1.0);
                     let ece_factor = (1.0 - t.calibration_ece).clamp(0.0, 1.0);
-                    let contradiction_factor = 1.0 / (1.0 + t.contradictions_detected as f64 * 0.1);
+                    let contradiction_factor = 1.0
+                        / (1.0
+                            + t.contradictions_detected as f64
+                                * KNOWLEDGE_CONTRADICTION_FACTOR_DENOM as f64);
                     let coherence = size_factor * ece_factor * contradiction_factor;
                     if coherence.is_finite() {
                         coherence
@@ -943,22 +1043,29 @@ impl CognitiveLoopService {
                 // operates at multiple scales (HierarchicalCfC), cross-scale
                 // integration contributes to emergence. Mediano et al. (2022):
                 // multi-scale integrated information exceeds single-scale Phi.
-                let scale_boost =
-                    if let Some(taus) = self.temporal_network.hierarchical_effective_taus() {
-                        let mean_tau = taus.iter().sum::<f32>() / taus.len().max(1) as f32;
-                        if mean_tau > 0.0 && mean_tau.is_finite() {
-                            let var = taus.iter().map(|t| (t - mean_tau).powi(2)).sum::<f32>()
-                                / taus.len().max(1) as f32;
-                            let cv = if var.is_finite() { var.sqrt() / mean_tau } else { 0.0 };
-                            // CV for default taus [0.01,0.1,1.0,10.0] ~ 1.7
-                            // Map to 0-15% boost via sigmoid
-                            (0.15 * (1.0 / (1.0 + (-2.0 * (cv - 1.0)).exp()))) as f64
+                let scale_boost = if let Some(taus) =
+                    self.temporal_network.hierarchical_effective_taus()
+                {
+                    let mean_tau = taus.iter().sum::<f32>() / taus.len().max(1) as f32;
+                    if mean_tau > 0.0 && mean_tau.is_finite() {
+                        let var = taus.iter().map(|t| (t - mean_tau).powi(2)).sum::<f32>()
+                            / taus.len().max(1) as f32;
+                        let cv = if var.is_finite() {
+                            var.sqrt() / mean_tau
                         } else {
                             0.0
-                        }
+                        };
+                        // CV for default taus [0.01,0.1,1.0,10.0] ~ 1.7
+                        // Map to 0-15% boost via sigmoid
+                        (SCALE_BOOST_SIGMOID_AMPLITUDE
+                            * (1.0 / (1.0 + (-SCALE_BOOST_SIGMOID_EXPONENT * (cv - 1.0)).exp())))
+                            as f64
                     } else {
                         0.0
-                    };
+                    }
+                } else {
+                    0.0
+                };
 
                 (
                     sp.micro_phi * (1.0 + scale_boost * 0.5),
@@ -1142,7 +1249,7 @@ impl CognitiveLoopService {
                 }
                 // Gate passed + good outcome → boost LR to reinforce
                 if gate_success {
-                    self.scale_lr("reasoning_gate_success", 1.02);
+                    self.scale_lr("reasoning_gate_success", REASONING_GATE_SUCCESS_LR_SCALE);
                 }
             }
         }
@@ -1184,9 +1291,9 @@ impl CognitiveLoopService {
                     phi_relation: model.phi_relational,
                     stage: model.stage,
                     synchrony: model.trust as f64,
-                    turn_taking_quality: 0.7,
+                    turn_taking_quality: SOCIAL_MODEL_TURN_TAKING_DEFAULT as f64,
                     mutual_information: model.reciprocity as f64,
-                    mode: if model.trust > 0.3 {
+                    mode: if model.trust > SOCIAL_MODEL_TRUST_MODE_THRESHOLD {
                         RelationMode::IThou
                     } else {
                         RelationMode::IIt
@@ -1424,7 +1531,7 @@ impl CognitiveLoopService {
         if epistemic_conflict_count > 2 && self.stats.total_cycles > 20 {
             self.adjust_exploration(
                 "epistemic_conflict",
-                epistemic_conflict_count as f32 * 0.015,
+                epistemic_conflict_count as f32 * EPISTEMIC_CONFLICT_EXPLORATION_SCALE,
             );
         }
 
@@ -1432,16 +1539,25 @@ impl CognitiveLoopService {
         // Fragmented binding = unreliable integration → dampen confidence, boost exploration.
         // Science: Tononi (2004) — low integration → low consciousness quality.
         if phenomenal_fragmented && self.stats.total_cycles > 15 {
-            self.scale_confidence("phenomenal_fragmented", 0.95);
-            self.adjust_exploration("phenomenal_fragmented", 0.02);
+            self.scale_confidence(
+                "phenomenal_fragmented",
+                PHENOMENAL_FRAGMENTED_CONFIDENCE_DAMPEN,
+            );
+            self.adjust_exploration(
+                "phenomenal_fragmented",
+                PHENOMENAL_FRAGMENTED_EXPLORATION_BOOST,
+            );
         }
 
         // Session 12 Item 6: Temporal discontinuity → LR dampen + exploration.
         // Temporal gaps make learning unreliable (missing causal chain).
         // Science: Howard & Kahana (2002) — temporal context model: gaps disrupt encoding.
         if temporal_discontinuity && self.stats.total_cycles > 15 {
-            self.scale_lr("temporal_discontinuity", 0.95);
-            self.adjust_exploration("temporal_discontinuity", 0.02);
+            self.scale_lr("temporal_discontinuity", TEMPORAL_DISCONTINUITY_LR_DAMPEN);
+            self.adjust_exploration(
+                "temporal_discontinuity",
+                TEMPORAL_DISCONTINUITY_EXPLORATION_BOOST,
+            );
         }
 
         // Session 16 Item 1: Temporal binding strength → exploration/LR feedback.
@@ -1460,7 +1576,10 @@ impl CognitiveLoopService {
                 self.adjust_exploration("temporal_binding_low", boost);
                 self.scale_lr("temporal_binding_low", TEMPORAL_BINDING_LOW_LR_SCALE);
             } else if tb > TEMPORAL_BINDING_DAMPEN_THRESHOLD && self.stats.total_cycles > 15 {
-                self.scale_exploration("temporal_binding_high", 0.98);
+                self.scale_exploration(
+                    "temporal_binding_high",
+                    TEMPORAL_BINDING_HIGH_EXPLORATION_SCALE,
+                );
             }
         }
 
@@ -1468,12 +1587,22 @@ impl CognitiveLoopService {
         // High binding (>0.7) → more modalities integrated → boost attention sensitivity.
         // Low binding (<0.3) → weak integration → dampen (trust only primary modality).
         // Science: Engel et al. (2001) — synchrony-based binding gates cross-modal attention.
-        if cross_modal_binding_strength > 0.7 && self.stats.total_cycles > 10 {
-            let binding_boost = (cross_modal_binding_strength - 0.7) * 0.1;
+        if cross_modal_binding_strength > CROSS_MODAL_BINDING_HIGH_THRESHOLD
+            && self.stats.total_cycles > 10
+        {
+            let binding_boost = (cross_modal_binding_strength - CROSS_MODAL_BINDING_HIGH_THRESHOLD)
+                * CROSS_MODAL_BINDING_HIGH_SCALE;
             self.adjust_confidence("binding_attention_hi", binding_boost);
-        } else if cross_modal_binding_strength < 0.3 && self.stats.total_cycles > 10 {
-            let binding_dampen = 1.0 - (0.3 - cross_modal_binding_strength) * 0.1;
-            self.scale_confidence("binding_attention_lo", binding_dampen.max(0.95));
+        } else if cross_modal_binding_strength < CROSS_MODAL_BINDING_LOW_THRESHOLD
+            && self.stats.total_cycles > 10
+        {
+            let binding_dampen = 1.0
+                - (CROSS_MODAL_BINDING_LOW_THRESHOLD - cross_modal_binding_strength)
+                    * CROSS_MODAL_BINDING_LOW_SCALE;
+            self.scale_confidence(
+                "binding_attention_lo",
+                binding_dampen.max(CROSS_MODAL_BINDING_LOW_FLOOR),
+            );
         }
 
         // Hierarchical bundling: accumulate current cycle's BinaryHV per region
@@ -1530,8 +1659,9 @@ impl CognitiveLoopService {
                         if count > 0 {
                             let avg_binding = binding_sum / count as f32;
                             // EMA-blend into cross-modal binding for downstream consumers
-                            cross_modal_binding_strength =
-                                cross_modal_binding_strength * 0.9 + avg_binding * 0.1;
+                            cross_modal_binding_strength = cross_modal_binding_strength
+                                * CROSS_MODAL_BINDING_MOMENTUM
+                                + avg_binding * CROSS_MODAL_BINDING_ALPHA;
                             tracing::debug!(
                                 avg_binding,
                                 active_regions = bundles.len(),
