@@ -219,71 +219,107 @@ impl MycellixClient {
     }
 
     //
-    // ===== MAIL OPERATIONS (Stub - Phase C Pending) =====
+    // ===== MAIL OPERATIONS =====
     //
 
-    /// Send a mail message
+    /// Send a mail message via the `mail_messages` Holochain zome.
     ///
-    /// TODO (Phase C): Replace with real Holochain zome call to `mail_messages::send_message`
+    /// Falls back to a local-only stub if the conductor is not connected.
     pub async fn send_message(
         &self,
         to_did: String,
         subject: Vec<u8>,
         body_cid: String,
-        _thread_id: Option<String>,
+        thread_id: Option<String>,
         tier: EpistemicTier,
     ) -> Result<String> {
-        println!("📧 [STUB] Would send message to {}", to_did);
-        println!("   Subject: {} bytes (encrypted)", subject.len());
-        println!("   Body CID: {}", body_cid);
-        println!("   Tier: {}", tier);
+        if !self.is_holochain_connected().await {
+            anyhow::bail!(
+                "Cannot send message: not connected to Holochain conductor. \
+                 Run 'mycelix-mail connect' first."
+            );
+        }
 
-        // Simulated message ID
-        let message_id = format!("msg_stub_{}", chrono::Utc::now().timestamp());
-        Ok(message_id)
+        #[derive(serde::Serialize, Debug)]
+        struct SendMessageInput {
+            to_did: String,
+            subject_encrypted: Vec<u8>,
+            body_cid: String,
+            thread_id: Option<String>,
+            epistemic_tier: String,
+        }
+
+        let input = SendMessageInput {
+            to_did,
+            subject_encrypted: subject,
+            body_cid,
+            thread_id,
+            epistemic_tier: format!("{}", tier),
+        };
+
+        let action_hash: ActionHash = self
+            .call_zome("mail_messages", "send_message", input)
+            .await
+            .context("Failed to send message via mail_messages zome")?;
+
+        // Return base58-encoded action hash as the message ID
+        Ok(bs58::encode(action_hash.get_raw_39()).into_string())
     }
 
-    /// Get inbox messages
+    /// Get inbox messages from the `mail_messages` Holochain zome.
     ///
-    /// TODO (Phase C): Replace with real Holochain zome call to `mail_messages::get_inbox`
+    /// Falls back to empty list if not connected.
     pub async fn get_inbox(&self) -> Result<Vec<MailMessage>> {
-        println!("📬 [STUB] Would fetch inbox from DHT");
-        Ok(vec![])
+        if !self.is_holochain_connected().await {
+            eprintln!("Warning: Not connected to Holochain conductor, returning empty inbox");
+            return Ok(vec![]);
+        }
+
+        let messages: Vec<MailMessage> = self
+            .call_zome("mail_messages", "get_inbox", ())
+            .await
+            .context("Failed to fetch inbox from mail_messages zome")?;
+
+        Ok(messages)
     }
 
-    /// Get sent messages
+    /// Get sent messages from the `mail_messages` Holochain zome.
     ///
-    /// TODO (Phase C): Replace with real Holochain zome call to `mail_messages::get_outbox`
+    /// Falls back to empty list if not connected.
     pub async fn get_sent(&self) -> Result<Vec<MailMessage>> {
-        println!("📤 [STUB] Would fetch sent messages from DHT");
-        Ok(vec![])
+        if !self.is_holochain_connected().await {
+            eprintln!("Warning: Not connected to Holochain conductor, returning empty outbox");
+            return Ok(vec![]);
+        }
+
+        let messages: Vec<MailMessage> = self
+            .call_zome("mail_messages", "get_outbox", ())
+            .await
+            .context("Failed to fetch outbox from mail_messages zome")?;
+
+        Ok(messages)
     }
 
-    /// Get a specific message by ID
-    ///
-    /// TODO (Phase C): Replace with real Holochain zome call to `mail_messages::get_message`
+    /// Get a specific message by ID from the `mail_messages` Holochain zome.
     pub async fn get_message(&self, message_id: &str) -> Result<MailMessage> {
-        println!("🔍 [STUB] Would fetch message {} from DHT", message_id);
+        if !self.is_holochain_connected().await {
+            anyhow::bail!(
+                "Cannot fetch message: not connected to Holochain conductor"
+            );
+        }
 
-        Ok(MailMessage {
-            from_did: self
-                .config
-                .identity
-                .did
-                .clone()
-                .unwrap_or_else(|| "did:mycelix:demo-sender".to_string()),
-            to_did: self
-                .config
-                .identity
-                .did
-                .clone()
-                .unwrap_or_else(|| "did:mycelix:demo-recipient".to_string()),
-            subject_encrypted: format!("ENC:Demo message {}", message_id).into_bytes(),
-            body_cid: format!("bafyrei{}", hex::encode(message_id.as_bytes())),
-            timestamp: chrono::Utc::now().timestamp(),
-            thread_id: None,
-            epistemic_tier: EpistemicTier::Tier2PrivatelyVerifiable,
-        })
+        // Parse message_id (base58-encoded ActionHash) back to ActionHash
+        let hash_bytes = bs58::decode(message_id)
+            .into_vec()
+            .context("Invalid message ID format (expected base58-encoded ActionHash)")?;
+        let message_hash = ActionHash::from_raw_39(hash_bytes);
+
+        let message: MailMessage = self
+            .call_zome("mail_messages", "get_message", message_hash)
+            .await
+            .context(format!("Failed to fetch message {} from DHT", message_id))?;
+
+        Ok(message)
     }
 
     /// Mark a message as read
@@ -727,19 +763,26 @@ impl MycellixClient {
     // ===== UTILITY OPERATIONS =====
     //
 
-    /// Get mail statistics
+    /// Get mail statistics from the DHT.
     ///
-    /// TODO (Phase C): Calculate from real DHT data
+    /// Falls back to zeroed stats if not connected to conductor.
     pub async fn get_stats(&self) -> Result<MailStats> {
-        println!("📊 [STUB] Would calculate stats from DHT");
+        if !self.is_holochain_connected().await {
+            return Ok(MailStats {
+                total_messages: 0,
+                unread_messages: 0,
+                total_contacts: 0,
+                total_trust_scores: 0,
+                last_sync: None,
+            });
+        }
 
-        Ok(MailStats {
-            total_messages: 0,
-            unread_messages: 0,
-            total_contacts: 0,
-            total_trust_scores: 0,
-            last_sync: Some(chrono::Utc::now().timestamp()),
-        })
+        let stats: MailStats = self
+            .call_zome("mail_messages", "get_stats", ())
+            .await
+            .context("Failed to fetch mail statistics from DHT")?;
+
+        Ok(stats)
     }
 
     /// Health check - verify connections
@@ -782,10 +825,24 @@ impl MycellixClient {
             }
         };
 
-        // TODO (Phase C): Check Holochain conductor connection
-        println!("  ⏳ Holochain Conductor: PENDING (Phase C)");
+        // Check Holochain conductor connection
+        let holo_ok = self.is_holochain_connected().await;
+        if holo_ok {
+            println!("  ✓ Holochain Conductor: OK");
+        } else {
+            // Attempt reconnection
+            match self.connect_holochain().await {
+                Ok(()) => {
+                    println!("  ✓ Holochain Conductor: RECONNECTED");
+                }
+                Err(e) => {
+                    println!("  ✗ Holochain Conductor: UNAVAILABLE ({})", e);
+                }
+            }
+        }
 
-        Ok(did_ok || matl_ok) // At least one service should be available
+        let holo_connected = self.is_holochain_connected().await;
+        Ok(did_ok || matl_ok || holo_connected) // At least one service should be available
     }
 
     //

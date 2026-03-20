@@ -144,6 +144,7 @@ pub fn query_hearth(input: DispatchInput) -> ExternResult<Record> {
         .unwrap_or_else(|| input.zome.clone());
 
     let query = HearthQueryEntry {
+        schema_version: 1,
         domain: domain.clone(),
         query_type: input.fn_name.clone(),
         requester: caller.clone(),
@@ -258,6 +259,7 @@ pub fn broadcast_event(input: DispatchInput) -> ExternResult<Record> {
         .unwrap_or_else(|| input.zome.clone());
 
     let event = HearthEventEntry {
+        schema_version: 1,
         domain: domain.clone(),
         event_type: input.fn_name.clone(),
         source_agent: caller.clone(),
@@ -309,6 +311,7 @@ pub fn broadcast_event(input: DispatchInput) -> ExternResult<Record> {
 pub fn log_governance_gate(input: GateAuditInput) -> ExternResult<()> {
     let agent = agent_info()?.agent_initial_pubkey;
     let event = HearthEventEntry {
+        schema_version: 1,
         domain: "governance_gate".to_string(),
         event_type: input.action_name.clone(),
         source_agent: agent.clone(),
@@ -590,6 +593,7 @@ pub fn initiate_severance(input: SeveranceInput) -> ExternResult<Record> {
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
 
     let event = HearthEventEntry {
+        schema_version: 1,
         domain: "kinship".to_string(),
         event_type: "severance_initiated".to_string(),
         source_agent: caller.clone(),
@@ -879,6 +883,7 @@ fn cache_credential(credential: &ConsciousnessCredential) -> ExternResult<()> {
     })?;
 
     let entry = CachedCredentialEntry {
+        schema_version: 1,
         did: credential.did.clone(),
         credential_json: json,
         cached_at_us: now,

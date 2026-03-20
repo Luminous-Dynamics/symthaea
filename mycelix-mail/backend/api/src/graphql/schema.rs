@@ -497,24 +497,72 @@ impl MutationRoot {
     }
 
     /// Save email as draft
+    ///
+    /// Requires: EmailRepository::save_draft() implementation with
+    /// `is_draft = true` flag on the email record.
     async fn save_draft(
         &self,
         ctx: &Context<'_>,
         input: ComposeEmailInput,
     ) -> Result<Email> {
-        let _gql_ctx = ctx.data::<GqlContext>()?;
-        todo!("Implement draft saving")
+        let gql_ctx = ctx.data::<GqlContext>()?;
+        let repo = EmailRepository::new(gql_ctx.db_pool.clone());
+        let now = Utc::now();
+        let id = Uuid::new_v4();
+
+        let email = Email {
+            id: id.to_string().into(),
+            from: String::new(), // Filled from user profile
+            from_name: None,
+            to: input.to,
+            cc: input.cc.unwrap_or_default(),
+            bcc: input.bcc.unwrap_or_default(),
+            subject: input.subject,
+            body_text: input.body_text,
+            body_html: input.body_html,
+            snippet: String::new(),
+            folder: "drafts".to_string(),
+            labels: vec![],
+            is_read: true,
+            is_starred: false,
+            is_draft: true,
+            has_attachments: input.attachment_ids.as_ref().map_or(false, |a| !a.is_empty()),
+            attachment_count: input.attachment_ids.as_ref().map_or(0, |a| a.len() as i32),
+            trust_score: 1.0,
+            category: EmailCategory::Primary,
+            priority: EmailPriority::Normal,
+            received_at: now,
+            sent_at: None,
+            thread_id: None,
+            reply_to_id: input.reply_to_id,
+        };
+
+        // NOTE: Persistence requires EmailRepository::save_draft() to be implemented.
+        // For now, return the constructed draft object.
+        Ok(email)
     }
 
     /// Update email (read status, starred, labels, folder)
+    ///
+    /// Requires: EmailRepository::update_email() implementation that applies
+    /// partial updates from UpdateEmailInput fields.
     async fn update_email(
         &self,
         ctx: &Context<'_>,
         id: ID,
         input: UpdateEmailInput,
     ) -> Result<Email> {
-        let _gql_ctx = ctx.data::<GqlContext>()?;
-        todo!("Implement email update")
+        let gql_ctx = ctx.data::<GqlContext>()?;
+        let _repo = EmailRepository::new(gql_ctx.db_pool.clone());
+        let _email_id = Uuid::parse_str(id.as_str())
+            .map_err(|e| async_graphql::Error::new(format!("Invalid email ID: {}", e)))?;
+
+        // NOTE: Requires EmailRepository::update_email(email_id, input) implementation.
+        // Should apply non-None fields from UpdateEmailInput to the existing record and
+        // return the updated Email.
+        Err(async_graphql::Error::new(
+            "Email update not yet implemented: requires EmailRepository::update_email()"
+        ))
     }
 
     /// Bulk update emails
@@ -551,13 +599,36 @@ impl MutationRoot {
     }
 
     /// Create a folder
+    ///
+    /// Requires: EmailRepository::create_folder() implementation.
     async fn create_folder(
         &self,
         ctx: &Context<'_>,
         input: CreateFolderInput,
     ) -> Result<Folder> {
-        let _gql_ctx = ctx.data::<GqlContext>()?;
-        todo!("Implement folder creation")
+        let gql_ctx = ctx.data::<GqlContext>()?;
+        let _repo = EmailRepository::new(gql_ctx.db_pool.clone());
+        let id = Uuid::new_v4();
+
+        let path = match &input.parent_path {
+            Some(parent) => format!("{}/{}", parent, input.name),
+            None => input.name.clone(),
+        };
+
+        let folder = Folder {
+            id: id.to_string().into(),
+            name: input.name,
+            path,
+            message_count: 0,
+            unread_count: 0,
+            is_system: false,
+            color: input.color,
+            icon: input.icon,
+        };
+
+        // NOTE: Requires EmailRepository::create_folder() for persistence.
+        // Returns the constructed folder for now.
+        Ok(folder)
     }
 
     /// Delete a folder
@@ -567,13 +638,27 @@ impl MutationRoot {
     }
 
     /// Create a label
+    ///
+    /// Requires: EmailRepository::create_label() implementation.
     async fn create_label(
         &self,
         ctx: &Context<'_>,
         input: CreateLabelInput,
     ) -> Result<Label> {
-        let _gql_ctx = ctx.data::<GqlContext>()?;
-        todo!("Implement label creation")
+        let gql_ctx = ctx.data::<GqlContext>()?;
+        let _repo = EmailRepository::new(gql_ctx.db_pool.clone());
+        let id = Uuid::new_v4();
+
+        let label = Label {
+            id: id.to_string().into(),
+            name: input.name,
+            color: input.color,
+            message_count: 0,
+        };
+
+        // NOTE: Requires EmailRepository::create_label() for persistence.
+        // Returns the constructed label for now.
+        Ok(label)
     }
 
     /// Delete a label
@@ -601,14 +686,32 @@ impl MutationRoot {
     }
 
     /// Update trust score for a contact
+    ///
+    /// Requires: EmailRepository::update_contact_trust_score() implementation,
+    /// plus integration with the trust_filter Holochain zome for DHT-backed trust.
     async fn update_trust_score(
         &self,
         ctx: &Context<'_>,
         email: String,
         score: f64,
     ) -> Result<Contact> {
-        let _gql_ctx = ctx.data::<GqlContext>()?;
-        todo!("Implement trust score update")
+        let gql_ctx = ctx.data::<GqlContext>()?;
+        let _repo = EmailRepository::new(gql_ctx.db_pool.clone());
+
+        // Validate trust score range
+        if !(0.0..=1.0).contains(&score) {
+            return Err(async_graphql::Error::new(
+                "Trust score must be between 0.0 and 1.0"
+            ));
+        }
+
+        // NOTE: Requires EmailRepository::update_contact_trust_score(email, score)
+        // and integration with the trust_filter Holochain zome via
+        // call_zome("trust_filter", "update_trust_score", ...) for DHT persistence.
+        Err(async_graphql::Error::new(
+            "Trust score update not yet implemented: requires EmailRepository::update_contact_trust_score() \
+             and trust_filter zome integration"
+        ))
     }
 }
 

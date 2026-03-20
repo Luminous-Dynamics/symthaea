@@ -257,8 +257,31 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         }
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
-        FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
-        FlatOp::RegisterDelete(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterUpdate(update) => {
+            let action = match &update {
+                OpUpdate::Entry { action, .. }
+                | OpUpdate::PrivateEntry { action, .. }
+                | OpUpdate::Agent { action, .. }
+                | OpUpdate::CapClaim { action, .. }
+                | OpUpdate::CapGrant { action, .. } => action,
+            };
+            let original = must_get_action(action.original_action_address.clone())?;
+            if *original.action().author() != action.author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original entry author can update their entries".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        FlatOp::RegisterDelete(OpDelete { action }) => {
+            let original = must_get_action(action.deletes_address.clone())?;
+            if *original.action().author() != action.author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original entry author can delete their entries".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
     }
 }
 
@@ -326,6 +349,30 @@ fn validate_create_sitrep(
         return Ok(ValidateCallbackResult::Invalid(
             "SITREP conditions must be 8192 characters or fewer".into(),
         ));
+    }
+    if sitrep.resources_needed.len() > 200 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Too many resources_needed entries (max 200)".into(),
+        ));
+    }
+    for r in &sitrep.resources_needed {
+        if r.len() > 512 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Individual resource_needed entry too long (max 512)".into(),
+            ));
+        }
+    }
+    if sitrep.hazards.len() > 200 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Too many hazards entries (max 200)".into(),
+        ));
+    }
+    for h in &sitrep.hazards {
+        if h.len() > 512 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Individual hazard entry too long (max 512)".into(),
+            ));
+        }
     }
     Ok(ValidateCallbackResult::Valid)
 }

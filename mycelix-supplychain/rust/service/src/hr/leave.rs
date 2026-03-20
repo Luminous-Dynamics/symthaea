@@ -218,22 +218,29 @@ impl LeaveService {
         .await
         .map_err(HrError::Database)?;
 
-        // Deduct from balance
-        let balance_field = match request.leave_type.as_str() {
-            "ANNUAL" => "annual_leave_balance",
-            "SICK" => "sick_leave_balance",
-            _ => "annual_leave_balance",
-        };
-
-        sqlx::query(&format!(
-            "UPDATE hr_employees SET {} = {} - $2, updated_at = NOW() WHERE id = $1",
-            balance_field, balance_field
-        ))
-        .bind(request.employee_id)
-        .bind(request.total_days)
-        .execute(&self.pool)
-        .await
-        .map_err(HrError::Database)?;
+        // Deduct from balance — use separate static queries to avoid dynamic SQL
+        match request.leave_type.as_str() {
+            "SICK" => {
+                sqlx::query(
+                    "UPDATE hr_employees SET sick_leave_balance = sick_leave_balance - $2, updated_at = NOW() WHERE id = $1",
+                )
+                .bind(request.employee_id)
+                .bind(request.total_days)
+                .execute(&self.pool)
+                .await
+                .map_err(HrError::Database)?;
+            }
+            _ => {
+                sqlx::query(
+                    "UPDATE hr_employees SET annual_leave_balance = annual_leave_balance - $2, updated_at = NOW() WHERE id = $1",
+                )
+                .bind(request.employee_id)
+                .bind(request.total_days)
+                .execute(&self.pool)
+                .await
+                .map_err(HrError::Database)?;
+            }
+        }
 
         self.get_leave_request(id).await
     }
@@ -268,23 +275,30 @@ impl LeaveService {
     pub async fn cancel(&self, id: Uuid) -> Result<LeaveRequest, HrError> {
         let request = self.get_leave_request(id).await?;
 
-        // If already approved, restore balance
+        // If already approved, restore balance — use separate static queries to avoid dynamic SQL
         if request.status == "APPROVED" {
-            let balance_field = match request.leave_type.as_str() {
-                "ANNUAL" => "annual_leave_balance",
-                "SICK" => "sick_leave_balance",
-                _ => "annual_leave_balance",
-            };
-
-            sqlx::query(&format!(
-                "UPDATE hr_employees SET {} = {} + $2, updated_at = NOW() WHERE id = $1",
-                balance_field, balance_field
-            ))
-            .bind(request.employee_id)
-            .bind(request.total_days)
-            .execute(&self.pool)
-            .await
-            .map_err(HrError::Database)?;
+            match request.leave_type.as_str() {
+                "SICK" => {
+                    sqlx::query(
+                        "UPDATE hr_employees SET sick_leave_balance = sick_leave_balance + $2, updated_at = NOW() WHERE id = $1",
+                    )
+                    .bind(request.employee_id)
+                    .bind(request.total_days)
+                    .execute(&self.pool)
+                    .await
+                    .map_err(HrError::Database)?;
+                }
+                _ => {
+                    sqlx::query(
+                        "UPDATE hr_employees SET annual_leave_balance = annual_leave_balance + $2, updated_at = NOW() WHERE id = $1",
+                    )
+                    .bind(request.employee_id)
+                    .bind(request.total_days)
+                    .execute(&self.pool)
+                    .await
+                    .map_err(HrError::Database)?;
+                }
+            }
         }
 
         sqlx::query(

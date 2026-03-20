@@ -255,7 +255,22 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         }
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
-        FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterUpdate(update) => {
+            let action = match &update {
+                OpUpdate::Entry { action, .. }
+                | OpUpdate::PrivateEntry { action, .. }
+                | OpUpdate::Agent { action, .. }
+                | OpUpdate::CapClaim { action, .. }
+                | OpUpdate::CapGrant { action, .. } => action,
+            };
+            let original = must_get_action(action.original_action_address.clone())?;
+            if *original.action().author() != action.author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original entry author can update their entries".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
         FlatOp::RegisterDelete(OpDelete { action, .. }) => {
             let original_action = must_get_action(action.deletes_address.clone())?;
             let original_author = original_action.action().author().clone();
@@ -346,6 +361,16 @@ fn validate_create_disaster(
                     "boundary coordinates must be a finite number".into(),
                 ));
             }
+            if lat < -90.0 || lat > 90.0 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Boundary latitude must be between -90 and 90".into(),
+                ));
+            }
+            if lon < -180.0 || lon > 180.0 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Boundary longitude must be between -180 and 180".into(),
+                ));
+            }
         }
     }
     if disaster.affected_area.zones.len() > 50 {
@@ -369,6 +394,23 @@ fn validate_create_disaster(
             return Ok(ValidateCallbackResult::Invalid(
                 "Zone boundary too many points (max 500)".into(),
             ));
+        }
+        for &(lat, lon) in &zone.boundary {
+            if !lat.is_finite() || !lon.is_finite() {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Zone boundary coordinates must be finite numbers".into(),
+                ));
+            }
+            if lat < -90.0 || lat > 90.0 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Zone boundary latitude must be between -90 and 90".into(),
+                ));
+            }
+            if lon < -180.0 || lon > 180.0 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Zone boundary longitude must be between -180 and 180".into(),
+                ));
+            }
         }
     }
     Ok(ValidateCallbackResult::Valid)
@@ -413,6 +455,16 @@ fn validate_update_disaster(disaster: Disaster) -> ExternResult<ValidateCallback
                     "boundary coordinates must be a finite number".into(),
                 ));
             }
+            if lat < -90.0 || lat > 90.0 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Boundary latitude must be between -90 and 90".into(),
+                ));
+            }
+            if lon < -180.0 || lon > 180.0 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Boundary longitude must be between -180 and 180".into(),
+                ));
+            }
         }
     }
     if disaster.affected_area.zones.len() > 50 {
@@ -435,6 +487,23 @@ fn validate_update_disaster(disaster: Disaster) -> ExternResult<ValidateCallback
             return Ok(ValidateCallbackResult::Invalid(
                 "Zone boundary too many points (max 500)".into(),
             ));
+        }
+        for &(lat, lon) in &zone.boundary {
+            if !lat.is_finite() || !lon.is_finite() {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Zone boundary coordinates must be finite numbers".into(),
+                ));
+            }
+            if lat < -90.0 || lat > 90.0 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Zone boundary latitude must be between -90 and 90".into(),
+                ));
+            }
+            if lon < -180.0 || lon > 180.0 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Zone boundary longitude must be between -180 and 180".into(),
+                ));
+            }
         }
     }
     Ok(ValidateCallbackResult::Valid)

@@ -496,6 +496,7 @@ pub fn broadcast_event(event: CommonsEvent) -> ExternResult<Record> {
 pub fn log_governance_gate(input: GateAuditInput) -> ExternResult<()> {
     let agent = agent_info()?.agent_initial_pubkey;
     let event = StoredEvent {
+        schema_version: 1,
         domain: "governance_gate".to_string(),
         event_type: input.action_name.clone(),
         source_agent: agent.clone(),
@@ -774,13 +775,28 @@ pub fn check_emergency_for_area(
             has_active_emergencies: false,
             active_count: 0,
             recommendation: None,
-            error: Some(format!("Cross-cluster network error: {}", err)),
+            error: Some(format!(
+                "Circuit breaker: civic cluster unavailable (network error), operation suspended: {}",
+                err
+            )),
         }),
-        _ => Ok(EmergencyAreaCheckResult {
+        Ok(other) => Ok(EmergencyAreaCheckResult {
             has_active_emergencies: false,
             active_count: 0,
             recommendation: None,
-            error: Some("Failed to reach civic cluster emergency_incidents".into()),
+            error: Some(format!(
+                "Circuit breaker: civic cluster returned unexpected response, operation suspended: {:?}",
+                other
+            )),
+        }),
+        Err(e) => Ok(EmergencyAreaCheckResult {
+            has_active_emergencies: false,
+            active_count: 0,
+            recommendation: None,
+            error: Some(format!(
+                "Circuit breaker: civic cluster unreachable (transport error), operation suspended: {:?}",
+                e
+            )),
         }),
     }
 }
@@ -1194,6 +1210,7 @@ fn cache_credential(credential: &ConsciousnessCredential) -> ExternResult<()> {
     })?;
 
     let entry = CachedCredentialEntry {
+        schema_version: 1,
         did: credential.did.clone(),
         credential_json: json,
         cached_at_us: now,
@@ -1480,7 +1497,7 @@ pub fn register_property_as_collateral(
 ) -> ExternResult<PropertyCollateralResult> {
     // 1. Verify consciousness tier via local bridge (Participant+ required)
     let credential = get_consciousness_credential(input.owner_did.clone())?;
-    if !credential.tier.can_participate() {
+    if credential.tier.min_score() < ConsciousnessTier::Participant.min_score() {
         return Ok(PropertyCollateralResult {
             success: false,
             property_id: input.property_id,
@@ -1566,19 +1583,25 @@ pub fn register_property_as_collateral(
             success: false,
             property_id: input.property_id,
             collateral_registered: false,
-            error: Some(format!("Finance bridge returned: {:?}", other)),
+            error: Some(format!(
+                "Circuit breaker: finance cluster returned unexpected response, operation suspended: {:?}",
+                other
+            )),
         }),
         Err(e) => {
-            // Finance cluster unreachable — non-fatal, property still registered locally
+            // Circuit breaker: Finance cluster unreachable — non-fatal, property still registered locally
             debug!(
-                "register_property_as_collateral: finance bridge unreachable: {:?}",
+                "Circuit breaker: finance cluster unreachable for register_collateral, operation suspended: {:?}",
                 e
             );
             Ok(PropertyCollateralResult {
                 success: false,
                 property_id: input.property_id,
                 collateral_registered: false,
-                error: Some(format!("Finance cluster unreachable: {:?}", e)),
+                error: Some(format!(
+                    "Circuit breaker: finance cluster unreachable, operation suspended: {:?}",
+                    e
+                )),
             })
         }
     }
@@ -1623,12 +1646,25 @@ pub fn check_property_collateral_health(
                 }),
             }
         }
-        _ => Ok(CollateralHealthResult {
+        Ok(other) => Ok(CollateralHealthResult {
             property_id,
             ltv_ratio: None,
             status: None,
             available: false,
-            error: Some("Finance cluster unreachable".into()),
+            error: Some(format!(
+                "Circuit breaker: finance cluster returned unexpected response, operation suspended: {:?}",
+                other
+            )),
+        }),
+        Err(e) => Ok(CollateralHealthResult {
+            property_id,
+            ltv_ratio: None,
+            status: None,
+            available: false,
+            error: Some(format!(
+                "Circuit breaker: finance cluster unreachable, operation suspended: {:?}",
+                e
+            )),
         }),
     }
 }

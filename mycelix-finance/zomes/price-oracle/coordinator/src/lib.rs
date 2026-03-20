@@ -671,6 +671,15 @@ pub fn define_basket(input: DefineBasketInput) -> ExternResult<Record> {
     let my_did = format!("did:holo:{}", my_info.agent_initial_pubkey);
     let now = sys_time()?;
 
+    // Validate all weights are finite and positive before processing
+    for bi in &input.items {
+        if !bi.weight.is_finite() || bi.weight <= 0.0 {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Basket item weights must be positive finite numbers".into()
+            )));
+        }
+    }
+
     let items: Vec<BasketItemDef> = input
         .items
         .into_iter()
@@ -1074,7 +1083,7 @@ mod tests {
     #[test]
     fn test_trimmed_median_odd() {
         let mut prices = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
-        prices.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        prices.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
         let trim_count = (prices.len() as f64 * TRIM_PERCENT).floor() as usize;
         let trimmed = &prices[trim_count..prices.len() - trim_count];
         // Trim 1 from each end: [2, 3, 4, 5, 6, 7, 8, 9]
@@ -1290,7 +1299,7 @@ mod tests {
         // (weighted_median, signal_integrity)
         // Sort by price for trimming
         let mut sorted: Vec<(f64, f64, u32)> = reports.to_vec();
-        sorted.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        sorted.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
 
         // Trim 10%
         let trim_count = (sorted.len() as f64 * TRIM_PERCENT).floor() as usize;

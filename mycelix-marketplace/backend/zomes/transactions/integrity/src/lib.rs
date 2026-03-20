@@ -157,3 +157,107 @@ fn validate_transaction(transaction: &Transaction) -> ExternResult<ValidateCallb
 
     Ok(ValidateCallbackResult::Valid)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn mock_agent(byte: u8) -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![byte; 36])
+    }
+
+    fn valid_transaction() -> Transaction {
+        Transaction {
+            buyer: mock_agent(1),
+            seller: mock_agent(2),
+            listing_hash: ActionHash::from_raw_36(vec![3u8; 36]),
+            quantity: 1,
+            total_price_cents: 1999,
+            status: TransactionStatus::Pending,
+            created_at: Timestamp::from_micros(1000000),
+            updated_at: Timestamp::from_micros(1000000),
+            tracking_info: None,
+            epistemic: EpistemicClassification {
+                empirical: EmpiricalLevel::E1Testimonial,
+                normative: NormativeLevel::N1Communal,
+                materiality: MaterialityLevel::M1Temporal,
+            },
+        }
+    }
+
+    #[test]
+    fn test_validate_transaction_valid() {
+        let tx = valid_transaction();
+        let result = validate_transaction(&tx).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_validate_transaction_zero_quantity() {
+        let tx = Transaction { quantity: 0, ..valid_transaction() };
+        let result = validate_transaction(&tx).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_validate_transaction_zero_price() {
+        let tx = Transaction { total_price_cents: 0, ..valid_transaction() };
+        let result = validate_transaction(&tx).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_validate_transaction_same_buyer_seller() {
+        let tx = Transaction { buyer: mock_agent(1), seller: mock_agent(1), ..valid_transaction() };
+        let result = validate_transaction(&tx).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_validate_transaction_wrong_normative_level() {
+        let tx = Transaction {
+            epistemic: EpistemicClassification {
+                empirical: EmpiricalLevel::E1Testimonial,
+                normative: NormativeLevel::N0Personal,
+                materiality: MaterialityLevel::M1Temporal,
+            },
+            ..valid_transaction()
+        };
+        let result = validate_transaction(&tx).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_all_transaction_statuses() {
+        let statuses = vec![
+            TransactionStatus::Pending, TransactionStatus::Confirmed,
+            TransactionStatus::Shipped, TransactionStatus::Delivered,
+            TransactionStatus::Completed, TransactionStatus::Disputed,
+            TransactionStatus::Cancelled,
+        ];
+        assert_eq!(statuses.len(), 7);
+    }
+
+    #[test]
+    fn test_transaction_serde_roundtrip() {
+        let tx = valid_transaction();
+        let json = serde_json::to_string(&tx).unwrap();
+        let parsed: Transaction = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.quantity, tx.quantity);
+        assert_eq!(parsed.total_price_cents, tx.total_price_cents);
+    }
+
+    #[test]
+    fn test_validate_transaction_large_quantity() {
+        let tx = Transaction { quantity: 1_000_000, total_price_cents: 1_000_000_000, ..valid_transaction() };
+        let result = validate_transaction(&tx).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_validate_transaction_min_valid() {
+        let tx = Transaction { quantity: 1, total_price_cents: 1, ..valid_transaction() };
+        let result = validate_transaction(&tx).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+}

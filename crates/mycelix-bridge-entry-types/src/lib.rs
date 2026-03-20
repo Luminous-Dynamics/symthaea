@@ -304,6 +304,161 @@ pub fn validate_jurisdiction_constraint(
 }
 
 // ============================================================================
+// Schema Migration Framework
+// ============================================================================
+
+/// Trait for entry types that support schema migration.
+///
+/// Implementors declare their current schema version and provide a migration
+/// path from older versions. This enables forward-compatible DHT reads: when
+/// a node encounters an entry written by a newer or older software version,
+/// migration can convert it to the current in-memory representation.
+///
+/// ## Adding a v1 → v2 migration (example)
+///
+/// When you add a new field to `BridgeQueryEntry`:
+///
+/// 1. Add the field with `#[serde(default)]` so v1 entries deserialize.
+/// 2. Bump `CURRENT_VERSION` to 2.
+/// 3. In `migrate()`, handle `from_version == 1`:
+///
+/// ```ignore
+/// fn migrate(raw: &Entry, from_version: u8) -> Result<Option<Self>, String> {
+///     match from_version {
+///         1 => {
+///             // Deserialize v1 entry (missing new_field will get serde default)
+///             let entry = Self::try_from(raw)
+///                 .map_err(|e| format!("v1 migration failed: {}", e))?;
+///             // Optionally transform fields here
+///             Ok(Some(entry))
+///         }
+///         v if v == Self::CURRENT_VERSION => Ok(None), // already current
+///         v => Err(format!("Unknown schema version {}", v)),
+///     }
+/// }
+/// ```
+pub trait SchemaMigration: Sized {
+    /// Current schema version for this type.
+    const CURRENT_VERSION: u8;
+
+    /// Migrate from an older version to the current version.
+    ///
+    /// Returns:
+    /// - `Ok(None)` if the entry is already at the current version (no migration needed).
+    /// - `Ok(Some(migrated))` if migration succeeded.
+    /// - `Err(reason)` if migration is not possible (e.g., unknown future version).
+    fn migrate(_raw: &Entry, from_version: u8) -> Result<Option<Self>, String>;
+}
+
+impl SchemaMigration for BridgeQueryEntry {
+    const CURRENT_VERSION: u8 = 1;
+
+    fn migrate(_raw: &Entry, from_version: u8) -> Result<Option<Self>, String> {
+        match from_version {
+            1 => Ok(None), // Already at current version — no migration needed
+            v if v > Self::CURRENT_VERSION => {
+                Err(format!(
+                    "BridgeQueryEntry schema version {} is newer than supported version {}",
+                    v,
+                    Self::CURRENT_VERSION
+                ))
+            }
+            v => Err(format!(
+                "BridgeQueryEntry has no migration path from version {}",
+                v
+            )),
+        }
+    }
+}
+
+impl SchemaMigration for BridgeEventEntry {
+    const CURRENT_VERSION: u8 = 1;
+
+    fn migrate(_raw: &Entry, from_version: u8) -> Result<Option<Self>, String> {
+        match from_version {
+            1 => Ok(None), // Already at current version — no migration needed
+            v if v > Self::CURRENT_VERSION => {
+                Err(format!(
+                    "BridgeEventEntry schema version {} is newer than supported version {}",
+                    v,
+                    Self::CURRENT_VERSION
+                ))
+            }
+            v => Err(format!(
+                "BridgeEventEntry has no migration path from version {}",
+                v
+            )),
+        }
+    }
+}
+
+impl SchemaMigration for CachedCredentialEntry {
+    const CURRENT_VERSION: u8 = 1;
+
+    fn migrate(_raw: &Entry, from_version: u8) -> Result<Option<Self>, String> {
+        match from_version {
+            1 => Ok(None), // Already at current version — no migration needed
+            v if v > Self::CURRENT_VERSION => {
+                Err(format!(
+                    "CachedCredentialEntry schema version {} is newer than supported version {}",
+                    v,
+                    Self::CURRENT_VERSION
+                ))
+            }
+            v => Err(format!(
+                "CachedCredentialEntry has no migration path from version {}",
+                v
+            )),
+        }
+    }
+}
+
+/// Read an entry with automatic schema migration.
+///
+/// Attempts to deserialize the entry as the current version of `T`. If
+/// deserialization succeeds and the `schema_version` field matches
+/// `T::CURRENT_VERSION`, returns the entry directly. If the version is
+/// older, attempts migration via `T::migrate()`.
+///
+/// ## Errors
+///
+/// Returns `Err` if:
+/// - The entry cannot be deserialized at all (corrupt or wrong type).
+/// - The schema version is from the future (newer than `CURRENT_VERSION`).
+/// - Migration fails for any other reason.
+///
+/// ## Example
+///
+/// ```ignore
+/// let entry: BridgeQueryEntry = read_with_migration::<BridgeQueryEntry>(&raw_entry)?;
+/// ```
+pub fn read_with_migration<T>(entry: &Entry) -> Result<T, String>
+where
+    T: SchemaMigration + for<'a> TryFrom<&'a Entry, Error = WasmError>,
+{
+    // First, try to deserialize as-is. Serde defaults handle missing fields
+    // from older versions, so this usually succeeds even for old entries.
+    match T::try_from(entry) {
+        Ok(value) => Ok(value),
+        Err(deser_err) => {
+            // Deserialization failed — try migration from version 0 as a last resort.
+            // In practice, entries that can't deserialize at all are truly incompatible.
+            match T::migrate(entry, 0) {
+                Ok(Some(migrated)) => Ok(migrated),
+                Ok(None) => Err(format!(
+                    "Entry deserialization failed and no migration applied: {}",
+                    deser_err
+                )),
+                Err(mig_err) => Err(format!(
+                    "Entry deserialization failed ({}), migration also failed ({})",
+                    deser_err, mig_err
+                )),
+            }
+        }
+    }
+}
+
+// ============================================================================
 // Validation helpers
 // ============================================================================
 
@@ -1020,5 +1175,95 @@ mod tests {
         let j2: JurisdictionConstraintEntry = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(j2.fiat_zone, None);
         assert_eq!(j2.authority_did, None);
+    }
+
+    // ---- Schema migration framework ----
+
+    #[test]
+    fn migration_current_version_returns_none() {
+        // All three types at version 1 should return Ok(None) — no migration needed
+        let entry = Entry::App(AppEntryBytes::try_from(
+            SerializedBytes::try_from(make_query("property", "{}")).unwrap(),
+        ).unwrap());
+        assert!(BridgeQueryEntry::migrate(&entry, 1).unwrap().is_none());
+
+        let entry = Entry::App(AppEntryBytes::try_from(
+            SerializedBytes::try_from(make_event("housing", "{}")).unwrap(),
+        ).unwrap());
+        assert!(BridgeEventEntry::migrate(&entry, 1).unwrap().is_none());
+
+        let entry = Entry::App(AppEntryBytes::try_from(
+            SerializedBytes::try_from(make_cached_credential("did:test", "{}")).unwrap(),
+        ).unwrap());
+        assert!(CachedCredentialEntry::migrate(&entry, 1).unwrap().is_none());
+    }
+
+    #[test]
+    fn migration_future_version_returns_error() {
+        // Version 99 is from the future — migration should fail
+        let entry = Entry::App(AppEntryBytes::try_from(
+            SerializedBytes::try_from(make_query("property", "{}")).unwrap(),
+        ).unwrap());
+        let err = BridgeQueryEntry::migrate(&entry, 99).unwrap_err();
+        assert!(err.contains("newer than supported"));
+        assert!(err.contains("99"));
+
+        let err = BridgeEventEntry::migrate(&entry, 99).unwrap_err();
+        assert!(err.contains("newer than supported"));
+
+        let err = CachedCredentialEntry::migrate(&entry, 99).unwrap_err();
+        assert!(err.contains("newer than supported"));
+    }
+
+    #[test]
+    fn migration_version_zero_returns_error() {
+        // Version 0 has no migration path
+        let entry = Entry::App(AppEntryBytes::try_from(
+            SerializedBytes::try_from(make_query("property", "{}")).unwrap(),
+        ).unwrap());
+        let err = BridgeQueryEntry::migrate(&entry, 0).unwrap_err();
+        assert!(err.contains("no migration path"));
+    }
+
+    #[test]
+    fn migration_current_version_constants() {
+        // Verify all types declare version 1 as current
+        assert_eq!(BridgeQueryEntry::CURRENT_VERSION, 1);
+        assert_eq!(BridgeEventEntry::CURRENT_VERSION, 1);
+        assert_eq!(CachedCredentialEntry::CURRENT_VERSION, 1);
+    }
+
+    #[test]
+    fn read_with_migration_current_version_succeeds() {
+        // read_with_migration should succeed for a well-formed current-version entry
+        let query = make_query("property", r#"{"key":"val"}"#);
+        let entry = Entry::App(AppEntryBytes::try_from(
+            SerializedBytes::try_from(query.clone()).unwrap(),
+        ).unwrap());
+        let result = read_with_migration::<BridgeQueryEntry>(&entry).unwrap();
+        assert_eq!(result.domain, "property");
+        assert_eq!(result.schema_version, 1);
+
+        let event = make_event("housing", "{}");
+        let entry = Entry::App(AppEntryBytes::try_from(
+            SerializedBytes::try_from(event.clone()).unwrap(),
+        ).unwrap());
+        let result = read_with_migration::<BridgeEventEntry>(&entry).unwrap();
+        assert_eq!(result.domain, "housing");
+
+        let cred = make_cached_credential("did:test:abc", r#"{"p":1}"#);
+        let entry = Entry::App(AppEntryBytes::try_from(
+            SerializedBytes::try_from(cred.clone()).unwrap(),
+        ).unwrap());
+        let result = read_with_migration::<CachedCredentialEntry>(&entry).unwrap();
+        assert_eq!(result.did, "did:test:abc");
+    }
+
+    #[test]
+    fn read_with_migration_wrong_entry_type_fails() {
+        // Trying to read an Agent entry as BridgeQueryEntry should fail
+        let entry = Entry::Agent(fake_agent());
+        let err = read_with_migration::<BridgeQueryEntry>(&entry).unwrap_err();
+        assert!(err.contains("failed"));
     }
 }

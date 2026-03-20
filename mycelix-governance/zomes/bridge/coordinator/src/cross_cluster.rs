@@ -32,21 +32,26 @@ pub fn dispatch_personal_call(input: DispatchPersonalCallInput) -> ExternResult<
     }
 
     // Call the personal cluster via OtherRole (pre-encoded payload)
+    // Circuit breaker: catch transport errors to return clear "cluster unavailable" messages
     match call(
         CallTargetCell::OtherRole("personal".into()),
-        ZomeName::from(input.zome_name),
-        FunctionName::from(input.fn_name),
+        ZomeName::from(input.zome_name.clone()),
+        FunctionName::from(input.fn_name.clone()),
         None,
         input.payload,
-    )? {
-        ZomeCallResponse::Ok(io) => Ok(io),
-        ZomeCallResponse::NetworkError(e) => Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Network error calling personal cluster: {}",
-            e
+    ) {
+        Ok(ZomeCallResponse::Ok(io)) => Ok(io),
+        Ok(ZomeCallResponse::NetworkError(e)) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Circuit breaker: personal cluster unavailable (network error calling {}::{}), operation suspended: {}",
+            input.zome_name, input.fn_name, e
         )))),
-        other => Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Personal cluster call failed: {:?}",
-            other
+        Ok(other) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Circuit breaker: personal cluster returned unexpected response from {}::{}, operation suspended: {:?}",
+            input.zome_name, input.fn_name, other
+        )))),
+        Err(e) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Circuit breaker: personal cluster unreachable (transport error calling {}::{}), operation suspended: {:?}",
+            input.zome_name, input.fn_name, e
         )))),
     }
 }
@@ -101,21 +106,26 @@ pub fn dispatch_identity_call(input: DispatchIdentityCallInput) -> ExternResult<
         )));
     }
 
+    // Circuit breaker: catch transport errors to return clear "cluster unavailable" messages
     match call(
         CallTargetCell::OtherRole("identity".into()),
-        ZomeName::from(input.zome_name),
-        FunctionName::from(input.fn_name),
+        ZomeName::from(input.zome_name.clone()),
+        FunctionName::from(input.fn_name.clone()),
         None,
         input.payload,
-    )? {
-        ZomeCallResponse::Ok(io) => Ok(io),
-        ZomeCallResponse::NetworkError(e) => Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Network error calling identity cluster: {}",
-            e
+    ) {
+        Ok(ZomeCallResponse::Ok(io)) => Ok(io),
+        Ok(ZomeCallResponse::NetworkError(e)) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Circuit breaker: identity cluster unavailable (network error calling {}::{}), operation suspended: {}",
+            input.zome_name, input.fn_name, e
         )))),
-        other => Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Identity cluster call failed: {:?}",
-            other
+        Ok(other) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Circuit breaker: identity cluster returned unexpected response from {}::{}, operation suspended: {:?}",
+            input.zome_name, input.fn_name, other
+        )))),
+        Err(e) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Circuit breaker: identity cluster unreachable (transport error calling {}::{}), operation suspended: {:?}",
+            input.zome_name, input.fn_name, e
         )))),
     }
 }

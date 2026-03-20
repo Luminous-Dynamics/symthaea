@@ -47,7 +47,11 @@ pub fn call_local(
 
 /// Make a cross-zome call to a zome in another role (cross-cluster/cross-DNA).
 ///
-/// Same error handling as `call_local` but targets `CallTargetCell::OtherRole`.
+/// Implements a circuit breaker pattern: if the target cluster is unreachable
+/// (transport error or network error), returns a descriptive "cluster unavailable"
+/// error instead of propagating raw Holochain internals. This ensures callers
+/// get a clear, consistent signal that the operation is suspended due to
+/// cluster unavailability.
 pub fn call_role(
     role: &str,
     zome: &str,
@@ -63,15 +67,19 @@ pub fn call_role(
         FunctionName::from(fn_name),
         None,
         payload,
-    )? {
-        ZomeCallResponse::Ok(io) => Ok(io),
-        ZomeCallResponse::NetworkError(e) => Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Network error calling {}::{}::{}: {}",
+    ) {
+        Ok(ZomeCallResponse::Ok(io)) => Ok(io),
+        Ok(ZomeCallResponse::NetworkError(e)) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Circuit breaker: {} cluster unavailable (network error calling {}::{}), operation suspended: {}",
             role, zome, fn_name, e
         )))),
-        other => Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Unexpected response from {}::{}::{}: {:?}",
+        Ok(other) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Circuit breaker: {} cluster returned unexpected response from {}::{}, operation suspended: {:?}",
             role, zome, fn_name, other
+        )))),
+        Err(e) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Circuit breaker: {} cluster unreachable (transport error calling {}::{}), operation suspended: {:?}",
+            role, zome, fn_name, e
         )))),
     }
 }

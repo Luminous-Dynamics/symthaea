@@ -779,7 +779,7 @@ pub fn get_community_member_count(dao_did: String) -> ExternResult<u32> {
             // blocking the operation until governance is reachable.
             if STRICT_GOVERNANCE_MODE {
                 return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                    "Governance cluster returned non-Ok response for {}: {:?}. Strict mode requires governance availability.",
+                    "Circuit breaker: governance cluster unavailable for {}, operation suspended: {:?}",
                     dao_did, other
                 ))));
             }
@@ -791,7 +791,7 @@ pub fn get_community_member_count(dao_did: String) -> ExternResult<u32> {
             // When STRICT_GOVERNANCE_MODE is true, fail-closed instead.
             if STRICT_GOVERNANCE_MODE {
                 return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                    "Governance cluster unreachable for {}: {:?}. Strict mode requires governance availability.",
+                    "Circuit breaker: governance cluster unreachable for {}, operation suspended: {:?}",
                     dao_did, e
                 ))));
             }
@@ -830,24 +830,22 @@ pub fn verify_governance_proposal(proposal_id: String) -> ExternResult<bool> {
             // Governance returned non-Ok — proposal likely doesn't exist
             Ok(false)
         }
-        Err(_e) => {
-            // SECURITY NOTE: When governance cluster is unreachable, behavior depends
-            // on STRICT_GOVERNANCE_MODE. In strict mode we fail-closed (return false),
+        Err(e) => {
+            // Circuit breaker: When governance cluster is unreachable, behavior depends
+            // on STRICT_GOVERNANCE_MODE. In strict mode we fail-closed (return error),
             // blocking operations that need governance approval. In permissive mode
             // we return true, relying on local verify_governance_agent as a fallback.
             if STRICT_GOVERNANCE_MODE {
-                debug!(
-                    "verify_governance_proposal: governance unreachable for {}, strict mode returning false (fail-closed)",
-                    proposal_id
-                );
-                Ok(false)
-            } else {
-                debug!(
-                    "verify_governance_proposal: governance unreachable for {}, defaulting to true (permissive)",
-                    proposal_id
-                );
-                Ok(true)
+                return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                    "Circuit breaker: governance cluster unreachable for proposal {}, operation suspended: {:?}",
+                    proposal_id, e
+                ))));
             }
+            debug!(
+                "verify_governance_proposal: governance unreachable for {}, defaulting to true (permissive): {:?}",
+                proposal_id, e
+            );
+            Ok(true)
         }
     }
 }
@@ -1527,6 +1525,8 @@ pub fn verify_energy_certificate(
                 }
 
                 // Verify project exists in energy cluster (cross-cluster call)
+                // Circuit breaker: if energy cluster is unreachable, log and proceed
+                // (non-fatal — accept verification in offline mode)
                 match call(
                     CallTargetCell::OtherRole("energy".into()),
                     ZomeName::from("energy_bridge"),
@@ -1535,9 +1535,23 @@ pub fn verify_energy_certificate(
                     cert.project_id.clone(),
                 ) {
                     Ok(ZomeCallResponse::Ok(_)) => {} // Project exists
-                    _ => {
-                        debug!("verify_energy_certificate: energy cluster unreachable, proceeding without project verification");
-                        // Non-fatal: accept verification even if energy cluster is unreachable (offline mode)
+                    Ok(ZomeCallResponse::NetworkError(e)) => {
+                        debug!(
+                            "Circuit breaker: energy cluster unavailable (network error), proceeding without project verification: {}",
+                            e
+                        );
+                    }
+                    Ok(other) => {
+                        debug!(
+                            "Circuit breaker: energy cluster returned unexpected response, proceeding without project verification: {:?}",
+                            other
+                        );
+                    }
+                    Err(e) => {
+                        debug!(
+                            "Circuit breaker: energy cluster unreachable (transport error), proceeding without project verification: {:?}",
+                            e
+                        );
                     }
                 }
 

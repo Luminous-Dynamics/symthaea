@@ -32,6 +32,9 @@ pub use consciousness_profile::{
 pub mod sub_passport;
 pub mod offline_credential;
 
+pub mod validation;
+pub use validation::{check_author_match, check_link_author_match};
+
 pub mod collective_phi;
 pub use collective_phi::{
     AgentConsciousnessVector, CollectivePhiEngine, CollectivePhiResult, COLLECTIVE_PHI_MAX_SYNC,

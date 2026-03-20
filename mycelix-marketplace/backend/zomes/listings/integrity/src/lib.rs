@@ -397,16 +397,254 @@ fn is_valid_ipfs_cid(cid: &str) -> bool {
 mod tests {
     use super::*;
 
+    // ===== Helpers =====
+
+    fn valid_listing() -> Listing {
+        Listing {
+            title: "Test Product".to_string(),
+            description: "A great test product description".to_string(),
+            price_cents: 1999,
+            category: ListingCategory::Electronics,
+            photos_ipfs_cids: vec!["QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG".to_string()],
+            quantity_available: 10,
+            status: ListingStatus::Active,
+            epistemic: EpistemicClassification {
+                empirical: EmpiricalLevel::E1Testimonial,
+                normative: NormativeLevel::N0Personal,
+                materiality: MaterialityLevel::M1Temporal,
+            },
+            created_at: Timestamp::from_micros(1000000),
+            updated_at: Timestamp::from_micros(1000000),
+        }
+    }
+
+    // ===== IPFS CID Tests =====
+
     #[test]
-    fn test_ipfs_cid_validation() {
-        // Valid CIDv0
+    fn test_ipfs_cid_validation_v0_valid() {
         assert!(is_valid_ipfs_cid(
             "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"
         ));
+    }
 
-        // Invalid CIDs
+    #[test]
+    fn test_ipfs_cid_validation_v0_invalid_short() {
         assert!(!is_valid_ipfs_cid("QmInvalid"));
-        assert!(!is_valid_ipfs_cid("notacid"));
+    }
+
+    #[test]
+    fn test_ipfs_cid_validation_empty() {
         assert!(!is_valid_ipfs_cid(""));
+    }
+
+    #[test]
+    fn test_ipfs_cid_validation_not_a_cid() {
+        assert!(!is_valid_ipfs_cid("notacid"));
+    }
+
+    #[test]
+    fn test_ipfs_cid_validation_v1_valid() {
+        // CIDv1 starts with 'b' and is >= 59 chars
+        let cid_v1 = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi";
+        assert!(is_valid_ipfs_cid(cid_v1));
+    }
+
+    #[test]
+    fn test_ipfs_cid_validation_v0_with_invalid_base58_chars() {
+        // '0', 'O', 'I', 'l' are not in base58
+        // 46 chars starting with Qm but containing '0'
+        assert!(!is_valid_ipfs_cid("Qm0wAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"));
+    }
+
+    // ===== Listing Validation Tests =====
+
+    #[test]
+    fn test_validate_listing_data_valid() {
+        let listing = valid_listing();
+        let result = validate_listing_data(&listing).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_validate_listing_data_empty_title() {
+        let listing = Listing { title: String::new(), ..valid_listing() };
+        let result = validate_listing_data(&listing).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_validate_listing_data_title_too_long() {
+        let listing = Listing { title: "x".repeat(201), ..valid_listing() };
+        let result = validate_listing_data(&listing).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_validate_listing_data_empty_description() {
+        let listing = Listing { description: String::new(), ..valid_listing() };
+        let result = validate_listing_data(&listing).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_validate_listing_data_description_too_long() {
+        let listing = Listing { description: "x".repeat(5001), ..valid_listing() };
+        let result = validate_listing_data(&listing).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_validate_listing_data_zero_price() {
+        let listing = Listing { price_cents: 0, ..valid_listing() };
+        let result = validate_listing_data(&listing).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_validate_listing_data_price_too_high() {
+        let listing = Listing { price_cents: 100_000_000_01, ..valid_listing() };
+        let result = validate_listing_data(&listing).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_validate_listing_data_max_valid_price() {
+        let listing = Listing { price_cents: 100_000_000_00, ..valid_listing() };
+        let result = validate_listing_data(&listing).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_validate_listing_data_no_photos() {
+        let listing = Listing { photos_ipfs_cids: vec![], ..valid_listing() };
+        let result = validate_listing_data(&listing).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_validate_listing_data_too_many_photos() {
+        let cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG".to_string();
+        let listing = Listing { photos_ipfs_cids: vec![cid; 11], ..valid_listing() };
+        let result = validate_listing_data(&listing).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_validate_listing_data_max_photos_valid() {
+        let cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG".to_string();
+        let listing = Listing { photos_ipfs_cids: vec![cid; 10], ..valid_listing() };
+        let result = validate_listing_data(&listing).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_validate_listing_data_zero_quantity() {
+        let listing = Listing { quantity_available: 0, ..valid_listing() };
+        let result = validate_listing_data(&listing).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_validate_listing_data_epistemic_e0_rejected() {
+        let listing = Listing {
+            epistemic: EpistemicClassification {
+                empirical: EmpiricalLevel::E0Null,
+                normative: NormativeLevel::N0Personal,
+                materiality: MaterialityLevel::M1Temporal,
+            },
+            ..valid_listing()
+        };
+        let result = validate_listing_data(&listing).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_validate_listing_data_epistemic_e3_rejected() {
+        let listing = Listing {
+            epistemic: EpistemicClassification {
+                empirical: EmpiricalLevel::E3Cryptographic,
+                normative: NormativeLevel::N0Personal,
+                materiality: MaterialityLevel::M1Temporal,
+            },
+            ..valid_listing()
+        };
+        let result = validate_listing_data(&listing).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_validate_listing_data_epistemic_e2_valid() {
+        let listing = Listing {
+            epistemic: EpistemicClassification {
+                empirical: EmpiricalLevel::E2PrivateVerify,
+                normative: NormativeLevel::N0Personal,
+                materiality: MaterialityLevel::M1Temporal,
+            },
+            ..valid_listing()
+        };
+        let result = validate_listing_data(&listing).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    // ===== Category and Status Tests =====
+
+    #[test]
+    fn test_all_listing_categories() {
+        let categories = vec![
+            ListingCategory::Electronics, ListingCategory::Fashion,
+            ListingCategory::HomeGarden, ListingCategory::SportsOutdoors,
+            ListingCategory::BooksMedia, ListingCategory::ToysGames,
+            ListingCategory::HealthBeauty, ListingCategory::Automotive,
+            ListingCategory::ArtCollectibles, ListingCategory::Other,
+        ];
+        assert_eq!(categories.len(), 10);
+    }
+
+    #[test]
+    fn test_all_listing_statuses() {
+        let statuses = vec![
+            ListingStatus::Active, ListingStatus::Sold,
+            ListingStatus::Inactive, ListingStatus::Deleted,
+        ];
+        assert_eq!(statuses.len(), 4);
+    }
+
+    #[test]
+    fn test_listing_serde_roundtrip() {
+        let listing = valid_listing();
+        let json = serde_json::to_string(&listing).unwrap();
+        let parsed: Listing = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.title, listing.title);
+        assert_eq!(parsed.price_cents, listing.price_cents);
+    }
+
+    // ===== Boundary Tests =====
+
+    #[test]
+    fn test_validate_listing_title_exactly_200_chars() {
+        let listing = Listing { title: "x".repeat(200), ..valid_listing() };
+        let result = validate_listing_data(&listing).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_validate_listing_description_exactly_5000_chars() {
+        let listing = Listing { description: "x".repeat(5000), ..valid_listing() };
+        let result = validate_listing_data(&listing).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_validate_listing_single_char_title() {
+        let listing = Listing { title: "A".to_string(), ..valid_listing() };
+        let result = validate_listing_data(&listing).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_validate_listing_min_price() {
+        let listing = Listing { price_cents: 1, ..valid_listing() };
+        let result = validate_listing_data(&listing).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
     }
 }

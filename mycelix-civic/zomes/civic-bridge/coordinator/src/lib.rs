@@ -44,6 +44,8 @@ const ALLOWED_ZOMES: &[&str] = &[
     "media_attribution",
     "media_factcheck",
     "media_curation",
+    // Resonance domain
+    "resonance_feed",
 ];
 
 // ============================================================================
@@ -350,6 +352,7 @@ pub fn broadcast_event(event: CivicEventEntry) -> ExternResult<Record> {
 pub fn log_governance_gate(input: GateAuditInput) -> ExternResult<()> {
     let agent = agent_info()?.agent_initial_pubkey;
     let event = CivicEventEntry {
+        schema_version: 1,
         domain: "governance_gate".to_string(),
         event_type: input.action_name.clone(),
         source_agent: agent.clone(),
@@ -1318,6 +1321,7 @@ fn cache_credential(credential: &ConsciousnessCredential) -> ExternResult<()> {
     })?;
 
     let entry = CachedCredentialEntry {
+        schema_version: 1,
         did: credential.did.clone(),
         credential_json: json,
         cached_at_us: now,
@@ -1586,8 +1590,8 @@ mod tests {
 
     #[test]
     fn local_allowlist_has_expected_count() {
-        // 5 justice + 6 emergency + 4 media = 15
-        assert_eq!(ALLOWED_ZOMES.len(), 15);
+        // 5 justice + 6 emergency + 4 media + 1 resonance = 16
+        assert_eq!(ALLOWED_ZOMES.len(), 16);
     }
 
     #[test]
