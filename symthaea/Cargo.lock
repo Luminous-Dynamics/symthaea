@@ -15228,6 +15228,7 @@ dependencies = [
  "symthaea-humanoid",
  "symthaea-materials",
  "symthaea-memory",
+ "symthaea-mycelix-conductor",
  "symthaea-narrative-self",
  "symthaea-neuroevolution",
  "symthaea-neuromodulators",
@@ -15616,6 +15617,18 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "symthaea-mycelix-conductor"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "rmp-serde",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

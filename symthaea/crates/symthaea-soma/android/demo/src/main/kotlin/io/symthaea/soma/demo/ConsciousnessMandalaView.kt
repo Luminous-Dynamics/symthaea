@@ -371,9 +371,9 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
      * Layer order: Flower of Life (circles) → Sri Yantra (triangles) → Golden Spiral
      */
     private fun drawSacredGeometry(canvas: Canvas, cx: Float, cy: Float, radius: Float, hr: Int, hg: Int, hb: Int) {
-        val baseAlpha = (55 + consciousnessLevel * 80).toInt().coerceIn(50, 135)
-        // Second breathing phase: pulsing stroke width 0.8→2.0 (7s period)
-        val strokePulse = 0.8f + 1.2f * (0.5f + 0.5f * sin(breathPhase2 * 2 * PI.toFloat()))
+        val baseAlpha = (80 + consciousnessLevel * 80).toInt().coerceIn(75, 160)
+        // Second breathing phase: pulsing stroke width 1.5→3.0 (7s period)
+        val strokePulse = 1.5f + 1.5f * (0.5f + 0.5f * sin(breathPhase2 * 2 * PI.toFloat()))
         glowPaint.strokeWidth = strokePulse
 
         // === Flower of Life ===
@@ -400,7 +400,7 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
 
         // Generation 2: 12 outer petals
         if (consciousnessLevel >= 0.30f) {
-            val gen2Alpha = (baseAlpha * 0.5f).toInt()
+            val gen2Alpha = (baseAlpha * 0.7f).toInt()
             glowPaint.color = Color.argb(gen2Alpha, hr, hg, hb)
             val gen2R = circleR * 2f
             for (i in 0 until 12) {
@@ -413,7 +413,7 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
 
         // Generation 3: 18 outermost
         if (consciousnessLevel >= 0.55f) {
-            val gen3Alpha = (baseAlpha * 0.3f).toInt()
+            val gen3Alpha = (baseAlpha * 0.5f).toInt()
             glowPaint.color = Color.argb(gen3Alpha, hr, hg, hb)
             val gen3R = circleR * 3f
             for (i in 0 until 18) {
