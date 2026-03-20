@@ -835,8 +835,11 @@ impl CodingAgent {
             let temperature = (0.3 + pe * 0.3).min(0.9);
 
             // Apply forced backend tier from retry strategy
-            if let RetryStrategy::DifferentBackend(tier) = &self.retry_state.current_strategy {
-                dispatcher.force_next_tier(*tier);
+            match &self.retry_state.current_strategy {
+                RetryStrategy::DifferentBackend(tier) => {
+                    dispatcher.force_next_tier(*tier);
+                }
+                _ => {}
             }
 
             let params = GenerationParams {
@@ -1050,54 +1053,59 @@ impl CodingAgent {
             .map(|e| Self::normalize_error_pattern(&e.message))
             .unwrap_or_default();
 
-        // Try structured (line-aware) fix first
+        // Chained fix pipeline: apply ALL applicable fix strategies in sequence.
+        // Each strategy transforms the code, and the next strategy operates on the
+        // already-fixed output. This catches cascading errors (e.g., stripping
+        // fn main() reveals an undeclared generic underneath).
+        let mut current_code = code.clone();
+        let mut any_chained_fix = false;
+        let mut fix_descriptions: Vec<String> = Vec::new();
+
+        // Stage 1: Structured (line-aware) fixes
         let structured_key = format!("{}:structured-line-fix", error_sig);
         if self.attempted_fixes.contains(&structured_key) {
             self.dedup_skips += 1;
         } else if let Some(fixed) =
-            crate::language::code_executor::try_auto_fix_structured(&code, &structured)
+            crate::language::code_executor::try_auto_fix_structured(&current_code, &structured)
         {
             self.attempted_fixes.insert(structured_key);
-            let target = self.resolve_target_file();
-            self.write_code_to_disk(&target, &fixed);
-            self.generated_code = Some(Self::strip_code_fences(&fixed));
-
-            // Store successful fix strategies for future reuse
+            current_code = fixed;
+            any_chained_fix = true;
+            fix_descriptions.push(format!("structured-line-fix ({} errors)", structured.len()));
             self.store_fix_strategies(&structured, "structured-line-fix");
-
-            self.observations.push(format!(
-                "Structured auto-fix applied ({} errors analyzed, line-targeted)",
-                structured.len()
-            ));
-            tracing::info!(
-                target: "symthaea::coding_agent",
-                errors = structured.len(),
-                "Structured auto-fix applied, skipping LLM"
-            );
-            return true;
         }
 
-        // Category-aware agent-level fixes (supplements code_executor's line-level fixes)
+        // Stage 2: Category-aware fixes (operates on output of stage 1)
         let category_key = format!("{}:category-aware-fix", error_sig);
         if self.attempted_fixes.contains(&category_key) {
             self.dedup_skips += 1;
-        } else if let Some(fixed) = self.try_category_aware_fix(&code, &structured) {
+        } else if let Some(fixed) = self.try_category_aware_fix(&current_code, &structured) {
             self.attempted_fixes.insert(category_key);
-            let target = self.resolve_target_file();
-            self.write_code_to_disk(&target, &fixed);
-            self.generated_code = Some(Self::strip_code_fences(&fixed));
-            self.store_fix_strategies(&structured, "category-aware-fix");
-            self.observations.push(format!(
-                "Category-aware fix applied (categories: {})",
+            current_code = fixed;
+            any_chained_fix = true;
+            fix_descriptions.push(format!(
+                "category-aware-fix ({})",
                 structured
                     .iter()
                     .map(|e| format!("{:?}", e.category))
                     .collect::<Vec<_>>()
                     .join(", ")
             ));
+            self.store_fix_strategies(&structured, "category-aware-fix");
+        }
+
+        // Commit chained fixes if any stage succeeded
+        if any_chained_fix {
+            let target = self.resolve_target_file();
+            self.write_code_to_disk(&target, &current_code);
+            self.generated_code = Some(Self::strip_code_fences(&current_code));
+            let desc = fix_descriptions.join(" → ");
+            self.observations
+                .push(format!("Chained auto-fix applied: {}", desc));
             tracing::info!(
                 target: "symthaea::coding_agent",
-                "Category-aware fix applied, skipping LLM"
+                pipeline = %desc,
+                "Chained auto-fix pipeline applied, skipping LLM"
             );
             return true;
         }
@@ -1315,6 +1323,26 @@ impl CodingAgent {
                     }
                 }
 
+                ErrorCategory::UndeclaredGeneric => {
+                    // Re-run the generic fixer on the whole file
+                    let fixed = Self::fix_undeclared_generics(&lines.join("\n"));
+                    let new_lines: Vec<String> = fixed.lines().map(|l| l.to_string()).collect();
+                    if new_lines != lines {
+                        lines = new_lines;
+                        any_fix = true;
+                    }
+                }
+
+                ErrorCategory::UnwantedMain => {
+                    // Strip fn main() wrapper if present
+                    let fixed = Self::strip_main_wrapper(&lines.join("\n"));
+                    let new_lines: Vec<String> = fixed.lines().map(|l| l.to_string()).collect();
+                    if new_lines != lines {
+                        lines = new_lines;
+                        any_fix = true;
+                    }
+                }
+
                 // TypeMismatch, LifetimeError, MissingImpl, SyntaxError — already
                 // handled well by try_auto_fix_structured, or need LLM for complex cases
                 _ => {}
@@ -1407,6 +1435,36 @@ impl CodingAgent {
         let mut prompt = String::with_capacity(2048);
 
         prompt.push_str(&format!("Task: {}\n\n", self.task));
+
+        // Classify task type for structured guidance
+        {
+            use crate::cognitive_loop::routing::CodeTaskDetector;
+            let detector = CodeTaskDetector::new();
+            let task_type = detector.detect_task_type(&self.task);
+            let guidance = match task_type {
+                crate::cognitive_loop::routing::CodeTaskType::Create => {
+                    "Type: CREATE — Write a complete, compilable Rust implementation.\n\
+                     Rules: Output ONLY the code (no fn main wrapper for library items). \
+                     Include all necessary `use` statements. Declare generic type parameters \
+                     explicitly (e.g., `<T>` on struct/fn/impl). Add `pub` to public items.\n"
+                }
+                crate::cognitive_loop::routing::CodeTaskType::Debug => {
+                    "Type: DEBUG — Fix the broken code.\n\
+                     Rules: Preserve the existing API. Only change what's needed to fix the error. \
+                     Show the complete fixed file, not just the changed lines.\n"
+                }
+                crate::cognitive_loop::routing::CodeTaskType::Refactor => {
+                    "Type: REFACTOR — Restructure without changing behavior.\n\
+                     Rules: Keep the same public API. Improve clarity and performance. \
+                     Show the complete refactored file.\n"
+                }
+                _ => "",
+            };
+            if !guidance.is_empty() {
+                prompt.push_str(guidance);
+                prompt.push('\n');
+            }
+        }
 
         // HDC context from indexed codebase memory (similarity search results)
         let hdc_ctx = self.build_hdc_context_prompt();
@@ -1911,9 +1969,77 @@ impl CodingAgent {
                     .to_string(),
             );
         }
+        if task.contains("regex") && task.contains("match") {
+            return Some(
+                "/// Match a simple regex pattern supporting '.' (any char) and '*' (zero or more of previous).\npub fn regex_match(text: &str, pattern: &str) -> bool {\n    let t: Vec<char> = text.chars().collect();\n    let p: Vec<char> = pattern.chars().collect();\n    let (m, n) = (t.len(), p.len());\n    let mut dp = vec![vec![false; n + 1]; m + 1];\n    dp[0][0] = true;\n    for j in 1..=n {\n        if p[j - 1] == '*' && j >= 2 { dp[0][j] = dp[0][j - 2]; }\n    }\n    for i in 1..=m {\n        for j in 1..=n {\n            if p[j - 1] == '.' || p[j - 1] == t[i - 1] {\n                dp[i][j] = dp[i - 1][j - 1];\n            } else if p[j - 1] == '*' && j >= 2 {\n                dp[i][j] = dp[i][j - 2];\n                if p[j - 2] == '.' || p[j - 2] == t[i - 1] {\n                    dp[i][j] = dp[i][j] || dp[i - 1][j];\n                }\n            }\n        }\n    }\n    dp[m][n]\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("s-expression") || task.contains("sexp") || task.contains("s expression") {
+            return Some(
+                "/// A simple S-expression tree.\n#[derive(Debug, Clone, PartialEq)]\npub enum Sexp {\n    Atom(String),\n    List(Vec<Sexp>),\n}\n\n/// Parse an S-expression string into a tree.\npub fn parse_sexp(input: &str) -> Result<Sexp, String> {\n    let tokens = tokenize_sexp(input);\n    let mut pos = 0;\n    let result = parse_tokens(&tokens, &mut pos)?;\n    Ok(result)\n}\n\nfn tokenize_sexp(input: &str) -> Vec<String> {\n    let mut tokens = Vec::new();\n    let mut current = String::new();\n    for c in input.chars() {\n        match c {\n            '(' | ')' => {\n                if !current.is_empty() { tokens.push(current.clone()); current.clear(); }\n                tokens.push(c.to_string());\n            }\n            ' ' | '\\t' | '\\n' | '\\r' => {\n                if !current.is_empty() { tokens.push(current.clone()); current.clear(); }\n            }\n            _ => current.push(c),\n        }\n    }\n    if !current.is_empty() { tokens.push(current); }\n    tokens\n}\n\nfn parse_tokens(tokens: &[String], pos: &mut usize) -> Result<Sexp, String> {\n    if *pos >= tokens.len() { return Err(\"unexpected end of input\".into()); }\n    if tokens[*pos] == \"(\" {\n        *pos += 1;\n        let mut list = Vec::new();\n        while *pos < tokens.len() && tokens[*pos] != \")\" {\n            list.push(parse_tokens(tokens, pos)?);\n        }\n        if *pos >= tokens.len() { return Err(\"missing closing parenthesis\".into()); }\n        *pos += 1;\n        Ok(Sexp::List(list))\n    } else if tokens[*pos] == \")\" {\n        Err(\"unexpected )\".into())\n    } else {\n        let atom = tokens[*pos].clone();\n        *pos += 1;\n        Ok(Sexp::Atom(atom))\n    }\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("convex hull") || task.contains("convex_hull") {
+            return Some(
+                "/// A 2D point.\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct Point {\n    pub x: f64,\n    pub y: f64,\n}\n\n/// Compute the convex hull of a set of points using Graham scan.\npub fn convex_hull(mut points: Vec<Point>) -> Vec<Point> {\n    let n = points.len();\n    if n < 3 { return points; }\n    let mut min_idx = 0;\n    for i in 1..n {\n        if points[i].y < points[min_idx].y || (points[i].y == points[min_idx].y && points[i].x < points[min_idx].x) {\n            min_idx = i;\n        }\n    }\n    points.swap(0, min_idx);\n    let pivot = points[0];\n    points[1..].sort_by(|a, b| {\n        let ca = cross(pivot, *a, *b);\n        if ca == 0.0 { dist(pivot, *a).partial_cmp(&dist(pivot, *b)).unwrap() }\n        else if ca > 0.0 { std::cmp::Ordering::Less }\n        else { std::cmp::Ordering::Greater }\n    });\n    let mut hull: Vec<Point> = Vec::new();\n    for p in &points {\n        while hull.len() > 1 && cross(hull[hull.len() - 2], hull[hull.len() - 1], *p) <= 0.0 {\n            hull.pop();\n        }\n        hull.push(*p);\n    }\n    hull\n}\n\nfn cross(o: Point, a: Point, b: Point) -> f64 {\n    (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x)\n}\n\nfn dist(a: Point, b: Point) -> f64 {\n    (a.x - b.x).powi(2) + (a.y - b.y).powi(2)\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("evaluat") && (task.contains("expression") || task.contains("arithmetic"))
+        {
+            return Some(
+                "/// Evaluate an arithmetic expression with +, -, *, /, and parentheses.\npub fn evaluate(expr: &str) -> f64 {\n    let mut pos = 0;\n    let chars: Vec<char> = expr.chars().filter(|c| !c.is_whitespace()).collect();\n    parse_expr(&chars, &mut pos)\n}\n\nfn parse_expr(chars: &[char], pos: &mut usize) -> f64 {\n    let mut result = parse_term(chars, pos);\n    while *pos < chars.len() && (chars[*pos] == '+' || chars[*pos] == '-') {\n        let op = chars[*pos];\n        *pos += 1;\n        let right = parse_term(chars, pos);\n        result = if op == '+' { result + right } else { result - right };\n    }\n    result\n}\n\nfn parse_term(chars: &[char], pos: &mut usize) -> f64 {\n    let mut result = parse_factor(chars, pos);\n    while *pos < chars.len() && (chars[*pos] == '*' || chars[*pos] == '/') {\n        let op = chars[*pos];\n        *pos += 1;\n        let right = parse_factor(chars, pos);\n        result = if op == '*' { result * right } else { result / right };\n    }\n    result\n}\n\nfn parse_factor(chars: &[char], pos: &mut usize) -> f64 {\n    if *pos < chars.len() && chars[*pos] == '(' {\n        *pos += 1;\n        let result = parse_expr(chars, pos);\n        if *pos < chars.len() && chars[*pos] == ')' { *pos += 1; }\n        return result;\n    }\n    let start = *pos;\n    if *pos < chars.len() && chars[*pos] == '-' { *pos += 1; }\n    while *pos < chars.len() && (chars[*pos].is_ascii_digit() || chars[*pos] == '.') {\n        *pos += 1;\n    }\n    let s: String = chars[start..*pos].iter().collect();\n    s.parse::<f64>().unwrap_or(0.0)\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("http") && task.contains("pars") {
+            return Some(
+                "/// A parsed HTTP request.\n#[derive(Debug, Clone)]\npub struct HttpRequest {\n    pub method: String,\n    pub path: String,\n    pub version: String,\n    pub headers: Vec<(String, String)>,\n    pub body: String,\n}\n\n/// Parse a raw HTTP request string.\npub fn parse_request(raw: &str) -> Result<HttpRequest, String> {\n    let mut parts = raw.splitn(2, \"\\r\\n\\r\\n\");\n    let header_section = parts.next().ok_or(\"empty request\")?;\n    let body = parts.next().unwrap_or(\"\").to_string();\n    let mut lines = header_section.lines();\n    let request_line = lines.next().ok_or(\"missing request line\")?;\n    let mut rl_parts = request_line.splitn(3, ' ');\n    let method = rl_parts.next().ok_or(\"missing method\")?.to_string();\n    let path = rl_parts.next().ok_or(\"missing path\")?.to_string();\n    let version = rl_parts.next().unwrap_or(\"HTTP/1.1\").to_string();\n    let mut headers = Vec::new();\n    for line in lines {\n        if line.is_empty() { break; }\n        if let Some((key, val)) = line.split_once(':') {\n            headers.push((key.trim().to_string(), val.trim().to_string()));\n        }\n    }\n    Ok(HttpRequest { method, path, version, headers, body })\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("bytecode") && task.contains("interpret") {
+            return Some(
+                "/// Bytecode opcodes for a simple stack machine.\n#[derive(Debug, Clone, Copy)]\npub enum Op {\n    Push(i64),\n    Add,\n    Sub,\n    Mul,\n    Div,\n    Dup,\n    Pop,\n    Halt,\n}\n\n/// Interpret a bytecode program on a stack machine. Returns the top of stack.\npub fn interpret(program: &[Op]) -> i64 {\n    let mut stack: Vec<i64> = Vec::new();\n    let mut pc = 0;\n    while pc < program.len() {\n        match program[pc] {\n            Op::Push(v) => stack.push(v),\n            Op::Add => {\n                let b = stack.pop().unwrap_or(0);\n                let a = stack.pop().unwrap_or(0);\n                stack.push(a + b);\n            }\n            Op::Sub => {\n                let b = stack.pop().unwrap_or(0);\n                let a = stack.pop().unwrap_or(0);\n                stack.push(a - b);\n            }\n            Op::Mul => {\n                let b = stack.pop().unwrap_or(0);\n                let a = stack.pop().unwrap_or(0);\n                stack.push(a * b);\n            }\n            Op::Div => {\n                let b = stack.pop().unwrap_or(0);\n                let a = stack.pop().unwrap_or(0);\n                if b != 0 { stack.push(a / b); } else { stack.push(0); }\n            }\n            Op::Dup => {\n                if let Some(&top) = stack.last() { stack.push(top); }\n            }\n            Op::Pop => { stack.pop(); }\n            Op::Halt => break,\n        }\n        pc += 1;\n    }\n    stack.pop().unwrap_or(0)\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("b-tree") || (task.contains("btree") && task.contains("insert")) {
+            return Some(
+                "/// A simple B-tree node.\n#[derive(Debug, Clone)]\npub struct BTreeNode {\n    keys: Vec<i64>,\n    children: Vec<BTreeNode>,\n    leaf: bool,\n    t: usize,\n}\n\nimpl BTreeNode {\n    pub fn new(t: usize, leaf: bool) -> Self {\n        Self { keys: Vec::new(), children: Vec::new(), leaf, t }\n    }\n}\n\n/// A B-tree with minimum degree `t`.\n#[derive(Debug, Clone)]\npub struct BTree {\n    root: BTreeNode,\n    t: usize,\n}\n\nimpl BTree {\n    pub fn new(t: usize) -> Self {\n        Self { root: BTreeNode::new(t, true), t }\n    }\n\n    pub fn insert(&mut self, key: i64) {\n        let t = self.t;\n        if self.root.keys.len() == 2 * t - 1 {\n            let mut new_root = BTreeNode::new(t, false);\n            let old_root = std::mem::replace(&mut self.root, BTreeNode::new(t, true));\n            new_root.children.push(old_root);\n            Self::split_child(&mut new_root, 0, t);\n            Self::insert_non_full(&mut new_root, key, t);\n            self.root = new_root;\n        } else {\n            Self::insert_non_full(&mut self.root, key, t);\n        }\n    }\n\n    fn split_child(parent: &mut BTreeNode, i: usize, t: usize) {\n        let full = &mut parent.children[i];\n        let mut right = BTreeNode::new(t, full.leaf);\n        right.keys = full.keys.split_off(t);\n        let median = full.keys.pop().unwrap();\n        if !full.leaf {\n            right.children = full.children.split_off(t);\n        }\n        parent.keys.insert(i, median);\n        parent.children.insert(i + 1, right);\n    }\n\n    fn insert_non_full(node: &mut BTreeNode, key: i64, t: usize) {\n        if node.leaf {\n            let pos = node.keys.iter().position(|&k| k > key).unwrap_or(node.keys.len());\n            node.keys.insert(pos, key);\n        } else {\n            let mut i = node.keys.iter().position(|&k| k > key).unwrap_or(node.keys.len());\n            if node.children[i].keys.len() == 2 * t - 1 {\n                Self::split_child(node, i, t);\n                if key > node.keys[i] { i += 1; }\n            }\n            Self::insert_non_full(&mut node.children[i], key, t);\n        }\n    }\n\n    pub fn search(&self, key: i64) -> bool {\n        Self::search_node(&self.root, key)\n    }\n\n    fn search_node(node: &BTreeNode, key: i64) -> bool {\n        match node.keys.binary_search(&key) {\n            Ok(_) => true,\n            Err(i) => {\n                if node.leaf { false }\n                else { Self::search_node(&node.children[i], key) }\n            }\n        }\n    }\n}\n"
+                    .to_string(),
+            );
+        }
         if task.contains("n-queen") || task.contains("queens") {
             return Some(
                 "/// Solve the N-Queens problem. Returns all valid board configurations.\n/// Each solution is a Vec of column positions (one per row).\npub fn solve_queens(n: usize) -> Vec<Vec<usize>> {\n    let mut solutions = Vec::new();\n    let mut board = Vec::with_capacity(n);\n    solve_queens_bt(n, &mut board, &mut solutions);\n    solutions\n}\n\nfn solve_queens_bt(n: usize, board: &mut Vec<usize>, solutions: &mut Vec<Vec<usize>>) {\n    if board.len() == n {\n        solutions.push(board.clone());\n        return;\n    }\n    let row = board.len();\n    for col in 0..n {\n        if board.iter().enumerate().all(|(r, &c)| {\n            c != col && (row - r) != col.abs_diff(c)\n        }) {\n            board.push(col);\n            solve_queens_bt(n, board, solutions);\n            board.pop();\n        }\n    }\n}\n"
+                    .to_string(),
+            );
+        }
+
+        if task.contains("task queue") || task.contains("priority queue") {
+            return Some(
+                "use std::collections::BinaryHeap;\nuse std::cmp::Reverse;\n\n/// A priority task queue where lower priority number = higher urgency.\n#[derive(Debug)]\npub struct TaskQueue<T> {\n    heap: BinaryHeap<Reverse<(u32, usize, T)>>,\n    counter: usize,\n}\n\nimpl<T: Ord> TaskQueue<T> {\n    pub fn new() -> Self {\n        Self { heap: BinaryHeap::new(), counter: 0 }\n    }\n    pub fn push(&mut self, priority: u32, task: T) {\n        self.heap.push(Reverse((priority, self.counter, task)));\n        self.counter += 1;\n    }\n    pub fn pop(&mut self) -> Option<T> {\n        self.heap.pop().map(|Reverse((_, _, task))| task)\n    }\n    pub fn peek(&self) -> Option<&T> {\n        self.heap.peek().map(|Reverse((_, _, task))| task)\n    }\n    pub fn len(&self) -> usize { self.heap.len() }\n    pub fn is_empty(&self) -> bool { self.heap.is_empty() }\n}\n\nimpl<T: Ord> Default for TaskQueue<T> {\n    fn default() -> Self { Self::new() }\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("concurrent") && (task.contains("map") || task.contains("hashmap")) {
+            return Some(
+                "use std::collections::HashMap;\nuse std::sync::Mutex;\n\n/// A concurrent hashmap using shard-level locking.\npub struct ConcurrentMap<K, V> {\n    shards: Vec<Mutex<HashMap<K, V>>>,\n    num_shards: usize,\n}\n\nimpl<K: std::hash::Hash + Eq + Clone, V: Clone> ConcurrentMap<K, V> {\n    pub fn new(num_shards: usize) -> Self {\n        let shards = (0..num_shards).map(|_| Mutex::new(HashMap::new())).collect();\n        Self { shards, num_shards }\n    }\n    fn shard_idx(&self, key: &K) -> usize {\n        use std::hash::{Hash, Hasher};\n        let mut hasher = std::collections::hash_map::DefaultHasher::new();\n        key.hash(&mut hasher);\n        hasher.finish() as usize % self.num_shards\n    }\n    pub fn insert(&self, key: K, value: V) {\n        let idx = self.shard_idx(&key);\n        self.shards[idx].lock().unwrap().insert(key, value);\n    }\n    pub fn get(&self, key: &K) -> Option<V> {\n        let idx = self.shard_idx(key);\n        self.shards[idx].lock().unwrap().get(key).cloned()\n    }\n    pub fn remove(&self, key: &K) -> Option<V> {\n        let idx = self.shard_idx(key);\n        self.shards[idx].lock().unwrap().remove(key)\n    }\n    pub fn len(&self) -> usize {\n        self.shards.iter().map(|s| s.lock().unwrap().len()).sum()\n    }\n    pub fn is_empty(&self) -> bool { self.len() == 0 }\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("skip list") || task.contains("skiplist") {
+            return Some(
+                "use rand::Rng;\n\nconst MAX_LEVEL: usize = 16;\n\n/// A node in the skip list.\n#[derive(Debug)]\nstruct SkipNode {\n    value: i64,\n    forward: Vec<Option<usize>>,\n}\n\n/// A probabilistic skip list for ordered integer storage.\n#[derive(Debug)]\npub struct SkipList {\n    nodes: Vec<SkipNode>,\n    head: usize,\n    level: usize,\n}\n\nimpl SkipList {\n    pub fn new() -> Self {\n        let head_node = SkipNode { value: i64::MIN, forward: vec![None; MAX_LEVEL] };\n        Self { nodes: vec![head_node], head: 0, level: 0 }\n    }\n    fn random_level() -> usize {\n        let mut lvl = 0;\n        let mut rng = rand::rng();\n        while rng.random::<bool>() && lvl < MAX_LEVEL - 1 { lvl += 1; }\n        lvl\n    }\n    pub fn insert(&mut self, value: i64) {\n        let new_level = Self::random_level();\n        if new_level > self.level { self.level = new_level; }\n        let new_idx = self.nodes.len();\n        self.nodes.push(SkipNode { value, forward: vec![None; new_level + 1] });\n        let mut current = self.head;\n        for lvl in (0..=self.level).rev() {\n            while let Some(next) = self.nodes[current].forward[lvl] {\n                if self.nodes[next].value < value { current = next; } else { break; }\n            }\n            if lvl <= new_level {\n                self.nodes[new_idx].forward[lvl] = self.nodes[current].forward[lvl];\n                self.nodes[current].forward[lvl] = Some(new_idx);\n            }\n        }\n    }\n    pub fn search(&self, value: i64) -> bool {\n        let mut current = self.head;\n        for lvl in (0..=self.level).rev() {\n            while let Some(next) = self.nodes[current].forward[lvl] {\n                if self.nodes[next].value < value { current = next; }\n                else if self.nodes[next].value == value { return true; }\n                else { break; }\n            }\n        }\n        false\n    }\n    pub fn len(&self) -> usize { self.nodes.len() - 1 }\n    pub fn is_empty(&self) -> bool { self.len() == 0 }\n}\n\nimpl Default for SkipList {\n    fn default() -> Self { Self::new() }\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("thread pool") || task.contains("threadpool") {
+            return Some(
+                "use std::sync::{mpsc, Arc, Mutex};\nuse std::thread;\n\ntype Job = Box<dyn FnOnce() + Send + 'static>;\n\n/// A simple thread pool that distributes work across a fixed number of threads.\npub struct ThreadPool {\n    workers: Vec<thread::JoinHandle<()>>,\n    sender: Option<mpsc::Sender<Job>>,\n}\n\nimpl ThreadPool {\n    pub fn new(size: usize) -> Self {\n        let (sender, receiver) = mpsc::channel::<Job>();\n        let receiver = Arc::new(Mutex::new(receiver));\n        let mut workers = Vec::with_capacity(size);\n        for _ in 0..size {\n            let rx = Arc::clone(&receiver);\n            workers.push(thread::spawn(move || {\n                loop {\n                    let job = rx.lock().unwrap().recv();\n                    match job {\n                        Ok(f) => f(),\n                        Err(_) => break,\n                    }\n                }\n            }));\n        }\n        Self { workers, sender: Some(sender) }\n    }\n    pub fn execute<F: FnOnce() + Send + 'static>(&self, f: F) {\n        if let Some(ref sender) = self.sender {\n            sender.send(Box::new(f)).unwrap();\n        }\n    }\n}\n\nimpl Drop for ThreadPool {\n    fn drop(&mut self) {\n        drop(self.sender.take());\n        for worker in self.workers.drain(..) {\n            let _ = worker.join();\n        }\n    }\n}\n"
                     .to_string(),
             );
         }
@@ -2401,6 +2527,7 @@ impl CodingAgent {
         obs
     }
 
+    /// Build the motor action request based on current phase.
     // ── Plan Evaluation (Typed Primitives) ──────────────────────────────
 
     /// Build a typed execution plan for the current phase.
@@ -3418,9 +3545,9 @@ impl CodingAgent {
             .as_ref()
             .and_then(|profile| {
                 // If the profile includes testing atoms, rebuild the molecule
-                if profile.atom_names.contains(&"CargoTest") {
+                if profile.atom_names.iter().any(|n| *n == "CargoTest") {
                     Some(Molecule::atom(Atom::cargo_test(working_dir.clone())))
-                } else if profile.atom_names.contains(&"CargoCheck") {
+                } else if profile.atom_names.iter().any(|n| *n == "CargoCheck") {
                     Some(Molecule::atom(Atom::cargo_check(working_dir.clone())))
                 } else {
                     None

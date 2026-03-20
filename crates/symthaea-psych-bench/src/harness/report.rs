@@ -444,6 +444,11 @@ impl BenchmarkReport {
                 &bl.executive,
             ),
             ("stroop_effect", "stroop_effect", &bl.executive),
+            (
+                "incongruent_accuracy",
+                "stroop_incongruent_accuracy",
+                &bl.executive,
+            ),
             ("flanker_effect", "flanker_effect", &bl.executive),
             (
                 "overall_optimal_rate",
@@ -2916,7 +2921,10 @@ mod tests {
         );
         report.add(r1);
         let mut r2 = BenchmarkResult::new("Executive::Stroop", None);
-        r2.insert("incongruent_accuracy", MetricValue::from_samples(&[0.10, 0.12]));
+        r2.insert(
+            "incongruent_accuracy",
+            MetricValue::from_samples(&[0.10, 0.12]),
+        );
         report.add(r2);
 
         let md = report.paper_summary();
@@ -2973,7 +2981,10 @@ mod tests {
     fn test_forest_plot_csv_header() {
         let mut report = BenchmarkReport::new();
         let mut r = BenchmarkResult::new("Executive::Stroop", None);
-        r.insert("incongruent_accuracy", MetricValue::from_samples(&[0.10, 0.12]));
+        r.insert(
+            "incongruent_accuracy",
+            MetricValue::from_samples(&[0.10, 0.12]),
+        );
         report.add(r);
         let csv = report.forest_plot_csv();
         assert!(csv.starts_with("domain,benchmark,metric"));
