@@ -926,9 +926,6 @@ pub const CONFLICT_EXPLORATION_INCREMENT: f64 = 0.02;
 /// Confidence velocity threshold for rising-confidence dampening detection.
 /// Basis: Schultz (2016) — rising confidence at this rate warrants caution.
 pub const CONFIDENCE_VELOCITY_RISING_THRESHOLD: f32 = 0.02;
-/// Flow state intensity threshold for LR boost telemetry.
-/// Basis: Csikszentmihalyi (1990) — flow below this is too weak to modulate.
-pub const FLOW_INTENSITY_TELEMETRY_THRESHOLD: f32 = 0.5;
 /// FEP accuracy threshold for efficiency detection.
 /// Basis: Friston (2010) — accurate prediction signals good model fit.
 pub const FEP_ACCURACY_EFFICIENCY_THRESHOLD: f64 = 0.5;
@@ -958,7 +955,7 @@ pub const EMBODIED_AGENCY_STABLE_MAX: f64 = 0.6;
 pub const ATTENTION_SCHEMA_FATIGUE_THRESHOLD: f32 = 0.4;
 /// Anomaly recovery PSI acceleration multiplier.
 /// Basis: Carver & Scheier (1998) — post-anomaly recovery acceleration.
-pub const ANOMALY_RECOVERY_PSI_MULTIPLIER: f32 = 1.05;
+pub const ANOMALY_RECOVERY_PSI_MULTIPLIER: f64 = 1.05;
 /// Consolidation consciousness offset (subtracted from EMA).
 /// Basis: Dehaene & Changeux (2011) — consolidation threshold sits below conscious access level.
 pub const CONSOLIDATION_CONSCIOUSNESS_OFFSET: f64 = 0.1;
@@ -1028,11 +1025,11 @@ pub const PRED_COHERENCE_LOW_DAMPEN_SCALE: f32 = 0.15;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// EMA alpha for prediction error and training loss averaging.
-/// Basis: Brown (1956) — α=0.1 gives ~10-sample effective window.
+/// Basis: Brown (1956) — alpha=0.1 gives ~10-sample effective window.
 pub const ERROR_EMA_ALPHA: f32 = 0.1;
 
 /// EMA alpha for cycle timing statistics (very slow update for stability).
-/// Basis: Brown (1956) — α=0.01 gives ~100-sample effective window.
+/// Basis: Brown (1956) — alpha=0.01 gives ~100-sample effective window.
 pub const TIMING_EMA_ALPHA: f32 = 0.01;
 
 /// Base importance offset for experience creation.
@@ -1061,17 +1058,17 @@ pub const PREFRONTAL_FLOOR: f64 = 0.4;
 // ═══════════════════════════════════════════════════════════════════════════════
 // REWARD HIGH-ERROR BOUNDARY
 // Basis: Schultz (1997) — reward prediction error signals. Prediction errors
-// above this threshold indicate substantial model failure → negative reward.
+// above this threshold indicate substantial model failure -> negative reward.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Prediction error threshold above which reward signal turns negative.
-/// Basis: Schultz (1997) — large PE indicates poor world model → punish.
+/// Basis: Schultz (1997) — large PE indicates poor world model -> punish.
 pub const REWARD_HIGH_ERROR_THRESHOLD: f32 = 0.5;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PHYSICS DOMAIN EXPLORATION
 // Basis: Schmidhuber (2010) — curiosity-driven exploration modulated by
-// domain familiarity. Known territory → exploit, uncharted → explore.
+// domain familiarity. Known territory -> exploit, uncharted -> explore.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Physics similarity above which exploration dampened (known territory).

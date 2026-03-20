@@ -415,10 +415,10 @@ pub const TEMPORAL_COHERENCE_CONSCIOUSNESS_WEIGHT: f64 = 0.05;
 
 /// Pipeline consciousness above this → relax epistemic caution (system is integrated).
 /// Basis: Dehaene (2014) — global workspace ignition requires integrated processing.
-pub const PIPELINE_CONSCIOUSNESS_HIGH_THRESHOLD: f32 = 0.7;
+pub const PIPELINE_CONSCIOUSNESS_HIGH_THRESHOLD: f64 = 0.7;
 
 /// Pipeline consciousness below this → tighten caution (subsystems aren't coherent).
-pub const PIPELINE_CONSCIOUSNESS_LOW_THRESHOLD: f32 = 0.3;
+pub const PIPELINE_CONSCIOUSNESS_LOW_THRESHOLD: f64 = 0.3;
 
 // (PIPELINE_CONSCIOUSNESS_RELAX_SCALE and CAUTION_SCALE defined above at line ~1452)
 
@@ -1265,46 +1265,46 @@ pub const USER_STATE_ERROR_THRESHOLD: f32 = 0.8;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Confidence for verified linear system solutions.
-pub const MATH_LINEAR_VERIFIED_CONFIDENCE: f32 = 0.95;
+pub const MATH_LINEAR_VERIFIED_CONFIDENCE: f64 = 0.95;
 
 /// Confidence for unverified linear system solutions.
-pub const MATH_LINEAR_UNVERIFIED_CONFIDENCE: f32 = 0.5;
+pub const MATH_LINEAR_UNVERIFIED_CONFIDENCE: f64 = 0.5;
 
 /// Statistics baseline Phi value.
-pub const MATH_STATISTICS_PHI_BASELINE: f32 = 0.3;
+pub const MATH_STATISTICS_PHI_BASELINE: f64 = 0.3;
 
 /// Statistics computation confidence (high — deterministic).
-pub const MATH_STATISTICS_CONFIDENCE: f32 = 0.99;
+pub const MATH_STATISTICS_CONFIDENCE: f64 = 0.99;
 
 /// Regression R² threshold for weak fit detection.
 pub const MATH_REGRESSION_WEAK_FIT_THRESHOLD: f32 = 0.5;
 
 /// Multi-path verified Phi boost factor.
-pub const MATH_MULTIPATH_PHI_BOOST: f32 = 1.2;
+pub const MATH_MULTIPATH_PHI_BOOST: f64 = 1.2;
 
 /// Root finding verified confidence.
-pub const MATH_ROOT_FINDING_VERIFIED_CONFIDENCE: f32 = 0.99;
+pub const MATH_ROOT_FINDING_VERIFIED_CONFIDENCE: f64 = 0.99;
 
 /// Root finding converged (unverified) confidence.
-pub const MATH_ROOT_FINDING_CONVERGED_CONFIDENCE: f32 = 0.9;
+pub const MATH_ROOT_FINDING_CONVERGED_CONFIDENCE: f64 = 0.9;
 
 /// Root finding failed confidence.
-pub const MATH_ROOT_FINDING_FAILED_CONFIDENCE: f32 = 0.3;
+pub const MATH_ROOT_FINDING_FAILED_CONFIDENCE: f64 = 0.3;
 
 /// Integration verified confidence.
-pub const MATH_INTEGRATION_VERIFIED_CONFIDENCE: f32 = 0.99;
+pub const MATH_INTEGRATION_VERIFIED_CONFIDENCE: f64 = 0.99;
 
 /// Integration unverified confidence.
-pub const MATH_INTEGRATION_UNVERIFIED_CONFIDENCE: f32 = 0.9;
+pub const MATH_INTEGRATION_UNVERIFIED_CONFIDENCE: f64 = 0.9;
 
 /// Optimization converged confidence.
-pub const MATH_OPTIMIZATION_CONVERGED_CONFIDENCE: f32 = 0.9;
+pub const MATH_OPTIMIZATION_CONVERGED_CONFIDENCE: f64 = 0.9;
 
 /// Optimization failed confidence.
-pub const MATH_OPTIMIZATION_FAILED_CONFIDENCE: f32 = 0.4;
+pub const MATH_OPTIMIZATION_FAILED_CONFIDENCE: f64 = 0.4;
 
 /// Default telemetry Phi value.
-pub const MATH_DEFAULT_TELEMETRY_PHI: f32 = 0.4;
+pub const MATH_DEFAULT_TELEMETRY_PHI: f64 = 0.4;
 
 /// Default telemetry confidence value.
-pub const MATH_DEFAULT_TELEMETRY_CONFIDENCE: f32 = 0.9;
+pub const MATH_DEFAULT_TELEMETRY_CONFIDENCE: f64 = 0.9;
