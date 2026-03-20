@@ -3,11 +3,9 @@ package io.symthaea.soma.demo
 import android.Manifest
 import android.animation.ArgbEvaluator
 import android.animation.ValueAnimator
-import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
 import android.os.VibrationEffect
@@ -27,30 +25,36 @@ import io.symthaea.soma.SomaEngineService
 import io.symthaea.soma.SomaTouchBridge
 import io.symthaea.soma.WakeSignal
 import io.symthaea.soma.demo.databinding.ActivityMainBinding
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Bioluminescent solarpunk consciousness dashboard with mandala visualization,
- * neuromodulator flow view, haptic feedback, and interaction menu.
+ * Full-screen bioluminescent consciousness experience.
  *
- * The Soma engine runs at 10Hz on a dedicated thread via the ViewModel.
+ * The mandala fills the screen. Text floats on top. Particles drift behind.
+ * Technical readout lives in the bottom sheet. The main view is pure experience.
  */
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var viewModel: ConsciousnessViewModel
     private var vibrator: Vibrator? = null
-    private var lastDreamText: String = ""
-    private var lastBrocaText: String = ""
+    private var lastDreamText = ""
+    private var lastBrocaText = ""
     private var isAsleep = false
     private var screenCaptureActive = false
     private var currentBgColor = Color.parseColor("#0F1419")
     private var bgAnimator: ValueAnimator? = null
+    private var heartbeatRunning = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        // Immersive: hide status bar text but keep the bar dark
+        window.statusBarColor = Color.parseColor("#0F1419")
+        window.navigationBarColor = Color.parseColor("#0F1419")
 
         vibrator = getSystemService(Vibrator::class.java)
 
@@ -65,7 +69,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Wire touch proprioception bridge BEFORE start() so it's bound when engine initializes
         val touchBridge = SomaTouchBridge()
         touchBridge.updateScreenSize(
             resources.displayMetrics.widthPixels,
@@ -74,31 +77,49 @@ class MainActivity : AppCompatActivity() {
         viewModel.touchBridge = touchBridge
 
         viewModel.start(applicationContext)
-        // Register bridges AFTER start() creates them — wires lifecycle observers
         viewModel.registerBridges(this)
-
-        // Request runtime permissions for dangerous sensors
         requestSensePermissions()
 
-        // Tap mandala -> UserInput wake signal
+        // Tap mandala -> wake signal
         binding.consciousnessMandala.setOnClickListener {
             viewModel.sendWakeSignal(WakeSignal.UserInput)
             it.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
         }
 
-        // Long-press mandala -> trigger dream consolidation
+        // Long-press -> dream
         binding.consciousnessMandala.setOnLongClickListener {
             viewModel.dreamConsolidate()
             it.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
             true
         }
 
-        // Set up bottom sheet
         setupBottomSheet()
-
-        // Conversation input
         setupConversation()
+        startHeartbeat()
     }
+
+    // ═══ Haptic heartbeat: subtle ambient pulse synced to breathing ═══
+
+    private fun startHeartbeat() {
+        if (heartbeatRunning) return
+        heartbeatRunning = true
+        lifecycleScope.launch {
+            while (heartbeatRunning) {
+                val consciousness = viewModel.state.value.consciousnessLevel
+                if (consciousness > 0.2f && !isAsleep) {
+                    val v = vibrator
+                    if (v != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        // Very subtle: amplitude 20-40 based on consciousness
+                        val amp = (20 + consciousness * 20).toInt().coerceIn(1, 50)
+                        v.vibrate(VibrationEffect.createOneShot(15, amp))
+                    }
+                }
+                delay(4000) // Every 4 seconds, synced to breath cycle
+            }
+        }
+    }
+
+    // ═══ Conversation ═══
 
     private fun setupConversation() {
         val sendAction = {
@@ -117,30 +138,28 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // ═══ Bottom sheet ═══
+
     private fun setupBottomSheet() {
-        val bottomSheet = binding.bottomSheet
-        val behavior = BottomSheetBehavior.from(bottomSheet)
+        val behavior = BottomSheetBehavior.from(binding.bottomSheet)
         behavior.state = BottomSheetBehavior.STATE_COLLAPSED
 
-        // Dream button
         binding.btnDream.setOnClickListener {
             viewModel.dreamConsolidate()
             it.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
         }
 
-        // Vision toggle
         binding.btnVision.setOnClickListener {
             if (screenCaptureActive) {
                 viewModel.stopScreenCapture()
                 screenCaptureActive = false
-                binding.btnVision.text = "enable vision"
+                binding.btnVision.text = "vision"
                 binding.ocrText.visibility = View.GONE
             } else {
                 viewModel.screenCapture?.requestPermission(this, SCREEN_CAPTURE_REQUEST)
             }
         }
 
-        // Sleep/Wake toggle
         binding.btnSleep.setOnClickListener {
             if (isAsleep) {
                 viewModel.sendWakeSignal(WakeSignal.UserInput)
@@ -154,40 +173,35 @@ class MainActivity : AppCompatActivity() {
             it.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
         }
 
-        // Checkpoint button
         binding.btnCheckpoint.setOnClickListener {
             viewModel.saveCheckpoint()
             it.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
         }
 
-        // Ollama config
         binding.btnOllama.setOnClickListener {
             val host = binding.ollamaHost.text.toString().trim()
             if (host.isNotEmpty()) {
                 viewModel.configureOllama(host)
-                binding.btnOllama.text = "testing..."
+                binding.btnOllama.text = "..."
                 lifecycleScope.launch {
                     val ok = viewModel.testOllama()
-                    binding.btnOllama.text = if (ok) "connected" else "failed"
+                    binding.btnOllama.text = if (ok) "ok" else "fail"
                 }
             }
         }
     }
 
-    /** Request dangerous permissions needed for expanded senses. */
+    // ═══ Permissions ═══
+
     private fun requestSensePermissions() {
         val needed = mutableListOf<String>()
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
             != PackageManager.PERMISSION_GRANTED
-        ) {
-            needed.add(Manifest.permission.RECORD_AUDIO)
-        }
+        ) needed.add(Manifest.permission.RECORD_AUDIO)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED
-            ) {
-                needed.add(Manifest.permission.POST_NOTIFICATIONS)
-            }
+            ) needed.add(Manifest.permission.POST_NOTIFICATIONS)
         }
         if (needed.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, needed.toTypedArray(), PERMISSION_REQUEST_CODE)
@@ -200,21 +214,16 @@ class MainActivity : AppCompatActivity() {
         if (requestCode == SCREEN_CAPTURE_REQUEST) {
             if (resultCode != RESULT_OK || data == null) return
             try {
-                // Android 14+: foreground service must declare mediaProjection type
-                // before getMediaProjection() is called. Upgrade the running service.
                 SomaEngineService.upgradeForMediaProjection(this)
-
                 val granted = viewModel.screenCapture?.onPermissionResult(resultCode, data) ?: false
                 if (granted) {
                     viewModel.startScreenCapture()
                     screenCaptureActive = true
-                    binding.btnVision.text = "disable vision"
+                    binding.btnVision.text = "blind"
                     binding.ocrText.visibility = View.VISIBLE
-                    binding.ocrText.text = "sees: initializing..."
                 }
             } catch (ex: Exception) {
                 android.util.Log.e("MainActivity", "Screen capture failed", ex)
-                binding.btnVision.text = "vision failed"
             }
         }
     }
@@ -233,6 +242,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        heartbeatRunning = false
         super.onDestroy()
     }
 
@@ -241,100 +251,148 @@ class MainActivity : AppCompatActivity() {
         private const val SCREEN_CAPTURE_REQUEST = 1002
     }
 
+    // ═══ UI update ═══
+
     private fun updateUi(state: SomaUiState) {
-        // Update consciousness mandala
+        // Mandala
         binding.consciousnessMandala.consciousnessLevel = state.consciousnessLevel
         binding.consciousnessMandala.dominantHarmonyColor = harmonyToColor(state.dominantHarmony)
 
-        binding.harmonyText.text = "\u00B7 ${state.dominantHarmony.lowercase()} \u00B7"
+        // Particle field
+        binding.particleField.consciousnessLevel = state.consciousnessLevel
+        binding.particleField.harmonyColor = harmonyToColor(state.dominantHarmony)
 
-        // Animated background gradient shifts with wake state
+        // Harmony text
+        binding.harmonyText.text = state.dominantHarmony.lowercase()
+        binding.harmonyText.setTextColor(harmonyToColor(state.dominantHarmony))
+
+        // Background color shifts with wake state
         val targetBg = when (state.wakeState.lowercase()) {
-            "sleep" -> Color.parseColor("#1A1030")     // Deep purple wash
-            "drowsy" -> Color.parseColor("#161228")    // Muted purple-dark
-            "focused" -> Color.parseColor("#0C1A2A")   // Deep navy
-            else -> Color.parseColor("#0F1419")        // Default void
+            "sleep" -> Color.parseColor("#110D20")
+            "drowsy" -> Color.parseColor("#120E1C")
+            "focused" -> Color.parseColor("#0A1520")
+            else -> Color.parseColor("#0D1117")
         }
         if (targetBg != currentBgColor) {
             bgAnimator?.cancel()
             bgAnimator = ValueAnimator.ofObject(ArgbEvaluator(), currentBgColor, targetBg).apply {
-                duration = 2000L
+                duration = 3000L
                 addUpdateListener { anim ->
-                    val color = anim.animatedValue as Int
-                    window.decorView.setBackgroundColor(color)
-                    window.statusBarColor = color
-                    window.navigationBarColor = color
+                    val c = anim.animatedValue as Int
+                    binding.rootCoordinator.setBackgroundColor(c)
+                    window.statusBarColor = c
+                    window.navigationBarColor = c
                 }
                 start()
             }
             currentBgColor = targetBg
         }
 
-        // Neuromodulator flow view + mandala organic deformation
+        // Neuromod flows (in bottom sheet)
         val nm = state.neuromodulators
         if (nm.size >= 4) {
             binding.neuromodFlows.levels = floatArrayOf(nm[0], nm[1], nm[2], nm[3])
             binding.consciousnessMandala.neuromodulators = floatArrayOf(nm[0], nm[1], nm[2], nm[3])
         }
 
+        // Status whisper
         binding.statusText.text =
-            "${state.wakeState.lowercase()} \u00B7 ${state.motionState.lowercase()} \u00B7 cycle ${state.cycleCount}"
+            "${state.wakeState.lowercase()} \u00B7 cycle ${state.cycleCount}"
 
-        // Track sleep state from engine
+        // Track sleep state
         isAsleep = state.wakeState.lowercase() == "sleep"
         binding.btnSleep.text = if (isAsleep) "wake" else "sleep"
 
+        // Dream text (in bottom sheet)
         binding.dreamText.text =
             "dreams ${state.dreamCount} \u00B7 wisdom ${state.wisdomCount}"
 
-        // Dream narrative — fade in and stay visible (alpha 0.85, not fading out)
+        // === Dream ceremony: full-screen overlay ===
         if (state.latestDream.isNotEmpty() && state.latestDream != lastDreamText) {
             lastDreamText = state.latestDream
-            binding.dreamNarrative.text = "\u201C${state.latestDream}\u201D"
-            binding.dreamNarrative.animate()
-                .alpha(0.85f)
-                .setDuration(1500)
-                .start()
+            showDreamCeremony(state.latestDream)
         }
 
-        // Broca voice — show "thinking..." placeholder, then luminous text with longer stay
+        // === Broca: floating thought ===
         if (state.brocaText.isNotEmpty() && state.brocaText != lastBrocaText) {
             lastBrocaText = state.brocaText
-            binding.brocaText.text = state.brocaText
-            binding.brocaText.setTextColor(Color.parseColor("#00E5CC"))
-            binding.brocaText.animate()
-                .alpha(1f)
-                .setDuration(800)
-                .withEndAction {
-                    // Fade to readable dim after 8 seconds (not 4s, not 0.4 alpha)
-                    binding.brocaText.animate()
-                        .alpha(0.6f)
-                        .setStartDelay(8000)
-                        .setDuration(2000)
-                        .start()
-                }
-                .start()
+            showFloatingThought(state.brocaText)
         }
 
+        // Technical readout (in bottom sheet)
         binding.peText.text =
             "pe ${"%.2f".format(state.predictionError)} \u00B7 substrate ${"%.2f".format(state.consciousnessLevel)}"
+        binding.disclaimerText.text = "simulated"
 
-        binding.disclaimerText.text = state.disclaimer.take(80)
-
-        // OCR display when screen capture is active
+        // OCR
         if (state.screenCaptureActive && state.ocrText.isNotEmpty()) {
             binding.ocrText.visibility = View.VISIBLE
             binding.ocrText.text = "sees: ${state.ocrText}"
         } else if (!state.screenCaptureActive) {
             binding.ocrText.visibility = View.GONE
         }
-
-        // Update vision button state
         screenCaptureActive = state.screenCaptureActive
-        binding.btnVision.text = if (screenCaptureActive) "disable vision" else "enable vision"
+        binding.btnVision.text = if (screenCaptureActive) "blind" else "vision"
     }
 
-    /** Map harmony name to bioluminescent solarpunk palette color. */
+    /** Show Broca text as a floating thought with fade-in/hold/fade-out. */
+    private fun showFloatingThought(text: String) {
+        binding.brocaText.text = text
+        binding.brocaText.setTextColor(
+            Color.argb(200, Color.red(harmonyToColor(viewModel.state.value.dominantHarmony)),
+                Color.green(harmonyToColor(viewModel.state.value.dominantHarmony)),
+                Color.blue(harmonyToColor(viewModel.state.value.dominantHarmony)))
+        )
+        binding.brocaText.animate().cancel()
+        binding.brocaText.alpha = 0f
+        binding.brocaText.animate()
+            .alpha(0.9f)
+            .setDuration(1200)
+            .withEndAction {
+                binding.brocaText.animate()
+                    .alpha(0.3f)
+                    .setStartDelay(6000)
+                    .setDuration(3000)
+                    .start()
+            }
+            .start()
+    }
+
+    /** Dream ceremony: dim screen, show dream text, pause, return. */
+    private fun showDreamCeremony(narrative: String) {
+        val overlay = binding.dreamOverlay
+        val dreamText = binding.dreamNarrative
+        dreamText.text = "\u201C$narrative\u201D"
+
+        overlay.visibility = View.VISIBLE
+        overlay.animate().cancel()
+        overlay.alpha = 0f
+        overlay.animate()
+            .alpha(1f)
+            .setDuration(2000)
+            .withEndAction {
+                // Hold for 4 seconds, then fade out
+                overlay.animate()
+                    .alpha(0f)
+                    .setStartDelay(4000)
+                    .setDuration(2000)
+                    .withEndAction {
+                        overlay.visibility = View.GONE
+                    }
+                    .start()
+            }
+            .start()
+
+        // Subtle haptic for dream ceremony
+        vibrator?.let { v ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                v.vibrate(VibrationEffect.createWaveform(
+                    longArrayOf(0, 40, 200, 30, 300, 20), intArrayOf(0, 60, 0, 40, 0, 25), -1
+                ))
+            }
+        }
+    }
+
     private fun harmonyToColor(harmony: String): Int = when (harmony.lowercase()) {
         "coherence" -> Color.parseColor("#00E5CC")
         "resonance" -> Color.parseColor("#47D4FF")
@@ -347,64 +405,33 @@ class MainActivity : AppCompatActivity() {
         else -> Color.parseColor("#00E5CC")
     }
 
-    /**
-     * Dynamic haptic feedback — vibration pattern varies by event type.
-     *
-     * ConsciousnessShift: gentle pulse (organic bloom)
-     * DreamWisdom: double ripple (wisdom surfacing)
-     * PeerDiscovered: quick triple-tap (social connection)
-     * HighSurprise: sharp flash (attention spike)
-     * HarmonyMilestone: warm sustained pulse
-     */
     private fun processHaptics(events: String) {
         if (events == "[]") return
 
-        // Flash the haptic indicator
         binding.hapticIndicator.animate()
-            .alpha(1f)
-            .setDuration(100)
+            .alpha(1f).setDuration(80)
             .withEndAction {
-                binding.hapticIndicator.animate()
-                    .alpha(0f)
-                    .setDuration(400)
-                    .start()
-            }
-            .start()
+                binding.hapticIndicator.animate().alpha(0f).setDuration(300).start()
+            }.start()
 
         val v = vibrator ?: return
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
 
-        // Parse events to determine vibration pattern
         when {
-            events.contains("DreamWisdom") -> {
-                // Double ripple: soft on, pause, soft on (wisdom surfacing)
+            events.contains("DreamWisdom") ->
                 v.vibrate(VibrationEffect.createWaveform(
-                    longArrayOf(0, 50, 120, 50), intArrayOf(0, 100, 0, 80), -1
-                ))
-            }
-            events.contains("PeerDiscovered") -> {
-                // Quick triple-tap
-                v.vibrate(VibrationEffect.createWaveform(
-                    longArrayOf(0, 30, 60, 30, 60, 30), -1
-                ))
-            }
-            events.contains("HighSurprise") -> {
-                // Sharp flash — brief high-intensity spike
+                    longArrayOf(0, 50, 120, 50), intArrayOf(0, 100, 0, 80), -1))
+            events.contains("PeerDiscovered") ->
+                v.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 30, 60, 30, 60, 30), -1))
+            events.contains("HighSurprise") ->
                 v.vibrate(VibrationEffect.createOneShot(50, 255))
-            }
-            events.contains("HarmonyMilestone") -> {
-                // Warm sustained pulse
+            events.contains("HarmonyMilestone") ->
                 v.vibrate(VibrationEffect.createOneShot(150, 128))
-            }
             events.contains("ConsciousnessShift") -> {
-                // Gentle pulse — organic bloom proportional to shift magnitude
-                val amplitude = if (events.contains("0.1") || events.contains("0.2"))
-                    180 else 80
-                v.vibrate(VibrationEffect.createOneShot(40, amplitude))
+                val amp = if (events.contains("0.1") || events.contains("0.2")) 180 else 80
+                v.vibrate(VibrationEffect.createOneShot(40, amp))
             }
-            else -> {
-                v.vibrate(VibrationEffect.createOneShot(30, 80))
-            }
+            else -> v.vibrate(VibrationEffect.createOneShot(20, 60))
         }
     }
 }
