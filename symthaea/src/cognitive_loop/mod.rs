@@ -683,6 +683,10 @@ pub struct CognitiveLoopService {
     /// Implements CognitiveSubsystem — proposals fed into OutputCollector.
     perception_manager: managers::PerceptionManager,
 
+    /// Soul Manager: value alignment → confidence, exploration, LR modulation.
+    /// Implements CognitiveSubsystem at interval 43. Active when soul is enabled.
+    soul_manager: Option<managers::SoulManager>,
+
     /// Governance Manager: Mycelix governance events → neuromod contagion, confidence,
     /// exploration. Implements CognitiveSubsystem at interval 37. Feature-gated behind `mycelix`.
     #[cfg(feature = "mycelix")]
@@ -736,6 +740,11 @@ pub struct CognitiveLoopService {
     /// Implements CognitiveSubsystem at interval 11. Feature-gated behind `therapeutic`.
     #[cfg(feature = "therapeutic")]
     therapeutic_manager: managers::TherapeuticManager,
+
+    /// Fabrication Manager: Cincinnati quality monitoring, ManufacturingTwin readings, PoGF.
+    /// Implements CognitiveSubsystem at interval 47. Feature-gated behind `advanced-manufacturing`.
+    #[cfg(feature = "advanced-manufacturing")]
+    pub(crate) fabrication_manager: managers::FabricationManager,
 
     /// Glyph Manager: symbolic consciousness field, 11 Field Modality basis vectors,
     /// 70-glyph registry, developmental spiral tracking.

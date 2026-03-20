@@ -38,6 +38,12 @@ use std::time::{Duration, Instant};
 
 #[cfg(feature = "neural-bridge")]
 use super::CycleResult;
+use super::thresholds::{
+    PRED_COHERENCE_HIGH_THRESHOLD, PRED_COHERENCE_LOW_THRESHOLD,
+    PRED_COHERENCE_HIGH_BOOST_SCALE, PRED_COHERENCE_LOW_DAMPEN_SCALE,
+    ERROR_EMA_ALPHA, TIMING_EMA_ALPHA, EXPERIENCE_BASE_IMPORTANCE,
+    PREFRONTAL_UTILIZATION_WEIGHT, PREFRONTAL_GRADUATION_WEIGHT, PREFRONTAL_FLOOR,
+};
 use super::{ActionHint, AdaptiveBehavior, CognitiveLoopService, Experience, LoopStats};
 
 /// Cosine similarity between two f32 slices.
@@ -110,10 +116,10 @@ impl CognitiveLoopService {
         if raw_predictions.len() >= 2 {
             let coh = Self::compute_prediction_coherence_from_cache(&raw_predictions);
             // High agreement → boost confidence, low → reduce
-            if coh > 0.8 {
-                self.adjust_confidence("embed_pred_coherence_high", (coh - 0.8) * 0.1);
-            } else if coh < 0.4 {
-                self.scale_confidence("embed_pred_coherence_low", 1.0 - (0.4 - coh) * 0.15);
+            if coh > PRED_COHERENCE_HIGH_THRESHOLD {
+                self.adjust_confidence("embed_pred_coherence_high", (coh - PRED_COHERENCE_HIGH_THRESHOLD) * PRED_COHERENCE_HIGH_BOOST_SCALE);
+            } else if coh < PRED_COHERENCE_LOW_THRESHOLD {
+                self.scale_confidence("embed_pred_coherence_low", 1.0 - (PRED_COHERENCE_LOW_THRESHOLD - coh) * PRED_COHERENCE_LOW_DAMPEN_SCALE);
             }
         }
 
@@ -122,7 +128,10 @@ impl CognitiveLoopService {
             .temporal_network
             .read_state()
             .map(|arr| arr.to_vec())
-            .unwrap_or_else(|_| vec![0.0; self.config.cfc_config.num_neurons]);
+            .unwrap_or_else(|e| {
+                tracing::warn!(err = %e, "temporal_network.read_state failed — using zero state");
+                vec![0.0; self.config.cfc_config.num_neurons]
+            });
 
         // 7. Feed prediction back to encoder: deferred to after last &prediction use
 
@@ -244,10 +253,10 @@ impl CognitiveLoopService {
         // 3b. Use prediction coherence as confidence signal
         if raw_predictions.len() >= 2 {
             let coh = Self::compute_prediction_coherence_from_cache(&raw_predictions);
-            if coh > 0.8 {
-                self.adjust_confidence("hv_pred_coherence_high", (coh - 0.8) * 0.1);
-            } else if coh < 0.4 {
-                self.scale_confidence("hv_pred_coherence_low", 1.0 - (0.4 - coh) * 0.15);
+            if coh > PRED_COHERENCE_HIGH_THRESHOLD {
+                self.adjust_confidence("hv_pred_coherence_high", (coh - PRED_COHERENCE_HIGH_THRESHOLD) * PRED_COHERENCE_HIGH_BOOST_SCALE);
+            } else if coh < PRED_COHERENCE_LOW_THRESHOLD {
+                self.scale_confidence("hv_pred_coherence_low", 1.0 - (PRED_COHERENCE_LOW_THRESHOLD - coh) * PRED_COHERENCE_LOW_DAMPEN_SCALE);
             }
         }
 
@@ -256,7 +265,10 @@ impl CognitiveLoopService {
             .temporal_network
             .read_state()
             .map(|arr| arr.to_vec())
-            .unwrap_or_else(|_| vec![0.0; self.config.cfc_config.num_neurons]);
+            .unwrap_or_else(|e| {
+                tracing::warn!(err = %e, "temporal_network.read_state failed — using zero state");
+                vec![0.0; self.config.cfc_config.num_neurons]
+            });
 
         // 5. Feed prediction back to encoder: deferred to after last &prediction use
 
@@ -452,7 +464,7 @@ impl CognitiveLoopService {
         if let Some(last_state) = self.last_state.take() {
             if let Some(last_pred) = self.last_prediction.take() {
                 // Calculate importance based on error
-                let importance = error + 0.1; // Base importance
+                let importance = error + EXPERIENCE_BASE_IMPORTANCE;
 
                 let exp = Experience {
                     state: last_state, // move, not clone
@@ -476,7 +488,7 @@ impl CognitiveLoopService {
 
     pub(super) fn update_stats(&mut self, error: f32, cycle_time: Duration) {
         // EMA for error
-        let alpha = 0.1;
+        let alpha = ERROR_EMA_ALPHA;
         self.stats.avg_prediction_error =
             self.stats.avg_prediction_error * (1.0 - alpha) + error * alpha;
         self.stats.avg_prediction_error_sq =
@@ -499,7 +511,7 @@ impl CognitiveLoopService {
 
         // Timing stats
         let cycle_us = cycle_time.as_micros() as f32;
-        self.stats.avg_cycle_time_us = self.stats.avg_cycle_time_us * 0.99 + cycle_us * 0.01;
+        self.stats.avg_cycle_time_us = self.stats.avg_cycle_time_us * (1.0 - TIMING_EMA_ALPHA) + cycle_us * TIMING_EMA_ALPHA;
 
         // Cycles per second
         let elapsed = self.start_time.elapsed().as_secs_f32();
@@ -675,7 +687,7 @@ impl CognitiveLoopService {
     }
 
     pub(super) fn update_loss_stats(&mut self, loss: f32) {
-        let alpha = 0.1;
+        let alpha = ERROR_EMA_ALPHA;
         self.stats.avg_training_loss = self.stats.avg_training_loss * (1.0 - alpha) + loss * alpha;
     }
 
@@ -739,7 +751,7 @@ impl CognitiveLoopService {
                 // Blend: 30% utilization (active use) + 30% graduation quality
                 // + 40% floor (WM capacity exists and is available even when
                 // idle — an unused but available workspace is not a deficit).
-                (utilization * 0.3 + graduation_quality * 0.3 + 0.4).clamp(0.0, 1.0)
+                (utilization * PREFRONTAL_UTILIZATION_WEIGHT + graduation_quality * PREFRONTAL_GRADUATION_WEIGHT + PREFRONTAL_FLOOR).clamp(0.0, 1.0)
             })
             .unwrap_or(0.5)
     }

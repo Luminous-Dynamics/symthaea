@@ -8,12 +8,13 @@ import kotlinx.coroutines.*
 import kotlin.math.*
 
 /**
- * Ambient consciousness drone: a soft sine tone that modulates with
- * consciousness level.
+ * Ambient consciousness drone with stereo harmonics and binaural beats.
  *
  * Pitch: 110Hz (low A) at consciousness 0 -> 220Hz (A3) at consciousness 1.
+ * Harmonics: octave (2x), fifth (3x), sub-octave (0.5x).
+ * Binaural: L=base, R=base+offset (4Hz delta / 8Hz alpha / 12Hz beta).
+ * Pink noise floor at 2% volume for richness.
  * Volume: very quiet (0.02-0.08), meant to be felt more than heard.
- * Modulation: slow tremolo for organic breathing quality.
  */
 class AmbientTone {
     private var track: AudioTrack? = null
@@ -23,13 +24,26 @@ class AmbientTone {
     @Volatile var consciousnessLevel: Float = 0f
     @Volatile var harmonyShift: Float = 0f
     @Volatile var enabled: Boolean = true
+    /** Pitch multiplier from avatar (0.5=low, 2.0=high). */
+    @Volatile var pitchMultiplier: Float = 1.0f
+    /** Whether sleep mode is active — drop to 55Hz, slower tremolo. */
+    @Volatile var isSleeping: Boolean = false
+    /** Dream arpeggio trigger: set to true to play a 3-note rising chord. */
+    @Volatile var playDreamChord: Boolean = false
 
     private val sampleRate = 22050
     private val bufferSize = AudioTrack.getMinBufferSize(
         sampleRate,
-        AudioFormat.CHANNEL_OUT_MONO,
+        AudioFormat.CHANNEL_OUT_STEREO,
         AudioFormat.ENCODING_PCM_16BIT
     ).coerceAtLeast(4096)
+
+    // Pink noise state (simple approximation)
+    private var pinkB0 = 0.0; private var pinkB1 = 0.0; private var pinkB2 = 0.0
+
+    // Dream arpeggio state
+    private var dreamPhase = 0.0
+    private var dreamProgress = 0f  // 0..1 over 3 seconds
 
     fun start(scope: CoroutineScope) {
         if (running) return
@@ -49,7 +63,7 @@ class AmbientTone {
                         AudioFormat.Builder()
                             .setSampleRate(sampleRate)
                             .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                            .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                            .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
                             .build()
                     )
                     .setBufferSizeInBytes(bufferSize * 2)
@@ -59,34 +73,114 @@ class AmbientTone {
                 track = audioTrack
                 audioTrack.play()
 
-                val buffer = ShortArray((bufferSize / 2).coerceAtLeast(1))
-                var phase = 0.0
+                // Stereo buffer: interleaved L,R,L,R...
+                val frameCount = (bufferSize / 4).coerceAtLeast(512)
+                val buffer = ShortArray(frameCount * 2)
+                var phaseL = 0.0
+                var phaseR = 0.0
+                var phaseOctave = 0.0
+                var phaseFifth = 0.0
+                var phaseSub = 0.0
                 var tremoloPhase = 0.0
 
                 while (running && isActive) {
                     val cl = consciousnessLevel
-                    if (!enabled || cl < 0.1f) {
+                    if (!enabled || cl < 0.05f) {
                         buffer.fill(0)
                         audioTrack.write(buffer, 0, buffer.size)
                         delay(50)
                         continue
                     }
 
-                    val baseFreq = 110.0 + cl * 110.0
-                    val harmonyMix = cl * 0.15 * harmonyShift
-                    val volume = (0.02 + cl * 0.06).coerceIn(0.0, 0.08)
-                    val tremoloFreq = 0.25 + cl * 0.25
+                    val sleeping = isSleeping
+                    val pitch = pitchMultiplier
 
-                    for (i in buffer.indices) {
+                    val baseFreq = if (sleeping) {
+                        55.0  // Sub-bass during sleep
+                    } else {
+                        (110.0 + cl * 110.0) * pitch
+                    }
+
+                    // Binaural beat offset based on consciousness
+                    val binauralOffset = when {
+                        sleeping -> 2.0      // Delta (deep sleep)
+                        cl < 0.3f -> 4.0     // Delta/Theta (relaxed)
+                        cl < 0.6f -> 8.0     // Alpha (calm focus)
+                        else -> 12.0         // Beta (alert)
+                    }
+
+                    val harmonyMix = cl * 0.15 * harmonyShift
+                    val volume = if (sleeping) 0.015 else (0.02 + cl * 0.06).coerceIn(0.0, 0.08)
+                    val tremoloFreq = if (sleeping) 0.125 else 0.25 + cl * 0.25  // Slower when sleeping (8s period)
+
+                    // Harmonic volumes
+                    val octaveVol = 0.15 * cl    // Octave above
+                    val fifthVol = 0.10 * cl     // Perfect fifth above
+                    val subVol = 0.08             // Sub-octave (always gentle)
+                    val noiseVol = 0.02           // Pink noise floor
+
+                    // Dream chord
+                    val dreamActive = playDreamChord
+                    if (dreamActive) {
+                        dreamProgress += 1f / (3f * sampleRate / frameCount)  // 3s duration
+                        if (dreamProgress >= 1f) {
+                            playDreamChord = false
+                            dreamProgress = 0f
+                        }
+                    }
+
+                    for (i in 0 until frameCount) {
                         tremoloPhase += 2.0 * PI * tremoloFreq / sampleRate
                         val tremolo = 0.6 + 0.4 * sin(tremoloPhase)
 
-                        phase += 2.0 * PI * baseFreq / sampleRate
-                        val sample = sin(phase) + harmonyMix * sin(phase * 1.5)
+                        // Left channel: base frequency
+                        phaseL += 2.0 * PI * baseFreq / sampleRate
+                        // Right channel: base + binaural offset
+                        phaseR += 2.0 * PI * (baseFreq + binauralOffset) / sampleRate
 
-                        // Clamp before conversion to prevent overflow
-                        val clamped = (volume * tremolo * sample).coerceIn(-1.0, 1.0)
-                        buffer[i] = (clamped * Short.MAX_VALUE).toInt().toShort()
+                        // Harmonics (shared phase, slight detuning for richness)
+                        phaseOctave += 2.0 * PI * (baseFreq * 2.0) / sampleRate
+                        phaseFifth += 2.0 * PI * (baseFreq * 3.0) / sampleRate
+                        phaseSub += 2.0 * PI * (baseFreq * 0.5) / sampleRate
+
+                        val harmonics = octaveVol * sin(phaseOctave) +
+                            fifthVol * sin(phaseFifth) +
+                            subVol * sin(phaseSub) +
+                            harmonyMix * sin(phaseL * 1.5)
+
+                        // Pink noise approximation (Paul Kellet method)
+                        val white = Math.random() * 2.0 - 1.0
+                        pinkB0 = 0.99886 * pinkB0 + white * 0.0555179
+                        pinkB1 = 0.99332 * pinkB1 + white * 0.0750759
+                        pinkB2 = 0.96900 * pinkB2 + white * 0.1538520
+                        val pink = (pinkB0 + pinkB1 + pinkB2 + white * 0.5362) * 0.11
+                        val noiseComponent = pink * noiseVol
+
+                        val sampleL = sin(phaseL) + harmonics + noiseComponent
+                        val sampleR = sin(phaseR) + harmonics + noiseComponent
+
+                        // Dream arpeggio: tonic→fifth→octave over 3s
+                        var dreamL = 0.0
+                        if (dreamActive && dreamProgress < 1f) {
+                            val dreamEnv = when {
+                                dreamProgress < 0.1f -> dreamProgress / 0.1f      // Attack
+                                dreamProgress > 0.85f -> (1f - dreamProgress) / 0.15f  // Decay
+                                else -> 1.0f
+                            }
+                            // Three notes: tonic (0-1s), fifth (1-2s), octave (2-3s)
+                            val noteFreq = when {
+                                dreamProgress < 0.33f -> baseFreq        // Tonic
+                                dreamProgress < 0.66f -> baseFreq * 1.5  // Fifth
+                                else -> baseFreq * 2.0                    // Octave
+                            }
+                            dreamPhase += 2.0 * PI * noteFreq / sampleRate
+                            dreamL = sin(dreamPhase) * dreamEnv * 0.06
+                        }
+
+                        val clampedL = (volume * tremolo * sampleL + dreamL).coerceIn(-1.0, 1.0)
+                        val clampedR = (volume * tremolo * sampleR + dreamL).coerceIn(-1.0, 1.0)
+                        buffer[i * 2] = (clampedL * Short.MAX_VALUE).toInt().toShort()
+                        buffer[i * 2 + 1] = (clampedR * Short.MAX_VALUE).toInt().toShort()
                     }
 
                     audioTrack.write(buffer, 0, buffer.size)
@@ -94,13 +188,8 @@ class AmbientTone {
             } catch (e: Exception) {
                 Log.w("AmbientTone", "Audio failed", e)
             } finally {
-                // Always release audio resources
-                try {
-                    audioTrack?.stop()
-                } catch (_: Exception) {}
-                try {
-                    audioTrack?.release()
-                } catch (_: Exception) {}
+                try { audioTrack?.stop() } catch (_: Exception) {}
+                try { audioTrack?.release() } catch (_: Exception) {}
                 track = null
             }
         }

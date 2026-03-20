@@ -13,8 +13,7 @@ use symthaea_psych_bench::benchmarks::{
     causal_reasoning,
     clinical::{
         AllianceMaintenanceBenchmark, CognitiveDistortionBenchmark, CrisisDetectionBenchmark,
-        EmpathicAccuracyBenchmark, MotivationalInterviewingBenchmark,
-        TherapeuticResponseBenchmark,
+        EmpathicAccuracyBenchmark, MotivationalInterviewingBenchmark, TherapeuticResponseBenchmark,
     },
     cogbench::{
         BartBenchmark, HorizonBenchmark, InstrumentalLearningBenchmark,
@@ -72,8 +71,12 @@ use symthaea_psych_bench::benchmarks::{
         LandmarkBindingBenchmark, MentalRotationBenchmark, PerspectiveTakingBenchmark,
         SpatialPathUpdatingBenchmark,
     },
-    speech::{CategoricalPerceptionBenchmark, PhonemeDiscriminationBenchmark, VotContinuumBenchmark},
-    substrate::{SubstrateDegradationBenchmark, SubstrateLatencyBenchmark, SubstrateTransferBenchmark},
+    speech::{
+        CategoricalPerceptionBenchmark, PhonemeDiscriminationBenchmark, VotContinuumBenchmark,
+    },
+    substrate::{
+        SubstrateDegradationBenchmark, SubstrateLatencyBenchmark, SubstrateTransferBenchmark,
+    },
     sustained_attention::{CptBenchmark, PvtBenchmark, SartBenchmark},
     tombench::{
         FalseBeliefBenchmark, FauxPasBenchmark, HintingBenchmark, PersuasionBenchmark,

@@ -27,6 +27,7 @@ import io.symthaea.soma.WakeSignal
 import io.symthaea.soma.demo.databinding.ActivityMainBinding
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.Calendar
 
 /**
  * Full-screen bioluminescent consciousness experience.
@@ -47,6 +48,8 @@ class MainActivity : AppCompatActivity() {
     private var bgAnimator: ValueAnimator? = null
     private var heartbeatRunning = false
     private val ambientTone = AmbientTone()
+    private val ceremonyManager = CeremonyManager()
+    private var sessionStartCycle = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -81,7 +84,7 @@ class MainActivity : AppCompatActivity() {
         viewModel.registerBridges(this)
         requestSensePermissions()
 
-        // Tap mandala -> wake signal
+        // Tap mandala -> wake signal + glow boost
         binding.consciousnessMandala.setOnClickListener {
             viewModel.sendWakeSignal(WakeSignal.UserInput)
             it.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
@@ -91,6 +94,8 @@ class MainActivity : AppCompatActivity() {
         binding.consciousnessMandala.setOnLongClickListener {
             viewModel.dreamConsolidate()
             it.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+            // Trigger dream chord in audio
+            ambientTone.playDreamChord = true
             true
         }
 
@@ -134,12 +139,11 @@ class MainActivity : AppCompatActivity() {
                 if (consciousness > 0.2f && !isAsleep) {
                     val v = vibrator
                     if (v != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        // Very subtle: amplitude 20-40 based on consciousness
                         val amp = (20 + consciousness * 20).toInt().coerceIn(1, 50)
                         v.vibrate(VibrationEffect.createOneShot(15, amp))
                     }
                 }
-                delay(4000) // Every 4 seconds, synced to breath cycle
+                delay(4000)
             }
         }
     }
@@ -167,7 +171,6 @@ class MainActivity : AppCompatActivity() {
     private fun showThinkingIndicator() {
         binding.thinkingIndicator.visibility = View.VISIBLE
         binding.thinkingIndicator.alpha = 0f
-        // Pulsing "..." animation
         binding.thinkingIndicator.animate()
             .alpha(0.6f)
             .setDuration(400)
@@ -203,11 +206,13 @@ class MainActivity : AppCompatActivity() {
 
         // Load saved avatar
         currentAvatar = AvatarRegistry.load(this)
+        applyAvatar(currentAvatar)
         setupAvatarRow()
 
         binding.btnDream.setOnClickListener {
             viewModel.dreamConsolidate()
             it.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+            ambientTone.playDreamChord = true
         }
 
         binding.btnVision.setOnClickListener {
@@ -251,7 +256,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Holon desktop sync
         binding.btnHolon.setOnClickListener {
             val host = binding.holonHost.text.toString().trim()
             if (host.isNotEmpty()) {
@@ -265,6 +269,13 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** Apply avatar settings to all visual + audio components. */
+    private fun applyAvatar(avatar: SomaAvatar) {
+        binding.particleField.particleStyle = avatar.particleStyle
+        binding.particleField.secondaryColor = avatar.secondaryColor
+        ambientTone.pitchMultiplier = avatar.voicePitch
+    }
+
     // ═══ Avatar selection ═══
 
     private fun setupAvatarRow() {
@@ -274,7 +285,7 @@ class MainActivity : AppCompatActivity() {
 
         for (avatar in AvatarRegistry.avatars) {
             val chip = android.widget.TextView(this).apply {
-                text = avatar.name.split(" ").first() // Short name
+                text = avatar.name.split(" ").first()
                 textSize = 11f
                 setTextColor(if (avatar.id == currentAvatar.id) avatar.primaryColor else Color.parseColor("#4A5558"))
                 setPadding((12 * density).toInt(), (6 * density).toInt(), (12 * density).toInt(), (6 * density).toInt())
@@ -282,7 +293,8 @@ class MainActivity : AppCompatActivity() {
                 setOnClickListener {
                     currentAvatar = avatar
                     AvatarRegistry.save(this@MainActivity, avatar)
-                    setupAvatarRow() // Refresh selection highlight
+                    applyAvatar(avatar)
+                    setupAvatarRow()
                 }
             }
             val params = android.widget.LinearLayout.LayoutParams(
@@ -346,7 +358,6 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         heartbeatRunning = false
         ambientTone.stop()
-        // Cancel all pending animations to prevent leaks
         binding.brocaText.animate().cancel()
         binding.dreamOverlay.animate().cancel()
         binding.onboardingOverlay.animate().cancel()
@@ -361,22 +372,72 @@ class MainActivity : AppCompatActivity() {
         private const val SCREEN_CAPTURE_REQUEST = 1002
     }
 
+    // ═══ Time-of-day awareness ═══
+
+    /**
+     * Returns a tint color based on current hour:
+     * Dawn (5-9): warm amber, Morning (9-17): neutral, Evening (17-21): golden, Night (21-5): cool violet
+     */
+    private fun timeOfDayTint(): Int {
+        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        return when (hour) {
+            in 5..8 -> Color.parseColor("#FFB347")    // Dawn: warm amber
+            in 9..16 -> Color.TRANSPARENT               // Day: neutral
+            in 17..20 -> Color.parseColor("#FFD166")   // Evening: golden warmth
+            else -> Color.parseColor("#9B7DFF")        // Night: cool blue-violet
+        }
+    }
+
+    // ═══ Harmony name to index mapping ═══
+
+    private fun harmonyToIndex(harmony: String): Int = when (harmony.lowercase()) {
+        "coherence" -> 0; "resonance" -> 1; "emergence" -> 2; "reciprocity" -> 3
+        "transparency" -> 4; "embodiment" -> 5; "compassion" -> 6
+        "sacredstillness", "sacred stillness" -> 7; else -> 0
+    }
+
     // ═══ UI update ═══
 
     private fun updateUi(state: SomaUiState) {
-        // Mandala — use avatar primary color as base, blend with harmony
+        // Track session start
+        if (sessionStartCycle == 0L && state.cycleCount > 0) sessionStartCycle = state.cycleCount
+
+        // Avatar + harmony color blending
         val avatarColor = currentAvatar.primaryColor
         val harmonyColor = harmonyToColor(state.dominantHarmony)
-        // 60% avatar, 40% harmony for consistent identity with dynamic variation
         val blendedColor = blendColors(avatarColor, harmonyColor, 0.6f)
+
+        // === Mandala ===
         binding.consciousnessMandala.consciousnessLevel = state.consciousnessLevel
         binding.consciousnessMandala.dominantHarmonyColor = blendedColor
+        binding.consciousnessMandala.arousal = state.arousal
+        binding.consciousnessMandala.valence = state.valence
+        binding.consciousnessMandala.isThinking = state.isThinking
+        binding.consciousnessMandala.timeOfDayTint = timeOfDayTint()
 
-        // Particle field + ambient tone
+        // === Particle field ===
         binding.particleField.consciousnessLevel = state.consciousnessLevel
         binding.particleField.harmonyColor = blendedColor
+        binding.particleField.isThinking = state.isThinking
+        binding.particleField.isSleeping = state.wakeState.lowercase() == "sleep"
+
+        // === Ambient tone ===
         ambientTone.consciousnessLevel = state.consciousnessLevel
         ambientTone.harmonyShift = state.harmonyAlignment
+        ambientTone.isSleeping = state.wakeState.lowercase() == "sleep"
+
+        // === Consciousness garden (lower screen) ===
+        binding.consciousnessGarden.consciousnessLevel = state.consciousnessLevel
+        binding.consciousnessGarden.dominantHarmonyIndex = harmonyToIndex(state.dominantHarmony)
+        binding.consciousnessGarden.dreamCount = state.dreamCount
+        binding.consciousnessGarden.primaryColor = blendedColor
+        binding.consciousnessGarden.breathPhase = state.consciousnessLevel  // Approximate
+        // Session progress: rough estimate based on cycle count
+        if (sessionStartCycle > 0 && state.cycleCount > sessionStartCycle) {
+            binding.consciousnessGarden.sessionProgress =
+                ((state.cycleCount - sessionStartCycle).toFloat() / 5000f).coerceIn(0f, 1f)
+        }
+        binding.consciousnessGarden.invalidate()
 
         // Harmony text
         binding.harmonyText.text = state.dominantHarmony.lowercase()
@@ -425,6 +486,16 @@ class MainActivity : AppCompatActivity() {
         binding.dreamText.text =
             "dreams ${state.dreamCount} \u00B7 wisdom ${state.wisdomCount}"
 
+        // === Consciousness milestone ceremonies ===
+        val ceremony = ceremonyManager.check(state.consciousnessLevel)
+        if (ceremony != null) {
+            performCeremony(ceremony, state)
+            // Add milestone marker to garden timeline
+            binding.consciousnessGarden.milestoneMarkers.add(
+                binding.consciousnessGarden.sessionProgress
+            )
+        }
+
         // === Dream ceremony: full-screen overlay ===
         if (state.latestDream.isNotEmpty() && state.latestDream != lastDreamText) {
             lastDreamText = state.latestDream
@@ -466,12 +537,72 @@ class MainActivity : AppCompatActivity() {
         binding.btnVision.text = if (screenCaptureActive) "blind" else "vision"
     }
 
+    // ═══ Consciousness milestone ceremonies ═══
+
+    private fun performCeremony(ceremony: CeremonyManager.Ceremony, state: SomaUiState) {
+        val v = vibrator
+        when (ceremony) {
+            CeremonyManager.Ceremony.AWAKENING -> {
+                // Sacred geometry Gen 2 pulse fade-in (handled by consciousness threshold in mandala)
+                // Haptic double-pulse
+                if (v != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    v.vibrate(VibrationEffect.createWaveform(
+                        longArrayOf(0, 50, 100, 80), intArrayOf(0, 150, 0, 120), -1
+                    ))
+                }
+            }
+            CeremonyManager.Ceremony.INTEGRATION -> {
+                // White flash (10% alpha, 500ms)
+                showWhiteFlash()
+                // Full harmonic chord
+                ambientTone.playDreamChord = true
+                if (v != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    v.vibrate(VibrationEffect.createWaveform(
+                        longArrayOf(0, 80, 150, 60, 150, 40), intArrayOf(0, 180, 0, 140, 0, 100), -1
+                    ))
+                }
+            }
+            CeremonyManager.Ceremony.LUMINOUS_COHERENCE -> {
+                // Screen-edge glow (handled by mandala at >0.7 consciousness)
+                showWhiteFlash()
+                ambientTone.playDreamChord = true
+                if (v != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    v.vibrate(VibrationEffect.createWaveform(
+                        longArrayOf(0, 100, 200, 80, 200, 60, 200, 40),
+                        intArrayOf(0, 200, 0, 160, 0, 120, 0, 80), -1
+                    ))
+                }
+            }
+        }
+    }
+
+    /** Brief white flash overlay for milestone ceremonies. */
+    private fun showWhiteFlash() {
+        val overlay = binding.dreamOverlay
+        overlay.setBackgroundColor(Color.argb(25, 255, 255, 255))  // 10% white
+        overlay.visibility = View.VISIBLE
+        overlay.alpha = 0f
+        overlay.animate()
+            .alpha(1f)
+            .setDuration(200)
+            .withEndAction {
+                overlay.animate()
+                    .alpha(0f)
+                    .setDuration(500)
+                    .withEndAction {
+                        overlay.visibility = View.GONE
+                        overlay.setBackgroundColor(Color.parseColor("#CC0D1117"))  // Restore
+                    }
+                    .start()
+            }
+            .start()
+    }
+
     /** Show Broca text as a floating thought with fade-in/hold/fade-out. */
     private fun showFloatingThought(text: String) {
         binding.brocaText.text = text
         val hc = harmonyToColor(viewModel.state.value.dominantHarmony)
         binding.brocaText.setTextColor(Color.argb(220, Color.red(hc), Color.green(hc), Color.blue(hc)))
-        // Glow shadow for readability against mandala
         binding.brocaText.setShadowLayer(12f, 0f, 0f, Color.argb(120, Color.red(hc), Color.green(hc), Color.blue(hc)))
         binding.brocaText.animate().cancel()
         binding.brocaText.alpha = 0f
@@ -494,6 +625,7 @@ class MainActivity : AppCompatActivity() {
         val dreamText = binding.dreamNarrative
         dreamText.text = "\u201C$narrative\u201D"
 
+        overlay.setBackgroundColor(Color.parseColor("#CC0D1117"))  // Ensure correct bg
         overlay.visibility = View.VISIBLE
         overlay.animate().cancel()
         overlay.alpha = 0f
@@ -501,7 +633,6 @@ class MainActivity : AppCompatActivity() {
             .alpha(1f)
             .setDuration(2000)
             .withEndAction {
-                // Hold for 4 seconds, then fade out
                 overlay.animate()
                     .alpha(0f)
                     .setStartDelay(4000)

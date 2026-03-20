@@ -1395,6 +1395,35 @@ pub struct CycleMetadata {
     #[serde(default)]
     pub governance_lr_boost: f32,
 
+    // ── Fabrication Manager Telemetry ─────────────────────────────────────
+    /// Manufacturing free energy from ManufacturingTwin (0.0 = equilibrium).
+    #[serde(default)]
+    pub fabrication_manufacturing_fe: f64,
+    /// Design loop free energy from DesignLoopTwin.
+    #[serde(default)]
+    pub fabrication_design_loop_fe: f64,
+    /// Manufacturing safety level as string ("Green"/"Yellow"/"Orange"/"Red").
+    #[serde(default)]
+    pub fabrication_safety_level: String,
+    /// Cincinnati anomaly count this cycle.
+    #[serde(default)]
+    pub fabrication_anomaly_count: u32,
+    /// EMA of anomaly severity [0, 1].
+    #[serde(default)]
+    pub fabrication_anomaly_ema: f32,
+    /// PoGF score EMA [0, 1].
+    #[serde(default)]
+    pub fabrication_pog_score_ema: f32,
+    /// Active print jobs.
+    #[serde(default)]
+    pub fabrication_active_jobs: u32,
+    /// Fabrication reward EMA.
+    #[serde(default)]
+    pub fabrication_reward_ema: f32,
+    /// Mean prediction coherence across manufacturing horizons.
+    #[serde(default)]
+    pub fabrication_prediction_coherence: f32,
+
     // ── CPG Manager Telemetry ─────────────────────────────────────────────
     /// Kuramoto synchronization index [0, 1]. 0 = incoherent, 1 = perfect sync.
     #[serde(default)]

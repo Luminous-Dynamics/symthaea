@@ -105,8 +105,10 @@ impl WisconsinCardSortingBenchmark {
         let mut rt_ticks = Vec::new();
 
         // Explicit hypothesis testing: 3 rule confidences [color, shape, number]
-        let mut rule_confidence = [1.0f64, 0.0, 0.0]; // Start believing color
-                                                      // Encoding noise and time pressure degrade learning rates (impaired feedback)
+        // Mild color prior: color is perceptually most salient and most subjects
+        // try it first (Milner, 1963; Grant & Berg, 1948).
+        let mut rule_confidence = [0.50f64, 0.25, 0.25];
+        // Encoding noise and time pressure degrade learning rates (impaired feedback)
         let noise = config.effective_noise();
         let lr_scale = 1.0 - noise * 0.6;
         let lr_correct = 0.2 * lr_scale; // Moderate reinforcement (lower cap = less needed)
@@ -248,7 +250,7 @@ impl WisconsinCardSortingBenchmark {
                 // Multiplicative decay + additive penalty for faster switching.
                 // Halving the wrong hypothesis' confidence is faster than subtracting
                 // a fixed amount when confidence is high.
-                rule_confidence[chosen_rule_idx] *= 0.4; // Rapid decay
+                rule_confidence[chosen_rule_idx] *= 0.25; // Rapid decay
                 rule_confidence[chosen_rule_idx] -= lr_error;
                 for (i, c) in rule_confidence.iter_mut().enumerate() {
                     if i != chosen_rule_idx {

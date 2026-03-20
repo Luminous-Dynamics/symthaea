@@ -507,7 +507,8 @@ impl SporeEngine {
             if self.state_trajectory.len() >= 100 {
                 self.state_trajectory.remove(0);
             }
-            self.state_trajectory.push([output_hv.values[0], output_hv.values[1]]);
+            self.state_trajectory
+                .push([output_hv.values[0], output_hv.values[1]]);
         }
 
         // Compute prediction error (similarity delta from previous output)
@@ -1044,15 +1045,10 @@ impl SporeEngine {
         }
 
         // Box-counting on first 2 dimensions (projected from high-D state)
-        let points: Vec<(f32, f32)> = self
-            .state_trajectory
-            .iter()
-            .map(|s| (s[0], s[1]))
-            .collect();
+        let points: Vec<(f32, f32)> = self.state_trajectory.iter().map(|s| (s[0], s[1])).collect();
 
         // Normalize to [0, 1]
-        let (mut min_x, mut max_x, mut min_y, mut max_y) =
-            (f32::MAX, f32::MIN, f32::MAX, f32::MIN);
+        let (mut min_x, mut max_x, mut min_y, mut max_y) = (f32::MAX, f32::MIN, f32::MAX, f32::MIN);
         for &(x, y) in &points {
             min_x = min_x.min(x);
             max_x = max_x.max(x);

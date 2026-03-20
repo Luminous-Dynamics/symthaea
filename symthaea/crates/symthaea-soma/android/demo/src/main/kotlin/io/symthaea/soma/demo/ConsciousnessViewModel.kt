@@ -39,6 +39,12 @@ data class SomaUiState(
     val chatSomaResponse: String = "",
     /** OCR text from screen vision (shown when capture is active). */
     val ocrText: String = "",
+    /** Emotional valence (-1 to 1): positive=warm, negative=cool. */
+    val valence: Float = 0f,
+    /** Arousal level (0-1): drives rotation speed, visual intensity. */
+    val arousal: Float = 0.5f,
+    /** Whether Soma is currently generating a response. */
+    val isThinking: Boolean = false,
 )
 
 class ConsciousnessViewModel : ViewModel() {
@@ -70,6 +76,13 @@ class ConsciousnessViewModel : ViewModel() {
 
     /** Holon WebSocket for phone<->desktop consciousness sync. */
     private var holonWs: HolonWebSocket? = null
+
+    // Exponential smoothing for visual stability (eliminates 10Hz jumps at 60fps)
+    private var smoothCl = 0f
+    private var smoothNm = floatArrayOf(0.5f, 0.5f, 0.5f, 0.5f)
+    private var smoothValence = 0f
+    private var smoothArousal = 0.5f
+    private var isThinking = false
 
     /** Register bridges as lifecycle observers so onStart()/onStop() fire. */
     fun registerBridges(owner: LifecycleOwner) {
@@ -182,11 +195,21 @@ class ConsciousnessViewModel : ViewModel() {
                         } catch (_: Exception) {}
                     }
 
+                    // Exponential smoothing: eliminates 10Hz visual jumps
+                    val alpha = 0.15f
+                    smoothCl += (result.consciousnessLevel - smoothCl) * alpha
+                    for (i in smoothNm.indices) {
+                        val raw = result.neuromodulators.getOrElse(i) { 0.5f }
+                        smoothNm[i] += (raw - smoothNm[i]) * alpha
+                    }
+                    smoothValence += (compass.valence - smoothValence) * alpha
+                    smoothArousal += (compass.arousal - smoothArousal) * alpha
+
                     _state.value = SomaUiState(
-                        consciousnessLevel = result.consciousnessLevel,
+                        consciousnessLevel = smoothCl,
                         harmonyAlignment = result.harmonyAlignment,
                         dominantHarmony = compass.dominantHarmony,
-                        neuromodulators = result.neuromodulators,
+                        neuromodulators = smoothNm.toList(),
                         predictionError = result.predictionError,
                         wakeState = WakeState.fromCode(compass.wakeState).name,
                         motionState = MotionState.fromCode(compass.motionState).name,
@@ -201,6 +224,9 @@ class ConsciousnessViewModel : ViewModel() {
                         screenSurprise = screenCaptureBridge?.currentSurprise ?: 0f,
                         screenCaptureActive = screenCaptureBridge?.isRunning ?: false,
                         ocrText = ocrText,
+                        valence = smoothValence,
+                        arousal = smoothArousal,
+                        isThinking = isThinking,
                     )
                     // Update persistent notification from ViewModel engine
                     if (tick % 30 == 0L) {
@@ -270,10 +296,12 @@ class ConsciousnessViewModel : ViewModel() {
 
     /** Send user message and get Broca response. Tries Ollama first, falls back to BrocaLite. */
     fun converse(userText: String) {
-        // Show user message immediately
+        // Show user message immediately + mark thinking
+        isThinking = true
         _state.value = _state.value.copy(
             chatUserMessage = userText,
             chatSomaResponse = "",
+            isThinking = true,
         )
 
         // Boost engagement
@@ -300,8 +328,11 @@ class ConsciousnessViewModel : ViewModel() {
                 }
             }
 
+            isThinking = false
             if (!text.isNullOrBlank()) {
-                _state.value = _state.value.copy(chatSomaResponse = text)
+                _state.value = _state.value.copy(chatSomaResponse = text, isThinking = false)
+            } else {
+                _state.value = _state.value.copy(isThinking = false)
             }
         }
     }

@@ -999,3 +999,93 @@ pub const RESONATOR_SIMILARITY_HIGH: f32 = 0.8;
 pub const RESONATOR_SIMILARITY_LOW: f32 = 0.3;
 pub const BINDING_STRENGTH_TELEMETRY_HIGH: f32 = 0.7;
 pub const BINDING_STRENGTH_TELEMETRY_LOW: f32 = 0.3;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PREDICTION COHERENCE
+// Basis: Clark (2013) — predictive processing. High inter-prediction agreement
+// signals reliable internal model; low agreement signals model uncertainty.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Coherence threshold above which prediction confidence is boosted.
+/// Basis: Clark (2013) — strong inter-scale agreement = reliable generative model.
+pub const PRED_COHERENCE_HIGH_THRESHOLD: f32 = 0.8;
+
+/// Coherence threshold below which prediction confidence is dampened.
+/// Basis: Clark (2013) — weak agreement = model conflict requiring recalibration.
+pub const PRED_COHERENCE_LOW_THRESHOLD: f32 = 0.4;
+
+/// Scale for confidence boost when coherence exceeds high threshold.
+/// Basis: Clark (2013) — graded confidence reinforcement proportional to excess coherence.
+pub const PRED_COHERENCE_HIGH_BOOST_SCALE: f32 = 0.1;
+
+/// Scale for confidence dampening when coherence falls below low threshold.
+/// Basis: Clark (2013) — uncertainty-proportional confidence reduction.
+pub const PRED_COHERENCE_LOW_DAMPEN_SCALE: f32 = 0.15;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EMA SMOOTHING
+// Basis: Brown (1956) — exponential smoothing for temporal averaging.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// EMA alpha for prediction error and training loss averaging.
+/// Basis: Brown (1956) — α=0.1 gives ~10-sample effective window.
+pub const ERROR_EMA_ALPHA: f32 = 0.1;
+
+/// EMA alpha for cycle timing statistics (very slow update for stability).
+/// Basis: Brown (1956) — α=0.01 gives ~100-sample effective window.
+pub const TIMING_EMA_ALPHA: f32 = 0.01;
+
+/// Base importance offset for experience creation.
+/// Basis: Schaul (2015) — prioritized experience replay with non-zero minimum
+/// importance ensures rare-but-important experiences are never completely forgotten.
+pub const EXPERIENCE_BASE_IMPORTANCE: f32 = 0.1;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PREFRONTAL WORKING MEMORY BLEND
+// Basis: Baddeley (2003) — working memory capacity correlates with
+// consciousness through active maintenance and episodic transfer.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Weight of utilization in prefrontal consciousness blend.
+/// Basis: Baddeley (2003) — active maintenance contributes to consciousness.
+pub const PREFRONTAL_UTILIZATION_WEIGHT: f64 = 0.3;
+
+/// Weight of graduation quality in prefrontal consciousness blend.
+/// Basis: Baddeley (2003) — episodic transfer quality reflects WM effectiveness.
+pub const PREFRONTAL_GRADUATION_WEIGHT: f64 = 0.3;
+
+/// Floor for prefrontal consciousness (WM capacity exists even when idle).
+/// Basis: Baddeley (2003) — available but unused workspace is not a deficit.
+pub const PREFRONTAL_FLOOR: f64 = 0.4;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REWARD HIGH-ERROR BOUNDARY
+// Basis: Schultz (1997) — reward prediction error signals. Prediction errors
+// above this threshold indicate substantial model failure → negative reward.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Prediction error threshold above which reward signal turns negative.
+/// Basis: Schultz (1997) — large PE indicates poor world model → punish.
+pub const REWARD_HIGH_ERROR_THRESHOLD: f32 = 0.5;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PHYSICS DOMAIN EXPLORATION
+// Basis: Schmidhuber (2010) — curiosity-driven exploration modulated by
+// domain familiarity. Known territory → exploit, uncharted → explore.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Physics similarity above which exploration dampened (known territory).
+/// Basis: Schmidhuber (2010) — high similarity = exploit regime.
+pub const PHYSICS_EXPLOIT_THRESHOLD: f32 = 0.5;
+
+/// Exploration dampen scale for known physics domain.
+/// Basis: Schmidhuber (2010) — graded transition from explore to exploit.
+pub const PHYSICS_EXPLOIT_SCALE: f32 = 0.3;
+
+/// Physics similarity below which exploration boosted (uncharted territory).
+/// Basis: Schmidhuber (2010) — low similarity = high learning potential.
+pub const PHYSICS_EXPLORE_THRESHOLD: f32 = 0.2;
+
+/// Exploration boost scale for uncharted physics domain.
+/// Basis: Schmidhuber (2010) — novelty-proportional exploration drive.
+pub const PHYSICS_EXPLORE_SCALE: f32 = 0.5;

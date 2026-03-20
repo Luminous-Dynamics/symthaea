@@ -1,9 +1,9 @@
 domain,score,n_benchmarks,interpretation
-Attention,0.635338,5,Moderate
-Executive,0.822872,6,Strong
-Language,0.308170,4,Below average
-Memory,0.778992,11,Strong
-Metacognition,0.737445,2,Moderate
-Motor,0.672602,3,Moderate
-Reasoning,0.783681,10,Strong
-Social,0.956250,8,Exceptional
+Attention,0.828688,5,Strong
+Executive,0.892525,6,Strong
+Language,0.399227,4,Below average
+Memory,0.798260,11,Strong
+Metacognition,0.740059,2,Moderate
+Motor,0.734284,3,Moderate
+Reasoning,0.773167,10,Strong
+Social,0.987500,8,Exceptional

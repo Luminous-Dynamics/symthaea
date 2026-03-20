@@ -165,13 +165,9 @@ pub enum ControlMessage {
     /// Request a full frame (after connection loss or desync).
     RequestFullFrame,
     /// Acknowledge receipt of frame (for flow control).
-    FrameAck {
-        frame_id: u64,
-    },
+    FrameAck { frame_id: u64 },
     /// Graceful session termination.
-    Goodbye {
-        reason: String,
-    },
+    Goodbye { reason: String },
     /// Consciousness attestation (proves server is a genuine Symthaea).
     ConsciousnessAttestation {
         /// Phi level at attestation time.

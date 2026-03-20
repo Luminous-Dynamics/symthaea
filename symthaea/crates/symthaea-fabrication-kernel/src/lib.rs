@@ -11,11 +11,14 @@ pub mod building;
 pub mod csg;
 pub mod design_loop;
 pub mod export;
+#[cfg(feature = "analytical")]
+pub mod generative;
 pub mod import;
 pub mod manufacturing;
 pub mod mesh;
 pub mod primitives;
 pub mod simulator;
+pub mod slicer;
 pub mod thought;
 pub mod validate;
 
@@ -26,5 +29,6 @@ pub use import::{parse_ascii_stl, parse_binary_stl, parse_stl, StlError};
 pub use mesh::TriangleMesh;
 pub use primitives::*;
 pub use simulator::{ForceHV, PhysicsBackend, SimState};
+pub use slicer::{slice_mesh, slice_mesh_at_z, Contour, Point2, Segment2, SliceConfig, SliceLayer};
 pub use thought::GeometricThought;
 pub use validate::{validate_mesh, ValidationReport};

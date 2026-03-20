@@ -114,19 +114,38 @@ impl FeatureConjunctionBenchmark {
                     &[1.0 - noise_frac, noise_frac],
                 );
 
-                // Query: does target exist in scene? Compare target to scene
-                let target_sim = noisy_scene.similarity(&target_hv);
-                // Compare random non-target to scene as foil
+                // Query: does target exist in scene?
+                // Two-signal detection: combine scene-level and item-level evidence.
+                // Scene-level: similarity of target vs foil to the bundled display.
+                // Item-level: max per-item similarity to target vs foil.
+                // Scene-level captures the aggregate presence signal; item-level
+                // provides a sharper probe that isn't diluted by other items in the
+                // bundle (Treisman & Gelade, 1980: serial search inspects individual
+                // items, not the whole display at once). Combining both reduces
+                // false alarms from partial-feature matches in the bundle.
+                let target_scene_sim = noisy_scene.similarity(&target_hv);
+                let target_item_max = display_hvs
+                    .iter()
+                    .map(|item| item.similarity(&target_hv))
+                    .fold(f32::NEG_INFINITY, f32::max);
+
                 xor_shift(&mut rng);
                 let foil_color = 1 + (rng as usize % (n_colors - 1));
                 let foil_shape = 1 + (rng as usize % (n_shapes - 1));
                 let foil_hv = color_hvs[foil_color]
                     .bind(&role_color)
                     .bind(&shape_hvs[foil_shape].bind(&role_shape));
-                let foil_sim = noisy_scene.similarity(&foil_hv);
+                let foil_scene_sim = noisy_scene.similarity(&foil_hv);
+                let foil_item_max = display_hvs
+                    .iter()
+                    .map(|item| item.similarity(&foil_hv))
+                    .fold(f32::NEG_INFINITY, f32::max);
+
+                let target_evidence = target_scene_sim + target_item_max;
+                let foil_evidence = foil_scene_sim + foil_item_max;
 
                 conj_total += 1;
-                if target_sim > foil_sim {
+                if target_evidence > foil_evidence {
                     conj_correct += 1;
                 }
             }

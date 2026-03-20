@@ -600,6 +600,33 @@ consciousness_full = ["reasoning_engine", "identity"]   # Full consciousness: re
 nix_full = ["nix-mind"]                                 # All NixOS features via the symthaea-nix crate
 all_benchmarks = ["benchmarks", "physics"]              # All benchmarking features (causal validation + tokamak plasma)
 
+# ── Mind bundles (graduated consciousness stacks) ─────────────────
+default-mind = [
+    "reasoning_engine",
+    "integrity",
+    "glyph_codex",
+    "sentinel",
+    "safety-agents",
+    "cpg",
+    "spectral_state",
+]
+networked-mind = [
+    "default-mind",
+    "mycelix",
+    "mesh",
+    "multi_agent",
+]
+embodied-mind = [
+    "default-mind",
+    "flight",
+    "humanoid",
+]
+sovereign-mind = [
+    "networked-mind",
+    "secure-mesh",
+    "ssm_language",
+]
+
 
 [dev-dependencies]
 criterion = "0.5"

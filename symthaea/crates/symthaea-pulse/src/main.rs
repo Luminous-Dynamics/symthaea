@@ -1609,7 +1609,18 @@ fn main() -> Result<()> {
             best_layer_count: 0,
             fitness_history: Vec::new(),
         },
-        fabrication: FabricationInfo::default(),
+        fabrication: FabricationInfo {
+            manufacturing_free_energy: m.fabrication_manufacturing_fe as f32,
+            design_loop_free_energy: m.fabrication_design_loop_fe as f32,
+            safety_level: m.fabrication_safety_level.clone(),
+            anomaly_count: m.fabrication_anomaly_count,
+            anomaly_ema: m.fabrication_anomaly_ema,
+            recommended_action: String::new(),
+            prediction_coherence: m.fabrication_prediction_coherence,
+            pog_score_ema: m.fabrication_pog_score_ema,
+            active_print_jobs: m.fabrication_active_jobs,
+            reward_ema: m.fabrication_reward_ema,
+        },
     };
 
     if let Some(json_path) = &args.json {
@@ -2013,7 +2024,18 @@ fn main() -> Result<()> {
                     best_layer_count: 0,
                     fitness_history: neuroevo_fitness_history.clone(),
                 },
-                fabrication: FabricationInfo::default(),
+                fabrication: FabricationInfo {
+                    manufacturing_free_energy: wm.fabrication_manufacturing_fe as f32,
+                    design_loop_free_energy: wm.fabrication_design_loop_fe as f32,
+                    safety_level: wm.fabrication_safety_level.clone(),
+                    anomaly_count: wm.fabrication_anomaly_count,
+                    anomaly_ema: wm.fabrication_anomaly_ema,
+                    recommended_action: String::new(),
+                    prediction_coherence: wm.fabrication_prediction_coherence,
+                    pog_score_ema: wm.fabrication_pog_score_ema,
+                    active_print_jobs: wm.fabrication_active_jobs,
+                    reward_ema: wm.fabrication_reward_ema,
+                },
             };
 
             // Delta against previous snapshot

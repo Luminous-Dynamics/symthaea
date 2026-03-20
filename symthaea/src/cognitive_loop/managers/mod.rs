@@ -8,6 +8,7 @@
 //! | Manager | Subsystems | Interval | Science |
 //! |---------|-----------|----------|---------|
 //! | [`DriveManager`] | curiosity, flow, boredom, exploration | 7 | Berlyne (1960), Csikszentmihalyi (1990) |
+//! | [`SoulManager`] | value alignment, dissonance, coherence | 43 | Schwartz (1992), Festinger (1957) |
 //! | [`MemoryManager`] | episodic, semantic, resonator, coordinator | 11 | Tulving (2002), Cowan (2001) |
 //! | [`LearningManager`] | FEP, dream, school, evolution | 13 | Friston (2010), Walker (2017) |
 //! | [`PerceptionManager`] | attention, multi-modal, social | 19 | Posner (1980), Baron-Cohen (1995) |
@@ -33,6 +34,7 @@ pub mod learning_manager;
 pub mod memory_manager;
 pub mod network_service_bridge;
 pub mod perception_manager;
+pub mod soul_manager;
 pub mod swarm_manager;
 
 #[cfg(feature = "mycelix")]
@@ -49,6 +51,7 @@ pub use network_service_bridge::{
     NetworkServiceBridgeHandle,
 };
 pub use perception_manager::PerceptionManager;
+pub use soul_manager::{SoulManager, SoulTelemetry};
 pub use swarm_manager::SwarmManager;
 
 #[cfg(feature = "mycelix")]

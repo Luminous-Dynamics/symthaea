@@ -18,7 +18,6 @@ fn make_runner() -> CognitiveLoopBenchmarkRunner {
 }
 
 #[test]
-#[ignore]
 fn test_butlin_live_vs_static_scores_differ() {
     let mut runner = make_runner();
 
@@ -54,7 +53,6 @@ fn test_butlin_live_vs_static_scores_differ() {
 }
 
 #[test]
-#[ignore]
 fn test_butlin_scores_change_under_ablation() {
     let config_full = BenchmarkConfig {
         dimension: 128,
@@ -87,7 +85,6 @@ fn test_butlin_scores_change_under_ablation() {
 }
 
 #[test]
-#[ignore]
 fn test_consciousness_weights_populated() {
     let mut runner = make_runner();
     // Warmup: run 200 cycles to stabilize weights

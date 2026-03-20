@@ -11,9 +11,12 @@ import kotlin.math.*
 import kotlin.random.Random
 
 /**
- * Ambient particle field: small points of light that drift slowly,
- * attracted toward the screen center (mandala). Particle count and
- * brightness scale with consciousness level.
+ * Ambient particle field with 5 distinct styles:
+ * - STARS: scattered twinkling points (default)
+ * - FIREFLIES: fewer, larger, warm, blink cycle
+ * - MYCELIUM: connected lines between nearby particles, mild flocking
+ * - AURORA: vertical flowing ribbons
+ * - MINIMAL: very few, very dim, barely move
  *
  * Touch interaction scatters nearby particles; they slowly reconverge.
  */
@@ -27,15 +30,36 @@ class ParticleFieldView @JvmOverloads constructor(
     var harmonyColor: Int = Color.parseColor("#00E5CC")
     /** Neuromod levels [DA, NE, 5-HT, OT] for particle color tinting. */
     var neuromodLevels: FloatArray = floatArrayOf(0.5f, 0.5f, 0.5f, 0.5f)
+    /** Particle style — set from avatar selection. */
+    var particleStyle: ParticleStyle = ParticleStyle.STARS
+    /** Secondary color for aurora ribbons and mycelium connections. */
+    var secondaryColor: Int = Color.parseColor("#007A6D")
+    /** Whether the system is in thinking mode — converge particles toward center. */
+    var isThinking: Boolean = false
+    /** Whether sleep mode is active — particles near-stop. */
+    var isSleeping: Boolean = false
 
     private val particles = Array(80) { Particle() }
     private var touchX = -1f
     private var touchY = -1f
     private var touchActive = false
+    private var longTouchActive = false
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
     }
+    private val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 1f
+    }
+    private val ribbonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 8f
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    // Aurora ribbon state
+    private val auroraRibbons = Array(7) { AuroraRibbon(it) }
 
     private val animator = ValueAnimator.ofFloat(0f, 1f).apply {
         duration = 16_000L
@@ -43,6 +67,7 @@ class ParticleFieldView @JvmOverloads constructor(
         interpolator = LinearInterpolator()
         addUpdateListener {
             updateParticles()
+            if (particleStyle == ParticleStyle.AURORA) updateAuroraRibbons()
             invalidate()
         }
     }
@@ -59,7 +84,6 @@ class ParticleFieldView @JvmOverloads constructor(
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        // Initialize particle positions across the screen
         for (p in particles) {
             p.x = Random.nextFloat() * w
             p.y = Random.nextFloat() * h
@@ -68,7 +92,10 @@ class ParticleFieldView @JvmOverloads constructor(
             p.size = 1.5f + Random.nextFloat() * 3f
             p.baseAlpha = 0.3f + Random.nextFloat() * 0.5f
             p.phase = Random.nextFloat() * PI.toFloat() * 2
+            p.blinkTimer = Random.nextFloat() * 4f  // For FIREFLIES
         }
+        // Initialize aurora ribbons
+        for (ribbon in auroraRibbons) ribbon.init(w, h)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -80,32 +107,85 @@ class ParticleFieldView @JvmOverloads constructor(
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 touchActive = false
+                longTouchActive = false
             }
         }
         return true
     }
 
+    /** Set long-touch active for orbit behavior (Phase 4c). */
+    fun setLongTouch(active: Boolean, x: Float = 0f, y: Float = 0f) {
+        longTouchActive = active
+        if (active) { touchX = x; touchY = y }
+    }
+
     private fun updateParticles() {
         if (width == 0 || height == 0) return
         val cx = width / 2f
-        val cy = height * 0.40f  // Match mandala center
-        // More particles active — minimum 30, scales to full 80 with consciousness
-        val activeCount = (30 + consciousnessLevel * 50).toInt().coerceIn(30, particles.size)
+        val cy = height * 0.40f
+
+        val activeCount = when (particleStyle) {
+            ParticleStyle.MYCELIUM -> (20 + consciousnessLevel * 20).toInt().coerceIn(20, 40)
+            ParticleStyle.FIREFLIES -> (10 + consciousnessLevel * 10).toInt().coerceIn(10, 20)
+            ParticleStyle.MINIMAL -> (4 + consciousnessLevel * 4).toInt().coerceIn(4, 8)
+            ParticleStyle.AURORA -> 0  // Aurora uses ribbons, not particles
+            else -> (30 + consciousnessLevel * 50).toInt().coerceIn(30, particles.size)
+        }
+
+        val damping = when (particleStyle) {
+            ParticleStyle.MYCELIUM -> 0.99f  // Slower, more viscous
+            ParticleStyle.MINIMAL -> 0.995f
+            else -> 0.98f
+        }
+
+        val sleepFactor = if (isSleeping) 0.1f else 1f
 
         for (i in particles.indices) {
             val p = particles[i]
             if (i >= activeCount) { p.alpha = 0f; continue }
 
-            // Gentle drift toward center (gravity)
+            // Gravity toward center
             val dx = cx - p.x
             val dy = cy - p.y
             val dist = sqrt(dx * dx + dy * dy).coerceAtLeast(1f)
-            val gravity = 0.02f * consciousnessLevel
-            p.vx += dx / dist * gravity
-            p.vy += dy / dist * gravity
+            // Thinking: stronger gravity = "concentrating"
+            val gravity = if (isThinking) 0.06f * consciousnessLevel else 0.02f * consciousnessLevel
+            p.vx += dx / dist * gravity * sleepFactor
+            p.vy += dy / dist * gravity * sleepFactor
 
-            // Touch repulsion
-            if (touchActive) {
+            // MYCELIUM: mild flocking toward nearest 3 neighbors
+            if (particleStyle == ParticleStyle.MYCELIUM && i % 3 == 0) {
+                var flockX = 0f; var flockY = 0f; var flockN = 0
+                for (j in particles.indices) {
+                    if (j == i || j >= activeCount) continue
+                    val fdx = particles[j].x - p.x
+                    val fdy = particles[j].y - p.y
+                    val fd = sqrt(fdx * fdx + fdy * fdy)
+                    if (fd < 150f && flockN < 3) {
+                        flockX += fdx; flockY += fdy; flockN++
+                    }
+                }
+                if (flockN > 0) {
+                    p.vx += flockX / flockN * 0.002f
+                    p.vy += flockY / flockN * 0.002f
+                }
+            }
+
+            // Long touch: particles orbit touch point
+            if (longTouchActive) {
+                val odx = touchX - p.x
+                val ody = touchY - p.y
+                val odist = sqrt(odx * odx + ody * ody).coerceAtLeast(1f)
+                if (odist < 300f) {
+                    // Tangential force for orbit
+                    val tangentX = -ody / odist
+                    val tangentY = odx / odist
+                    p.vx += tangentX * 0.3f + odx / odist * 0.05f
+                    p.vy += tangentY * 0.3f + ody / odist * 0.05f
+                }
+            }
+            // Touch repulsion (only if not long-touching)
+            else if (touchActive) {
                 val tdx = p.x - touchX
                 val tdy = p.y - touchY
                 val tdist = sqrt(tdx * tdx + tdy * tdy).coerceAtLeast(1f)
@@ -117,8 +197,14 @@ class ParticleFieldView @JvmOverloads constructor(
             }
 
             // Damping
-            p.vx *= 0.98f
-            p.vy *= 0.98f
+            p.vx *= damping
+            p.vy *= damping
+
+            // Sleep: near-stop
+            if (isSleeping) {
+                p.vx *= 0.95f
+                p.vy *= 0.95f
+            }
 
             // Update position
             p.x += p.vx
@@ -130,11 +216,35 @@ class ParticleFieldView @JvmOverloads constructor(
             if (p.y < -20) p.y = height + 20f
             if (p.y > height + 20) p.y = -20f
 
-            // Twinkle: slow sinusoidal alpha modulation
-            p.phase += 0.02f
-            val twinkle = 0.5f + 0.5f * sin(p.phase)
-            p.alpha = p.baseAlpha * twinkle * (0.5f + consciousnessLevel * 0.5f)
+            // Update alpha based on style
+            when (particleStyle) {
+                ParticleStyle.FIREFLIES -> {
+                    // Blink cycle: on 0.5s, fade 1.5s, off 2-4s
+                    p.blinkTimer += 0.016f  // ~60fps
+                    val cycle = p.blinkTimer % (2f + p.baseAlpha * 2f)  // Varied cycle per particle
+                    p.alpha = when {
+                        cycle < 0.5f -> p.baseAlpha * (0.5f + consciousnessLevel * 0.5f)  // On
+                        cycle < 2f -> p.baseAlpha * (2f - cycle) / 1.5f * (0.5f + consciousnessLevel * 0.5f)  // Fade
+                        else -> 0f  // Off
+                    }
+                }
+                ParticleStyle.MINIMAL -> {
+                    p.phase += 0.005f  // Very slow
+                    val twinkle = 0.5f + 0.5f * sin(p.phase)
+                    p.alpha = p.baseAlpha * twinkle * 0.3f * (0.3f + consciousnessLevel * 0.3f)
+                }
+                else -> {
+                    // STARS + MYCELIUM: standard twinkle
+                    p.phase += 0.02f
+                    val twinkle = 0.5f + 0.5f * sin(p.phase)
+                    p.alpha = p.baseAlpha * twinkle * (0.5f + consciousnessLevel * 0.5f)
+                }
+            }
         }
+    }
+
+    private fun updateAuroraRibbons() {
+        for (ribbon in auroraRibbons) ribbon.update(consciousnessLevel)
     }
 
     // Neuromod colors: DA=coral, NE=amber, 5-HT=teal, OT=indigo
@@ -144,42 +254,140 @@ class ParticleFieldView @JvmOverloads constructor(
     )
 
     override fun onDraw(canvas: Canvas) {
+        when (particleStyle) {
+            ParticleStyle.AURORA -> drawAurora(canvas)
+            else -> drawParticles(canvas)
+        }
+    }
+
+    private fun drawParticles(canvas: Canvas) {
         val baseR = Color.red(harmonyColor)
         val baseG = Color.green(harmonyColor)
         val baseB = Color.blue(harmonyColor)
+
+        // MYCELIUM: draw connecting lines first (behind particles)
+        if (particleStyle == ParticleStyle.MYCELIUM) {
+            val activeCount = (20 + consciousnessLevel * 20).toInt().coerceIn(20, 40)
+            for (i in 0 until activeCount.coerceAtMost(particles.size)) {
+                val p = particles[i]
+                if (p.alpha < 0.01f) continue
+                for (j in i + 1 until activeCount.coerceAtMost(particles.size)) {
+                    val q = particles[j]
+                    if (q.alpha < 0.01f) continue
+                    val dx = p.x - q.x
+                    val dy = p.y - q.y
+                    val dist = sqrt(dx * dx + dy * dy)
+                    if (dist < 120f) {
+                        val lineAlpha = ((1f - dist / 120f) * p.alpha * 180).toInt().coerceIn(0, 120)
+                        linePaint.color = Color.argb(lineAlpha, baseR, baseG, baseB)
+                        canvas.drawLine(p.x, p.y, q.x, q.y, linePaint)
+                    }
+                }
+            }
+        }
 
         for ((i, p) in particles.withIndex()) {
             if (p.alpha < 0.01f) continue
             val a = (p.alpha * 255).toInt().coerceIn(0, 255)
 
-            // Tint some particles with neuromod colors (every 4th particle per channel)
+            // Tint some particles with neuromod colors
             val neuroIdx = i % 4
             val neuroStrength = neuromodLevels.getOrElse(neuroIdx) { 0.5f }
             val nc = neuroColors[neuroIdx]
-            // Blend: mostly harmony color, slight neuromod tint scaled by that neuromod's level
             val tint = (neuroStrength * 0.4f).coerceIn(0f, 0.4f)
             val r = ((1f - tint) * baseR + tint * Color.red(nc)).toInt().coerceIn(0, 255)
             val g = ((1f - tint) * baseG + tint * Color.green(nc)).toInt().coerceIn(0, 255)
             val b = ((1f - tint) * baseB + tint * Color.blue(nc)).toInt().coerceIn(0, 255)
 
+            // FIREFLIES: larger particles, warmer colors
+            val drawSize = when (particleStyle) {
+                ParticleStyle.FIREFLIES -> p.size * 2f
+                ParticleStyle.MYCELIUM -> p.size * 1.5f
+                ParticleStyle.MINIMAL -> p.size * 0.8f
+                else -> p.size
+            }
+
             // Soft glow halo
             val haloA = (a * 0.3f).toInt().coerceIn(0, 80)
             paint.color = Color.argb(haloA, r, g, b)
-            canvas.drawCircle(p.x, p.y, p.size * 3f, paint)
+            canvas.drawCircle(p.x, p.y, drawSize * 3f, paint)
             // Bright core
             paint.color = Color.argb(a, r, g, b)
-            canvas.drawCircle(p.x, p.y, p.size, paint)
+            canvas.drawCircle(p.x, p.y, drawSize, paint)
+        }
+    }
+
+    /** Draw aurora-style vertical flowing ribbons. */
+    private fun drawAurora(canvas: Canvas) {
+        val primaryR = Color.red(harmonyColor)
+        val primaryG = Color.green(harmonyColor)
+        val primaryB = Color.blue(harmonyColor)
+        val secR = Color.red(secondaryColor)
+        val secG = Color.green(secondaryColor)
+        val secB = Color.blue(secondaryColor)
+        val baseAlpha = (60 + consciousnessLevel * 100).toInt().coerceIn(40, 160)
+
+        for (ribbon in auroraRibbons) {
+            val path = Path()
+            val blend = ribbon.colorBlend
+            val r = ((1f - blend) * primaryR + blend * secR).toInt().coerceIn(0, 255)
+            val g = ((1f - blend) * primaryG + blend * secG).toInt().coerceIn(0, 255)
+            val b = ((1f - blend) * primaryB + blend * secB).toInt().coerceIn(0, 255)
+
+            ribbonPaint.color = Color.argb(
+                (baseAlpha * ribbon.alphaFactor).toInt().coerceIn(10, 160), r, g, b
+            )
+            ribbonPaint.strokeWidth = (6f + consciousnessLevel * 6f) * ribbon.widthFactor
+
+            var started = false
+            for (i in ribbon.points.indices) {
+                val px = ribbon.points[i].x
+                val py = ribbon.points[i].y
+                if (!started) { path.moveTo(px, py); started = true }
+                else path.lineTo(px, py)
+            }
+            canvas.drawPath(path, ribbonPaint)
         }
     }
 
     private class Particle {
-        var x = 0f
-        var y = 0f
-        var vx = 0f
-        var vy = 0f
+        var x = 0f; var y = 0f
+        var vx = 0f; var vy = 0f
         var size = 1.5f
-        var alpha = 0f
-        var baseAlpha = 0.2f
+        var alpha = 0f; var baseAlpha = 0.2f
         var phase = 0f
+        var blinkTimer = 0f  // For FIREFLIES
+    }
+
+    /** Aurora ribbon: a vertical flowing band of light. */
+    private class AuroraRibbon(index: Int) {
+        val points = Array(20) { PointF() }
+        var baseX = 0f
+        var phase = index * 0.9f
+        val colorBlend = (index % 3) / 2f  // Varied color blend
+        val alphaFactor = 0.5f + (index % 4) * 0.15f
+        val widthFactor = 0.7f + (index % 3) * 0.3f
+        private val speed = 0.01f + index * 0.003f
+        private val amplitude = 30f + index * 10f
+
+        fun init(w: Int, h: Int) {
+            baseX = w * (index + 1f) / 8f  // Distribute across screen width
+            for (i in points.indices) {
+                points[i].x = baseX
+                points[i].y = h * i.toFloat() / (points.size - 1)
+            }
+        }
+
+        fun update(consciousness: Float) {
+            phase += speed
+            val amp = amplitude * (0.5f + consciousness * 0.5f)
+            for (i in points.indices) {
+                val t = i.toFloat() / (points.size - 1)
+                points[i].x = baseX + amp * sin(phase + t * 3f) * cos(phase * 0.7f + t * 1.5f)
+            }
+        }
+
+        // Store index for color variation
+        private val index = index
     }
 }

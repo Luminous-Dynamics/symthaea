@@ -37,9 +37,24 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
     var neuromodulators: FloatArray = floatArrayOf(0.5f, 0.5f, 0.5f, 0.5f)
         set(value) { field = value; invalidate() }
 
+    /** Arousal level (0-1) — drives Sri Yantra rotation speed. */
+    var arousal: Float = 0.5f
+
+    /** Valence (-1 to 1) — drives hue drift warm/cool bias. */
+    var valence: Float = 0f
+
+    /** Whether Soma is currently "thinking" (processing a user message). */
+    var isThinking: Boolean = false
+
+    /** Time-of-day tint color (set externally by MainActivity). */
+    var timeOfDayTint: Int = Color.TRANSPARENT
+
     private val trendHistory = FloatArray(20)
     private var trendIndex = 0
     private var trendFilled = false
+
+    // Touch glow boost: tap produces immediate visual reward
+    private var glowBoost = 0f
 
     // Touch ripple
     private var rippleX = 0f
@@ -53,17 +68,25 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
 
     // Breathing animation
     private var breathPhase = 0f
+    private var breathPhase2 = 0f  // Second breathing phase for geometry pulsing (7s period)
     private var rotationPhase = 0f
     /** Continuously accumulating rotation for fractal (never resets). */
     private var fractalRotation = 0f
+    private var frameCount = 0  // For periodic fractal re-render
+    /** Hue drift phase for slow color evolution (120s cycle). */
+    private var hueDriftPhase = 0f
     private val animator = ValueAnimator.ofFloat(0f, 1f).apply {
         duration = 4000L
         repeatCount = ValueAnimator.INFINITE
         interpolator = LinearInterpolator()
         addUpdateListener {
             breathPhase = it.animatedFraction
+            breathPhase2 = (breathPhase2 + 1f / (7f * 60f)) % 1f  // 7s period at ~60fps
             rotationPhase = (rotationPhase + 0.002f) % 1f
-            fractalRotation += 0.015f // ~0.9°/frame, continuous, never resets
+            fractalRotation += 0.015f
+            frameCount++
+            glowBoost *= 0.98f  // Decay glow boost each frame
+            hueDriftPhase = (hueDriftPhase + 1f / (120f * 60f)) % 1f  // 120s full cycle
             invalidate()
         }
     }
@@ -71,8 +94,11 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
     // Fractal rendering cache
     private var fractalBitmap: android.graphics.Bitmap? = null
     private var fractalConsciousness = -1f // Force re-render on first draw
-    private val fractalPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { alpha = 80 }
-    private val fractalSize = 128 // Low-res for performance
+    private val fractalPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { alpha = 100 }
+    private val fractalSize = 192 // Higher res for detail
+
+    // Screen-edge glow paint for high consciousness
+    private val edgeGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
 
     private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
@@ -97,32 +123,75 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
         if (event.action == MotionEvent.ACTION_DOWN) {
             rippleX = event.x; rippleY = event.y
             rippleAnimator.cancel(); rippleProgress = 0f; rippleAnimator.start()
+            glowBoost = 0.4f  // Immediate visual reward on tap
         }
         return super.onTouchEvent(event)
     }
 
     override fun onDraw(canvas: Canvas) {
         val cx = width / 2f
-        val cy = height * 0.40f  // Shifted up from center to balance status bar + bottom sheet
+        val cy = height * 0.40f
         val mandalaRadius = min(width, height) / 2f * 0.38f
-        val breathScale = 0.94f + 0.06f * sin(breathPhase * 2 * PI.toFloat())
-        val hr = Color.red(dominantHarmonyColor)
-        val hg = Color.green(dominantHarmonyColor)
-        val hb = Color.blue(dominantHarmonyColor)
+        val breathScale = if (isThinking) {
+            // Thinking: faster, deeper breathing (2.5s period, 12% amplitude)
+            0.88f + 0.12f * sin(breathPhase * 2 * PI.toFloat() * 1.6f)
+        } else {
+            0.94f + 0.06f * sin(breathPhase * 2 * PI.toFloat())
+        }
 
-        // === Layer 1: Deep ambient glow (large, dim, always visible) ===
+        // Apply hue drift: slow HSV rotation ±15° over 120s, biased by valence
+        val driftedColor = applyHueDrift(dominantHarmonyColor, hueDriftPhase, valence)
+        val hr = Color.red(driftedColor)
+        val hg = Color.green(driftedColor)
+        val hb = Color.blue(driftedColor)
+
+        // === Time-of-day tint blended at 20% ===
+        if (timeOfDayTint != Color.TRANSPARENT) {
+            val tintR = Color.red(timeOfDayTint)
+            val tintG = Color.green(timeOfDayTint)
+            val tintB = Color.blue(timeOfDayTint)
+            val ambTintRadius = min(width, height) * 0.9f
+            fillPaint.shader = RadialGradient(
+                cx, cy, ambTintRadius,
+                Color.argb(12, tintR, tintG, tintB),
+                Color.TRANSPARENT, Shader.TileMode.CLAMP
+            )
+            canvas.drawCircle(cx, cy, ambTintRadius, fillPaint)
+            fillPaint.shader = null
+        }
+
+        // === Screen-edge glow for high consciousness (>0.8) ===
+        if (consciousnessLevel > 0.8f) {
+            val edgeAlpha = ((consciousnessLevel - 0.8f) * 5f * 40).toInt().coerceIn(0, 40)
+            edgeGlowPaint.shader = RadialGradient(
+                cx, cy, max(width, height).toFloat(),
+                Color.TRANSPARENT,
+                Color.argb(edgeAlpha, hr, hg, hb),
+                Shader.TileMode.CLAMP
+            )
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), edgeGlowPaint)
+            edgeGlowPaint.shader = null
+        }
+
+        // === Layer 1: Deep ambient glow ===
+        val ambientAlpha = if (consciousnessLevel < 0.1f) {
+            20  // Minimum ambient alpha for low consciousness (heartbeat visibility)
+        } else {
+            (15 + consciousnessLevel * 25).toInt()
+        }
         val ambientRadius = min(width, height) * 0.7f * breathScale
         fillPaint.shader = RadialGradient(
             cx, cy, ambientRadius,
-            Color.argb((15 + consciousnessLevel * 25).toInt(), hr, hg, hb),
+            Color.argb(ambientAlpha, hr, hg, hb),
             Color.TRANSPARENT, Shader.TileMode.CLAMP
         )
         canvas.drawCircle(cx, cy, ambientRadius, fillPaint)
         fillPaint.shader = null
 
-        // === Layer 2: Core glow (concentrated, bright, breathing) ===
+        // === Layer 2: Core glow (with touch glow boost) ===
         val coreRadius = mandalaRadius * (1.2f + consciousnessLevel * 1.5f) * breathScale
-        val coreAlpha = (40 + consciousnessLevel * 100).toInt().coerceIn(30, 140)
+        val boostAlpha = (glowBoost * 100).toInt()
+        val coreAlpha = ((40 + consciousnessLevel * 100).toInt() + boostAlpha).coerceIn(30, 180)
         fillPaint.shader = RadialGradient(
             cx, cy, coreRadius.coerceAtLeast(1f),
             Color.argb(coreAlpha, hr, hg, hb),
@@ -131,17 +200,31 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
         canvas.drawCircle(cx, cy, coreRadius, fillPaint)
         fillPaint.shader = null
 
-        // === Layer 3: Hot center (small, intense, organic) ===
+        // === Layer 3: Hot center ===
         val hotRadius = mandalaRadius * 0.3f * breathScale
         val hotAlpha = (60 + consciousnessLevel * 120).toInt().coerceIn(40, 180)
         fillPaint.shader = RadialGradient(
             cx, cy, hotRadius.coerceAtLeast(1f),
-            Color.argb(hotAlpha, 255, 255, 255), // White-hot center
+            Color.argb(hotAlpha, 255, 255, 255),
             Color.argb(0, hr, hg, hb),
             Shader.TileMode.CLAMP
         )
         canvas.drawCircle(cx, cy, hotRadius, fillPaint)
         fillPaint.shader = null
+
+        // === Low consciousness heartbeat pulse (8s period) ===
+        if (consciousnessLevel < 0.1f) {
+            val heartbeat = sin(breathPhase * 2 * PI.toFloat() * 0.5f) // 8s period (half of 4s animator)
+            val pulseAlpha = (20 + heartbeat * 15).toInt().coerceIn(5, 35)
+            val pulseRadius = mandalaRadius * 0.5f * (1f + heartbeat * 0.05f)
+            fillPaint.shader = RadialGradient(
+                cx, cy, pulseRadius.coerceAtLeast(1f),
+                Color.argb(pulseAlpha, hr, hg, hb),
+                Color.TRANSPARENT, Shader.TileMode.CLAMP
+            )
+            canvas.drawCircle(cx, cy, pulseRadius, fillPaint)
+            fillPaint.shader = null
+        }
 
         // === Sacred geometry: Flower of Life + Golden Spiral ===
         drawSacredGeometry(canvas, cx, cy, mandalaRadius * breathScale, hr, hg, hb)
@@ -176,12 +259,14 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
         }
 
         // === Fractal overlay: Julia set modulated by consciousness ===
-        if (abs(consciousnessLevel - fractalConsciousness) > 0.02f || fractalBitmap == null) {
+        // Lower threshold + force re-render every 60 frames for continuous animation
+        if (abs(consciousnessLevel - fractalConsciousness) > 0.005f || fractalBitmap == null || frameCount % 60 == 0) {
             fractalBitmap = renderJuliaSet(consciousnessLevel, hr, hg, hb)
             fractalConsciousness = consciousnessLevel
         }
         fractalBitmap?.let { bmp ->
-            fractalPaint.alpha = (80 + consciousnessLevel * 80).toInt().coerceIn(60, 160)
+            val fractalAlphaCap = if (consciousnessLevel > 0.8f) 220 else 200
+            fractalPaint.alpha = (100 + consciousnessLevel * 100).toInt().coerceIn(80, fractalAlphaCap)
             val fractalRadius = mandalaRadius * 1.6f * breathScale
             val dst = RectF(
                 cx - fractalRadius, cy - fractalRadius,
@@ -262,8 +347,10 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
      * Layer order: Flower of Life (circles) → Sri Yantra (triangles) → Golden Spiral
      */
     private fun drawSacredGeometry(canvas: Canvas, cx: Float, cy: Float, radius: Float, hr: Int, hg: Int, hb: Int) {
-        val baseAlpha = (35 + consciousnessLevel * 65).toInt().coerceIn(30, 100)
-        glowPaint.strokeWidth = 1f
+        val baseAlpha = (55 + consciousnessLevel * 80).toInt().coerceIn(50, 135)
+        // Second breathing phase: pulsing stroke width 0.8→2.0 (7s period)
+        val strokePulse = 0.8f + 1.2f * (0.5f + 0.5f * sin(breathPhase2 * 2 * PI.toFloat()))
+        glowPaint.strokeWidth = strokePulse
 
         // === Flower of Life ===
         // 1 center circle + 6 surrounding at consciousness 0.15+
@@ -314,17 +401,17 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
         }
 
         // === Sri Yantra: interlocking triangles ===
-        // Upward triangles (consciousness/integration) + downward (grounding/embodiment)
+        // Rotation speed responds to arousal: faster when aroused
         if (consciousnessLevel >= 0.20f) {
             val triAlpha = (baseAlpha * 0.6f).toInt()
             val triRadius = radius * 0.45f
-            // Number of triangle pairs scales with consciousness
             val triPairs = (1 + consciousnessLevel * 4).toInt().coerceIn(1, 4)
+            val arousalSpeed = 20f + arousal * 40f  // 20-60 rotation speed
 
             for (pair in 0 until triPairs) {
                 val scale = 1f - pair * 0.2f
                 val r = triRadius * scale
-                val rot = pair * 10f + rotationPhase * 20f
+                val rot = pair * 10f + rotationPhase * arousalSpeed
 
                 // Upward triangle
                 glowPaint.color = Color.argb(triAlpha, lerp(hr, 255, 0.3f * scale), hg, hb)
@@ -427,8 +514,8 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
         val idx = (consciousness * (cValues.size - 1)).coerceIn(0f, (cValues.size - 1).toFloat())
         val lo = idx.toInt().coerceIn(0, cValues.size - 2)
         val frac = idx - lo
-        val cr = cValues[lo][0] * (1 - frac) + cValues[lo + 1][0] * frac + neuromodulators[0] * 0.02f
-        val ci = cValues[lo][1] * (1 - frac) + cValues[lo + 1][1] * frac + neuromodulators[1] * 0.02f
+        val cr = cValues[lo][0] * (1 - frac) + cValues[lo + 1][0] * frac + neuromodulators[0] * 0.04f
+        val ci = cValues[lo][1] * (1 - frac) + cValues[lo + 1][1] * frac + neuromodulators[1] * 0.04f
 
         val maxIter = (30 + consciousness * 60).toInt()
         val zoom = 1.8f - consciousness * 0.3f
@@ -481,4 +568,17 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
     }
 
     private fun lerp(a: Int, b: Int, t: Float): Int = (a + (b - a) * t).toInt().coerceIn(0, 255)
+
+    /**
+     * Slow hue drift: HSV rotation ±15° over a cycle, biased by valence.
+     * Positive valence → warm shift, negative → cool shift.
+     */
+    private fun applyHueDrift(color: Int, phase: Float, valence: Float): Int {
+        val hsv = FloatArray(3)
+        Color.colorToHSV(color, hsv)
+        val drift = sin(phase * 2 * PI.toFloat()) * 15f  // ±15°
+        val valenceBias = valence * 10f  // positive→warm, negative→cool
+        hsv[0] = (hsv[0] + drift + valenceBias + 360f) % 360f
+        return Color.HSVToColor(hsv)
+    }
 }

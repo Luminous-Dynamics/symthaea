@@ -690,14 +690,16 @@ impl CognitiveSubsystem for SentinelManager {
 
             if threat_level > thresholds::SENTINEL_THREAT_MODERATE {
                 // Dampen exploration during active threat
-                output.exploration_delta = -(threat_level as f64) * thresholds::SENTINEL_EXPLORATION_DAMPEN_SCALE;
+                output.exploration_delta =
+                    -(threat_level as f64) * thresholds::SENTINEL_EXPLORATION_DAMPEN_SCALE;
                 // Additional arousal spike
                 output.arousal_delta = threat_level * thresholds::SENTINEL_AROUSAL_SCALE_HEIGHTENED;
             }
 
             if threat_level > thresholds::SENTINEL_THREAT_CRITICAL {
                 // Significant threat: reduce confidence (epistemic caution)
-                output.confidence_delta = -(threat_level as f64) * thresholds::SENTINEL_CONFIDENCE_DAMPEN_SCALE;
+                output.confidence_delta =
+                    -(threat_level as f64) * thresholds::SENTINEL_CONFIDENCE_DAMPEN_SCALE;
                 // Signal urgency escalation
                 output.flags |= output_flags::ESCALATE_URGENCY;
             }

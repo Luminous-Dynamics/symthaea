@@ -981,6 +981,11 @@ impl CognitiveLoopService {
             memory_manager: super::managers::MemoryManager::default(),
             learning_manager: super::managers::LearningManager::default(),
             perception_manager: super::managers::PerceptionManager::default(),
+            soul_manager: if enable_soul_alignment {
+                Some(super::managers::SoulManager::new())
+            } else {
+                None
+            },
             #[cfg(feature = "mycelix")]
             governance_mgr: super::managers::GovernanceManager::default(),
             swarm_manager: super::managers::SwarmManager::default(),
@@ -1009,6 +1014,8 @@ impl CognitiveLoopService {
                     .set_threshold(therapeutic_crisis_threshold);
                 tm
             },
+            #[cfg(feature = "advanced-manufacturing")]
+            fabrication_manager: super::managers::FabricationManager::default(),
             cantor_dream: super::cantor_dream_manager::CantorDreamManager::new(
                 super::thresholds::CANTOR_CODEBOOK_MAX_ENTRIES,
             ),

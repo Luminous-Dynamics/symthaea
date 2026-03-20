@@ -377,9 +377,12 @@ impl CognitiveSubsystem for SpectralManager {
         // ── Spectral entropy → exploration ───────────────────────────────
 
         // High entropy = broadband = rich content → boost exploration
-        if self.telemetry.spectral_entropy > crate::cognitive_loop::thresholds::SPECTRAL_ENTROPY_THRESHOLD {
-            output.exploration_delta =
-                (self.telemetry.spectral_entropy - crate::cognitive_loop::thresholds::SPECTRAL_ENTROPY_THRESHOLD) * SPECTRAL_ENTROPY_EXPLORATION_SCALE as f64;
+        if self.telemetry.spectral_entropy
+            > crate::cognitive_loop::thresholds::SPECTRAL_ENTROPY_THRESHOLD
+        {
+            output.exploration_delta = (self.telemetry.spectral_entropy
+                - crate::cognitive_loop::thresholds::SPECTRAL_ENTROPY_THRESHOLD)
+                * SPECTRAL_ENTROPY_EXPLORATION_SCALE as f64;
         }
 
         // ── Theta-gamma PAC → consciousness confidence ──────────────────
@@ -411,7 +414,7 @@ impl CognitiveSubsystem for SpectralManager {
         // History is transient (ring buffer rebuilt from live data); analyzer stays as-is.
         tracing::debug!(
             "SpectralManager restored: dims={}, cycle_count={}",
-            self.config.analysis_dims,
+            self.config.analyzed_dims,
             self.cycle_count
         );
         Ok(())
