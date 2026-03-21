@@ -252,6 +252,11 @@ pub struct BenchmarkResult {
     /// Per-trial trace data (populated when `config.trial_trace` is true).
     #[serde(default)]
     pub trial_trace: Vec<super::trial_analysis::TrialOutcome>,
+    /// Free-text notes about methodology limitations or caveats.
+    /// Benchmarks should use this to flag when tasks are synthetic,
+    /// when baselines are not directly comparable, etc.
+    #[serde(default)]
+    pub notes: Vec<String>,
 }
 
 impl BenchmarkResult {
@@ -265,6 +270,7 @@ impl BenchmarkResult {
             conditions: 0,
             trials_per_condition: 0,
             trial_trace: Vec::new(),
+            notes: Vec::new(),
         }
     }
 
@@ -1199,6 +1205,15 @@ impl BenchmarkReport {
             push_specific("novelty", "blend_novelty", &bl.creativity);
             push_specific("coherence", "blend_coherence", &bl.creativity);
         }
+        if benchmark.contains("InsightProblem") {
+            push_specific(
+                "restructuring_success",
+                "restructuring_success",
+                &bl.creativity,
+            );
+            push_specific("insight_latency", "insight_latency", &bl.creativity);
+            push_specific("aha_magnitude", "aha_magnitude", &bl.creativity);
+        }
         // Stop Signal Task (Inhibition)
         if benchmark.contains("StopSignal") {
             push_specific("sst_go_accuracy", "sst_go_accuracy", &bl.inhibition);
@@ -1551,6 +1566,11 @@ impl BenchmarkReport {
             push_specific("causal_score", "causal_score", &bl.causal_reasoning);
         }
 
+        // Coding::HumanEvalMini
+        if benchmark.contains("HumanEvalMini") {
+            push_specific("pass_at_1", "humaneval_pass_at_1", &bl.coding);
+        }
+
         // Only return comparisons relevant to this benchmark
         if benchmark.contains("WorM")
             || benchmark.contains("CogBench")
@@ -1578,6 +1598,7 @@ impl BenchmarkReport {
             || benchmark.contains("Spatial")
             || benchmark.contains("CausalReasoning")
             || benchmark.contains("Security")
+            || benchmark.contains("Coding")
         {
             comps
         } else {
@@ -2170,6 +2191,7 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("AlternateUses") => "fluency",
         b if b.contains("DivergentThinking") => "originality_score",
         b if b.contains("ConceptualBlending") => "blend_quality",
+        b if b.contains("InsightProblem") => "restructuring_success",
         b if b.contains("GoNoGo") => "nogo_accuracy",
         b if b.contains("AttentionalBlink") => "lag3_t2_accuracy",
         b if b.contains("ProspectiveMemory") => "pm_hit_rate",
@@ -2273,6 +2295,9 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("CrisisDetection") => "crisis_sensitivity",
         b if b.contains("CognitiveDistortion") => "distortion_identification",
         b if b.contains("MotivationalInterviewing") => "mi_spirit_score",
+        // Coding domain
+        b if b.contains("BugDetection") => "detection_accuracy",
+        b if b.contains("HumanEvalMini") => "pass_at_1",
         // Security (HDC-FHE) domain
         b if b.contains("EncryptedLearning") => "learning_accuracy",
         b if b.contains("CrossMaskPrivacy") => "cross_session_leakage",
@@ -3162,6 +3187,7 @@ mod tests {
             Box::new(RemoteAssociatesBenchmark),
             Box::new(DivergentThinkingBenchmark),
             Box::new(ConceptualBlendingBenchmark),
+            Box::new(InsightProblemBenchmark),
             // Butlin
             Box::new(ButlinIndicatorSuite),
             // Inhibition
@@ -3406,7 +3432,8 @@ mod tests {
         use crate::benchmarks::affect::EmotionalStroopBenchmark;
         use crate::benchmarks::attention::AttentionalBlinkBenchmark;
         use crate::benchmarks::creativity::{
-            AlternateUsesBenchmark, ConceptualBlendingBenchmark, RemoteAssociatesBenchmark,
+            AlternateUsesBenchmark, ConceptualBlendingBenchmark, InsightProblemBenchmark,
+            RemoteAssociatesBenchmark,
         };
         use crate::benchmarks::executive::{FlankerBenchmark, StroopBenchmark};
         use crate::benchmarks::inhibition::StopSignalBenchmark;
@@ -3448,6 +3475,7 @@ mod tests {
             &RemoteAssociatesBenchmark,
             &AlternateUsesBenchmark,
             &ConceptualBlendingBenchmark,
+            &InsightProblemBenchmark,
             &RmeBenchmark,
         ];
 

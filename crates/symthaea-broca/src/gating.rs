@@ -2254,7 +2254,7 @@ mod tests {
         #[test]
         fn test_high_distress_suppresses_directives() {
             let mut channels = ThoughtChannels::default();
-            channels.channels[26] = 0.9; // client_distress_level = high
+            channels.channels[30] = 0.9; // client_distress_level = high
 
             let should_logit = TherapeuticGate::apply("should", &channels, 0.0);
             assert!(
@@ -2267,7 +2267,7 @@ mod tests {
         #[test]
         fn test_high_distress_boosts_validating() {
             let mut channels = ThoughtChannels::default();
-            channels.channels[26] = 0.9; // client_distress_level = high
+            channels.channels[30] = 0.9; // client_distress_level = high
 
             let understand_logit = TherapeuticGate::apply("understand", &channels, 0.0);
             assert!(
@@ -2280,7 +2280,7 @@ mod tests {
         #[test]
         fn test_low_alliance_suppresses_directives() {
             let mut channels = ThoughtChannels::default();
-            channels.channels[25] = 0.1; // alliance_quality = low
+            channels.channels[29] = 0.1; // alliance_quality = low
 
             let must_logit = TherapeuticGate::apply("must", &channels, 0.0);
             assert!(
@@ -2293,7 +2293,7 @@ mod tests {
         #[test]
         fn test_crisis_mode_suppresses_directives_boosts_crisis() {
             let mut channels = ThoughtChannels::default();
-            channels.channels[24] = 7.0; // therapeutic_intent = crisis
+            channels.channels[28] = 7.0; // therapeutic_intent = crisis
 
             let should_logit = TherapeuticGate::apply("should", &channels, 0.0);
             let call_logit = TherapeuticGate::apply("call", &channels, 0.0);
@@ -2319,8 +2319,8 @@ mod tests {
         #[test]
         fn test_depth_exceeds_alliance_suppresses() {
             let mut channels = ThoughtChannels::default();
-            channels.channels[25] = 0.3; // alliance
-            channels.channels[27] = 0.8; // depth > alliance + 0.2
+            channels.channels[29] = 0.3; // alliance
+            channels.channels[31] = 0.8; // depth > alliance + 0.2
 
             let correct_logit = TherapeuticGate::apply("correct", &channels, 0.0);
             assert!(
@@ -2333,7 +2333,7 @@ mod tests {
         #[test]
         fn test_reflective_intent_boosts_reflective() {
             let mut channels = ThoughtChannels::default();
-            channels.channels[24] = 2.0; // therapeutic_intent = reflect
+            channels.channels[28] = 2.0; // therapeutic_intent = reflect
 
             let wonder_logit = TherapeuticGate::apply("I wonder", &channels, 0.0);
             assert!(
@@ -2358,7 +2358,7 @@ mod tests {
         #[test]
         fn test_e2e_high_distress_directive_vs_validating_spread() {
             let mut channels = ThoughtChannels::default();
-            channels.channels[26] = 0.9; // High distress
+            channels.channels[30] = 0.9; // High distress
 
             let directive_words = ["should", "must", "wrong"];
             let validating_words = ["understand", "hear", "notice"];

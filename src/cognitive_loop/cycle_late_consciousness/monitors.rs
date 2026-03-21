@@ -108,7 +108,8 @@ impl CognitiveLoopService {
                             crate::memory::memory_coordinator::GraduationEvent {
                                 content: grad.embedding.clone(),
                                 label: grad.id.clone(),
-                                steps_survived: self.stats.total_cycles as u64 - grad.added_at,
+                                steps_survived: (self.stats.total_cycles as u64)
+                                    .saturating_sub(grad.added_at),
                                 final_activation: grad_importance as f64,
                                 psi_at_graduation: ctx.pp_phi as f64,
                                 coherence_at_graduation: ctx.coherence as f64,

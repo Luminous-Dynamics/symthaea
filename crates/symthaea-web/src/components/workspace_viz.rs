@@ -79,34 +79,30 @@ pub fn WorkspaceViz() -> impl IntoView {
                 </span>
             </div>
             <div class="ws-contents">
-                {move || {
-                    let items = ws_contents.get();
-                    if items.is_empty() {
-                        vec![view! {
-                            <div class="ws-empty" style="color: var(--fg-muted); font-size: 0.8rem; font-style: italic;">
-                                "Trigger ignition to see workspace competition"
-                            </div>
-                        }]
-                    } else {
-                        items.iter().map(|(name, activation)| {
-                            let width = format!("{}%", (activation * 100.0) as u32);
-                            let name = name.clone();
-                            let activation = *activation;
-                            view! {
-                                <div class="neuro-bar-row">
-                                    <span class="nb-label" style="width: 4.5rem;">{name}</span>
-                                    <div class="nb-track">
-                                        <div class="nb-fill"
-                                            style:width=width
-                                            style:background="var(--solar-gold)"
-                                        />
-                                    </div>
-                                    <span class="nb-val">{format!("{:.2}", activation)}</span>
+                <Show when=move || ws_contents.get().is_empty()>
+                    <div class="ws-empty" style="color: var(--fg-muted); font-size: 0.8rem; font-style: italic;">
+                        "Trigger ignition to see workspace competition"
+                    </div>
+                </Show>
+                <For
+                    each=move || ws_contents.get()
+                    key=|(name, _)| name.clone()
+                    children=move |(name, activation): (String, f32)| {
+                        let width = format!("{}%", (activation * 100.0) as u32);
+                        view! {
+                            <div class="neuro-bar-row">
+                                <span class="nb-label" style="width: 4.5rem;">{name}</span>
+                                <div class="nb-track">
+                                    <div class="nb-fill"
+                                        style:width=width
+                                        style:background="var(--solar-gold)"
+                                    />
                                 </div>
-                            }
-                        }).collect::<Vec<_>>()
+                                <span class="nb-val">{format!("{:.2}", activation)}</span>
+                            </div>
+                        }
                     }
-                }}
+                />
             </div>
         </GlassPanel>
     }

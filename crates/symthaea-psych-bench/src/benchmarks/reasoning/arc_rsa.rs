@@ -1,4 +1,10 @@
-//! Representational Similarity Analysis (RSA) for HDC grid encodings.
+//! Representational Similarity Analysis (RSA) for HDC grid encodings
+//! (SYNTHETIC — tests encoding structure, not reasoning).
+//!
+//! **Honesty note:** This benchmark explicitly measures encoding geometry
+//! (whether HDC cosine similarity preserves grid structural similarity),
+//! not reasoning. The z-scores reflect how faithfully the HDC space
+//! represents task-relevant structure — an encoding quality metric.
 //!
 //! Builds two similarity matrices:
 //! 1. **Encoding similarity**: pairwise cosine between HDC grid encodings
@@ -325,6 +331,12 @@ impl PsychBenchmark for ArcRsaBenchmark {
         if config.trial_trace {
             result.trial_trace = trace;
         }
+        result.notes.push(
+            "SYNTHETIC: Measures HDC encoding geometry (whether cosine similarity \
+             preserves grid structural similarity), not reasoning. Z-scores reflect \
+             representational fidelity of the HDC space."
+                .to_string(),
+        );
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

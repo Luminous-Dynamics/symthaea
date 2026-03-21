@@ -23,7 +23,7 @@ use symthaea_psych_bench::benchmarks::{
     consciousness::{BinocularRivalryBenchmark, BlindSightBenchmark, PerceptualCrowdingBenchmark},
     creativity::{
         AlternateUsesBenchmark, ConceptualBlendingBenchmark, DivergentThinkingBenchmark,
-        RemoteAssociatesBenchmark,
+        InsightProblemBenchmark, RemoteAssociatesBenchmark,
     },
     executive::{
         DualTaskBenchmark, FlankerBenchmark, IowaGamblingBenchmark,
@@ -170,6 +170,7 @@ fn full_battery_report() {
     report.add(AlternateUsesBenchmark.run(&config));
     report.add(DivergentThinkingBenchmark.run(&config));
     report.add(ConceptualBlendingBenchmark.run(&config));
+    report.add(InsightProblemBenchmark.run(&config));
 
     // ── Butlin Consciousness Indicators ──
     report.add(ButlinIndicatorSuite.run(&config));

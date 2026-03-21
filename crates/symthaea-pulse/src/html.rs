@@ -462,9 +462,9 @@ pub fn generate_pulse_html(
     write_knowledge_pane(&mut html, &current.knowledge);
     write_cantor_pane(&mut html, &current.cantor);
     write_perception_pane(&mut html, &current.perception);
+    write_vision_pane(&mut html, &current.vision);
     write_drive_pane(&mut html, &current.drive);
     write_learning_pane(&mut html, &current.learning);
-    write_vision_pane(&mut html, &current.vision);
     write_language_pane(&mut html, &current.language);
     write_reasoning_pane(&mut html, &current.reasoning);
     write_dream_pane(&mut html, &current.dream);

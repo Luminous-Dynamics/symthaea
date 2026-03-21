@@ -1,4 +1,11 @@
-//! ARC Noise Robustness benchmark.
+//! ARC Noise Robustness benchmark (SYNTHETIC — tests HDC noise tolerance, not reasoning).
+//!
+//! **Honesty note:** This benchmark uses procedurally generated grid tasks.
+//! It tests how HDC encoding degrades under input corruption — a property
+//! of the high-dimensional distributed representation, not of reasoning.
+//! The 2-AFC scoring uses random BinaryHV distractors (chance = ~50%),
+//! which is a lenient baseline. The z-scores reflect encoding noise
+//! tolerance, not robust reasoning under uncertainty.
 //!
 //! Tests graceful degradation of HDC grid encoding under input corruption.
 //! Corrupts varying fractions of cells in test input grids and measures
@@ -332,6 +339,13 @@ impl PsychBenchmark for ArcNoiseBenchmark {
         if config.trial_trace {
             result.trial_trace = trace;
         }
+        result.notes.push(
+            "SYNTHETIC: Uses procedural grid transforms, not Chollet's real ARC. \
+             Tests HDC noise tolerance (graceful degradation under corruption), not \
+             robust reasoning. 2-AFC uses random BinaryHV distractors (chance ~50%), \
+             a lenient baseline. Z-scores reflect encoding noise tolerance."
+                .to_string(),
+        );
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

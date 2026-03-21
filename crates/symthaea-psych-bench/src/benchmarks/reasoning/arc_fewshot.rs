@@ -1,4 +1,11 @@
-//! ARC Few-Shot Scaling benchmark.
+//! ARC Few-Shot Scaling benchmark (SYNTHETIC — tests HDC bundling, not learning).
+//!
+//! **Honesty note:** This benchmark uses procedurally generated grid tasks.
+//! It tests how HDC majority-vote bundling improves with more examples — a
+//! property of the encoding algebra, not of learning or generalization.
+//! The 2-AFC scoring uses random BinaryHV distractors (chance = ~50%),
+//! which is a lenient baseline. The z-scores reflect bundling efficiency,
+//! not few-shot learning ability.
 //!
 //! Tests how transfer accuracy scales with the number of training examples
 //! (1, 2, 3, 4, 5). This reveals the learning curve of HDC rule bundling:
@@ -245,7 +252,7 @@ impl PsychBenchmark for ArcFewShotBenchmark {
 
     fn provenance(&self) -> Option<BenchmarkProvenance> {
         Some(BenchmarkProvenance {
-            paradigm: "Few-shot learning curve analysis",
+            paradigm: "Synthetic HDC bundling efficiency (few-shot scaling)",
             citation: "Chollet (2019); Lake et al. (2015)",
             year: 2019,
             doi: Some("10.48550/arXiv.1911.01547"),
@@ -316,6 +323,13 @@ impl PsychBenchmark for ArcFewShotBenchmark {
         if config.trial_trace {
             result.trial_trace = trace;
         }
+        result.notes.push(
+            "SYNTHETIC: Uses procedural grid transforms, not Chollet's real ARC. \
+             Tests HDC bundling efficiency (majority-vote consensus), not few-shot \
+             learning. 2-AFC uses random BinaryHV distractors (chance ~50%), a \
+             lenient baseline. Z-scores reflect bundling quality."
+                .to_string(),
+        );
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

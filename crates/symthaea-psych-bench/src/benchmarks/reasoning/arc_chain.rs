@@ -1,4 +1,11 @@
-//! ARC Multi-Transform Composition Chain benchmark.
+//! ARC Multi-Transform Composition Chain benchmark (SYNTHETIC — tests HDC capacity, not reasoning).
+//!
+//! **Honesty note:** This benchmark uses procedurally generated grid tasks.
+//! It tests how well HDC XOR binding preserves signal through multi-step
+//! compositions, not whether the system can discover or reason about
+//! compositional rules. The 2-AFC scoring uses random BinaryHV distractors
+//! (chance = ~50%), which is a lenient baseline. The z-scores reflect
+//! encoding capacity limits, not compositional reasoning ability.
 //!
 //! Tests whether HDC rule algebra supports chaining 3+ sequential transforms.
 //! Unlike ArcCompositional (which tests 2-step chains), this benchmark tests
@@ -278,7 +285,7 @@ impl PsychBenchmark for ArcChainBenchmark {
 
     fn provenance(&self) -> Option<BenchmarkProvenance> {
         Some(BenchmarkProvenance {
-            paradigm: "Multi-step compositional rule chaining",
+            paradigm: "Synthetic multi-step HDC rule composition",
             citation: "Chollet (2019); Lake & Baroni (2018)",
             year: 2019,
             doi: Some("10.48550/arXiv.1911.01547"),
@@ -354,6 +361,13 @@ impl PsychBenchmark for ArcChainBenchmark {
         if config.trial_trace {
             result.trial_trace = trace;
         }
+        result.notes.push(
+            "SYNTHETIC: Uses procedural grid transforms, not Chollet's real ARC. \
+             Tests HDC capacity under multi-step composition. 2-AFC uses random \
+             BinaryHV distractors (chance ~50%), a lenient baseline. Z-scores \
+             reflect encoding capacity, not compositional reasoning."
+                .to_string(),
+        );
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

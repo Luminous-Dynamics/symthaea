@@ -1,9 +1,21 @@
-//! ARC Fluid Reasoning benchmark.
+//! ARC Fluid Reasoning benchmark (SYNTHETIC, not real ARC).
 //!
-//! Measures fluid intelligence via procedurally generated grid transformation
-//! tasks inspired by the Abstraction and Reasoning Corpus (ARC). Each task
-//! presents 2 training input/output pairs demonstrating a transformation rule,
-//! then tests whether the system can apply the inferred rule to a novel input.
+//! **Honesty note:** This benchmark uses procedurally generated grid tasks, NOT
+//! Chollet's real ARC dataset. It tests HDC encoding/retrieval algebra — whether
+//! XOR-based rule binding can recover a known transform applied to a novel input.
+//! Because BinaryHV XOR bind is self-inverse, "rule application" is exact
+//! algebraic recovery (input XOR rule XOR rule = input), not genuine
+//! generalization or novel rule discovery.
+//!
+//! The z-scores from this benchmark reflect encoding fidelity and noise
+//! tolerance of the HDC representation, not abstract reasoning ability.
+//! Distractors are plausible (same transform family, different type), which
+//! provides a meaningful but still limited test of discriminability.
+//!
+//! Measures fluid intelligence proxy via procedurally generated grid
+//! transformation tasks inspired by the Abstraction and Reasoning Corpus (ARC).
+//! Each task presents training input/output pairs demonstrating a transformation
+//! rule, then tests whether the system can apply the inferred rule to a novel input.
 //!
 //! Human baselines (Chollet 2019; Johnson et al. 2021):
 //! - rule_consistency: ~0.85 (SD~0.10) — within-task rule agreement
@@ -51,6 +63,10 @@ struct TrialResult {
     single_pair_accuracy: f64,
     /// Confusion matrix: 4×4 (true_type × predicted_type), row-normalized
     confusion_matrix: [[f64; 4]; 4],
+    /// Generalization gap: accuracy with same-param test minus different-param test.
+    /// Positive values indicate the system is memorizing specific parameters rather
+    /// than learning a generalizable transform.
+    generalization_gap: f64,
     /// Per-task trial trace (populated when config.trial_trace is true).
     task_trace: Vec<TrialOutcome>,
 }
@@ -366,6 +382,77 @@ impl ArcFluidBenchmark {
             }
         }
 
+        // ── Generalization gap: same-param vs different-param test ──
+        // Train with one param, test with a DIFFERENT param (same transform type).
+        // This reveals whether the rule HV encodes the abstract transform or just
+        // memorizes the specific parameter instantiation.
+        let mut same_param_hits = 0u32;
+        let mut diff_param_hits = 0u32;
+        let mut gen_gap_total = 0u32;
+
+        for &task_type in &TASK_TYPES {
+            for _ in 0..3 {
+                xor_shift(&mut rng);
+                let train_param = rng;
+
+                // Train with train_param
+                let mut gen_rules = Vec::new();
+                for _ in 0..4 {
+                    xor_shift(&mut rng);
+                    let input = gen_grid(&mut rng);
+                    let output = apply_transform(&input, task_type, train_param);
+                    let in_hv = encoder.encode_grid(&input);
+                    let out_hv = encoder.encode_grid(&output);
+                    gen_rules.push(encoder.encode_rule(&in_hv, &out_hv));
+                }
+                let gen_consensus = encoder.bundle_rules(&gen_rules);
+
+                // Test with SAME param (control)
+                xor_shift(&mut rng);
+                let same_input = gen_grid(&mut rng);
+                let same_output = apply_transform(&same_input, task_type, train_param);
+                let same_in_hv = encoder.encode_grid(&same_input);
+                let same_out_hv = encoder.encode_grid(&same_output);
+                let same_pred = encoder.apply_rule(&same_in_hv, &gen_consensus);
+                let same_sim = same_pred.similarity(&same_out_hv) as f64;
+
+                // Test with DIFFERENT param (generalization)
+                xor_shift(&mut rng);
+                let diff_param = rng ^ 0xBEEF; // ensure different param
+                let diff_input = gen_grid(&mut rng);
+                let diff_output = apply_transform(&diff_input, task_type, diff_param);
+                let diff_in_hv = encoder.encode_grid(&diff_input);
+                let diff_out_hv = encoder.encode_grid(&diff_output);
+                let diff_pred = encoder.apply_rule(&diff_in_hv, &gen_consensus);
+                let diff_sim = diff_pred.similarity(&diff_out_hv) as f64;
+
+                // 2-AFC vs plausible distractor for both
+                xor_shift(&mut rng);
+                let dist_rng = rng;
+                let dist_same = BinaryHV::random(dist_rng);
+                let dist_diff = BinaryHV::random(dist_rng ^ 0xCAFE);
+                if same_sim > same_pred.similarity(&dist_same) as f64 {
+                    same_param_hits += 1;
+                }
+                if diff_sim > diff_pred.similarity(&dist_diff) as f64 {
+                    diff_param_hits += 1;
+                }
+                gen_gap_total += 1;
+            }
+        }
+
+        let same_acc = if gen_gap_total > 0 {
+            same_param_hits as f64 / gen_gap_total as f64
+        } else {
+            0.0
+        };
+        let diff_acc = if gen_gap_total > 0 {
+            diff_param_hits as f64 / gen_gap_total as f64
+        } else {
+            0.0
+        };
+        let generalization_gap = same_acc - diff_acc;
+
         TrialResult {
             rule_consistency,
             cross_task_discrimination,
@@ -375,6 +462,7 @@ impl ArcFluidBenchmark {
             per_type_accuracy,
             single_pair_accuracy,
             confusion_matrix,
+            generalization_gap,
             task_trace,
         }
     }
@@ -387,7 +475,7 @@ impl PsychBenchmark for ArcFluidBenchmark {
 
     fn provenance(&self) -> Option<BenchmarkProvenance> {
         Some(BenchmarkProvenance {
-            paradigm: "Abstraction and Reasoning Corpus",
+            paradigm: "Synthetic ARC-inspired grid transforms (HDC encoding test)",
             citation: "Chollet (2019)",
             year: 2019,
             doi: Some("10.48550/arXiv.1911.01547"),
@@ -406,6 +494,7 @@ impl PsychBenchmark for ArcFluidBenchmark {
         let mut per_type: [Vec<f64>; 4] = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
         let mut single_pair_accs = Vec::new();
         let mut confusion_sum = [[0.0f64; 4]; 4];
+        let mut gen_gaps = Vec::new();
         let mut trace = Vec::new();
 
         for trial in 0..config.trials_per_condition {
@@ -416,6 +505,7 @@ impl PsychBenchmark for ArcFluidBenchmark {
             similarities.push(r.transfer_similarity);
             rts.push(r.rt_ticks);
             single_pair_accs.push(r.single_pair_accuracy);
+            gen_gaps.push(r.generalization_gap);
             #[allow(clippy::needless_range_loop)]
             for i in 0..4 {
                 per_type[i].push(r.per_type_accuracy[i]);
@@ -517,9 +607,20 @@ impl PsychBenchmark for ArcFluidBenchmark {
             );
         }
 
+        // Generalization gap: same-param accuracy minus different-param accuracy.
+        // Positive = system memorizes parameters, not the abstract transform.
+        result.insert("generalization_gap", MetricValue::from_samples(&gen_gaps));
+
         if config.trial_trace {
             result.trial_trace = trace;
         }
+
+        result.notes.push(
+            "SYNTHETIC: Uses procedural grid transforms, not Chollet's real ARC. \
+             Tests HDC encoding algebra (XOR bind/unbind), not novel rule discovery. \
+             Z-scores reflect encoding quality, not abstract reasoning."
+                .to_string(),
+        );
 
         result.conditions = 4; // 4 task types
         result.trials_per_condition = config.trials_per_condition;
@@ -625,7 +726,8 @@ mod tests {
     #[test]
     fn test_provenance_correct() {
         let prov = ArcFluidBenchmark.provenance().unwrap();
-        assert_eq!(prov.paradigm, "Abstraction and Reasoning Corpus");
+        assert!(prov.paradigm.contains("Synthetic"));
+        assert!(prov.paradigm.contains("HDC encoding"));
         assert_eq!(prov.citation, "Chollet (2019)");
         assert_eq!(prov.year, 2019);
         assert_eq!(prov.doi, Some("10.48550/arXiv.1911.01547"));

@@ -47,18 +47,25 @@ impl TrainingPair {
 
     /// Convert channels to ThoughtChannels, padding legacy 20-channel data with defaults.
     pub fn to_thought_channels(&self) -> ThoughtChannels {
-        use crate::encoder::{LEGACY_NUM_CHANNELS, NEW_CHANNEL_DEFAULTS, NUM_CHANNELS};
+        use crate::encoder::{
+            CODE_CHANNEL_DEFAULTS, LEGACY_NUM_CHANNELS, NEW_CHANNEL_DEFAULTS, NUM_CHANNELS,
+        };
         let mut tc = ThoughtChannels::default();
         let n = self.channels.len().min(NUM_CHANNELS);
         tc.channels[..n].copy_from_slice(&self.channels[..n]);
-        // If legacy data (< 24 channels), fill new channels with defaults
-        if self.channels.len() < NUM_CHANNELS {
-            for i in self.channels.len()..NUM_CHANNELS {
-                if i >= LEGACY_NUM_CHANNELS {
-                    tc.channels[i] = NEW_CHANNEL_DEFAULTS[i - LEGACY_NUM_CHANNELS];
-                }
+        // If legacy data (fewer channels than current), fill missing channels with defaults.
+        // ThoughtChannels::default() already provides correct defaults for all channels,
+        // but we explicitly set v3 channel defaults for legacy 20-channel data.
+        if self.channels.len() < NUM_CHANNELS && self.channels.len() <= LEGACY_NUM_CHANNELS {
+            for i in 0..NEW_CHANNEL_DEFAULTS
+                .len()
+                .min(NUM_CHANNELS - LEGACY_NUM_CHANNELS)
+            {
+                tc.channels[LEGACY_NUM_CHANNELS + i] = NEW_CHANNEL_DEFAULTS[i];
             }
         }
+        // Code channels (24-27) and therapeutic channels (28-31) keep their Default values
+        // when not provided in the input data.
         tc
     }
 }

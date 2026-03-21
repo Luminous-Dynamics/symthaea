@@ -101,6 +101,174 @@ impl BinaryGridEncoder {
     pub fn color_hv(&self, idx: usize) -> &BinaryHV {
         &self.color_hvs[idx]
     }
+
+    // ========================================================================
+    // Rule Discovery (Program Synthesis)
+    // ========================================================================
+
+    /// Discover a transformation rule from multiple input/output examples.
+    ///
+    /// Unlike `encode_rule` (which memorizes a single pair), this method
+    /// extracts a *generalizable* rule by:
+    /// 1. Computing per-pair rules via XOR
+    /// 2. Bundling them via majority vote (noise reduction)
+    /// 3. Measuring rule consistency across pairs
+    /// 4. Testing generalization on held-out examples
+    ///
+    /// Returns a `DiscoveredRule` with the consensus rule, consistency score,
+    /// and generalization estimate.
+    pub fn discover_rule(&self, examples: &[(Vec<Vec<u8>>, Vec<Vec<u8>>)]) -> DiscoveredRule {
+        if examples.is_empty() {
+            return DiscoveredRule::empty();
+        }
+        if examples.len() == 1 {
+            let hv_in = self.encode_grid(&examples[0].0);
+            let hv_out = self.encode_grid(&examples[0].1);
+            let rule = self.encode_rule(&hv_in, &hv_out);
+            return DiscoveredRule {
+                rule_hv: rule,
+                consistency: 1.0,
+                generalization_score: 0.0, // can't estimate from 1 example
+                num_examples: 1,
+            };
+        }
+
+        // 1. Compute per-pair rules
+        let pair_rules: Vec<BinaryHV> = examples
+            .iter()
+            .map(|(input, output)| {
+                let hv_in = self.encode_grid(input);
+                let hv_out = self.encode_grid(output);
+                self.encode_rule(&hv_in, &hv_out)
+            })
+            .collect();
+
+        // 2. Consensus rule via majority vote
+        let consensus = self.bundle_rules(&pair_rules);
+
+        // 3. Rule consistency: average pairwise similarity of individual rules
+        let mut consistency_sum = 0.0f32;
+        let mut consistency_count = 0u32;
+        for i in 0..pair_rules.len() {
+            for j in (i + 1)..pair_rules.len() {
+                consistency_sum += pair_rules[i].similarity(&pair_rules[j]);
+                consistency_count += 1;
+            }
+        }
+        let consistency = if consistency_count > 0 {
+            consistency_sum / consistency_count as f32
+        } else {
+            1.0
+        };
+
+        // 4. Leave-one-out generalization estimate
+        let mut gen_score = 0.0f32;
+        for hold_out in 0..examples.len() {
+            // Train on all except hold_out
+            let train_rules: Vec<BinaryHV> = pair_rules
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| *i != hold_out)
+                .map(|(_, r)| r.clone())
+                .collect();
+            let train_consensus = self.bundle_rules(&train_rules);
+
+            // Test: apply to held-out input, compare to held-out output
+            let hv_test_in = self.encode_grid(&examples[hold_out].0);
+            let hv_test_out = self.encode_grid(&examples[hold_out].1);
+            let predicted = self.apply_rule(&hv_test_in, &train_consensus);
+            gen_score += predicted.similarity(&hv_test_out);
+        }
+        let generalization_score = gen_score / examples.len() as f32;
+
+        DiscoveredRule {
+            rule_hv: consensus,
+            consistency,
+            generalization_score,
+            num_examples: examples.len(),
+        }
+    }
+
+    /// Classify which transformation type best matches a set of examples.
+    ///
+    /// Given a library of named prototype rules (learned from prior tasks),
+    /// find the closest matching rule via HDC similarity. This enables
+    /// transfer learning: "this looks like a color replacement" even on
+    /// novel inputs.
+    pub fn classify_rule(
+        &self,
+        observed_rule: &BinaryHV,
+        prototypes: &[(String, BinaryHV)],
+    ) -> Option<(String, f32)> {
+        prototypes
+            .iter()
+            .map(|(name, proto)| (name.clone(), observed_rule.similarity(proto)))
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+    }
+
+    /// Apply a discovered rule to a novel input and measure confidence.
+    ///
+    /// Returns (predicted_output_hv, confidence) where confidence is
+    /// the rule's generalization_score weighted by how similar the novel
+    /// input is to the training distribution.
+    pub fn apply_discovered_rule(
+        &self,
+        input: &[Vec<u8>],
+        rule: &DiscoveredRule,
+        training_inputs: &[Vec<Vec<u8>>],
+    ) -> (BinaryHV, f32) {
+        let hv_in = self.encode_grid(input);
+        let predicted = self.apply_rule(&hv_in, &rule.rule_hv);
+
+        // Confidence: generalization score × input similarity to training distribution
+        let input_similarity = if training_inputs.is_empty() {
+            0.5 // no prior → moderate confidence
+        } else {
+            let train_hvs: Vec<BinaryHV> = training_inputs
+                .iter()
+                .map(|g| self.encode_grid(g))
+                .collect();
+            let centroid = BinaryHV::bundle(&train_hvs);
+            hv_in.similarity(&centroid).max(0.0)
+        };
+
+        let confidence = rule.generalization_score * (0.5 + 0.5 * input_similarity);
+        (predicted, confidence)
+    }
+}
+
+/// Result of rule discovery from multiple examples.
+#[derive(Debug, Clone)]
+pub struct DiscoveredRule {
+    /// The consensus rule HV (majority-vote of per-pair rules).
+    pub rule_hv: BinaryHV,
+    /// Consistency score: how similar are individual pair rules to each other?
+    /// High consistency (>0.7) suggests a single consistent transformation.
+    /// Low consistency (<0.3) suggests multiple different transformations mixed.
+    pub consistency: f32,
+    /// Leave-one-out generalization estimate: how well does the rule
+    /// transfer to held-out examples? This is the honest measure of
+    /// whether the rule genuinely generalizes vs just memorizes.
+    pub generalization_score: f32,
+    /// Number of training examples used.
+    pub num_examples: usize,
+}
+
+impl DiscoveredRule {
+    /// Empty rule (no examples).
+    fn empty() -> Self {
+        Self {
+            rule_hv: BinaryHV::random(0),
+            consistency: 0.0,
+            generalization_score: 0.0,
+            num_examples: 0,
+        }
+    }
+
+    /// Whether this rule is likely to generalize (heuristic threshold).
+    pub fn is_reliable(&self) -> bool {
+        self.num_examples >= 2 && self.consistency > 0.4 && self.generalization_score > 0.5
+    }
 }
 
 #[cfg(test)]

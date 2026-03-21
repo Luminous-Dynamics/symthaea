@@ -28,9 +28,9 @@ use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 
 /// Number of thought channels.
 #[cfg(not(feature = "therapeutic"))]
-pub const NUM_CHANNELS: usize = 24;
-#[cfg(feature = "therapeutic")]
 pub const NUM_CHANNELS: usize = 28;
+#[cfg(feature = "therapeutic")]
+pub const NUM_CHANNELS: usize = 32;
 
 /// Number of channels in legacy (v2) training data format.
 pub const LEGACY_NUM_CHANNELS: usize = 20;
@@ -66,6 +66,11 @@ const CHANNEL_NAMES: [&str; NUM_CHANNELS] = [
     "domain_familiarity",  // 21: how well-known the topic is (0=novel, 1=expert)
     "social_context",      // 22: formality of interaction (0=intimate, 1=formal)
     "response_confidence", // 23: confidence in the generated response (0=unsure, 1=confident)
+    // Code channels (v5)
+    "syntax_complexity", // 24: 0.0=simple expression, 1.0=deeply nested generics/lifetimes
+    "type_confidence",   // 25: 0.0=unknown types, 1.0=all types resolved
+    "algorithm_pattern", // 26: 0.0=no pattern detected, 1.0=strong algorithm match
+    "error_likelihood",  // 27: 0.0=likely correct, 1.0=likely to have errors
 ];
 
 /// Channel names for genesis seeding (therapeutic variant with 4 extra channels).
@@ -96,11 +101,16 @@ const CHANNEL_NAMES: [&str; NUM_CHANNELS] = [
     "domain_familiarity",  // 21
     "social_context",      // 22
     "response_confidence", // 23
+    // Code channels (v5)
+    "syntax_complexity", // 24
+    "type_confidence",   // 25
+    "algorithm_pattern", // 26
+    "error_likelihood",  // 27
     // Therapeutic channels (v4)
-    "therapeutic_intent",    // 24
-    "alliance_quality",      // 25
-    "client_distress_level", // 26
-    "intervention_depth",    // 27
+    "therapeutic_intent",    // 28
+    "alliance_quality",      // 29
+    "client_distress_level", // 30
+    "intervention_depth",    // 31
 ];
 
 /// Channel ranges [min, max] for normalization to [0, 1].
@@ -131,6 +141,11 @@ const CHANNEL_RANGES: [[f32; 2]; NUM_CHANNELS] = [
     [0.0, 1.0], // domain_familiarity
     [0.0, 1.0], // social_context
     [0.0, 1.0], // response_confidence
+    // Code channels (v5)
+    [0.0, 1.0], // syntax_complexity
+    [0.0, 1.0], // type_confidence
+    [0.0, 1.0], // algorithm_pattern
+    [0.0, 1.0], // error_likelihood
 ];
 
 /// Channel ranges [min, max] for normalization to [0, 1] (therapeutic variant).
@@ -161,6 +176,11 @@ const CHANNEL_RANGES: [[f32; 2]; NUM_CHANNELS] = [
     [0.0, 1.0], // domain_familiarity
     [0.0, 1.0], // social_context
     [0.0, 1.0], // response_confidence
+    // Code channels (v5)
+    [0.0, 1.0], // syntax_complexity
+    [0.0, 1.0], // type_confidence
+    [0.0, 1.0], // algorithm_pattern
+    [0.0, 1.0], // error_likelihood
     // Therapeutic channels (v4)
     [0.0, 7.0], // therapeutic_intent
     [0.0, 1.0], // alliance_quality
@@ -174,6 +194,14 @@ pub const NEW_CHANNEL_DEFAULTS: [f32; 4] = [
     0.5, // domain_familiarity: mid
     0.5, // social_context: mid
     0.5, // response_confidence: mid
+];
+
+/// Default values for the 4 code channels (indices 24-27).
+pub const CODE_CHANNEL_DEFAULTS: [f32; 4] = [
+    0.0, // syntax_complexity: simple
+    0.0, // type_confidence: unknown
+    0.0, // algorithm_pattern: none
+    0.0, // error_likelihood: likely correct
 ];
 
 /// Decoupled thought state: 20 scalar channels extracted from StructuredThought.
@@ -208,6 +236,11 @@ impl Default for ThoughtChannels {
                 0.5, // domain_familiarity: mid
                 0.5, // social_context: mid
                 0.5, // response_confidence: mid
+                // Code channels (v5)
+                0.0, // syntax_complexity: simple
+                0.0, // type_confidence: unknown
+                0.0, // algorithm_pattern: none
+                0.0, // error_likelihood: likely correct
             ],
         }
     }
@@ -236,6 +269,11 @@ impl Default for ThoughtChannels {
                 0.5, // domain_familiarity: mid
                 0.5, // social_context: mid
                 0.5, // response_confidence: mid
+                // Code channels (v5)
+                0.0, // syntax_complexity: simple
+                0.0, // type_confidence: unknown
+                0.0, // algorithm_pattern: none
+                0.0, // error_likelihood: likely correct
                 // Therapeutic channels (v4)
                 0.0, // therapeutic_intent
                 0.5, // alliance_quality
@@ -352,42 +390,77 @@ impl ThoughtChannels {
         tc.channels[21] = NEW_CHANNEL_DEFAULTS[1];
         tc.channels[22] = NEW_CHANNEL_DEFAULTS[2];
         tc.channels[23] = NEW_CHANNEL_DEFAULTS[3];
+        // Code channels default to 0.0 (already set by Default)
         #[cfg(feature = "therapeutic")]
         {
-            tc.channels[24] = THERAPEUTIC_CHANNEL_DEFAULTS[0];
-            tc.channels[25] = THERAPEUTIC_CHANNEL_DEFAULTS[1];
-            tc.channels[26] = THERAPEUTIC_CHANNEL_DEFAULTS[2];
-            tc.channels[27] = THERAPEUTIC_CHANNEL_DEFAULTS[3];
+            tc.channels[28] = THERAPEUTIC_CHANNEL_DEFAULTS[0];
+            tc.channels[29] = THERAPEUTIC_CHANNEL_DEFAULTS[1];
+            tc.channels[30] = THERAPEUTIC_CHANNEL_DEFAULTS[2];
+            tc.channels[31] = THERAPEUTIC_CHANNEL_DEFAULTS[3];
         }
         tc
     }
 
+    /// Set code generation channels.
+    pub fn set_code(
+        &mut self,
+        syntax_complexity: f32,
+        type_confidence: f32,
+        algorithm_pattern: f32,
+        error_likelihood: f32,
+    ) {
+        self.channels[24] = syntax_complexity.clamp(0.0, 1.0);
+        self.channels[25] = type_confidence.clamp(0.0, 1.0);
+        self.channels[26] = algorithm_pattern.clamp(0.0, 1.0);
+        self.channels[27] = error_likelihood.clamp(0.0, 1.0);
+    }
+
+    /// Get syntax complexity (0.0=simple expression, 1.0=deeply nested generics/lifetimes).
+    pub fn syntax_complexity(&self) -> f32 {
+        self.channels[24]
+    }
+
+    /// Get type confidence (0.0=unknown types, 1.0=all types resolved).
+    pub fn type_confidence(&self) -> f32 {
+        self.channels[25]
+    }
+
+    /// Get algorithm pattern strength (0.0=no pattern, 1.0=strong match).
+    pub fn algorithm_pattern(&self) -> f32 {
+        self.channels[26]
+    }
+
+    /// Get error likelihood (0.0=likely correct, 1.0=likely has errors).
+    pub fn error_likelihood(&self) -> f32 {
+        self.channels[27]
+    }
+
     #[cfg(feature = "therapeutic")]
     pub fn set_therapeutic(&mut self, intent: f32, alliance: f32, distress: f32, depth: f32) {
-        self.channels[24] = intent;
-        self.channels[25] = alliance;
-        self.channels[26] = distress;
-        self.channels[27] = depth;
+        self.channels[28] = intent;
+        self.channels[29] = alliance;
+        self.channels[30] = distress;
+        self.channels[31] = depth;
     }
 
     #[cfg(feature = "therapeutic")]
     pub fn therapeutic_intent(&self) -> f32 {
-        self.channels[24]
+        self.channels[28]
     }
 
     #[cfg(feature = "therapeutic")]
     pub fn alliance_quality(&self) -> f32 {
-        self.channels[25]
+        self.channels[29]
     }
 
     #[cfg(feature = "therapeutic")]
     pub fn client_distress_level(&self) -> f32 {
-        self.channels[26]
+        self.channels[30]
     }
 
     #[cfg(feature = "therapeutic")]
     pub fn intervention_depth(&self) -> f32 {
-        self.channels[27]
+        self.channels[31]
     }
 }
 
@@ -678,7 +751,7 @@ mod tests {
     // ── Channel Integration Tests ────────────────────────────────────────
 
     #[test]
-    fn test_all_24_channels_produce_distinct_encodings() {
+    fn test_all_channels_produce_distinct_encodings() {
         let genesis = test_genesis();
         let enc = ThoughtLanguageEncoder::new(&genesis);
         let baseline = enc.encode(&ThoughtChannels::default());
@@ -693,7 +766,39 @@ mod tests {
         }
         assert!(
             distinct >= 20,
-            "At least 20/24 channels should be distinct, got {distinct}"
+            "At least 20/{NUM_CHANNELS} channels should be distinct, got {distinct}"
+        );
+    }
+
+    #[test]
+    fn test_code_channels_default_zero() {
+        let tc = ThoughtChannels::default();
+        assert_eq!(tc.syntax_complexity(), 0.0);
+        assert_eq!(tc.type_confidence(), 0.0);
+        assert_eq!(tc.algorithm_pattern(), 0.0);
+        assert_eq!(tc.error_likelihood(), 0.0);
+    }
+
+    #[test]
+    fn test_code_channels_set_and_get() {
+        let mut tc = ThoughtChannels::default();
+        tc.set_code(0.8, 0.9, 0.7, 0.3);
+        assert!((tc.syntax_complexity() - 0.8).abs() < 1e-6);
+        assert!((tc.type_confidence() - 0.9).abs() < 1e-6);
+        assert!((tc.algorithm_pattern() - 0.7).abs() < 1e-6);
+        assert!((tc.error_likelihood() - 0.3).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_code_channels_affect_encoding() {
+        let enc = ThoughtLanguageEncoder::new(&test_genesis());
+        let baseline = ThoughtChannels::default();
+        let mut code_active = ThoughtChannels::default();
+        code_active.set_code(1.0, 1.0, 1.0, 1.0);
+        let sim = enc.encode(&baseline).similarity(&enc.encode(&code_active));
+        assert!(
+            sim < 0.99,
+            "Code channels should affect encoding, sim={sim}"
         );
     }
 

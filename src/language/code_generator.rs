@@ -531,6 +531,14 @@ pub struct CodeContext<'a> {
     /// When > 0, modulates the CfC sequencer's completion threshold —
     /// higher MCTS confidence means more ambitious plans.
     pub mcts_plan_confidence: f32,
+    /// Error hints from the CodingExperienceStore: (error_pattern, fix_hint).
+    /// Populated by callers who have access to the experience store.
+    /// Used during auto-fix retry and to inform native generation.
+    pub error_hints: Vec<(String, String)>,
+    /// Learned code template from the CodingExperienceStore.
+    /// If a similar task was previously completed via LLM, the template
+    /// is injected here so native generation can use it directly.
+    pub learned_template: Option<String>,
 }
 
 impl<'a> Default for CodeContext<'a> {
@@ -541,6 +549,8 @@ impl<'a> Default for CodeContext<'a> {
             source_files: Vec::new(),
             past_examples: Vec::new(),
             mcts_plan_confidence: 0.0,
+            error_hints: Vec::new(),
+            learned_template: None,
         }
     }
 }
@@ -548,7 +558,7 @@ impl<'a> Default for CodeContext<'a> {
 /// The main code generation engine
 pub struct CodeGenerator {
     encoder: CodeHDEncoder,
-    _algebra: CodeAlgebra,
+    algebra: CodeAlgebra,
     sequencer: CfCCodeSequencer,
     rust_emitter: RustEmitter,
     python_emitter: PythonEmitter,
@@ -572,7 +582,7 @@ impl CodeGenerator {
 
         Self {
             encoder,
-            _algebra: algebra,
+            algebra,
             sequencer,
             rust_emitter: RustEmitter,
             python_emitter: PythonEmitter,
@@ -609,6 +619,11 @@ impl CodeGenerator {
         &self.encoder
     }
 
+    /// Get the code algebra for external similarity/analogy queries
+    pub fn algebra(&self) -> &CodeAlgebra {
+        &self.algebra
+    }
+
     /// Generate code from an intent
     ///
     /// This is the main entry point for consciousness-aware code generation.
@@ -643,6 +658,82 @@ impl CodeGenerator {
     /// Get the primitive executor for direct access
     pub fn primitive_executor(&self) -> &CodePrimitiveExecutor {
         &self.primitive_executor
+    }
+
+    /// Check if a generated result needs LLM completion (contains `todo!()` or `unimplemented!()`).
+    pub fn needs_llm_completion(result: &GeneratedCode) -> bool {
+        result.source.contains("todo!(") || result.source.contains("unimplemented!(")
+    }
+
+    /// Build an LLM prompt to complete code that has `todo!()` placeholders.
+    ///
+    /// Returns a prompt string suitable for sending to any LLM backend.
+    /// The prompt includes the generated scaffold, the spec, error hints,
+    /// and instructions to replace `todo!()` with real implementations.
+    pub fn build_llm_completion_prompt(spec: &CodeSpec, result: &GeneratedCode) -> String {
+        let mut prompt = String::new();
+        prompt.push_str("Complete the following Rust code by replacing all `todo!()` ");
+        prompt.push_str("and `unimplemented!()` macros with real implementations.\n\n");
+        prompt.push_str(&format!("## Purpose\n{}\n\n", spec.purpose));
+        if let Some(ref sig) = spec.signature {
+            prompt.push_str(&format!("## Signature\n{}\n\n", sig));
+        }
+        if !spec.examples.is_empty() {
+            prompt.push_str("## Examples\n");
+            for (input, output) in &spec.examples {
+                prompt.push_str(&format!("  {} => {}\n", input, output));
+            }
+            prompt.push_str("\n");
+        }
+        if !spec.constraints.is_empty() {
+            prompt.push_str("## Constraints\n");
+            for c in &spec.constraints {
+                prompt.push_str(&format!("  - {}\n", c));
+            }
+            prompt.push_str("\n");
+        }
+        // Include error hints from experience store
+        for note in &result.notes {
+            if note.starts_with("ERROR_HINT") {
+                prompt.push_str(&format!("## Known Issue\n{}\n\n", note));
+            }
+        }
+        prompt.push_str("## Code to Complete\n```rust\n");
+        prompt.push_str(&result.source);
+        prompt.push_str("\n```\n\n");
+        prompt.push_str("Return ONLY the completed Rust code, no explanations.\n");
+        prompt
+    }
+
+    /// Generate code with automatic LLM fallback for `todo!()` placeholders.
+    ///
+    /// Pipeline:
+    /// 1. Native generation via HDC+CfC emitters
+    /// 2. If result contains `todo!()`, build LLM completion prompt
+    /// 3. Return (result, Option<llm_prompt>) — caller dispatches to LLM backend
+    ///
+    /// This closes the two-tier architecture loop: native patterns handle ~70%
+    /// of functions, LLM handles the rest, and successful LLM outputs get
+    /// distilled back into Broca SSM for future native generation.
+    pub fn generate_with_fallback(
+        &self,
+        intent: &CodeIntent,
+        context: &CodeContext,
+    ) -> (GeneratedCode, Option<String>) {
+        let result = self.generate(intent, context);
+
+        if Self::needs_llm_completion(&result) {
+            // Extract spec from intent for prompt building
+            let prompt = match intent {
+                CodeIntent::Create { spec, .. } => {
+                    Some(Self::build_llm_completion_prompt(spec, &result))
+                }
+                _ => None, // LLM fallback only for Create intents
+            };
+            (result, prompt)
+        } else {
+            (result, None)
+        }
     }
 
     /// Extract an SSM distillation target from a successful native generation.
@@ -875,8 +966,15 @@ impl CodeGenerator {
             }
         }
 
-        // 4. Emit code using language-specific emitter
-        let source = self.emit_from_plan(&plan, spec, &spec.language);
+        // 3.5. Check for learned template from CodingExperienceStore
+        // If a previous LLM-generated solution exists for a similar task,
+        // use it directly instead of the emitter's pattern library.
+        let source = if let Some(ref template) = context.learned_template {
+            template.clone()
+        } else {
+            // 4. Emit code using language-specific emitter
+            self.emit_from_plan(&plan, spec, &spec.language)
+        };
 
         // 5. Compute intent similarity (combine plan coverage + primitive phi + MCTS)
         let intent_similarity = if !source.is_empty() {
@@ -892,6 +990,11 @@ impl CodeGenerator {
         let mut notes = Vec::new();
         for (purpose, code) in &context.past_examples {
             notes.push(format!("PAST_EXAMPLE({}):\n{}", purpose, code));
+        }
+
+        // Include error hints from CodingExperienceStore for informed generation
+        for (pattern, hint) in &context.error_hints {
+            notes.push(format!("ERROR_HINT({}): {}", pattern, hint));
         }
 
         // Dataflow analysis for Rust code
@@ -1455,7 +1558,11 @@ impl CodeGenerator {
         ContinuousHV::bundle_owned(&[name_hv, purpose_hv, lang_hv])
     }
 
-    /// Find similar patterns from context
+    /// Find similar patterns from context, including analogy-based retrieval.
+    ///
+    /// If codebase memory provides at least 2 results, uses CodeAlgebra.analogy()
+    /// to find "A:B :: intent:?" patterns — transferring relationships from known
+    /// code to the current intent.
     fn find_similar_context(
         &self,
         intent_hv: &ContinuousHV,
@@ -1470,13 +1577,37 @@ impl CodeGenerator {
 
         // Query codebase memory if available
         if let Some(memory) = context.memory {
-            let matches = memory.query(intent_hv, 3);
-            // We just use the match info, not the HVs themselves since CodeMatch
-            // doesn't store them. The memory context is already captured in context_hvs.
+            let matches = memory.query(intent_hv, 5);
             if !matches.is_empty() {
                 // Encode matched names as additional context
+                let mut match_hvs = Vec::new();
                 for m in &matches {
-                    results.push(self.encoder.encode_name(&m.name));
+                    let hv = self.encoder.encode_name(&m.name);
+                    match_hvs.push(hv.clone());
+                    results.push(hv);
+                }
+
+                // Analogy-based retrieval: if we have at least 2 matches,
+                // use "match[0]:match[1] :: intent:?" to find analogous patterns
+                if match_hvs.len() >= 2 {
+                    let analogy_matches = self.algebra.analogy(
+                        &match_hvs[0],
+                        &match_hvs[1],
+                        intent_hv,
+                        &match_hvs[2..]
+                            .iter()
+                            .collect::<Vec<_>>()
+                            .iter()
+                            .map(|h| (*h).clone())
+                            .collect::<Vec<_>>(),
+                    );
+                    for am in analogy_matches.iter().take(2) {
+                        if am.similarity > 0.3 {
+                            if let Some(hv) = match_hvs.get(am.index + 2) {
+                                results.push(hv.clone());
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1494,6 +1625,82 @@ impl CodeGenerator {
         };
 
         emitter.emit_from_spec(spec, plan)
+    }
+
+    /// Attempt automatic repair using CodingExperienceStore hints first,
+    /// then falling back to pattern-based diagnosis.
+    ///
+    /// `error_hints` are (error_pattern, fix_hint) pairs from the experience store.
+    /// If a matching hint is found, applies the hint-suggested fix before trying
+    /// the general-purpose `diagnose_compile_error` path.
+    pub fn try_auto_fix_with_hints(
+        &self,
+        source: &str,
+        stderr: &str,
+        error_hints: &[(String, String)],
+    ) -> Option<String> {
+        // Try experience-store hints first — these are learned from prior sessions
+        for (pattern, hint) in error_hints {
+            if stderr.contains(pattern.as_str())
+                || pattern
+                    .split_whitespace()
+                    .filter(|w| w.len() > 3)
+                    .any(|w| stderr.contains(w))
+            {
+                // Apply hint-based fix
+                if let Some(fixed) = Self::apply_hint_fix(source, hint) {
+                    return Some(fixed);
+                }
+            }
+        }
+        // Fall back to pattern-based auto-fix
+        self.try_auto_fix(source, stderr)
+    }
+
+    /// Apply a fix hint from the CodingExperienceStore.
+    ///
+    /// Hints are strings like "add `as u32`", "use `&str` instead of `String`",
+    /// "add `#[derive(Clone)]`". Returns `Some(fixed)` if the hint was actionable.
+    fn apply_hint_fix(source: &str, hint: &str) -> Option<String> {
+        let hint_lower = hint.to_lowercase();
+        let mut fixed = source.to_string();
+
+        if hint_lower.contains("derive") {
+            // Extract derive name and add it
+            if let Some(start) = hint.find("Derive(").or_else(|| hint.find("derive(")) {
+                let derive_part = &hint[start..];
+                if let Some(end) = derive_part.find(')') {
+                    let derive = &derive_part[..=end];
+                    if !fixed.contains(derive) {
+                        // Add derive before the first struct/enum
+                        if let Some(pos) = fixed
+                            .find("pub struct")
+                            .or_else(|| fixed.find("struct"))
+                            .or_else(|| fixed.find("pub enum"))
+                            .or_else(|| fixed.find("enum"))
+                        {
+                            fixed.insert_str(pos, &format!("#[{}]\n", derive));
+                            return Some(fixed);
+                        }
+                    }
+                }
+            }
+        }
+
+        if hint_lower.contains("as u32")
+            || hint_lower.contains("as i32")
+            || hint_lower.contains("as usize")
+        {
+            // Already handled by diagnose_compile_error, skip to avoid double-fixing
+            return None;
+        }
+
+        if hint_lower.contains(".clone()") && !fixed.contains(".clone()") {
+            // Generic: can't auto-apply without knowing WHERE to add .clone()
+            return None;
+        }
+
+        None // Hint wasn't actionable — fall through to pattern-based
     }
 
     /// Attempt automatic repair of generated Rust code based on compiler error output.

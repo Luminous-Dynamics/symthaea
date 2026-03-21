@@ -517,6 +517,20 @@ impl MathService {
 
     /// Compute descriptive statistics
     pub fn compute_statistics(&mut self, data: &[f64]) -> MathResponse {
+        if data.is_empty() {
+            return MathResponse {
+                answer: "n=0, no data".to_string(),
+                numerical_result: Some(0.0),
+                vector_result: None,
+                encoding: BinaryHV::random(seed_from_name("STATS_EMPTY")),
+                phi: 0.0,
+                confidence: 0.0,
+                multipath_verified: false,
+                problem_type: MathProblemType::Statistics,
+                epistemic_caveat: Some("Empty dataset".to_string()),
+                error_bound: None,
+            };
+        }
         let m = statistics::mean(data);
         let v = statistics::variance(data);
         let s = statistics::std_dev(data);
@@ -632,7 +646,11 @@ impl MathService {
 
         let response = MathResponse {
             answer,
-            numerical_result: Some(tt.satisfying_count as f64 / tt.rows.len() as f64),
+            numerical_result: if tt.rows.is_empty() {
+                Some(0.0)
+            } else {
+                Some(tt.satisfying_count as f64 / tt.rows.len() as f64)
+            },
             vector_result: None,
             encoding: prop.encode(),
             phi,

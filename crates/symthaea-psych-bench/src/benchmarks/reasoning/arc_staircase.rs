@@ -1,4 +1,11 @@
-//! ARC Adaptive Difficulty Staircase benchmark.
+//! ARC Adaptive Difficulty Staircase benchmark
+//! (SYNTHETIC — tests HDC capacity threshold, not reasoning).
+//!
+//! **Honesty note:** This benchmark uses procedurally generated grid tasks.
+//! It finds the grid size at which HDC encoding fidelity drops below 75%
+//! accuracy — this is a capacity metric of the representation, not a
+//! cognitive threshold. The 2-AFC scoring uses random BinaryHV distractors
+//! (chance = ~50%), which is a lenient baseline.
 //!
 //! Uses a staircase procedure to find the grid complexity threshold
 //! where accuracy drops to 75% (psychometric threshold). Starts at
@@ -295,6 +302,12 @@ impl PsychBenchmark for ArcStaircaseBenchmark {
         if config.trial_trace {
             result.trial_trace = trace;
         }
+        result.notes.push(
+            "SYNTHETIC: Tests HDC capacity threshold (grid size at 75% accuracy), not \
+             reasoning. 2-AFC uses random BinaryHV distractors (chance ~50%), a \
+             lenient baseline. Z-scores reflect encoding capacity, not cognitive threshold."
+                .to_string(),
+        );
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

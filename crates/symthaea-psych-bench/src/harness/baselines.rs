@@ -66,6 +66,8 @@ pub struct BaselineCollection {
     pub causal_reasoning: BaselineMap,
     /// Security (HDC-FHE) baselines (encrypted classification, collective aggregation).
     pub security: BaselineMap,
+    /// Coding domain baselines (HumanEval pass@1, code completion).
+    pub coding: BaselineMap,
     /// GPT-4 baselines from CogBench (Coda et al., 2023).
     pub llm_cogbench: BaselineMap,
     /// GPT-4 baselines from ToMBench (Kosinski, 2023).
@@ -106,6 +108,7 @@ impl BaselineCollection {
             spatial: spatial_baselines(),
             causal_reasoning: causal_reasoning_baselines(),
             security: security_baselines(),
+            coding: coding_baselines(),
             llm_cogbench: llm_cogbench_baselines(),
             llm_tombench: llm_tombench_baselines(),
             llm_arc: llm_arc_baselines(),
@@ -1552,6 +1555,35 @@ pub fn creativity_baselines() -> BTreeMap<&'static str, Baseline> {
             value: 0.65,
             sd: Some(0.12),
             source: "Fauconnier & Turner (2002), blend structural consistency ratings",
+            population: "human adults",
+        },
+    );
+
+    // Insight Problem (Knoblich et al., 1999; matchstick arithmetic)
+    m.insert(
+        "restructuring_success",
+        Baseline {
+            value: 0.55,
+            sd: Some(0.18),
+            source: "Knoblich et al. (1999), matchstick arithmetic restructuring success",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "insight_latency",
+        Baseline {
+            value: 12.0,
+            sd: Some(4.0),
+            source: "Knoblich et al. (1999), normalized deliberation time to insight",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "aha_magnitude",
+        Baseline {
+            value: 0.30,
+            sd: Some(0.12),
+            source: "Knoblich et al. (1999), subjective insight magnitude rating",
             population: "human adults",
         },
     );
@@ -4734,6 +4766,27 @@ pub fn security_baselines() -> BaselineMap {
             sd: Some(0.05),
             source: "Rahimi et al. (2016) HDC classification scaling",
             population: "HDC classification systems",
+        },
+    );
+    m
+}
+
+/// Coding domain baselines.
+///
+/// Human baselines from competitive programming and HumanEval studies.
+/// Chen et al. (2021) HumanEval: pass@1 for humans ~0.67 (SD 0.12).
+/// Austin et al. (2021) MBPP: similar human performance on simple problems.
+pub fn coding_baselines() -> BaselineMap {
+    let mut m = BTreeMap::new();
+    // HumanEvalMini: pass_at_1
+    // Human competitive programmers on HumanEval (Chen et al., 2021)
+    m.insert(
+        "humaneval_pass_at_1",
+        Baseline {
+            value: 0.67,
+            sd: Some(0.12),
+            source: "Chen et al. (2021) HumanEval; competitive programmer pass@1",
+            population: "human competitive programmers",
         },
     );
     m

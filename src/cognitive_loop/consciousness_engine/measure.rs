@@ -73,7 +73,7 @@ impl ConsciousnessEngine {
 
         // Sigma → learning rate + confidence modulation
         // Science: Tononi (2008) — high Φ → stabilize, low Φ → explore
-        if let Some(sig) = self.cache.last_sigma {
+        if let Some(sig) = self.cache.last_sigma.filter(|s| s.is_finite()) {
             if sig > super::super::thresholds::SIGMA_HIGH_THRESHOLD {
                 let sig_dampen = ((sig - super::super::thresholds::SIGMA_HIGH_THRESHOLD)
                     * super::super::thresholds::SIGMA_DAMPEN_SCALE)

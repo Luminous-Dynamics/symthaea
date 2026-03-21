@@ -1,4 +1,11 @@
-//! ARC Grid Complexity and Dimension Scaling benchmark.
+//! ARC Grid Complexity and Dimension Scaling benchmark
+//! (SYNTHETIC — tests HDC capacity limits, not reasoning).
+//!
+//! **Honesty note:** This benchmark uses procedurally generated grid tasks.
+//! It measures how HDC encoding fidelity scales with grid size and vector
+//! dimension — these are capacity/efficiency metrics of the representation,
+//! not reasoning metrics. The 2-AFC scoring uses random BinaryHV distractors
+//! (chance = ~50%), which is a lenient baseline.
 //!
 //! Two parametric studies in one benchmark:
 //!
@@ -310,6 +317,12 @@ impl PsychBenchmark for ArcScalingBenchmark {
         if config.trial_trace {
             result.trial_trace = trace;
         }
+        result.notes.push(
+            "SYNTHETIC: Tests HDC capacity scaling (grid size x dimension), not \
+             reasoning. 2-AFC uses random BinaryHV distractors (chance ~50%), a \
+             lenient baseline. Z-scores reflect encoding capacity limits."
+                .to_string(),
+        );
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }
