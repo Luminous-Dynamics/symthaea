@@ -63,9 +63,9 @@ attention_network,ach_boost,0.40,conflict_effect,4.528504
 attention_network,ach_boost,0.45,alerting_effect,0.887096
 attention_network,ach_boost,0.45,orienting_effect,-1.008670
 attention_network,ach_boost,0.45,conflict_effect,4.216512
-attention_network,ach_boost,0.50,alerting_effect,0.916276
+attention_network,ach_boost,0.50,alerting_effect,0.916277
 attention_network,ach_boost,0.50,orienting_effect,-1.177884
-attention_network,ach_boost,0.50,conflict_effect,3.916986
+attention_network,ach_boost,0.50,conflict_effect,3.916987
 dose_response,dose,0.10,da_output,0.742013
 dose_response,dose,0.20,da_output,0.784026
 dose_response,dose,0.30,da_output,0.826039

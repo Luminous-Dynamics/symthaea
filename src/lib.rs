@@ -207,7 +207,6 @@ Key types are re-exported at the crate root for convenience:
 #![allow(unknown_lints)]
 // HDC code uses index-based iteration for element-wise vector operations (~1,075 sites).
 #![allow(clippy::needless_range_loop)]
-#![allow(clippy::manual_is_multiple_of)]
 // Crate-level allows: each lint has 5+ occurrences across src/ (verified Feb 2026).
 // Lints with <5 occurrences moved to per-function #[allow(...)] annotations.
 #![allow(
