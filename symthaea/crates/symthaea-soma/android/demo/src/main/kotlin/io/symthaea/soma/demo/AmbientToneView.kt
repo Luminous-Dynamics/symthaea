@@ -99,9 +99,10 @@ class AmbientTone {
                     val pitch = pitchMultiplier
 
                     val baseFreq = if (sleeping) {
-                        55.0  // Sub-bass during sleep
+                        220.0 * pitch  // Low drone during sleep
                     } else {
-                        (110.0 + cl * 110.0) * pitch
+                        // 220-440Hz range — audible on phone speakers (A3 to A4)
+                        (220.0 + cl * 220.0) * pitch
                     }
 
                     // Binaural beat offset based on consciousness
@@ -113,14 +114,14 @@ class AmbientTone {
                     }
 
                     val harmonyMix = cl * 0.15 * harmonyShift
-                    // Volume: must be loud enough for phone speakers
-                    val volume = if (sleeping) 0.08 else (0.15 + cl * 0.35).coerceIn(0.10, 0.50)
+                    // Volume: loud enough for phone speakers
+                    val volume = if (sleeping) 0.12 else (0.20 + cl * 0.40).coerceIn(0.15, 0.60)
                     val tremoloFreq = if (sleeping) 0.125 else 0.25 + cl * 0.25  // Slower when sleeping (8s period)
 
-                    // Harmonic volumes
-                    val octaveVol = 0.15 * cl    // Octave above
-                    val fifthVol = 0.10 * cl     // Perfect fifth above
-                    val subVol = 0.08             // Sub-octave (always gentle)
+                    // Harmonic volumes — higher harmonics are more audible on phone speakers
+                    val octaveVol = 0.25 * cl    // Octave above (440-880Hz, most audible)
+                    val fifthVol = 0.15 * cl     // Perfect fifth above
+                    val subVol = 0.05             // Sub-octave (barely perceptible on speakers)
                     val noiseVol = 0.02           // Pink noise floor
 
                     // Dream chord
