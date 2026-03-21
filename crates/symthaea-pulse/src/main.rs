@@ -1755,6 +1755,7 @@ fn main() -> Result<()> {
             pog_score_ema: m.fabrication_pog_score_ema,
             active_print_jobs: m.fabrication_active_jobs,
             reward_ema: m.fabrication_reward_ema,
+            ..FabricationInfo::default()
         },
     };
 
@@ -2186,6 +2187,7 @@ fn main() -> Result<()> {
                     pog_score_ema: wm.fabrication_pog_score_ema,
                     active_print_jobs: wm.fabrication_active_jobs,
                     reward_ema: wm.fabrication_reward_ema,
+                    ..FabricationInfo::default()
                 },
                 mesh_consciousness: MeshConsciousnessInfo::default(),
             };

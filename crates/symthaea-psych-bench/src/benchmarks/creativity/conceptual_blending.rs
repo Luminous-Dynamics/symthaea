@@ -93,35 +93,28 @@ impl ConceptualBlendingBenchmark {
         for blend_idx in 0..n_blends {
             xor_shift(&mut rng);
 
-            // Select blending strategy — each models a different blending mechanism
-            // from Fauconnier & Turner's Conceptual Integration Networks (2002)
+            // Select blending strategy
             let blend = match blend_idx % 4 {
                 0 => {
-                    // Cross-space mapping: bind roles with PERMUTED fillers from B
-                    // (not just role_i⊕filler_b_i which = concept_b; instead, the
-                    // permutation creates a genuinely novel cross-space alignment)
-                    let shift = blend_idx / 4 + 1;
+                    // Completion: take roles from A, fillers from B (cross-space mapping)
                     let cross: Vec<BinaryHV> = roles
                         .iter()
                         .zip(fillers_b.iter())
-                        .map(|(r, f)| r.bind(&f.permute(shift)))
+                        .map(|(r, f)| r.bind(f))
                         .collect();
                     BinaryHV::bundle(&cross)
                 }
                 1 => {
-                    // Elaboration: XOR bind the two concepts (creates emergent pattern
-                    // equidistant from both parents — maximal novelty)
+                    // Elaboration: XOR bind the two concepts (creates emergent pattern)
                     concept_a.bind(&concept_b)
                 }
                 2 => {
-                    // Selective projection: mix features with role permutation to
-                    // create novel structure within the recombination
+                    // Selective projection: take some features from A, rest from B
                     let split = (xor_shift(&mut rng) as usize % (n_features - 1)) + 1;
-                    let shift = blend_idx / 4 + 2;
                     let mixed: Vec<BinaryHV> = (0..n_features)
                         .map(|i| {
                             if i < split {
-                                roles[i].permute(shift).bind(&fillers_a[i])
+                                roles[i].bind(&fillers_a[i])
                             } else {
                                 roles[i].bind(&fillers_b[i])
                             }
@@ -130,11 +123,10 @@ impl ConceptualBlendingBenchmark {
                     BinaryHV::bundle(&mixed)
                 }
                 _ => {
-                    // Emergent structure: multi-scale permutation creates patterns
-                    // not present in either parent (Ward, 1994: "creative cognition")
-                    let shift = blend_idx / 4 + 1;
-                    let permuted = concept_a.permute(shift);
-                    permuted.bind(&concept_b.permute(shift + 1))
+                    // Emergent structure: permute concept_a, bind with concept_b
+                    // Creates a pattern not in either parent
+                    let permuted = concept_a.permute(1);
+                    permuted.bind(&concept_b)
                 }
             };
 

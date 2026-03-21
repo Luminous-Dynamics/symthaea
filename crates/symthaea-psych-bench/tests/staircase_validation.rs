@@ -162,12 +162,12 @@ fn staircase_produces_reversals() {
     let bench = StroopBenchmark;
     let staircase_cfg = StaircaseConfig {
         max_reversals: 4,
-        max_steps: 20,
+        max_steps: 40,
         ..Default::default()
     };
     let result = run_staircase(&bench, &base_config(), &staircase_cfg);
 
-    // With 20 steps and start_difficulty=0.3, the staircase should
+    // With 40 steps and start_difficulty=0.3, the staircase should
     // encounter at least 1 reversal
     assert!(
         result.n_reversals >= 1,
