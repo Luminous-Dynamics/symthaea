@@ -1,152 +1,6 @@
 /* @ts-self-types="./symthaea_spore.d.ts" */
 
 /**
- * Sovereign Birth ceremony state machine.
- *
- * Tracks progress through the Inoculation phases, accumulating narration
- * and awakening Harmony tones as each subsystem installs.
- */
-export class InoculationOrchestrator {
-    __destroy_into_raw() {
-        const ptr = this.__wbg_ptr;
-        this.__wbg_ptr = 0;
-        InoculationOrchestratorFinalization.unregister(this);
-        return ptr;
-    }
-    free() {
-        const ptr = this.__destroy_into_raw();
-        wasm.__wbg_inoculationorchestrator_free(ptr, 0);
-    }
-    /**
-     * Get the Harmony tones array as JSON.
-     * @returns {any}
-     */
-    harmony_tones() {
-        try {
-            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-            wasm.inoculationorchestrator_harmony_tones(retptr, this.__wbg_ptr);
-            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
-            if (r2) {
-                throw takeObject(r1);
-            }
-            return takeObject(r0);
-        } finally {
-            wasm.__wbindgen_add_to_stack_pointer(16);
-        }
-    }
-    /**
-     * Advance to the next phase. Takes a JSON object with:
-     * - `phase` (string): phase name (e.g. "TrustVerification", "StorePopulation")
-     * - `subsystem` (string, optional): for StorePopulation, the subsystem name
-     * - `elapsed` (number): elapsed seconds since ceremony start
-     * - `context` (object, optional): template variables for narration
-     *
-     * Returns a `PhaseAdvanceResult` with narration, haptic, tone, and state.
-     * @param {any} phase_data
-     * @returns {any}
-     */
-    inoculation_advance(phase_data) {
-        try {
-            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-            wasm.inoculationorchestrator_inoculation_advance(retptr, this.__wbg_ptr, addHeapObject(phase_data));
-            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
-            if (r2) {
-                throw takeObject(r1);
-            }
-            return takeObject(r0);
-        } finally {
-            wasm.__wbindgen_add_to_stack_pointer(16);
-        }
-    }
-    /**
-     * Get narration for a specific phase without advancing state.
-     *
-     * `phase` is the phase name string, `context` is a JSON object of template variables.
-     * @param {string} phase
-     * @param {any} context
-     * @returns {string}
-     */
-    inoculation_narrate(phase, context) {
-        let deferred3_0;
-        let deferred3_1;
-        try {
-            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-            const ptr0 = passStringToWasm0(phase, wasm.__wbindgen_export, wasm.__wbindgen_export2);
-            const len0 = WASM_VECTOR_LEN;
-            wasm.inoculationorchestrator_inoculation_narrate(retptr, this.__wbg_ptr, ptr0, len0, addHeapObject(context));
-            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
-            var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
-            var ptr2 = r0;
-            var len2 = r1;
-            if (r3) {
-                ptr2 = 0; len2 = 0;
-                throw takeObject(r2);
-            }
-            deferred3_0 = ptr2;
-            deferred3_1 = len2;
-            return getStringFromWasm0(ptr2, len2);
-        } finally {
-            wasm.__wbindgen_add_to_stack_pointer(16);
-            wasm.__wbindgen_export4(deferred3_0, deferred3_1, 1);
-        }
-    }
-    /**
-     * Get the current InoculationState as a JSON object.
-     *
-     * Returns: `{ current_phase, phases_completed, harmonies_awakened,
-     *             consciousness_level, elapsed_seconds, narration_history }`
-     * @returns {any}
-     */
-    inoculation_state() {
-        try {
-            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-            wasm.inoculationorchestrator_inoculation_state(retptr, this.__wbg_ptr);
-            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
-            if (r2) {
-                throw takeObject(r1);
-            }
-            return takeObject(r0);
-        } finally {
-            wasm.__wbindgen_add_to_stack_pointer(16);
-        }
-    }
-    /**
-     * Whether the ceremony is complete.
-     * @returns {boolean}
-     */
-    is_complete() {
-        const ret = wasm.inoculationorchestrator_is_complete(this.__wbg_ptr);
-        return ret !== 0;
-    }
-    /**
-     * Create a new Inoculation orchestrator at the start of the ceremony.
-     */
-    constructor() {
-        const ret = wasm.inoculationorchestrator_new();
-        this.__wbg_ptr = ret >>> 0;
-        InoculationOrchestratorFinalization.register(this, this.__wbg_ptr, this);
-        return this;
-    }
-    /**
-     * Current progress fraction (0.0 to 1.0).
-     * @returns {number}
-     */
-    progress() {
-        const ret = wasm.inoculationorchestrator_progress(this.__wbg_ptr);
-        return ret;
-    }
-}
-if (Symbol.dispose) InoculationOrchestrator.prototype[Symbol.dispose] = InoculationOrchestrator.prototype.free;
-
-/**
  * WASM-exported Spore consciousness engine.
  */
 export class SporeEngine {
@@ -182,6 +36,37 @@ export class SporeEngine {
         try {
             const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
             wasm.sporeengine_anesthesia_experiment(retptr, this.__wbg_ptr, warmup_cycles, suppression_cycles, recovery_cycles);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return takeObject(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * Check if the full Broca pipeline is loaded and ready.
+     *
+     * Returns false if the `broca-pipeline` feature is not enabled or no
+     * checkpoint has been loaded.
+     * @returns {boolean}
+     */
+    broca_pipeline_ready() {
+        const ret = wasm.sporeengine_broca_pipeline_ready(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    /**
+     * Get the current causal graph as a JS object.
+     * Returns { edges: [...], variables: [...] }.
+     * @returns {any}
+     */
+    causal_graph() {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.sporeengine_causal_graph(retptr, this.__wbg_ptr);
             var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
             var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
             var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
@@ -243,6 +128,27 @@ export class SporeEngine {
         } finally {
             wasm.__wbindgen_add_to_stack_pointer(16);
             wasm.__wbindgen_export4(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
+     * Conversation context statistics: turn count, topic coherence, recent consciousness avg.
+     *
+     * Returns `{ turn_count, topic_coherence, recent_consciousness_avg }`.
+     * @returns {any}
+     */
+    conversation_stats() {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.sporeengine_conversation_stats(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return takeObject(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
         }
     }
     /**
@@ -433,31 +339,6 @@ export class SporeEngine {
         }
     }
     /**
-     * Generate text from current consciousness state, aware of user input.
-     * The user's input is encoded as intent signals so generation relates to what was said.
-     * Returns GenerationResult as JS object with `text`, `num_tokens`, `eos_terminated`.
-     * @param {string} input
-     * @param {number} max_tokens
-     * @returns {any}
-     */
-    generate_text_with_input(input, max_tokens) {
-        try {
-            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-            const ptr0 = passStringToWasm0(input, wasm.__wbindgen_export, wasm.__wbindgen_export2);
-            const len0 = WASM_VECTOR_LEN;
-            wasm.sporeengine_generate_text_with_input(retptr, this.__wbg_ptr, ptr0, len0, max_tokens);
-            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
-            if (r2) {
-                throw takeObject(r1);
-            }
-            return takeObject(r0);
-        } finally {
-            wasm.__wbindgen_add_to_stack_pointer(16);
-        }
-    }
-    /**
      * Get the current network output hypervector (16,384 f32 values).
      * Used for live waveform visualization in the browser demo.
      * @returns {Float32Array}
@@ -502,6 +383,96 @@ export class SporeEngine {
         wasm.sporeengine_inject_neuromodulator(this.__wbg_ptr, ptr0, len0, amount);
     }
     /**
+     * Query knowledge facts about a subject. Returns QueryResult as JS object.
+     * @param {string} subject
+     * @returns {any}
+     */
+    knowledge_query(subject) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            const ptr0 = passStringToWasm0(subject, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+            const len0 = WASM_VECTOR_LEN;
+            wasm.sporeengine_knowledge_query(retptr, this.__wbg_ptr, ptr0, len0);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return takeObject(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * Knowledge engine statistics: fact count, contradiction count, etc.
+     * @returns {any}
+     */
+    knowledge_stats() {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.sporeengine_knowledge_stats(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return takeObject(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * Load trained Broca checkpoint weights from a binary buffer.
+     *
+     * The checkpoint file (broca-spore-v1.bin) contains trained token embeddings,
+     * position embeddings, and gate weights. After loading, the autoregressive
+     * generation path produces coherent language at consciousness levels >= 0.15.
+     * @param {Uint8Array} data
+     */
+    load_broca_checkpoint(data) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            const ptr0 = passArray8ToWasm0(data, wasm.__wbindgen_export);
+            const len0 = WASM_VECTOR_LEN;
+            wasm.sporeengine_load_broca_checkpoint(retptr, this.__wbg_ptr, ptr0, len0);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            if (r1) {
+                throw takeObject(r0);
+            }
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * Load a full Broca pipeline checkpoint (symthaea-broca format).
+     *
+     * Requires `broca-pipeline` feature. After loading, `generate_text()` uses
+     * the production HdcLtcUnifiedNetwork + epistemic gating + semantic veto
+     * pipeline instead of BrocaLite.
+     *
+     * Pass the distilled checkpoint (broca-spore-distilled.bin, ~130MB) for
+     * browser deployment, not the full v6-joint checkpoint (~976MB).
+     * @param {Uint8Array} data
+     */
+    load_broca_pipeline_checkpoint(data) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            const ptr0 = passArray8ToWasm0(data, wasm.__wbindgen_export);
+            const len0 = WASM_VECTOR_LEN;
+            wasm.sporeengine_load_broca_pipeline_checkpoint(retptr, this.__wbg_ptr, ptr0, len0);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            if (r1) {
+                throw takeObject(r0);
+            }
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
      * Compute Perturbational Complexity Index (PCI). Returns PciResult as JS object.
      *
      * Based on Casali et al. (2013): perturb the network and measure spatiotemporal
@@ -514,6 +485,25 @@ export class SporeEngine {
         try {
             const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
             wasm.sporeengine_measure_pci(retptr, this.__wbg_ptr, perturbation_magnitude, observation_cycles);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return takeObject(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * Trigger memory consolidation (dream replay). Returns ConsolidationResult.
+     * @returns {any}
+     */
+    memory_consolidate() {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.sporeengine_memory_consolidate(retptr, this.__wbg_ptr);
             var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
             var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
             var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
@@ -587,17 +577,17 @@ export class SporeEngine {
         }
     }
     /**
-     * Select the most resonant glyph for the current consciousness state and user input.
-     * Returns JS object with `glyph_id` (string) and `echo_phrase` (string).
+     * Run a 7-step reasoning cycle on the given input.
+     * Returns the full ReasoningCycle trace as a JS object.
      * @param {string} input
      * @returns {any}
      */
-    select_glyph(input) {
+    reasoning_cycle(input) {
         try {
             const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
             const ptr0 = passStringToWasm0(input, wasm.__wbindgen_export, wasm.__wbindgen_export2);
             const len0 = WASM_VECTOR_LEN;
-            wasm.sporeengine_select_glyph(retptr, this.__wbg_ptr, ptr0, len0);
+            wasm.sporeengine_reasoning_cycle(retptr, this.__wbg_ptr, ptr0, len0);
             var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
             var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
             var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
@@ -610,6 +600,26 @@ export class SporeEngine {
         }
     }
     /**
+     * Current safety level as a string ("Green", "Yellow", "Orange", "Red").
+     * @returns {string}
+     */
+    safety_level() {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.sporeengine_safety_level(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            deferred1_0 = r0;
+            deferred1_1 = r1;
+            return getStringFromWasm0(r0, r1);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+            wasm.__wbindgen_export4(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
      * Switch substrate type.
      * @param {string} substrate
      */
@@ -617,6 +627,25 @@ export class SporeEngine {
         const ptr0 = passStringToWasm0(substrate, wasm.__wbindgen_export, wasm.__wbindgen_export2);
         const len0 = WASM_VECTOR_LEN;
         wasm.sporeengine_set_substrate(this.__wbg_ptr, ptr0, len0);
+    }
+    /**
+     * Social mind state: partners, empathy level, coherence.
+     * @returns {any}
+     */
+    social_mind_state() {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.sporeengine_social_mind_state(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return takeObject(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
     }
     /**
      * Run a split-brain experiment. Returns SplitBrainResult as JS object.
@@ -648,6 +677,28 @@ export class SporeEngine {
     substrate_feasibility() {
         const ret = wasm.sporeengine_substrate_feasibility(this.__wbg_ptr);
         return ret;
+    }
+    /**
+     * Assess an input for threats. Returns ThreatAssessment as JS object.
+     * @param {string} input
+     * @returns {any}
+     */
+    threat_assessment(input) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            const ptr0 = passStringToWasm0(input, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+            const len0 = WASM_VECTOR_LEN;
+            wasm.sporeengine_threat_assessment(retptr, this.__wbg_ptr, ptr0, len0);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return takeObject(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
     }
     /**
      * Analyze consciousness topology. Returns TopologyAnalysis.
@@ -688,42 +739,138 @@ export class SporeEngine {
             wasm.__wbindgen_export4(deferred1_0, deferred1_1, 1);
         }
     }
+    /**
+     * Whether the workspace has reached ignition (conscious experience).
+     * @returns {boolean}
+     */
+    workspace_ignition() {
+        const ret = wasm.sporeengine_workspace_ignition(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    /**
+     * Current workspace state: broadcast, contents, history.
+     * @returns {any}
+     */
+    workspace_state() {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.sporeengine_workspace_state(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return takeObject(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
 }
 if (Symbol.dispose) SporeEngine.prototype[Symbol.dispose] = SporeEngine.prototype.free;
 
 /**
- * Probe hardware capabilities and generate NixOS configuration.
- *
- * Takes browser-collected hardware data as a JS object (camelCase fields matching
- * `HardwareProfile`) and returns a `ProbeResult` containing the parsed profile
- * plus NixOS hardware configuration recommendations.
- *
- * # JS usage
- * ```js
- * const result = probe_hardware({
- *   cpuCores: navigator.hardwareConcurrency,
- *   deviceMemoryGb: navigator.deviceMemory || 0,
- *   hasWebgpu: !!navigator.gpu,
- *   // ... etc
- * });
- * console.log(result.nixConfig.nixHardwareConfig);
- * ```
- * @param {any} js_data
- * @returns {any}
+ * Generate disko disk configuration from hardware probe.
+ * @param {string} hardware_json
+ * @returns {string}
  */
-export function probe_hardware(js_data) {
+export function generate_disko_config(hardware_json) {
+    let deferred3_0;
+    let deferred3_1;
     try {
         const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        wasm.probe_hardware(retptr, addHeapObject(js_data));
+        const ptr0 = passStringToWasm0(hardware_json, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+        const len0 = WASM_VECTOR_LEN;
+        wasm.generate_disko_config(retptr, ptr0, len0);
         var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
         var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
         var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
-        if (r2) {
-            throw takeObject(r1);
+        var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
+        var ptr2 = r0;
+        var len2 = r1;
+        if (r3) {
+            ptr2 = 0; len2 = 0;
+            throw takeObject(r2);
         }
-        return takeObject(r0);
+        deferred3_0 = ptr2;
+        deferred3_1 = len2;
+        return getStringFromWasm0(ptr2, len2);
     } finally {
         wasm.__wbindgen_add_to_stack_pointer(16);
+        wasm.__wbindgen_export4(deferred3_0, deferred3_1, 1);
+    }
+}
+
+/**
+ * Generate a complete NixOS flake.nix from hardware probe results.
+ *
+ * Takes the hardware profile JSON from the browser probe and returns
+ * a full flake.nix string suitable for `nixos-install`.
+ * @param {string} hardware_json
+ * @param {string} path
+ * @param {string} hostname
+ * @returns {string}
+ */
+export function generate_flake(hardware_json, path, hostname) {
+    let deferred5_0;
+    let deferred5_1;
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        const ptr0 = passStringToWasm0(hardware_json, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passStringToWasm0(path, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+        const len1 = WASM_VECTOR_LEN;
+        const ptr2 = passStringToWasm0(hostname, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+        const len2 = WASM_VECTOR_LEN;
+        wasm.generate_flake(retptr, ptr0, len0, ptr1, len1, ptr2, len2);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+        var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
+        var ptr4 = r0;
+        var len4 = r1;
+        if (r3) {
+            ptr4 = 0; len4 = 0;
+            throw takeObject(r2);
+        }
+        deferred5_0 = ptr4;
+        deferred5_1 = len4;
+        return getStringFromWasm0(ptr4, len4);
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+        wasm.__wbindgen_export4(deferred5_0, deferred5_1, 1);
+    }
+}
+
+/**
+ * Generate hardware-configuration.nix from probe results.
+ * @param {string} hardware_json
+ * @returns {string}
+ */
+export function generate_hardware_nix(hardware_json) {
+    let deferred3_0;
+    let deferred3_1;
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        const ptr0 = passStringToWasm0(hardware_json, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+        const len0 = WASM_VECTOR_LEN;
+        wasm.generate_hardware_nix(retptr, ptr0, len0);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+        var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
+        var ptr2 = r0;
+        var len2 = r1;
+        if (r3) {
+            ptr2 = 0; len2 = 0;
+            throw takeObject(r2);
+        }
+        deferred3_0 = ptr2;
+        deferred3_1 = len2;
+        return getStringFromWasm0(ptr2, len2);
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+        wasm.__wbindgen_export4(deferred3_0, deferred3_1, 1);
     }
 }
 
@@ -784,6 +931,10 @@ function __wbg_get_imports() {
             const ret = typeof(val) === 'object' && val !== null;
             return ret;
         },
+        __wbg___wbindgen_is_string_cd444516edc5b180: function(arg0) {
+            const ret = typeof(getObject(arg0)) === 'string';
+            return ret;
+        },
         __wbg___wbindgen_is_undefined_9e4d92534c42d778: function(arg0) {
             const ret = getObject(arg0) === undefined;
             return ret;
@@ -817,12 +968,12 @@ function __wbg_get_imports() {
             const ret = getObject(arg0).call(getObject(arg1));
             return addHeapObject(ret);
         }, arguments); },
-        __wbg_done_57b39ecd9addfe81: function(arg0) {
-            const ret = getObject(arg0).done;
-            return ret;
-        },
-        __wbg_entries_58c7934c745daac7: function(arg0) {
-            const ret = Object.entries(getObject(arg0));
+        __wbg_call_4708e0c13bdc8e95: function() { return handleError(function (arg0, arg1, arg2) {
+            const ret = getObject(arg0).call(getObject(arg1), getObject(arg2));
+            return addHeapObject(ret);
+        }, arguments); },
+        __wbg_crypto_86f2631e91b51511: function(arg0) {
+            const ret = getObject(arg0).crypto;
             return addHeapObject(ret);
         },
         __wbg_error_7534b8e9a36f1ab4: function(arg0, arg1) {
@@ -836,13 +987,8 @@ function __wbg_get_imports() {
                 wasm.__wbindgen_export4(deferred0_0, deferred0_1, 1);
             }
         },
-        __wbg_get_9b94d73e6221f75c: function(arg0, arg1) {
-            const ret = getObject(arg0)[arg1 >>> 0];
-            return addHeapObject(ret);
-        },
-        __wbg_get_b3ed3ad4be2bc8ac: function() { return handleError(function (arg0, arg1) {
-            const ret = Reflect.get(getObject(arg0), getObject(arg1));
-            return addHeapObject(ret);
+        __wbg_getRandomValues_b3f15fcbfabb0f8b: function() { return handleError(function (arg0, arg1) {
+            getObject(arg0).getRandomValues(getObject(arg1));
         }, arguments); },
         __wbg_get_with_ref_key_1dc361bd10053bfe: function(arg0, arg1) {
             const ret = getObject(arg0)[getObject(arg1)];
@@ -872,17 +1018,13 @@ function __wbg_get_imports() {
             const ret = Number.isSafeInteger(getObject(arg0));
             return ret;
         },
-        __wbg_iterator_6ff6560ca1568e55: function() {
-            const ret = Symbol.iterator;
-            return addHeapObject(ret);
-        },
         __wbg_length_32ed9a279acd054c: function(arg0) {
             const ret = getObject(arg0).length;
             return ret;
         },
-        __wbg_length_35a7bace40f36eac: function(arg0) {
-            const ret = getObject(arg0).length;
-            return ret;
+        __wbg_msCrypto_d562bbe83e0d4b91: function(arg0) {
+            const ret = getObject(arg0).msCrypto;
+            return addHeapObject(ret);
         },
         __wbg_new_361308b2356cecd0: function() {
             const ret = new Object();
@@ -904,12 +1046,12 @@ function __wbg_get_imports() {
             const ret = new Function(getStringFromWasm0(arg0, arg1));
             return addHeapObject(ret);
         },
-        __wbg_next_3482f54c49e8af19: function() { return handleError(function (arg0) {
-            const ret = getObject(arg0).next();
+        __wbg_new_with_length_a2c39cbe88fd8ff1: function(arg0) {
+            const ret = new Uint8Array(arg0 >>> 0);
             return addHeapObject(ret);
-        }, arguments); },
-        __wbg_next_418f80d8f5303233: function(arg0) {
-            const ret = getObject(arg0).next;
+        },
+        __wbg_node_e1f24f89a7336c2e: function(arg0) {
+            const ret = getObject(arg0).node;
             return addHeapObject(ret);
         },
         __wbg_now_2c95c9de01293173: function(arg0) {
@@ -920,9 +1062,20 @@ function __wbg_get_imports() {
             const ret = getObject(arg0).performance;
             return addHeapObject(ret);
         },
+        __wbg_process_3975fd6c72f520aa: function(arg0) {
+            const ret = getObject(arg0).process;
+            return addHeapObject(ret);
+        },
         __wbg_prototypesetcall_bdcdcc5842e4d77d: function(arg0, arg1, arg2) {
             Uint8Array.prototype.set.call(getArrayU8FromWasm0(arg0, arg1), getObject(arg2));
         },
+        __wbg_randomFillSync_f8c153b79f285817: function() { return handleError(function (arg0, arg1) {
+            getObject(arg0).randomFillSync(takeObject(arg1));
+        }, arguments); },
+        __wbg_require_b74f47fc2d022fd6: function() { return handleError(function () {
+            const ret = module.require;
+            return addHeapObject(ret);
+        }, arguments); },
         __wbg_set_3f1d0b984ed272ed: function(arg0, arg1, arg2) {
             getObject(arg0)[takeObject(arg1)] = takeObject(arg2);
         },
@@ -952,8 +1105,12 @@ function __wbg_get_imports() {
             const ret = typeof window === 'undefined' ? null : window;
             return isLikeNone(ret) ? 0 : addHeapObject(ret);
         },
-        __wbg_value_0546255b415e96c1: function(arg0) {
-            const ret = getObject(arg0).value;
+        __wbg_subarray_a96e1fef17ed23cb: function(arg0, arg1, arg2) {
+            const ret = getObject(arg0).subarray(arg1 >>> 0, arg2 >>> 0);
+            return addHeapObject(ret);
+        },
+        __wbg_versions_4e31226f5e8dc909: function(arg0) {
+            const ret = getObject(arg0).versions;
             return addHeapObject(ret);
         },
         __wbindgen_cast_0000000000000001: function(arg0) {
@@ -967,11 +1124,16 @@ function __wbg_get_imports() {
             return addHeapObject(ret);
         },
         __wbindgen_cast_0000000000000003: function(arg0, arg1) {
+            // Cast intrinsic for `Ref(Slice(U8)) -> NamedExternref("Uint8Array")`.
+            const ret = getArrayU8FromWasm0(arg0, arg1);
+            return addHeapObject(ret);
+        },
+        __wbindgen_cast_0000000000000004: function(arg0, arg1) {
             // Cast intrinsic for `Ref(String) -> Externref`.
             const ret = getStringFromWasm0(arg0, arg1);
             return addHeapObject(ret);
         },
-        __wbindgen_cast_0000000000000004: function(arg0) {
+        __wbindgen_cast_0000000000000005: function(arg0) {
             // Cast intrinsic for `U64 -> Externref`.
             const ret = BigInt.asUintN(64, arg0);
             return addHeapObject(ret);
@@ -990,9 +1152,6 @@ function __wbg_get_imports() {
     };
 }
 
-const InoculationOrchestratorFinalization = (typeof FinalizationRegistry === 'undefined')
-    ? { register: () => {}, unregister: () => {} }
-    : new FinalizationRegistry(ptr => wasm.__wbg_inoculationorchestrator_free(ptr >>> 0, 1));
 const SporeEngineFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_sporeengine_free(ptr >>> 0, 1));
@@ -1133,6 +1292,13 @@ let heap_next = heap.length;
 
 function isLikeNone(x) {
     return x === undefined || x === null;
+}
+
+function passArray8ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 1, 1) >>> 0;
+    getUint8ArrayMemory0().set(arg, ptr / 1);
+    WASM_VECTOR_LEN = arg.length;
+    return ptr;
 }
 
 function passArrayF32ToWasm0(arg, malloc) {

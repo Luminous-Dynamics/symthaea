@@ -22,15 +22,14 @@ pub use consciousness_profile::{
     evaluate_governance_with_reputation, gate_consciousness, is_bootstrap_eligible, needs_refresh,
     requirement_for_basic, requirement_for_constitutional, requirement_for_guardian,
     requirement_for_proposal, requirement_for_voting, should_audit, ConsciousnessCredential,
-    ConsciousnessProfile, ConsciousnessTier, GateAuditInput, GovernanceAuditFilter,
+    ConsciousnessProfile, ConsciousnessTier, ExtensionKey, GateAuditInput, GovernanceAuditFilter,
     GovernanceAuditResult, GovernanceEligibility, GovernanceRequirement, ReputationState,
-    ExtensionKey, GRACE_PERIOD_US, REFRESH_WINDOW_US, REPUTATION_BLACKLIST_THRESHOLD,
-    REPUTATION_DECAY_PER_DAY, REPUTATION_MAX_SLASHES, REPUTATION_RESTORATION_INTERACTIONS,
-    REPUTATION_SLASH_FACTOR,
+    GRACE_PERIOD_US, REFRESH_WINDOW_US, REPUTATION_BLACKLIST_THRESHOLD, REPUTATION_DECAY_PER_DAY,
+    REPUTATION_MAX_SLASHES, REPUTATION_RESTORATION_INTERACTIONS, REPUTATION_SLASH_FACTOR,
 };
 
-pub mod sub_passport;
 pub mod offline_credential;
+pub mod sub_passport;
 
 pub mod validation;
 pub use validation::{check_author_match, check_link_author_match};

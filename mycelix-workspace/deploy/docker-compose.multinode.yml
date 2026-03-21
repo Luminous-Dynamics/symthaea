@@ -1,0 +1,94 @@
+# Mycelix 3-Node Deployment Overlay
+#
+# Extends docker-compose.prod.yml with 2 additional conductor nodes for
+# testing DHT gossip, cross-node hApp calls, and network resilience.
+#
+# Usage:
+#   cd deploy/
+#   cp .env.example .env  # fill in LAIR_PASSPHRASE, cert paths
+#   docker-compose -f docker-compose.prod.yml -f docker-compose.multinode.yml build
+#   docker-compose -f docker-compose.prod.yml -f docker-compose.multinode.yml up -d
+#
+# All 3 nodes share the same bootstrap/signal server for peer discovery.
+# DHT gossip handles data synchronization automatically.
+#
+# Ports:
+#   Node 1 (conductor):  app=8888, admin=4444  (from prod.yml)
+#   Node 2 (conductor2): app=8889, admin=4446
+#   Node 3 (conductor3): app=8890, admin=4447
+#   Observatory:         3000 (connects to node 1)
+#   Nginx:               80/443 (load-balances across all 3 nodes)
+
+services:
+  # ---------------------------------------------------------------------------
+  # Node 2 — Second Holochain conductor
+  # ---------------------------------------------------------------------------
+  conductor2:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.conductor
+    container_name: mycelix-conductor-2
+    restart: unless-stopped
+    environment:
+      - LAIR_PASSPHRASE=${LAIR_PASSPHRASE_NODE2:-${LAIR_PASSPHRASE}}
+    ports:
+      - "127.0.0.1:4446:4444"
+      - "8891:8888"
+    volumes:
+      - holochain-data-node2:/data/holochain
+    networks:
+      - mycelix-net
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8888", "||", "true"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ---------------------------------------------------------------------------
+  # Node 3 — Third Holochain conductor
+  # ---------------------------------------------------------------------------
+  conductor3:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.conductor
+    container_name: mycelix-conductor-3
+    restart: unless-stopped
+    environment:
+      - LAIR_PASSPHRASE=${LAIR_PASSPHRASE_NODE3:-${LAIR_PASSPHRASE}}
+    ports:
+      - "127.0.0.1:4447:4444"
+      - "8890:8888"
+    volumes:
+      - holochain-data-node3:/data/holochain
+    networks:
+      - mycelix-net
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8888", "||", "true"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ---------------------------------------------------------------------------
+  # Override nginx to load-balance across all 3 conductors
+  # ---------------------------------------------------------------------------
+  nginx:
+    volumes:
+      - ./nginx-multinode.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${TLS_CERT_PATH:-./certs/mycelix.crt}:/etc/ssl/certs/mycelix.crt:ro
+      - ${TLS_KEY_PATH:-./certs/mycelix.key}:/etc/ssl/private/mycelix.key:ro
+    depends_on:
+      - conductor
+      - conductor2
+      - conductor3
+      - observatory
+
+# ---------------------------------------------------------------------------
+# Additional Volumes
+# ---------------------------------------------------------------------------
+volumes:
+  holochain-data-node2:
+    driver: local
+  holochain-data-node3:
+    driver: local

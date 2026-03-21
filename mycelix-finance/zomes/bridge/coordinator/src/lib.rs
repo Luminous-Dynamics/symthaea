@@ -172,7 +172,10 @@ pub fn update_collateral_status(input: UpdateCollateralStatusInput) -> ExternRes
 
     // Find the collateral registration
     let links = get_links(
-        LinkQuery::try_new(anchor_hash("collateral_registry")?, LinkTypes::CollateralRegistry)?,
+        LinkQuery::try_new(
+            anchor_hash("collateral_registry")?,
+            LinkTypes::CollateralRegistry,
+        )?,
         GetStrategy::default(),
     )?;
 
@@ -180,10 +183,7 @@ pub fn update_collateral_status(input: UpdateCollateralStatusInput) -> ExternRes
         let hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
         let record = follow_update_chain(hash)?;
-        if let Ok(Some(collateral)) = record
-            .entry()
-            .to_app_option::<CollateralRegistration>()
-        {
+        if let Ok(Some(collateral)) = record.entry().to_app_option::<CollateralRegistration>() {
             if collateral.id == input.collateral_id {
                 // Verify ownership
                 if collateral.owner_did != input.owner_did {
@@ -329,9 +329,9 @@ pub fn deposit_collateral(input: DepositCollateralInput) -> ExternResult<Record>
     let mycel_score = fetch_mycel_score(&input.depositor_did);
     let tier = FeeTier::from_mycel(mycel_score);
     let daily_limit_pct = match tier {
-        FeeTier::Newcomer => 1,   // 1% for newcomers (shouldn't reach here due to tier gate, but defense in depth)
-        FeeTier::Member => 5,     // 5% for members
-        FeeTier::Steward => 10,   // 10% for stewards
+        FeeTier::Newcomer => 1, // 1% for newcomers (shouldn't reach here due to tier gate, but defense in depth)
+        FeeTier::Member => 5,   // 5% for members
+        FeeTier::Steward => 10, // 10% for stewards
     };
 
     // Enforce rate limit: max daily_limit_pct% of vault per day per member
@@ -539,7 +539,12 @@ pub fn redeem_collateral(deposit_id: String) -> ExternResult<Record> {
         FeeTier::Member => 5,
         FeeTier::Steward => 10,
     };
-    enforce_rate_limit(&deposit.depositor_did, deposit.sap_minted, now, redeem_daily_limit_pct)?;
+    enforce_rate_limit(
+        &deposit.depositor_did,
+        deposit.sap_minted,
+        now,
+        redeem_daily_limit_pct,
+    )?;
 
     let redeemed = CollateralBridgeDeposit {
         status: BridgeDepositStatus::Redeemed,
@@ -1052,7 +1057,10 @@ pub struct FinanceBridgeHealth {
 ///
 /// Fetches consensus from the price-oracle zome. If the oracle is unreachable
 /// (bootstrap/standalone), accepts the claimed rate with a warning.
-fn verify_oracle_rate_against_consensus(collateral_type: &str, claimed_rate: f64) -> ExternResult<()> {
+fn verify_oracle_rate_against_consensus(
+    collateral_type: &str,
+    claimed_rate: f64,
+) -> ExternResult<()> {
     use mycelix_finance_types::ORACLE_RATE_TOLERANCE;
 
     #[derive(Serialize, Debug)]
@@ -1073,34 +1081,30 @@ fn verify_oracle_rate_against_consensus(collateral_type: &str, claimed_rate: f64
         None,
         GetConsensusInput { item },
     ) {
-        Ok(ZomeCallResponse::Ok(result)) => {
-            match result.decode::<ConsensusResult>() {
-                Ok(consensus)
-                    if consensus.median_price.is_finite() && consensus.median_price > 0.0 =>
-                {
-                    let deviation =
-                        (claimed_rate - consensus.median_price).abs() / consensus.median_price;
-                    if deviation > ORACLE_RATE_TOLERANCE {
-                        return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                            "Oracle rate {:.6} deviates {:.1}% from consensus {:.6} (max {:.0}%). \
+        Ok(ZomeCallResponse::Ok(result)) => match result.decode::<ConsensusResult>() {
+            Ok(consensus) if consensus.median_price.is_finite() && consensus.median_price > 0.0 => {
+                let deviation =
+                    (claimed_rate - consensus.median_price).abs() / consensus.median_price;
+                if deviation > ORACLE_RATE_TOLERANCE {
+                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "Oracle rate {:.6} deviates {:.1}% from consensus {:.6} (max {:.0}%). \
                              Use get_consensus_price to fetch current rate before depositing.",
-                            claimed_rate,
-                            deviation * 100.0,
-                            consensus.median_price,
-                            ORACLE_RATE_TOLERANCE * 100.0
-                        ))));
-                    }
-                    Ok(())
+                        claimed_rate,
+                        deviation * 100.0,
+                        consensus.median_price,
+                        ORACLE_RATE_TOLERANCE * 100.0
+                    ))));
                 }
-                _ => {
-                    debug!(
-                        "verify_oracle_rate: consensus invalid, accepting claimed rate {:.6}",
-                        claimed_rate
-                    );
-                    Ok(())
-                }
+                Ok(())
             }
-        }
+            _ => {
+                debug!(
+                    "verify_oracle_rate: consensus invalid, accepting claimed rate {:.6}",
+                    claimed_rate
+                );
+                Ok(())
+            }
+        },
         _ => {
             debug!(
                 "verify_oracle_rate: price oracle unreachable, accepting claimed rate {:.6}",
@@ -1256,7 +1260,10 @@ pub fn check_covenants(collateral_id: String) -> ExternResult<Vec<Record>> {
 /// Used by both the extern `check_covenants` and internal covenant enforcement.
 fn get_active_covenants(collateral_id: &str) -> ExternResult<Vec<Record>> {
     let links = get_links(
-        LinkQuery::try_new(anchor_hash(collateral_id)?, LinkTypes::CollateralToCovenants)?,
+        LinkQuery::try_new(
+            anchor_hash(collateral_id)?,
+            LinkTypes::CollateralToCovenants,
+        )?,
         GetStrategy::default(),
     )?;
 
@@ -1316,9 +1323,7 @@ pub struct UpdateCollateralHealthInput {
 /// Fetches current value from the price oracle, computes the LTV ratio,
 /// and stores a CollateralHealth snapshot linked to the collateral.
 #[hdk_extern]
-pub fn update_collateral_health(
-    input: UpdateCollateralHealthInput,
-) -> ExternResult<Record> {
+pub fn update_collateral_health(input: UpdateCollateralHealthInput) -> ExternResult<Record> {
     verify_participant_tier()?;
     let now = sys_time()?;
 
@@ -1346,7 +1351,11 @@ pub fn update_collateral_health(
         collateral_id: input.collateral_id.clone(),
         current_value,
         obligation_amount: input.obligation_amount,
-        ltv_ratio: if ltv_ratio.is_finite() { ltv_ratio } else { 999.0 },
+        ltv_ratio: if ltv_ratio.is_finite() {
+            ltv_ratio
+        } else {
+            999.0
+        },
         status: status.to_string(),
         computed_at: now,
     };
@@ -1398,10 +1407,9 @@ fn fetch_collateral_value(collateral_id: &str) -> u64 {
             collateral_id: collateral_id.to_string(),
         },
     ) {
-        Ok(ZomeCallResponse::Ok(result)) => result
-            .decode::<ValueResult>()
-            .map(|v| v.value)
-            .unwrap_or(0),
+        Ok(ZomeCallResponse::Ok(result)) => {
+            result.decode::<ValueResult>().map(|v| v.value).unwrap_or(0)
+        }
         _ => {
             debug!(
                 "fetch_collateral_value: oracle unreachable for {}, defaulting to 0",
@@ -1431,9 +1439,7 @@ pub struct RegisterEnergyCertificateInput {
 
 /// Register a new energy production certificate. Requires Participant+ tier.
 #[hdk_extern]
-pub fn register_energy_certificate(
-    input: RegisterEnergyCertificateInput,
-) -> ExternResult<Record> {
+pub fn register_energy_certificate(input: RegisterEnergyCertificateInput) -> ExternResult<Record> {
     verify_participant_tier()?;
     verify_caller_is_did(&input.producer_did)?;
     let now = sys_time()?;
@@ -1496,9 +1502,7 @@ pub struct VerifyEnergyCertificateInput {
 
 /// Verify an energy certificate and assign SAP value. Requires Citizen+ tier.
 #[hdk_extern]
-pub fn verify_energy_certificate(
-    input: VerifyEnergyCertificateInput,
-) -> ExternResult<Record> {
+pub fn verify_energy_certificate(input: VerifyEnergyCertificateInput) -> ExternResult<Record> {
     verify_citizen_tier()?;
     verify_caller_is_did(&input.verifier_did)?;
 
@@ -1596,9 +1600,7 @@ pub struct RegisterAgriculturalAssetInput {
 
 /// Register a new agricultural asset. Requires Participant+ tier.
 #[hdk_extern]
-pub fn register_agricultural_asset(
-    input: RegisterAgriculturalAssetInput,
-) -> ExternResult<Record> {
+pub fn register_agricultural_asset(input: RegisterAgriculturalAssetInput) -> ExternResult<Record> {
     verify_participant_tier()?;
     verify_caller_is_did(&input.producer_did)?;
     let now = sys_time()?;
@@ -1645,9 +1647,8 @@ pub fn register_agricultural_asset(
         .to_string(),
     })?;
 
-    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
-        "Asset not found".into()
-    )))
+    get(hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Asset not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1659,9 +1660,7 @@ pub struct VerifyAgriculturalAssetInput {
 
 /// Verify an agricultural asset and assign SAP value. Requires Citizen+ tier.
 #[hdk_extern]
-pub fn verify_agricultural_asset(
-    input: VerifyAgriculturalAssetInput,
-) -> ExternResult<Record> {
+pub fn verify_agricultural_asset(input: VerifyAgriculturalAssetInput) -> ExternResult<Record> {
     verify_citizen_tier()?;
     verify_caller_is_did(&input.verifier_did)?;
 
@@ -1737,13 +1736,12 @@ pub fn create_multi_collateral_position(
         #[serde(rename = "type")]
         _type: String,
     }
-    let components: Vec<Component> =
-        serde_json::from_str(&input.components_json).map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!(
-                "Invalid components JSON: {:?}",
-                e
-            )))
-        })?;
+    let components: Vec<Component> = serde_json::from_str(&input.components_json).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Invalid components JSON: {:?}",
+            e
+        )))
+    })?;
 
     if components.is_empty() {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -1919,7 +1917,10 @@ pub fn verify_fiat_deposit(input: VerifyFiatDepositInput) -> ExternResult<Record
     verify_caller_is_did(&input.verifier_did)?;
 
     let links = get_links(
-        LinkQuery::try_new(anchor_hash("fiat_deposits")?, LinkTypes::FiatDepositRegistry)?,
+        LinkQuery::try_new(
+            anchor_hash("fiat_deposits")?,
+            LinkTypes::FiatDepositRegistry,
+        )?,
         GetStrategy::default(),
     )?;
 
@@ -2009,7 +2010,12 @@ pub fn verify_fiat_deposit(input: VerifyFiatDepositInput) -> ExternResult<Record
 /// Vault value = sum of `sap_minted` for all Confirmed deposits.
 /// Daily activity = sum of `sap_minted` for this member's deposits/redemptions
 /// created within the last 24 hours.
-fn enforce_rate_limit(member_did: &str, new_amount: u64, now: Timestamp, daily_limit_pct: u32) -> ExternResult<()> {
+fn enforce_rate_limit(
+    member_did: &str,
+    new_amount: u64,
+    now: Timestamp,
+    daily_limit_pct: u32,
+) -> ExternResult<()> {
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::CollateralBridgeDeposit,

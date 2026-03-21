@@ -171,6 +171,14 @@ export interface PhiWeightedTally {
   talliedAt: number;
   finalTally: boolean;
   phiTierBreakdown: PhiTierBreakdown;
+  /** Herfindahl-Hirschman Index of vote weight concentration (0.0-1.0) */
+  hhiConcentration?: number;
+  /** Whether vote weight is concentrated (HHI > 0.25) */
+  concentrationWarning?: boolean;
+  /** Vote margin (distance from threshold) */
+  voteMargin?: number;
+  /** Whether the vote margin was suspiciously narrow (< 2%) */
+  narrowMarginWarning?: boolean;
 }
 
 /** Input for tallying Φ-weighted votes */
@@ -268,6 +276,14 @@ export interface ProposalReflection {
   /** Reflection prompts for the group */
   reflectionPrompts: string[];
 
+  // === POWER CONCENTRATION ===
+  /** Herfindahl-Hirschman Index of vote weight concentration (0.0-1.0) */
+  hhiConcentration?: number;
+  /** Whether vote weight is concentrated (HHI > 0.25) */
+  concentrationWarning?: boolean;
+  /** Whether the vote margin was suspiciously narrow (< 2%) */
+  narrowMarginWarning?: boolean;
+
   /** Whether this reflection suggests review before finalizing */
   needsReview: boolean;
   /** Human-readable summary */
@@ -277,6 +293,57 @@ export interface ProposalReflection {
 /** Input for reflecting on a proposal */
 export interface ReflectOnProposalInput {
   proposalId: string;
+}
+
+// ============================================================================
+// TYPES - Cartel Detection (Cross-Proposal Voting Pattern Analysis)
+// ============================================================================
+
+/** Input for bloc detection analysis */
+export interface DetectBlocsInput {
+  /** Minimum shared proposals for a pair to be analyzed (default: 10) */
+  minSharedProposals?: number;
+  /** Similarity threshold for bloc detection (default: 0.90) */
+  similarityThreshold?: number;
+  /** Maximum number of recent proposals to analyze (default: 50) */
+  maxProposals?: number;
+}
+
+/** A detected voting bloc */
+export interface BlocDetection {
+  id: string;
+  detectedAt: number;
+  correlatedPairs: CorrelatedPair[];
+  proposalsAnalyzed: number;
+  maxSimilarity: number;
+  blocDetected: boolean;
+  blocCount: number;
+  summary: string;
+}
+
+/** A pair of agents with correlated voting patterns */
+export interface CorrelatedPair {
+  agentA: string;
+  agentB: string;
+  /** Jaccard similarity (0.0-1.0) */
+  jaccardSimilarity: number;
+  sharedProposals: number;
+  agreementCount: number;
+}
+
+/** Circuit breaker outcome */
+export type CircuitBreakerOutcome =
+  | { type: 'Allow' }
+  | { type: 'Advisory'; reason: string; severity: number }
+  | { type: 'Escalate'; reason: string; severity: number }
+  | { type: 'CoolingPeriod'; reason: string; severity: number; coolingHours: number }
+  | { type: 'MandatoryReview'; reason: string; severity: number };
+
+/** Input for releasing a proposal from cooling period */
+export interface ReleaseCoolingPeriodInput {
+  proposalId: string;
+  /** Reason for release (stored on-chain for audit) */
+  reason: string;
 }
 
 // ============================================================================

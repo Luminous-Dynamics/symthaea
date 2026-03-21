@@ -9,6 +9,7 @@
 //! - Contour closure validation with gap-closing search
 //! - Orientation enforcement (outer CCW, inner CW)
 
+use crate::infill::{generate_infill, InfillConfig};
 use crate::mesh::TriangleMesh;
 use std::collections::HashMap;
 
@@ -114,6 +115,8 @@ pub struct SliceConfig {
     pub tolerance: f32,
     /// Layer height in mm.
     pub layer_height: f32,
+    /// Infill configuration. `None` disables infill generation.
+    pub infill: Option<InfillConfig>,
 }
 
 impl Default for SliceConfig {
@@ -122,6 +125,7 @@ impl Default for SliceConfig {
             nozzle_diameter: 0.4,
             tolerance: 1e-4,
             layer_height: 0.2,
+            infill: Some(InfillConfig::default()),
         }
     }
 }
@@ -134,6 +138,8 @@ pub struct SliceLayer {
     pub outer_contours: Vec<Contour>,
     /// Inner/hole contours (CW winding).
     pub inner_contours: Vec<Contour>,
+    /// Generated infill line segments (empty if infill is disabled).
+    pub infill_lines: Vec<Segment2>,
 }
 
 // ── Spatial hash for O(1) endpoint lookup ───────────────────────────────
@@ -536,11 +542,19 @@ pub fn slice_mesh_at_z(mesh: &TriangleMesh, z: f32, config: &SliceConfig) -> Sli
     // 4. Classify and orient.
     let (outer, inner) = classify_contours(contours);
 
-    SliceLayer {
+    let mut layer = SliceLayer {
         z,
         outer_contours: outer,
         inner_contours: inner,
+        infill_lines: Vec::new(),
+    };
+
+    // 5. Generate infill if configured.
+    if let Some(ref infill_config) = config.infill {
+        layer.infill_lines = generate_infill(&layer, infill_config, config.nozzle_diameter);
     }
+
+    layer
 }
 
 /// Slice a mesh into multiple layers from z_min to z_max.

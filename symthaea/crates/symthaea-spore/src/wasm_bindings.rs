@@ -156,6 +156,18 @@ impl SporeEngine {
         serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
     }
 
+    /// Generate text aware of user input.
+    /// Injects intent signals so generated language relates to user message.
+    /// Returns GenerationResult as JS object with `text`, `num_tokens`, `eos_terminated`.
+    pub fn generate_text_with_input(
+        &mut self,
+        input: &str,
+        max_tokens: usize,
+    ) -> Result<JsValue, JsError> {
+        let result = self.inner.generate_text_with_input(input, max_tokens);
+        serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
+    }
+
     // ======================================================================
     // Reasoning engine (7-step cognitive cycle)
     // ======================================================================

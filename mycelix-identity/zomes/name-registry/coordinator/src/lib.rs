@@ -1,9 +1,9 @@
 use hdk::prelude::*;
-use name_registry_integrity::*;
 use mycelix_bridge_common::{
-    gate_consciousness, requirement_for_basic, requirement_for_voting,
-    GovernanceEligibility, GovernanceRequirement,
+    gate_consciousness, requirement_for_basic, requirement_for_voting, GovernanceEligibility,
+    GovernanceRequirement,
 };
+use name_registry_integrity::*;
 
 fn require_consciousness(
     requirement: &GovernanceRequirement,
@@ -39,8 +39,9 @@ pub fn register_name(entry: MeshNameEntry) -> ExternResult<Record> {
     // Link from agent
     create_link(agent, action_hash.clone(), LinkTypes::AgentToNames, ())?;
 
-    let record = get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Record not found".into())))?;
+    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Record not found".into())
+    ))?;
     Ok(record)
 }
 
@@ -64,7 +65,12 @@ pub fn resolve_name(canonical: String) -> ExternResult<Option<MeshNameEntry>> {
     for link in links.into_iter().rev() {
         if let Some(target) = link.target.into_action_hash() {
             if let Some(record) = get(target, GetOptions::default())? {
-                if let Some(entry) = record.entry().to_app_option::<MeshNameEntry>().ok().flatten() {
+                if let Some(entry) = record
+                    .entry()
+                    .to_app_option::<MeshNameEntry>()
+                    .ok()
+                    .flatten()
+                {
                     return Ok(Some(entry));
                 }
             }
@@ -84,17 +90,30 @@ pub fn transfer_name(transfer: NameTransfer) -> ExternResult<Record> {
     let owner = name_record.action().author().clone();
     let caller = agent_info()?.agent_initial_pubkey;
     if owner != caller {
-        return Err(wasm_error!(WasmErrorInner::Guest("Only owner can transfer".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only owner can transfer".into()
+        )));
     }
 
     let action_hash = create_entry(&EntryTypes::NameTransfer(transfer.clone()))?;
-    create_link(transfer.name_hash, action_hash.clone(), LinkTypes::NameToTransfers, ())?;
+    create_link(
+        transfer.name_hash,
+        action_hash.clone(),
+        LinkTypes::NameToTransfers,
+        (),
+    )?;
 
     // Link new owner
-    create_link(transfer.new_owner, action_hash.clone(), LinkTypes::AgentToNames, ())?;
+    create_link(
+        transfer.new_owner,
+        action_hash.clone(),
+        LinkTypes::AgentToNames,
+        (),
+    )?;
 
-    let record = get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Record not found".into())))?;
+    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Record not found".into())
+    ))?;
     Ok(record)
 }
 
@@ -108,15 +127,23 @@ pub fn renew_name(name_hash: ActionHash) -> ExternResult<Record> {
     let owner = record.action().author().clone();
     let caller = agent_info()?.agent_initial_pubkey;
     if owner != caller {
-        return Err(wasm_error!(WasmErrorInner::Guest("Only owner can renew".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only owner can renew".into()
+        )));
     }
 
-    if let Some(mut entry) = record.entry().to_app_option::<MeshNameEntry>().ok().flatten() {
+    if let Some(mut entry) = record
+        .entry()
+        .to_app_option::<MeshNameEntry>()
+        .ok()
+        .flatten()
+    {
         let one_year_us = 365 * 24 * 3600 * 1_000_000u64;
         entry.expires_at = entry.expires_at.saturating_add(one_year_us);
         let new_hash = update_entry(name_hash, &entry)?;
-        let updated = get(new_hash, GetOptions::default())?
-            .ok_or(wasm_error!(WasmErrorInner::Guest("Updated record not found".into())))?;
+        let updated = get(new_hash, GetOptions::default())?.ok_or(wasm_error!(
+            WasmErrorInner::Guest("Updated record not found".into())
+        ))?;
         Ok(updated)
     } else {
         Err(wasm_error!(WasmErrorInner::Guest("Invalid entry".into())))

@@ -48,6 +48,7 @@ class AmbientTone {
     fun start(scope: CoroutineScope) {
         if (running) return
         running = true
+        Log.i("AmbientTone", "start() called, bufferSize=$bufferSize")
 
         job = scope.launch(Dispatchers.IO) {
             var audioTrack: AudioTrack? = null
@@ -72,7 +73,7 @@ class AmbientTone {
 
                 track = audioTrack
                 audioTrack.play()
-                Log.i("AmbientTone", "Audio started: sampleRate=$sampleRate bufferSize=$bufferSize")
+                Log.i("AmbientTone", "Audio PLAYING: rate=$sampleRate buf=$bufferSize state=${audioTrack.state}")
 
                 // Stereo buffer: interleaved L,R,L,R...
                 val frameCount = (bufferSize / 4).coerceAtLeast(512)
@@ -188,7 +189,7 @@ class AmbientTone {
                     audioTrack.write(buffer, 0, buffer.size)
                 }
             } catch (e: Exception) {
-                Log.w("AmbientTone", "Audio failed", e)
+                Log.e("AmbientTone", "Audio FAILED: ${e.message}", e)
             } finally {
                 try { audioTrack?.stop() } catch (_: Exception) {}
                 try { audioTrack?.release() } catch (_: Exception) {}

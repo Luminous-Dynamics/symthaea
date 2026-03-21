@@ -15,7 +15,14 @@ mod resilience_tests {
     #[test]
     fn resilience_oracle_malicious_external_feed() {
         let community = 100.0;
-        let malicious_values = [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -1.0, 0.0, -0.001];
+        let malicious_values = [
+            f64::NAN,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            -1.0,
+            0.0,
+            -0.001,
+        ];
 
         for &val in &malicious_values {
             let rate = compute_blended_oracle_rate(community, Some(val), 0.95);
@@ -90,7 +97,12 @@ mod resilience_tests {
     fn resilience_demurrage_exact_floor() {
         // Balance == floor: no deduction
         assert_eq!(
-            compute_demurrage_deduction(DEMURRAGE_EXEMPT_FLOOR, DEMURRAGE_EXEMPT_FLOOR, DEMURRAGE_RATE, 86_400),
+            compute_demurrage_deduction(
+                DEMURRAGE_EXEMPT_FLOOR,
+                DEMURRAGE_EXEMPT_FLOOR,
+                DEMURRAGE_RATE,
+                86_400
+            ),
             0
         );
         // Balance == floor + 1: tiny deduction possible
@@ -363,7 +375,10 @@ mod resilience_tests {
             confirmation_timeout_hours: 0,
             max_exchanges_per_day: 0,
         };
-        assert!(params.validate().is_ok(), "Minimum valid params should pass");
+        assert!(
+            params.validate().is_ok(),
+            "Minimum valid params should pass"
+        );
 
         // Max everything
         params.credit_limit = MINTED_CREDIT_LIMIT_MAX;
@@ -372,7 +387,10 @@ mod resilience_tests {
         params.min_service_minutes = 60;
         params.confirmation_timeout_hours = MINTED_CONFIRMATION_TIMEOUT_MAX;
         params.max_exchanges_per_day = MINTED_MAX_EXCHANGES_PER_DAY_MAX;
-        assert!(params.validate().is_ok(), "Maximum valid params should pass");
+        assert!(
+            params.validate().is_ok(),
+            "Maximum valid params should pass"
+        );
     }
 
     /// NaN demurrage rate should be rejected.

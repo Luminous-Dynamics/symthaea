@@ -234,7 +234,6 @@ pub struct GatingConfig {
     pub veto_rewind_alpha: f32,
 
     // ── W3.3: Spectral Coherence Gating ──
-
     /// Enable spectral quality check on thought vectors before generation.
     #[serde(default)]
     pub enable_spectral_gating: bool,
@@ -243,7 +242,6 @@ pub struct GatingConfig {
     pub spectral_quality_threshold: f32,
 
     // ── Temperature-based epistemic gating (Round 2) ──
-
     /// Enable temperature-based epistemic gating (default: true).
     /// Temperature mode divides ALL logits by an epistemic-dependent factor,
     /// producing a flatter distribution while applying mild additive adjustments.
@@ -465,10 +463,7 @@ impl SpectralCoherenceGate {
     }
 
     /// Check if a thought vector is too fragmented for coherent generation.
-    pub fn should_gate(
-        thought_hv: &symthaea_core::hdc::ContinuousHV,
-        threshold: f32,
-    ) -> bool {
+    pub fn should_gate(thought_hv: &symthaea_core::hdc::ContinuousHV, threshold: f32) -> bool {
         Self::spectral_quality(thought_hv) < threshold
     }
 }
@@ -829,7 +824,8 @@ impl EpistemicGate {
                 }
                 for &id in &self.hedging_token_ids {
                     if let Some(l) = logits.get_mut(id as usize) {
-                        *l += self.config.uncertain_hedging_boost * familiarity_scale * backend_scale;
+                        *l +=
+                            self.config.uncertain_hedging_boost * familiarity_scale * backend_scale;
                     }
                 }
             }

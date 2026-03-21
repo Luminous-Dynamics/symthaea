@@ -247,9 +247,8 @@ impl MemoryConsolidator {
             saliences[saliences.len() / 2]
         };
 
-        self.episodes.retain(|e| {
-            !e.consolidated || e.salience >= median_salience
-        });
+        self.episodes
+            .retain(|e| !e.consolidated || e.salience >= median_salience);
     }
 
     /// Total number of episodes stored.
@@ -406,6 +405,9 @@ mod tests {
         consolidator.prune();
         // At least the high-salience one should remain
         assert!(consolidator.episode_count() >= 1);
-        assert!(consolidator.episodes.iter().any(|e| e.description == "high"));
+        assert!(consolidator
+            .episodes
+            .iter()
+            .any(|e| e.description == "high"));
     }
 }

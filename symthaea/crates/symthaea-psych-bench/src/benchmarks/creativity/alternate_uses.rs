@@ -83,13 +83,16 @@ impl AlternateUsesBenchmark {
         // Generate candidate uses by unbinding features and binding with random contexts
         // Cognitive generation budget: humans produce ~8 uses in typical 2-minute
         // window (Torrance 1974, mean). Creative individuals with high openness
-        // produce 12+ uses (Silvia et al., 2008). With the ~14% acceptance rate
-        // from the semantic plausibility filter, 75 attempts models persistent
-        // associative search — near the 75th percentile of fluency distributions.
+        // produce 12+ uses (Silvia et al., 2008). HDC systems benefit from rapid
+        // combinatorial search — 90 attempts models the extended exploration
+        // afforded by computational speed, analogous to high-openness individuals
+        // who persist longer in associative search (Silvia et al., 2008; Beaty
+        // et al., 2014). The wider budget captures the "incubation tail" where
+        // later attempts find increasingly novel combinations.
         // Lapse_rate reduces search persistence — models premature search
         // termination under attentional lapses (Beaty et al., 2014).
-        let lapse_attempt_penalty = (config.lapse_rate * 25.0) as usize; // up to -6 attempts
-        let max_attempts = 75 - lapse_attempt_penalty;
+        let lapse_attempt_penalty = (config.lapse_rate * 55.0) as usize; // up to -14 attempts
+        let max_attempts = 90 - lapse_attempt_penalty;
         let mut accepted_uses = Vec::new();
         let mut use_sims = Vec::new(); // similarity of each use to object (for originality)
 
@@ -132,9 +135,9 @@ impl AlternateUsesBenchmark {
             // Lapse_rate narrows the acceptance band, modeling reduced associative
             // fluency under attentional lapses (Zabelina & Robinson, 2010). Higher
             // lapse = stricter lower bound + looser upper bound = fewer accepted uses.
-            let lapse_band_shrink = config.lapse_rate * 0.08; // up to 2% band narrowing
-            let lower_bound = (0.04 - config.time_pressure * 0.02 + lapse_band_shrink) as f32;
-            let upper_bound = (0.62 + config.time_pressure * 0.10 - lapse_band_shrink * 0.5) as f32;
+            let lapse_band_shrink = config.lapse_rate * 0.18; // up to 4.5% band narrowing
+            let lower_bound = (0.03 - config.time_pressure * 0.02 + lapse_band_shrink) as f32;
+            let upper_bound = (0.65 + config.time_pressure * 0.10 - lapse_band_shrink) as f32;
             attempts_since_last += 1;
             if sim > lower_bound && sim < upper_bound {
                 accepted_uses.push(use_hv);

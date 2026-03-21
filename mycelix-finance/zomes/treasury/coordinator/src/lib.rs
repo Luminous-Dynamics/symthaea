@@ -1407,10 +1407,7 @@ pub fn execute_dkg_allocation(input: DkgAllocationInput) -> ExternResult<Record>
         recipient_did: input.recipient_did.clone(),
         amount: input.amount,
         currency: treasury.currency.clone(),
-        purpose: format!(
-            "[DKG] {} (committee: {})",
-            input.reason, input.committee_id
-        ),
+        purpose: format!("[DKG] {} (committee: {})", input.reason, input.committee_id),
         status: AllocationStatus::Executed,
         approved_by: vec![format!("dkg:{}", input.committee_id)],
         created: now,

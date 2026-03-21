@@ -335,9 +335,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::CollateralBridgeDeposit(deposit) => {
                     validate_update_collateral_bridge_deposit(action, deposit)
                 }
-                EntryTypes::Covenant(covenant) => {
-                    validate_update_covenant(action, covenant)
-                }
+                EntryTypes::Covenant(covenant) => validate_update_covenant(action, covenant),
                 EntryTypes::CollateralHealth(_) => {
                     // Health entries are append-only snapshots; updates are always valid
                     Ok(ValidateCallbackResult::Valid)
@@ -700,7 +698,9 @@ fn validate_create_covenant(
     covenant: Covenant,
 ) -> ExternResult<ValidateCallbackResult> {
     if covenant.id.is_empty() || covenant.id.len() > MAX_REFERENCE_LEN {
-        return Ok(ValidateCallbackResult::Invalid("Covenant ID invalid".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Covenant ID invalid".into(),
+        ));
     }
     if covenant.collateral_id.is_empty() || covenant.collateral_id.len() > MAX_REFERENCE_LEN {
         return Ok(ValidateCallbackResult::Invalid(
@@ -732,15 +732,16 @@ fn validate_update_covenant(
     covenant: Covenant,
 ) -> ExternResult<ValidateCallbackResult> {
     // Core invariants must hold
-    if !covenant.beneficiary_did.starts_with("did:")
-        || covenant.beneficiary_did.len() > MAX_DID_LEN
+    if !covenant.beneficiary_did.starts_with("did:") || covenant.beneficiary_did.len() > MAX_DID_LEN
     {
         return Ok(ValidateCallbackResult::Invalid(
             "Beneficiary DID invalid".into(),
         ));
     }
     if covenant.id.is_empty() || covenant.id.len() > MAX_REFERENCE_LEN {
-        return Ok(ValidateCallbackResult::Invalid("Covenant ID invalid".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Covenant ID invalid".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -857,9 +858,7 @@ fn validate_create_energy_certificate(
         ));
     }
     if cert.project_id.is_empty() || cert.project_id.len() > MAX_REFERENCE_LEN {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Project ID invalid".into(),
-        ));
+        return Ok(ValidateCallbackResult::Invalid("Project ID invalid".into()));
     }
     if !cert.producer_did.starts_with("did:") || cert.producer_did.len() > MAX_DID_LEN {
         return Ok(ValidateCallbackResult::Invalid(
@@ -871,18 +870,12 @@ fn validate_create_energy_certificate(
             "kWh produced must be a finite positive number".into(),
         ));
     }
-    if !cert.location_lat.is_finite()
-        || cert.location_lat < -90.0
-        || cert.location_lat > 90.0
-    {
+    if !cert.location_lat.is_finite() || cert.location_lat < -90.0 || cert.location_lat > 90.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Latitude must be between -90 and 90".into(),
         ));
     }
-    if !cert.location_lon.is_finite()
-        || cert.location_lon < -180.0
-        || cert.location_lon > 180.0
-    {
+    if !cert.location_lon.is_finite() || cert.location_lon < -180.0 || cert.location_lon > 180.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Longitude must be between -180 and 180".into(),
         ));
@@ -935,26 +928,19 @@ fn validate_create_agricultural_asset(
         ));
     }
     if asset.asset_type.is_empty() || asset.asset_type.len() > MAX_REFERENCE_LEN {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Asset type invalid".into(),
-        ));
+        return Ok(ValidateCallbackResult::Invalid("Asset type invalid".into()));
     }
     if !asset.quantity_kg.is_finite() || asset.quantity_kg <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Quantity must be a finite positive number".into(),
         ));
     }
-    if !asset.location_lat.is_finite()
-        || asset.location_lat < -90.0
-        || asset.location_lat > 90.0
-    {
+    if !asset.location_lat.is_finite() || asset.location_lat < -90.0 || asset.location_lat > 90.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Latitude must be between -90 and 90".into(),
         ));
     }
-    if !asset.location_lon.is_finite()
-        || asset.location_lon < -180.0
-        || asset.location_lon > 180.0
+    if !asset.location_lon.is_finite() || asset.location_lon < -180.0 || asset.location_lon > 180.0
     {
         return Ok(ValidateCallbackResult::Invalid(
             "Longitude must be between -180 and 180".into(),
@@ -999,9 +985,7 @@ fn validate_create_multi_collateral_position(
         ));
     }
     if !pos.holder_did.starts_with("did:") || pos.holder_did.len() > MAX_DID_LEN {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Holder DID invalid".into(),
-        ));
+        return Ok(ValidateCallbackResult::Invalid("Holder DID invalid".into()));
     }
     if pos.components_json.is_empty() || pos.components_json.len() > MAX_COMPONENTS_JSON_LEN {
         return Ok(ValidateCallbackResult::Invalid(
@@ -1029,9 +1013,7 @@ fn validate_update_multi_collateral_position(
     pos: MultiCollateralPosition,
 ) -> ExternResult<ValidateCallbackResult> {
     if !pos.holder_did.starts_with("did:") || pos.holder_did.len() > MAX_DID_LEN {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Holder DID invalid".into(),
-        ));
+        return Ok(ValidateCallbackResult::Invalid("Holder DID invalid".into()));
     }
     if !pos.effective_ltv.is_finite() || pos.effective_ltv < 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
@@ -1754,11 +1736,9 @@ mod tests {
 
     #[test]
     fn test_covenant_create_valid() {
-        let result = validate_create_covenant(
-            EntryCreationAction::Create(make_create()),
-            valid_covenant(),
-        )
-        .unwrap();
+        let result =
+            validate_create_covenant(EntryCreationAction::Create(make_create()), valid_covenant())
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Valid));
     }
 
@@ -2230,7 +2210,9 @@ mod tests {
 
     #[test]
     fn test_multi_position_update_valid() {
-        let result = validate_update_multi_collateral_position(make_update(), valid_multi_position()).unwrap();
+        let result =
+            validate_update_multi_collateral_position(make_update(), valid_multi_position())
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Valid));
     }
 

@@ -10,6 +10,9 @@ pub mod transport;
 pub mod dedup_cache;
 pub mod encryption;
 pub mod meshtastic;
+pub mod espnow;
+pub mod reticulum;
+pub mod ccsds;
 
 #[cfg(feature = "mqtt")]
 pub mod mqtt;

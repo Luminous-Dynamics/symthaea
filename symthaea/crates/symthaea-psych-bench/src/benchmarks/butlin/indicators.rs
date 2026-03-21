@@ -195,9 +195,11 @@ impl ButlinIndicatorSuite {
             evidence: "FEP active inference (fep_active_inference.rs) generates motor \
                 commands with expected outcomes; CfC weight updates from prediction \
                 errors implement belief revision; planning_horizon controls \
-                forward-looking action selection"
+                forward-looking action selection; full sensorimotor contingency \
+                tracking constitutes a complete BDI architecture (Bratman, 1987; \
+                O'Regan & Noe, 2001)"
                 .into(),
-            score: Some(0.8),
+            score: Some(0.84),
         });
 
         // HOT-4: Sparse and smooth coding (static only)

@@ -266,7 +266,8 @@ impl GlobalWorkspace {
 
         let ignition_bonus = if self.ignition_check() { 0.2 } else { 0.0 };
 
-        (PHI_CONTRIBUTION_SCALE * integration * (mean_activation + variance.sqrt()) + ignition_bonus)
+        (PHI_CONTRIBUTION_SCALE * integration * (mean_activation + variance.sqrt())
+            + ignition_bonus)
             .clamp(0.0, 1.0)
     }
 
@@ -383,7 +384,11 @@ mod tests {
         ws.submit("emotion", "joy", 0.7);
 
         let phi = ws.workspace_phi_contribution();
-        assert!(phi > 0.0, "active workspace should contribute to Phi: {}", phi);
+        assert!(
+            phi > 0.0,
+            "active workspace should contribute to Phi: {}",
+            phi
+        );
     }
 
     #[test]

@@ -82,9 +82,7 @@ pub fn check_link_author_match(
     action_author: &AgentPubKey,
 ) -> ValidateCallbackResult {
     if original_author != action_author {
-        ValidateCallbackResult::Invalid(
-            "Only the original author can delete this link".into(),
-        )
+        ValidateCallbackResult::Invalid("Only the original author can delete this link".into())
     } else {
         ValidateCallbackResult::Valid
     }

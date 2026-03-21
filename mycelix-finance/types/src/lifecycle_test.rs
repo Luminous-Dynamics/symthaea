@@ -169,8 +169,7 @@ mod lifecycle_tests {
         let community_rate = 10_000.0;
         let external_rate = 10_200.0; // 2% higher
         let confidence = 0.8;
-        let blended =
-            compute_blended_oracle_rate(community_rate, Some(external_rate), confidence);
+        let blended = compute_blended_oracle_rate(community_rate, Some(external_rate), confidence);
 
         // Blended should be between community and external
         assert!(blended > community_rate && blended < external_rate);

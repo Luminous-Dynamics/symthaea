@@ -125,19 +125,34 @@ pub fn apply_demurrage(input: ApplyDemurrageInput) -> ExternResult<DemurrageResu
     if let Some(ref pool_id) = input.local_commons_pool_id {
         if !try_deliver_compost(pool_id, local_amount, &input.member_did) {
             fully_redistributed = false;
-            queue_pending_compost(pool_id, local_amount, &input.member_did, CompostPoolTier::Local)?;
+            queue_pending_compost(
+                pool_id,
+                local_amount,
+                &input.member_did,
+                CompostPoolTier::Local,
+            )?;
         }
     }
     if let Some(ref pool_id) = input.regional_commons_pool_id {
         if !try_deliver_compost(pool_id, regional_amount, &input.member_did) {
             fully_redistributed = false;
-            queue_pending_compost(pool_id, regional_amount, &input.member_did, CompostPoolTier::Regional)?;
+            queue_pending_compost(
+                pool_id,
+                regional_amount,
+                &input.member_did,
+                CompostPoolTier::Regional,
+            )?;
         }
     }
     if let Some(ref pool_id) = input.global_commons_pool_id {
         if !try_deliver_compost(pool_id, global_amount, &input.member_did) {
             fully_redistributed = false;
-            queue_pending_compost(pool_id, global_amount, &input.member_did, CompostPoolTier::Global)?;
+            queue_pending_compost(
+                pool_id,
+                global_amount,
+                &input.member_did,
+                CompostPoolTier::Global,
+            )?;
         }
     }
 
@@ -234,11 +249,12 @@ fn queue_pending_compost(
         created_at_micros: now.as_micros(),
         retry_count: COMPOST_MAX_RETRIES,
     };
-    let tag_bytes =
-        serde_json::to_vec(&pending).map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
+    let tag_bytes = serde_json::to_vec(&pending).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
             "Failed to serialize PendingCompost: {:?}",
             e
-        ))))?;
+        )))
+    })?;
     let anchor = anchor_hash(PENDING_COMPOST_ANCHOR)?;
     create_link(
         anchor,
@@ -288,7 +304,11 @@ fn drain_pending_compost_inner() -> ExternResult<u32> {
             }
         };
 
-        if try_deliver_compost(&pending.commons_pool_id, pending.amount, &pending.source_member_did) {
+        if try_deliver_compost(
+            &pending.commons_pool_id,
+            pending.amount,
+            &pending.source_member_did,
+        ) {
             // Success — remove from queue
             delete_link(link.create_link_hash.clone(), GetOptions::default())?;
             drained += 1;
@@ -326,7 +346,10 @@ const DEMURRAGE_MIN_ELAPSED_SECONDS: u64 = 60;
 pub fn credit_sap(input: CreditSapInput) -> ExternResult<Record> {
     // Opportunistically drain any pending compost deliveries
     if let Err(e) = drain_pending_compost_inner() {
-        debug!("credit_sap: pending compost drain failed (non-fatal): {:?}", e);
+        debug!(
+            "credit_sap: pending compost drain failed (non-fatal): {:?}",
+            e
+        );
     }
 
     // Check if this member has no balance — if so, auto-initialize (no race concern for create)
@@ -433,7 +456,10 @@ pub struct CreditSapInput {
 pub fn debit_sap(input: DebitSapInput) -> ExternResult<Record> {
     // Opportunistically drain any pending compost deliveries
     if let Err(e) = drain_pending_compost_inner() {
-        debug!("debit_sap: pending compost drain failed (non-fatal): {:?}", e);
+        debug!(
+            "debit_sap: pending compost drain failed (non-fatal): {:?}",
+            e
+        );
     }
 
     for attempt in 0..MAX_SAP_RETRIES {
@@ -2144,9 +2170,9 @@ fn get_hearth_pool_record(hearth_did: &str) -> ExternResult<(Record, HearthSapPo
         (),
     )?;
 
-    let record = get(hash, GetOptions::default())?.ok_or(wasm_error!(
-        WasmErrorInner::Guest("HearthSapPool not found after creation".into())
-    ))?;
+    let record = get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "HearthSapPool not found after creation".into()
+    )))?;
     Ok((record, pool))
 }
 

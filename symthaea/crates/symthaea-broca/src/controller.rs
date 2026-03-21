@@ -87,13 +87,25 @@ pub struct LanguageControllerConfig {
     pub dt_max: f32,
 
     // ── W3.1: Orthogonal Positional Encoding ──
-
     /// Replace cyclic permutation with Gram-Schmidt orthogonal position bases.
     #[serde(default)]
     pub enable_orthogonal_positions: bool,
     /// Number of orthogonal position vectors to generate. Default 512.
     #[serde(default = "default_orthogonal_position_count")]
     pub orthogonal_position_count: usize,
+
+    // ── Thought-Seeded CfC State ──
+    /// When true, `seed_from_thought()` projects the thought HV into each
+    /// CfC neuron's initial state instead of starting from zeros.
+    /// This makes early tokens thought-dependent (different intents → different starts)
+    /// and gives coherence monitoring a non-zero baseline.
+    #[serde(default = "default_true")]
+    pub enable_thought_seeding: bool,
+    /// Scaling factor for thought seed injection (0.0-1.0).
+    /// Controls how strongly the thought HV influences the initial CfC state.
+    /// Default 0.3 — gentle seeding that doesn't overwhelm learned dynamics.
+    #[serde(default = "default_thought_seed_scale")]
+    pub thought_seed_scale: f32,
 }
 
 fn default_logit_scale() -> f32 {

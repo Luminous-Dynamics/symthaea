@@ -1,0 +1,30 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/manufacturing_common",
+    "zomes/workorders/coordinator",
+    "zomes/workorders/integrity",
+    "zomes/bom/coordinator",
+    "zomes/bom/integrity",
+    "zomes/operations/coordinator",
+    "zomes/operations/integrity",
+    "zomes/machines/coordinator",
+    "zomes/machines/integrity",
+    "zomes/planning/coordinator",
+    "zomes/planning/integrity",
+    "zomes/bridge/coordinator",
+    "zomes/bridge/integrity",
+]
+
+[workspace.dependencies]
+hdi = "0.5"
+hdk = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[workspace.lints.clippy]
+all = "warn"
+
+[profile.release]
+opt-level = "z"
+lto = true

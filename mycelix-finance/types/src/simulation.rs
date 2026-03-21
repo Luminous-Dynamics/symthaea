@@ -34,7 +34,9 @@ mod economic_simulations {
     /// Simple PRNG (xorshift64) for deterministic simulations without external deps.
     struct Rng(u64);
     impl Rng {
-        fn new(seed: u64) -> Self { Self(seed) }
+        fn new(seed: u64) -> Self {
+            Self(seed)
+        }
         fn next_u64(&mut self) -> u64 {
             self.0 ^= self.0 << 13;
             self.0 ^= self.0 >> 7;
@@ -86,7 +88,11 @@ mod economic_simulations {
 
         // Verify no negative balances
         for agent in &agents {
-            assert!(agent.sap_balance > 0, "Agent {} balance went to 0", agent.did);
+            assert!(
+                agent.sap_balance > 0,
+                "Agent {} balance went to 0",
+                agent.did
+            );
         }
 
         // Verify total compost collected is approximately 2% of eligible balance
@@ -94,7 +100,10 @@ mod economic_simulations {
         let total_remaining: u64 = agents.iter().map(|a| a.sap_balance).sum();
         let total_loss = total_initial - total_remaining;
 
-        assert_eq!(total_loss, total_compost, "Conservation: loss must equal compost");
+        assert_eq!(
+            total_loss, total_compost,
+            "Conservation: loss must equal compost"
+        );
 
         // Each agent started with 10,000 SAP, exempt floor is 1,000 SAP.
         // Eligible = 9,000 SAP. After 1 year at 2%, should lose ~2% of eligible.
@@ -103,13 +112,16 @@ mod economic_simulations {
         let eligible_initial = initial_sap - DEMURRAGE_EXEMPT_FLOOR;
         let expected_remaining = eligible_initial as f64 * (-DEMURRAGE_RATE * 1.0f64).exp();
         let actual_remaining = agents[0].sap_balance - DEMURRAGE_EXEMPT_FLOOR;
-        let error_pct = ((actual_remaining as f64 - expected_remaining) / expected_remaining * 100.0).abs();
+        let error_pct =
+            ((actual_remaining as f64 - expected_remaining) / expected_remaining * 100.0).abs();
 
         // Allow 1% error due to daily discretization
         assert!(
             error_pct < 1.0,
             "Demurrage error too large: {:.2}% (expected remaining ~{:.0}, got {})",
-            error_pct, expected_remaining, actual_remaining
+            error_pct,
+            expected_remaining,
+            actual_remaining
         );
     }
 
@@ -129,7 +141,10 @@ mod economic_simulations {
             agent.sap_balance = agent.sap_balance.saturating_sub(deduction);
         }
 
-        assert_eq!(agent.sap_balance, small_balance, "Balance at exempt floor should not decay");
+        assert_eq!(
+            agent.sap_balance, small_balance,
+            "Balance at exempt floor should not decay"
+        );
     }
 
     /// Verify demurrage doesn't reduce balance below exempt floor.
@@ -150,7 +165,8 @@ mod economic_simulations {
             assert!(
                 agent.sap_balance >= DEMURRAGE_EXEMPT_FLOOR,
                 "Balance {} dropped below exempt floor {}",
-                agent.sap_balance, DEMURRAGE_EXEMPT_FLOOR
+                agent.sap_balance,
+                DEMURRAGE_EXEMPT_FLOOR
             );
         }
     }
@@ -183,8 +199,10 @@ mod economic_simulations {
             let provider_new = agents[provider].tend_balance - hours;
             let receiver_new = agents[receiver].tend_balance + hours;
 
-            if provider_new >= -limit && provider_new <= limit
-                && receiver_new >= -limit && receiver_new <= limit
+            if provider_new >= -limit
+                && provider_new <= limit
+                && receiver_new >= -limit
+                && receiver_new <= limit
             {
                 agents[provider].tend_balance -= hours;
                 agents[receiver].tend_balance += hours;
@@ -193,10 +211,18 @@ mod economic_simulations {
 
             // Verify zero-sum after every exchange
             let total: i32 = agents.iter().map(|a| a.tend_balance).sum();
-            assert_eq!(total, 0, "Zero-sum violated after exchange {}", successful_exchanges);
+            assert_eq!(
+                total, 0,
+                "Zero-sum violated after exchange {}",
+                successful_exchanges
+            );
         }
 
-        assert!(successful_exchanges > 1000, "Too few successful exchanges: {}", successful_exchanges);
+        assert!(
+            successful_exchanges > 1000,
+            "Too few successful exchanges: {}",
+            successful_exchanges
+        );
 
         // Final zero-sum check
         let total: i32 = agents.iter().map(|a| a.tend_balance).sum();
@@ -300,7 +326,10 @@ mod economic_simulations {
         // Healthy (<80%): old LTV < 40% → about 22% of positions
         // Liquidation (>95%): old LTV > 47.5% → about 61% of positions
         assert!(liquidation > 0, "50% crash should cause some liquidations");
-        assert!(healthy > 0, "Some conservative positions should survive 50% crash");
+        assert!(
+            healthy > 0,
+            "Some conservative positions should survive 50% crash"
+        );
 
         // Print distribution for manual inspection
         let _ = (healthy, warning, margin_call, liquidation); // used in asserts above
@@ -379,7 +408,8 @@ mod economic_simulations {
 
         // The bonus gives ~17.6% more headroom
         let headroom_increase = (effective_liquidation_diverse - effective_liquidation_single)
-            / effective_liquidation_single * 100.0;
+            / effective_liquidation_single
+            * 100.0;
         assert!(
             headroom_increase > 15.0 && headroom_increase < 20.0,
             "Headroom increase should be ~17.6%, got {:.1}%",
@@ -391,33 +421,33 @@ mod economic_simulations {
     /// the same 5% bonus, but overall position may not justify the complexity.
     #[test]
     fn sim_diversification_marginal_returns() {
-        let mut components = vec![
-            CollateralComponent {
-                asset_id: "a".into(),
-                asset_class: CollateralAssetClass::RealEstate,
-                weight: 1.0,
-                current_value: 1000,
-            },
-        ];
+        let mut components = vec![CollateralComponent {
+            asset_id: "a".into(),
+            asset_class: CollateralAssetClass::RealEstate,
+            weight: 1.0,
+            current_value: 1000,
+        }];
 
-        let bonuses: Vec<f64> = (0..6).map(|i| {
-            if i > 0 {
-                let class = match i {
-                    1 => CollateralAssetClass::EnergyCertificate,
-                    2 => CollateralAssetClass::AgriculturalAsset,
-                    3 => CollateralAssetClass::CarbonCredit,
-                    4 => CollateralAssetClass::Vehicle,
-                    _ => CollateralAssetClass::Equipment,
-                };
-                components.push(CollateralComponent {
-                    asset_id: format!("asset_{}", i),
-                    asset_class: class,
-                    weight: 1.0,
-                    current_value: 1000,
-                });
-            }
-            compute_diversification_bonus(&components)
-        }).collect();
+        let bonuses: Vec<f64> = (0..6)
+            .map(|i| {
+                if i > 0 {
+                    let class = match i {
+                        1 => CollateralAssetClass::EnergyCertificate,
+                        2 => CollateralAssetClass::AgriculturalAsset,
+                        3 => CollateralAssetClass::CarbonCredit,
+                        4 => CollateralAssetClass::Vehicle,
+                        _ => CollateralAssetClass::Equipment,
+                    };
+                    components.push(CollateralComponent {
+                        asset_id: format!("asset_{}", i),
+                        asset_class: class,
+                        weight: 1.0,
+                        current_value: 1000,
+                    });
+                }
+                compute_diversification_bonus(&components)
+            })
+            .collect();
 
         // Verify: 0%, 5%, 10%, 15%, 20%, 20% (capped)
         assert_eq!(bonuses[0], 0.0);
@@ -481,9 +511,11 @@ mod economic_simulations {
         // After demurrage: positive balances decrease, but negative balances don't.
         // So sum(balances) becomes negative by total_compost.
         assert_eq!(
-            balance_sum + total_compost, 0,
+            balance_sum + total_compost,
+            0,
             "Minted currency zero-sum violated: balances={}, compost={}",
-            balance_sum, total_compost
+            balance_sum,
+            total_compost
         );
     }
 
@@ -514,23 +546,34 @@ mod economic_simulations {
 
         // Compute variance of blended vs raw
         let raw_mean: f64 = raw_rates.iter().sum::<f64>() / raw_rates.len() as f64;
-        let raw_variance: f64 = raw_rates.iter().map(|r| (r - raw_mean).powi(2)).sum::<f64>() / raw_rates.len() as f64;
+        let raw_variance: f64 = raw_rates
+            .iter()
+            .map(|r| (r - raw_mean).powi(2))
+            .sum::<f64>()
+            / raw_rates.len() as f64;
 
         let blended_mean: f64 = blended_rates.iter().sum::<f64>() / blended_rates.len() as f64;
-        let blended_variance: f64 = blended_rates.iter().map(|r| (r - blended_mean).powi(2)).sum::<f64>() / blended_rates.len() as f64;
+        let blended_variance: f64 = blended_rates
+            .iter()
+            .map(|r| (r - blended_mean).powi(2))
+            .sum::<f64>()
+            / blended_rates.len() as f64;
 
         // Blended should have significantly lower variance
         assert!(
             blended_variance < raw_variance * 0.5,
             "Blended variance ({:.2}) should be < 50% of raw variance ({:.2})",
-            blended_variance, raw_variance
+            blended_variance,
+            raw_variance
         );
 
         // Blended mean should be closer to community rate
         assert!(
             (blended_mean - community_rate).abs() < (raw_mean - community_rate).abs() + 1.0,
             "Blended mean ({:.2}) should be closer to community rate ({}) than raw mean ({:.2})",
-            blended_mean, community_rate, raw_mean
+            blended_mean,
+            community_rate,
+            raw_mean
         );
     }
 
@@ -559,8 +602,8 @@ mod economic_simulations {
         // Member: 0.3 <= score <= 0.7 → 40% of agents
         // Steward: score > 0.7 → 30% of agents (actually 29.9% due to exclusive >)
         assert_eq!(newcomer, 300); // 0.000 to 0.299
-        assert_eq!(member, 401);   // 0.300 to 0.700
-        assert_eq!(steward, 299);  // 0.701 to 0.999
+        assert_eq!(member, 401); // 0.300 to 0.700
+        assert_eq!(steward, 299); // 0.701 to 0.999
 
         // Verify fee rates are monotonically decreasing
         assert!(FeeTier::Newcomer.base_fee_rate() > FeeTier::Member.base_fee_rate());

@@ -298,12 +298,30 @@ mod tests {
 
     #[test]
     fn tier_degrade_levels() {
-        assert_eq!(ConsciousnessTier::Guardian.degrade(0), ConsciousnessTier::Guardian);
-        assert_eq!(ConsciousnessTier::Guardian.degrade(1), ConsciousnessTier::Steward);
-        assert_eq!(ConsciousnessTier::Guardian.degrade(2), ConsciousnessTier::Citizen);
-        assert_eq!(ConsciousnessTier::Guardian.degrade(3), ConsciousnessTier::Participant);
-        assert_eq!(ConsciousnessTier::Guardian.degrade(4), ConsciousnessTier::Observer);
-        assert_eq!(ConsciousnessTier::Guardian.degrade(100), ConsciousnessTier::Observer);
+        assert_eq!(
+            ConsciousnessTier::Guardian.degrade(0),
+            ConsciousnessTier::Guardian
+        );
+        assert_eq!(
+            ConsciousnessTier::Guardian.degrade(1),
+            ConsciousnessTier::Steward
+        );
+        assert_eq!(
+            ConsciousnessTier::Guardian.degrade(2),
+            ConsciousnessTier::Citizen
+        );
+        assert_eq!(
+            ConsciousnessTier::Guardian.degrade(3),
+            ConsciousnessTier::Participant
+        );
+        assert_eq!(
+            ConsciousnessTier::Guardian.degrade(4),
+            ConsciousnessTier::Observer
+        );
+        assert_eq!(
+            ConsciousnessTier::Guardian.degrade(100),
+            ConsciousnessTier::Observer
+        );
     }
 
     #[test]

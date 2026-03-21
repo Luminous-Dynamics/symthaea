@@ -81,6 +81,27 @@ impl ProposalTier {
         }
     }
 
+    /// Absolute minimum voter count for this tier, regardless of network size.
+    /// Prevents small-network capture (e.g., 3 of 5 agents = 60% in a tiny network).
+    pub fn absolute_quorum_floor(&self) -> u64 {
+        match self {
+            ProposalTier::Basic => 3,           // At least 3 voters
+            ProposalTier::Major => 5,           // At least 5 voters
+            ProposalTier::Constitutional => 10, // At least 10 voters
+        }
+    }
+
+    /// Effective quorum: max(percentage-based, absolute floor).
+    /// This ensures small communities can't be trivially captured.
+    ///
+    /// Returns the minimum number of voters required for this tier
+    /// given the total number of eligible voters.
+    pub fn effective_quorum(&self, eligible_voters: u64) -> u64 {
+        let percentage_quorum =
+            (eligible_voters as f64 * self.quorum_requirement()).ceil() as u64;
+        percentage_quorum.max(self.absolute_quorum_floor())
+    }
+
     /// Get the approval threshold for this tier
     pub fn approval_threshold(&self) -> f64 {
         match self {
@@ -445,6 +466,22 @@ pub struct PhiWeightedTally {
     /// Fraction of votes with verified consciousness data (phi_enhanced / total)
     #[serde(default)]
     pub phi_coverage: f64,
+    /// Herfindahl-Hirschman Index of vote weight concentration (0.0-1.0).
+    /// HHI = Σ(share_i²) where share_i = weight_i / total_weight.
+    /// 0.0 = perfectly distributed, 1.0 = single voter controls all.
+    /// Threshold: HHI > 0.25 indicates concentrated voting power.
+    #[serde(default)]
+    pub hhi_concentration: f64,
+    /// Whether HHI exceeds the concentration warning threshold (0.25).
+    #[serde(default)]
+    pub concentration_warning: bool,
+    /// Vote margin (approval_rate distance from threshold).
+    /// Values close to 0.0 indicate suspiciously close outcomes.
+    #[serde(default)]
+    pub vote_margin: f64,
+    /// Whether the vote margin is below 2% (narrow outcome warning).
+    #[serde(default)]
+    pub narrow_margin_warning: bool,
 }
 
 /// Breakdown of votes by voter Φ tier
@@ -832,6 +869,18 @@ pub struct ProposalReflection {
     /// Reflection prompts for the group
     pub reflection_prompts: Vec<String>,
 
+    // === POWER CONCENTRATION ===
+    /// Herfindahl-Hirschman Index from the tally (0.0-1.0).
+    /// Measures vote weight concentration. > 0.25 = warning.
+    #[serde(default)]
+    pub hhi_concentration: f64,
+    /// Whether vote weight is concentrated (HHI > 0.25)
+    #[serde(default)]
+    pub concentration_warning: bool,
+    /// Whether the vote margin was suspiciously narrow (< 2%)
+    #[serde(default)]
+    pub narrow_margin_warning: bool,
+
     /// Whether this reflection suggests review before finalizing
     pub needs_review: bool,
     /// Human-readable summary
@@ -849,6 +898,8 @@ impl ProposalReflection {
             || self.rapid_convergence_warning
             || self.fragmentation_warning
             || self.harmony_coverage < 0.3
+            || self.concentration_warning
+            || self.narrow_margin_warning
     }
 
     /// Get a severity score (0-10) based on concerns
@@ -874,8 +925,278 @@ impl ProposalReflection {
         if self.centralization > 0.8 {
             severity += 1;
         }
+        if self.concentration_warning {
+            severity += 3;
+        }
+        if self.narrow_margin_warning {
+            severity += 2;
+        }
 
         severity.min(10)
+    }
+
+    /// Evaluate circuit breaker outcome for this reflection.
+    ///
+    /// Returns an enforceable action based on concern severity:
+    /// - severity < 5: Allow (no intervention)
+    /// - severity 5-6: Advisory (flag but allow)
+    /// - severity 7-8: Escalate (require next tier's thresholds)
+    /// - severity >= 9: CoolingPeriod (block finalization for 72 hours)
+    ///
+    /// Special case: concentration_warning + narrow_margin_warning together
+    /// triggers MandatoryReview regardless of severity.
+    pub fn circuit_breaker_outcome(&self) -> CircuitBreakerOutcome {
+        self.circuit_breaker_outcome_with_bloc_context(0)
+    }
+
+    /// Evaluate circuit breaker with bloc detection context.
+    ///
+    /// `bloc_voter_count` is the number of voters in this proposal who are
+    /// members of a previously detected voting bloc. Each bloc voter adds +1
+    /// to the effective severity, making it harder for cartels to pass proposals.
+    pub fn circuit_breaker_outcome_with_bloc_context(
+        &self,
+        bloc_voter_count: u32,
+    ) -> CircuitBreakerOutcome {
+        let base_severity = self.concern_severity();
+        // Each bloc voter adds +1 severity, capped at 10
+        let severity = (base_severity as u32 + bloc_voter_count).min(10) as u8;
+
+        // Special compound trigger: concentration + narrow margin = mandatory review
+        if self.concentration_warning && self.narrow_margin_warning {
+            return CircuitBreakerOutcome::MandatoryReview {
+                reason: "Vote weight concentration detected with narrow margin — \
+                         requires review by agents outside the voter set"
+                    .to_string(),
+                severity,
+            };
+        }
+
+        match severity {
+            0..=4 => CircuitBreakerOutcome::Allow,
+            5..=6 => CircuitBreakerOutcome::Advisory {
+                reason: self.summarize_concerns(),
+                severity,
+            },
+            7..=8 => CircuitBreakerOutcome::Escalate {
+                reason: self.summarize_concerns(),
+                severity,
+            },
+            _ => CircuitBreakerOutcome::CoolingPeriod {
+                reason: self.summarize_concerns(),
+                severity,
+                cooling_hours: 72,
+            },
+        }
+    }
+
+    /// Human-readable summary of active concerns.
+    fn summarize_concerns(&self) -> String {
+        let mut concerns = Vec::new();
+
+        match self.echo_chamber_risk {
+            EchoChamberRiskLevel::Critical => concerns.push("critical echo chamber"),
+            EchoChamberRiskLevel::High => concerns.push("high echo chamber risk"),
+            _ => {}
+        }
+        if self.rapid_convergence_warning {
+            concerns.push("rapid convergence");
+        }
+        if self.fragmentation_warning {
+            concerns.push("fragmentation");
+        }
+        if self.harmony_coverage < 0.3 {
+            concerns.push("low harmony coverage");
+        }
+        if self.centralization > 0.8 {
+            concerns.push("high centralization");
+        }
+        if self.concentration_warning {
+            concerns.push("vote weight concentration (HHI > 0.25)");
+        }
+        if self.narrow_margin_warning {
+            concerns.push("narrow vote margin (< 2%)");
+        }
+
+        if concerns.is_empty() {
+            "no specific concerns".to_string()
+        } else {
+            concerns.join("; ")
+        }
+    }
+}
+
+// ============================================================================
+// Cross-Proposal Voting Pattern Analysis (Cartel Detection)
+// ============================================================================
+
+/// Record of an agent's vote on a single proposal (for correlation analysis).
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct VoteRecord {
+    /// Proposal ID
+    pub proposal_id: String,
+    /// Vote choice
+    pub choice: VoteChoice,
+    /// Vote weight at time of voting
+    pub weight: f64,
+    /// Timestamp
+    pub timestamp_us: u64,
+}
+
+/// A detected voting bloc — a group of agents that vote together suspiciously often.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct BlocDetection {
+    /// Unique detection ID
+    pub id: String,
+    /// Timestamp of analysis
+    pub detected_at: Timestamp,
+    /// Agent pairs with high voting correlation
+    pub correlated_pairs: Vec<CorrelatedPair>,
+    /// Number of proposals analyzed
+    pub proposals_analyzed: u64,
+    /// Highest pairwise Jaccard similarity found
+    pub max_similarity: f64,
+    /// Whether any pair exceeds the bloc threshold (0.90)
+    pub bloc_detected: bool,
+    /// Number of distinct blocs found (connected components in similarity graph)
+    pub bloc_count: u32,
+    /// Human-readable summary
+    pub summary: String,
+}
+
+/// A pair of agents with correlated voting patterns.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct CorrelatedPair {
+    /// First agent DID
+    pub agent_a: String,
+    /// Second agent DID
+    pub agent_b: String,
+    /// Jaccard similarity of their voting records (0.0-1.0)
+    /// |A ∩ B| / |A ∪ B| where A/B = set of proposals voted the same way
+    pub jaccard_similarity: f64,
+    /// Number of proposals where both voted
+    pub shared_proposals: u64,
+    /// Number of proposals where both voted the same way
+    pub agreement_count: u64,
+}
+
+impl BlocDetection {
+    /// Check if this detection found actionable blocs.
+    pub fn is_actionable(&self) -> bool {
+        self.bloc_detected && self.max_similarity >= 0.90
+    }
+}
+
+/// Compute Jaccard similarity between two vote histories.
+///
+/// Jaccard(A, B) = |agreements| / |shared proposals|
+/// where "agreement" means both agents voted the same way (For/For or Against/Against).
+///
+/// Returns 0.0 if fewer than `min_shared` proposals in common (insufficient data).
+pub fn jaccard_vote_similarity(
+    votes_a: &[VoteRecord],
+    votes_b: &[VoteRecord],
+    min_shared: usize,
+) -> (f64, u64, u64) {
+    // Build lookup: proposal_id → choice for agent B
+    let b_choices: std::collections::HashMap<&str, &VoteChoice> = votes_b
+        .iter()
+        .map(|v| (v.proposal_id.as_str(), &v.choice))
+        .collect();
+
+    let mut shared = 0u64;
+    let mut agreements = 0u64;
+
+    for vote_a in votes_a {
+        if let Some(choice_b) = b_choices.get(vote_a.proposal_id.as_str()) {
+            shared += 1;
+            if &vote_a.choice == *choice_b {
+                agreements += 1;
+            }
+        }
+    }
+
+    if (shared as usize) < min_shared {
+        return (0.0, shared, agreements);
+    }
+
+    let similarity = if shared > 0 {
+        agreements as f64 / shared as f64
+    } else {
+        0.0
+    };
+
+    (similarity, shared, agreements)
+}
+
+/// Circuit breaker outcome — enforceable governance safeguard.
+///
+/// Unlike `has_concerns()` which is informational, circuit breaker outcomes
+/// are enforced by the tally system:
+/// - **Allow**: Proposal proceeds normally
+/// - **Advisory**: Proposal proceeds but concern is logged on-chain
+/// - **Escalate**: Proposal must meet the next tier's approval/quorum thresholds
+/// - **CoolingPeriod**: Proposal finalization delayed by N hours
+/// - **MandatoryReview**: Proposal blocked until reviewed by non-voter agents
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum CircuitBreakerOutcome {
+    /// No intervention — proposal proceeds normally.
+    Allow,
+
+    /// Concern flagged but proposal proceeds. Logged on-chain for audit.
+    Advisory {
+        reason: String,
+        severity: u8,
+    },
+
+    /// Proposal must meet the NEXT tier's thresholds to pass.
+    /// Basic → Major thresholds (60% approval, 25% quorum).
+    /// Major → Constitutional thresholds (67% approval, 40% quorum).
+    /// Constitutional → cannot escalate further; triggers CoolingPeriod instead.
+    Escalate {
+        reason: String,
+        severity: u8,
+    },
+
+    /// Proposal finalization blocked for `cooling_hours`.
+    /// The proposal remains in "Approved-Pending-Review" status.
+    CoolingPeriod {
+        reason: String,
+        severity: u8,
+        cooling_hours: u32,
+    },
+
+    /// Requires explicit review by agents who did NOT vote on this proposal.
+    /// Triggered by compound risk: concentration + narrow margin.
+    MandatoryReview {
+        reason: String,
+        severity: u8,
+    },
+}
+
+impl CircuitBreakerOutcome {
+    /// Whether this outcome blocks normal proposal advancement.
+    pub fn blocks_advancement(&self) -> bool {
+        matches!(
+            self,
+            Self::Escalate { .. } | Self::CoolingPeriod { .. } | Self::MandatoryReview { .. }
+        )
+    }
+
+    /// Whether escalation applies (proposal must meet higher thresholds).
+    pub fn requires_escalation(&self) -> bool {
+        matches!(self, Self::Escalate { .. })
+    }
+
+    /// Get the escalated tier, if applicable.
+    /// Returns None if already at Constitutional (cannot escalate further).
+    pub fn escalated_tier(current: &ProposalTier) -> Option<ProposalTier> {
+        match current {
+            ProposalTier::Basic => Some(ProposalTier::Major),
+            ProposalTier::Major => Some(ProposalTier::Constitutional),
+            ProposalTier::Constitutional => None, // Already highest — use CoolingPeriod
+        }
     }
 }
 
@@ -899,6 +1220,8 @@ pub enum EntryTypes {
     ProofAttestation(ProofAttestation),
     /// Collective mirror reflection on proposal voting
     ProposalReflection(ProposalReflection),
+    /// Cross-proposal voting bloc detection result
+    BlocDetection(BlocDetection),
 }
 
 #[hdk_link_types]
@@ -933,6 +1256,10 @@ pub enum LinkTypes {
     VerifierToAttestation,
     /// Proposal to collective mirror reflections
     ProposalToReflection,
+    /// Voter to their voting history (for cross-proposal correlation)
+    VoterToVotingHistory,
+    /// Bloc detection results
+    BlocDetectionAnchor,
 }
 
 /// HDI 0.7 single validation callback using FlatOp pattern
@@ -961,6 +1288,10 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 }
                 EntryTypes::ProposalReflection(reflection) => {
                     validate_create_proposal_reflection(action, reflection)
+                }
+                EntryTypes::BlocDetection(_) => {
+                    // Bloc detections are informational — always valid to create
+                    Ok(ValidateCallbackResult::Valid)
                 }
             },
             OpEntry::UpdateEntry {
@@ -1001,6 +1332,12 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::ProposalReflection(reflection) => {
                     validate_update_proposal_reflection(action, reflection)
                 }
+                EntryTypes::BlocDetection(_) => {
+                    // Bloc detections are immutable
+                    Ok(ValidateCallbackResult::Invalid(
+                        "Bloc detections cannot be updated".into(),
+                    ))
+                }
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
@@ -1026,6 +1363,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             LinkTypes::ProofToAttestation => Ok(ValidateCallbackResult::Valid),
             LinkTypes::VerifierToAttestation => Ok(ValidateCallbackResult::Valid),
             LinkTypes::ProposalToReflection => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::VoterToVotingHistory => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::BlocDetectionAnchor => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterDeleteLink {
             link_type,
@@ -1747,6 +2086,40 @@ mod tests {
     }
 
     #[test]
+    fn test_absolute_quorum_floor() {
+        assert_eq!(ProposalTier::Basic.absolute_quorum_floor(), 3);
+        assert_eq!(ProposalTier::Major.absolute_quorum_floor(), 5);
+        assert_eq!(ProposalTier::Constitutional.absolute_quorum_floor(), 10);
+    }
+
+    #[test]
+    fn test_effective_quorum_small_network() {
+        // 5 eligible voters: 15% = 1, but floor = 3 → effective = 3
+        assert_eq!(ProposalTier::Basic.effective_quorum(5), 3);
+        // 5 eligible voters: 25% = 2, but floor = 5 → effective = 5
+        assert_eq!(ProposalTier::Major.effective_quorum(5), 5);
+        // 10 eligible voters: 40% = 4, but floor = 10 → effective = 10
+        assert_eq!(ProposalTier::Constitutional.effective_quorum(10), 10);
+    }
+
+    #[test]
+    fn test_effective_quorum_large_network() {
+        // 1000 eligible voters: 15% = 150 > floor(3) → effective = 150
+        assert_eq!(ProposalTier::Basic.effective_quorum(1000), 150);
+        // 1000 eligible voters: 25% = 250 > floor(5) → effective = 250
+        assert_eq!(ProposalTier::Major.effective_quorum(1000), 250);
+        // 1000 eligible voters: 40% = 400 > floor(10) → effective = 400
+        assert_eq!(ProposalTier::Constitutional.effective_quorum(1000), 400);
+    }
+
+    #[test]
+    fn test_effective_quorum_zero_voters() {
+        // 0 eligible: percentage = 0, but floor applies
+        assert_eq!(ProposalTier::Basic.effective_quorum(0), 3);
+        assert_eq!(ProposalTier::Constitutional.effective_quorum(0), 10);
+    }
+
+    #[test]
     fn test_proposal_tier_approval_thresholds() {
         assert!((ProposalTier::Basic.approval_threshold() - 0.50).abs() < f64::EPSILON);
         assert!((ProposalTier::Major.approval_threshold() - 0.60).abs() < f64::EPSILON);
@@ -2179,6 +2552,9 @@ mod tests {
             abstentions: 1,
             approval_ratio: 0.7,
             polarization: 0.3,
+            hhi_concentration: 0.1,
+            concentration_warning: false,
+            narrow_margin_warning: false,
             suggested_interventions: vec![],
             reflection_prompts: vec![],
             needs_review,
@@ -2266,5 +2642,299 @@ mod tests {
         // High(3) + rapid(2) = 5
         let r = make_reflection(EchoChamberRiskLevel::High, true, false, 0.8, 0.3, false);
         assert_eq!(r.concern_severity(), 5);
+    }
+
+    // ========================================================================
+    // HHI Power Concentration tests
+    // ========================================================================
+
+    #[test]
+    fn test_has_concerns_concentration_warning() {
+        let mut r = make_reflection(EchoChamberRiskLevel::Low, false, false, 0.8, 0.3, false);
+        r.concentration_warning = true;
+        r.hhi_concentration = 0.35;
+        assert!(r.has_concerns());
+    }
+
+    #[test]
+    fn test_has_concerns_narrow_margin() {
+        let mut r = make_reflection(EchoChamberRiskLevel::Low, false, false, 0.8, 0.3, false);
+        r.narrow_margin_warning = true;
+        assert!(r.has_concerns());
+    }
+
+    #[test]
+    fn test_concern_severity_concentration() {
+        // concentration(3) = 3
+        let mut r = make_reflection(EchoChamberRiskLevel::Low, false, false, 0.8, 0.3, false);
+        r.concentration_warning = true;
+        assert_eq!(r.concern_severity(), 3);
+    }
+
+    #[test]
+    fn test_concern_severity_narrow_margin() {
+        // narrow_margin(2) = 2
+        let mut r = make_reflection(EchoChamberRiskLevel::Low, false, false, 0.8, 0.3, false);
+        r.narrow_margin_warning = true;
+        assert_eq!(r.concern_severity(), 2);
+    }
+
+    #[test]
+    fn test_concern_severity_concentration_plus_narrow() {
+        // concentration(3) + narrow_margin(2) = 5
+        let mut r = make_reflection(EchoChamberRiskLevel::Low, false, false, 0.8, 0.3, false);
+        r.concentration_warning = true;
+        r.narrow_margin_warning = true;
+        assert_eq!(r.concern_severity(), 5);
+    }
+
+    #[test]
+    fn test_hhi_perfect_equality() {
+        // HHI for N equal voters = 1/N
+        // 10 equal voters → HHI = 0.1 (no concentration)
+        let r = make_reflection(EchoChamberRiskLevel::Low, false, false, 0.8, 0.3, false);
+        assert!(!r.concentration_warning);
+        assert!(r.hhi_concentration < 0.25);
+    }
+
+    // ========================================================================
+    // Circuit Breaker tests
+    // ========================================================================
+
+    #[test]
+    fn test_circuit_breaker_allow_no_concerns() {
+        let r = make_reflection(EchoChamberRiskLevel::Low, false, false, 0.8, 0.3, false);
+        assert_eq!(r.circuit_breaker_outcome(), CircuitBreakerOutcome::Allow);
+    }
+
+    #[test]
+    fn test_circuit_breaker_advisory_moderate_concern() {
+        // Moderate echo(1) + rapid convergence(2) + fragmentation(2) = 5 → Advisory
+        let r = make_reflection(EchoChamberRiskLevel::Moderate, true, true, 0.8, 0.3, false);
+        match r.circuit_breaker_outcome() {
+            CircuitBreakerOutcome::Advisory { severity, .. } => {
+                assert!(severity >= 5 && severity <= 6);
+            }
+            other => panic!("Expected Advisory, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_circuit_breaker_escalate_high_concern() {
+        // Critical echo(4) + rapid convergence(2) + low harmony(2) = 8 → Escalate
+        let r = make_reflection(EchoChamberRiskLevel::Critical, true, false, 0.1, 0.3, false);
+        match r.circuit_breaker_outcome() {
+            CircuitBreakerOutcome::Escalate { severity, .. } => {
+                assert!(severity >= 7);
+            }
+            other => panic!("Expected Escalate, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_circuit_breaker_cooling_period_extreme_concern() {
+        // Critical echo(4) + rapid(2) + fragment(2) + low harmony(2) + high central(1) = 11→10
+        // → CoolingPeriod (severity >= 9)
+        let mut r =
+            make_reflection(EchoChamberRiskLevel::Critical, true, true, 0.1, 0.9, false);
+        // Don't trigger the compound MandatoryReview
+        r.concentration_warning = false;
+        r.narrow_margin_warning = false;
+        match r.circuit_breaker_outcome() {
+            CircuitBreakerOutcome::CoolingPeriod {
+                cooling_hours,
+                severity,
+                ..
+            } => {
+                assert_eq!(cooling_hours, 72);
+                assert!(severity >= 9);
+            }
+            other => panic!("Expected CoolingPeriod, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_circuit_breaker_mandatory_review_compound_trigger() {
+        // Concentration + narrow margin → MandatoryReview regardless of severity
+        let mut r = make_reflection(EchoChamberRiskLevel::Low, false, false, 0.8, 0.3, false);
+        r.concentration_warning = true;
+        r.narrow_margin_warning = true;
+        match r.circuit_breaker_outcome() {
+            CircuitBreakerOutcome::MandatoryReview { .. } => {}
+            other => panic!("Expected MandatoryReview, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_circuit_breaker_blocks_advancement() {
+        assert!(!CircuitBreakerOutcome::Allow.blocks_advancement());
+        assert!(
+            !CircuitBreakerOutcome::Advisory {
+                reason: String::new(),
+                severity: 5
+            }
+            .blocks_advancement()
+        );
+        assert!(
+            CircuitBreakerOutcome::Escalate {
+                reason: String::new(),
+                severity: 7
+            }
+            .blocks_advancement()
+        );
+        assert!(
+            CircuitBreakerOutcome::CoolingPeriod {
+                reason: String::new(),
+                severity: 9,
+                cooling_hours: 72
+            }
+            .blocks_advancement()
+        );
+        assert!(
+            CircuitBreakerOutcome::MandatoryReview {
+                reason: String::new(),
+                severity: 5
+            }
+            .blocks_advancement()
+        );
+    }
+
+    #[test]
+    fn test_escalated_tier() {
+        assert_eq!(
+            CircuitBreakerOutcome::escalated_tier(&ProposalTier::Basic),
+            Some(ProposalTier::Major)
+        );
+        assert_eq!(
+            CircuitBreakerOutcome::escalated_tier(&ProposalTier::Major),
+            Some(ProposalTier::Constitutional)
+        );
+        assert_eq!(
+            CircuitBreakerOutcome::escalated_tier(&ProposalTier::Constitutional),
+            None
+        );
+    }
+
+    // ========================================================================
+    // Jaccard Vote Similarity tests (cartel detection)
+    // ========================================================================
+
+    fn make_vote_record(proposal: &str, choice: VoteChoice) -> VoteRecord {
+        VoteRecord {
+            proposal_id: proposal.to_string(),
+            choice,
+            weight: 1.0,
+            timestamp_us: 0,
+        }
+    }
+
+    #[test]
+    fn test_jaccard_perfect_agreement() {
+        let votes_a = vec![
+            make_vote_record("p1", VoteChoice::For),
+            make_vote_record("p2", VoteChoice::Against),
+            make_vote_record("p3", VoteChoice::For),
+        ];
+        let votes_b = vec![
+            make_vote_record("p1", VoteChoice::For),
+            make_vote_record("p2", VoteChoice::Against),
+            make_vote_record("p3", VoteChoice::For),
+        ];
+        let (sim, shared, agreements) = jaccard_vote_similarity(&votes_a, &votes_b, 1);
+        assert!((sim - 1.0).abs() < f64::EPSILON);
+        assert_eq!(shared, 3);
+        assert_eq!(agreements, 3);
+    }
+
+    #[test]
+    fn test_jaccard_perfect_disagreement() {
+        let votes_a = vec![
+            make_vote_record("p1", VoteChoice::For),
+            make_vote_record("p2", VoteChoice::For),
+        ];
+        let votes_b = vec![
+            make_vote_record("p1", VoteChoice::Against),
+            make_vote_record("p2", VoteChoice::Against),
+        ];
+        let (sim, shared, agreements) = jaccard_vote_similarity(&votes_a, &votes_b, 1);
+        assert!(sim.abs() < f64::EPSILON);
+        assert_eq!(shared, 2);
+        assert_eq!(agreements, 0);
+    }
+
+    #[test]
+    fn test_jaccard_partial_overlap() {
+        let votes_a = vec![
+            make_vote_record("p1", VoteChoice::For),
+            make_vote_record("p2", VoteChoice::For),
+            make_vote_record("p3", VoteChoice::Against),
+            make_vote_record("p4", VoteChoice::For),
+        ];
+        let votes_b = vec![
+            make_vote_record("p1", VoteChoice::For),   // agree
+            make_vote_record("p2", VoteChoice::Against), // disagree
+            make_vote_record("p5", VoteChoice::For),   // not shared
+        ];
+        // Shared: p1, p2 (2 proposals). Agreements: p1 (1).
+        let (sim, shared, agreements) = jaccard_vote_similarity(&votes_a, &votes_b, 1);
+        assert!((sim - 0.5).abs() < f64::EPSILON);
+        assert_eq!(shared, 2);
+        assert_eq!(agreements, 1);
+    }
+
+    #[test]
+    fn test_jaccard_insufficient_data() {
+        let votes_a = vec![make_vote_record("p1", VoteChoice::For)];
+        let votes_b = vec![make_vote_record("p1", VoteChoice::For)];
+        // min_shared = 5 but only 1 shared → returns 0.0
+        let (sim, shared, _) = jaccard_vote_similarity(&votes_a, &votes_b, 5);
+        assert!(sim.abs() < f64::EPSILON);
+        assert_eq!(shared, 1);
+    }
+
+    #[test]
+    fn test_jaccard_no_overlap() {
+        let votes_a = vec![make_vote_record("p1", VoteChoice::For)];
+        let votes_b = vec![make_vote_record("p2", VoteChoice::For)];
+        let (sim, shared, agreements) = jaccard_vote_similarity(&votes_a, &votes_b, 1);
+        assert!(sim.abs() < f64::EPSILON);
+        assert_eq!(shared, 0);
+        assert_eq!(agreements, 0);
+    }
+
+    #[test]
+    fn test_bloc_detection_actionable() {
+        let detection = BlocDetection {
+            id: "test".to_string(),
+            detected_at: Timestamp::from_micros(0),
+            correlated_pairs: vec![CorrelatedPair {
+                agent_a: "alice".to_string(),
+                agent_b: "bob".to_string(),
+                jaccard_similarity: 0.95,
+                shared_proposals: 15,
+                agreement_count: 14,
+            }],
+            proposals_analyzed: 20,
+            max_similarity: 0.95,
+            bloc_detected: true,
+            bloc_count: 1,
+            summary: "Test".to_string(),
+        };
+        assert!(detection.is_actionable());
+    }
+
+    #[test]
+    fn test_bloc_detection_not_actionable_low_similarity() {
+        let detection = BlocDetection {
+            id: "test".to_string(),
+            detected_at: Timestamp::from_micros(0),
+            correlated_pairs: vec![],
+            proposals_analyzed: 20,
+            max_similarity: 0.70,
+            bloc_detected: false,
+            bloc_count: 0,
+            summary: "Test".to_string(),
+        };
+        assert!(!detection.is_actionable());
     }
 }

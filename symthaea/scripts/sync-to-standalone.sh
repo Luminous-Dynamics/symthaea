@@ -291,12 +291,12 @@ if ! $DRY_RUN; then
     if [ -f "${STANDALONE_REPO}/symthaea-core/Cargo.toml" ]; then
         sed -i '/^\[lints\]/{N;/workspace = true/d;}' "${STANDALONE_REPO}/symthaea-core/Cargo.toml"
     fi
-    # Remove [lints] workspace = true from ALL sub-crates
+    # Remove [lints] workspace = true from ALL Cargo.toml files in the repo
     while IFS= read -r subcrate_toml; do
-        if grep -q 'workspace = true' "$subcrate_toml" 2>/dev/null; then
+        if grep -q '\[lints\]' "$subcrate_toml" 2>/dev/null; then
             sed -i '/^\[lints\]/{N;/workspace = true/d;}' "$subcrate_toml"
         fi
-    done < <(find "${STANDALONE_REPO}/crates" -name Cargo.toml 2>/dev/null)
+    done < <(find "${STANDALONE_REPO}" -name Cargo.toml -not -path '*/target/*' 2>/dev/null)
     ok "Stripped workspace lints (incompatible with CI clippy config)"
 
     # Remove workspace members that don't exist in the standalone repo
@@ -314,6 +314,14 @@ if ! $DRY_RUN; then
     if [ $REMOVED_MEMBERS -gt 0 ]; then
         ok "Removed $REMOVED_MEMBERS missing workspace members"
     fi
+
+    # Remove monorepo-only dependencies that escape the standalone tree.
+    # These are dev-dependencies that point to ../crates/ (monorepo root)
+    # and don't have stubs in the standalone repo.
+    sed -i '/^mycelix-bridge-common.*path.*"\.\./d' "$TOML"
+    # Strip any remaining path deps that point outside the standalone tree
+    sed -i '/path\s*=\s*"\.\.\//d' "$TOML"
+    ok "Stripped monorepo-only path dependencies"
 
     if $REWRITE_OK; then
         ok "Cargo.toml fixups verified"
@@ -391,6 +399,15 @@ if ! $DRY_RUN && ! $SKIP_CHECK; then
 elif $SKIP_CHECK; then
     info "Skipping cargo check (--skip-check)"
     echo
+fi
+
+# --- Post-sync license fixups -------------------------------------------------
+# The monorepo uses AGPL-3.0-or-later for some crates that should be Apache-2.0
+# in the standalone repo (e.g. symthaea-mycelix-conductor).
+CONDUCTOR_TOML="${STANDALONE_REPO}/crates/symthaea-mycelix-conductor/Cargo.toml"
+if [ -f "$CONDUCTOR_TOML" ] && grep -q 'license = "AGPL-3.0-or-later"' "$CONDUCTOR_TOML"; then
+    sed -i 's/^license = "AGPL-3.0-or-later"/license = "Apache-2.0"/' "$CONDUCTOR_TOML"
+    info "Fixed symthaea-mycelix-conductor license → Apache-2.0"
 fi
 
 # --- Format with CI toolchain -------------------------------------------------

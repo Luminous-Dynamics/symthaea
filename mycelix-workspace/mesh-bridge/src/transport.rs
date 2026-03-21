@@ -210,6 +210,9 @@ impl MeshTransport for BatmanTransport {
 ///   - `lora` — direct SX1276 SPI (feature: `lora`)
 ///   - `batman` — B.A.T.M.A.N. UDP mesh (feature: `batman`)
 ///   - `meshtastic` — Meshtastic device via serial/TCP (feature: `meshtastic`)
+///   - `espnow` — ESP-NOW peer-to-peer WiFi via serial bridge (feature: `espnow`)
+///   - `reticulum` — Reticulum daemon store-and-forward mesh (feature: `reticulum`)
+///   - `ccsds` — CCSDS space packet via ground station modem (feature: `ccsds`)
 ///   - `mqtt` — MQTT broker gateway (feature: `mqtt`)
 pub fn create_transport() -> Result<Box<dyn MeshTransport>> {
     // Check env for transport preference
@@ -234,6 +237,26 @@ pub fn create_transport() -> Result<Box<dyn MeshTransport>> {
         "meshtastic" => {
             let config = crate::meshtastic::MeshtasticConfig::from_env();
             let transport = crate::meshtastic::MeshtasticTransport::new(config)?;
+            Ok(Box::new(transport))
+        }
+        #[cfg(feature = "espnow")]
+        "espnow" => {
+            let config = crate::espnow::EspNowConfig::from_env();
+            let transport = crate::espnow::EspNowTransport::new(config)?;
+            Ok(Box::new(transport))
+        }
+        #[cfg(feature = "reticulum")]
+        "reticulum" => {
+            let config = crate::reticulum::ReticulumConfig::from_env();
+            let rt = tokio::runtime::Handle::current();
+            let transport = rt.block_on(crate::reticulum::ReticulumTransport::new(config))?;
+            Ok(Box::new(transport))
+        }
+        #[cfg(feature = "ccsds")]
+        "ccsds" => {
+            let config = crate::ccsds::CcsdsConfig::from_env();
+            let rt = tokio::runtime::Handle::current();
+            let transport = rt.block_on(crate::ccsds::CcsdsTransport::new(config))?;
             Ok(Box::new(transport))
         }
         #[cfg(feature = "mqtt")]

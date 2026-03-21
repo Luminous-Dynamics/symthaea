@@ -277,6 +277,14 @@ pub struct PhiWeightedTally {
     pub reputation_only_count: u64,
     #[serde(default)]
     pub phi_coverage: f64,
+    #[serde(default)]
+    pub hhi_concentration: f64,
+    #[serde(default)]
+    pub concentration_warning: bool,
+    #[serde(default)]
+    pub vote_margin: f64,
+    #[serde(default)]
+    pub narrow_margin_warning: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]

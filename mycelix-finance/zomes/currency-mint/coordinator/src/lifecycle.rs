@@ -261,17 +261,13 @@ pub fn retire_currency(currency_id: String) -> ExternResult<CurrencyDefinition> 
         let _ = get_or_create_minted_balance(compost_did.clone(), currency_id.clone())?;
 
         for did in &member_dids {
-            let bal =
-                get_or_create_minted_balance(did.clone(), currency_id.clone())?;
+            let bal = get_or_create_minted_balance(did.clone(), currency_id.clone())?;
             let elapsed = now
                 .as_micros()
                 .saturating_sub(bal.last_activity.as_micros()) as u64
                 / 1_000_000;
-            let deduction = compute_minted_demurrage(
-                bal.balance,
-                def.params.demurrage_rate,
-                elapsed,
-            );
+            let deduction =
+                compute_minted_demurrage(bal.balance, def.params.demurrage_rate, elapsed);
             if deduction > 0 {
                 mutate_balance(did, &currency_id, |b| {
                     b.balance -= deduction;
@@ -297,8 +293,7 @@ pub fn retire_currency(currency_id: String) -> ExternResult<CurrencyDefinition> 
             sum += bal.balance as i64;
         }
         // Include compost balance in the sum
-        let compost_bal =
-            get_or_create_minted_balance(compost_did, currency_id.clone())?;
+        let compost_bal = get_or_create_minted_balance(compost_did, currency_id.clone())?;
         sum += compost_bal.balance as i64;
 
         if sum != 0 {

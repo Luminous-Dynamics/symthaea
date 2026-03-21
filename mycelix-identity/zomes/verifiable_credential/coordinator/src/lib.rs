@@ -1560,9 +1560,9 @@ pub fn update_request_status(input: UpdateRequestStatusInput) -> ExternResult<Re
         &EntryTypes::CredentialRequest(updated_req),
     )?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
-        WasmErrorInner::Guest("Could not find updated request".into())
-    ))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated request".into()
+    )))
 }
 
 /// Input for updating request status

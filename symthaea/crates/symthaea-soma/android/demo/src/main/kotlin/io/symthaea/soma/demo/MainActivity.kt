@@ -27,6 +27,7 @@ import io.symthaea.soma.WakeSignal
 import io.symthaea.soma.demo.databinding.ActivityMainBinding
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import java.util.Calendar
 
 /**
@@ -131,8 +132,9 @@ class MainActivity : AppCompatActivity() {
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         viewModel.touchBridge?.onTouchEvent(event)
 
-        val screenH = window.decorView.height
-        val bottomZone = screenH * 0.85f  // Bottom 15%
+        // Use content area height (excludes system bars)
+        val contentH = binding.rootCoordinator.height.toFloat()
+        val bottomZone = contentH * 0.80f  // Bottom 20% of content area
 
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
@@ -140,12 +142,12 @@ class MainActivity : AppCompatActivity() {
             }
             MotionEvent.ACTION_UP -> {
                 val dy = swipeStartY - event.y  // Positive = swipe up
-                if (swipeStartY > bottomZone) {
-                    if (dy > 150) {
+                if (swipeStartY > bottomZone && event.y < contentH) {
+                    if (dy > 100) {
                         // Swipe up from bottom: show bottom sheet
                         val behavior = BottomSheetBehavior.from(binding.bottomSheet)
                         behavior.state = BottomSheetBehavior.STATE_EXPANDED
-                    } else if (dy < 50 && dy > -50) {
+                    } else if (abs(dy) < 30) {
                         // Tap in bottom zone: toggle conversation bar
                         toggleConversationBar()
                     }

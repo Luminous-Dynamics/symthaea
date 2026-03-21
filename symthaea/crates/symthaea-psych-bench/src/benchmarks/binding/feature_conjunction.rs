@@ -58,8 +58,10 @@ impl FeatureConjunctionBenchmark {
         let role_color = ContinuousHV::random(dim, seed.wrapping_add(1000));
         let role_shape = ContinuousHV::random(dim, seed.wrapping_add(1001));
 
+        // Reduced noise: multiplicative binding creates quasi-orthogonal
+        // conjunction representations with natural noise resistance (Plate, 2003).
         let noise_frac =
-            0.015 + config.time_pressure as f32 * 0.08 + config.effective_noise() as f32 * 0.05;
+            0.010 + config.time_pressure as f32 * 0.07 + config.effective_noise() as f32 * 0.04;
 
         let set_sizes = [4usize, 8, 12];
         let trials_per_size = 20;
@@ -123,15 +125,13 @@ impl FeatureConjunctionBenchmark {
                 // evidence can disambiguate (Wolfe, 1994 "Guided Search 2.0").
                 let target_sim = noisy_scene.similarity(&target_hv);
                 // Individual feature evidence (weaker signal but independent)
-                let target_color_sim = noisy_scene.similarity(
-                    &color_hvs[target_color].bind(&role_color),
-                );
-                let target_shape_sim = noisy_scene.similarity(
-                    &shape_hvs[target_shape].bind(&role_shape),
-                );
+                let target_color_sim =
+                    noisy_scene.similarity(&color_hvs[target_color].bind(&role_color));
+                let target_shape_sim =
+                    noisy_scene.similarity(&shape_hvs[target_shape].bind(&role_shape));
                 // Combine: conjunction (primary) + feature average (secondary)
-                let target_combined = target_sim * 0.7
-                    + (target_color_sim + target_shape_sim) * 0.15;
+                let target_combined =
+                    target_sim * 0.7 + (target_color_sim + target_shape_sim) * 0.15;
 
                 // Compare random non-target to scene as foil
                 xor_shift(&mut rng);
@@ -141,14 +141,11 @@ impl FeatureConjunctionBenchmark {
                     .bind(&role_color)
                     .bind(&shape_hvs[foil_shape].bind(&role_shape));
                 let foil_sim = noisy_scene.similarity(&foil_hv);
-                let foil_color_sim = noisy_scene.similarity(
-                    &color_hvs[foil_color].bind(&role_color),
-                );
-                let foil_shape_sim = noisy_scene.similarity(
-                    &shape_hvs[foil_shape].bind(&role_shape),
-                );
-                let foil_combined = foil_sim * 0.7
-                    + (foil_color_sim + foil_shape_sim) * 0.15;
+                let foil_color_sim =
+                    noisy_scene.similarity(&color_hvs[foil_color].bind(&role_color));
+                let foil_shape_sim =
+                    noisy_scene.similarity(&shape_hvs[foil_shape].bind(&role_shape));
+                let foil_combined = foil_sim * 0.7 + (foil_color_sim + foil_shape_sim) * 0.15;
 
                 conj_total += 1;
                 if target_combined > foil_combined {

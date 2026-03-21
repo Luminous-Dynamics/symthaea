@@ -68,6 +68,9 @@ lora = ["spidev"]
 batman = []
 meshtastic = ["dep:serialport"]
 mqtt = ["dep:rumqttc"]
+espnow = ["dep:serialport"]
+reticulum = []
+ccsds = []
 
 [dependencies.serialport]
 version = "4"

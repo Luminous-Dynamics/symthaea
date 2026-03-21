@@ -83,7 +83,7 @@ services:
       - "80:80"
       - "443:443"
       # Admin API on separate port (firewalled in production)
-      - "127.0.0.1:4445:4445"
+      - "127.0.0.1:${NGINX_ADMIN_PORT:-4455}:4445"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ${TLS_CERT_PATH:-./certs/mycelix.crt}:/etc/ssl/certs/mycelix.crt:ro

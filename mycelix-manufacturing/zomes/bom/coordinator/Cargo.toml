@@ -1,0 +1,17 @@
+[package]
+name = "bom"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hdk = { workspace = true }
+bom_integrity = { path = "../integrity" }
+manufacturing_common = { path = "../../../crates/manufacturing_common" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[lints]
+workspace = true

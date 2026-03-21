@@ -936,12 +936,7 @@ pub fn get_recent_reports(input: GetRecentReportsInput) -> ExternResult<Vec<Rece
     for link in &links {
         if let Some(hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(hash.clone(), GetOptions::default())? {
-                if let Some(report) = record
-                    .entry()
-                    .to_app_option::<PriceReport>()
-                    .ok()
-                    .flatten()
-                {
+                if let Some(report) = record.entry().to_app_option::<PriceReport>().ok().flatten() {
                     results.push(RecentReportResult {
                         id: hash.to_string(),
                         item_name: report.item,
@@ -1476,12 +1471,12 @@ mod tests {
         // With the cap, each sybil gets at most 0.5 → 3×0.5 = 1.5 total.
         // Honest total: 0.95 + 0.92 + 0.90 = 2.77 → honest dominate.
         let reports = vec![
-            (0.50, 0.95, MIN_REPORTS_FOR_FULL_WEIGHT),     // established honest
+            (0.50, 0.95, MIN_REPORTS_FOR_FULL_WEIGHT), // established honest
             (0.51, 0.92, MIN_REPORTS_FOR_FULL_WEIGHT + 3), // established honest
             (0.52, 0.90, MIN_REPORTS_FOR_FULL_WEIGHT + 1), // established honest
-            (10.0, ACCURACY_INITIAL_SCORE, 0),              // sybil newcomer
-            (10.0, ACCURACY_INITIAL_SCORE, 1),              // sybil newcomer
-            (10.0, ACCURACY_INITIAL_SCORE, 2),              // sybil newcomer
+            (10.0, ACCURACY_INITIAL_SCORE, 0),         // sybil newcomer
+            (10.0, ACCURACY_INITIAL_SCORE, 1),         // sybil newcomer
+            (10.0, ACCURACY_INITIAL_SCORE, 2),         // sybil newcomer
         ];
         let (median, _si) = sim_consensus_with_counts(&reports);
 
@@ -1496,10 +1491,7 @@ mod tests {
 
         // Compare: without newcomer cap (all treated as established), sybils would
         // have full weight and pull the median higher.
-        let uncapped_reports: Vec<(f64, f64)> = reports
-            .iter()
-            .map(|(p, a, _)| (*p, *a))
-            .collect();
+        let uncapped_reports: Vec<(f64, f64)> = reports.iter().map(|(p, a, _)| (*p, *a)).collect();
         let (uncapped_median, _) = sim_consensus(&uncapped_reports);
         assert!(
             median <= uncapped_median,

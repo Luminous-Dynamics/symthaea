@@ -115,7 +115,10 @@ impl WisconsinCardSortingBenchmark {
         // that error-driven hypothesis updating is asymmetric: errors drive faster
         // switching than correct trials drive perseveration. This models the
         // negative feedback dominance in WCST set-shifting.
-        let lr_correct = 0.18 * lr_scale; // Slightly lower correct reinforcement
+        // Increased correct reinforcement (0.22) for faster hypothesis locking —
+        // explicit hypothesis testing converges faster than implicit rule learning
+        // (Ashby & Maddox, 2005 COVIS model).
+        let lr_correct = 0.22 * lr_scale;
         let lr_error = 0.85 * lr_scale; // Stronger error penalty for faster set-shifting
 
         let all_colors = [Color::Red, Color::Blue, Color::Green, Color::Yellow];

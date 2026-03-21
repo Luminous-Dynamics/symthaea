@@ -634,7 +634,10 @@ proptest! {
 
 use mycelix_bridge_common::offline_credential::{FreshnessAttestation, OfflineCredential};
 
-fn make_offline_credential(tier: ConsciousnessTier, issued_at: u64) -> mycelix_bridge_common::consciousness_profile::ConsciousnessCredential {
+fn make_offline_credential(
+    tier: ConsciousnessTier,
+    issued_at: u64,
+) -> mycelix_bridge_common::consciousness_profile::ConsciousnessCredential {
     let hours_168 = 168 * 3600 * 1_000_000u64;
     mycelix_bridge_common::consciousness_profile::ConsciousnessCredential {
         did: "did:mycelix:test".to_string(),
@@ -715,7 +718,11 @@ fn sub_passport_violation_counter_saturates() {
     );
     sp.violation_count = u32::MAX;
     sp.record_violation();
-    assert_eq!(sp.violation_count, u32::MAX, "violation_count should saturate at u32::MAX");
+    assert_eq!(
+        sp.violation_count,
+        u32::MAX,
+        "violation_count should saturate at u32::MAX"
+    );
 }
 
 #[test]
@@ -728,7 +735,11 @@ fn sub_passport_correction_counter_saturates() {
     );
     sp.correction_count = u32::MAX;
     sp.record_correction();
-    assert_eq!(sp.correction_count, u32::MAX, "correction_count should saturate at u32::MAX");
+    assert_eq!(
+        sp.correction_count,
+        u32::MAX,
+        "correction_count should saturate at u32::MAX"
+    );
 }
 
 // ============================================================================
@@ -743,8 +754,11 @@ fn grace_period_capped_at_30_days() {
     // At 721 hours, should be past 720h grace (capped) and degraded
     let t_721h = 721 * 3600 * 1_000_000;
     let tier = offline.effective_tier(t_721h);
-    assert!(tier < ConsciousnessTier::Guardian,
-        "Grace period should be capped at 720h, but tier was {:?} at 721h", tier);
+    assert!(
+        tier < ConsciousnessTier::Guardian,
+        "Grace period should be capped at 720h, but tier was {:?} at 721h",
+        tier
+    );
 }
 
 // ============================================================================
@@ -787,7 +801,13 @@ proptest! {
 #[test]
 fn trajectory_commitment_binding() {
     let mut cred = ConsciousnessCredential::from_unified_consciousness(
-        "did:test".into(), 0.5, 0.5, 0.5, 0.5, "issuer".into(), 1000,
+        "did:test".into(),
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        "issuer".into(),
+        1000,
     );
     assert!(!cred.has_trajectory_binding());
     cred = cred.with_trajectory_commitment([42u8; 32]);

@@ -55,7 +55,12 @@ pub const TIER_HYSTERESIS_MARGIN: f64 = 0.05;
 /// Temperature controls strictness:
 /// - low temperature (0.02): sharp transition (like hard threshold)
 /// - high temperature (0.10): gradual transition (noise-tolerant)
-pub fn continuous_vote_weight(score: f64, threshold: f64, temperature: f64, max_weight: f64) -> f64 {
+pub fn continuous_vote_weight(
+    score: f64,
+    threshold: f64,
+    temperature: f64,
+    max_weight: f64,
+) -> f64 {
     if temperature <= 0.0 || !score.is_finite() {
         return 0.0;
     }
@@ -409,7 +414,10 @@ impl ConsciousnessTier {
     /// Promotion requires crossing `threshold + TIER_HYSTERESIS_MARGIN`.
     /// Demotion requires dropping below `threshold - TIER_HYSTERESIS_MARGIN`.
     /// This prevents rapid tier flapping from measurement noise.
-    pub fn from_score_with_hysteresis(score: f64, current_tier: ConsciousnessTier) -> ConsciousnessTier {
+    pub fn from_score_with_hysteresis(
+        score: f64,
+        current_tier: ConsciousnessTier,
+    ) -> ConsciousnessTier {
         let margin = TIER_HYSTERESIS_MARGIN;
 
         // Determine what tier we'd promote to (higher threshold required)
@@ -3265,10 +3273,7 @@ mod tests {
     #[test]
     fn test_reputation_nan_safety() {
         let state = ReputationState::new(f64::NAN, 0);
-        assert!(
-            (state.score - 0.0).abs() < 1e-10,
-            "NaN should clamp to 0"
-        );
+        assert!((state.score - 0.0).abs() < 1e-10, "NaN should clamp to 0");
 
         let mut state2 = ReputationState::new(0.5, 0);
         state2.apply_decay(u64::MAX); // extreme elapsed time
@@ -3326,7 +3331,12 @@ mod tests {
 
     #[test]
     fn test_sigmoid_infinity_score_returns_zero() {
-        let w = continuous_vote_weight(f64::INFINITY, 0.4, VOTE_WEIGHT_TEMPERATURE, VOTE_WEIGHT_MAX_BP);
+        let w = continuous_vote_weight(
+            f64::INFINITY,
+            0.4,
+            VOTE_WEIGHT_TEMPERATURE,
+            VOTE_WEIGHT_MAX_BP,
+        );
         assert!(
             (w - 0.0).abs() < 1e-10,
             "Infinity score should return 0.0, got {w}"
@@ -3343,7 +3353,10 @@ mod tests {
         };
         // combined_score = 0.5, which is above 0.4 threshold
         let w = profile.vote_weight_continuous();
-        assert!(w > VOTE_WEIGHT_MAX_BP / 2.0, "Score 0.5 > threshold 0.4 should give > half max");
+        assert!(
+            w > VOTE_WEIGHT_MAX_BP / 2.0,
+            "Score 0.5 > threshold 0.4 should give > half max"
+        );
         assert!(w < VOTE_WEIGHT_MAX_BP, "Should not exceed max");
     }
 
@@ -3354,7 +3367,8 @@ mod tests {
     #[test]
     fn test_hysteresis_no_promote_in_deadband() {
         // Score 0.42 — above Citizen threshold (0.4) but below promote threshold (0.45)
-        let tier = ConsciousnessTier::from_score_with_hysteresis(0.42, ConsciousnessTier::Participant);
+        let tier =
+            ConsciousnessTier::from_score_with_hysteresis(0.42, ConsciousnessTier::Participant);
         assert_eq!(
             tier,
             ConsciousnessTier::Participant,
@@ -3387,7 +3401,8 @@ mod tests {
     #[test]
     fn test_hysteresis_promotes_above_upper_threshold() {
         // Score 0.46 — above promote threshold (0.45)
-        let tier = ConsciousnessTier::from_score_with_hysteresis(0.46, ConsciousnessTier::Participant);
+        let tier =
+            ConsciousnessTier::from_score_with_hysteresis(0.46, ConsciousnessTier::Participant);
         assert_eq!(
             tier,
             ConsciousnessTier::Citizen,
@@ -3399,36 +3414,67 @@ mod tests {
     fn test_hysteresis_guardian_boundary() {
         // 0.83 — above 0.8 but below promote threshold 0.85
         let tier = ConsciousnessTier::from_score_with_hysteresis(0.83, ConsciousnessTier::Steward);
-        assert_eq!(tier, ConsciousnessTier::Steward, "0.83 should NOT promote to Guardian (need 0.85)");
+        assert_eq!(
+            tier,
+            ConsciousnessTier::Steward,
+            "0.83 should NOT promote to Guardian (need 0.85)"
+        );
 
         // 0.86 — above promote threshold 0.85
         let tier = ConsciousnessTier::from_score_with_hysteresis(0.86, ConsciousnessTier::Steward);
-        assert_eq!(tier, ConsciousnessTier::Guardian, "0.86 should promote to Guardian");
+        assert_eq!(
+            tier,
+            ConsciousnessTier::Guardian,
+            "0.86 should promote to Guardian"
+        );
 
         // 0.76 — below demote threshold 0.75
         let tier = ConsciousnessTier::from_score_with_hysteresis(0.74, ConsciousnessTier::Guardian);
-        assert_eq!(tier, ConsciousnessTier::Steward, "0.74 should demote from Guardian");
+        assert_eq!(
+            tier,
+            ConsciousnessTier::Steward,
+            "0.74 should demote from Guardian"
+        );
     }
 
     #[test]
     fn test_hysteresis_observer_boundary() {
         // 0.33 — above 0.3 but below promote threshold 0.35
         let tier = ConsciousnessTier::from_score_with_hysteresis(0.33, ConsciousnessTier::Observer);
-        assert_eq!(tier, ConsciousnessTier::Observer, "0.33 should NOT promote from Observer (need 0.35)");
+        assert_eq!(
+            tier,
+            ConsciousnessTier::Observer,
+            "0.33 should NOT promote from Observer (need 0.35)"
+        );
 
         // 0.36 — above promote threshold 0.35
         let tier = ConsciousnessTier::from_score_with_hysteresis(0.36, ConsciousnessTier::Observer);
-        assert_eq!(tier, ConsciousnessTier::Participant, "0.36 should promote to Participant");
+        assert_eq!(
+            tier,
+            ConsciousnessTier::Participant,
+            "0.36 should promote to Participant"
+        );
 
         // 0.24 — below demote threshold 0.25
-        let tier = ConsciousnessTier::from_score_with_hysteresis(0.24, ConsciousnessTier::Participant);
-        assert_eq!(tier, ConsciousnessTier::Observer, "0.24 should demote to Observer");
+        let tier =
+            ConsciousnessTier::from_score_with_hysteresis(0.24, ConsciousnessTier::Participant);
+        assert_eq!(
+            tier,
+            ConsciousnessTier::Observer,
+            "0.24 should demote to Observer"
+        );
     }
 
     #[test]
     fn extensions_default_empty() {
         let cred = ConsciousnessCredential::from_unified_consciousness(
-            "did:test".into(), 0.5, 0.5, 0.5, 0.5, "issuer".into(), 1000,
+            "did:test".into(),
+            0.5,
+            0.5,
+            0.5,
+            0.5,
+            "issuer".into(),
+            1000,
         );
         assert!(cred.extensions.is_empty());
         assert!(cred.trajectory_commitment.is_none());
@@ -3437,7 +3483,13 @@ mod tests {
     #[test]
     fn extensions_set_get_roundtrip() {
         let mut cred = ConsciousnessCredential::from_unified_consciousness(
-            "did:test".into(), 0.5, 0.5, 0.5, 0.5, "issuer".into(), 1000,
+            "did:test".into(),
+            0.5,
+            0.5,
+            0.5,
+            0.5,
+            "issuer".into(),
+            1000,
         );
         cred.set_extension("foo", vec![1, 2, 3]);
         assert_eq!(cred.get_extension("foo"), Some(&vec![1, 2, 3]));
@@ -3447,7 +3499,13 @@ mod tests {
     #[test]
     fn extensions_remove() {
         let mut cred = ConsciousnessCredential::from_unified_consciousness(
-            "did:test".into(), 0.5, 0.5, 0.5, 0.5, "issuer".into(), 1000,
+            "did:test".into(),
+            0.5,
+            0.5,
+            0.5,
+            0.5,
+            "issuer".into(),
+            1000,
         );
         cred.set_extension("key", vec![42]);
         let removed = cred.remove_extension("key");

@@ -963,7 +963,11 @@ impl BenchmarkReport {
         }
         if benchmark.contains("RemoteAssociates") {
             push_specific("overall_accuracy", "rat_overall_accuracy", &bl.creativity);
-            push_specific("mean_solution_rank", "rat_mean_solution_rank", &bl.creativity);
+            push_specific(
+                "mean_solution_rank",
+                "rat_mean_solution_rank",
+                &bl.creativity,
+            );
         }
         if benchmark.contains("StrangeStory") {
             push_specific("overall_accuracy", "strange_story_accuracy", &bl.tombench);
@@ -3401,7 +3405,9 @@ mod tests {
     fn test_full_reliability_audit() {
         use crate::benchmarks::affect::EmotionalStroopBenchmark;
         use crate::benchmarks::attention::AttentionalBlinkBenchmark;
-        use crate::benchmarks::creativity::RemoteAssociatesBenchmark;
+        use crate::benchmarks::creativity::{
+            AlternateUsesBenchmark, ConceptualBlendingBenchmark, RemoteAssociatesBenchmark,
+        };
         use crate::benchmarks::executive::{FlankerBenchmark, StroopBenchmark};
         use crate::benchmarks::inhibition::StopSignalBenchmark;
         use crate::benchmarks::language::SemanticPrimingBenchmark;
@@ -3440,6 +3446,8 @@ mod tests {
             // Affect + Creativity + Social
             &EmotionalStroopBenchmark,
             &RemoteAssociatesBenchmark,
+            &AlternateUsesBenchmark,
+            &ConceptualBlendingBenchmark,
             &RmeBenchmark,
         ];
 
@@ -3491,8 +3499,8 @@ mod tests {
 
         // At least some benchmarks should produce results
         assert!(
-            total >= 15,
-            "Expected 15+ reliability results, got {}",
+            total >= 17,
+            "Expected 17+ reliability results, got {}",
             total
         );
     }

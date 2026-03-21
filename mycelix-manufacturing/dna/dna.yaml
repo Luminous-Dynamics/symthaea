@@ -1,0 +1,49 @@
+---
+manifest_version: "0"
+name: manufacturing
+integrity:
+  network_seed: "00000000-0000-0000-0000-000000000000"
+  properties: ~
+  zomes:
+    - name: workorders_integrity
+      path: ../target/wasm32-unknown-unknown/release/workorders_integrity.wasm
+    - name: bom_integrity
+      path: ../target/wasm32-unknown-unknown/release/bom_integrity.wasm
+    - name: operations_integrity
+      path: ../target/wasm32-unknown-unknown/release/operations_integrity.wasm
+    - name: machines_integrity
+      path: ../target/wasm32-unknown-unknown/release/machines_integrity.wasm
+    - name: planning_integrity
+      path: ../target/wasm32-unknown-unknown/release/planning_integrity.wasm
+    - name: manufacturing_bridge_integrity
+      path: ../target/wasm32-unknown-unknown/release/manufacturing_bridge_integrity.wasm
+coordinator:
+  zomes:
+    - name: workorders
+      path: ../target/wasm32-unknown-unknown/release/workorders.wasm
+      dependencies:
+        - name: workorders_integrity
+    - name: bom
+      path: ../target/wasm32-unknown-unknown/release/bom.wasm
+      dependencies:
+        - name: bom_integrity
+    - name: operations
+      path: ../target/wasm32-unknown-unknown/release/operations.wasm
+      dependencies:
+        - name: operations_integrity
+    - name: machines
+      path: ../target/wasm32-unknown-unknown/release/machines.wasm
+      dependencies:
+        - name: machines_integrity
+    - name: planning
+      path: ../target/wasm32-unknown-unknown/release/planning.wasm
+      dependencies:
+        - name: planning_integrity
+        - name: workorders_integrity
+        - name: bom_integrity
+        - name: machines_integrity
+    - name: manufacturing_bridge
+      path: ../target/wasm32-unknown-unknown/release/manufacturing_bridge.wasm
+      dependencies:
+        - name: manufacturing_bridge_integrity
+        - name: workorders_integrity

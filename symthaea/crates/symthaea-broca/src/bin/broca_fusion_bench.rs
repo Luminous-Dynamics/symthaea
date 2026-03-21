@@ -79,23 +79,30 @@ fn core_configs() -> Vec<BenchRun> {
 }
 
 fn alpha_sweep_configs() -> Vec<BenchRun> {
-    [0.05f32, 0.10, 0.15, 0.20, 0.25, 0.30].iter().map(|&alpha| {
-        BenchRun {
+    [0.05f32, 0.10, 0.15, 0.20, 0.25, 0.30]
+        .iter()
+        .map(|&alpha| BenchRun {
             name: format!("alpha={alpha:.2}"),
             setup: Box::new(move |c| {
                 c.controller.enable_compositional_logits = true;
                 c.controller.compositional_alpha = alpha;
                 c.gating.enable_algebraic_correction = true;
             }),
-        }
-    }).collect()
+        })
+        .collect()
 }
 
 fn make_dataset(tok: &BpeTokenizer) -> TrainingDataset {
     let mut ds = TrainingDataset::default();
     let texts = [
-        "I understand", "the answer is", "let me clarify", "perhaps we should",
-        "this is certain", "reflecting on it", "continuing now", "something new",
+        "I understand",
+        "the answer is",
+        "let me clarify",
+        "perhaps we should",
+        "this is certain",
+        "reflecting on it",
+        "continuing now",
+        "something new",
     ];
     for (i, text) in texts.iter().enumerate() {
         let ch = ThoughtChannels::with_intent(i % 8);
@@ -121,7 +128,10 @@ fn run_eval(genesis: &GenesisSeed, bench: &BenchRun, dataset: &TrainingDataset) 
 }
 
 fn print_table(results: &[(&str, EvalResult)]) {
-    println!("\n{:<32} {:>8} {:>6} {:>8} {:>6}", "Config", "Perplx", "Eng%", "Coher", "Hall");
+    println!(
+        "\n{:<32} {:>8} {:>6} {:>8} {:>6}",
+        "Config", "Perplx", "Eng%", "Coher", "Hall"
+    );
     println!("{}", "-".repeat(66));
     for (name, r) in results {
         println!(
@@ -148,8 +158,12 @@ fn print_table(results: &[(&str, EvalResult)]) {
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let epochs: usize = args.iter().position(|a| a == "--epochs")
-        .and_then(|i| args.get(i + 1)).and_then(|s| s.parse().ok()).unwrap_or(0);
+    let epochs: usize = args
+        .iter()
+        .position(|a| a == "--epochs")
+        .and_then(|i| args.get(i + 1))
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
     let do_sweep = args.iter().any(|a| a == "--sweep");
     let do_fusion_train = args.iter().any(|a| a == "--fusion-train");
 
@@ -163,12 +177,20 @@ fn main() {
         let cfg = base_config();
         let mut gen = BrocaGenerator::new(&genesis, cfg);
         let tc = TrainingConfig {
-            epochs, learning_rate: 0.01, bptt_window: 8, use_adam: true,
-            train_network: true, network_lr_scale: 0.3, embedding_target_norm: 128.0,
+            epochs,
+            learning_rate: 0.01,
+            bptt_window: 8,
+            use_adam: true,
+            train_network: true,
+            network_lr_scale: 0.3,
+            embedding_target_norm: 128.0,
             ..Default::default()
         };
         let m = training::train(&mut gen, &dataset, &tc);
-        eprintln!("  Final loss: {:.4}\n", m.last().map(|m| m.avg_loss).unwrap_or(0.0));
+        eprintln!(
+            "  Final loss: {:.4}\n",
+            m.last().map(|m| m.avg_loss).unwrap_or(0.0)
+        );
     }
 
     eprintln!("=== Core configs ===");
@@ -177,7 +199,10 @@ fn main() {
     for run in &configs {
         eprint!("  {} ... ", run.name);
         let r = run_eval(&genesis, run, &dataset);
-        eprintln!("ppl={:.1} eng={:.3} coh={:.4}", r.perplexity, r.english_word_ratio, r.avg_coherence);
+        eprintln!(
+            "ppl={:.1} eng={:.3} coh={:.4}",
+            r.perplexity, r.english_word_ratio, r.avg_coherence
+        );
         results.push((&run.name, r));
     }
     print_table(&results);
@@ -190,7 +215,10 @@ fn main() {
         for run in &sweep {
             eprint!("  {} ... ", run.name);
             let r = run_eval(&genesis, run, &dataset);
-            eprintln!("ppl={:.1} eng={:.3} coh={:.4}", r.perplexity, r.english_word_ratio, r.avg_coherence);
+            eprintln!(
+                "ppl={:.1} eng={:.3} coh={:.4}",
+                r.perplexity, r.english_word_ratio, r.avg_coherence
+            );
             sweep_results.push((&run.name, r));
         }
         print_table(&sweep_results);
@@ -206,18 +234,29 @@ fn main() {
         cfg.gating.enable_algebraic_correction = true;
         let mut gen = BrocaGenerator::new(&genesis, cfg);
         let tc = TrainingConfig {
-            epochs, learning_rate: 0.01, bptt_window: 8, use_adam: true,
-            train_network: true, network_lr_scale: 0.3, embedding_target_norm: 128.0,
+            epochs,
+            learning_rate: 0.01,
+            bptt_window: 8,
+            use_adam: true,
+            train_network: true,
+            network_lr_scale: 0.3,
+            embedding_target_norm: 128.0,
             enable_fusion_during_training: true,
             fusion_warmup_epochs: epochs / 4, // First 25% without fusion
             ..Default::default()
         };
         let m = training::train(&mut gen, &dataset, &tc);
-        eprintln!("  Fusion-trained final loss: {:.4}", m.last().map(|m| m.avg_loss).unwrap_or(0.0));
+        eprintln!(
+            "  Fusion-trained final loss: {:.4}",
+            m.last().map(|m| m.avg_loss).unwrap_or(0.0)
+        );
         if let Some(last) = m.last() {
             if let Some(dt) = last.adaptive_dt_mean {
-                eprintln!("  Adaptive dt mean: {dt:.4} [{:.4}-{:.4}]",
-                    last.adaptive_dt_min.unwrap_or(0.0), last.adaptive_dt_max.unwrap_or(0.0));
+                eprintln!(
+                    "  Adaptive dt mean: {dt:.4} [{:.4}-{:.4}]",
+                    last.adaptive_dt_min.unwrap_or(0.0),
+                    last.adaptive_dt_max.unwrap_or(0.0)
+                );
             }
         }
 
@@ -230,7 +269,9 @@ fn main() {
             max_gen_tokens: 20,
         };
         let r = evaluation::evaluate(&mut gen, &eval_cfg);
-        eprintln!("  Fusion-trained eval: ppl={:.1} eng={:.3} coh={:.4}",
-            r.perplexity, r.english_word_ratio, r.avg_coherence);
+        eprintln!(
+            "  Fusion-trained eval: ppl={:.1} eng={:.3} coh={:.4}",
+            r.perplexity, r.english_word_ratio, r.avg_coherence
+        );
     }
 }

@@ -2,18 +2,23 @@ use leptos::prelude::*;
 
 use crate::state::AppState;
 
-/// Neuromodulator bar chart: DA, NE, 5-HT, OT
+/// Neuromodulator bar chart: all 9 transmitters from the consciousness bath.
 #[component]
 pub fn NeuroBars() -> impl IntoView {
     let state = use_context::<AppState>().expect("AppState");
     let neuromods = state.neuromods;
 
-    let labels = ["DA", "NE", "5-HT", "OT"];
+    let labels = ["DA", "NE", "5-HT", "OT", "ACh", "GABA", "Glu", "Ade", "eCB"];
     let colors = [
         "var(--da-blue)",
         "var(--ne-red)",
         "var(--sht-green)",
         "var(--ot-pink)",
+        "#8b5cf6", // ACh — violet
+        "#f59e0b", // GABA — amber
+        "#ef4444", // Glutamate — red-orange
+        "#6366f1", // Adenosine — indigo
+        "#10b981", // Endocannabinoid — emerald
     ];
 
     view! {

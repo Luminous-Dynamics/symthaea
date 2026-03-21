@@ -69,23 +69,31 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                         // Validate segments
                         for seg in &entry.segments {
                             if seg.is_empty() || seg.len() > 63 {
-                                return Ok(ValidateCallbackResult::Invalid(
-                                    format!("Segment '{}' invalid length", seg),
-                                ));
+                                return Ok(ValidateCallbackResult::Invalid(format!(
+                                    "Segment '{}' invalid length",
+                                    seg
+                                )));
                             }
-                            if !seg.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
-                                return Ok(ValidateCallbackResult::Invalid(
-                                    format!("Segment '{}' contains invalid chars", seg),
-                                ));
+                            if !seg
+                                .chars()
+                                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+                            {
+                                return Ok(ValidateCallbackResult::Invalid(format!(
+                                    "Segment '{}' contains invalid chars",
+                                    seg
+                                )));
                             }
                             if seg.starts_with('-') || seg.ends_with('-') {
-                                return Ok(ValidateCallbackResult::Invalid(
-                                    format!("Segment '{}' cannot start/end with hyphen", seg),
-                                ));
+                                return Ok(ValidateCallbackResult::Invalid(format!(
+                                    "Segment '{}' cannot start/end with hyphen",
+                                    seg
+                                )));
                             }
                         }
                         // Endpoint type validation
-                        if !["iroh", "lora", "holochain", "ip"].contains(&entry.endpoint_type.as_str()) {
+                        if !["iroh", "lora", "holochain", "ip"]
+                            .contains(&entry.endpoint_type.as_str())
+                        {
                             return Ok(ValidateCallbackResult::Invalid(
                                 "Invalid endpoint type".to_string(),
                             ));

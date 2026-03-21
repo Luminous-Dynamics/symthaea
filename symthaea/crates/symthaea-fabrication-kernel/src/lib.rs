@@ -6,6 +6,7 @@
 
 #[cfg(feature = "analytical")]
 pub mod analytical;
+pub mod autonomy_loop;
 pub mod bsp;
 pub mod building;
 pub mod csg;
@@ -14,21 +15,38 @@ pub mod export;
 #[cfg(feature = "analytical")]
 pub mod generative;
 pub mod import;
+pub mod infill;
 pub mod manufacturing;
+pub mod material_handling;
 pub mod mesh;
 pub mod primitives;
+pub mod printer_control;
 pub mod simulator;
 pub mod slicer;
 pub mod thought;
+pub mod toolpath;
 pub mod validate;
+
+pub mod cincinnati_live;
+pub mod defect_prediction;
+pub mod hardware_config;
+pub mod nurbs;
+pub mod step_import;
 
 pub use bsp::{csg_intersect, csg_subtract};
 pub use csg::{BooleanOp, CSGNode, Primitive, Transform3D};
 pub use export::{export_3mf, export_stl};
 pub use import::{parse_ascii_stl, parse_binary_stl, parse_stl, StlError};
+pub use infill::{generate_infill, InfillConfig, InfillPattern};
 pub use mesh::TriangleMesh;
 pub use primitives::*;
 pub use simulator::{ForceHV, PhysicsBackend, SimState};
 pub use slicer::{slice_mesh, slice_mesh_at_z, Contour, Point2, Segment2, SliceConfig, SliceLayer};
 pub use thought::GeometricThought;
+pub use toolpath::{generate_gcode, GCodeCommand, GCodeProgram, ToolpathConfig};
 pub use validate::{validate_mesh, ValidationReport};
+
+pub use cincinnati_live::{
+    AnomalyAlert, AnomalyType, ChannelStats, CincinnatiMonitor, CincinnatiMonitorConfig,
+    SensorReading,
+};

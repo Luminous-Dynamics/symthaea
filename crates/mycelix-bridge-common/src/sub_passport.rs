@@ -104,12 +104,7 @@ pub struct SubPassport {
 
 impl SubPassport {
     /// Create a new sub-passport with default constraints.
-    pub fn new(
-        agent_did: String,
-        delegator_did: String,
-        purpose: String,
-        now_us: u64,
-    ) -> Self {
+    pub fn new(agent_did: String, delegator_did: String, purpose: String, now_us: u64) -> Self {
         Self {
             agent_did,
             delegator_did,

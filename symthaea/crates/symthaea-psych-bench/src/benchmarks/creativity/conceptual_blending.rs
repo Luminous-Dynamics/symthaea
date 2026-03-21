@@ -93,35 +93,28 @@ impl ConceptualBlendingBenchmark {
         for blend_idx in 0..n_blends {
             xor_shift(&mut rng);
 
-            // Select blending strategy — each models a different blending mechanism
-            // from Fauconnier & Turner's Conceptual Integration Networks (2002)
+            // Select blending strategy
             let blend = match blend_idx % 4 {
                 0 => {
-                    // Cross-space mapping: bind roles with PERMUTED fillers from B
-                    // (not just role_i⊕filler_b_i which = concept_b; instead, the
-                    // permutation creates a genuinely novel cross-space alignment)
-                    let shift = (blend_idx / 4) as i32 + 1;
+                    // Completion: take roles from A, fillers from B (cross-space mapping)
                     let cross: Vec<BinaryHV> = roles
                         .iter()
                         .zip(fillers_b.iter())
-                        .map(|(r, f)| r.bind(&f.permute(shift)))
+                        .map(|(r, f)| r.bind(f))
                         .collect();
                     BinaryHV::bundle(&cross)
                 }
                 1 => {
-                    // Elaboration: XOR bind the two concepts (creates emergent pattern
-                    // equidistant from both parents — maximal novelty)
+                    // Elaboration: XOR bind the two concepts (creates emergent pattern)
                     concept_a.bind(&concept_b)
                 }
                 2 => {
-                    // Selective projection: mix features with role permutation to
-                    // create novel structure within the recombination
+                    // Selective projection: take some features from A, rest from B
                     let split = (xor_shift(&mut rng) as usize % (n_features - 1)) + 1;
-                    let shift = (blend_idx / 4) as i32 + 2;
                     let mixed: Vec<BinaryHV> = (0..n_features)
                         .map(|i| {
                             if i < split {
-                                roles[i].permute(shift).bind(&fillers_a[i])
+                                roles[i].bind(&fillers_a[i])
                             } else {
                                 roles[i].bind(&fillers_b[i])
                             }
@@ -130,11 +123,10 @@ impl ConceptualBlendingBenchmark {
                     BinaryHV::bundle(&mixed)
                 }
                 _ => {
-                    // Emergent structure: multi-scale permutation creates patterns
-                    // not present in either parent (Ward, 1994: "creative cognition")
-                    let shift = (blend_idx / 4) as i32 + 1;
-                    let permuted = concept_a.permute(shift);
-                    permuted.bind(&concept_b.permute(shift + 1))
+                    // Emergent structure: permute concept_a, bind with concept_b
+                    // Creates a pattern not in either parent
+                    let permuted = concept_a.permute(1);
+                    permuted.bind(&concept_b)
                 }
             };
 
@@ -157,10 +149,8 @@ impl ConceptualBlendingBenchmark {
             let mut role_matches = 0.0;
             for (i, role) in roles.iter().enumerate() {
                 let unbound = role.bind(&blend); // XOR is self-inverse
-                let sim_a =
-                    1.0 - unbound.hamming_distance(&fillers_a[i]) as f64 / dim as f64;
-                let sim_b =
-                    1.0 - unbound.hamming_distance(&fillers_b[i]) as f64 / dim as f64;
+                let sim_a = 1.0 - unbound.hamming_distance(&fillers_a[i]) as f64 / dim as f64;
+                let sim_b = 1.0 - unbound.hamming_distance(&fillers_b[i]) as f64 / dim as f64;
                 let best_sim = sim_a.max(sim_b);
                 // In a clean bundle, unbinding recovers fillers with ~0.55-0.65
                 // similarity (noise from other bundle components).
@@ -181,15 +171,12 @@ impl ConceptualBlendingBenchmark {
 
         // Aggregate across blending strategies
         let mean_novelty = novelties.iter().sum::<f64>() / novelties.len() as f64;
-        let mean_coherence =
-            coherences.iter().sum::<f64>() / coherences.len() as f64;
-        let mean_emergent =
-            emergent_scores.iter().sum::<f64>() / emergent_scores.len() as f64;
+        let mean_coherence = coherences.iter().sum::<f64>() / coherences.len() as f64;
+        let mean_emergent = emergent_scores.iter().sum::<f64>() / emergent_scores.len() as f64;
 
         // Blend quality: weighted composite (Fauconnier & Turner's integration)
         // Novelty × 0.4 + Coherence × 0.35 + Emergence × 0.25
-        let blend_quality =
-            mean_novelty * 0.4 + mean_coherence * 0.35 + mean_emergent * 0.25;
+        let blend_quality = mean_novelty * 0.4 + mean_coherence * 0.35 + mean_emergent * 0.25;
 
         BlendResult {
             novelty: mean_novelty,
@@ -248,10 +235,7 @@ impl PsychBenchmark for ConceptualBlendingBenchmark {
         result.insert("blend_quality", MetricValue::from_samples(&qualities));
         result.insert("novelty", MetricValue::from_samples(&novelties));
         result.insert("coherence", MetricValue::from_samples(&coherences));
-        result.insert(
-            "emergent_structure",
-            MetricValue::from_samples(&emergents),
-        );
+        result.insert("emergent_structure", MetricValue::from_samples(&emergents));
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;

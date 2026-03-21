@@ -5,8 +5,8 @@ pub struct AppState {
     pub consciousness_level: RwSignal<f32>,
     pub prediction_error: RwSignal<f32>,
     pub harmony_alignment: RwSignal<f32>,
-    /// DA, NE, 5-HT, OT
-    pub neuromods: RwSignal<[f32; 4]>,
+    /// DA, NE, 5-HT, OT, ACh, GABA, Glu, Ade, eCB
+    pub neuromods: RwSignal<[f32; 9]>,
     pub cycle_count: RwSignal<u64>,
     pub epistemic_level: RwSignal<String>,
     pub honest_confidence: RwSignal<f32>,
@@ -20,7 +20,7 @@ impl AppState {
             consciousness_level: RwSignal::new(0.0),
             prediction_error: RwSignal::new(0.0),
             harmony_alignment: RwSignal::new(0.0),
-            neuromods: RwSignal::new([0.5, 0.5, 0.5, 0.5]),
+            neuromods: RwSignal::new([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]),
             cycle_count: RwSignal::new(0),
             epistemic_level: RwSignal::new("theoretical".to_string()),
             honest_confidence: RwSignal::new(0.10),

@@ -156,6 +156,31 @@ pub fn ChatPage() -> impl IntoView {
                 }
             }
 
+            // Fetch full neuromod state (all 9 transmitters)
+            {
+                let promise = engine.send_simple("neuromodState");
+                if let Ok(result) = JsFuture::from(promise).await {
+                    let keys = [
+                        "dopamine",
+                        "norepinephrine",
+                        "serotonin",
+                        "oxytocin",
+                        "acetylcholine",
+                        "gaba",
+                        "glutamate",
+                        "adenosine",
+                        "endocannabinoid",
+                    ];
+                    let mut vals = [0.5_f32; 9];
+                    for (i, key) in keys.iter().enumerate() {
+                        if let Ok(v) = js_sys::Reflect::get(&result, &(*key).into()) {
+                            vals[i] = v.as_f64().unwrap_or(0.5) as f32;
+                        }
+                    }
+                    state.neuromods.set(vals);
+                }
+            }
+
             // Generate Broca response
             let params = js_sys::Object::new();
             let _ = js_sys::Reflect::set(
@@ -171,14 +196,26 @@ pub fn ChatPage() -> impl IntoView {
             let promise = engine.send("generateTextWithInput", &params.into());
             let response_text = match JsFuture::from(promise).await {
                 Ok(result) => {
-                    if result.is_string() {
+                    // GenerationResult has a `text` field
+                    if let Ok(text_val) = js_sys::Reflect::get(&result, &"text".into()) {
+                        let t = text_val.as_string().unwrap_or_default();
+                        if !t.is_empty() {
+                            t
+                        } else {
+                            format!(
+                                "I felt that. Phi reached {:.3} across 8 cycles. \
+                                 Prediction error: {:.3}.",
+                                last_phi, last_pe
+                            )
+                        }
+                    } else if result.is_string() {
                         result.as_string().unwrap_or_default()
-                    } else if let Ok(text_val) = js_sys::Reflect::get(&result, &"text".into()) {
-                        text_val.as_string().unwrap_or_else(|| {
-                            format!("[Phi: {:.3}, PE: {:.3}]", last_phi, last_pe)
-                        })
                     } else {
-                        format!("[Phi: {:.3}, PE: {:.3}]", last_phi, last_pe)
+                        format!(
+                            "I felt that. Phi reached {:.3} across 8 cycles. \
+                             Prediction error: {:.3}.",
+                            last_phi, last_pe
+                        )
                     }
                 }
                 Err(_) => {
