@@ -1845,9 +1845,13 @@ impl HdcLtcUnifiedNetwork {
         }
     }
 
-    /// Compute input for a layer
+    /// Compute input for a layer (layer_idx must be ≥ 1; layer 0 uses original_input directly).
     fn compute_layer_input(&self, layer_idx: usize, original_input: &ContinuousHV) -> ContinuousHV {
-        let prev_output = &self.layer_outputs[layer_idx - 1];
+        debug_assert!(
+            layer_idx > 0,
+            "compute_layer_input called with layer_idx=0; use original_input directly"
+        );
+        let prev_output = &self.layer_outputs[layer_idx.saturating_sub(1)];
 
         // Apply layer binding if configured
         let bound_input = if self.config.use_layer_binding {

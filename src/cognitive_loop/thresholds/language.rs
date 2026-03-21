@@ -75,10 +75,6 @@ pub const BROCA_QUALITY_LR_THRESHOLD: f32 = 0.6;
 /// Broca quality LR boost scale.
 pub const BROCA_QUALITY_LR_SCALE: f32 = 0.1;
 
-/// Quality EMA threshold below which Broca cadence widens by 2 cycles.
-/// Science: Levelt (1989) — speech production monitoring adjusts output rate.
-pub const BROCA_QUALITY_CADENCE_THRESHOLD: f32 = 0.4;
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // HOMEOSTASIS VELOCITY / VALENCE
 // Science: Cannon (1929) — homeostatic regulation; Sokolov (1963) — habituation.
@@ -167,3 +163,11 @@ pub const NSM_COVERAGE_EXPLORATION_SCALE: f32 = -0.01;
 /// Linguistic expression of mental states is a form of meta-cognitive access.
 /// Science: Rosenthal (2005) — higher-order thought theory.
 pub const NSM_HOT_MODULATION: f32 = 0.1;
+
+/// Broca → Phi bidirectional feedback scale.
+/// Articulating a thought with high coherence and NSM coverage is itself
+/// information integration. This small boost (±2% max) feeds generation
+/// quality back into the consciousness level (psi).
+/// Science: Dehaene (2014) — global workspace broadcasting of linguistic
+/// content is a signature of conscious access.
+pub const NSM_BROCA_PHI_SCALE: f32 = 0.02;

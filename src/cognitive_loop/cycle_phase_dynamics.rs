@@ -2602,7 +2602,6 @@ impl CognitiveLoopService {
                     cycle_id: self.stats.total_cycles as u64,
                     neuromod_exploration_mod: self.neuromod.bath.mcts_exploration_modulation(),
                     epistemic_quality: 0.5, // default neutral; wired when epistemic tiers active
-                    code_context: None,
                 };
 
                 let reasoning_result = reasoning_engine.reason(&reasoning_ctx);
@@ -4571,6 +4570,33 @@ impl CognitiveLoopService {
                             Priority::Aesthetic,
                         );
                     }
+                }
+            }
+
+            // Broca → Phi bidirectional feedback.
+            // Articulating a thought is itself information integration: high-quality
+            // generation (high coherence AND high NSM prime coverage) demonstrates
+            // that the system successfully unified semantic content into coherent
+            // output. This should reinforce consciousness level.
+            // Science: Dehaene (2014) — global workspace broadcasting of linguistic
+            // content is a signature of conscious access.
+            {
+                let nsm_cov = self
+                    .language_comm
+                    .broca_manager
+                    .as_ref()
+                    .map(|b| b.last_telemetry.nsm_prime_coverage)
+                    .unwrap_or(0.0);
+                // Composite quality: coherence × (0.5 + 0.5 × coverage)
+                // High coherence alone gets partial credit; both together get full credit.
+                let articulation_quality =
+                    final_coherence * (0.5 + 0.5 * nsm_cov.max(0.0).min(1.0));
+                if articulation_quality > 0.3 {
+                    // Scale is small (±2%) to avoid runaway feedback loops.
+                    let phi_boost =
+                        (articulation_quality - 0.3) * super::thresholds::NSM_BROCA_PHI_SCALE;
+                    self.unification_engine.psi =
+                        (self.unification_engine.psi + phi_boost as f64).clamp(0.0, 1.0);
                 }
             }
 

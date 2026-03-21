@@ -416,7 +416,9 @@ impl BrocaGenerator {
 
         // 4b. Construct NSM gate and tracker if enabled and primes are provided.
         let nsm_gate = if self.config.enable_nsm_gate && !active_primes.is_empty() {
-            Some(crate::gating::NsmSemanticGate::new(&self.tokenizer))
+            Some(crate::gating::NsmSemanticGate::new_with_lexicon(
+                &self.tokenizer,
+            ))
         } else {
             None
         };
