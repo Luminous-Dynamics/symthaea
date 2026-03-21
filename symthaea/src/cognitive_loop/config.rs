@@ -567,6 +567,18 @@ pub struct CognitiveLoopConfig {
     #[cfg(feature = "ssm_language")]
     pub broca_checkpoint_path: Option<String>,
 
+    /// Enable NSM semantic HV blending into thought HV before Broca generation.
+    /// When true, detected primitives are composed into a semantic ContinuousHV
+    /// and blended with the thought vector via lerp (weight: `broca_nsm_semantic_alpha`).
+    /// Science: Barsalou (1999) — grounded cognition requires ~30% semantic modulation.
+    #[cfg(feature = "ssm_language")]
+    pub enable_broca_nsm_semantic: bool,
+
+    /// Enable NSM semantic gate: boost logits for tokens expressing active primes.
+    /// Science: Collins & Loftus (1975) — spreading activation in semantic networks.
+    #[cfg(feature = "ssm_language")]
+    pub enable_broca_nsm_gate: bool,
+
     // ── Per-Region Substrate Types (Phase 4 Foundation) ────────────────
     /// Per-region substrate mapping: allows different cortical regions to run
     /// on different physical substrates. When `None`, all regions use the
@@ -818,6 +830,10 @@ impl Default for CognitiveLoopConfig {
             enable_broca_language: false,
             #[cfg(feature = "ssm_language")]
             broca_checkpoint_path: None,
+            #[cfg(feature = "ssm_language")]
+            enable_broca_nsm_semantic: false,
+            #[cfg(feature = "ssm_language")]
+            enable_broca_nsm_gate: false,
             enable_energy_budget: false,
             energy_budget_joules_per_sec: None,
             substrate_transition_alpha: super::thresholds::SUBSTRATE_TRANSITION_ALPHA_DEFAULT
@@ -1019,6 +1035,8 @@ impl ConsciousnessProfile {
         #[cfg(feature = "ssm_language")]
         {
             config.enable_broca_language = false;
+            config.enable_broca_nsm_semantic = false;
+            config.enable_broca_nsm_gate = false;
         }
         #[cfg(feature = "foveation")]
         {
@@ -1106,6 +1124,12 @@ impl ConsciousnessProfile {
                 config.enable_coherence_field = true;
                 config.enable_visualization = true;
                 config.enable_soul_alignment = true;
+                // NSM language integration: semantic HV blending + logit gate
+                #[cfg(feature = "ssm_language")]
+                {
+                    config.enable_broca_nsm_semantic = true;
+                    config.enable_broca_nsm_gate = true;
+                }
             }
         }
     }

@@ -2602,7 +2602,6 @@ impl CognitiveLoopService {
                     cycle_id: self.stats.total_cycles as u64,
                     neuromod_exploration_mod: self.neuromod.bath.mcts_exploration_modulation(),
                     epistemic_quality: 0.5, // default neutral; wired when epistemic tiers active
-                    code_context: None,
                 };
 
                 let reasoning_result = reasoning_engine.reason(&reasoning_ctx);
@@ -4150,6 +4149,77 @@ impl CognitiveLoopService {
     /// novel content worth articulating. Minimum cadence 7 to prevent spam.
     /// Biologically: Broca's area activates for speech production when there's
     /// something meaningful to express (Hickok & Poeppel 2007).
+    /// Map a detected primitive name string (e.g., "FEEL", "BAD", "MOVE") to a SemanticPrime enum.
+    /// Returns None for non-NSM primitives (e.g., "CAUSE", "ACTION", "GREATER_THAN").
+    #[cfg(feature = "ssm_language")]
+    fn nsm_name_to_prime(
+        name: &str,
+    ) -> Option<symthaea_core::hdc::universal_semantics::SemanticPrime> {
+        use symthaea_core::hdc::universal_semantics::SemanticPrime;
+        match name.to_uppercase().as_str() {
+            "I" => Some(SemanticPrime::I),
+            "YOU" => Some(SemanticPrime::You),
+            "SOMEONE" | "PERSON" => Some(SemanticPrime::Someone),
+            "SOMETHING" | "THING" => Some(SemanticPrime::Something),
+            "PEOPLE" => Some(SemanticPrime::People),
+            "BODY" => Some(SemanticPrime::Body),
+            "KIND_OF" | "KINDOF" => Some(SemanticPrime::KindOf),
+            "PART_OF" | "PARTOF" => Some(SemanticPrime::PartOf),
+            "THIS" => Some(SemanticPrime::This),
+            "SAME" => Some(SemanticPrime::Same),
+            "OTHER" => Some(SemanticPrime::Other),
+            "ONE" => Some(SemanticPrime::One),
+            "TWO" => Some(SemanticPrime::Two),
+            "SOME" => Some(SemanticPrime::Some),
+            "ALL" => Some(SemanticPrime::All),
+            "MUCH" | "MANY" => Some(SemanticPrime::Much),
+            "LITTLE" | "FEW" => Some(SemanticPrime::Little),
+            "GOOD" => Some(SemanticPrime::Good),
+            "BAD" => Some(SemanticPrime::Bad),
+            "BIG" => Some(SemanticPrime::Big),
+            "SMALL" => Some(SemanticPrime::Small),
+            "THINK" => Some(SemanticPrime::Think),
+            "KNOW" => Some(SemanticPrime::Know),
+            "WANT" => Some(SemanticPrime::Want),
+            "FEEL" => Some(SemanticPrime::Feel),
+            "SEE" => Some(SemanticPrime::See),
+            "HEAR" => Some(SemanticPrime::Hear),
+            "SAY" => Some(SemanticPrime::Say),
+            "WORDS" => Some(SemanticPrime::Words),
+            "TRUE" => Some(SemanticPrime::True),
+            "DO" | "ACT" => Some(SemanticPrime::Do),
+            "HAPPEN" | "OCCUR" => Some(SemanticPrime::Happen),
+            "MOVE" => Some(SemanticPrime::Move),
+            "TOUCH" => Some(SemanticPrime::Touch),
+            "BE" | "EXIST" => Some(SemanticPrime::Be),
+            "HAVE" => Some(SemanticPrime::Have),
+            "LIVE" | "ALIVE" => Some(SemanticPrime::Live),
+            "DIE" | "DEAD" => Some(SemanticPrime::Die),
+            "NOT" => Some(SemanticPrime::Not),
+            "MAYBE" | "PERHAPS" => Some(SemanticPrime::Maybe),
+            "CAN" | "ABLE" => Some(SemanticPrime::Can),
+            "BECAUSE" => Some(SemanticPrime::Because),
+            "IF" => Some(SemanticPrime::If),
+            "WHEN" => Some(SemanticPrime::When),
+            "NOW" => Some(SemanticPrime::Now),
+            "BEFORE" => Some(SemanticPrime::Before),
+            "AFTER" => Some(SemanticPrime::After),
+            "WHERE" => Some(SemanticPrime::Where),
+            "HERE" => Some(SemanticPrime::Here),
+            "ABOVE" => Some(SemanticPrime::Above),
+            "BELOW" => Some(SemanticPrime::Below),
+            "FAR" => Some(SemanticPrime::Far),
+            "NEAR" | "CLOSE" => Some(SemanticPrime::Near),
+            "INSIDE" | "IN" => Some(SemanticPrime::Inside),
+            "ON" => Some(SemanticPrime::On),
+            "VERY" => Some(SemanticPrime::Very),
+            "MORE" => Some(SemanticPrime::More),
+            "LIKE" => Some(SemanticPrime::Like),
+            "WITH" => Some(SemanticPrime::With),
+            _ => None,
+        }
+    }
+
     #[cfg(feature = "ssm_language")]
     fn run_broca_generation(
         &mut self,
@@ -4263,21 +4333,36 @@ impl CognitiveLoopService {
         #[cfg(not(feature = "mycelix"))]
         let (mode_valence_nudge, mode_arousal_nudge, mode_warmth) = (0.0f32, 0.0f32, 0.5f32);
 
-        // Phase 2: Compute NSM semantic HV from detected primitives (once, reused in signals).
-        // GroundedUnderstanding decomposes the primitive names into NSM primes and
-        // composes a BinaryHV, which we convert to ContinuousHV for Broca blending.
+        // Phase 2: Compose NSM semantic HV directly from detected primitive names.
+        // Uses UniversalSemantics to look up each prime by name and bundle them,
+        // avoiding the circular round-trip through GroundedUnderstanding.understand().
         let (nsm_semantic_hv, nsm_semantic_confidence) = if detected_primitives.is_empty() {
             (None, 0.0_f32)
         } else {
-            let meaning = self
-                .language_comm
-                .grounded_understanding
-                .understand(&detected_primitives.join(" "));
-            let confidence = meaning.confidence as f32;
-            if confidence > super::thresholds::NSM_MIN_CONFIDENCE {
-                (Some(meaning.semantic_hv.to_continuous()), confidence)
+            use symthaea_core::hdc::universal_semantics::{SemanticPrime, UniversalSemantics};
+            let semantics = UniversalSemantics::new();
+            // Map detected primitive names (e.g., "FEEL", "BAD") to SemanticPrime enums.
+            // detected_primitives may contain non-NSM names (e.g., "CAUSE", "ACTION")
+            // which won't match — that's fine, we just skip them.
+            let matched_primes: Vec<SemanticPrime> = detected_primitives
+                .iter()
+                .filter_map(|name| Self::nsm_name_to_prime(name))
+                .collect();
+            if matched_primes.is_empty() {
+                (None, 0.0)
             } else {
-                (None, confidence)
+                let prime_hvs: Vec<symthaea_core::hdc::binary_hv::BinaryHV> = matched_primes
+                    .iter()
+                    .map(|p| *semantics.get_prime(*p))
+                    .collect();
+                let bundled = symthaea_core::hdc::binary_hv::BinaryHV::bundle(&prime_hvs);
+                let confidence = (matched_primes.len() as f32 / detected_primitives.len() as f32)
+                    .clamp(0.0, 1.0);
+                if confidence > super::thresholds::NSM_MIN_CONFIDENCE {
+                    (Some(bundled.to_continuous()), confidence)
+                } else {
+                    (None, confidence)
+                }
             }
         };
 
