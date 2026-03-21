@@ -280,6 +280,7 @@ impl PsychBenchmark for EncryptedClassificationBenchmark {
             conditions: 2, // plaintext vs encrypted
             trials_per_condition: trials,
             trial_trace: Vec::new(),
+            notes: Vec::new(),
         }
     }
 }

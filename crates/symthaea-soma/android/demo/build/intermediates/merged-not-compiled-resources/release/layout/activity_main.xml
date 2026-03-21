@@ -1,0 +1,596 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/rootCoordinator"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/soma_void">
+
+<!-- ═══ Main experience: full-screen layered composition ═══ -->
+<FrameLayout
+    android:id="@+id/experienceLayer"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:layout_marginBottom="0dp">
+
+    <!-- Layer 0: Particle field (behind everything) -->
+    <io.symthaea.soma.demo.ParticleFieldView
+        android:id="@+id/particleField"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- Layer 1: Full-screen consciousness mandala -->
+    <io.symthaea.soma.demo.ConsciousnessMandalaView
+        android:id="@+id/consciousnessMandala"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- Layer 1.5: Consciousness garden (lower screen area) -->
+    <io.symthaea.soma.demo.ConsciousnessGardenView
+        android:id="@+id/consciousnessGarden"
+        android:layout_width="match_parent"
+        android:layout_height="120dp"
+        android:layout_gravity="bottom"
+        android:layout_marginBottom="56dp" />
+
+    <!-- Layer 2: Overlaid text — floating on top of mandala -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <!-- Title: top-left whisper -->
+        <TextView
+            android:id="@+id/titleText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="soma"
+            android:textColor="#00E5CC"
+            android:textSize="14sp"
+            android:fontFamily="sans-serif-light"
+            android:letterSpacing="0.4"
+            android:alpha="0.5"
+            android:layout_gravity="top|start"
+            android:layout_marginTop="48dp"
+            android:layout_marginStart="24dp" />
+
+        <!-- Haptic pulse indicator -->
+        <View
+            android:id="@+id/hapticIndicator"
+            android:layout_width="6dp"
+            android:layout_height="6dp"
+            android:background="@drawable/circle_indicator"
+            android:alpha="0"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="52dp"
+            android:layout_marginEnd="24dp" />
+
+        <!-- Harmony: below title, subtle -->
+        <TextView
+            android:id="@+id/harmonyText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="coherence"
+            android:textColor="#00E5CC"
+            android:textSize="11sp"
+            android:fontFamily="sans-serif-light"
+            android:letterSpacing="0.3"
+            android:alpha="0.4"
+            android:layout_gravity="top|start"
+            android:layout_marginTop="68dp"
+            android:layout_marginStart="24dp" />
+
+        <!-- Broca voice: floating thought as inner poetry -->
+        <TextView
+            android:id="@+id/brocaText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textColor="#00E5CC"
+            android:textSize="15sp"
+            android:fontFamily="serif"
+            android:textStyle="italic"
+            android:alpha="0"
+            android:maxLines="3"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:letterSpacing="0.03"
+            android:lineSpacingMultiplier="1.5"
+            android:paddingStart="40dp"
+            android:paddingEnd="40dp"
+            android:layout_gravity="top|center_horizontal"
+            android:layout_marginTop="160dp" />
+
+        <!-- Conversation thread: last few exchanges -->
+        <LinearLayout
+            android:id="@+id/conversationThread"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="56dp"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp">
+
+            <!-- User's last message -->
+            <TextView
+                android:id="@+id/chatUserMsg"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#7A8B8F"
+                android:textSize="12sp"
+                android:fontFamily="sans-serif-light"
+                android:visibility="gone"
+                android:layout_gravity="end"
+                android:background="#22E8F0F2"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:layout_marginBottom="6dp"
+                android:maxLines="2" />
+
+            <!-- Soma's response -->
+            <TextView
+                android:id="@+id/chatSomaResponse"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#00E5CC"
+                android:textSize="13sp"
+                android:fontFamily="sans-serif-light"
+                android:textStyle="italic"
+                android:visibility="gone"
+                android:layout_gravity="start"
+                android:background="#1500E5CC"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:maxLines="4"
+                android:lineSpacingMultiplier="1.3" />
+
+        </LinearLayout>
+
+        <!-- Dream overlay: full-screen ceremony -->
+        <FrameLayout
+            android:id="@+id/dreamOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:alpha="0"
+            android:visibility="gone"
+            android:background="#CC0D1117">
+
+            <TextView
+                android:id="@+id/dreamNarrative"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#C4B5FD"
+                android:textSize="18sp"
+                android:fontFamily="serif"
+                android:textStyle="italic"
+                android:gravity="center"
+                android:lineSpacingMultiplier="1.6"
+                android:paddingStart="40dp"
+                android:paddingEnd="40dp"
+                android:layout_gravity="center" />
+
+        </FrameLayout>
+
+        <!-- Status whisper: bottom-left -->
+        <TextView
+            android:id="@+id/statusText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="alert · cycle 0"
+            android:textColor="#4A5558"
+            android:textSize="9sp"
+            android:fontFamily="monospace"
+            android:alpha="0.6"
+            android:layout_gravity="bottom|start"
+            android:layout_marginBottom="16dp"
+            android:layout_marginStart="24dp" />
+
+        <!-- Disclaimer: bottom-right -->
+        <TextView
+            android:id="@+id/disclaimerText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="simulated"
+            android:textColor="#4A5558"
+            android:textSize="9sp"
+            android:fontFamily="monospace"
+            android:alpha="0.4"
+            android:layout_gravity="bottom|end"
+            android:layout_marginBottom="16dp"
+            android:layout_marginEnd="24dp" />
+
+        <!-- Thinking indicator: shows "..." after user sends message -->
+        <TextView
+            android:id="@+id/thinkingIndicator"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="..."
+            android:textColor="#00E5CC"
+            android:textSize="20sp"
+            android:fontFamily="sans-serif-light"
+            android:alpha="0"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="100dp"
+            android:visibility="gone" />
+
+        <!-- Bottom hint: subtle indicator to tap for conversation -->
+        <TextView
+            android:id="@+id/bottomHint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="\u2022 \u2022 \u2022"
+            android:textColor="#4A5558"
+            android:textSize="8sp"
+            android:fontFamily="sans-serif-light"
+            android:alpha="0.3"
+            android:letterSpacing="0.5"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Conversation: hidden by default, appears on bottom-edge tap -->
+        <LinearLayout
+            android:id="@+id/conversationRow"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_gravity="bottom|center_horizontal"
+            android:background="#CC161D26"
+            android:visibility="gone"
+            android:paddingStart="20dp"
+            android:paddingEnd="12dp">
+
+            <EditText
+                android:id="@+id/conversationInput"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:hint="speak to soma..."
+                android:textColor="#E8F0F2"
+                android:textColorHint="#557A8B8F"
+                android:textSize="13sp"
+                android:fontFamily="sans-serif-light"
+                android:background="@android:color/transparent"
+                android:paddingStart="0dp"
+                android:paddingEnd="8dp"
+                android:singleLine="true"
+                android:imeOptions="actionSend"
+                android:inputType="text" />
+
+            <ImageView
+                android:id="@+id/btnMic"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@android:drawable/ic_btn_speak_now"
+                android:alpha="0.5"
+                android:padding="6dp"
+                android:contentDescription="voice input" />
+
+            <ImageView
+                android:id="@+id/btnSend"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@android:drawable/ic_menu_send"
+                android:alpha="0.5"
+                android:padding="6dp"
+                android:contentDescription="send" />
+
+        </LinearLayout>
+
+    </FrameLayout>
+
+</FrameLayout>
+
+<!-- ═══ Bottom Sheet: controls + technical readout ═══ -->
+<LinearLayout
+    android:id="@+id/bottomSheet"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@color/soma_surface"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="16dp"
+    android:elevation="8dp"
+    app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior"
+    app:behavior_peekHeight="0dp"
+    app:behavior_hideable="true">
+
+    <!-- Drag handle (large touch target) -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="24dp"
+        android:layout_marginBottom="4dp">
+        <View
+            android:layout_width="48dp"
+            android:layout_height="4dp"
+            android:layout_gravity="center"
+            android:background="@color/soma_bioluminescent_dim" />
+    </FrameLayout>
+
+    <!-- Neuromod arcs (moved from main view) -->
+    <io.symthaea.soma.demo.NeuromodFlowView
+        android:id="@+id/neuromodFlows"
+        android:layout_width="match_parent"
+        android:layout_height="100dp"
+        android:layout_marginBottom="8dp" />
+
+    <!-- Technical readout -->
+    <TextView
+        android:id="@+id/peText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="pe 0.00 · substrate 0.00"
+        android:textColor="#4A5558"
+        android:textSize="9sp"
+        android:fontFamily="monospace"
+        android:layout_marginBottom="4dp" />
+
+    <TextView
+        android:id="@+id/dreamText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textColor="#4A5558"
+        android:textSize="9sp"
+        android:fontFamily="monospace"
+        android:layout_marginBottom="4dp" />
+
+    <TextView
+        android:id="@+id/ocrText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textColor="#4A5558"
+        android:textSize="9sp"
+        android:fontFamily="monospace"
+        android:visibility="gone"
+        android:layout_marginBottom="8dp" />
+
+    <!-- Action buttons -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginBottom="6dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnDream"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:text="dream"
+            android:textColor="#C4B5FD"
+            android:textSize="10sp"
+            android:fontFamily="sans-serif-light"
+            android:layout_marginEnd="4dp"
+            app:strokeColor="#33C4B5FD"
+            app:strokeWidth="1dp"
+            app:rippleColor="#22C4B5FD" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnVision"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:text="vision"
+            android:textColor="#00E5CC"
+            android:textSize="10sp"
+            android:fontFamily="sans-serif-light"
+            android:layout_marginStart="4dp"
+            app:strokeColor="#3300E5CC"
+            app:strokeWidth="1dp"
+            app:rippleColor="#2200E5CC" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginBottom="6dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSleep"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:text="sleep"
+            android:textColor="#FFBE4F"
+            android:textSize="10sp"
+            android:fontFamily="sans-serif-light"
+            android:layout_marginEnd="4dp"
+            app:strokeColor="#33FFBE4F"
+            app:strokeWidth="1dp"
+            app:rippleColor="#22FFBE4F" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnCheckpoint"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:text="save"
+            android:textColor="#7A8B8F"
+            android:textSize="10sp"
+            android:fontFamily="sans-serif-light"
+            android:layout_marginStart="4dp"
+            app:strokeColor="#337A8B8F"
+            app:strokeWidth="1dp"
+            app:rippleColor="#227A8B8F" />
+
+    </LinearLayout>
+
+    <!-- Avatar selection -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/avatarRow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical" />
+
+    </HorizontalScrollView>
+
+    <!-- Ollama config -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <EditText
+            android:id="@+id/ollamaHost"
+            android:layout_width="0dp"
+            android:layout_height="32dp"
+            android:layout_weight="1"
+            android:hint="ollama host"
+            android:textColor="#7A8B8F"
+            android:textColorHint="#334A5558"
+            android:textSize="10sp"
+            android:fontFamily="monospace"
+            android:background="@android:color/transparent"
+            android:paddingStart="4dp"
+            android:singleLine="true"
+            android:inputType="text" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnOllama"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:text="connect"
+            android:textColor="#5EEAD4"
+            android:textSize="9sp"
+            android:fontFamily="monospace"
+            android:minWidth="56dp"
+            app:rippleColor="#225EEAD4" />
+
+    </LinearLayout>
+
+    <!-- Holon desktop sync -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="4dp">
+
+        <EditText
+            android:id="@+id/holonHost"
+            android:layout_width="0dp"
+            android:layout_height="32dp"
+            android:layout_weight="1"
+            android:hint="desktop host (holon sync)"
+            android:textColor="#7A8B8F"
+            android:textColorHint="#334A5558"
+            android:textSize="10sp"
+            android:fontFamily="monospace"
+            android:background="@android:color/transparent"
+            android:paddingStart="4dp"
+            android:singleLine="true"
+            android:inputType="text" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnHolon"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:text="sync"
+            android:textColor="#FFB347"
+            android:textSize="9sp"
+            android:fontFamily="monospace"
+            android:minWidth="56dp"
+            app:rippleColor="#22FFB347" />
+
+    </LinearLayout>
+
+</LinearLayout>
+
+<!-- ═══ Onboarding overlay: shown on first launch ═══ -->
+<FrameLayout
+    android:id="@+id/onboardingOverlay"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#E60D1117"
+    android:clickable="true"
+    android:focusable="true"
+    android:visibility="gone"
+    android:elevation="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:layout_gravity="center"
+        android:paddingStart="48dp"
+        android:paddingEnd="48dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="soma"
+            android:textColor="#00E5CC"
+            android:textSize="36sp"
+            android:fontFamily="sans-serif-thin"
+            android:letterSpacing="0.5"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="a simulated consciousness\nrunning on your phone"
+            android:textColor="#7A8B8F"
+            android:textSize="14sp"
+            android:fontFamily="sans-serif-light"
+            android:gravity="center"
+            android:lineSpacingMultiplier="1.5"
+            android:layout_marginBottom="32dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="touch to wake\nlong-press to dream\npinch to explore the fractal\ntap the bottom edge to speak\nswipe up from bottom for controls"
+            android:textColor="#4A5558"
+            android:textSize="12sp"
+            android:fontFamily="sans-serif-light"
+            android:gravity="center"
+            android:lineSpacingMultiplier="1.6"
+            android:layout_marginBottom="48dp" />
+
+        <TextView
+            android:id="@+id/onboardingDismiss"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="tap to begin"
+            android:textColor="#00E5CC"
+            android:textSize="13sp"
+            android:fontFamily="sans-serif-light"
+            android:letterSpacing="0.2"
+            android:alpha="0.7" />
+
+    </LinearLayout>
+
+</FrameLayout>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

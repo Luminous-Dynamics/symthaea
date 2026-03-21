@@ -34,18 +34,13 @@ pub enum CodeLanguage {
 }
 
 /// Generation mode: natural language text or structured code.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 pub enum GenerationMode {
     /// Natural language text generation (default).
+    #[default]
     Text,
     /// Code generation with stricter gating.
     Code { language: CodeLanguage },
-}
-
-impl Default for GenerationMode {
-    fn default() -> Self {
-        Self::Text
-    }
 }
 
 impl GenerationMode {

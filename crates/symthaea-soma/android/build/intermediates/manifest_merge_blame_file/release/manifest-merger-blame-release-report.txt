@@ -1,0 +1,9 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="io.symthaea.soma" > <!-- Library permissions that consumers should declare -->
+4    <!-- android.permission.BLUETOOTH_SCAN, BLUETOOTH_ADVERTISE for BLE mesh -->
+5    <!-- android.permission.ACCESS_FINE_LOCATION for GPS novelty -->
+6    <!-- android.permission.FOREGROUND_SERVICE for SomaEngineService -->
+7    <uses-sdk android:minSdkVersion="24" />
+8
+9</manifest>

@@ -241,7 +241,7 @@ impl HumanEvalMiniBenchmark {
     /// type, missing edge case).
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> TrialResult {
         let seed = config.trial_seed("coding", "humaneval_mini", trial_idx);
-        let mut rng = seed ^ 0xC0DE_EVAL_0000_0001;
+        let mut rng = seed ^ 0xC0DE_E0A1_0000_0001;
 
         let probs = problems();
 

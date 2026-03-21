@@ -1,0 +1,18 @@
+<lint-module
+    format="1"
+    dir="/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo"
+    name=":demo"
+    type="APP"
+    maven="symthaea-soma-android:demo:"
+    agpVersion="8.2.2"
+    buildFolder="build"
+    bootClassPath="/nix/store/hnc6i940v9iccw2rqy64h6bzfnyrgpc9-androidsdk/libexec/android-sdk/platforms/android-34/android.jar:/nix/store/hnc6i940v9iccw2rqy64h6bzfnyrgpc9-androidsdk/libexec/android-sdk/build-tools/34.0.0/core-lambda-stubs.jar"
+    javaSourceLevel="17"
+    compileTarget="android-34">
+  <lintOptions
+      abortOnError="true"
+      absolutePaths="true"
+      checkReleaseBuilds="true"
+      explainIssues="true"/>
+  <variant name="release"/>
+</lint-module>

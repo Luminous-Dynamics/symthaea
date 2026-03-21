@@ -1,0 +1,19 @@
+{
+    "logs": [
+        {
+            "outputFile": "io.symthaea.soma.demo-mergeReleaseResources-33:/values-port/values-port.xml",
+            "map": [
+                {
+                    "source": "/home/tstoltz/.gradle/caches/transforms-3/849c9d0bd44968c4ea569c4ee28fcf9d/transformed/appcompat-1.6.1/res/values-port/values-port.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "55",
+                        "endOffsets": "106"
+                    }
+                }
+            ]
+        }
+    ]
+}

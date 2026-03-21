@@ -209,6 +209,7 @@ impl PsychBenchmark for ScalingAnalysisBenchmark {
             conditions: CLASS_COUNTS.len(),
             trials_per_condition: trials,
             trial_trace: Vec::new(),
+            notes: Vec::new(),
         }
     }
 }

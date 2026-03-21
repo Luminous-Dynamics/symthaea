@@ -47,9 +47,7 @@ impl TrainingPair {
 
     /// Convert channels to ThoughtChannels, padding legacy 20-channel data with defaults.
     pub fn to_thought_channels(&self) -> ThoughtChannels {
-        use crate::encoder::{
-            CODE_CHANNEL_DEFAULTS, LEGACY_NUM_CHANNELS, NEW_CHANNEL_DEFAULTS, NUM_CHANNELS,
-        };
+        use crate::encoder::{LEGACY_NUM_CHANNELS, NEW_CHANNEL_DEFAULTS, NUM_CHANNELS};
         let mut tc = ThoughtChannels::default();
         let n = self.channels.len().min(NUM_CHANNELS);
         tc.channels[..n].copy_from_slice(&self.channels[..n]);

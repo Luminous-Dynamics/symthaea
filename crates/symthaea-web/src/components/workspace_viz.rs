@@ -15,9 +15,10 @@ pub fn WorkspaceViz() -> impl IntoView {
     let (ws_contents, set_ws_contents) = signal(Vec::<(String, f32)>::new());
 
     let engine_ignite = engine.clone();
+    let state_ignite = state.clone();
     let on_ignite = move |_| {
         let engine = engine_ignite.clone();
-        let state = state.clone();
+        let state = state_ignite.clone();
         let set_contents = set_ws_contents;
         wasm_bindgen_futures::spawn_local(async move {
             // Trigger ignition
