@@ -287,8 +287,9 @@ pub struct HdvSummary {
 impl HdvSummary {
     pub fn from_hdv(hdv: &[f32]) -> Self {
         let norm: f32 = hdv.iter().map(|x| x * x).sum::<f32>().sqrt();
-        let mean: f32 = hdv.iter().sum::<f32>() / hdv.len() as f32;
-        let variance: f32 = hdv.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / hdv.len() as f32;
+        let n = hdv.len().max(1) as f32;
+        let mean: f32 = hdv.iter().sum::<f32>() / n;
+        let variance: f32 = hdv.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / n;
         let std = variance.sqrt();
 
         // Find top 10 by absolute value

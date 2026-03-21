@@ -345,7 +345,7 @@ impl CfCCoherenceBridge {
             .cloned()
             .collect();
 
-        if older.is_empty() {
+        if older.is_empty() || recent.is_empty() {
             return 0.0;
         }
 
