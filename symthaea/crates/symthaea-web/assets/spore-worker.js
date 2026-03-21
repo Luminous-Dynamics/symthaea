@@ -284,6 +284,22 @@ self.onmessage = async function(e) {
         result = { text };
         break;
       }
+      // Flake generation from hardware probe
+      // Phase 6: Reasoning engine (7-step cognitive cycle)
+      case 'reasoningCycle':
+        if (engine) result = engine.reasoning_cycle(params.input || currentThought);
+        break;
+      // Phase 7: Immune system (threat detection + defense cascade)
+      case 'threatAssessment':
+        if (engine) result = engine.threat_assessment(params.input || '');
+        break;
+      case 'safetyLevel':
+        if (engine) result = engine.safety_level();
+        break;
+      // Phase 8: Causal discovery
+      case 'causalGraph':
+        if (engine) result = engine.causal_graph();
+        break;
       default:
         throw new Error(`Unknown action: ${action}`);
     }
