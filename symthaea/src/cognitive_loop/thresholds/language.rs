@@ -163,3 +163,11 @@ pub const NSM_COVERAGE_EXPLORATION_SCALE: f32 = -0.01;
 /// Linguistic expression of mental states is a form of meta-cognitive access.
 /// Science: Rosenthal (2005) — higher-order thought theory.
 pub const NSM_HOT_MODULATION: f32 = 0.1;
+
+/// Broca → Phi bidirectional feedback scale.
+/// Articulating a thought with high coherence and NSM coverage is itself
+/// information integration. This small boost (±2% max) feeds generation
+/// quality back into the consciousness level (psi).
+/// Science: Dehaene (2014) — global workspace broadcasting of linguistic
+/// content is a signature of conscious access.
+pub const NSM_BROCA_PHI_SCALE: f32 = 0.02;

@@ -320,7 +320,13 @@ impl BrocaGenerator {
         semantic_hv: Option<&symthaea_core::hdc::ContinuousHV>,
         active_primes: &[String],
     ) -> GenerationResult {
-        self.generate_internal_with_semantic(channels, &mut |_| {}, true, semantic_hv, active_primes)
+        self.generate_internal_with_semantic(
+            channels,
+            &mut |_| {},
+            true,
+            semantic_hv,
+            active_primes,
+        )
     }
 
     /// Generate continuing from the current CfC state (multi-turn context).
@@ -410,7 +416,9 @@ impl BrocaGenerator {
 
         // 4b. Construct NSM gate and tracker if enabled and primes are provided.
         let nsm_gate = if self.config.enable_nsm_gate && !active_primes.is_empty() {
-            Some(crate::gating::NsmSemanticGate::new(&self.tokenizer))
+            Some(crate::gating::NsmSemanticGate::new_with_lexicon(
+                &self.tokenizer,
+            ))
         } else {
             None
         };
@@ -513,7 +521,11 @@ impl BrocaGenerator {
             // NSM semantic gate: boost logits for tokens expressing active primes.
             // Inserted after epistemic/emotional/therapeutic gates, before coherence feedback.
             let this_nsm_boost = if let Some(ref gate) = nsm_gate {
-                gate.apply(&mut logits, active_primes, self.config.nsm_prime_logit_boost);
+                gate.apply(
+                    &mut logits,
+                    active_primes,
+                    self.config.nsm_prime_logit_boost,
+                );
                 self.config.nsm_prime_logit_boost
             } else {
                 0.0

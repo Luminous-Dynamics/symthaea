@@ -2768,6 +2768,30 @@ impl NsmSemanticGate {
             }
         }
 
+        // Morpheme decomposition: for BPE tokens not covered by word lookup,
+        // try prefix/suffix stripping to infer NSM primes from morphological structure.
+        // Science: Wierzbicka (1996) — morphological structure carries semantic prime content.
+        for tid in 0..tokenizer.vocab_size() as u32 {
+            if gate.token_to_primes.contains_key(&tid) || tokenizer.is_special(tid) {
+                continue;
+            }
+            let token_str = tokenizer.token_str(tid);
+            let morph_primes = Self::morpheme_primes_for_token(token_str);
+            if !morph_primes.is_empty() {
+                for &prime in &morph_primes {
+                    let prime_upper = prime.to_uppercase();
+                    gate.prime_to_tokens
+                        .entry(prime_upper.clone())
+                        .or_default()
+                        .push(tid);
+                    gate.token_to_primes
+                        .entry(tid)
+                        .or_default()
+                        .push(prime_upper);
+                }
+            }
+        }
+
         gate.deduplicate();
         gate
     }
@@ -2788,6 +2812,73 @@ impl NsmSemanticGate {
                     .push(prime_upper);
             }
         }
+    }
+
+    /// Attempt morpheme decomposition for a BPE token not in the word lexicon.
+    /// Strips known prefixes (un-, re-, dis-, etc.) and suffixes (-ing, -ed, -able, etc.)
+    /// to infer NSM primes from morphological structure.
+    /// Science: Wierzbicka (1996) — morphological structure carries semantic prime content.
+    fn morpheme_primes_for_token(token_str: &str) -> Vec<&'static str> {
+        let word = token_str.to_lowercase();
+        if word.len() < 3 {
+            return Vec::new();
+        }
+        let mut primes = Vec::new();
+
+        // Prefix stripping (longest match first)
+        let prefixes: &[(&str, &[&str])] = &[
+            ("under", &["LITTLE", "BELOW"]),
+            ("super", &["ABOVE", "BIG"]),
+            ("multi", &["MUCH"]),
+            ("auto", &["SAME"]),
+            ("over", &["MUCH", "ABOVE"]),
+            ("post", &["AFTER"]),
+            ("pre", &["BEFORE"]),
+            ("mis", &["BAD"]),
+            ("dis", &["NOT"]),
+            ("out", &["FAR"]),
+            ("sub", &["BELOW"]),
+            ("un", &["NOT"]),
+            ("re", &["BEFORE"]),
+            ("de", &["NOT"]),
+            ("in", &["INSIDE"]),
+            ("co", &["SAME"]),
+        ];
+        for &(prefix, prefix_primes) in prefixes {
+            if word.starts_with(prefix) && word.len() > prefix.len() + 2 {
+                primes.extend_from_slice(prefix_primes);
+                break; // Only strip one prefix
+            }
+        }
+
+        // Suffix stripping (longest match first)
+        let suffixes: &[(&str, &[&str])] = &[
+            ("ation", &["SOMETHING", "HAPPEN"]),
+            ("tion", &["SOMETHING", "HAPPEN"]),
+            ("sion", &["SOMETHING", "HAPPEN"]),
+            ("ment", &["SOMETHING"]),
+            ("ness", &["KIND_OF"]),
+            ("able", &["CAN"]),
+            ("ible", &["CAN"]),
+            ("less", &["NOT", "HAVE"]),
+            ("ful", &["MUCH"]),
+            ("ing", &["NOW", "HAPPEN"]),
+            ("ize", &["DO", "HAPPEN"]),
+            ("ise", &["DO", "HAPPEN"]),
+            ("ify", &["DO", "HAPPEN"]),
+            ("er", &["SOMEONE", "DO"]),
+            ("or", &["SOMEONE", "DO"]),
+            ("ed", &["BEFORE", "HAPPEN"]),
+            ("ly", &[]), // Modifier only, no prime content
+        ];
+        for &(suffix, suffix_primes) in suffixes {
+            if word.ends_with(suffix) && word.len() > suffix.len() + 2 {
+                primes.extend_from_slice(suffix_primes);
+                break; // Only strip one suffix
+            }
+        }
+
+        primes
     }
 
     /// Deduplicate the reverse indices.
