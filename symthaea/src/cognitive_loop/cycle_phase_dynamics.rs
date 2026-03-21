@@ -2602,6 +2602,7 @@ impl CognitiveLoopService {
                     cycle_id: self.stats.total_cycles as u64,
                     neuromod_exploration_mod: self.neuromod.bath.mcts_exploration_modulation(),
                     epistemic_quality: 0.5, // default neutral; wired when epistemic tiers active
+                    code_context: None,
                 };
 
                 let reasoning_result = reasoning_engine.reason(&reasoning_ctx);
