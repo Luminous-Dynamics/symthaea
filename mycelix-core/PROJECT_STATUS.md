@@ -1,6 +1,6 @@
 # Mycelix Project Status
 
-**Last Updated**: January 16, 2026
+**Last Updated**: March 21, 2026
 **Status**: Testnet Ready
 **Target**: Mainnet Q4 2026
 
@@ -93,6 +93,13 @@ mainnet preparation.
 - [x] Validator recruitment materials
 - [x] Security audit scope document
 - [x] Self-assessment report
+
+### March 2026 Hardening
+- [x] Consciousness gating tests added to finance shared lib (25+ tests)
+- [x] Cross-project bridge integration tests (17 tests in symthaea)
+- [x] mycelix-bridge-common proptest count: 349+
+- [x] Cluster relabeling: Energy/Climate/Music/Space/Knowledge now "Built" (all fully implemented, previously labeled "Scaffolded")
+- [x] Health Tier 2 promoted: 15 active zomes (8 deferred zomes uncommented)
 
 ---
 

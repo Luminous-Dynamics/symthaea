@@ -1,6 +1,6 @@
 # Symthaea Technical Status
 
-Honest per-capability assessment of Symthaea's current state as of 2026-03-04.
+Honest per-capability assessment of Symthaea's current state as of March 2026.
 
 ## Status Levels
 
@@ -68,6 +68,9 @@ Honest per-capability assessment of Symthaea's current state as of 2026-03-04.
 | 15 | **Genesis: Ectogenesis** | STRUCTURAL | HIGH | ~102 tests across 13 files | Artificial womb, consent proxy, microbiome, hormones, monitoring. |
 | 15 | **Genesis: Nurture** | STRUCTURAL | HIGH | ~166 tests across 15 files | Bowlby attachment, co-regulation, milestones, sleep, language acquisition. Nurture bridge in cognitive loop (`nurture_bridge.rs`, 6 tests) connects attachment to neuromod bath. |
 | 16 | **Neural Bridge** | STRUCTURAL | MEDIUM | 9 in `neural_bridge.rs`, 3 in `neural_bridge_v2.rs`, 4 in `consciousness_probe.rs`; 1,160 LOC | External model integration (ONNX, probe weights). Feature-gated (`neural-bridge`). Optional field in cognitive loop constructor. Loads probe weights from `models/neural_bridge/` if present. |
+| 17 | **Manager: VisionManager** | REAL | MEDIUM | ~10 tests | Feature-gated (`vision-manifold`). Interval 17. Visual surprise drives exploration boost. Bridges vision manifold crate into cognitive loop phase processing. |
+| 18 | **Manager: LanguageManager** | REAL | MEDIUM | ~10 tests | Feature-gated (`ssm_language`). Interval 61. Broca quality feedback modulates confidence and learning rate. Adaptive cadence based on consciousness level. |
+| 19 | **Manager: ReasoningManager** | REAL | MEDIUM | ~10 tests | Feature-gated (`reasoning_engine`). Interval 73. Reasoning reliability modulates learning rate. Tracks reasoning cycle success/failure for adaptive confidence. |
 
 ---
 
@@ -91,6 +94,9 @@ Honest per-capability assessment of Symthaea's current state as of 2026-03-04.
 | Broca / Language (14) | ~208 | STRUCTURAL (not driving loop) |
 | Genesis Pipeline (15) | ~734 | STRUCTURAL (standalone) |
 | Neural Bridge (16) | ~16 | STRUCTURAL |
+| VisionManager (17) | ~10 | REAL (feature-gated) |
+| LanguageManager (18) | ~10 | REAL (feature-gated) |
+| ReasoningManager (19) | ~10 | REAL (feature-gated) |
 
 ## Key Observations
 
@@ -112,4 +118,4 @@ Honest per-capability assessment of Symthaea's current state as of 2026-03-04.
 
 ---
 
-*Last updated: 2026-03-04. Run `cargo test --lib` to verify current test counts.*
+*Last updated: March 2026. Run `cargo test --lib` to verify current test counts.*
