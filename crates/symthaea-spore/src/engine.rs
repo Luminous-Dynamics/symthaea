@@ -571,11 +571,17 @@ impl SporeEngine {
         // PE-driven production (no manual decay — reuptake handles that).
         // Immune lr_factor attenuates production under threat conditions.
         // DA: reward prediction error (Schultz 1997)
-        self.bath.dopamine.produce(prediction_error * 0.08 * lr_factor);
+        self.bath
+            .dopamine
+            .produce(prediction_error * 0.08 * lr_factor);
         // NE: arousal/alertness from surprise (Aston-Jones & Cohen 2005)
-        self.bath.noradrenaline.produce(prediction_error * 0.10 * lr_factor);
+        self.bath
+            .noradrenaline
+            .produce(prediction_error * 0.10 * lr_factor);
         // 5-HT: contentment from low surprise (Dayan & Huys 2009)
-        self.bath.serotonin.produce((1.0 - prediction_error) * 0.04 * lr_factor);
+        self.bath
+            .serotonin
+            .produce((1.0 - prediction_error) * 0.04 * lr_factor);
         // OT: baseline social presence — doesn't require BLE peers
         self.bath.oxytocin.produce(0.003);
 
@@ -2031,7 +2037,8 @@ impl SporeEngine {
             self.bath.oxytocin.effective(),
         ];
         let harmony = self.evaluate_harmony_alignment(self.last_consciousness);
-        self.reasoning.run(input, self.last_consciousness, 0.0, &neuromods, harmony)
+        self.reasoning
+            .run(input, self.last_consciousness, 0.0, &neuromods, harmony)
     }
 
     /// Assess an input for threats. Returns ThreatAssessment.

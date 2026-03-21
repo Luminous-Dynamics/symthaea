@@ -139,7 +139,10 @@ fn print_success_full_neuromod_cascade() {
     );
 
     // Reward EMA should be positive
-    assert!(mgr.reward_ema() > 0.0, "Reward EMA should be positive after success");
+    assert!(
+        mgr.reward_ema() > 0.0,
+        "Reward EMA should be positive after success"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -191,8 +194,14 @@ fn safety_red_full_emergency_response() {
     let output = mgr.process(&default_snapshot());
 
     // Both flags should be set
-    assert!(output.has_flag(output_flags::VETO_ACTION), "Red should VETO");
-    assert!(output.has_flag(output_flags::ESCALATE_URGENCY), "Red should ESCALATE");
+    assert!(
+        output.has_flag(output_flags::VETO_ACTION),
+        "Red should VETO"
+    );
+    assert!(
+        output.has_flag(output_flags::ESCALATE_URGENCY),
+        "Red should ESCALATE"
+    );
     assert!(output.arousal_delta > 0.0, "Red should raise arousal");
 
     // NE injection for vigilance
@@ -202,7 +211,9 @@ fn safety_red_full_emergency_response() {
     // 5-HT baseline dip for stress
     let baselines = mgr.drain_baselines();
     assert!(
-        baselines.iter().any(|b| b.target == "serotonin" && b.nudge < 0.0),
+        baselines
+            .iter()
+            .any(|b| b.target == "serotonin" && b.nudge < 0.0),
         "Red should dip serotonin baseline"
     );
 }
@@ -292,12 +303,21 @@ fn all_neuromod_pathways_fire() {
     let baselines = mgr.drain_baselines();
 
     let inj_targets: Vec<&str> = injections.iter().map(|i| i.target).collect();
-    assert!(inj_targets.contains(&"norepinephrine"), "NE pathway missing");
+    assert!(
+        inj_targets.contains(&"norepinephrine"),
+        "NE pathway missing"
+    );
     assert!(inj_targets.contains(&"dopamine"), "DA pathway missing");
-    assert!(inj_targets.contains(&"oxytocin"), "Oxytocin pathway missing");
+    assert!(
+        inj_targets.contains(&"oxytocin"),
+        "Oxytocin pathway missing"
+    );
 
     let bl_targets: Vec<&str> = baselines.iter().map(|b| b.target).collect();
-    assert!(bl_targets.contains(&"serotonin"), "5-HT baseline pathway missing");
+    assert!(
+        bl_targets.contains(&"serotonin"),
+        "5-HT baseline pathway missing"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -64,10 +64,7 @@ pub enum StepEntity {
         knots_v: Vec<f32>,
     },
     /// Any entity type we don't explicitly handle.
-    Unknown {
-        entity_type: String,
-        params: String,
-    },
+    Unknown { entity_type: String, params: String },
 }
 
 /// A parsed STEP file containing a table of numbered entities.
@@ -145,9 +142,9 @@ fn parse_entity_line(line: &str) -> Result<Option<(usize, StepEntity)>, StepPars
 
     // Extract params between outermost parens, strip trailing ';'
     let after_open = &rhs[paren_open + 1..];
-    let paren_close = after_open.rfind(')').ok_or_else(|| {
-        StepParseError::InvalidFormat(format!("No closing ')' in: {}", rhs))
-    })?;
+    let paren_close = after_open
+        .rfind(')')
+        .ok_or_else(|| StepParseError::InvalidFormat(format!("No closing ')' in: {}", rhs)))?;
     let params = after_open[..paren_close].trim();
 
     let entity = match entity_type.as_str() {
@@ -363,7 +360,10 @@ fn extract_float_lists(params: &str) -> Vec<Vec<f32>> {
 impl StepFile {
     /// Look up an entity by its numeric ID.
     pub fn entity_by_id(&self, id: usize) -> Option<&StepEntity> {
-        self.entities.iter().find(|(eid, _)| *eid == id).map(|(_, e)| e)
+        self.entities
+            .iter()
+            .find(|(eid, _)| *eid == id)
+            .map(|(_, e)| e)
     }
 
     /// Convert all `BSplineCurve` entities to [`NurbsCurve`]s.
@@ -611,7 +611,11 @@ ENDSEC;
 END-ISO-10303-21;";
 
         let step_file = parse_step(step_input).expect("STEP parse must succeed");
-        assert_eq!(step_file.entities.len(), 6, "should parse 6 surface entities");
+        assert_eq!(
+            step_file.entities.len(),
+            6,
+            "should parse 6 surface entities"
+        );
 
         // ── Stage 2: Convert to NURBS surfaces ─────────────────────────
         let surfaces = step_file.to_nurbs_surfaces();
@@ -619,7 +623,11 @@ END-ISO-10303-21;";
             !surfaces.is_empty(),
             "must extract at least 1 NURBS surface"
         );
-        assert_eq!(surfaces.len(), 6, "should have 6 surfaces (one per box face)");
+        assert_eq!(
+            surfaces.len(),
+            6,
+            "should have 6 surfaces (one per box face)"
+        );
 
         // ── Stage 3: Tessellate STEP surfaces + merge with CSG mesh ────
         // The STEP parser's extract_point_grid returns a single row for
@@ -646,10 +654,7 @@ END-ISO-10303-21;";
         // Merge STEP-derived triangles into the mesh
         mesh.merge(&step_mesh);
 
-        assert!(
-            mesh.vertices.len() > 0,
-            "mesh must have >0 vertices"
-        );
+        assert!(mesh.vertices.len() > 0, "mesh must have >0 vertices");
 
         // ── Stage 4: Validate mesh ─────────────────────────────────────
         let report = validate_mesh(&mesh);
@@ -689,10 +694,7 @@ END-ISO-10303-21;";
         // ── Stage 6: Generate G-code ───────────────────────────────────
         let toolpath_config = ToolpathConfig::default();
         let gcode = generate_gcode(&layers, &slice_config, &toolpath_config);
-        assert!(
-            gcode.command_count() > 0,
-            "G-code must have >0 commands"
-        );
+        assert!(gcode.command_count() > 0, "G-code must have >0 commands");
         assert!(
             gcode.total_extrusion_mm > 0.0,
             "total extrusion must be >0 mm, got {}",

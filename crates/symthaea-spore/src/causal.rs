@@ -48,16 +48,12 @@ impl CausalGraph {
 
     /// Find edge between two variables (if any).
     pub fn find_edge(&self, from: &str, to: &str) -> Option<&CausalEdge> {
-        self.edges
-            .iter()
-            .find(|e| e.from == from && e.to == to)
+        self.edges.iter().find(|e| e.from == from && e.to == to)
     }
 
     /// Find edge mutably.
     fn find_edge_mut(&mut self, from: &str, to: &str) -> Option<&mut CausalEdge> {
-        self.edges
-            .iter_mut()
-            .find(|e| e.from == from && e.to == to)
+        self.edges.iter_mut().find(|e| e.from == from && e.to == to)
     }
 }
 
@@ -219,10 +215,18 @@ impl CausalDiscovery {
                     continue;
                 };
                 // Ensure pair tracker exists
-                if !self.pair_stats.iter().any(|p| p.from_idx == idx_a && p.to_idx == idx_b) {
+                if !self
+                    .pair_stats
+                    .iter()
+                    .any(|p| p.from_idx == idx_a && p.to_idx == idx_b)
+                {
                     self.pair_stats.push(PairStats::new(idx_a, idx_b));
                 }
-                if let Some(ps) = self.pair_stats.iter_mut().find(|p| p.from_idx == idx_a && p.to_idx == idx_b) {
+                if let Some(ps) = self
+                    .pair_stats
+                    .iter_mut()
+                    .find(|p| p.from_idx == idx_a && p.to_idx == idx_b)
+                {
                     ps.observe(*val_a, *val_b);
                 }
             }
@@ -359,7 +363,10 @@ mod tests {
         let mut discovery = CausalDiscovery::new();
         discovery.observe(&[("consciousness", 0.5), ("dopamine", 0.6)]);
         assert_eq!(discovery.graph().variables.len(), 2);
-        assert!(discovery.graph().variables.contains(&"consciousness".to_string()));
+        assert!(discovery
+            .graph()
+            .variables
+            .contains(&"consciousness".to_string()));
     }
 
     #[test]
@@ -380,13 +387,10 @@ mod tests {
 
         // Should have discovered at least one edge between dopamine and consciousness
         let graph = discovery.graph();
-        let has_da_consciousness = graph
-            .edges
-            .iter()
-            .any(|e| {
-                (e.from == "dopamine" && e.to == "consciousness")
-                    || (e.from == "consciousness" && e.to == "dopamine")
-            });
+        let has_da_consciousness = graph.edges.iter().any(|e| {
+            (e.from == "dopamine" && e.to == "consciousness")
+                || (e.from == "consciousness" && e.to == "dopamine")
+        });
         assert!(
             has_da_consciousness,
             "Should discover edge between correlated variables. Edges: {:?}",

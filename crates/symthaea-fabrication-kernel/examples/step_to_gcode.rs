@@ -99,9 +99,15 @@ fn main() {
     // ── Stage 4: Validate mesh ──────────────────────────────────────────
     let report = validate_mesh(&mesh);
     println!("\nStage 4 - Mesh Validation");
-    println!("  Valid (no OOB):      {}", report.out_of_bounds_indices.is_empty());
+    println!(
+        "  Valid (no OOB):      {}",
+        report.out_of_bounds_indices.is_empty()
+    );
     println!("  Watertight:          {}", report.is_watertight);
-    println!("  Degenerate tris:     {}", report.degenerate_triangles.len());
+    println!(
+        "  Degenerate tris:     {}",
+        report.degenerate_triangles.len()
+    );
     println!("  Boundary edges:      {}", report.boundary_edges);
     println!("  Signed volume:       {:.3} mm^3", report.signed_volume);
 

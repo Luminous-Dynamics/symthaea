@@ -87,7 +87,6 @@ pub struct LanguageControllerConfig {
     pub dt_max: f32,
 
     // ── W3.1: Orthogonal Positional Encoding ──
-
     /// Replace cyclic permutation with Gram-Schmidt orthogonal position bases.
     #[serde(default)]
     pub enable_orthogonal_positions: bool,

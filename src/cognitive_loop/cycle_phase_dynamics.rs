@@ -117,6 +117,12 @@ use super::thresholds::{
     DOMINANCE_FLOW_SCALE,
     DYNAMICS_POST_BOOT_CYCLES,
     DYNAMICS_STARTUP_WARMUP_CYCLES,
+    // Round 22: magic number extraction
+    EPISTEMIC_BUDGET_CONTRACT_BASE,
+    EPISTEMIC_BUDGET_CONTRACT_RAMP,
+    EPISTEMIC_BUDGET_CONTRACT_THRESHOLD,
+    EPISTEMIC_BUDGET_EXPAND_CAP,
+    EPISTEMIC_BUDGET_EXPAND_THRESHOLD,
     EPISTEMIC_EXPLORE_SCALE,
     EPISTEMIC_EXPLORE_THRESHOLD,
     EPISTEMIC_LOW_DAMPEN,
@@ -131,6 +137,8 @@ use super::thresholds::{
     EPISTEMIC_UNCERTAINTY_DEFAULT,
     ETHICS_CAUTION_CONFIDENCE_CAP,
     FEP_ACCURACY_CONFIDENCE_THRESHOLD,
+    FEP_COMPLEXITY_LR_SCALE,
+    FEP_COMPLEXITY_PENALTY_CAP,
     FEP_COMPLEXITY_THRESHOLD,
     FEP_EFFICIENT_EXPLORATION_DAMPEN,
     FEP_LEARNING_PLASTICITY_THRESHOLD,
@@ -138,6 +146,10 @@ use super::thresholds::{
     FEP_PRAGMATIC_EXPLOIT_THRESHOLD,
     FEP_PRAGMATIC_EXPLORE_SCALE,
     FEP_PRAGMATIC_EXPLORE_THRESHOLD,
+    FEP_SURPRISE_EXPLORE_CAP,
+    FEP_SURPRISE_EXPLORE_SCALE,
+    FEP_SURPRISE_EXPLORE_SECONDARY_CAP,
+    FEP_SURPRISE_EXPLORE_SECONDARY_SCALE,
     FEP_SURPRISE_TAU_SCALE,
     FEP_TD_ERROR_DISCOVERY_THRESHOLD,
     GOAL_DELTA_BASE_STEP,
@@ -170,10 +182,12 @@ use super::thresholds::{
     HORIZON_SLOPE_EXPAND_RATE,
     HORIZON_SLOPE_THRESHOLD,
     INFERENCE_MODE_INIT_CONFIDENCE,
+    KNOWLEDGE_ALERT_EXPLORE_CAP,
     KNOWLEDGE_ATTENTION_CONTRADICTION_BOOST,
     KNOWLEDGE_ATTENTION_CONTRADICTION_THRESHOLD,
     KNOWLEDGE_CAUSAL_DEPTH_DA_NUDGE,
     KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD,
+    KNOWLEDGE_CONTRADICTION_FLOOR,
     KNOWLEDGE_CONTRADICTION_NE_BOOST,
     KNOWLEDGE_CONTRADICTION_SHT_BOOST,
     KNOWLEDGE_GROUNDING_CERTAINTY_WEIGHT,
@@ -253,6 +267,8 @@ use super::thresholds::{
     SLEEP_PRESSURE_LR_DAMPEN_SCALE,
     SLEEP_PRESSURE_LR_FACTOR_MIN,
     SLEEP_PRESSURE_LR_THRESHOLD,
+    STILLNESS_BUDGET_CONTRACT_CAP,
+    STILLNESS_BUDGET_THRESHOLD,
     THALAMIC_DEEP_BUDGET_SCALE,
     THALAMIC_DEEP_LR_FACTOR,
     THALAMIC_DEEP_SALIENCE,
@@ -272,22 +288,6 @@ use super::thresholds::{
     WORLD_MODEL_SPONGY_LR_SCALE,
     WORLD_MODEL_STIFFNESS_LR_SCALE,
     WORLD_MODEL_STIFFNESS_THRESHOLD,
-    // Round 22: magic number extraction
-    EPISTEMIC_BUDGET_CONTRACT_BASE,
-    EPISTEMIC_BUDGET_CONTRACT_RAMP,
-    EPISTEMIC_BUDGET_CONTRACT_THRESHOLD,
-    EPISTEMIC_BUDGET_EXPAND_CAP,
-    EPISTEMIC_BUDGET_EXPAND_THRESHOLD,
-    FEP_COMPLEXITY_LR_SCALE,
-    FEP_COMPLEXITY_PENALTY_CAP,
-    FEP_SURPRISE_EXPLORE_CAP,
-    FEP_SURPRISE_EXPLORE_SCALE,
-    FEP_SURPRISE_EXPLORE_SECONDARY_CAP,
-    FEP_SURPRISE_EXPLORE_SECONDARY_SCALE,
-    KNOWLEDGE_ALERT_EXPLORE_CAP,
-    KNOWLEDGE_CONTRADICTION_FLOOR,
-    STILLNESS_BUDGET_CONTRACT_CAP,
-    STILLNESS_BUDGET_THRESHOLD,
 };
 #[cfg(feature = "vision-manifold")]
 use super::thresholds::{
@@ -953,8 +953,8 @@ impl CognitiveLoopService {
                     // Science: Festinger (1957) — dissonance strength scales with confidence.
                     let alerts = km.drain_alerts();
                     if !alerts.is_empty() {
-                        let boost =
-                            (alerts.len() as f32 * KNOWLEDGE_NOVELTY_EXPLORE_SCALE).min(KNOWLEDGE_ALERT_EXPLORE_CAP);
+                        let boost = (alerts.len() as f32 * KNOWLEDGE_NOVELTY_EXPLORE_SCALE)
+                            .min(KNOWLEDGE_ALERT_EXPLORE_CAP);
                         let contra_conf = sigs_contradiction.clamp(0.0, 1.0) as f32;
                         self.adjust_exploration_weighted(
                             "knowledge_contradictions",
@@ -1608,12 +1608,15 @@ impl CognitiveLoopService {
                 if comp > FEP_COMPLEXITY_THRESHOLD {
                     self.scale_lr(
                         "fep_complexity",
-                        1.0 - ((comp - FEP_COMPLEXITY_THRESHOLD).min(FEP_COMPLEXITY_PENALTY_CAP) * FEP_COMPLEXITY_LR_SCALE) as f32,
+                        1.0 - ((comp - FEP_COMPLEXITY_THRESHOLD).min(FEP_COMPLEXITY_PENALTY_CAP)
+                            * FEP_COMPLEXITY_LR_SCALE) as f32,
                     );
                 }
                 if surp > reflection_thresholds.surprise as f64 {
-                    let s_explore =
-                        ((surp - reflection_thresholds.surprise as f64) * FEP_SURPRISE_EXPLORE_SECONDARY_SCALE).min(FEP_SURPRISE_EXPLORE_SECONDARY_CAP) as f32;
+                    let s_explore = ((surp - reflection_thresholds.surprise as f64)
+                        * FEP_SURPRISE_EXPLORE_SECONDARY_SCALE)
+                        .min(FEP_SURPRISE_EXPLORE_SECONDARY_CAP)
+                        as f32;
                     self.adjust_exploration("reflection_surprise", s_explore);
                 }
                 (acc, comp, surp, pe)
@@ -1740,7 +1743,8 @@ impl CognitiveLoopService {
 
         if fep_surprise > surprise_thresh {
             if let Some(ref mut replay) = self.episodic_persistence.replay {
-                let surprise_boost = (fep_surprise - surprise_thresh).min(FEP_SURPRISE_EXPLORE_CAP) * FEP_SURPRISE_EXPLORE_SCALE;
+                let surprise_boost = (fep_surprise - surprise_thresh).min(FEP_SURPRISE_EXPLORE_CAP)
+                    * FEP_SURPRISE_EXPLORE_SCALE;
                 replay.boost_recent_consolidation(surprise_boost);
             }
         }
@@ -2287,7 +2291,8 @@ impl CognitiveLoopService {
         // Science: Gottlieb et al. (2013) — uncertain environments demand more attentional resources.
         // High epistemic (>0.4) scales budget up to 1.3×; low (<0.2) contracts to 0.9×.
         let epistemic_budget_scale = if epistemic_uncertainty > EPISTEMIC_BUDGET_EXPAND_THRESHOLD {
-            1.0 + (epistemic_uncertainty - EPISTEMIC_BUDGET_EXPAND_THRESHOLD).min(EPISTEMIC_BUDGET_EXPAND_CAP)
+            1.0 + (epistemic_uncertainty - EPISTEMIC_BUDGET_EXPAND_THRESHOLD)
+                .min(EPISTEMIC_BUDGET_EXPAND_CAP)
         } else if epistemic_uncertainty < EPISTEMIC_BUDGET_CONTRACT_THRESHOLD {
             EPISTEMIC_BUDGET_CONTRACT_BASE + epistemic_uncertainty * EPISTEMIC_BUDGET_CONTRACT_RAMP
         } else {

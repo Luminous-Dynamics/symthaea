@@ -251,9 +251,7 @@ impl PrinterApi for MockPrinter {
         self.jobs.retain(|j| j.id != job_id);
 
         if self.jobs.len() == before {
-            return Err(PrinterError::ApiError(format!(
-                "job not found: {job_id}"
-            )));
+            return Err(PrinterError::ApiError(format!("job not found: {job_id}")));
         }
 
         // Update status.
@@ -310,9 +308,7 @@ impl OctoPrintClient {
     }
 
     fn stub_err() -> PrinterError {
-        PrinterError::ApiError(
-            "Not implemented: requires printer-control feature".into(),
-        )
+        PrinterError::ApiError("Not implemented: requires printer-control feature".into())
     }
 }
 
@@ -379,9 +375,7 @@ impl MoonrakerClient {
     }
 
     fn stub_err() -> PrinterError {
-        PrinterError::ApiError(
-            "Not implemented: requires printer-control feature".into(),
-        )
+        PrinterError::ApiError("Not implemented: requires printer-control feature".into())
     }
 }
 

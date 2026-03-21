@@ -270,7 +270,11 @@ impl ReasoningEngine {
             None
         };
         let select_desc = match &selected {
-            Some(a) => format!("Selected: {} (score={:.3})", a.description, a.combined_score()),
+            Some(a) => format!(
+                "Selected: {} (score={:.3})",
+                a.description,
+                a.combined_score()
+            ),
             None => format!("No action (Phi_eff={:.3} < 0.1 threshold)", effective_phi),
         };
         steps.push(ReasoningStepResult {
@@ -289,7 +293,8 @@ impl ReasoningEngine {
             phi_change: reflect_phi_change,
             prediction_error: pe_delta,
             description: format!(
-                "Consciousness delta: {:.4}, cycle {}", consciousness_delta, self.cycle_count
+                "Consciousness delta: {:.4}, cycle {}",
+                consciousness_delta, self.cycle_count
             ),
         });
 
