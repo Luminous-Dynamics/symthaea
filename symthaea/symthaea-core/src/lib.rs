@@ -41,6 +41,7 @@
 #![allow(clippy::redundant_guards)]
 #![allow(clippy::unwrap_or_default)]
 #![allow(clippy::duplicated_attributes)]
+#![allow(clippy::manual_is_multiple_of)]
 // Suppress test-harness-generated deprecated warnings for phi_real module tests.
 // phi_real is #![deprecated] (renamed to spectral_connectivity), but the linter
 // hook restores its tests; the test harness references deprecated test constants

@@ -104,7 +104,11 @@ impl Contour {
         // For CCW contours, the inward normal of edge (a→b) is the left normal:
         // (-dy, dx) / len. For CW contours it's the right normal: (dy, -dx) / len.
         // Determine sign from winding.
-        let winding_sign = if self.signed_area() >= 0.0 { 1.0f32 } else { -1.0f32 };
+        let winding_sign = if self.signed_area() >= 0.0 {
+            1.0f32
+        } else {
+            -1.0f32
+        };
 
         // Build offset lines: each as a point on the line + direction vector.
         // Represent as (point, direction) pairs, then intersect consecutive pairs.
@@ -364,23 +368,18 @@ fn generate_honeycomb_infill(
     while cx < x_end {
         let mut cy = y_start + if col % 2 == 1 { row_stride } else { 0.0 };
         while cy < y_end {
-            // Rotate the hex center around the bbox centre.
-            let rotated_center = rotate(cx, cy);
-            let rcx = rotated_center.x;
-            let rcy = rotated_center.y;
-
-            // Generate the 6 edges of this hexagon (vertices rotated by angle_rad).
+            // Generate the 6 vertices of this hexagon, rotating each around the
+            // bounding box centre by angle_rad. The center (cx, cy) is on the
+            // unrotated grid; rotating the vertices achieves the same result as
+            // rotating the entire grid.
             let vertices: Vec<Point2> = hex_angles
                 .iter()
                 .map(|&a| {
-                    // Raw vertex position relative to unrotated center.
                     let vx = cx + r * a.cos();
                     let vy = cy + r * a.sin();
-                    // Rotate around bbox center.
                     rotate(vx, vy)
                 })
                 .collect();
-            let _ = (rcx, rcy); // suppress unused warning
 
             for i in 0..6 {
                 let j = (i + 1) % 6;
@@ -517,9 +516,15 @@ pub fn generate_infill_for_layer(
             ));
             segs
         }
-        InfillPattern::Honeycomb => {
-            generate_honeycomb_infill(layer, &edges, bb_min, bb_max, spacing, nozzle_diameter, angle_rad)
-        }
+        InfillPattern::Honeycomb => generate_honeycomb_infill(
+            layer,
+            &edges,
+            bb_min,
+            bb_max,
+            spacing,
+            nozzle_diameter,
+            angle_rad,
+        ),
     };
 
     result
@@ -850,7 +855,9 @@ mod tests {
         let contour = square_contour(20.0);
         let nozzle_diameter = 0.4f32;
         let inset_amount = nozzle_diameter * 0.5;
-        let inset_contour = contour.inset(inset_amount).expect("should produce valid inset");
+        let inset_contour = contour
+            .inset(inset_amount)
+            .expect("should produce valid inset");
 
         let inset_layer = SliceLayer {
             z: 0.2,
@@ -904,7 +911,10 @@ mod tests {
         let differs = lines_0.iter().zip(lines_30.iter()).any(|(a, b)| {
             (a.start.x - b.start.x).abs() > 0.01 || (a.start.y - b.start.y).abs() > 0.01
         });
-        assert!(differs, "Rotated honeycomb should produce different geometry");
+        assert!(
+            differs,
+            "Rotated honeycomb should produce different geometry"
+        );
     }
 
     #[test]
