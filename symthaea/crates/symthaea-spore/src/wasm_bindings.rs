@@ -329,6 +329,57 @@ impl SporeEngine {
             .collapse_threshold_experiment(steps, cycles_per_step);
         serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
     }
+
+    // ======================================================================
+    // Social Theory of Mind
+    // ======================================================================
+
+    /// Social mind state: partners, empathy level, coherence.
+    pub fn social_mind_state(&self) -> Result<JsValue, JsError> {
+        let state = self.inner.social_mind_state();
+        serde_wasm_bindgen::to_value(&state).map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    // ======================================================================
+    // Knowledge Engine
+    // ======================================================================
+
+    /// Query knowledge facts about a subject. Returns QueryResult as JS object.
+    pub fn knowledge_query(&mut self, subject: &str) -> Result<JsValue, JsError> {
+        let result = self.inner.knowledge_query(subject);
+        serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    /// Knowledge engine statistics: fact count, contradiction count, etc.
+    pub fn knowledge_stats(&self) -> Result<JsValue, JsError> {
+        let stats = self.inner.knowledge_stats();
+        serde_wasm_bindgen::to_value(&stats).map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    // ======================================================================
+    // Memory Consolidation
+    // ======================================================================
+
+    /// Trigger memory consolidation (dream replay). Returns ConsolidationResult.
+    pub fn memory_consolidate(&mut self) -> Result<JsValue, JsError> {
+        let result = self.inner.memory_consolidate();
+        serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    // ======================================================================
+    // Global Workspace
+    // ======================================================================
+
+    /// Current workspace state: broadcast, contents, history.
+    pub fn workspace_state(&self) -> Result<JsValue, JsError> {
+        let state = self.inner.workspace_state();
+        serde_wasm_bindgen::to_value(&state).map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    /// Whether the workspace has reached ignition (conscious experience).
+    pub fn workspace_ignition(&self) -> bool {
+        self.inner.workspace_ignition()
+    }
 }
 
 // ======================================================================

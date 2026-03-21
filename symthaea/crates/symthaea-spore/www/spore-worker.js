@@ -309,6 +309,28 @@ self.onmessage = async function(e) {
       case 'causalGraph':
         if (engine) result = engine.causal_graph();
         break;
+      // Phase 9: Social Theory of Mind
+      case 'socialMindState':
+        if (engine) result = engine.social_mind_state();
+        break;
+      // Phase 10: Knowledge Engine
+      case 'knowledgeQuery':
+        if (engine) result = engine.knowledge_query(params.subject || '');
+        break;
+      case 'knowledgeStats':
+        if (engine) result = engine.knowledge_stats();
+        break;
+      // Phase 11: Memory Consolidation
+      case 'memoryConsolidate':
+        if (engine) result = engine.memory_consolidate();
+        break;
+      // Phase 12: Global Workspace
+      case 'workspaceState':
+        if (engine) result = engine.workspace_state();
+        break;
+      case 'workspaceIgnition':
+        if (engine) result = engine.workspace_ignition();
+        break;
       default:
         throw new Error(`Unknown action: ${action}`);
     }
