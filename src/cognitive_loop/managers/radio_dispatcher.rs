@@ -767,7 +767,7 @@ impl CompressionStrategy {
                     CompressionStrategy::Full // Must send full on first contact
                 }
             }
-            RadioTier::Regional => CompressionStrategy::HashOnly,
+            RadioTier::Regional | RadioTier::Interplanetary => CompressionStrategy::HashOnly,
         }
     }
 }
