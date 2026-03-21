@@ -106,3 +106,60 @@ pub const GOAL_DELTA_CONFIDENCE_SCALE: f32 = 0.5;
 
 /// World model error importance scale.
 pub const WORLD_MODEL_ERROR_IMPORTANCE_SCALE: f32 = 0.3;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NSM SEMANTIC PRIMITIVE INTEGRATION
+// Science: Wierzbicka (1996) — universal semantic primes ground language production.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Blend weight for NSM primitive grounding into domain_familiarity channel.
+/// When detected primitives cover input well, domain familiarity increases,
+/// enabling more confident generation.
+/// Science: Wierzbicka (1996) — semantic decomposition depth correlates with domain knowledge.
+pub const NSM_GROUNDING_DOMAIN_BLEND: f32 = 0.5;
+
+/// Scaling factor for detected primitive count → concept_count channel (index 19).
+/// Raw count is clamped to [0, 10] after scaling.
+pub const NSM_CONCEPT_COUNT_SCALE: f32 = 1.0;
+
+/// Minimum GroundedUnderstanding confidence to inject NSM semantic HV into Broca.
+/// Below this, too few words mapped to recognized primes to trust the decomposition.
+/// Science: Wierzbicka (1996) — partial decomposition may mislead more than help.
+pub const NSM_MIN_CONFIDENCE: f32 = 0.2;
+
+/// Base blend weight for NSM semantic HV into thought HV (0.0–1.0).
+/// Higher values give more weight to the NSM semantic content.
+/// Science: Barsalou (1999) — ~30% semantic modulation for grounded cognition.
+pub const NSM_SEMANTIC_BLEND_ALPHA: f32 = 0.3;
+
+/// Logit boost for tokens expressing active NSM primes (Phase 3).
+/// Applied per-prime: tokens expressing multiple active primes get multiple boosts.
+/// Science: Collins & Loftus (1975) — spreading activation in semantic networks.
+pub const NSM_PRIME_LOGIT_BOOST: f32 = 0.5;
+
+/// How much NSM prime coverage relaxes semantic veto threshold (Phase 3).
+/// High coverage suggests generation is on-track semantically.
+/// Science: Grice (1975) — cooperative principle; semantic coverage = communicative success.
+pub const NSM_COVERAGE_VETO_SCALE: f32 = 0.1;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NSM CONSCIOUSNESS FEEDBACK — Phase 4
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Confidence modulation from NSM expressive coverage (Phase 4).
+/// coverage > 0.5 → positive boost; < 0.5 → dampens confidence.
+/// Science: Levelt (1989) — successful articulation feeds back into speaker confidence.
+pub const NSM_COVERAGE_CONFIDENCE_SCALE: f32 = 0.05;
+
+/// Learning rate modulation from NSM expressive coverage (Phase 4).
+/// High coverage → consolidate (less LR boost); low → learn more.
+pub const NSM_COVERAGE_LR_SCALE: f32 = 0.02;
+
+/// Exploration dampening when NSM coverage is high (Phase 4).
+/// Successful expression reduces need to explore alternative strategies.
+pub const NSM_COVERAGE_EXPLORATION_SCALE: f32 = -0.01;
+
+/// HOT depth modulation from expressive coverage (Phase 4).
+/// Linguistic expression of mental states is a form of meta-cognitive access.
+/// Science: Rosenthal (2005) — higher-order thought theory.
+pub const NSM_HOT_MODULATION: f32 = 0.1;

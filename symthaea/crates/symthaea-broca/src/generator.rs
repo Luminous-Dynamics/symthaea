@@ -69,6 +69,18 @@ pub struct BrocaConfig {
     /// BPE vocab stores spaces as separate tokens. Untrained models don't emit them.
     #[serde(default = "default_auto_spacing")]
     pub enable_auto_spacing: bool,
+    /// Enable NSM semantic content blending into thought HV (Phase 2).
+    /// When true and a semantic_hv is provided, it is blended with the
+    /// thought HV before generation via linear interpolation.
+    /// Science: Barsalou (1999) — grounded cognition requires semantic modulation.
+    #[serde(default)]
+    pub enable_nsm_semantic: bool,
+    /// Blend weight for NSM semantic HV into thought HV (0.0–1.0).
+    /// Higher values give more weight to the NSM semantic content.
+    /// Default 0.3: ~30% semantic modulation for meaningful influence
+    /// without overwhelming procedural dynamics.
+    #[serde(default = "default_nsm_semantic_alpha")]
+    pub nsm_semantic_alpha: f32,
 }
 
 fn default_repetition_penalty() -> f32 {
@@ -77,6 +89,10 @@ fn default_repetition_penalty() -> f32 {
 
 fn default_auto_spacing() -> bool {
     true
+}
+
+fn default_nsm_semantic_alpha() -> f32 {
+    0.3
 }
 
 impl Default for BrocaConfig {
@@ -94,6 +110,8 @@ impl Default for BrocaConfig {
             repetition_penalty: default_repetition_penalty(),
             sampling_seed: None,
             enable_auto_spacing: true,
+            enable_nsm_semantic: false,
+            nsm_semantic_alpha: default_nsm_semantic_alpha(),
         }
     }
 }
@@ -259,6 +277,23 @@ impl BrocaGenerator {
         self.generate_with_callback(channels, &mut |_| {})
     }
 
+    /// Generate with an optional NSM semantic content vector.
+    ///
+    /// When `semantic_hv` is provided and `enable_nsm_semantic` is true,
+    /// the semantic HV is blended with the thought HV via linear interpolation
+    /// before entering the CfC generation loop. This gives the generator
+    /// actual semantic content (NSM-composed meaning) rather than just
+    /// metadata about the thought.
+    ///
+    /// Science: Barsalou (1999) — grounded cognition requires ~30% semantic modulation.
+    pub fn generate_with_semantic(
+        &mut self,
+        channels: &ThoughtChannels,
+        semantic_hv: Option<&symthaea_core::hdc::ContinuousHV>,
+    ) -> GenerationResult {
+        self.generate_internal_with_semantic(channels, &mut |_| {}, true, semantic_hv)
+    }
+
     /// Generate continuing from the current CfC state (multi-turn context).
     ///
     /// Unlike `generate()`, this does NOT reset the controller state,
@@ -285,9 +320,32 @@ impl BrocaGenerator {
         on_token: &mut dyn FnMut(&str),
         reset_state: bool,
     ) -> GenerationResult {
+        self.generate_internal_with_semantic(channels, on_token, reset_state, None)
+    }
+
+    /// Internal generation with configurable state reset and optional NSM semantic HV.
+    fn generate_internal_with_semantic(
+        &mut self,
+        channels: &ThoughtChannels,
+        on_token: &mut dyn FnMut(&str),
+        reset_state: bool,
+        semantic_hv: Option<&symthaea_core::hdc::ContinuousHV>,
+    ) -> GenerationResult {
         // 1. Encode thought channels once
         let thought_hv_original = self.encoder.encode(channels);
         let mut thought_hv = thought_hv_original.clone();
+
+        // 1b. Blend NSM semantic content into thought HV if enabled and provided.
+        // This gives the generator actual compositional meaning (e.g., FEEL(BAD) ⊗ BECAUSE ⊗ MOVE(AWAY))
+        // rather than just scalar metadata about the thought.
+        if self.config.enable_nsm_semantic {
+            if let Some(sem_hv) = semantic_hv {
+                let alpha = self.config.nsm_semantic_alpha.clamp(0.0, 1.0);
+                if alpha > 0.0 {
+                    thought_hv.lerp_in_place(sem_hv, 1.0 - alpha, alpha);
+                }
+            }
+        }
 
         // 2. Compute max tokens (consciousness-gated, then time-pressure-adjusted)
         let pre_pressure_tokens = if self.config.enable_consciousness_gating {

@@ -557,6 +557,12 @@ impl CognitiveLoopService {
                 } else {
                     None
                 },
+                #[cfg(feature = "ssm_language")]
+                grounded_understanding:
+                    symthaea_core::hdc::grounded_understanding::GroundedUnderstanding::new()
+                        .with_depth(
+                            symthaea_core::hdc::grounded_understanding::UnderstandingDepth::Surface,
+                        ),
             },
             adaptive_behavior,
             prediction_confidence: 0.5_f64, // Start neutral

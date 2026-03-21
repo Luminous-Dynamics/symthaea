@@ -22,6 +22,12 @@ pub struct LanguageAndCommunicationManager {
 
     /// User state inference for adaptive response generation.
     pub user_state: Option<crate::user_state_inference::UserStateInference>,
+
+    /// NSM grounded understanding engine for semantic decomposition.
+    /// Used to produce semantic_hv for Broca generation (Phase 2).
+    /// Science: Wierzbicka (1996) — universal semantic primes ground language production.
+    #[cfg(feature = "ssm_language")]
+    pub grounded_understanding: symthaea_core::hdc::grounded_understanding::GroundedUnderstanding,
 }
 
 impl std::fmt::Debug for LanguageAndCommunicationManager {

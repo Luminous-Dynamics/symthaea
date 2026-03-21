@@ -3993,6 +3993,7 @@ impl CognitiveLoopService {
             coherence,
             effective_lr,
             math_result,
+            &perception.encoding.encoding_result.detected_primitives,
         );
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -4156,6 +4157,7 @@ impl CognitiveLoopService {
         coherence: f32,
         effective_lr: f32,
         math_result: &DynMath,
+        detected_primitives: &[String],
     ) {
         let broca_psi = self.unification_engine.psi as f32;
         let broca_novelty = prediction_error > self.config.learning_threshold || surprise_triggered;
@@ -4260,6 +4262,24 @@ impl CognitiveLoopService {
         #[cfg(not(feature = "mycelix"))]
         let (mode_valence_nudge, mode_arousal_nudge, mode_warmth) = (0.0f32, 0.0f32, 0.5f32);
 
+        // Phase 2: Compute NSM semantic HV from detected primitives (once, reused in signals).
+        // GroundedUnderstanding decomposes the primitive names into NSM primes and
+        // composes a BinaryHV, which we convert to ContinuousHV for Broca blending.
+        let (nsm_semantic_hv, nsm_semantic_confidence) = if detected_primitives.is_empty() {
+            (None, 0.0_f32)
+        } else {
+            let meaning = self
+                .language_comm
+                .grounded_understanding
+                .understand(&detected_primitives.join(" "));
+            let confidence = meaning.confidence as f32;
+            if confidence > super::thresholds::NSM_MIN_CONFIDENCE {
+                (Some(meaning.semantic_hv.to_continuous()), confidence)
+            } else {
+                (None, confidence)
+            }
+        };
+
         // Generate in a scoped borrow, then apply feedback outside
         let broca_feedback = if let Some(ref mut broca) = self.language_comm.broca_manager {
             let math_epistemic_penalty = if math_result.epistemic_caveat.is_some() {
@@ -4315,6 +4335,18 @@ impl CognitiveLoopService {
                     .ethics_verdict_override
                     .unwrap_or(self.last_ethics_verdict)
                     == super::ethics_engine::EthicalVerdict::Blocked,
+                detected_primitives: detected_primitives.to_vec(),
+                primitive_grounding: if detected_primitives.is_empty() {
+                    0.0
+                } else {
+                    // Estimate: each primitive maps roughly to one input concept.
+                    // Cap at 1.0 (perfect decomposition).
+                    (detected_primitives.len() as f32 / 10.0).clamp(0.0, 1.0)
+                },
+                // Phase 2: Compose NSM semantic content vector from detected primitives.
+                // Use GroundedUnderstanding to build a BinaryHV → ContinuousHV.
+                semantic_hv: nsm_semantic_hv.clone(),
+                semantic_confidence: nsm_semantic_confidence,
             };
             if let Some(mut result) = broca.generate(signals) {
                 if !result.text.is_empty() {
@@ -4421,6 +4453,38 @@ impl CognitiveLoopService {
                     super::thresholds::BROCA_VETO_EXPLORATION_SCALE,
                     Priority::Aesthetic,
                 );
+            }
+
+            // Phase 4: NSM expressive coverage → consciousness feedback.
+            // Use primitive grounding as a proxy for expressive coverage
+            // (full NsmCoherenceTracker integration will replace this).
+            // Science: Levelt (1989) — self-monitoring; Rosenthal (2005) — HOT theory.
+            {
+                let nsm_coverage = self
+                    .language_comm
+                    .broca_manager
+                    .as_ref()
+                    .map(|b| b.last_telemetry.nsm_grounding)
+                    .unwrap_or(0.0);
+                if nsm_coverage > 0.0 {
+                    // Confidence modulation: coverage > 0.5 boosts, < 0.5 dampens.
+                    let coverage_delta =
+                        (nsm_coverage - 0.5) * super::thresholds::NSM_COVERAGE_CONFIDENCE_SCALE;
+                    self.adjust_confidence_pri(
+                        "nsm_expressive_coverage",
+                        coverage_delta,
+                        Priority::Aesthetic,
+                    );
+                    // Exploration modulation: high coverage → consolidate.
+                    if nsm_coverage > 0.5 {
+                        self.scale_exploration_pri(
+                            "nsm_coverage_consolidate",
+                            super::thresholds::NSM_COVERAGE_EXPLORATION_SCALE
+                                * (nsm_coverage - 0.5),
+                            Priority::Aesthetic,
+                        );
+                    }
+                }
             }
 
             let _ = deferred_sem_pe;
