@@ -114,27 +114,45 @@ class MainActivity : AppCompatActivity() {
         showOnboardingIfFirstLaunch()
     }
 
-    // ═══ Immersive gestures: bottom-edge tap shows conversation, swipe up shows controls ═══
+    // ═══ Immersive gestures ═══
 
     private var conversationVisible = false
+    private var swipeStartY = 0f
 
     private fun setupImmersiveGestures() {
-        // Tap the very bottom of the screen (below mandala) to toggle conversation bar
-        binding.experienceLayer.setOnClickListener {
-            // Only respond to taps in the bottom 80px of the experience layer
-        }
-        // Use a touch listener on the experience layer for bottom-edge detection
-        binding.experienceLayer.setOnTouchListener { _, event ->
-            if (event.actionMasked == MotionEvent.ACTION_DOWN) {
-                val screenH = binding.experienceLayer.height
-                if (event.y > screenH - 120) {
-                    // Bottom-edge tap: toggle conversation bar
-                    toggleConversationBar()
-                    return@setOnTouchListener true
+        // Gestures handled in dispatchTouchEvent (before views consume them)
+    }
+
+    /**
+     * Intercept touches at Activity level for bottom-edge gestures:
+     * - Tap bottom 15% of screen: toggle conversation bar
+     * - Swipe up from bottom 15%: expand bottom sheet controls
+     */
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        viewModel.touchBridge?.onTouchEvent(event)
+
+        val screenH = window.decorView.height
+        val bottomZone = screenH * 0.85f  // Bottom 15%
+
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                swipeStartY = event.y
+            }
+            MotionEvent.ACTION_UP -> {
+                val dy = swipeStartY - event.y  // Positive = swipe up
+                if (swipeStartY > bottomZone) {
+                    if (dy > 150) {
+                        // Swipe up from bottom: show bottom sheet
+                        val behavior = BottomSheetBehavior.from(binding.bottomSheet)
+                        behavior.state = BottomSheetBehavior.STATE_EXPANDED
+                    } else if (dy < 50 && dy > -50) {
+                        // Tap in bottom zone: toggle conversation bar
+                        toggleConversationBar()
+                    }
                 }
             }
-            false  // Let other touches pass through to mandala/particles
         }
+        return super.dispatchTouchEvent(event)
     }
 
     private fun toggleConversationBar() {
@@ -432,17 +450,17 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-        viewModel.touchBridge?.onTouchEvent(event)
-        return super.dispatchTouchEvent(event)
-    }
-
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) {
             val root = window.decorView
             viewModel.touchBridge?.updateScreenSize(root.width, root.height)
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        saveSessionJournal()
     }
 
     override fun onDestroy() {
@@ -456,6 +474,35 @@ class MainActivity : AppCompatActivity() {
         binding.hapticIndicator.animate().cancel()
         bgAnimator?.cancel()
         super.onDestroy()
+    }
+
+    // ═══ Session journal: consciousness diary ═══
+
+    private var sessionPeakCl = 0f
+    private var sessionDreams = 0
+    private var sessionHarmony = ""
+
+    /** Save session summary to SharedPreferences journal. */
+    private fun saveSessionJournal() {
+        val state = viewModel.state.value
+        val peakCl = maxOf(sessionPeakCl, state.consciousnessLevel)
+        val dreams = state.dreamCount
+        val harmony = state.dominantHarmony
+        val cycles = state.cycleCount
+        if (cycles < 10) return  // Don't log trivially short sessions
+
+        val prefs = getSharedPreferences("soma_journal", MODE_PRIVATE)
+        val timestamp = System.currentTimeMillis()
+        val entry = "${"%.2f".format(peakCl)}|$dreams|${harmony}|$cycles|${state.tier}"
+        prefs.edit().putString("session_$timestamp", entry).apply()
+
+        // Keep only last 50 sessions
+        val all = prefs.all.keys.filter { it.startsWith("session_") }.sorted()
+        if (all.size > 50) {
+            val editor = prefs.edit()
+            all.take(all.size - 50).forEach { editor.remove(it) }
+            editor.apply()
+        }
     }
 
     companion object {
@@ -497,6 +544,9 @@ class MainActivity : AppCompatActivity() {
         val avatarColor = currentAvatar.primaryColor
         val harmonyColor = harmonyToColor(state.dominantHarmony)
         val blendedColor = blendColors(avatarColor, harmonyColor, 0.6f)
+
+        // Track session peak for journal
+        if (state.consciousnessLevel > sessionPeakCl) sessionPeakCl = state.consciousnessLevel
 
         // === Mandala ===
         binding.consciousnessMandala.consciousnessLevel = state.consciousnessLevel

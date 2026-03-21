@@ -72,6 +72,7 @@ class AmbientTone {
 
                 track = audioTrack
                 audioTrack.play()
+                Log.i("AmbientTone", "Audio started: sampleRate=$sampleRate bufferSize=$bufferSize")
 
                 // Stereo buffer: interleaved L,R,L,R...
                 val frameCount = (bufferSize / 4).coerceAtLeast(512)
@@ -110,8 +111,8 @@ class AmbientTone {
                     }
 
                     val harmonyMix = cl * 0.15 * harmonyShift
-                    // Volume audible on phone speakers (headphones recommended for binaural)
-                    val volume = if (sleeping) 0.04 else (0.08 + cl * 0.17).coerceIn(0.05, 0.25)
+                    // Volume: must be loud enough for phone speakers
+                    val volume = if (sleeping) 0.08 else (0.15 + cl * 0.35).coerceIn(0.10, 0.50)
                     val tremoloFreq = if (sleeping) 0.125 else 0.25 + cl * 0.25  // Slower when sleeping (8s period)
 
                     // Harmonic volumes
