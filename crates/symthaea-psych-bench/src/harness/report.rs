@@ -974,6 +974,7 @@ impl BenchmarkReport {
                 "rat_mean_solution_rank",
                 &bl.creativity,
             );
+            push_specific("binding_accuracy", "rat_binding_accuracy", &bl.creativity);
         }
         if benchmark.contains("StrangeStory") {
             push_specific("overall_accuracy", "strange_story_accuracy", &bl.tombench);
@@ -1195,6 +1196,7 @@ impl BenchmarkReport {
         }
         // Creativity RT mappings
         if benchmark.contains("AlternateUses") {
+            push_specific("originality", "aut_originality", &bl.creativity);
             push_specific("rt_ticks", "aut_rt_ticks", &bl.creativity);
         }
         if benchmark.contains("RemoteAssociates") {
@@ -2187,8 +2189,8 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("Butlin") => "mean_quality_score",
         b if b.contains("ValenceClassification") => "valence_accuracy",
         b if b.contains("MoodCongruent") => "congruence_ratio",
-        b if b.contains("RemoteAssociates") => "mean_solution_rank",
-        b if b.contains("AlternateUses") => "fluency",
+        b if b.contains("RemoteAssociates") => "binding_accuracy",
+        b if b.contains("AlternateUses") => "originality",
         b if b.contains("DivergentThinking") => "originality_score",
         b if b.contains("ConceptualBlending") => "blend_quality",
         b if b.contains("InsightProblem") => "restructuring_success",

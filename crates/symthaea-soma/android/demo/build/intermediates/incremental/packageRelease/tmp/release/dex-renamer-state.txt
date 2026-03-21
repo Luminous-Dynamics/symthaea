@@ -1,0 +1,4 @@
+#Sat Mar 21 12:06:11 SAST 2026
+base.0=/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/build/intermediates/dex/release/minifyReleaseWithR8/classes.dex
+renamed.0=classes.dex
+path.0=classes.dex

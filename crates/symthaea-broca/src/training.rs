@@ -312,7 +312,7 @@ impl Default for TrainingConfig {
             coherence_collapse_threshold: 0.05,
             coherence_alignment_weight: 0.0,
             coherence_alignment_start_weight: 0.0,
-            merge_token_loss_weight: 1.5,
+            merge_token_loss_weight: 1.0, // 1.0 = disabled; use --merge-bias 1.5 to enable
             enable_fusion_during_training: false,
             fusion_warmup_epochs: 0,
         }
