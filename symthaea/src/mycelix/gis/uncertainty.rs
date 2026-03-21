@@ -404,7 +404,7 @@ impl MoralUncertainty {
                 dimension: MoralUncertaintyType::Epistemic,
                 action: "Gather more information about consequences and affected parties"
                     .to_string(),
-                priority: (self.epistemic * 10.0) as u8,
+                priority: (self.epistemic * 10.0).clamp(0.0, 255.0) as u8,
             });
         }
 
@@ -412,7 +412,7 @@ impl MoralUncertainty {
             recs.push(MoralRecommendation {
                 dimension: MoralUncertaintyType::Axiological,
                 action: "Identify which values and principles are at stake".to_string(),
-                priority: (self.axiological * 12.0) as u8, // Higher priority for value uncertainty
+                priority: (self.axiological * 12.0).clamp(0.0, 255.0) as u8, // Higher priority for value uncertainty
             });
         }
 
@@ -421,7 +421,7 @@ impl MoralUncertainty {
                 dimension: MoralUncertaintyType::Deontic,
                 action: "Consider multiple ethical frameworks and their recommendations"
                     .to_string(),
-                priority: (self.deontic * 10.0) as u8,
+                priority: (self.deontic * 10.0).clamp(0.0, 255.0) as u8,
             });
         }
 

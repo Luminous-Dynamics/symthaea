@@ -986,9 +986,14 @@ pub fn try_auto_fix_structured(source: &str, errors: &[CompileError]) -> Option<
     let mut line_offset: i64 = 0;
 
     for error in errors {
-        let target_line = error
-            .line
-            .map(|l| ((l as i64 + line_offset) as usize).saturating_sub(1));
+        let target_line = error.line.map(|l| {
+            let adjusted = l as i64 + line_offset;
+            if adjusted < 1 {
+                0
+            } else {
+                (adjusted as usize).saturating_sub(1)
+            }
+        });
 
         match error.category {
             ErrorCategory::TypeMismatch => {
