@@ -692,6 +692,13 @@ END-ISO-10303-21;";
             "at least some layers must have contours"
         );
 
+        // Infill should be generated (default config enables 20% rectilinear).
+        let total_infill: usize = layers.iter().map(|l| l.infill_lines.len()).sum();
+        assert!(
+            total_infill > 0,
+            "default SliceConfig should produce infill lines, got 0"
+        );
+
         // ── Stage 6: Generate G-code ───────────────────────────────────
         let toolpath_config = ToolpathConfig::default();
         let gcode = generate_gcode(&layers, &slice_config, &toolpath_config);

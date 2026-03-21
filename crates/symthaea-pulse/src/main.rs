@@ -1755,7 +1755,12 @@ fn main() -> Result<()> {
             pog_score_ema: m.fabrication_pog_score_ema,
             active_print_jobs: m.fabrication_active_jobs,
             reward_ema: m.fabrication_reward_ema,
-            ..FabricationInfo::default()
+            mrp_planned_orders: m.fabrication_mrp_planned_orders,
+            mrp_feasible: m.fabrication_mrp_feasible,
+            mrp_shortages_count: m.fabrication_mrp_shortages,
+            mrp_work_order_count: m.fabrication_mrp_work_orders,
+            defect_prediction: m.fabrication_defect_prediction,
+            defect_confidence: m.fabrication_defect_confidence,
         },
     };
 
@@ -2187,7 +2192,12 @@ fn main() -> Result<()> {
                     pog_score_ema: wm.fabrication_pog_score_ema,
                     active_print_jobs: wm.fabrication_active_jobs,
                     reward_ema: wm.fabrication_reward_ema,
-                    ..FabricationInfo::default()
+                    mrp_planned_orders: wm.fabrication_mrp_planned_orders,
+                    mrp_feasible: wm.fabrication_mrp_feasible,
+                    mrp_shortages_count: wm.fabrication_mrp_shortages,
+                    mrp_work_order_count: wm.fabrication_mrp_work_orders,
+                    defect_prediction: wm.fabrication_defect_prediction,
+                    defect_confidence: wm.fabrication_defect_confidence,
                 },
                 mesh_consciousness: MeshConsciousnessInfo::default(),
             };

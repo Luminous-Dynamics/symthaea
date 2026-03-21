@@ -75,6 +75,10 @@ impl CalibrationAudit {
             }
             let bin_confidence = (i as f64 + 0.5) / 10.0; // Bin midpoint
             let bin_accuracy = correct as f64 / total as f64;
+            debug_assert!(
+                self.total_samples > 0,
+                "total_samples checked at function entry"
+            );
             let weight = total as f64 / self.total_samples as f64;
             ece += weight * (bin_accuracy - bin_confidence).abs();
         }

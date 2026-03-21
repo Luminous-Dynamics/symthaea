@@ -218,6 +218,10 @@ fn main() {
     let mut monitor = CincinnatiMonitor::new(monitor_config);
     let mut anomaly_events: Vec<(u32, String)> = Vec::new();
 
+    // Online defect predictor — trains during the print, not just after.
+    let mut predictor = DefectPredictor::new();
+    let mut prediction_log: Vec<(u32, f64)> = Vec::new();
+
     for step in 0..TOTAL_STEPS {
         let readings = simulate_sensor_readings(step, TOTAL_STEPS);
         for reading in readings {
@@ -233,12 +237,34 @@ fn main() {
         }
         // Advance mock printer progress.
         printer.advance_progress(1.0 / TOTAL_STEPS as f32);
+
+        // Online training every 10 steps — feed current quality estimate.
+        if step > 0 && step % 10 == 0 {
+            let current_quality = run_quality_check(monitor.anomaly_count());
+            let progress = step as f64 / TOTAL_STEPS as f64;
+            let input = PredictionInput {
+                tolerance: (0.85 - monitor.anomaly_count() as f64 * 0.02).clamp(0.0, 1.0),
+                surface_quality: (0.9 - monitor.anomaly_count() as f64 * 0.03).clamp(0.0, 1.0),
+                throughput: 0.7 + progress * 0.1,
+                energy_cost: 0.3 + progress * 0.05,
+                anomaly_count: monitor.anomaly_count() as u32,
+                layer_count: (layers.len() as f64 * progress) as u32,
+            };
+            predictor.train(&input, current_quality);
+
+            let pred = predictor.predict(&input);
+            prediction_log.push((step, pred.predicted_quality));
+        }
     }
 
     println!("  Total sensor readings: {}", monitor.history_len());
     println!("  Anomalies detected: {}", monitor.anomaly_count());
     for (step, desc) in &anomaly_events {
         println!("    Step {}: {}", step, desc);
+    }
+    println!("  Online predictions during print:");
+    for (step, pred) in &prediction_log {
+        println!("    Step {:>3}: predicted quality = {:.3}", step, pred);
     }
 
     // ── Phase D: QC check ────────────────────────────────────────────
@@ -248,16 +274,15 @@ fn main() {
     println!("  Quality score: {:.2}", quality);
     println!("  Result: {}", if pass { "PASS ✓" } else { "FAIL ✗" });
 
-    // ── Phase E: Train DefectPredictor ───────────────────────────────
-    println!("\n=== Phase E: Defect Prediction Training ===");
-    let mut predictor = DefectPredictor::new();
+    // ── Phase E: Final defect prediction assessment ──────────────────
+    println!("\n=== Phase E: Defect Prediction (Online-Trained) ===");
+    // Train a final batch with actual quality.
     let training_data =
         generate_training_data(monitor.anomaly_count(), layers.len() as u32, quality);
-
     for (input, actual) in &training_data {
         predictor.train(input, *actual);
     }
-    println!("  Training samples: {}", predictor.training_count);
+    println!("  Total training samples: {}", predictor.training_count);
 
     // Predict on the last sample.
     let last_input = &training_data.last().unwrap().0;

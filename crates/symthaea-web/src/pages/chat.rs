@@ -6,6 +6,7 @@ use crate::components::glyph_display::GlyphDisplay;
 use crate::components::harmony_radar::HarmonyRadar;
 use crate::components::neuro_bars::NeuroBars;
 use crate::components::phi_meter::PhiMeter;
+use crate::components::workspace_viz::WorkspaceViz;
 use crate::state::AppState;
 use crate::worker::EngineWorker;
 
@@ -33,43 +34,6 @@ pub fn ChatPage() -> impl IntoView {
     let (next_msg_id, set_next_msg_id) = signal(1_usize);
     let (input_value, set_input_value) = signal(String::new());
     let (is_thinking, set_is_thinking) = signal(false);
-    let (is_initialized, set_is_initialized) = signal(false);
-
-    // Initialize the engine on first render
-    let engine_init = engine.clone();
-    let state_init = state.clone();
-    Effect::new(move |_| {
-        if is_initialized.get() {
-            return;
-        }
-        let engine = engine_init.clone();
-        let state = state_init.clone();
-        let set_init = set_is_initialized;
-        if engine.is_available() {
-            wasm_bindgen_futures::spawn_local(async move {
-                let promise = engine.send_simple("init");
-                match JsFuture::from(promise).await {
-                    Ok(_result) => {
-                        log::info!("SporeEngine initialized");
-                        state.worker_ready.set(true);
-
-                        // Try loading Broca checkpoint
-                        let promise = engine.send_simple("loadBrocaCheckpoint");
-                        match JsFuture::from(promise).await {
-                            Ok(_) => {
-                                log::info!("Broca checkpoint loaded");
-                                state.pipeline_loaded.set(true);
-                            }
-                            Err(e) => log::warn!("Broca checkpoint not available: {:?}", e),
-                        }
-
-                        set_init.set(true);
-                    }
-                    Err(e) => log::error!("Engine init failed: {:?}", e),
-                }
-            });
-        }
-    });
 
     // Submit handler
     let engine_submit = engine.clone();
@@ -113,6 +77,10 @@ pub fn ChatPage() -> impl IntoView {
                 set_is_thinking.set(false);
                 return;
             }
+
+            // Stop the live loop during thinking (we'll do directed cycles)
+            let _ = JsFuture::from(engine.send_simple("stopLoop")).await;
+            state.loop_running.set(false);
 
             // Run 8 cognitive cycles with the user input
             let mut last_phi = 0.0_f64;
@@ -196,7 +164,6 @@ pub fn ChatPage() -> impl IntoView {
             let promise = engine.send("generateTextWithInput", &params.into());
             let response_text = match JsFuture::from(promise).await {
                 Ok(result) => {
-                    // GenerationResult has a `text` field
                     if let Ok(text_val) = js_sys::Reflect::get(&result, &"text".into()) {
                         let t = text_val.as_string().unwrap_or_default();
                         if !t.is_empty() {
@@ -227,7 +194,7 @@ pub fn ChatPage() -> impl IntoView {
                 }
             };
 
-            // Try to get a glyph for the response
+            // Get a glyph for the response
             let glyph_id = {
                 let params = js_sys::Object::new();
                 let _ = js_sys::Reflect::set(
@@ -239,7 +206,9 @@ pub fn ChatPage() -> impl IntoView {
                 match JsFuture::from(promise).await {
                     Ok(result) => {
                         if let Ok(id) = js_sys::Reflect::get(&result, &"id".into()) {
-                            id.as_string().unwrap_or_else(|| "omega_0".into())
+                            let g = id.as_string().unwrap_or_else(|| "omega_0".into());
+                            state.active_glyph.set(g.clone());
+                            g
                         } else {
                             "omega_0".into()
                         }
@@ -264,6 +233,16 @@ pub fn ChatPage() -> impl IntoView {
                 });
             });
             set_is_thinking.set(false);
+
+            // Restart the live loop
+            let params = js_sys::Object::new();
+            let _ = js_sys::Reflect::set(
+                &params,
+                &"interval".into(),
+                &wasm_bindgen::JsValue::from(50),
+            );
+            let _ = JsFuture::from(engine.send("startLoop", &params.into())).await;
+            state.loop_running.set(true);
 
             // Scroll chat to bottom
             if let Some(window) = web_sys::window() {
@@ -348,6 +327,7 @@ pub fn ChatPage() -> impl IntoView {
                 <GlassPanel title="Active Glyph">
                     <GlyphDisplay />
                 </GlassPanel>
+                <WorkspaceViz />
             </div>
         </div>
     }

@@ -14,6 +14,8 @@ use serde::{Deserialize, Serialize};
 pub enum InfillPattern {
     /// Parallel lines at a fixed angle.
     Rectilinear,
+    /// Two perpendicular passes per layer (0° and 90° relative to base angle).
+    Grid,
 }
 
 /// Configuration for infill generation.
@@ -146,38 +148,18 @@ fn layer_bounding_box(layer: &SliceLayer) -> Option<(Point2, Point2)> {
     }
 }
 
-/// Generate infill line segments for a sliced layer.
-///
-/// Produces parallel scan lines at the configured angle and density,
-/// clipped to contour boundaries using the even-odd fill rule.
-pub fn generate_infill(
+/// Generate infill at a specific angle (internal workhorse).
+fn generate_infill_at_angle(
     layer: &SliceLayer,
-    config: &InfillConfig,
-    nozzle_diameter: f32,
+    edges: &[(Point2, Point2)],
+    bb_min: Point2,
+    bb_max: Point2,
+    angle_rad: f32,
+    spacing: f32,
 ) -> Vec<Segment2> {
-    if config.density <= 0.0 || layer.outer_contours.is_empty() {
-        return Vec::new();
-    }
-
-    let density = config.density.clamp(0.001, 1.0);
-    let spacing = nozzle_diameter / density;
-    let angle_rad = config.angle_degrees.to_radians();
     let cos_a = angle_rad.cos();
     let sin_a = angle_rad.sin();
 
-    // Collect all edges.
-    let edges = collect_edges(layer);
-    if edges.is_empty() {
-        return Vec::new();
-    }
-
-    // Get bounding box and compute rotated bounds.
-    let (bb_min, bb_max) = match layer_bounding_box(layer) {
-        Some(bb) => bb,
-        None => return Vec::new(),
-    };
-
-    // Rotate bounding box corners to find the range of scan lines.
     let corners = [
         bb_min,
         Point2::new(bb_max.x, bb_min.y),
@@ -185,8 +167,6 @@ pub fn generate_infill(
         Point2::new(bb_min.x, bb_max.y),
     ];
 
-    // Project corners onto the scan-line normal (perpendicular to scan direction).
-    // Scan lines are along direction (cos_a, sin_a), so the normal is (-sin_a, cos_a).
     let mut proj_min = f32::MAX;
     let mut proj_max = f32::MIN;
     for c in &corners {
@@ -196,24 +176,15 @@ pub fn generate_infill(
     }
 
     let mut result = Vec::new();
-
-    // Generate scan lines in the rotated coordinate frame.
     let mut d = proj_min + spacing * 0.5;
     while d < proj_max {
-        // The scan line passes through points where -sin_a * x + cos_a * y = d.
-        // Parametrically: (cos_a * t + sin_a * d, sin_a * t + cos_a * d) for varying t
-        // (this is the rotation-based parametrization, but it's simpler to just
-        // compute intersections of each edge with this line).
-        //
-        // For each edge (a, b), solve: -sin_a * lerp(a.x, b.x, s) + cos_a * lerp(a.y, b.y, s) = d
         let mut intersections = Vec::new();
-
-        for &(a, b) in &edges {
+        for &(a, b) in edges {
             let pa = -sin_a * a.x + cos_a * a.y;
             let pb = -sin_a * b.x + cos_a * b.y;
             let dp = pb - pa;
             if dp.abs() < 1e-10 {
-                continue; // Edge parallel to scan line.
+                continue;
             }
             let s = (d - pa) / dp;
             if !(0.0..=1.0).contains(&s) {
@@ -221,27 +192,85 @@ pub fn generate_infill(
             }
             let ix = a.x + s * (b.x - a.x);
             let iy = a.y + s * (b.y - a.y);
-            // Project onto scan direction to get sort key.
             let t = cos_a * ix + sin_a * iy;
             intersections.push((t, Point2::new(ix, iy)));
         }
-
-        // Sort by position along the scan direction.
         intersections.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
-
-        // Emit segments between odd/even crossings (even-odd fill rule).
         let mut i = 0;
         while i + 1 < intersections.len() {
             let start = intersections[i].1;
             let end = intersections[i + 1].1;
-            // Skip degenerate segments.
             if start.dist(end) > 1e-4 {
                 result.push(Segment2 { start, end });
             }
             i += 2;
         }
-
         d += spacing;
+    }
+    result
+}
+
+/// Generate infill line segments for a sliced layer.
+///
+/// Produces parallel scan lines at the configured angle and density,
+/// clipped to contour boundaries using the even-odd fill rule.
+///
+/// For `Rectilinear`, a single pass at the configured angle.
+/// For `Grid`, two perpendicular passes (angle and angle+90°).
+///
+/// Use `layer_index` to enable per-layer angle alternation: odd layers
+/// rotate by 90° for cross-hatching. Pass `None` to use the config angle as-is.
+pub fn generate_infill(
+    layer: &SliceLayer,
+    config: &InfillConfig,
+    nozzle_diameter: f32,
+) -> Vec<Segment2> {
+    generate_infill_for_layer(layer, config, nozzle_diameter, None)
+}
+
+/// Generate infill with optional per-layer angle alternation.
+pub fn generate_infill_for_layer(
+    layer: &SliceLayer,
+    config: &InfillConfig,
+    nozzle_diameter: f32,
+    layer_index: Option<usize>,
+) -> Vec<Segment2> {
+    if config.density <= 0.0 || layer.outer_contours.is_empty() {
+        return Vec::new();
+    }
+
+    let density = config.density.clamp(0.001, 1.0);
+    let spacing = nozzle_diameter / density;
+
+    // Alternate angle by 90° on odd layers for cross-hatching.
+    let base_angle = config.angle_degrees
+        + if layer_index.map_or(false, |i| i % 2 == 1) {
+            90.0
+        } else {
+            0.0
+        };
+    let angle_rad = base_angle.to_radians();
+
+    // Collect all edges.
+    let edges = collect_edges(layer);
+    if edges.is_empty() {
+        return Vec::new();
+    }
+
+    // Get bounding box.
+    let (bb_min, bb_max) = match layer_bounding_box(layer) {
+        Some(bb) => bb,
+        None => return Vec::new(),
+    };
+
+    // First pass at the base angle.
+    let mut result = generate_infill_at_angle(layer, &edges, bb_min, bb_max, angle_rad, spacing);
+
+    // Grid pattern: add a second perpendicular pass.
+    if config.pattern == InfillPattern::Grid {
+        let perp = angle_rad + std::f32::consts::FRAC_PI_2;
+        let pass2 = generate_infill_at_angle(layer, &edges, bb_min, bb_max, perp, spacing);
+        result.extend(pass2);
     }
 
     result
@@ -430,6 +459,102 @@ mod tests {
             lines.len() >= 15,
             "100% density should produce many lines, got {}",
             lines.len()
+        );
+    }
+
+    // ── Grid pattern ────────────────────────────────────────────────
+
+    #[test]
+    fn grid_produces_more_lines_than_rectilinear() {
+        let layer = square_layer(10.0);
+        let rect_config = InfillConfig {
+            pattern: InfillPattern::Rectilinear,
+            density: 0.3,
+            angle_degrees: 0.0,
+        };
+        let grid_config = InfillConfig {
+            pattern: InfillPattern::Grid,
+            density: 0.3,
+            angle_degrees: 0.0,
+        };
+        let rect_lines = generate_infill(&layer, &rect_config, 0.4);
+        let grid_lines = generate_infill(&layer, &grid_config, 0.4);
+        // Grid does two perpendicular passes — should produce roughly 2× lines.
+        assert!(
+            grid_lines.len() > rect_lines.len(),
+            "Grid ({}) should produce more lines than Rectilinear ({})",
+            grid_lines.len(),
+            rect_lines.len()
+        );
+    }
+
+    #[test]
+    fn grid_has_perpendicular_lines() {
+        let layer = square_layer(10.0);
+        let config = InfillConfig {
+            pattern: InfillPattern::Grid,
+            density: 0.3,
+            angle_degrees: 0.0,
+        };
+        let lines = generate_infill(&layer, &config, 0.4);
+        // With angle=0, first pass is horizontal (dy≈0), second is vertical (dx≈0).
+        let horizontal = lines
+            .iter()
+            .filter(|s| (s.start.y - s.end.y).abs() < 0.01)
+            .count();
+        let vertical = lines
+            .iter()
+            .filter(|s| (s.start.x - s.end.x).abs() < 0.01)
+            .count();
+        assert!(horizontal > 0, "Grid should have horizontal lines");
+        assert!(vertical > 0, "Grid should have vertical lines");
+    }
+
+    // ── Layer alternation ───────────────────────────────────────────
+
+    #[test]
+    fn alternating_layers_have_different_angles() {
+        let layer = square_layer(10.0);
+        let config = InfillConfig {
+            pattern: InfillPattern::Rectilinear,
+            density: 0.3,
+            angle_degrees: 0.0,
+        };
+        let even = generate_infill_for_layer(&layer, &config, 0.4, Some(0));
+        let odd = generate_infill_for_layer(&layer, &config, 0.4, Some(1));
+
+        // Even layer at 0°: horizontal lines (dy≈0).
+        let even_horizontal = even
+            .iter()
+            .filter(|s| (s.start.y - s.end.y).abs() < 0.01)
+            .count();
+        // Odd layer at 90°: vertical lines (dx≈0).
+        let odd_vertical = odd
+            .iter()
+            .filter(|s| (s.start.x - s.end.x).abs() < 0.01)
+            .count();
+
+        assert!(
+            even_horizontal > 0,
+            "Even layer should have horizontal lines"
+        );
+        assert!(odd_vertical > 0, "Odd layer should have vertical lines");
+    }
+
+    #[test]
+    fn alternation_none_uses_base_angle() {
+        let layer = square_layer(10.0);
+        let config = InfillConfig {
+            pattern: InfillPattern::Rectilinear,
+            density: 0.3,
+            angle_degrees: 0.0,
+        };
+        let no_alt = generate_infill(&layer, &config, 0.4);
+        let explicit_none = generate_infill_for_layer(&layer, &config, 0.4, None);
+        assert_eq!(
+            no_alt.len(),
+            explicit_none.len(),
+            "None layer_index should match generate_infill"
         );
     }
 }

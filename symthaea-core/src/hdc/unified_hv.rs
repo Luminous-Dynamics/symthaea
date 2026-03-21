@@ -128,8 +128,9 @@ impl ContinuousHV {
             state ^= state >> 7;
             state ^= state << 17;
 
-            // Map to [-1, 1]
-            let normalized = (state as f32 / u64::MAX as f32) * 2.0 - 1.0;
+            // Map to [-1, 1] using top 24 bits for full f32 precision.
+            // (state as f32 / u64::MAX as f32) loses precision since u64 >> f32 mantissa.
+            let normalized = ((state >> 40) as f32) * (2.0 / (1u64 << 24) as f32) - 1.0;
             values.push(normalized);
         }
 

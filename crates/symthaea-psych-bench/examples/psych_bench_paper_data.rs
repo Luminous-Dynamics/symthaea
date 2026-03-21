@@ -38,7 +38,8 @@ use symthaea_psych_bench::benchmarks::consciousness::{
     BinocularRivalryBenchmark, BlindSightBenchmark, PerceptualCrowdingBenchmark,
 };
 use symthaea_psych_bench::benchmarks::creativity::{
-    AlternateUsesBenchmark, DivergentThinkingBenchmark, RemoteAssociatesBenchmark,
+    AlternateUsesBenchmark, ConceptualBlendingBenchmark, DivergentThinkingBenchmark,
+    RemoteAssociatesBenchmark,
 };
 use symthaea_psych_bench::benchmarks::executive::{
     DualTaskBenchmark, FlankerBenchmark, IowaGamblingBenchmark, RavensProgressiveMatricesBenchmark,
@@ -165,10 +166,11 @@ fn all_benchmarks() -> Vec<Box<dyn PsychBenchmark + Send + Sync>> {
         Box::new(ValenceClassificationBenchmark),
         Box::new(MoodCongruentRecallBenchmark),
         Box::new(EmotionalStroopBenchmark),
-        // Creativity (3)
+        // Creativity (4)
         Box::new(RemoteAssociatesBenchmark),
         Box::new(AlternateUsesBenchmark),
         Box::new(DivergentThinkingBenchmark),
+        Box::new(ConceptualBlendingBenchmark),
         // Inhibition (3)
         Box::new(GoNoGoBenchmark),
         Box::new(StopSignalBenchmark),

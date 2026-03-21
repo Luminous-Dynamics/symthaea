@@ -134,10 +134,20 @@ fn main() {
         curriculum: CurriculumSchedule::LengthAscending,
         freeze_embeddings: opts.freeze_embeddings,
         coherence_alignment_weight: opts.coherence_alignment_weight,
+        coherence_alignment_start_weight: opts.coherence_alignment_start,
+        merge_token_loss_weight: opts.merge_token_loss_weight,
         enable_fusion_during_training: opts.enable_fusion,
         fusion_warmup_epochs: opts.fusion_warmup_epochs,
         ..Default::default()
     };
+
+    // Optionally disable thought-seeded CfC state
+    if opts.no_thought_seed {
+        generator
+            .controller_mut()
+            .config_mut()
+            .enable_thought_seeding = false;
+    }
 
     tracing::info!(
         epochs = opts.epochs,
@@ -328,10 +338,16 @@ struct TrainOpts {
     sample_top_k: usize,
     /// Coherence alignment loss weight (default: 0.0 = off).
     coherence_alignment_weight: f32,
+    /// Starting weight for curriculum alignment annealing (default: 0.0 = constant).
+    coherence_alignment_start: f32,
+    /// Merge-token loss bias weight (default: 1.5).
+    merge_token_loss_weight: f32,
     /// Enable fusion flags during training (compositional logits, adaptive dt, adaptive alpha).
     enable_fusion: bool,
     /// Epochs of raw CfC training before fusion activates (default: 0 = immediate).
     fusion_warmup_epochs: usize,
+    /// Disable thought-seeded CfC initial state.
+    no_thought_seed: bool,
 }
 
 fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
@@ -360,8 +376,11 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
         sample_temperature: 1.0,
         sample_top_k: 0,
         coherence_alignment_weight: 0.0,
+        coherence_alignment_start: 0.0,
+        merge_token_loss_weight: 1.5,
         enable_fusion: false,
         fusion_warmup_epochs: 0,
+        no_thought_seed: false,
     };
 
     let mut i = 1;
@@ -516,6 +535,25 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
                     .parse()
                     .map_err(|_| "--coherence-alignment must be a float")?;
             }
+            "--alignment-start" => {
+                i += 1;
+                opts.coherence_alignment_start = args
+                    .get(i)
+                    .ok_or("--alignment-start requires a number")?
+                    .parse()
+                    .map_err(|_| "--alignment-start must be a float")?;
+            }
+            "--merge-bias" => {
+                i += 1;
+                opts.merge_token_loss_weight = args
+                    .get(i)
+                    .ok_or("--merge-bias requires a number")?
+                    .parse()
+                    .map_err(|_| "--merge-bias must be a float")?;
+            }
+            "--no-thought-seed" => {
+                opts.no_thought_seed = true;
+            }
             "--fusion" => {
                 opts.enable_fusion = true;
             }
@@ -573,5 +611,10 @@ fn print_usage() {
     eprintln!("  --temperature F       Sampling temperature for --samples (default: 1.0)");
     eprintln!("  --top-k N             Top-k sampling for --samples (default: 0 = off)");
     eprintln!("  --coherence-alignment F  Coherence alignment loss weight (default: 0.0 = off)");
+    eprintln!(
+        "  --alignment-start F  Starting alignment weight for curriculum annealing (default: 0.0)"
+    );
+    eprintln!("  --merge-bias F       Merge-token loss weight (default: 1.5, 1.0 = off)");
+    eprintln!("  --no-thought-seed    Disable thought-seeded CfC initial state");
     eprintln!("  --help, -h           Show this help message");
 }

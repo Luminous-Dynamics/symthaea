@@ -35,11 +35,16 @@ function startLoop(intervalMs) {
 
       // Every 10th cycle, also send the output HV for visualization
       let hv = null;
+      let neuromods = null;
       if (cycleCount % 10 === 0) {
         hv = Array.from(engine.get_output_hv());
       }
+      // Every 5th cycle, include full neuromod state
+      if (cycleCount % 5 === 0) {
+        try { neuromods = JSON.parse(engine.neuromod_state()); } catch (_) {}
+      }
 
-      self.postMessage({ type: 'cycle', result, hv });
+      self.postMessage({ type: 'cycle', result: { ...result, neuromods }, hv });
     } catch (e) {
       self.postMessage({ type: 'error', error: e.message });
     }

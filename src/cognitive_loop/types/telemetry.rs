@@ -1428,6 +1428,24 @@ pub struct CycleMetadata {
     /// Mean prediction coherence across manufacturing horizons.
     #[serde(default)]
     pub fabrication_prediction_coherence: f32,
+    /// MRP planned orders count.
+    #[serde(default)]
+    pub fabrication_mrp_planned_orders: u32,
+    /// MRP feasibility (true = no shortages).
+    #[serde(default)]
+    pub fabrication_mrp_feasible: bool,
+    /// MRP material shortage count.
+    #[serde(default)]
+    pub fabrication_mrp_shortages: u32,
+    /// MRP work orders in scope.
+    #[serde(default)]
+    pub fabrication_mrp_work_orders: u32,
+    /// Defect prediction quality score [0, 1].
+    #[serde(default)]
+    pub fabrication_defect_prediction: f32,
+    /// Defect prediction confidence [0, 1].
+    #[serde(default)]
+    pub fabrication_defect_confidence: f32,
 
     // ── CPG Manager Telemetry ─────────────────────────────────────────────
     /// Kuramoto synchronization index [0, 1]. 0 = incoherent, 1 = perfect sync.

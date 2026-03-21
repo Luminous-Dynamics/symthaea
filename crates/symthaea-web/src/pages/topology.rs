@@ -26,21 +26,10 @@ const REGION_NAMES: [&str; 12] = [
 
 /// Region colors (solarpunk palette).
 const REGION_COLORS: [&str; 12] = [
-    "#7ec8a0", // Prefrontal  — leaf green
-    "#d47070", // Motor       — warm red
-    "#5b9bd5", // Sensory     — blue
-    "#e8c547", // Visual      — solar gold
-    "#d4a0c4", // Auditory    — soft pink
-    "#5ab8a0", // Language    — teal
-    "#c4956a", // Memory      — clay
-    "#c76b5a", // Emotional   — autumn rust
-    "#a0c4d4", // Social      — sky
-    "#d4c470", // Creative    — amber
-    "#7ea0c8", // Executive   — steel blue
-    "#b0d890", // Integration — spring green
+    "#7ec8a0", "#d47070", "#5b9bd5", "#e8c547", "#d4a0c4", "#5ab8a0", "#c4956a", "#c76b5a",
+    "#a0c4d4", "#d4c470", "#7ea0c8", "#b0d890",
 ];
 
-/// Node position in the force-directed layout (simple ring initialization).
 #[derive(Clone, Copy)]
 struct Node {
     x: f64,
@@ -50,7 +39,6 @@ struct Node {
     phi: f64,
 }
 
-/// Edge between two nodes.
 #[derive(Clone, Copy)]
 struct Edge {
     from: usize,
@@ -58,11 +46,8 @@ struct Edge {
     weight: f64,
 }
 
-/// Build the default connectivity: all-to-adjacent + some long-range links
-/// resembling cortical connectivity patterns.
 fn default_edges() -> Vec<Edge> {
     let mut edges = Vec::new();
-    // Ring adjacency
     for i in 0..12 {
         edges.push(Edge {
             from: i,
@@ -70,20 +55,19 @@ fn default_edges() -> Vec<Edge> {
             weight: 0.8,
         });
     }
-    // Long-range connections (loosely inspired by neuroscience)
     let long_range = [
-        (0, 6, 0.6),  // Prefrontal <-> Memory
-        (0, 10, 0.7), // Prefrontal <-> Executive
-        (0, 11, 0.5), // Prefrontal <-> Integration
-        (2, 3, 0.7),  // Sensory <-> Visual
-        (3, 4, 0.5),  // Visual <-> Auditory
-        (5, 6, 0.6),  // Language <-> Memory
-        (7, 8, 0.6),  // Emotional <-> Social
-        (7, 11, 0.4), // Emotional <-> Integration
-        (9, 5, 0.5),  // Creative <-> Language
-        (1, 10, 0.5), // Motor <-> Executive
-        (2, 7, 0.4),  // Sensory <-> Emotional
-        (11, 6, 0.6), // Integration <-> Memory
+        (0, 6, 0.6),
+        (0, 10, 0.7),
+        (0, 11, 0.5),
+        (2, 3, 0.7),
+        (3, 4, 0.5),
+        (5, 6, 0.6),
+        (7, 8, 0.6),
+        (7, 11, 0.4),
+        (9, 5, 0.5),
+        (1, 10, 0.5),
+        (2, 7, 0.4),
+        (11, 6, 0.6),
     ];
     for (from, to, weight) in long_range {
         edges.push(Edge { from, to, weight });
@@ -91,7 +75,6 @@ fn default_edges() -> Vec<Edge> {
     edges
 }
 
-/// Initialize nodes in a ring layout.
 fn init_nodes(cx: f64, cy: f64, radius: f64) -> Vec<Node> {
     (0..12)
         .map(|i| {
@@ -107,7 +90,6 @@ fn init_nodes(cx: f64, cy: f64, radius: f64) -> Vec<Node> {
         .collect()
 }
 
-/// One step of a simple force-directed layout.
 fn force_step(nodes: &mut [Node], edges: &[Edge], cx: f64, cy: f64) {
     let repulsion = 5000.0;
     let attraction = 0.005;
@@ -115,11 +97,9 @@ fn force_step(nodes: &mut [Node], edges: &[Edge], cx: f64, cy: f64) {
     let center_pull = 0.002;
     let n = nodes.len();
 
-    // Accumulate forces
     let mut fx = vec![0.0_f64; n];
     let mut fy = vec![0.0_f64; n];
 
-    // Repulsion (all pairs)
     for i in 0..n {
         for j in (i + 1)..n {
             let dx = nodes[i].x - nodes[j].x;
@@ -136,7 +116,6 @@ fn force_step(nodes: &mut [Node], edges: &[Edge], cx: f64, cy: f64) {
         }
     }
 
-    // Attraction (edges)
     for edge in edges {
         let dx = nodes[edge.to].x - nodes[edge.from].x;
         let dy = nodes[edge.to].y - nodes[edge.from].y;
@@ -150,13 +129,11 @@ fn force_step(nodes: &mut [Node], edges: &[Edge], cx: f64, cy: f64) {
         fy[edge.to] -= fdy;
     }
 
-    // Center pull
     for i in 0..n {
         fx[i] += (cx - nodes[i].x) * center_pull;
         fy[i] += (cy - nodes[i].y) * center_pull;
     }
 
-    // Apply forces
     for i in 0..n {
         nodes[i].vx = (nodes[i].vx + fx[i]) * damping;
         nodes[i].vy = (nodes[i].vy + fy[i]) * damping;
@@ -165,7 +142,6 @@ fn force_step(nodes: &mut [Node], edges: &[Edge], cx: f64, cy: f64) {
     }
 }
 
-/// Draw the topology to a canvas context.
 fn draw_topology(
     ctx: &CanvasRenderingContext2d,
     nodes: &[Node],
@@ -173,8 +149,8 @@ fn draw_topology(
     width: f64,
     height: f64,
     time: f64,
+    phi: f32,
 ) {
-    // Clear
     ctx.set_fill_style_str("rgba(0, 0, 0, 0.2)");
     ctx.fill_rect(0.0, 0.0, width, height);
 
@@ -191,36 +167,32 @@ fn draw_topology(
         ctx.stroke();
     }
 
-    // Draw nodes
+    // Draw nodes — pulse with live Phi
     for (i, node) in nodes.iter().enumerate() {
-        let color = REGION_COLORS[i];
+        let color = REGION_COLORS[i % REGION_COLORS.len()];
         let base_r = 8.0;
-        // Pulse radius based on phi and time
-        let pulse = 1.0 + node.phi.abs() * 0.5 * (time * 2.0 + i as f64 * 0.5).sin().abs();
+        let effective_phi = if node.phi > 0.0 { node.phi } else { phi as f64 };
+        let pulse = 1.0 + effective_phi.abs() * 0.5 * (time * 2.0 + i as f64 * 0.5).sin().abs();
         let r = base_r * pulse;
 
-        // Glow
         ctx.set_shadow_color(color);
-        ctx.set_shadow_blur(10.0 + node.phi.abs() * 20.0);
-
-        // Fill circle
+        ctx.set_shadow_blur(10.0 + effective_phi.abs() * 20.0);
         ctx.set_fill_style_str(color);
         ctx.begin_path();
         let _ = ctx.arc(node.x, node.y, r, 0.0, std::f64::consts::TAU);
         ctx.fill();
-
-        // Reset shadow
         ctx.set_shadow_blur(0.0);
 
-        // Label
-        ctx.set_fill_style_str("rgba(255, 255, 255, 0.7)");
-        ctx.set_font("9px -apple-system, sans-serif");
-        ctx.set_text_align("center");
-        let _ = ctx.fill_text(REGION_NAMES[i], node.x, node.y + r + 14.0);
+        if i < REGION_NAMES.len() {
+            ctx.set_fill_style_str("rgba(255, 255, 255, 0.7)");
+            ctx.set_font("9px -apple-system, sans-serif");
+            ctx.set_text_align("center");
+            let _ = ctx.fill_text(REGION_NAMES[i], node.x, node.y + r + 14.0);
+        }
     }
 }
 
-/// Tab 2: Force-directed consciousness topology graph.
+/// Tab 2: Force-directed consciousness topology with live Phi + causal graph.
 #[component]
 pub fn TopologyPage() -> impl IntoView {
     let state = use_context::<AppState>().expect("AppState");
@@ -233,15 +205,16 @@ pub fn TopologyPage() -> impl IntoView {
     let (euler, set_euler) = signal("--".to_string());
     let (topo_status, set_topo_status) =
         signal("Awaiting topology data from SporeEngine...".to_string());
+    let (causal_info, set_causal_info) = signal(Vec::<String>::new());
 
-    // Start the canvas animation loop on mount
+    // Start the canvas animation loop on mount — reads live Phi
+    let state_anim = state.clone();
     Effect::new(move |_| {
         let Some(canvas_el) = canvas_ref.get() else {
             return;
         };
         let canvas: HtmlCanvasElement = canvas_el.into();
 
-        // Set actual pixel dimensions
         let display_width = canvas.client_width() as u32;
         let display_height = 420_u32;
         canvas.set_width(display_width.max(600));
@@ -263,14 +236,13 @@ pub fn TopologyPage() -> impl IntoView {
         let mut nodes = init_nodes(cx, cy, radius);
         let edges = default_edges();
 
-        // Settle the layout with some initial force iterations
         for _ in 0..80 {
             force_step(&mut nodes, &edges, cx, cy);
         }
 
-        // Animation state stored in a closure (single-threaded WASM)
         let nodes_rc = std::rc::Rc::new(std::cell::RefCell::new(nodes));
         let edges_rc = std::rc::Rc::new(edges);
+        let state = state_anim.clone();
         let frame_ref: std::rc::Rc<std::cell::RefCell<Option<Closure<dyn FnMut()>>>> =
             std::rc::Rc::new(std::cell::RefCell::new(None));
         let frame_ref_clone = frame_ref.clone();
@@ -281,11 +253,11 @@ pub fn TopologyPage() -> impl IntoView {
                 .map(|p| p.now() / 1000.0)
                 .unwrap_or(0.0);
 
+            let phi = state.consciousness_level.get_untracked();
             let mut nodes = nodes_rc.borrow_mut();
             force_step(&mut nodes, &edges_rc, cx, cy);
-            draw_topology(&ctx, &nodes, &edges_rc, width, height, time);
+            draw_topology(&ctx, &nodes, &edges_rc, width, height, time, phi);
 
-            // Request next frame
             if let Some(window) = web_sys::window() {
                 if let Some(ref cb) = *frame_ref_clone.borrow() {
                     let _ = window.request_animation_frame(cb.as_ref().unchecked_ref());
@@ -293,7 +265,6 @@ pub fn TopologyPage() -> impl IntoView {
             }
         }) as Box<dyn FnMut()>);
 
-        // Kick off animation
         if let Some(window) = web_sys::window() {
             let _ = window.request_animation_frame(closure.as_ref().unchecked_ref());
         }
@@ -301,47 +272,82 @@ pub fn TopologyPage() -> impl IntoView {
         *frame_ref.borrow_mut() = Some(closure);
     });
 
-    // Fetch topology data from the engine when available
+    // Fetch topology + causal graph data
     let engine_topo = engine.clone();
     Effect::new(move |_| {
         if !state.worker_ready.get() {
             return;
         }
         let engine = engine_topo.clone();
-        let set_b0 = set_betti_0;
-        let set_b1 = set_betti_1;
-        let set_b2 = set_betti_2;
-        let set_eu = set_euler;
-        let set_status = set_topo_status;
 
         wasm_bindgen_futures::spawn_local(async move {
+            // Topology analysis (Betti numbers)
             let promise = engine.send_simple("topologyAnalysis");
             match JsFuture::from(promise).await {
                 Ok(result) => {
                     if let Ok(b0) = js_sys::Reflect::get(&result, &"betti_0".into()) {
                         if let Some(v) = b0.as_f64() {
-                            set_b0.set(format!("{}", v as i32));
+                            set_betti_0.set(format!("{}", v as i32));
                         }
                     }
                     if let Ok(b1) = js_sys::Reflect::get(&result, &"betti_1".into()) {
                         if let Some(v) = b1.as_f64() {
-                            set_b1.set(format!("{}", v as i32));
+                            set_betti_1.set(format!("{}", v as i32));
                         }
                     }
                     if let Ok(b2) = js_sys::Reflect::get(&result, &"betti_2".into()) {
                         if let Some(v) = b2.as_f64() {
-                            set_b2.set(format!("{}", v as i32));
+                            set_betti_2.set(format!("{}", v as i32));
                         }
                     }
                     if let Ok(eu) = js_sys::Reflect::get(&result, &"euler_characteristic".into()) {
                         if let Some(v) = eu.as_f64() {
-                            set_eu.set(format!("{}", v as i32));
+                            set_euler.set(format!("{}", v as i32));
                         }
                     }
-                    set_status.set("Topology data loaded.".into());
+                    set_topo_status.set("Topology data loaded.".into());
                 }
                 Err(_) => {
-                    set_status.set("Topology analysis not available in this build.".into());
+                    set_topo_status.set("Topology analysis not available.".into());
+                }
+            }
+
+            // Causal graph
+            let promise = engine.send_simple("causalGraph");
+            match JsFuture::from(promise).await {
+                Ok(result) => {
+                    let mut info = Vec::new();
+                    if let Ok(edges) = js_sys::Reflect::get(&result, &"edge_count".into()) {
+                        info.push(format!(
+                            "Causal edges: {}",
+                            edges.as_f64().unwrap_or(0.0) as i32
+                        ));
+                    }
+                    if let Ok(nodes) = js_sys::Reflect::get(&result, &"node_count".into()) {
+                        info.push(format!(
+                            "Causal nodes: {}",
+                            nodes.as_f64().unwrap_or(0.0) as i32
+                        ));
+                    }
+                    if let Ok(density) = js_sys::Reflect::get(&result, &"density".into()) {
+                        info.push(format!(
+                            "Graph density: {:.3}",
+                            density.as_f64().unwrap_or(0.0)
+                        ));
+                    }
+                    if info.is_empty() {
+                        // Try to stringify the whole result
+                        if let Ok(s) = js_sys::JSON::stringify(&result) {
+                            let s = String::from(s);
+                            if s.len() > 2 {
+                                info.push(s);
+                            }
+                        }
+                    }
+                    set_causal_info.set(info);
+                }
+                Err(_) => {
+                    set_causal_info.set(vec!["Causal graph not available.".into()]);
                 }
             }
         });
@@ -350,8 +356,7 @@ pub fn TopologyPage() -> impl IntoView {
     view! {
         <GlassPanel title="Consciousness Topology">
             <p style="font-size: 0.82rem; color: var(--fg-dim); line-height: 1.6; margin-bottom: 1rem;">
-                "Force-directed graph of the 12 cortical regions, their causal connections, "
-                "and real-time information flow. Each node pulses with its local Phi contribution."
+                "Force-directed graph of the 12 cortical regions. Nodes pulse with live Phi from the running engine."
             </p>
             <canvas
                 node_ref=canvas_ref
@@ -382,11 +387,19 @@ pub fn TopologyPage() -> impl IntoView {
                         </div>
                     </div>
                 </GlassPanel>
-                <GlassPanel title="Wave Packets">
+                <GlassPanel title="Causal Graph">
                     <div class="wave-packet-list">
                         <div class="wave-packet-item">
                             {move || topo_status.get()}
                         </div>
+                        {move || {
+                            causal_info.get().iter().map(|info| {
+                                let info = info.clone();
+                                view! {
+                                    <div class="wave-packet-item">{info}</div>
+                                }
+                            }).collect::<Vec<_>>()
+                        }}
                     </div>
                 </GlassPanel>
             </div>
