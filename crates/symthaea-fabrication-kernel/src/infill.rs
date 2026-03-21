@@ -150,7 +150,7 @@ fn layer_bounding_box(layer: &SliceLayer) -> Option<(Point2, Point2)> {
 
 /// Generate infill at a specific angle (internal workhorse).
 fn generate_infill_at_angle(
-    layer: &SliceLayer,
+    _layer: &SliceLayer,
     edges: &[(Point2, Point2)],
     bb_min: Point2,
     bb_max: Point2,
@@ -244,7 +244,7 @@ pub fn generate_infill_for_layer(
 
     // Alternate angle by 90° on odd layers for cross-hatching.
     let base_angle = config.angle_degrees
-        + if layer_index.map_or(false, |i| i % 2 == 1) {
+        + if layer_index.is_some_and(|i| i % 2 == 1) {
             90.0
         } else {
             0.0
