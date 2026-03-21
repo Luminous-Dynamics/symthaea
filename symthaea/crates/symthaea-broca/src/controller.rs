@@ -783,9 +783,11 @@ impl LanguageController {
                         *dp += di;
                     }
                 }
-                let inv = 1.0 / layer.len() as f32;
-                for v in d_prev.values.iter_mut() {
-                    *v *= inv;
+                if !layer.is_empty() {
+                    let inv = 1.0 / layer.len() as f32;
+                    for v in d_prev.values.iter_mut() {
+                        *v *= inv;
+                    }
                 }
             }
 
