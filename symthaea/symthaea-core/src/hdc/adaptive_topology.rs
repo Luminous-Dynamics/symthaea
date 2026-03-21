@@ -517,7 +517,11 @@ impl AdaptiveTopology {
         let sum_xy: f64 = recent.iter().enumerate().map(|(i, &y)| i as f64 * y).sum();
         let sum_xx: f64 = (0..recent.len()).map(|i| (i * i) as f64).sum();
 
-        (n * sum_xy - sum_x * sum_y) / (n * sum_xx - sum_x * sum_x)
+        let denom = n * sum_xx - sum_x * sum_x;
+        if denom.abs() < 1e-10 {
+            return 0.0; // Degenerate: all values equal → no trend
+        }
+        (n * sum_xy - sum_x * sum_y) / denom
     }
 
     /// Get the underlying organizer

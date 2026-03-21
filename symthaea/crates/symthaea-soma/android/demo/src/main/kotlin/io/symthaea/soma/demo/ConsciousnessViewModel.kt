@@ -183,7 +183,8 @@ class ConsciousnessViewModel : ViewModel() {
                         try {
                             val brocaJson = e.generateText(16)
                             val obj = JSONObject(brocaJson)
-                            val text = obj.optString("text", "")
+                            val rawText = obj.optString("text", "")
+                            val text = cleanBrocaText(rawText)
                             if (text.isNotBlank()) {
                                 lastBrocaText = text
                                 android.util.Log.d("SomaBroca", "text: $text")
@@ -409,6 +410,42 @@ class ConsciousnessViewModel : ViewModel() {
     }
 
     /** Save checkpoint and hand off to background service. */
+    /**
+     * Clean up Broca-generated text for readability:
+     * - Capitalize first letter of each sentence
+     * - Fix common BrocaLite grammar patterns
+     * - Ensure proper punctuation
+     * - Trim to reasonable length
+     */
+    private fun cleanBrocaText(raw: String): String {
+        if (raw.isBlank()) return ""
+        var text = raw.trim()
+
+        // Capitalize first character
+        text = text.replaceFirstChar { it.uppercase() }
+
+        // Capitalize after sentence-ending punctuation
+        text = text.replace(Regex("([.!?])\\s+([a-z])")) { match ->
+            "${match.groupValues[1]} ${match.groupValues[2].uppercase()}"
+        }
+
+        // Add period at end if no terminal punctuation
+        if (!text.endsWith('.') && !text.endsWith('!') && !text.endsWith('?') && !text.endsWith('"')) {
+            text = "$text."
+        }
+
+        // Fix double spaces
+        text = text.replace(Regex("\\s+"), " ")
+
+        // Trim to ~120 chars max for display
+        if (text.length > 120) {
+            val cutoff = text.lastIndexOf(' ', 120)
+            if (cutoff > 60) text = text.substring(0, cutoff) + "..."
+        }
+
+        return text
+    }
+
     override fun onCleared() {
         touchBridge?.unbind()
         screenCaptureBridge?.stop()

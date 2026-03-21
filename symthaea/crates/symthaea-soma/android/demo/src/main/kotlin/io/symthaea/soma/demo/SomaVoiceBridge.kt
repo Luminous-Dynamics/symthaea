@@ -106,12 +106,13 @@ class SomaVoiceBridge(private val context: Context) {
 
         val engine = tts ?: return
 
-        // Consciousness-modulated voice parameters
+        // Consciousness-modulated: slower and deeper = more contemplative
         val basePitch = avatarPitch
-        val clPitch = 0.85f + consciousnessLevel * 0.3f  // 0.85 at low, 1.15 at high
-        engine.setPitch((basePitch * clPitch).coerceIn(0.5f, 2.0f))
+        val clPitch = 0.80f + consciousnessLevel * 0.25f  // 0.80-1.05: slightly lower than default
+        engine.setPitch((basePitch * clPitch).coerceIn(0.5f, 1.5f))
 
-        val baseRate = if (isSleeping) 0.7f else 0.85f + consciousnessLevel * 0.3f
+        // Slower speech rate: contemplative, not robotic
+        val baseRate = if (isSleeping) 0.6f else 0.70f + consciousnessLevel * 0.15f  // 0.70-0.85
         engine.setSpeechRate(baseRate.coerceIn(0.5f, 1.5f))
 
         val params = Bundle()

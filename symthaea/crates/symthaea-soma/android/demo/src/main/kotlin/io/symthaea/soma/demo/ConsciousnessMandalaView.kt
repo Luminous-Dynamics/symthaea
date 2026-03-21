@@ -101,7 +101,8 @@ class ConsciousnessMandalaView @JvmOverloads constructor(
     }
 
     // === Organic breath model (replaces mechanical sine) ===
-    private val breath = BreathModel()
+    /** Breath model — exposed for audio sync. */
+    val breath = BreathModel()
     private var breathPhase2 = 0f  // Secondary geometry pulsing (7s period)
     private var rotationPhase = 0f
     private var fractalRotation = 0f

@@ -1141,7 +1141,7 @@ impl HdcContext {
     ///
     /// **Performance**: O(d/64) using bit-parallel operations internally
     pub fn hamming_similarity(&self, a: &[i8], b: &[i8]) -> f32 {
-        if a.len() != b.len() {
+        if a.len() != b.len() || a.is_empty() {
             return 0.0;
         }
 

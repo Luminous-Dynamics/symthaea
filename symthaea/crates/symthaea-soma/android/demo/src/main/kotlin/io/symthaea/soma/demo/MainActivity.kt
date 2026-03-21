@@ -570,6 +570,14 @@ class MainActivity : AppCompatActivity() {
         ambientTone.consciousnessLevel = state.consciousnessLevel
         ambientTone.harmonyShift = state.harmonyAlignment
         ambientTone.isSleeping = state.wakeState.lowercase() == "sleep"
+        // Feed breath + neuromod to audio for cross-modal sync
+        ambientTone.breathValue = binding.consciousnessMandala.breath.breathValue
+        if (state.neuromodulators.size >= 4) {
+            ambientTone.neuromodLevels = floatArrayOf(
+                state.neuromodulators[0], state.neuromodulators[1],
+                state.neuromodulators[2], state.neuromodulators[3]
+            )
+        }
 
         // === Voice bridge ===
         voiceBridge.consciousnessLevel = state.consciousnessLevel

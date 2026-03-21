@@ -602,6 +602,9 @@ impl TextEncoder {
 
     /// Hamming similarity (faster for bipolar)
     pub fn hamming_similarity(&self, a: &[i8], b: &[i8]) -> f32 {
+        if a.is_empty() {
+            return 0.0;
+        }
         let matches: usize = a.iter().zip(b.iter()).filter(|(x, y)| x == y).count();
         matches as f32 / a.len() as f32
     }
