@@ -1027,20 +1027,20 @@ impl ConsciousnessDatabase for SqliteMemory {
             };
 
             Ok(DatabaseStats {
-                total_records: total_records as usize,
+                total_records: total_records.max(0) as usize,
                 database_size_bytes,
-                page_count: page_count as u64,
-                page_size: page_size as u64,
-                freelist_count: freelist_count as u64,
+                page_count: page_count.max(0) as u64,
+                page_size: page_size.max(0) as u64,
+                freelist_count: freelist_count.max(0) as u64,
                 cache_hit_ratio,
-                cache_hits: cache_hits as u64,
-                cache_misses: cache_misses as u64,
+                cache_hits: cache_hits.max(0) as u64,
+                cache_misses: cache_misses.max(0) as u64,
                 avg_query_latency_us: 0, // Not tracked yet
                 total_queries: 0,        // Not tracked yet
                 memory_type_counts,
                 avg_psi,
-                oldest_timestamp_ms: oldest_timestamp_ms as u64,
-                newest_timestamp_ms: newest_timestamp_ms as u64,
+                oldest_timestamp_ms: oldest_timestamp_ms.max(0) as u64,
+                newest_timestamp_ms: newest_timestamp_ms.max(0) as u64,
                 backend_status,
             })
         })

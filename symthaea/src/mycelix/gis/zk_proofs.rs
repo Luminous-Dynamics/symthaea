@@ -319,7 +319,10 @@ impl BulletproofRangeProof {
         if range_size <= 0.0 {
             return None;
         }
-        let normalized = ((value - range.0) / range_size * (u32::MAX as f32)) as u32;
+        // Use f64 for normalization: u32::MAX is not exactly representable in f32,
+        // which would cause overflow at the top of the range.
+        let normalized = ((value - range.0) as f64 / range_size as f64 * u32::MAX as f64)
+            .min(u32::MAX as f64) as u32;
 
         // Bit decomposition
         let bits: Vec<bool> = (0..32).map(|i| (normalized >> i) & 1 == 1).collect();
