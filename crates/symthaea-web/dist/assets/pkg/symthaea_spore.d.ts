@@ -98,6 +98,12 @@ export class SporeEngine {
      */
     generate_text(max_tokens: number): any;
     /**
+     * Generate text aware of user input.
+     * Injects intent signals so generated language relates to user message.
+     * Returns GenerationResult as JS object with `text`, `num_tokens`, `eos_terminated`.
+     */
+    generate_text_with_input(input: string, max_tokens: number): any;
+    /**
      * Get the current network output hypervector (16,384 f32 values).
      * Used for live waveform visualization in the browser demo.
      */
@@ -238,57 +244,61 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly __wbg_sporeengine_free: (a: number, b: number) => void;
-    readonly generate_disko_config: (a: number, b: number, c: number) => void;
-    readonly generate_flake: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
-    readonly generate_hardware_nix: (a: number, b: number, c: number) => void;
+    readonly generate_disko_config: (a: number, b: number) => [number, number, number, number];
+    readonly generate_flake: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
+    readonly generate_hardware_nix: (a: number, b: number) => [number, number, number, number];
     readonly sporeengine_active_instance_count: () => number;
-    readonly sporeengine_anesthesia_experiment: (a: number, b: number, c: number, d: number, e: number) => void;
+    readonly sporeengine_anesthesia_experiment: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly sporeengine_broca_pipeline_ready: (a: number) => number;
-    readonly sporeengine_causal_graph: (a: number, b: number) => void;
-    readonly sporeengine_collapse_threshold_experiment: (a: number, b: number, c: number, d: number) => void;
+    readonly sporeengine_causal_graph: (a: number) => [number, number, number];
+    readonly sporeengine_collapse_threshold_experiment: (a: number, b: number, c: number) => [number, number, number];
     readonly sporeengine_consciousness_level: (a: number) => number;
-    readonly sporeengine_consciousness_report: (a: number, b: number) => void;
-    readonly sporeengine_conversation_stats: (a: number, b: number) => void;
-    readonly sporeengine_cycle: (a: number, b: number, c: number, d: number) => void;
+    readonly sporeengine_consciousness_report: (a: number) => [number, number];
+    readonly sporeengine_conversation_stats: (a: number) => [number, number, number];
+    readonly sporeengine_cycle: (a: number, b: number, c: number) => [number, number, number];
     readonly sporeengine_cycle_count: (a: number) => bigint;
-    readonly sporeengine_cycle_hv: (a: number, b: number, c: number, d: number) => void;
-    readonly sporeengine_dream_cycle: (a: number, b: number) => void;
-    readonly sporeengine_dream_session: (a: number, b: number, c: number) => void;
-    readonly sporeengine_dream_stats: (a: number, b: number) => void;
+    readonly sporeengine_cycle_hv: (a: number, b: number, c: number) => [number, number, number];
+    readonly sporeengine_dream_cycle: (a: number) => [number, number, number];
+    readonly sporeengine_dream_session: (a: number, b: number) => [number, number, number];
+    readonly sporeengine_dream_stats: (a: number) => [number, number, number];
     readonly sporeengine_dream_wisdom_count: (a: number) => number;
-    readonly sporeengine_encode_text: (a: number, b: number, c: number, d: number) => void;
-    readonly sporeengine_fep_cycle: (a: number, b: number) => void;
+    readonly sporeengine_encode_text: (a: number, b: number, c: number) => [number, number];
+    readonly sporeengine_fep_cycle: (a: number) => [number, number, number];
     readonly sporeengine_free_energy: (a: number) => number;
-    readonly sporeengine_generate_text: (a: number, b: number, c: number) => void;
-    readonly sporeengine_get_output_hv: (a: number, b: number) => void;
+    readonly sporeengine_generate_text: (a: number, b: number) => [number, number, number];
+    readonly sporeengine_generate_text_with_input: (a: number, b: number, c: number, d: number) => [number, number, number];
+    readonly sporeengine_get_output_hv: (a: number) => [number, number];
     readonly sporeengine_harmony_alignment: (a: number) => number;
     readonly sporeengine_honest_confidence: (a: number) => number;
     readonly sporeengine_inject_neuromodulator: (a: number, b: number, c: number, d: number) => void;
-    readonly sporeengine_knowledge_query: (a: number, b: number, c: number, d: number) => void;
-    readonly sporeengine_knowledge_stats: (a: number, b: number) => void;
-    readonly sporeengine_load_broca_checkpoint: (a: number, b: number, c: number, d: number) => void;
-    readonly sporeengine_load_broca_pipeline_checkpoint: (a: number, b: number, c: number, d: number) => void;
-    readonly sporeengine_measure_pci: (a: number, b: number, c: number, d: number) => void;
-    readonly sporeengine_memory_consolidate: (a: number, b: number) => void;
-    readonly sporeengine_memory_stats: (a: number, b: number) => void;
-    readonly sporeengine_neuromod_state: (a: number, b: number) => void;
-    readonly sporeengine_new: (a: number, b: number) => void;
-    readonly sporeengine_reasoning_cycle: (a: number, b: number, c: number, d: number) => void;
-    readonly sporeengine_safety_level: (a: number, b: number) => void;
+    readonly sporeengine_knowledge_query: (a: number, b: number, c: number) => [number, number, number];
+    readonly sporeengine_knowledge_stats: (a: number) => [number, number, number];
+    readonly sporeengine_load_broca_checkpoint: (a: number, b: number, c: number) => [number, number];
+    readonly sporeengine_load_broca_pipeline_checkpoint: (a: number, b: number, c: number) => [number, number];
+    readonly sporeengine_measure_pci: (a: number, b: number, c: number) => [number, number, number];
+    readonly sporeengine_memory_consolidate: (a: number) => [number, number, number];
+    readonly sporeengine_memory_stats: (a: number) => [number, number, number];
+    readonly sporeengine_neuromod_state: (a: number) => [number, number];
+    readonly sporeengine_new: (a: any) => [number, number, number];
+    readonly sporeengine_reasoning_cycle: (a: number, b: number, c: number) => [number, number, number];
+    readonly sporeengine_safety_level: (a: number) => [number, number];
     readonly sporeengine_set_substrate: (a: number, b: number, c: number) => void;
-    readonly sporeengine_social_mind_state: (a: number, b: number) => void;
-    readonly sporeengine_split_brain_experiment: (a: number, b: number, c: number) => void;
+    readonly sporeengine_social_mind_state: (a: number) => [number, number, number];
+    readonly sporeengine_split_brain_experiment: (a: number, b: number) => [number, number, number];
     readonly sporeengine_substrate_feasibility: (a: number) => number;
-    readonly sporeengine_threat_assessment: (a: number, b: number, c: number, d: number) => void;
-    readonly sporeengine_topology_analysis: (a: number, b: number) => void;
-    readonly sporeengine_topology_report: (a: number, b: number) => void;
+    readonly sporeengine_threat_assessment: (a: number, b: number, c: number) => [number, number, number];
+    readonly sporeengine_topology_analysis: (a: number) => [number, number, number];
+    readonly sporeengine_topology_report: (a: number) => [number, number];
     readonly sporeengine_workspace_ignition: (a: number) => number;
-    readonly sporeengine_workspace_state: (a: number, b: number) => void;
-    readonly __wbindgen_export: (a: number, b: number) => number;
-    readonly __wbindgen_export2: (a: number, b: number, c: number, d: number) => number;
-    readonly __wbindgen_export3: (a: number) => void;
-    readonly __wbindgen_export4: (a: number, b: number, c: number) => void;
-    readonly __wbindgen_add_to_stack_pointer: (a: number) => number;
+    readonly sporeengine_workspace_state: (a: number) => [number, number, number];
+    readonly __wbindgen_malloc: (a: number, b: number) => number;
+    readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
+    readonly __wbindgen_exn_store: (a: number) => void;
+    readonly __externref_table_alloc: () => number;
+    readonly __wbindgen_externrefs: WebAssembly.Table;
+    readonly __wbindgen_free: (a: number, b: number, c: number) => void;
+    readonly __externref_table_dealloc: (a: number) => void;
+    readonly __wbindgen_start: () => void;
 }
 
 export type SyncInitInput = BufferSource | WebAssembly.Module;

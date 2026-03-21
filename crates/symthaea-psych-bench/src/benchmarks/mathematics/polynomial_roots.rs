@@ -116,14 +116,6 @@ fn find_roots(
 
         found.push(best_val);
         used.insert(best_val);
-
-        // Refine: permute the polynomial encoding to "remove" the found root
-        // This models factoring out (x - r) from the polynomial.
-        // We bind the polynomial with the found root's encoding to shift
-        // the representation toward remaining roots.
-        let root_hv = encode_integer(value_base, best_val);
-        // Permute + bind simulates polynomial deflation in HDC space
-        *&mut *Box::new(poly_hv.bind(&root_hv.permute(1)));
     }
 
     found

@@ -35,11 +35,16 @@ function startLoop(intervalMs) {
 
       // Every 10th cycle, also send the output HV for visualization
       let hv = null;
+      let neuromods = null;
       if (cycleCount % 10 === 0) {
         hv = Array.from(engine.get_output_hv());
       }
+      // Every 5th cycle, include full neuromod state
+      if (cycleCount % 5 === 0) {
+        try { neuromods = JSON.parse(engine.neuromod_state()); } catch (_) {}
+      }
 
-      self.postMessage({ type: 'cycle', result, hv });
+      self.postMessage({ type: 'cycle', result: { ...result, neuromods }, hv });
     } catch (e) {
       self.postMessage({ type: 'error', error: e.message });
     }
@@ -152,6 +157,9 @@ self.onmessage = async function(e) {
         if (engine) engine.inject_neuromodulator(params.name, params.amount);
         result = { ok: true };
         break;
+      case 'neuromodState':
+        if (engine) result = JSON.parse(engine.neuromod_state());
+        break;
       case 'getOutputHV':
         if (engine) result = Array.from(engine.get_output_hv());
         break;
@@ -181,7 +189,7 @@ self.onmessage = async function(e) {
       // Broca checkpoint loading
       case 'loadBrocaCheckpoint':
         if (engine) {
-          var response = await fetch('./broca-spore-v1.bin');
+          var response = await fetch('./assets/broca-spore-v1.bin');
           if (!response.ok) throw new Error('Checkpoint fetch failed: ' + response.status);
           var buffer = await response.arrayBuffer();
           engine.load_broca_checkpoint(new Uint8Array(buffer));
@@ -191,7 +199,7 @@ self.onmessage = async function(e) {
       case 'loadBrocaPipeline':
         if (engine) {
           // Try local first (self-hosted), fall back to GitHub LFS
-          var response = await fetch('./broca-pipeline.bin').catch(function() { return { ok: false }; });
+          var response = await fetch('./assets/broca-pipeline.bin').catch(function() { return { ok: false }; });
           if (!response.ok) {
             response = await fetch('https://media.githubusercontent.com/media/Luminous-Dynamics/luminous-dynamics/main/symthaea/crates/symthaea-spore/data/broca-pipeline-distilled.bin');
           }

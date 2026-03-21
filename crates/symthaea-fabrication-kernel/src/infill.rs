@@ -368,23 +368,18 @@ fn generate_honeycomb_infill(
     while cx < x_end {
         let mut cy = y_start + if col % 2 == 1 { row_stride } else { 0.0 };
         while cy < y_end {
-            // Rotate the hex center around the bbox centre.
-            let rotated_center = rotate(cx, cy);
-            let rcx = rotated_center.x;
-            let rcy = rotated_center.y;
-
-            // Generate the 6 edges of this hexagon (vertices rotated by angle_rad).
+            // Generate the 6 vertices of this hexagon, rotating each around the
+            // bounding box centre by angle_rad. The center (cx, cy) is on the
+            // unrotated grid; rotating the vertices achieves the same result as
+            // rotating the entire grid.
             let vertices: Vec<Point2> = hex_angles
                 .iter()
                 .map(|&a| {
-                    // Raw vertex position relative to unrotated center.
                     let vx = cx + r * a.cos();
                     let vy = cy + r * a.sin();
-                    // Rotate around bbox center.
                     rotate(vx, vy)
                 })
                 .collect();
-            let _ = (rcx, rcy); // suppress unused warning
 
             for i in 0..6 {
                 let j = (i + 1) % 6;

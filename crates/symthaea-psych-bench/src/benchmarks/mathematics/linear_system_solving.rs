@@ -89,7 +89,7 @@ fn solve_component(
 
     // Find the candidate integer closest to the consensus
     let mut best_val = 0i32;
-    let mut best_dist = usize::MAX;
+    let mut best_dist = u32::MAX;
     for candidate in candidate_range {
         let candidate_hv = encode_integer(value_base, candidate);
         let dist = consensus.hamming_distance(&candidate_hv);
