@@ -15,16 +15,18 @@ use crate::cognitive_loop::feedback_state::Priority;
 
 /// Geometric mean of positive f32 values. Returns 1.0 for empty/invalid input.
 fn geometric_mean(factors: &[f32]) -> f32 {
-    let valid: Vec<f32> = factors
-        .iter()
-        .copied()
-        .filter(|f| *f > 0.0 && f.is_finite())
-        .collect();
-    if valid.is_empty() {
+    let mut log_sum = 0.0f32;
+    let mut count = 0u32;
+    for &f in factors {
+        if f > 0.0 && f.is_finite() {
+            log_sum += f.ln();
+            count += 1;
+        }
+    }
+    if count == 0 {
         return 1.0;
     }
-    let log_sum: f32 = valid.iter().map(|f| f.ln()).sum();
-    let mean = (log_sum / valid.len() as f32).exp();
+    let mean = (log_sum / count as f32).exp();
     if mean.is_finite() {
         mean
     } else {

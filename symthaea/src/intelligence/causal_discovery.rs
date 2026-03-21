@@ -933,12 +933,19 @@ impl CausalDiscoveryEngine {
         }
 
         let n = v.len() as f64;
+        if n == 0.0 {
+            return 0.0;
+        }
         counts
             .values()
             .filter(|&&c| c > 0)
             .map(|&c| {
                 let p = c as f64 / n;
-                -p * p.log2()
+                if p > 1e-15 {
+                    -p * p.log2()
+                } else {
+                    0.0
+                }
             })
             .sum()
     }
@@ -950,12 +957,19 @@ impl CausalDiscoveryEngine {
         }
 
         let n = x.len() as f64;
+        if n == 0.0 {
+            return 0.0;
+        }
         counts
             .values()
             .filter(|&&c| c > 0)
             .map(|&c| {
                 let p = c as f64 / n;
-                -p * p.log2()
+                if p > 1e-15 {
+                    -p * p.log2()
+                } else {
+                    0.0
+                }
             })
             .sum()
     }

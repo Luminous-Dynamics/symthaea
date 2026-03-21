@@ -369,6 +369,16 @@ impl LiveLearningRouter {
     fn extract_meta(&self, x: &[f64], y: &[f64]) -> MetaFeatures {
         // Simplified meta-feature extraction
         let n = x.len();
+        if n < 2 {
+            return MetaFeatures {
+                n_samples: n,
+                correlation: 0.0,
+                noise_ratio: 0.5,
+                nonlinearity: 0.0,
+                kurtosis_x: 0.0,
+                kurtosis_y: 0.0,
+            };
+        }
         let mx: f64 = x.iter().sum::<f64>() / n as f64;
         let my: f64 = y.iter().sum::<f64>() / n as f64;
 

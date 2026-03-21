@@ -69,6 +69,26 @@ pub(super) fn cosine_f32(a: &[f32], b: &[f32]) -> f32 {
     }
 }
 
+/// Safe arithmetic mean for f32 slices. Returns `default` if slice is empty.
+#[inline]
+pub(crate) fn safe_mean_f32(values: &[f32], default: f32) -> f32 {
+    if values.is_empty() {
+        default
+    } else {
+        values.iter().sum::<f32>() / values.len() as f32
+    }
+}
+
+/// Safe arithmetic mean for f64 slices. Returns `default` if slice is empty.
+#[inline]
+pub(crate) fn safe_mean_f64(values: &[f64], default: f64) -> f64 {
+    if values.is_empty() {
+        default
+    } else {
+        values.iter().sum::<f64>() / values.len() as f64
+    }
+}
+
 impl CognitiveLoopService {
     /// Process a pre-computed text embedding through the neural bridge and
     /// cognitive loop.
