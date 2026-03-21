@@ -19,6 +19,9 @@ cp assets/broca-spore-v1.bin dist/assets/ 2>/dev/null && echo "[deploy] Copied b
 # Add .nojekyll for GitHub Pages (prevents underscore-prefixed files being ignored)
 touch dist/.nojekyll
 
+# Custom domain
+echo "symthaea.luminousdynamics.io" > dist/CNAME
+
 echo ""
 echo "[deploy] dist/ contents:"
 ls -la dist/
