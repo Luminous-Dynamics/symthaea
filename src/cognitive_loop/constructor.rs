@@ -677,7 +677,7 @@ impl CognitiveLoopService {
                                 Some(nb)
                             }
                             Err(e) => {
-                                tracing::warn!("Failed to load neural bridge: {e}");
+                                tracing::warn!(err = %e, "Failed to load neural bridge");
                                 None
                             }
                         }
@@ -696,7 +696,7 @@ impl CognitiveLoopService {
                         match symthaea_embeddings::channel::EmbeddingChannel::spawn(qwen_config) {
                             Ok(channel) => Some(channel),
                             Err(e) => {
-                                tracing::warn!("Failed to spawn semantic encoder: {e}");
+                                tracing::warn!(err = %e, "Failed to spawn semantic encoder");
                                 None
                             }
                         }
@@ -910,7 +910,7 @@ impl CognitiveLoopService {
                 let engine_ucp = if has_primitive_processor {
                     crate::consciousness::unified_consciousness_pipeline::UnifiedConsciousnessPipeline::new(
                         crate::consciousness::unified_consciousness_pipeline::PipelineConfig::default(),
-                    ).map_err(|e| tracing::warn!("UnifiedConsciousnessPipeline init failed: {e}")).ok()
+                    ).map_err(|e| tracing::warn!(err = %e, "UnifiedConsciousnessPipeline init failed")).ok()
                 } else {
                     None
                 };
@@ -1139,6 +1139,10 @@ impl CognitiveLoopService {
             civic_crisis_detector: super::civic_crisis_detector::CivicCrisisDetector::new(),
             #[cfg(feature = "neuroevolution")]
             neuroevolution_manager: super::managers::NeuroevolutionManager::default(),
+            #[cfg(feature = "reasoning_engine")]
+            reasoning_manager: super::managers::ReasoningManager::default(),
+            #[cfg(feature = "ssm_language")]
+            language_manager: super::managers::LanguageManager::default(),
             security_telemetry: crate::swarm::SecurityTelemetry::default(),
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
             streaming_inference: if enable_streaming_inference {
@@ -1246,7 +1250,7 @@ impl CognitiveLoopService {
         let mut embedder = match symthaea_embeddings::Qwen3Embedder::new(qwen_config) {
             Ok(e) => e,
             Err(e) => {
-                tracing::warn!("Failed to create Qwen3 embedder for dense HarmonyBasis: {e}");
+                tracing::warn!(err = %e, "Failed to create Qwen3 embedder for dense HarmonyBasis");
                 return None;
             }
         };
@@ -1263,7 +1267,7 @@ impl CognitiveLoopService {
         let batch_result = match embedder.embed_batch(&keyword_refs) {
             Ok(results) => results,
             Err(e) => {
-                tracing::warn!("Failed to batch-encode harmony keywords: {e}");
+                tracing::warn!(err = %e, "Failed to batch-encode harmony keywords");
                 return None;
             }
         };

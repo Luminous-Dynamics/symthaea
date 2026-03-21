@@ -272,6 +272,22 @@ use super::thresholds::{
     WORLD_MODEL_SPONGY_LR_SCALE,
     WORLD_MODEL_STIFFNESS_LR_SCALE,
     WORLD_MODEL_STIFFNESS_THRESHOLD,
+    // Round 22: magic number extraction
+    EPISTEMIC_BUDGET_CONTRACT_BASE,
+    EPISTEMIC_BUDGET_CONTRACT_RAMP,
+    EPISTEMIC_BUDGET_CONTRACT_THRESHOLD,
+    EPISTEMIC_BUDGET_EXPAND_CAP,
+    EPISTEMIC_BUDGET_EXPAND_THRESHOLD,
+    FEP_COMPLEXITY_LR_SCALE,
+    FEP_COMPLEXITY_PENALTY_CAP,
+    FEP_SURPRISE_EXPLORE_CAP,
+    FEP_SURPRISE_EXPLORE_SCALE,
+    FEP_SURPRISE_EXPLORE_SECONDARY_CAP,
+    FEP_SURPRISE_EXPLORE_SECONDARY_SCALE,
+    KNOWLEDGE_ALERT_EXPLORE_CAP,
+    KNOWLEDGE_CONTRADICTION_FLOOR,
+    STILLNESS_BUDGET_CONTRACT_CAP,
+    STILLNESS_BUDGET_THRESHOLD,
 };
 #[cfg(feature = "vision-manifold")]
 use super::thresholds::{
@@ -709,6 +725,14 @@ impl CognitiveLoopService {
                         .record("fabrication_manager", fabrication_output);
                 }
 
+                // ── Language Manager (interval 61, co-prime) ────────────
+                #[cfg(feature = "ssm_language")]
+                if self.language_manager.should_run(cycle_num, urgency_u8) {
+                    let language_output = self.language_manager.process(snapshot);
+                    self.subsystem_collector
+                        .record("language_manager", language_output);
+                }
+
                 // ── Neuroevolution Manager (interval 71, co-prime) ─────
                 #[cfg(feature = "neuroevolution")]
                 {
@@ -717,6 +741,14 @@ impl CognitiveLoopService {
                         self.subsystem_collector
                             .record("neuroevolution", neuro_output);
                     }
+                }
+
+                // ── Reasoning Manager (interval 73, co-prime) ────────
+                #[cfg(feature = "reasoning_engine")]
+                if self.reasoning_manager.should_run(cycle_num, urgency_u8) {
+                    let reasoning_output = self.reasoning_manager.process(snapshot);
+                    self.subsystem_collector
+                        .record("reasoning_manager", reasoning_output);
                 }
 
                 // ── Governance Manager (interval 37, co-prime) ──────────
@@ -922,13 +954,13 @@ impl CognitiveLoopService {
                     let alerts = km.drain_alerts();
                     if !alerts.is_empty() {
                         let boost =
-                            (alerts.len() as f32 * KNOWLEDGE_NOVELTY_EXPLORE_SCALE).min(0.2);
+                            (alerts.len() as f32 * KNOWLEDGE_NOVELTY_EXPLORE_SCALE).min(KNOWLEDGE_ALERT_EXPLORE_CAP);
                         let contra_conf = sigs_contradiction.clamp(0.0, 1.0) as f32;
                         self.adjust_exploration_weighted(
                             "knowledge_contradictions",
                             boost,
                             Priority::Cognitive,
-                            contra_conf.max(0.3), // floor at 0.3 so alerts always have some weight
+                            contra_conf.max(KNOWLEDGE_CONTRADICTION_FLOOR), // floor so alerts always have some weight
                         );
                     }
 
@@ -1576,12 +1608,12 @@ impl CognitiveLoopService {
                 if comp > FEP_COMPLEXITY_THRESHOLD {
                     self.scale_lr(
                         "fep_complexity",
-                        1.0 - ((comp - FEP_COMPLEXITY_THRESHOLD).min(0.5) * 0.1) as f32,
+                        1.0 - ((comp - FEP_COMPLEXITY_THRESHOLD).min(FEP_COMPLEXITY_PENALTY_CAP) * FEP_COMPLEXITY_LR_SCALE) as f32,
                     );
                 }
                 if surp > reflection_thresholds.surprise as f64 {
                     let s_explore =
-                        ((surp - reflection_thresholds.surprise as f64) * 0.1).min(0.05) as f32;
+                        ((surp - reflection_thresholds.surprise as f64) * FEP_SURPRISE_EXPLORE_SECONDARY_SCALE).min(FEP_SURPRISE_EXPLORE_SECONDARY_CAP) as f32;
                     self.adjust_exploration("reflection_surprise", s_explore);
                 }
                 (acc, comp, surp, pe)
@@ -1708,7 +1740,7 @@ impl CognitiveLoopService {
 
         if fep_surprise > surprise_thresh {
             if let Some(ref mut replay) = self.episodic_persistence.replay {
-                let surprise_boost = (fep_surprise - surprise_thresh).min(0.5) * 0.2;
+                let surprise_boost = (fep_surprise - surprise_thresh).min(FEP_SURPRISE_EXPLORE_CAP) * FEP_SURPRISE_EXPLORE_SCALE;
                 replay.boost_recent_consolidation(surprise_boost);
             }
         }
@@ -2254,10 +2286,10 @@ impl CognitiveLoopService {
         // Epistemic uncertainty → attention budget expansion.
         // Science: Gottlieb et al. (2013) — uncertain environments demand more attentional resources.
         // High epistemic (>0.4) scales budget up to 1.3×; low (<0.2) contracts to 0.9×.
-        let epistemic_budget_scale = if epistemic_uncertainty > 0.4 {
-            1.0 + (epistemic_uncertainty - 0.4).min(0.3)
-        } else if epistemic_uncertainty < 0.2 {
-            0.9 + epistemic_uncertainty * 0.5 // 0.9 at 0.0, 1.0 at 0.2
+        let epistemic_budget_scale = if epistemic_uncertainty > EPISTEMIC_BUDGET_EXPAND_THRESHOLD {
+            1.0 + (epistemic_uncertainty - EPISTEMIC_BUDGET_EXPAND_THRESHOLD).min(EPISTEMIC_BUDGET_EXPAND_CAP)
+        } else if epistemic_uncertainty < EPISTEMIC_BUDGET_CONTRACT_THRESHOLD {
+            EPISTEMIC_BUDGET_CONTRACT_BASE + epistemic_uncertainty * EPISTEMIC_BUDGET_CONTRACT_RAMP
         } else {
             1.0
         };
@@ -2268,9 +2300,9 @@ impl CognitiveLoopService {
         let stillness_budget_scale = {
             let ss_coord =
                 self.ethics_engine.last_harmony_coordinates()[HARMONY_INDEX_SACRED_STILLNESS]; // SacredStillness
-            if ss_coord > 0.5 {
+            if ss_coord > STILLNESS_BUDGET_THRESHOLD {
                 // High stillness activation → contract budget by up to 30%
-                1.0 - (ss_coord - 0.5).min(0.3)
+                1.0 - (ss_coord - STILLNESS_BUDGET_THRESHOLD).min(STILLNESS_BUDGET_CONTRACT_CAP)
             } else {
                 1.0
             }

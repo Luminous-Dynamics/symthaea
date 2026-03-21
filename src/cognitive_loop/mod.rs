@@ -804,6 +804,16 @@ pub struct CognitiveLoopService {
     #[cfg(feature = "neuroevolution")]
     pub(crate) neuroevolution_manager: managers::NeuroevolutionManager,
 
+    /// Reasoning Manager: reasoning reliability → LR modulation, confidence, trend affect.
+    /// Implements CognitiveSubsystem at interval 73. Feature-gated behind `reasoning_engine`.
+    #[cfg(feature = "reasoning_engine")]
+    reasoning_manager: managers::ReasoningManager,
+
+    /// Language Manager: Broca quality feedback → confidence, LR, consolidation.
+    /// Implements CognitiveSubsystem at interval 61. Feature-gated behind `ssm_language`.
+    #[cfg(feature = "ssm_language")]
+    language_manager: managers::LanguageManager,
+
     /// Cantor dream: broadcast buffer, cleanup engine, activation, surprise, resonance.
     pub(crate) cantor_dream: cantor_dream_manager::CantorDreamManager,
 

@@ -6,6 +6,8 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "Mycelial colonization boot animation for NixOS installer — bare-metal DRM/KMS framebuffer"
 license = "AGPL-3.0-or-later"
 
+[lints]
+workspace = true
 
 [[bin]]
 name = "quicken-fb"

@@ -528,7 +528,9 @@ impl BrocaGenerator {
                     if let (Some(&last_byte), Some(&first_byte)) =
                         (text_bytes.last(), token_str.as_bytes().first())
                     {
-                        if last_byte.is_ascii_alphanumeric() && first_byte.is_ascii_alphanumeric() {
+                        if last_byte.is_ascii_alphanumeric()
+                            && first_byte.is_ascii_alphanumeric()
+                        {
                             text_bytes.push(b' ');
                             on_token(" ");
                         }

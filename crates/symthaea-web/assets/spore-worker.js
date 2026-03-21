@@ -1,7 +1,7 @@
 // Web Worker for Spore consciousness engine.
 // Keeps experiments and heavy cycles off the main thread.
 
-import init, { SporeEngine, generate_flake, generate_disko_config, generate_hardware_nix } from './pkg/symthaea_spore.js';
+import init, { SporeEngine } from './pkg/symthaea_spore.js';
 
 let engine = null;
 let running = false;
@@ -285,14 +285,20 @@ self.onmessage = async function(e) {
         break;
       }
       // Flake generation from hardware probe
-      case 'generateFlake':
-        result = generate_flake(params.hardwareJson, params.path || '/', params.hostname || 'guardian');
+      // Phase 6: Reasoning engine (7-step cognitive cycle)
+      case 'reasoningCycle':
+        if (engine) result = engine.reasoning_cycle(params.input || currentThought);
         break;
-      case 'generateDiskoConfig':
-        result = generate_disko_config(params.hardwareJson);
+      // Phase 7: Immune system (threat detection + defense cascade)
+      case 'threatAssessment':
+        if (engine) result = engine.threat_assessment(params.input || '');
         break;
-      case 'generateHardwareNix':
-        result = generate_hardware_nix(params.hardwareJson);
+      case 'safetyLevel':
+        if (engine) result = engine.safety_level();
+        break;
+      // Phase 8: Causal discovery
+      case 'causalGraph':
+        if (engine) result = engine.causal_graph();
         break;
       default:
         throw new Error(`Unknown action: ${action}`);

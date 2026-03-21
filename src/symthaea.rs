@@ -3381,7 +3381,9 @@ impl Symthaea {
         bridge: &mut crate::consciousness::mycelix_bridge::MycelixBridge,
         rt: &tokio::runtime::Handle,
     ) -> bool {
-        use symthaea_mycelix_conductor::{ConductorConfig, GovernanceDispatcher, MockTransport};
+        use symthaea_mycelix_conductor::{
+            ConductorConfig, GovernanceDispatcher, MockTransport,
+        };
 
         let Some(config) = ConductorConfig::from_env() else {
             tracing::debug!("MYCELIX_CONDUCTOR_URL not set — governance dispatch disabled");
@@ -3394,8 +3396,7 @@ impl Symthaea {
             "Wiring governance dispatch to Holochain conductor"
         );
 
-        let (tx, rx) =
-            crate::consciousness::mycelix_bridge::MycelixBridge::create_governance_channel();
+        let (tx, rx) = crate::consciousness::mycelix_bridge::MycelixBridge::create_governance_channel();
         bridge.set_governance_dispatch_tx(tx);
 
         // Spawn the dispatch loop with MockTransport for now.
@@ -3441,9 +3442,7 @@ impl Symthaea {
                     },
                     GDC::QueryActiveProposals => DispatchCommand::QueryActiveProposals,
                 };
-                if cmd_tx.send(dc).is_err() {
-                    break;
-                }
+                if cmd_tx.send(dc).is_err() { break; }
             }
         });
 

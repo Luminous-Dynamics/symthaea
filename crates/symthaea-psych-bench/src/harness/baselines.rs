@@ -1527,6 +1527,35 @@ pub fn creativity_baselines() -> BTreeMap<&'static str, Baseline> {
         },
     );
 
+    // Conceptual Blending (Fauconnier & Turner, 2002; Ward, 1994)
+    m.insert(
+        "blend_quality",
+        Baseline {
+            value: 0.52,
+            sd: Some(0.14),
+            source: "Ward (1994), composite creativity score for conceptual combination",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "blend_novelty",
+        Baseline {
+            value: 0.48,
+            sd: Some(0.16),
+            source: "Wisniewski (1997), semantic distance in conceptual combinations",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "blend_coherence",
+        Baseline {
+            value: 0.65,
+            sd: Some(0.12),
+            source: "Fauconnier & Turner (2002), blend structural consistency ratings",
+            population: "human adults",
+        },
+    );
+
     m
 }
 

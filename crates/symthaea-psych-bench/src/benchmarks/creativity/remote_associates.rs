@@ -167,19 +167,27 @@ impl RemoteAssociatesBenchmark {
             .iter()
             .map(|c| adapter.encode(&Word(c.to_string()), dim))
             .collect();
-        let raw_bundle = ContinuousHV::bundle_owned(&cue_hvs);
+        // Multi-level associative bundling: combine direct cue representations
+        // with pairwise bindings. The bindings capture compound associations
+        // (e.g., "cottage-swiss" → cheese) that the flat bundle misses.
+        // Kenett et al. (2014, Creativity Research Journal) showed that creative
+        // associative thinking involves both direct and mediated associations
+        // through network spreading activation (Mednick, 1962).
+        let pair_01 = cue_hvs[0].bind(&cue_hvs[1]);
+        let pair_02 = cue_hvs[0].bind(&cue_hvs[2]);
+        let pair_12 = cue_hvs[1].bind(&cue_hvs[2]);
+        let raw_bundle = ContinuousHV::weighted_bundle(
+            &[&cue_hvs[0], &cue_hvs[1], &cue_hvs[2], &pair_01, &pair_02, &pair_12],
+            &[1.0, 1.0, 1.0, 0.5, 0.5, 0.5],
+        );
 
         // Lapse_rate degrades associative binding coherence: higher lapse → noisier
         // bundle representation, modeling reduced spreading activation depth
         // (Mednick 1962; individual differences in associative search breadth).
         let bundle = if config.lapse_rate > 0.0 {
             let corruption = (config.lapse_rate * 1.6) as f32; // up to 40% binding disruption
-            let noise_hv =
-                ContinuousHV::random(dim, config.trial_seed("creativity", "rat_lapse", trial_idx));
-            ContinuousHV::weighted_bundle(
-                &[&raw_bundle, &noise_hv],
-                &[1.0 - corruption, corruption],
-            )
+            let noise_hv = ContinuousHV::random(dim, config.trial_seed("creativity", "rat_lapse", trial_idx));
+            ContinuousHV::weighted_bundle(&[&raw_bundle, &noise_hv], &[1.0 - corruption, corruption])
         } else {
             raw_bundle
         };
@@ -234,9 +242,7 @@ impl RemoteAssociatesBenchmark {
         // activation breadth). This creates stable per-subject differences.
         if config.lapse_rate > 0.0 && all_sims.len() > 2 {
             let search_cutoff = {
-                let hash = seed
-                    .wrapping_mul(0x517CC1B727220A95)
-                    .wrapping_add(trial_idx as u64 * 31);
+                let hash = seed.wrapping_mul(0x517CC1B727220A95).wrapping_add(trial_idx as u64 * 31);
                 (hash >> 32) as f64 / (1u64 << 32) as f64
             };
             // Higher lapse → higher chance of dropping last candidate(s)
@@ -250,22 +256,14 @@ impl RemoteAssociatesBenchmark {
         all_sims.sort_by(|(_, a), (_, b)| b.total_cmp(a));
 
         // Accuracy: solution ranks first. Lapse model can flip correctness.
-        let rank = all_sims
-            .iter()
-            .position(|(idx, _)| *idx == 0)
-            .unwrap_or(all_sims.len())
-            + 1;
+        let rank = all_sims.iter().position(|(idx, _)| *idx == 0).unwrap_or(all_sims.len()) + 1;
         let correct = config.check_correct(rank == 1, "remote_associates", trial_idx);
         let accuracy = if correct { 1.0 } else { 0.0 };
         // Fractional rank: integer rank + similarity-margin interpolation for
         // continuous individual differences (rank alone is integer 1-4, too coarse
         // for reliable ICC). Margin captures how close the solution was to adjacent
         // candidates, reflecting associative search depth.
-        let sol_sim_val = all_sims
-            .iter()
-            .find(|(idx, _)| *idx == 0)
-            .map(|(_, s)| *s)
-            .unwrap_or(0.0);
+        let sol_sim_val = all_sims.iter().find(|(idx, _)| *idx == 0).map(|(_, s)| *s).unwrap_or(0.0);
         let rank_pos = rank - 1; // 0-indexed position in sorted list
         let fractional_offset = if rank_pos > 0 {
             // How far solution's similarity is below the candidate just above it
@@ -274,11 +272,7 @@ impl RemoteAssociatesBenchmark {
             gap as f64 * 5.0 // scale to [0, 0.5]
         } else {
             // Rank 1: how far above the next candidate
-            let below_sim = if all_sims.len() > 1 {
-                all_sims[1].1
-            } else {
-                0.0
-            };
+            let below_sim = if all_sims.len() > 1 { all_sims[1].1 } else { 0.0 };
             let margin = (sol_sim_val - below_sim).max(0.0).min(0.1);
             -(margin as f64 * 5.0) // negative offset = better than rank 1.0
         };

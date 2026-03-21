@@ -59,6 +59,19 @@ use super::thresholds::{
     TEMPORAL_COHERENCE_LOW,
     VALUE_CACHE_HIT_RATE_HIGH,
     VALUE_CACHE_HIT_RATE_LOW,
+    // Round 23: output-phase constants
+    ADAPTIVE_THRESHOLD_SCALE_LOWER,
+    ADAPTIVE_THRESHOLD_SCALE_UPPER,
+    ANTI_MONOPOLY_DAMPEN_SCALE,
+    DOMINANT_CONCENTRATION_MONOPOLY_THRESHOLD,
+    FEEDBACK_INTEGRATION_RATE_LOWER,
+    FULL_DAMPEN_ESCAPE_EXPLORATION,
+    SUBSYSTEM_EXPLORATION_REQUEST_NUDGE,
+    SUBSYSTEM_REST_REQUEST_LR_SCALE,
+    SUBSTRATE_TAU_DEVIATION_THRESHOLD,
+    SUBSTRATE_TAU_FACTOR_MINIMUM,
+    URGENCY_ESCALATION_AROUSAL_BOOST,
+    URGENCY_ESCALATION_EXPLORATION_SCALE,
 };
 use super::{CognitiveLoopService, CycleResult};
 
@@ -1521,23 +1534,23 @@ impl CognitiveLoopService {
         // by 20% toward cycle-start to prevent single-subsystem monopoly.
         // Dehaene (2014): GWT prevents single-module monopoly via ignition competition.
         let dominant_concentration = self.feedback_state.dominant_source_concentration();
-        if dominant_concentration > 0.6 && self.feedback_state.total_proposals() > 4 {
+        if dominant_concentration > DOMINANT_CONCENTRATION_MONOPOLY_THRESHOLD && self.feedback_state.total_proposals() > 4 {
             // Apply a mild Scale(0.97) to all channels from "anti_monopoly" source
             self.feedback_state.confidence.propose(
                 "anti_monopoly",
-                super::feedback_state::FeedbackProposal::Scale(0.97),
+                super::feedback_state::FeedbackProposal::Scale(ANTI_MONOPOLY_DAMPEN_SCALE),
             );
             self.feedback_state.learning_rate.propose(
                 "anti_monopoly",
-                super::feedback_state::FeedbackProposal::Scale(0.97),
+                super::feedback_state::FeedbackProposal::Scale(ANTI_MONOPOLY_DAMPEN_SCALE),
             );
             self.feedback_state.exploration.propose(
                 "anti_monopoly",
-                super::feedback_state::FeedbackProposal::Scale(0.97),
+                super::feedback_state::FeedbackProposal::Scale(ANTI_MONOPOLY_DAMPEN_SCALE),
             );
             self.feedback_state.threshold.propose(
                 "anti_monopoly",
-                super::feedback_state::FeedbackProposal::Scale(0.97),
+                super::feedback_state::FeedbackProposal::Scale(ANTI_MONOPOLY_DAMPEN_SCALE),
             );
         }
 
@@ -1599,32 +1612,33 @@ impl CognitiveLoopService {
                 .carryover
                 .learning
                 .adaptive_threshold_scale
-                .clamp(0.9, 1.1);
+                .clamp(ADAPTIVE_THRESHOLD_SCALE_LOWER as f64, ADAPTIVE_THRESHOLD_SCALE_UPPER as f64);
             // Gentle exploration boost to escape the suppressed state
-            self.adjust_exploration("full_dampen_escape", 0.02);
+            self.adjust_exploration("full_dampen_escape", FULL_DAMPEN_ESCAPE_EXPLORATION);
         }
 
         // Session 9 Item 8: Substrate tau → feedback integration rate.
         // Fast substrates (tau < 1.0) apply consensus more aggressively;
         // slow substrates (tau > 1.0) blend more gently with cycle-start values.
-        let feedback_consensus = if (self.substrate_manager.tau_factor - 1.0).abs() > 0.05 {
-            let tau = self.substrate_manager.tau_factor.max(0.01); // Guard: prevent div-by-zero
-                                                                   // Integration strength: tau=0.5 → 100% consensus, tau=2.0 → 50% consensus
+        let feedback_consensus = if (self.substrate_manager.tau_factor as f64 - 1.0).abs() > SUBSTRATE_TAU_DEVIATION_THRESHOLD as f64 {
+            let tau = (self.substrate_manager.tau_factor as f64).max(SUBSTRATE_TAU_FACTOR_MINIMUM as f64); // Guard: prevent div-by-zero
+            // Integration strength: tau=0.5 → 100% consensus, tau=2.0 → 50% consensus
             let integration_rate = if tau.is_finite() {
-                (1.0 / tau).clamp(0.5, 1.0) as f64
+                (1.0_f64 / tau).clamp(FEEDBACK_INTEGRATION_RATE_LOWER as f64, 1.0)
             } else {
-                1.0
+                1.0_f64
             };
             let cs = &self.feedback_state;
+            let rate = integration_rate as f64;
             super::feedback_state::ConsensusResult {
-                consensus_confidence: cs.cycle_start_confidence() * (1.0 - integration_rate)
-                    + feedback_consensus.consensus_confidence * integration_rate,
-                consensus_lr: cs.cycle_start_lr() * (1.0 - integration_rate)
-                    + feedback_consensus.consensus_lr * integration_rate,
-                consensus_exploration: cs.cycle_start_exploration() * (1.0 - integration_rate)
-                    + feedback_consensus.consensus_exploration * integration_rate,
-                consensus_threshold: cs.cycle_start_threshold() * (1.0 - integration_rate)
-                    + feedback_consensus.consensus_threshold * integration_rate,
+                consensus_confidence: cs.cycle_start_confidence() * (1.0 - rate)
+                    + feedback_consensus.consensus_confidence * rate,
+                consensus_lr: cs.cycle_start_lr() * (1.0 - rate)
+                    + feedback_consensus.consensus_lr * rate,
+                consensus_exploration: cs.cycle_start_exploration() * (1.0 - rate)
+                    + feedback_consensus.consensus_exploration * rate,
+                consensus_threshold: cs.cycle_start_threshold() * (1.0 - rate)
+                    + feedback_consensus.consensus_threshold * rate,
             }
         } else {
             feedback_consensus
@@ -1678,8 +1692,8 @@ impl CognitiveLoopService {
             // Boost arousal and suppress exploration to focus on the threat.
             if integrated.has_flag(output_flags::ESCALATE_URGENCY) {
                 self.emotion_contagion.arousal =
-                    (self.emotion_contagion.arousal + 0.1).clamp(0.0, 1.0);
-                self.scale_exploration("urgency_escalation", 0.7);
+                    (self.emotion_contagion.arousal + URGENCY_ESCALATION_AROUSAL_BOOST).clamp(0.0, 1.0);
+                self.scale_exploration("urgency_escalation", URGENCY_ESCALATION_EXPLORATION_SCALE);
                 tracing::debug!(
                     cycle = self.stats.total_cycles,
                     "Subsystem ESCALATE_URGENCY: arousal boosted, exploration dampened"
@@ -1699,7 +1713,7 @@ impl CognitiveLoopService {
             // REQUEST_REST: A subsystem is fatigued and requests reduced processing.
             // Dampen learning rate to allow recovery.
             if integrated.has_flag(output_flags::REQUEST_REST) {
-                self.scale_lr("subsystem_rest_request", 0.9);
+                self.scale_lr("subsystem_rest_request", SUBSYSTEM_REST_REQUEST_LR_SCALE);
                 tracing::trace!(
                     cycle = self.stats.total_cycles,
                     "Subsystem REQUEST_REST: LR dampened for recovery"
@@ -1710,7 +1724,7 @@ impl CognitiveLoopService {
             // Already handled via exploration_delta averaging, but flag provides
             // a discrete signal — give an additional nudge.
             if integrated.has_flag(output_flags::REQUEST_EXPLORATION) {
-                self.adjust_exploration("subsystem_request_explore", 0.02);
+                self.adjust_exploration("subsystem_request_explore", SUBSYSTEM_EXPLORATION_REQUEST_NUDGE);
             }
 
             // ANOMALY_DETECTED: One or more subsystems detected anomalous conditions.

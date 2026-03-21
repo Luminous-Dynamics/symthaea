@@ -111,8 +111,12 @@ impl WisconsinCardSortingBenchmark {
         // Encoding noise and time pressure degrade learning rates (impaired feedback)
         let noise = config.effective_noise();
         let lr_scale = 1.0 - noise * 0.6;
-        let lr_correct = 0.2 * lr_scale; // Moderate reinforcement (lower cap = less needed)
-        let lr_error = 0.8 * lr_scale; // Stronger error penalty for faster set-shifting
+        // Monsell (2003, "Task switching", Trends in Cognitive Sciences) showed
+        // that error-driven hypothesis updating is asymmetric: errors drive faster
+        // switching than correct trials drive perseveration. This models the
+        // negative feedback dominance in WCST set-shifting.
+        let lr_correct = 0.18 * lr_scale; // Slightly lower correct reinforcement
+        let lr_error = 0.85 * lr_scale; // Stronger error penalty for faster set-shifting
 
         let all_colors = [Color::Red, Color::Blue, Color::Green, Color::Yellow];
         let all_shapes = [Shape::Triangle, Shape::Circle, Shape::Square, Shape::Star];

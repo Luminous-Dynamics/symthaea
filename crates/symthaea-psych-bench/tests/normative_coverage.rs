@@ -81,6 +81,8 @@ fn test_normative_coverage() {
         // Creativity
         Box::new(AlternateUsesBenchmark),
         Box::new(RemoteAssociatesBenchmark),
+        Box::new(DivergentThinkingBenchmark),
+        Box::new(ConceptualBlendingBenchmark),
         // Butlin
         Box::new(ButlinIndicatorSuite),
         // Inhibition

@@ -3,11 +3,14 @@
 use crate::broca::BrocaLite;
 #[cfg(feature = "broca-pipeline")]
 use crate::broca_pipeline::BrocaPipeline;
+use crate::causal::CausalDiscovery;
 use crate::config::SporeConfig;
 use crate::dream::DreamEngine;
 use crate::dream_journal::DreamJournal;
 use crate::fep::{ActiveInferenceAgent, FepCycleResult};
+use crate::immune::ImmuneSystem;
 use crate::memory::MemoryCoordinator;
+use crate::reasoning::ReasoningEngine;
 use crate::topology::TopologyAnalyzer;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -358,6 +361,11 @@ pub struct SporeEngine {
     /// Recent CfC hidden state trajectory for fractal dimension computation.
     /// Each entry is first 2 dimensions of the hidden state. Ring buffer, max 100.
     state_trajectory: Vec<[f32; 2]>,
+
+    // Phase 6-8: Reasoning, Immune, Causal subsystems
+    reasoning: ReasoningEngine,
+    immune: ImmuneSystem,
+    causal: CausalDiscovery,
 }
 
 impl SporeEngine {
@@ -454,11 +462,37 @@ impl SporeEngine {
             storage: None,
             checkpoint_interval: 0,
             state_trajectory: Vec::with_capacity(100),
+            reasoning: ReasoningEngine::new(),
+            immune: ImmuneSystem::new(),
+            causal: CausalDiscovery::new(),
         }
     }
 
     /// Run a single consciousness cycle with text input.
     pub fn cycle(&mut self, input: &str) -> CycleResult {
+        // Immune pre-check: assess input before processing.
+        let threat = self.immune.assess(input);
+
+        // If Red-level threat: return minimal result without processing.
+        if threat.safety_level == crate::immune::SafetyLevel::Red {
+            self.cycle_count += 1;
+            return CycleResult {
+                consciousness_level: 0.0,
+                cycle: self.cycle_count,
+                neuromodulators: [
+                    self.bath.dopamine.effective(),
+                    self.bath.noradrenaline.effective(),
+                    self.bath.serotonin.effective(),
+                    self.bath.oxytocin.effective(),
+                ],
+                substrate_feasibility: self.substrate_feasibility as f32,
+                prediction_error: 0.0,
+                bottleneck: "immune_halt".into(),
+                epistemic_status: self.build_epistemic_status(),
+                harmony_alignment: 0.0,
+            };
+        }
+
         let encoded = self
             .text_encoder
             .encode_sentence(input)
@@ -466,7 +500,10 @@ impl SporeEngine {
         let floats: Vec<f32> = encoded.iter().map(|&x| x as f32).collect();
         let input_hv = ContinuousHV::from_vec(floats);
 
-        self.cycle_inner(input_hv)
+        // Apply immune defense to learning rate modulation
+        let lr_factor = threat.recommended_action.learning_rate_factor();
+
+        self.cycle_inner_with_context(input_hv, Some(input), lr_factor)
     }
 
     /// Run a single consciousness cycle with a raw hypervector input.
@@ -480,7 +517,7 @@ impl SporeEngine {
             ContinuousHV::from_vec(padded)
         };
 
-        self.cycle_inner(input_hv)
+        self.cycle_inner_with_context(input_hv, None, 1.0)
     }
 
     /// Inner cycle: evolve network, compute consciousness, update neuromodulators,
@@ -488,7 +525,12 @@ impl SporeEngine {
     ///
     /// This is the pure consciousness kernel — mobile embodiment (sensors, haptics,
     /// metabolism, BLE mesh) is handled by SomaEngine in `symthaea-soma`.
-    fn cycle_inner(&mut self, input_hv: ContinuousHV) -> CycleResult {
+    fn cycle_inner_with_context(
+        &mut self,
+        input_hv: ContinuousHV,
+        input_text: Option<&str>,
+        lr_factor: f32,
+    ) -> CycleResult {
         self.cycle_count += 1;
 
         // Default to Alert rate (20Hz) — SomaEngine controls actual frequency via metabolism
@@ -527,12 +569,13 @@ impl SporeEngine {
         self.bath.oxytocin.reuptake();
 
         // PE-driven production (no manual decay — reuptake handles that).
+        // Immune lr_factor attenuates production under threat conditions.
         // DA: reward prediction error (Schultz 1997)
-        self.bath.dopamine.produce(prediction_error * 0.08);
+        self.bath.dopamine.produce(prediction_error * 0.08 * lr_factor);
         // NE: arousal/alertness from surprise (Aston-Jones & Cohen 2005)
-        self.bath.noradrenaline.produce(prediction_error * 0.10);
+        self.bath.noradrenaline.produce(prediction_error * 0.10 * lr_factor);
         // 5-HT: contentment from low surprise (Dayan & Huys 2009)
-        self.bath.serotonin.produce((1.0 - prediction_error) * 0.04);
+        self.bath.serotonin.produce((1.0 - prediction_error) * 0.04 * lr_factor);
         // OT: baseline social presence — doesn't require BLE peers
         self.bath.oxytocin.produce(0.003);
 
@@ -659,6 +702,28 @@ impl SporeEngine {
             }
             _ => {}
         }
+
+        // Reasoning: run 7-step cycle after consciousness measurement.
+        // Only runs when we have text input (not raw HV cycles).
+        if let Some(text) = input_text {
+            let _reasoning_result = self.reasoning.run(
+                text,
+                consciousness_level,
+                prediction_error,
+                &neuromods,
+                harmony_alignment,
+            );
+        }
+
+        // Causal discovery: observe post-cycle metrics, update graph.
+        self.causal.observe(&[
+            ("consciousness", consciousness_level as f64),
+            ("prediction_error", prediction_error as f64),
+            ("dopamine", neuromods[0] as f64),
+            ("norepinephrine", neuromods[1] as f64),
+            ("serotonin", neuromods[2] as f64),
+            ("harmony", harmony_alignment as f64),
+        ]);
 
         // Auto-checkpoint
         if self.checkpoint_interval > 0 && self.cycle_count % self.checkpoint_interval == 0 {
@@ -1949,8 +2014,39 @@ impl SporeEngine {
             "oxytocin": self.bath.oxytocin.effective(),
             "acetylcholine": self.bath.acetylcholine.effective(),
             "gaba": self.bath.gaba.effective(),
+            "glutamate": self.bath.glutamate.effective(),
+            "adenosine": self.bath.adenosine.effective(),
+            "endocannabinoid": self.bath.endocannabinoid.effective(),
         })
         .to_string()
+    }
+
+    /// Run a standalone reasoning cycle on the given input.
+    /// Returns the full 7-step ReasoningCycle result.
+    pub fn reasoning_cycle(&mut self, input: &str) -> crate::reasoning::ReasoningCycle {
+        let neuromods = [
+            self.bath.dopamine.effective(),
+            self.bath.noradrenaline.effective(),
+            self.bath.serotonin.effective(),
+            self.bath.oxytocin.effective(),
+        ];
+        let harmony = self.evaluate_harmony_alignment(self.last_consciousness);
+        self.reasoning.run(input, self.last_consciousness, 0.0, &neuromods, harmony)
+    }
+
+    /// Assess an input for threats. Returns ThreatAssessment.
+    pub fn threat_assessment(&mut self, input: &str) -> crate::immune::ThreatAssessment {
+        self.immune.assess(input)
+    }
+
+    /// Get the current causal graph.
+    pub fn causal_graph(&self) -> &crate::causal::CausalGraph {
+        self.causal.graph()
+    }
+
+    /// Current safety level as a string.
+    pub fn safety_level(&self) -> &'static str {
+        self.immune.safety_level().as_str()
     }
 
     /// Get substrate feasibility score.

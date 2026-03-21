@@ -86,7 +86,10 @@ impl AlternateUsesBenchmark {
         // produce 12+ uses (Silvia et al., 2008). With the ~14% acceptance rate
         // from the semantic plausibility filter, 75 attempts models persistent
         // associative search — near the 75th percentile of fluency distributions.
-        let max_attempts = 75;
+        // Lapse_rate reduces search persistence — models premature search
+        // termination under attentional lapses (Beaty et al., 2014).
+        let lapse_attempt_penalty = (config.lapse_rate * 25.0) as usize; // up to -6 attempts
+        let max_attempts = 75 - lapse_attempt_penalty;
         let mut accepted_uses = Vec::new();
         let mut use_sims = Vec::new(); // similarity of each use to object (for originality)
 
@@ -125,8 +128,13 @@ impl AlternateUsesBenchmark {
             // constraint: uses must be functionally grounded (Silvia et al., 2008).
             // Time pressure: -0.02/unit lowers minimum originality, +0.10/unit raises max similarity;
             // models relaxed quality criteria under deadline (Silvia et al., 2008; Beaty et al., 2014 AUT).
-            let lower_bound = (0.04 - config.time_pressure * 0.02) as f32;
-            let upper_bound = (0.62 + config.time_pressure * 0.10) as f32;
+            //
+            // Lapse_rate narrows the acceptance band, modeling reduced associative
+            // fluency under attentional lapses (Zabelina & Robinson, 2010). Higher
+            // lapse = stricter lower bound + looser upper bound = fewer accepted uses.
+            let lapse_band_shrink = config.lapse_rate * 0.08; // up to 2% band narrowing
+            let lower_bound = (0.04 - config.time_pressure * 0.02 + lapse_band_shrink) as f32;
+            let upper_bound = (0.62 + config.time_pressure * 0.10 - lapse_band_shrink * 0.5) as f32;
             attempts_since_last += 1;
             if sim > lower_bound && sim < upper_bound {
                 accepted_uses.push(use_hv);

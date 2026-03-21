@@ -59,6 +59,10 @@ pub mod topology;
 pub mod hardware_probe;
 pub mod neuroevolution;
 
+pub mod causal;
+pub mod immune;
+pub mod reasoning;
+
 #[cfg(feature = "wasm")]
 pub mod quickening;
 

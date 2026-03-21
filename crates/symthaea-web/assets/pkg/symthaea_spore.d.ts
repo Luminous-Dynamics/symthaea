@@ -2,56 +2,6 @@
 /* eslint-disable */
 
 /**
- * Sovereign Birth ceremony state machine.
- *
- * Tracks progress through the Inoculation phases, accumulating narration
- * and awakening Harmony tones as each subsystem installs.
- */
-export class InoculationOrchestrator {
-    free(): void;
-    [Symbol.dispose](): void;
-    /**
-     * Get the Harmony tones array as JSON.
-     */
-    harmony_tones(): any;
-    /**
-     * Advance to the next phase. Takes a JSON object with:
-     * - `phase` (string): phase name (e.g. "TrustVerification", "StorePopulation")
-     * - `subsystem` (string, optional): for StorePopulation, the subsystem name
-     * - `elapsed` (number): elapsed seconds since ceremony start
-     * - `context` (object, optional): template variables for narration
-     *
-     * Returns a `PhaseAdvanceResult` with narration, haptic, tone, and state.
-     */
-    inoculation_advance(phase_data: any): any;
-    /**
-     * Get narration for a specific phase without advancing state.
-     *
-     * `phase` is the phase name string, `context` is a JSON object of template variables.
-     */
-    inoculation_narrate(phase: string, context: any): string;
-    /**
-     * Get the current InoculationState as a JSON object.
-     *
-     * Returns: `{ current_phase, phases_completed, harmonies_awakened,
-     *             consciousness_level, elapsed_seconds, narration_history }`
-     */
-    inoculation_state(): any;
-    /**
-     * Whether the ceremony is complete.
-     */
-    is_complete(): boolean;
-    /**
-     * Create a new Inoculation orchestrator at the start of the ceremony.
-     */
-    constructor();
-    /**
-     * Current progress fraction (0.0 to 1.0).
-     */
-    progress(): number;
-}
-
-/**
  * WASM-exported Spore consciousness engine.
  */
 export class SporeEngine {
@@ -69,6 +19,18 @@ export class SporeEngine {
      */
     anesthesia_experiment(warmup_cycles: number, suppression_cycles: number, recovery_cycles: number): any;
     /**
+     * Check if the full Broca pipeline is loaded and ready.
+     *
+     * Returns false if the `broca-pipeline` feature is not enabled or no
+     * checkpoint has been loaded.
+     */
+    broca_pipeline_ready(): boolean;
+    /**
+     * Get the current causal graph as a JS object.
+     * Returns { edges: [...], variables: [...] }.
+     */
+    causal_graph(): any;
+    /**
      * Find the consciousness collapse threshold. Returns CollapseThresholdResult as JS object.
      *
      * Systematically degrades the network and finds the point where consciousness
@@ -83,6 +45,12 @@ export class SporeEngine {
      * Human-readable consciousness report with epistemic disclaimers.
      */
     consciousness_report(): string;
+    /**
+     * Conversation context statistics: turn count, topic coherence, recent consciousness avg.
+     *
+     * Returns `{ turn_count, topic_coherence, recent_consciousness_avg }`.
+     */
+    conversation_stats(): any;
     /**
      * Run a consciousness cycle with text input. Returns CycleResult as JS object.
      */
@@ -130,12 +98,6 @@ export class SporeEngine {
      */
     generate_text(max_tokens: number): any;
     /**
-     * Generate text from current consciousness state, aware of user input.
-     * The user's input is encoded as intent signals so generation relates to what was said.
-     * Returns GenerationResult as JS object with `text`, `num_tokens`, `eos_terminated`.
-     */
-    generate_text_with_input(input: string, max_tokens: number): any;
-    /**
      * Get the current network output hypervector (16,384 f32 values).
      * Used for live waveform visualization in the browser demo.
      */
@@ -152,6 +114,25 @@ export class SporeEngine {
      * Inject neuromodulator impulse.
      */
     inject_neuromodulator(name: string, amount: number): void;
+    /**
+     * Load trained Broca checkpoint weights from a binary buffer.
+     *
+     * The checkpoint file (broca-spore-v1.bin) contains trained token embeddings,
+     * position embeddings, and gate weights. After loading, the autoregressive
+     * generation path produces coherent language at consciousness levels >= 0.15.
+     */
+    load_broca_checkpoint(data: Uint8Array): void;
+    /**
+     * Load a full Broca pipeline checkpoint (symthaea-broca format).
+     *
+     * Requires `broca-pipeline` feature. After loading, `generate_text()` uses
+     * the production HdcLtcUnifiedNetwork + epistemic gating + semantic veto
+     * pipeline instead of BrocaLite.
+     *
+     * Pass the distilled checkpoint (broca-spore-distilled.bin, ~130MB) for
+     * browser deployment, not the full v6-joint checkpoint (~976MB).
+     */
+    load_broca_pipeline_checkpoint(data: Uint8Array): void;
     /**
      * Compute Perturbational Complexity Index (PCI). Returns PciResult as JS object.
      *
@@ -173,10 +154,14 @@ export class SporeEngine {
      */
     constructor(config: any);
     /**
-     * Select the most resonant glyph for the current consciousness state and user input.
-     * Returns JS object with `glyph_id` (string) and `echo_phrase` (string).
+     * Run a 7-step reasoning cycle on the given input.
+     * Returns the full ReasoningCycle trace as a JS object.
      */
-    select_glyph(input: string): any;
+    reasoning_cycle(input: string): any;
+    /**
+     * Current safety level as a string ("Green", "Yellow", "Orange", "Red").
+     */
+    safety_level(): string;
     /**
      * Switch substrate type.
      */
@@ -193,6 +178,10 @@ export class SporeEngine {
      */
     substrate_feasibility(): number;
     /**
+     * Assess an input for threats. Returns ThreatAssessment as JS object.
+     */
+    threat_assessment(input: string): any;
+    /**
      * Analyze consciousness topology. Returns TopologyAnalysis.
      */
     topology_analysis(): any;
@@ -203,44 +192,39 @@ export class SporeEngine {
 }
 
 /**
- * Probe hardware capabilities and generate NixOS configuration.
- *
- * Takes browser-collected hardware data as a JS object (camelCase fields matching
- * `HardwareProfile`) and returns a `ProbeResult` containing the parsed profile
- * plus NixOS hardware configuration recommendations.
- *
- * # JS usage
- * ```js
- * const result = probe_hardware({
- *   cpuCores: navigator.hardwareConcurrency,
- *   deviceMemoryGb: navigator.deviceMemory || 0,
- *   hasWebgpu: !!navigator.gpu,
- *   // ... etc
- * });
- * console.log(result.nixConfig.nixHardwareConfig);
- * ```
+ * Generate disko disk configuration from hardware probe.
  */
-export function probe_hardware(js_data: any): any;
+export function generate_disko_config(hardware_json: string): string;
+
+/**
+ * Generate a complete NixOS flake.nix from hardware probe results.
+ *
+ * Takes the hardware profile JSON from the browser probe and returns
+ * a full flake.nix string suitable for `nixos-install`.
+ */
+export function generate_flake(hardware_json: string, path: string, hostname: string): string;
+
+/**
+ * Generate hardware-configuration.nix from probe results.
+ */
+export function generate_hardware_nix(hardware_json: string): string;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
-    readonly __wbg_inoculationorchestrator_free: (a: number, b: number) => void;
     readonly __wbg_sporeengine_free: (a: number, b: number) => void;
-    readonly inoculationorchestrator_harmony_tones: (a: number, b: number) => void;
-    readonly inoculationorchestrator_inoculation_advance: (a: number, b: number, c: number) => void;
-    readonly inoculationorchestrator_inoculation_narrate: (a: number, b: number, c: number, d: number, e: number) => void;
-    readonly inoculationorchestrator_inoculation_state: (a: number, b: number) => void;
-    readonly inoculationorchestrator_is_complete: (a: number) => number;
-    readonly inoculationorchestrator_new: () => number;
-    readonly inoculationorchestrator_progress: (a: number) => number;
-    readonly probe_hardware: (a: number, b: number) => void;
+    readonly generate_disko_config: (a: number, b: number, c: number) => void;
+    readonly generate_flake: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
+    readonly generate_hardware_nix: (a: number, b: number, c: number) => void;
     readonly sporeengine_active_instance_count: () => number;
     readonly sporeengine_anesthesia_experiment: (a: number, b: number, c: number, d: number, e: number) => void;
+    readonly sporeengine_broca_pipeline_ready: (a: number) => number;
+    readonly sporeengine_causal_graph: (a: number, b: number) => void;
     readonly sporeengine_collapse_threshold_experiment: (a: number, b: number, c: number, d: number) => void;
     readonly sporeengine_consciousness_level: (a: number) => number;
     readonly sporeengine_consciousness_report: (a: number, b: number) => void;
+    readonly sporeengine_conversation_stats: (a: number, b: number) => void;
     readonly sporeengine_cycle: (a: number, b: number, c: number, d: number) => void;
     readonly sporeengine_cycle_count: (a: number) => bigint;
     readonly sporeengine_cycle_hv: (a: number, b: number, c: number, d: number) => void;
@@ -252,19 +236,22 @@ export interface InitOutput {
     readonly sporeengine_fep_cycle: (a: number, b: number) => void;
     readonly sporeengine_free_energy: (a: number) => number;
     readonly sporeengine_generate_text: (a: number, b: number, c: number) => void;
-    readonly sporeengine_generate_text_with_input: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly sporeengine_get_output_hv: (a: number, b: number) => void;
     readonly sporeengine_harmony_alignment: (a: number) => number;
     readonly sporeengine_honest_confidence: (a: number) => number;
     readonly sporeengine_inject_neuromodulator: (a: number, b: number, c: number, d: number) => void;
+    readonly sporeengine_load_broca_checkpoint: (a: number, b: number, c: number, d: number) => void;
+    readonly sporeengine_load_broca_pipeline_checkpoint: (a: number, b: number, c: number, d: number) => void;
     readonly sporeengine_measure_pci: (a: number, b: number, c: number, d: number) => void;
     readonly sporeengine_memory_stats: (a: number, b: number) => void;
     readonly sporeengine_neuromod_state: (a: number, b: number) => void;
     readonly sporeengine_new: (a: number, b: number) => void;
-    readonly sporeengine_select_glyph: (a: number, b: number, c: number, d: number) => void;
+    readonly sporeengine_reasoning_cycle: (a: number, b: number, c: number, d: number) => void;
+    readonly sporeengine_safety_level: (a: number, b: number) => void;
     readonly sporeengine_set_substrate: (a: number, b: number, c: number) => void;
     readonly sporeengine_split_brain_experiment: (a: number, b: number, c: number) => void;
     readonly sporeengine_substrate_feasibility: (a: number) => number;
+    readonly sporeengine_threat_assessment: (a: number, b: number, c: number, d: number) => void;
     readonly sporeengine_topology_analysis: (a: number, b: number) => void;
     readonly sporeengine_topology_report: (a: number, b: number) => void;
     readonly __wbindgen_export: (a: number, b: number) => number;

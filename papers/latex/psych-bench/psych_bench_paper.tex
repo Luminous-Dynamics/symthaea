@@ -702,10 +702,10 @@ where $\lambda$ is the accuracy asymptote, $\beta$ is the approach rate (how qui
 % --- Figure 5: SAT Curves (loaded from per-benchmark CSVs) ---
 \begin{figure}[t]
 \centering
-\pgfplotstableread[col sep=comma]{../data/psych_bench/sat_stroop.csv}\satstroop
-\pgfplotstableread[col sep=comma]{../data/psych_bench/sat_flanker.csv}\satflanker
-\pgfplotstableread[col sep=comma]{../data/psych_bench/sat_visualsearch.csv}\satvisualsearch
-\pgfplotstableread[col sep=comma]{../data/psych_bench/sat_arcfluid.csv}\satarcfluid
+\pgfplotstableread[col sep=comma]{../../data/psych_bench/sat_stroop.csv}\satstroop
+\pgfplotstableread[col sep=comma]{../../data/psych_bench/sat_flanker.csv}\satflanker
+\pgfplotstableread[col sep=comma]{../../data/psych_bench/sat_visualsearch.csv}\satvisualsearch
+\pgfplotstableread[col sep=comma]{../../data/psych_bench/sat_arcfluid.csv}\satarcfluid
 \begin{tikzpicture}
 \begin{axis}[
     width=0.9\textwidth, height=6cm,
@@ -766,7 +766,7 @@ We demonstrate \psychbench{} on the \symthaea{} Holographic Liquid Brain, a cogn
 % --- Figure 6: Cognitive Profile Radar (loaded from CSV) ---
 \begin{figure}[t]
 \centering
-\pgfplotstableread[col sep=comma]{../data/psych_bench/cognitive_profile.csv}\cogprofile
+\pgfplotstableread[col sep=comma]{../../data/psych_bench/cognitive_profile.csv}\cogprofile
 % Extract scores into macros (CSV rows are alphabetically sorted by domain)
 \pgfplotstablegetelem{0}{score}\of\cogprofile \let\scoreAttention\pgfplotsretval
 \pgfplotstablegetelem{1}{score}\of\cogprofile \let\scoreExecutive\pgfplotsretval
@@ -856,7 +856,7 @@ We demonstrate \psychbench{} on the \symthaea{} Holographic Liquid Brain, a cogn
 % --- Figure 7: Forest Plot (loaded from CSV) ---
 \begin{figure}[p]
 \centering
-\pgfplotstableread[col sep=comma]{../data/psych_bench/normative_zscores.csv}\normdata
+\pgfplotstableread[col sep=comma]{../../data/psych_bench/normative_zscores.csv}\normdata
 \begin{tikzpicture}
 \begin{axis}[
     width=0.85\textwidth, height=18cm,
@@ -910,7 +910,7 @@ We demonstrate \psychbench{} on the \symthaea{} Holographic Liquid Brain, a cogn
 % --- Figure 8: Ablation Results (loaded from CSV) ---
 \begin{figure}[t]
 \centering
-\pgfplotstableread[col sep=comma]{../data/psych_bench/ablation_domains.csv}\abldata
+\pgfplotstableread[col sep=comma]{../../data/psych_bench/ablation_domains.csv}\abldata
 \begin{tikzpicture}
 \begin{axis}[
     width=\textwidth, height=7cm,
@@ -918,7 +918,7 @@ We demonstrate \psychbench{} on the \symthaea{} Holographic Liquid Brain, a cogn
     bar width=4pt,
     ylabel={Domain Score (0--1)},
     ymin=0, ymax=1.05,
-    symbolic x coords={Attention,Executive,Language,Memory,Metacognition,Motor,Reasoning,Social},
+    symbolic x coords={Affect,Attention,Binding,Butlin,CausalReasoning,Clinical,CogBench,Consciousness,Creativity,Executive,Inhibition,InstitutionalReasoning,Language,Mathematics,MemoryAgent,Metacognition,Motor,Reasoning,Security,Social,Spatial,Speech,Substrate,SustainedAttention,ToMBench,WorM},
     xtick=data,
     x tick label style={rotate=30, anchor=east, font=\scriptsize},
     y tick label style={font=\scriptsize},

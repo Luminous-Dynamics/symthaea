@@ -21,7 +21,7 @@ use symthaea_psych_bench::benchmarks::{
         TemporalDiscountingBenchmark, TwoStepBenchmark,
     },
     consciousness::{BinocularRivalryBenchmark, BlindSightBenchmark, PerceptualCrowdingBenchmark},
-    creativity::{AlternateUsesBenchmark, DivergentThinkingBenchmark, RemoteAssociatesBenchmark},
+    creativity::{AlternateUsesBenchmark, ConceptualBlendingBenchmark, DivergentThinkingBenchmark, RemoteAssociatesBenchmark},
     executive::{
         DualTaskBenchmark, FlankerBenchmark, IowaGamblingBenchmark,
         RavensProgressiveMatricesBenchmark, StroopBenchmark, TowerOfLondonBenchmark,
@@ -166,6 +166,7 @@ fn full_battery_report() {
     report.add(RemoteAssociatesBenchmark.run(&config));
     report.add(AlternateUsesBenchmark.run(&config));
     report.add(DivergentThinkingBenchmark.run(&config));
+    report.add(ConceptualBlendingBenchmark.run(&config));
 
     // ── Butlin Consciousness Indicators ──
     report.add(ButlinIndicatorSuite.run(&config));
@@ -410,6 +411,7 @@ fn regression_against_baseline() {
     report.add(RemoteAssociatesBenchmark.run(&config));
     report.add(AlternateUsesBenchmark.run(&config));
     report.add(DivergentThinkingBenchmark.run(&config));
+    report.add(ConceptualBlendingBenchmark.run(&config));
     report.add(ButlinIndicatorSuite.run(&config));
     report.add(GoNoGoBenchmark.run(&config));
     report.add(StopSignalBenchmark.run(&config));

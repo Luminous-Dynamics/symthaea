@@ -1086,3 +1086,94 @@ pub const PHYSICS_EXPLORE_THRESHOLD: f32 = 0.2;
 /// Exploration boost scale for uncharted physics domain.
 /// Basis: Schmidhuber (2010) — novelty-proportional exploration drive.
 pub const PHYSICS_EXPLORE_SCALE: f32 = 0.5;
+
+// ─── Psi → neuromodulator coupling (Arnsten 2009; Schultz 1997) ─────────────
+
+/// Psi threshold above which dopamine is released (high consciousness → reward).
+/// Basis: Schultz (1997) — DA neurons fire at reward-prediction error.
+pub const PSI_DA_THRESHOLD: f64 = 0.7;
+
+/// Dopamine production scale from psi surplus.
+/// Basis: Schultz (1997) — proportional reward signal.
+pub const PSI_DA_SCALE: f64 = 0.15;
+
+/// Maximum dopamine injection per cycle from psi coupling.
+pub const PSI_DA_CAP: f32 = 0.1;
+
+/// Psi threshold above which serotonin is released (moderate consciousness → wellbeing).
+/// Basis: Arnsten (2009) — 5-HT stabilises prefrontal function.
+pub const PSI_5HT_THRESHOLD: f64 = 0.5;
+
+/// Serotonin production scale from psi surplus.
+pub const PSI_5HT_SCALE: f64 = 0.1;
+
+/// Maximum serotonin injection per cycle from psi coupling.
+pub const PSI_5HT_CAP: f32 = 0.05;
+
+/// Psi threshold below which noradrenaline is released (low consciousness → alerting).
+/// Basis: Arnsten (2009) — NE fires under uncertainty / low arousal.
+pub const PSI_NE_THRESHOLD: f64 = 0.3;
+
+/// Noradrenaline production scale from psi deficit.
+pub const PSI_NE_SCALE: f64 = 0.12;
+
+/// Maximum noradrenaline injection per cycle from psi coupling.
+pub const PSI_NE_CAP: f32 = 0.08;
+
+// ─── Epistemic gate & scale boost ──────────────────────────────────────────
+
+/// Maximum rejection strength when epistemic gate rejects input.
+/// Basis: Friston (2010) — precision-weighted prediction error gating.
+pub const EPISTEMIC_REJECTION_CLAMP_MAX: f32 = 0.5;
+
+/// Micro-phi scale boost dampening factor for substrate bandwidth.
+/// Basis: Tononi (2004) — information integration scales with bandwidth.
+pub const MICRO_PHI_SCALE_BOOST_FACTOR: f64 = 0.5;
+
+// ─── HOT depth default ──────────────────────────────────────────────────────
+
+/// Default higher-order thought depth when metacognition is disabled.
+/// Basis: Lau & Rosenthal (2011) — moderate HOT baseline.
+pub const HOT_DEPTH_DEFAULT: f64 = 0.5;
+
+/// Default CPG sync index when CPG feature is disabled.
+pub const CPG_SYNC_DEFAULT: f64 = 0.5;
+
+// ─── Output phase: anti-monopoly & subsystem flags (Dehaene 2014) ───────────
+
+/// Dominant source concentration threshold for anti-monopoly dampening.
+/// Basis: Dehaene (2014) — GWT prevents single-module monopoly.
+pub const DOMINANT_CONCENTRATION_MONOPOLY_THRESHOLD: f32 = 0.6;
+
+/// Anti-monopoly dampening scale applied to all feedback channels.
+pub const ANTI_MONOPOLY_DAMPEN_SCALE: f64 = 0.97;
+
+/// Adaptive threshold scale lower bound (prevents over-dampening).
+pub const ADAPTIVE_THRESHOLD_SCALE_LOWER: f64 = 0.9;
+
+/// Adaptive threshold scale upper bound (prevents runaway amplification).
+pub const ADAPTIVE_THRESHOLD_SCALE_UPPER: f64 = 1.1;
+
+/// Exploration boost to escape full-dampening spiral.
+pub const FULL_DAMPEN_ESCAPE_EXPLORATION: f32 = 0.02;
+
+/// Substrate tau factor deviation threshold for feedback integration modulation.
+pub const SUBSTRATE_TAU_DEVIATION_THRESHOLD: f32 = 0.05;
+
+/// Minimum tau factor guard to prevent division by zero.
+pub const SUBSTRATE_TAU_FACTOR_MINIMUM: f32 = 0.01;
+
+/// Feedback integration rate lower bound (slow substrates).
+pub const FEEDBACK_INTEGRATION_RATE_LOWER: f32 = 0.5;
+
+/// Urgency escalation arousal boost when ESCALATE_URGENCY flag set.
+pub const URGENCY_ESCALATION_AROUSAL_BOOST: f32 = 0.1;
+
+/// Urgency escalation exploration dampening scale.
+pub const URGENCY_ESCALATION_EXPLORATION_SCALE: f32 = 0.7;
+
+/// Learning rate scale for subsystem rest request.
+pub const SUBSYSTEM_REST_REQUEST_LR_SCALE: f32 = 0.9;
+
+/// Exploration nudge for subsystem exploration request.
+pub const SUBSYSTEM_EXPLORATION_REQUEST_NUDGE: f32 = 0.02;

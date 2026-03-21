@@ -31,7 +31,7 @@ pub struct CanvasTelemetry {
 
 /// Stateful canvas manager — holds the AestheticEngine (EMA state) and last output.
 #[cfg(feature = "canvas")]
-pub struct CanvasManager {
+pub(crate) struct CanvasManager {
     engine: AestheticEngine,
     /// Consciousness threshold below which we skip full scene generation.
     consciousness_threshold: f32,

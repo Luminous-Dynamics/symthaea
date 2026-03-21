@@ -882,3 +882,61 @@ pub const EXPERIENCE_BUFFER_CAPACITY: usize = 1000;
 /// Basis: Sufficient for linear regression slope estimation (compute_error_trend)
 /// while keeping memory bounded.
 pub const ERROR_HISTORY_CAPACITY: usize = 100;
+
+// ─── Knowledge contradiction exploration (Round 22) ─────────────────────────
+
+/// Maximum exploration boost from knowledge contradictions.
+/// Basis: Festinger (1957) — dissonance strength saturates with evidence.
+pub const KNOWLEDGE_ALERT_EXPLORE_CAP: f32 = 0.2;
+
+/// Minimum confidence weight for contradiction alerts.
+/// Basis: Even weak contradictions deserve some exploration weight.
+pub const KNOWLEDGE_CONTRADICTION_FLOOR: f32 = 0.3;
+
+// ─── FEP complexity & surprise modulation ───────────────────────────────────
+
+/// Maximum complexity penalty range above FEP_COMPLEXITY_THRESHOLD.
+/// Basis: Friston (2010) — complexity penalty saturates.
+pub const FEP_COMPLEXITY_PENALTY_CAP: f64 = 0.5;
+
+/// Learning rate scale per unit excess complexity.
+/// Basis: Friston (2010) — gradual LR reduction under high complexity.
+pub const FEP_COMPLEXITY_LR_SCALE: f64 = 0.1;
+
+/// Maximum surprise range for exploration boost.
+/// Basis: Schmidhuber (2010) — exploration signal proportional to surprise.
+pub const FEP_SURPRISE_EXPLORE_CAP: f64 = 0.5;
+
+/// Exploration scale per unit surprise above threshold.
+pub const FEP_SURPRISE_EXPLORE_SCALE: f64 = 0.2;
+
+/// Surprise threshold for exploration boost (relative to reflection).
+pub const FEP_SURPRISE_EXPLORE_SECONDARY_CAP: f64 = 0.05;
+
+/// Surprise exploration secondary scale.
+pub const FEP_SURPRISE_EXPLORE_SECONDARY_SCALE: f64 = 0.1;
+
+// ─── Epistemic attention budget scaling (Gottlieb 2013) ─────────────────────
+
+/// Epistemic uncertainty threshold for attention budget expansion.
+pub const EPISTEMIC_BUDGET_EXPAND_THRESHOLD: f32 = 0.4;
+
+/// Maximum attention budget expansion from epistemic uncertainty.
+pub const EPISTEMIC_BUDGET_EXPAND_CAP: f32 = 0.3;
+
+/// Epistemic uncertainty threshold for attention budget contraction.
+pub const EPISTEMIC_BUDGET_CONTRACT_THRESHOLD: f32 = 0.2;
+
+/// Base scale for contracted attention budget.
+pub const EPISTEMIC_BUDGET_CONTRACT_BASE: f32 = 0.9;
+
+/// Contraction ramp rate per unit epistemic certainty.
+pub const EPISTEMIC_BUDGET_CONTRACT_RAMP: f32 = 0.5;
+
+// ─── Sacred Stillness attention budget ──────────────────────────────────────
+
+/// Sacred Stillness coordinate threshold for attention budget contraction.
+pub const STILLNESS_BUDGET_THRESHOLD: f64 = 0.5;
+
+/// Maximum attention budget contraction from Sacred Stillness.
+pub const STILLNESS_BUDGET_CONTRACT_CAP: f64 = 0.3;

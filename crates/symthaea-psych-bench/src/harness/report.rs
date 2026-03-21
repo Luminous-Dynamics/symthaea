@@ -963,11 +963,7 @@ impl BenchmarkReport {
         }
         if benchmark.contains("RemoteAssociates") {
             push_specific("overall_accuracy", "rat_overall_accuracy", &bl.creativity);
-            push_specific(
-                "mean_solution_rank",
-                "rat_mean_solution_rank",
-                &bl.creativity,
-            );
+            push_specific("mean_solution_rank", "rat_mean_solution_rank", &bl.creativity);
         }
         if benchmark.contains("StrangeStory") {
             push_specific("overall_accuracy", "strange_story_accuracy", &bl.tombench);
@@ -1193,6 +1189,11 @@ impl BenchmarkReport {
         }
         if benchmark.contains("RemoteAssociates") {
             push_specific("rt_ticks", "rat_rt_ticks", &bl.creativity);
+        }
+        if benchmark.contains("ConceptualBlending") {
+            push_specific("blend_quality", "blend_quality", &bl.creativity);
+            push_specific("novelty", "blend_novelty", &bl.creativity);
+            push_specific("coherence", "blend_coherence", &bl.creativity);
         }
         // Stop Signal Task (Inhibition)
         if benchmark.contains("StopSignal") {
@@ -2062,6 +2063,7 @@ pub fn calibration_class_of(benchmark: &str) -> &'static str {
         "RemoteAssociates",
         "AlternateUses",
         "DivergentThinking",
+        "ConceptualBlending",
         "FlankerInhibition",
         "CategoricalPerception",
         "PerceptualCrowding",
@@ -2163,6 +2165,7 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("RemoteAssociates") => "mean_solution_rank",
         b if b.contains("AlternateUses") => "fluency",
         b if b.contains("DivergentThinking") => "originality_score",
+        b if b.contains("ConceptualBlending") => "blend_quality",
         b if b.contains("GoNoGo") => "nogo_accuracy",
         b if b.contains("AttentionalBlink") => "lag3_t2_accuracy",
         b if b.contains("ProspectiveMemory") => "pm_hit_rate",
@@ -3154,6 +3157,7 @@ mod tests {
             Box::new(AlternateUsesBenchmark),
             Box::new(RemoteAssociatesBenchmark),
             Box::new(DivergentThinkingBenchmark),
+            Box::new(ConceptualBlendingBenchmark),
             // Butlin
             Box::new(ButlinIndicatorSuite),
             // Inhibition

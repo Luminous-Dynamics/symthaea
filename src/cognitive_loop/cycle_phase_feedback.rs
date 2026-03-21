@@ -145,6 +145,20 @@ use super::thresholds::{
     UNIFIED_QUALITY_ANOMALY_WEIGHT,
     UNIFIED_QUALITY_HIGH_THRESHOLD,
     UNIFIED_QUALITY_PREDICTION_WEIGHT,
+    // Round 22: psi→neuromod + epistemic gate constants
+    CPG_SYNC_DEFAULT,
+    EPISTEMIC_REJECTION_CLAMP_MAX,
+    HOT_DEPTH_DEFAULT,
+    MICRO_PHI_SCALE_BOOST_FACTOR,
+    PSI_5HT_CAP,
+    PSI_5HT_SCALE,
+    PSI_5HT_THRESHOLD,
+    PSI_DA_CAP,
+    PSI_DA_SCALE,
+    PSI_DA_THRESHOLD,
+    PSI_NE_CAP,
+    PSI_NE_SCALE,
+    PSI_NE_THRESHOLD,
 };
 use super::{CognitiveLoopService, CycleState};
 
@@ -522,7 +536,7 @@ impl CognitiveLoopService {
         // ── Track 5a: Epistemic gate → actual information gating ─────────────
         let mut epistemic_coherence_gated = false;
         if !epistemic_gate_approved {
-            let rejection_strength = (1.0 - epistemic_gate_confidence).clamp(0.0, 0.5);
+            let rejection_strength = (1.0 - epistemic_gate_confidence).clamp(0.0, EPISTEMIC_REJECTION_CLAMP_MAX);
             self.carryover.learning.subsystem_lr_factor *=
                 1.0 - rejection_strength * EPISTEMIC_REJECTION_LR_SCALE;
             self.scale_confidence(
@@ -888,7 +902,7 @@ impl CognitiveLoopService {
                             let normalized_depth = mc.depth() as f64 / 3.0;
                             normalized_depth * self.substrate_manager.hot_capability(&self.config)
                         })
-                        .unwrap_or(0.5); // preserve backward compat when disabled
+                        .unwrap_or(HOT_DEPTH_DEFAULT); // preserve backward compat when disabled
                                          // Hubris attenuates HOT: can't claim deep self-knowledge while
                                          // morally overconfident. 0.7× during hubris, 1.0× otherwise.
                     if self.ethics_engine.last_anomaly_report().moral_hubris {
@@ -1080,7 +1094,7 @@ impl CognitiveLoopService {
                 };
 
                 (
-                    sp.micro_phi * (1.0 + scale_boost * 0.5),
+                    sp.micro_phi * (1.0 + scale_boost * MICRO_PHI_SCALE_BOOST_FACTOR),
                     sp.meso_phi * (1.0 + scale_boost),
                     sp.macro_phi * (1.0 + scale_boost),
                     sp.bottleneck_score,
@@ -1352,16 +1366,16 @@ impl CognitiveLoopService {
         // catecholamine release.
         {
             let psi = self.stats.unified_psi;
-            if psi > 0.7 {
-                let da_signal = ((psi - 0.7) * 0.15).min(0.1) as f32;
+            if psi > PSI_DA_THRESHOLD as f32 {
+                let da_signal = ((psi as f64 - PSI_DA_THRESHOLD) * PSI_DA_SCALE).min(PSI_DA_CAP as f64) as f32;
                 self.neuromod.bath.dopamine.produce(da_signal);
             }
-            if psi > 0.5 {
-                let sht_signal = ((psi - 0.5) * 0.1).min(0.05) as f32;
+            if psi > PSI_5HT_THRESHOLD as f32 {
+                let sht_signal = ((psi as f64 - PSI_5HT_THRESHOLD) * PSI_5HT_SCALE).min(PSI_5HT_CAP as f64) as f32;
                 self.neuromod.bath.serotonin.produce(sht_signal);
             }
-            if psi < 0.3 && psi > 0.0 {
-                let ne_signal = ((0.3 - psi) * 0.12).min(0.08) as f32;
+            if psi < PSI_NE_THRESHOLD as f32 && psi > 0.0 {
+                let ne_signal = ((PSI_NE_THRESHOLD - psi as f64) * PSI_NE_SCALE).min(PSI_NE_CAP as f64) as f32;
                 self.neuromod.bath.noradrenaline.produce(ne_signal);
             }
         }

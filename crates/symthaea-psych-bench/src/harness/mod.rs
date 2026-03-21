@@ -263,6 +263,8 @@ mod tests {
             // Creativity
             Box::new(AlternateUsesBenchmark),
             Box::new(RemoteAssociatesBenchmark),
+            Box::new(DivergentThinkingBenchmark),
+            Box::new(ConceptualBlendingBenchmark),
             // Butlin
             Box::new(ButlinIndicatorSuite),
             // Inhibition

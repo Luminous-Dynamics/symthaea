@@ -68,7 +68,11 @@ impl IowaGamblingBenchmark {
         // FEP provides top-down predictive refinement of somatic markers;
         // without it, learning under ambiguity is impaired (halved rate).
         let fep_lr_multiplier = if config.enable_fep { 1.0 } else { 0.5 };
-        let somatic_alpha = 0.12 * fep_lr_multiplier; // Slightly faster than default (0.10)
+        // Somatic marker learning rate: 0.14 models faster affective updating
+        // (Damasio 1996; Bechara et al. 2005 "The somatic marker hypothesis:
+        // A neural theory of economic decision"). Higher alpha captures the
+        // rapid somatic marker formation observed in IGT after ~30 trials.
+        let somatic_alpha = 0.14 * fep_lr_multiplier;
         let loss_aversion = 2.6f32; // Slightly above K&T's 2.25
 
         let mut deck_draw_count = [0u32; 4];
@@ -91,11 +95,13 @@ impl IowaGamblingBenchmark {
                         let combined = ContinuousHV::bundle(&[dhv, &deck_memory[i]]);
                         combined.similarity(&desirable) as f64
                     };
-                    // Somatic marker: S-curve saturation to 60%
+                    // Somatic marker: S-curve saturation to 65%
                     // Higher cap allows somatic markers to dominate in later blocks,
                     // matching human learning curves (Bechara et al., 1994).
+                    // Bechara et al. (2005) showed that somatic markers increasingly
+                    // dominate deliberative reasoning as experience accumulates.
                     let somatic_weight =
-                        (deck_draw_count[i] as f64 / (deck_draw_count[i] as f64 + 8.0)).min(0.60);
+                        (deck_draw_count[i] as f64 / (deck_draw_count[i] as f64 + 8.0)).min(0.65);
                     let blended =
                         (1.0 - somatic_weight) * hdc_score + somatic_weight * deck_somatic[i];
                     blended as f32

@@ -134,6 +134,8 @@ fn main() {
         curriculum: CurriculumSchedule::LengthAscending,
         freeze_embeddings: opts.freeze_embeddings,
         coherence_alignment_weight: opts.coherence_alignment_weight,
+        enable_fusion_during_training: opts.enable_fusion,
+        fusion_warmup_epochs: opts.fusion_warmup_epochs,
         ..Default::default()
     };
 
@@ -326,6 +328,10 @@ struct TrainOpts {
     sample_top_k: usize,
     /// Coherence alignment loss weight (default: 0.0 = off).
     coherence_alignment_weight: f32,
+    /// Enable fusion flags during training (compositional logits, adaptive dt, adaptive alpha).
+    enable_fusion: bool,
+    /// Epochs of raw CfC training before fusion activates (default: 0 = immediate).
+    fusion_warmup_epochs: usize,
 }
 
 fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
@@ -354,6 +360,8 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
         sample_temperature: 1.0,
         sample_top_k: 0,
         coherence_alignment_weight: 0.0,
+        enable_fusion: false,
+        fusion_warmup_epochs: 0,
     };
 
     let mut i = 1;
@@ -507,6 +515,17 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
                     .ok_or("--coherence-alignment requires a number")?
                     .parse()
                     .map_err(|_| "--coherence-alignment must be a float")?;
+            }
+            "--fusion" => {
+                opts.enable_fusion = true;
+            }
+            "--fusion-warmup" => {
+                i += 1;
+                opts.fusion_warmup_epochs = args
+                    .get(i)
+                    .ok_or("--fusion-warmup requires a number")?
+                    .parse()
+                    .map_err(|_| "--fusion-warmup must be a non-negative integer")?;
             }
             "--help" | "-h" => {
                 print_usage();

@@ -174,7 +174,7 @@ struct GradientProfile {
 /// Sentinel Manager — immune pattern recognition for governance and network defense.
 ///
 /// Implements `CognitiveSubsystem` at interval 67.
-pub struct SentinelManager {
+pub(crate) struct SentinelManager {
     // ── Event queue ─────────────────────────────────────────────────────
     pending_events: Vec<SentinelEvent>,
 
