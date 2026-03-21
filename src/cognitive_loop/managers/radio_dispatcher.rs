@@ -6004,14 +6004,16 @@ mod tests {
         let second = sdr.advance_sweep();
         assert_ne!(first, second, "Consecutive sweeps should advance");
 
-        // Should wrap around
-        for _ in 0..plan_len {
+        // Should wrap around: we've consumed 2 elements (first, second),
+        // so (plan_len - 2) more calls complete the cycle, then the next
+        // call wraps back to plan[0] == first.
+        for _ in 0..(plan_len - 2) {
             sdr.advance_sweep();
         }
         let wrapped = sdr.advance_sweep();
         assert_eq!(
-            wrapped, second,
-            "Should wrap to second frequency after full cycle"
+            wrapped, first,
+            "Should wrap to first frequency after full cycle"
         );
     }
 
