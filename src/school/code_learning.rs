@@ -1430,8 +1430,9 @@ impl CodeLearningEngine {
             }
 
             // Build a minimal ThoughtChannels-like record
+            let channels: Vec<f32> = vec![0.0; 24];
             let record = serde_json::json!({
-                "channels": [0.0f32; 24], // Will be populated by encoder
+                "channels": channels,
                 "target_text": source,
                 "metadata": {
                     "purpose": purpose,

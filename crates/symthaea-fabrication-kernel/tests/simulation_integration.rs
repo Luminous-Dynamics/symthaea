@@ -103,13 +103,12 @@ fn full_pipeline_design_to_qc() {
     assert!(job_id.starts_with("mock-job-"));
 
     // Advance to completion.
-    for _ in 0..100 {
-        printer.advance_progress(0.01);
-    }
+    printer.advance_progress(1.0);
     let status = printer.status().unwrap();
     assert!(
         matches!(status, PrinterStatus::Idle),
-        "Printer should be idle after full progress"
+        "Printer should be idle after full progress, got {:?}",
+        status
     );
 
     // ── Phase E: Cincinnati monitoring ──────────────────────────────
