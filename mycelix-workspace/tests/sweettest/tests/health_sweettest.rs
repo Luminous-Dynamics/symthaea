@@ -464,3 +464,265 @@ async fn test_bridge_health_check() {
         "Health bridge should report at least one domain"
     );
 }
+
+// ============================================================================
+// Tier 2 Mirror Types
+// ============================================================================
+
+// --- Clinical Trials ---
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct TrialEnrollmentInput {
+    trial_id: String,
+    patient_id: String,
+    consent_given: bool,
+    enrollment_date: i64,
+}
+
+// --- FHIR Mapping ---
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct FhirMappingInput {
+    resource_type: String,
+    source_id: String,
+    fhir_json: String,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct FhirMappingResult {
+    mapped: bool,
+    fhir_id: Option<String>,
+}
+
+// --- Clinical Decision Support ---
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct CdsRecommendationInput {
+    patient_id: String,
+    condition: String,
+    current_medications: Vec<String>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct CdsRecommendation {
+    recommendation: String,
+    severity: String,
+    evidence_level: String,
+}
+
+// --- Telehealth ---
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct TelehealthSessionInput {
+    patient_id: String,
+    provider_id: String,
+    session_type: String,
+    scheduled_at: i64,
+}
+
+// --- Nutrition ---
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct NutritionPlanInput {
+    patient_id: String,
+    dietary_restrictions: Vec<String>,
+    caloric_target: u32,
+    notes: String,
+}
+
+// ============================================================================
+// Tests — Tier 2: Clinical Trials
+// ============================================================================
+
+/// Test: Enroll a patient in a clinical trial.
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+#[ignore = "requires compiled health WASM + conductor"]
+async fn test_trials_enrollment() {
+    let dna_path = DnaPaths::health();
+    if !dna_path.exists() {
+        eprintln!("Skipping: health DNA not built at {:?}", dna_path);
+        return;
+    }
+
+    let agents = setup_test_agents(&dna_path, "health", 1).await;
+    let alice = &agents[0];
+
+    let enrollment = TrialEnrollmentInput {
+        trial_id: "TRIAL-2026-001".into(),
+        patient_id: "PAT-001".into(),
+        consent_given: true,
+        enrollment_date: 1711065600,
+    };
+
+    let created: Record = alice
+        .call_zome_fn("trials", "enroll_patient", enrollment)
+        .await;
+
+    let action_hash = created.action_hashed().hash.clone();
+    let retrieved: Record = alice
+        .call_zome_fn("trials", "get_enrollment", action_hash)
+        .await;
+
+    assert_eq!(
+        retrieved.action_hashed().hash,
+        created.action_hashed().hash,
+        "Retrieved enrollment should match created enrollment"
+    );
+}
+
+// ============================================================================
+// Tests — Tier 2: FHIR Mapping
+// ============================================================================
+
+/// Test: Map a patient record to FHIR format and retrieve.
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+#[ignore = "requires compiled health WASM + conductor"]
+async fn test_fhir_mapping_roundtrip() {
+    let dna_path = DnaPaths::health();
+    if !dna_path.exists() {
+        eprintln!("Skipping: health DNA not built at {:?}", dna_path);
+        return;
+    }
+
+    let agents = setup_test_agents(&dna_path, "health", 1).await;
+    let alice = &agents[0];
+
+    let mapping = FhirMappingInput {
+        resource_type: "Patient".into(),
+        source_id: "PAT-001".into(),
+        fhir_json: r#"{"resourceType":"Patient","name":[{"given":["Alice"],"family":"Test"}]}"#
+            .into(),
+    };
+
+    let result: FhirMappingResult = alice
+        .call_zome_fn("fhir_mapping", "create_mapping", mapping)
+        .await;
+
+    assert!(result.mapped, "FHIR mapping should succeed");
+    assert!(
+        result.fhir_id.is_some(),
+        "FHIR mapping should return a FHIR ID"
+    );
+}
+
+// ============================================================================
+// Tests — Tier 2: Clinical Decision Support
+// ============================================================================
+
+/// Test: Get a CDS recommendation for a patient condition.
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+#[ignore = "requires compiled health WASM + conductor"]
+async fn test_cds_recommendation() {
+    let dna_path = DnaPaths::health();
+    if !dna_path.exists() {
+        eprintln!("Skipping: health DNA not built at {:?}", dna_path);
+        return;
+    }
+
+    let agents = setup_test_agents(&dna_path, "health", 1).await;
+    let alice = &agents[0];
+
+    let input = CdsRecommendationInput {
+        patient_id: "PAT-001".into(),
+        condition: "hypertension".into(),
+        current_medications: vec!["lisinopril".into()],
+    };
+
+    let rec: CdsRecommendation = alice
+        .call_zome_fn("cds", "get_recommendation", input)
+        .await;
+
+    assert!(
+        !rec.recommendation.is_empty(),
+        "CDS should return a non-empty recommendation"
+    );
+    assert!(
+        !rec.evidence_level.is_empty(),
+        "CDS should specify evidence level"
+    );
+}
+
+// ============================================================================
+// Tests — Tier 2: Telehealth
+// ============================================================================
+
+/// Test: Create and retrieve a telehealth session.
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+#[ignore = "requires compiled health WASM + conductor"]
+async fn test_telehealth_session() {
+    let dna_path = DnaPaths::health();
+    if !dna_path.exists() {
+        eprintln!("Skipping: health DNA not built at {:?}", dna_path);
+        return;
+    }
+
+    let agents = setup_test_agents(&dna_path, "health", 1).await;
+    let alice = &agents[0];
+
+    let session = TelehealthSessionInput {
+        patient_id: "PAT-001".into(),
+        provider_id: "PROV-001".into(),
+        session_type: "video".into(),
+        scheduled_at: 1711152000,
+    };
+
+    let created: Record = alice
+        .call_zome_fn("telehealth", "create_session", session)
+        .await;
+
+    let action_hash = created.action_hashed().hash.clone();
+    let retrieved: Record = alice
+        .call_zome_fn("telehealth", "get_session", action_hash)
+        .await;
+
+    assert_eq!(
+        retrieved.action_hashed().hash,
+        created.action_hashed().hash,
+        "Retrieved telehealth session should match created session"
+    );
+}
+
+// ============================================================================
+// Tests — Tier 2: Nutrition
+// ============================================================================
+
+/// Test: Create and retrieve a nutrition plan.
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+#[ignore = "requires compiled health WASM + conductor"]
+async fn test_nutrition_plan() {
+    let dna_path = DnaPaths::health();
+    if !dna_path.exists() {
+        eprintln!("Skipping: health DNA not built at {:?}", dna_path);
+        return;
+    }
+
+    let agents = setup_test_agents(&dna_path, "health", 1).await;
+    let alice = &agents[0];
+
+    let plan = NutritionPlanInput {
+        patient_id: "PAT-001".into(),
+        dietary_restrictions: vec!["gluten-free".into(), "low-sodium".into()],
+        caloric_target: 2000,
+        notes: "Post-surgical recovery diet".into(),
+    };
+
+    let created: Record = alice
+        .call_zome_fn("nutrition", "create_plan", plan)
+        .await;
+
+    let action_hash = created.action_hashed().hash.clone();
+    let retrieved: Record = alice
+        .call_zome_fn("nutrition", "get_plan", action_hash)
+        .await;
+
+    assert_eq!(
+        retrieved.action_hashed().hash,
+        created.action_hashed().hash,
+        "Retrieved nutrition plan should match created plan"
+    );
+}

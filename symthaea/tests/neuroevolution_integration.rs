@@ -1,6 +1,10 @@
 //! Integration tests for the symthaea-neuroevolution crate.
 //!
 //! Verifies the full pipeline: random genomes → evaluate → evolve → fitness improves.
+//!
+//! Requires: `cargo test --features neuroevolution`
+
+#![cfg(feature = "neuroevolution")]
 
 use symthaea_neuroevolution::{
     FepFitnessBridge, FepFitnessConfig, FitnessWeights, NeuralGenome, NeuralOrganism,

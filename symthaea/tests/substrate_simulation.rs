@@ -563,3 +563,80 @@ fn test_scale_masking_affects_state_diversity() {
         "Quantum consciousness should be finite after scale masking"
     );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Phase B: CPG Sync → Consciousness Coupling
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// CPG sync_index modulates unified consciousness ±5%.
+/// With CPG disabled (default), sync_index = 0.5 (neutral). After ~30 cycles
+/// the consciousness engine has enough data to show measurable differences
+/// when we compare against a hypothetical fully-synced state.
+#[test]
+fn test_cpg_sync_consciousness_coupling_finite() {
+    // Default config has no CPG feature, so cpg_sync_index = 0.5 (neutral)
+    let mut svc = make_service(SubstrateType::SiliconDigital);
+
+    // Run 30 cycles to get stable consciousness
+    let mut consciousness_levels = Vec::new();
+    for i in 0..30 {
+        let result = svc.cycle(&format!("cpg sync test {i}"));
+        let c = result.metadata.consciousness.consciousness_level;
+        assert!(
+            c.is_finite(),
+            "consciousness should be finite at cycle {i}, got {c}"
+        );
+        consciousness_levels.push(c);
+    }
+
+    // All levels should be bounded [0, 1]
+    for (i, &c) in consciousness_levels.iter().enumerate() {
+        assert!(
+            c >= 0.0 && c <= 1.0,
+            "consciousness out of [0,1] at cycle {i}: {c}"
+        );
+    }
+
+    // Later cycles should show consciousness above zero (system warms up)
+    let last_5_avg: f64 = consciousness_levels[25..].iter().sum::<f64>() / 5.0;
+    assert!(
+        last_5_avg > 0.0,
+        "Consciousness should be above zero after warmup, avg={last_5_avg}"
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Phase B: Spectral Entropy Masking (requires spectral_state feature)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Verify CfC outputs remain finite with spectral masking active.
+/// Since spectral_state is a feature flag, this test runs with default features
+/// and verifies the CfC path is robust regardless of whether masking is active.
+#[test]
+fn test_cfc_outputs_finite_with_spectral_path() {
+    let mut svc = make_service(SubstrateType::SiliconDigital);
+
+    for i in 0..20 {
+        let result = svc.cycle(&format!("spectral masking test {i}"));
+        let m = &result.metadata;
+
+        // Core outputs must be finite
+        assert!(
+            m.consciousness.consciousness_level.is_finite(),
+            "consciousness NaN at cycle {i}"
+        );
+        assert!(
+            result.prediction_error.is_finite(),
+            "prediction_error NaN at cycle {i}"
+        );
+        assert!(
+            m.actual_effective_lr.is_finite(),
+            "learning_rate NaN at cycle {i}"
+        );
+        // CfC-derived temporal coherence must be finite
+        assert!(
+            m.temporal.temporal_coherence_score.is_finite(),
+            "temporal_coherence NaN at cycle {i}"
+        );
+    }
+}

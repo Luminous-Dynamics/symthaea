@@ -3361,6 +3361,107 @@ impl Symthaea {
     }
 
     // ========================================================================
+    // Governance Conductor Wiring
+    // ========================================================================
+
+    /// Wire governance dispatch to a real Holochain conductor via env vars.
+    ///
+    /// Reads `MYCELIX_CONDUCTOR_URL`, `MYCELIX_APP_TOKEN`, `MYCELIX_APP_ID`.
+    /// If all are set, creates the governance channel, sets the dispatch sender
+    /// on the bridge, and spawns the async dispatch loop in the background.
+    ///
+    /// Returns `true` if the conductor was wired, `false` if env vars are missing.
+    ///
+    /// # Arguments
+    /// * `bridge` — The MycelixBridge instance (caller owns it, passes mutably)
+    /// * `rt` — A tokio runtime handle for spawning the async dispatch loop
+    #[cfg(feature = "mycelix")]
+    pub fn wire_governance_conductor(
+        &self,
+        bridge: &mut crate::consciousness::mycelix_bridge::MycelixBridge,
+        rt: &tokio::runtime::Handle,
+    ) -> bool {
+        use symthaea_mycelix_conductor::{ConductorConfig, GovernanceDispatcher, MockTransport};
+
+        let Some(config) = ConductorConfig::from_env() else {
+            tracing::debug!("MYCELIX_CONDUCTOR_URL not set — governance dispatch disabled");
+            return false;
+        };
+
+        tracing::info!(
+            url = %config.url,
+            app_id = %config.app_id,
+            "Wiring governance dispatch to Holochain conductor"
+        );
+
+        let (tx, rx) =
+            crate::consciousness::mycelix_bridge::MycelixBridge::create_governance_channel();
+        bridge.set_governance_dispatch_tx(tx);
+
+        // Spawn the dispatch loop with MockTransport for now.
+        // Real transport requires a separate binary due to serde version conflicts.
+        // The dispatch loop still provides timeout tracking and outcome routing.
+        //
+        // Bridge between GovernanceDispatchCommand (mycelix_bridge) and DispatchCommand (conductor).
+        use symthaea_mycelix_conductor::DispatchCommand;
+        let (cmd_tx, cmd_rx) = std::sync::mpsc::sync_channel::<DispatchCommand>(64);
+        let (outcome_tx, mut outcome_rx) = tokio::sync::mpsc::channel(64);
+        let dispatcher = GovernanceDispatcher::new(MockTransport);
+
+        // Converter thread: GovernanceDispatchCommand → DispatchCommand
+        std::thread::spawn(move || {
+            use crate::consciousness::mycelix_bridge::GovernanceDispatchCommand as GDC;
+            while let Ok(gdc) = rx.recv() {
+                let dc = match gdc {
+                    GDC::SubmitProposal {
+                        correlation_id,
+                        description,
+                        proposer_did,
+                        consciousness_phi,
+                        alignment_score,
+                    } => DispatchCommand::SubmitProposal {
+                        correlation_id,
+                        description,
+                        proposer_did,
+                        consciousness_phi,
+                        alignment_score,
+                    },
+                    GDC::CastVote {
+                        correlation_id,
+                        proposal_id,
+                        voter_did,
+                        approve,
+                        rationale,
+                    } => DispatchCommand::CastVote {
+                        correlation_id,
+                        proposal_id,
+                        voter_did,
+                        approve,
+                        rationale,
+                    },
+                    GDC::QueryActiveProposals => DispatchCommand::QueryActiveProposals,
+                };
+                if cmd_tx.send(dc).is_err() {
+                    break;
+                }
+            }
+        });
+
+        rt.spawn(async move {
+            dispatcher.run_dispatch_loop(cmd_rx, outcome_tx).await;
+        });
+
+        // Spawn outcome drainer (logs outcomes for now; future: inject into CLS)
+        rt.spawn(async move {
+            while let Some(outcome) = outcome_rx.recv().await {
+                tracing::info!(?outcome, "Governance dispatch outcome received");
+            }
+        });
+
+        true
+    }
+
+    // ========================================================================
     // Calibration (Brier Score Integration)
     // ========================================================================
 

@@ -37,6 +37,8 @@ use super::thresholds::{
     CONSCIOUSNESS_GRADIENT_STABILITY_THRESHOLD,
     CONTEXT_PHI_SCALE_BASE,
     CONTEXT_PHI_SCALE_RANGE,
+    // Round 22: psi→neuromod + epistemic gate constants
+    CPG_SYNC_DEFAULT,
     CROSS_MODAL_BINDING_ALPHA,
     CROSS_MODAL_BINDING_HIGH_SCALE,
     CROSS_MODAL_BINDING_HIGH_THRESHOLD,
@@ -60,6 +62,7 @@ use super::thresholds::{
     EPISTEMIC_CAUTION_SCALE,
     EPISTEMIC_CAUTION_THRESHOLD,
     EPISTEMIC_CONFLICT_EXPLORATION_SCALE,
+    EPISTEMIC_REJECTION_CLAMP_MAX,
     EPISTEMIC_REJECTION_CONFIDENCE_SCALE,
     EPISTEMIC_REJECTION_LR_SCALE,
     EPISTEMIC_TRUST_SCALE,
@@ -75,6 +78,7 @@ use super::thresholds::{
     HARMONIC_INTERFERENCE_FREE_CYCLES,
     HARMONIC_INTERFERENCE_MAX_COUNT,
     HARMONIC_INTERFERENCE_MAX_DAMPEN,
+    HOT_DEPTH_DEFAULT,
     HOT_HUBRIS_CONFIDENCE_DAMPEN,
     KNOWLEDGE_CONTRADICTION_FACTOR_DENOM,
     KNOWLEDGE_REASONING_LOG_SCALE,
@@ -84,6 +88,7 @@ use super::thresholds::{
     LOVE_RESONANCE_LR_FRACTION,
     LOVE_RESONANCE_THRESHOLD,
     LOW_QUALITY_EXPLORATION_DAMPEN,
+    MICRO_PHI_SCALE_BOOST_FACTOR,
     MORAL_SCORE_NORMALIZE_OFFSET,
     MORAL_SCORE_NORMALIZE_SCALE,
     NEUROMOD_ATTENTION_SENSITIVITY_MAX,
@@ -98,6 +103,15 @@ use super::thresholds::{
     PIPELINE_CONSCIOUSNESS_CAUTION_SCALE,
     PIPELINE_CONSCIOUSNESS_RELAX,
     PIPELINE_CONSCIOUSNESS_RELAX_SCALE,
+    PSI_5HT_CAP,
+    PSI_5HT_SCALE,
+    PSI_5HT_THRESHOLD,
+    PSI_DA_CAP,
+    PSI_DA_SCALE,
+    PSI_DA_THRESHOLD,
+    PSI_NE_CAP,
+    PSI_NE_SCALE,
+    PSI_NE_THRESHOLD,
     QUALITY_EMA_DECAY,
     QUALITY_FLOOR_EXPLORATION_ADJUSTMENT,
     QUALITY_HIGH_LR_SCALE,
@@ -145,20 +159,6 @@ use super::thresholds::{
     UNIFIED_QUALITY_ANOMALY_WEIGHT,
     UNIFIED_QUALITY_HIGH_THRESHOLD,
     UNIFIED_QUALITY_PREDICTION_WEIGHT,
-    // Round 22: psi→neuromod + epistemic gate constants
-    CPG_SYNC_DEFAULT,
-    EPISTEMIC_REJECTION_CLAMP_MAX,
-    HOT_DEPTH_DEFAULT,
-    MICRO_PHI_SCALE_BOOST_FACTOR,
-    PSI_5HT_CAP,
-    PSI_5HT_SCALE,
-    PSI_5HT_THRESHOLD,
-    PSI_DA_CAP,
-    PSI_DA_SCALE,
-    PSI_DA_THRESHOLD,
-    PSI_NE_CAP,
-    PSI_NE_SCALE,
-    PSI_NE_THRESHOLD,
 };
 use super::{CognitiveLoopService, CycleState};
 
@@ -227,7 +227,8 @@ impl CognitiveLoopService {
         let context_phi_weight = consciousness_metrics.context_phi_weight;
 
         // ── Phase 18: Context Phi Weight → Unified Psi modulation ────────────
-        let context_phi_applied = context_phi_weight > 0.0 && context_phi_weight != 1.0;
+        let context_phi_applied =
+            context_phi_weight > 0.0 && (context_phi_weight - 1.0).abs() > f64::EPSILON;
         if context_phi_applied {
             let scale =
                 CONTEXT_PHI_SCALE_BASE as f64 + context_phi_weight * CONTEXT_PHI_SCALE_RANGE as f64;
@@ -536,7 +537,8 @@ impl CognitiveLoopService {
         // ── Track 5a: Epistemic gate → actual information gating ─────────────
         let mut epistemic_coherence_gated = false;
         if !epistemic_gate_approved {
-            let rejection_strength = (1.0 - epistemic_gate_confidence).clamp(0.0, EPISTEMIC_REJECTION_CLAMP_MAX);
+            let rejection_strength =
+                (1.0 - epistemic_gate_confidence).clamp(0.0, EPISTEMIC_REJECTION_CLAMP_MAX);
             self.carryover.learning.subsystem_lr_factor *=
                 1.0 - rejection_strength * EPISTEMIC_REJECTION_LR_SCALE;
             self.scale_confidence(
@@ -903,8 +905,8 @@ impl CognitiveLoopService {
                             normalized_depth * self.substrate_manager.hot_capability(&self.config)
                         })
                         .unwrap_or(HOT_DEPTH_DEFAULT); // preserve backward compat when disabled
-                                         // Hubris attenuates HOT: can't claim deep self-knowledge while
-                                         // morally overconfident. 0.7× during hubris, 1.0× otherwise.
+                                                       // Hubris attenuates HOT: can't claim deep self-knowledge while
+                                                       // morally overconfident. 0.7× during hubris, 1.0× otherwise.
                     if self.ethics_engine.last_anomaly_report().moral_hubris {
                         raw_hot * HOT_HUBRIS_CONFIDENCE_DAMPEN as f64
                     } else {
@@ -1367,15 +1369,18 @@ impl CognitiveLoopService {
         {
             let psi = self.stats.unified_psi;
             if psi > PSI_DA_THRESHOLD as f32 {
-                let da_signal = ((psi as f64 - PSI_DA_THRESHOLD) * PSI_DA_SCALE).min(PSI_DA_CAP as f64) as f32;
+                let da_signal =
+                    ((psi as f64 - PSI_DA_THRESHOLD) * PSI_DA_SCALE).min(PSI_DA_CAP as f64) as f32;
                 self.neuromod.bath.dopamine.produce(da_signal);
             }
             if psi > PSI_5HT_THRESHOLD as f32 {
-                let sht_signal = ((psi as f64 - PSI_5HT_THRESHOLD) * PSI_5HT_SCALE).min(PSI_5HT_CAP as f64) as f32;
+                let sht_signal = ((psi as f64 - PSI_5HT_THRESHOLD) * PSI_5HT_SCALE)
+                    .min(PSI_5HT_CAP as f64) as f32;
                 self.neuromod.bath.serotonin.produce(sht_signal);
             }
             if psi < PSI_NE_THRESHOLD as f32 && psi > 0.0 {
-                let ne_signal = ((PSI_NE_THRESHOLD - psi as f64) * PSI_NE_SCALE).min(PSI_NE_CAP as f64) as f32;
+                let ne_signal =
+                    ((PSI_NE_THRESHOLD - psi as f64) * PSI_NE_SCALE).min(PSI_NE_CAP as f64) as f32;
                 self.neuromod.bath.noradrenaline.produce(ne_signal);
             }
         }

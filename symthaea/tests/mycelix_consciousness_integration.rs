@@ -34,25 +34,25 @@ fn test_inject_profile_updates_social_metrics() {
     let expected_combined: f32 = (0.25 * 0.8 + 0.25 * 0.6 + 0.30 * 0.9 + 0.20 * 0.5) as f32;
 
     assert!(
-        (m.social.social_trust_current - 0.9).abs() < 1e-5,
+        (m.social_trust_current - 0.9).abs() < 1e-5,
         "social_trust should reflect community=0.9, got {}",
-        m.social.social_trust_current,
+        m.social_trust_current,
     );
     assert!(
-        (m.social.social_cooperation_current - 0.6).abs() < 1e-5,
+        (m.social_cooperation_current - 0.6).abs() < 1e-5,
         "social_cooperation_rate should reflect reputation=0.6, got {}",
-        m.social.social_cooperation_current,
+        m.social_cooperation_current,
     );
     assert!(
-        (m.social.social_prediction_accuracy - 0.8).abs() < 1e-5,
+        (m.social_prediction_accuracy - 0.8).abs() < 1e-5,
         "social_prediction_accuracy should reflect identity=0.8, got {}",
-        m.social.social_prediction_accuracy,
+        m.social_prediction_accuracy,
     );
     assert!(
-        (m.social.social_mean_trust - expected_combined).abs() < 1e-5,
+        (m.social_mean_trust - expected_combined).abs() < 1e-5,
         "social_mean_trust should reflect combined_score={}, got {}",
         expected_combined,
-        m.social.social_mean_trust,
+        m.social_mean_trust,
     );
 }
 
@@ -126,44 +126,44 @@ fn test_out_of_range_values_clamp() {
 
     // community=1.5 → social_trust clamped to 1.0
     assert!(
-        m.social.social_trust_current >= 0.0 && m.social.social_trust_current <= 1.0,
+        m.social_trust_current >= 0.0 && m.social_trust_current <= 1.0,
         "social_trust must be in [0,1], got {}",
-        m.social.social_trust_current,
+        m.social_trust_current,
     );
     // reputation=-1.0 → social_cooperation_rate clamped to 0.0
     assert!(
-        m.social.social_cooperation_current >= 0.0 && m.social.social_cooperation_current <= 1.0,
+        m.social_cooperation_current >= 0.0 && m.social_cooperation_current <= 1.0,
         "social_cooperation_rate must be in [0,1], got {}",
-        m.social.social_cooperation_current,
+        m.social_cooperation_current,
     );
     // identity=2.0 → social_prediction_accuracy clamped to 1.0
     assert!(
-        m.social.social_prediction_accuracy >= 0.0 && m.social.social_prediction_accuracy <= 1.0,
+        m.social_prediction_accuracy >= 0.0 && m.social_prediction_accuracy <= 1.0,
         "social_prediction_accuracy must be in [0,1], got {}",
-        m.social.social_prediction_accuracy,
+        m.social_prediction_accuracy,
     );
     // combined_score with out-of-range inputs → clamped to [0,1]
     assert!(
-        m.social.social_mean_trust >= 0.0 && m.social.social_mean_trust <= 1.0,
+        m.social_mean_trust >= 0.0 && m.social_mean_trust <= 1.0,
         "social_mean_trust must be in [0,1], got {}",
-        m.social.social_mean_trust,
+        m.social_mean_trust,
     );
 
     // Verify specific clamped values
     assert!(
-        (m.social.social_trust_current - 1.0).abs() < 1e-5,
+        (m.social_trust_current - 1.0).abs() < 1e-5,
         "community=1.5 should clamp social_trust to 1.0, got {}",
-        m.social.social_trust_current,
+        m.social_trust_current,
     );
     assert!(
-        m.social.social_cooperation_current.abs() < 1e-5,
+        m.social_cooperation_current.abs() < 1e-5,
         "reputation=-1.0 should clamp social_cooperation_rate to 0.0, got {}",
-        m.social.social_cooperation_current,
+        m.social_cooperation_current,
     );
     assert!(
-        (m.social.social_prediction_accuracy - 1.0).abs() < 1e-5,
+        (m.social_prediction_accuracy - 1.0).abs() < 1e-5,
         "identity=2.0 should clamp social_prediction_accuracy to 1.0, got {}",
-        m.social.social_prediction_accuracy,
+        m.social_prediction_accuracy,
     );
 }
 
@@ -179,7 +179,7 @@ fn test_profile_injection_persists_across_cycles() {
     let mut last_trust = 0.0_f32;
     for i in 0..5 {
         let result = service.cycle(&format!("persistence cycle {}", i));
-        last_trust = result.metadata.social.social_trust_current;
+        last_trust = result.metadata.social_trust_current;
     }
 
     assert!(

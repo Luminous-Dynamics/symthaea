@@ -1088,6 +1088,11 @@ pub struct CycleMetadata {
     #[serde(default)]
     pub gwt_perception_broadcasts: u32,
 
+    // ── Cantor Fractal Dream Telemetry ─────────────────────────────────
+    /// Cantor CRHV broadcast buffer, dream consolidation, and codebook metrics.
+    #[serde(default)]
+    pub cantor: CantorTelemetry,
+
     // ── Social Coherence Telemetry ──────────────────────────────────────
     /// Current social trust level (0.0–1.0) from Mind module's SocialCoherence.
     #[serde(default)]
@@ -2322,6 +2327,26 @@ pub struct FeedbackTelemetry {
     pub feedback_trace_exploration: Vec<(String, String)>,
     /// Per-proposal trace for threshold (populated when `trace_feedback = true`).
     pub feedback_trace_threshold: Vec<(String, String)>,
+}
+
+/// Cantor fractal dream subsystem telemetry.
+///
+/// Reports CRHV broadcast buffer state, dream consolidation metrics,
+/// and resonator codebook statistics from the CantorDreamManager.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct CantorTelemetry {
+    /// Number of CRHVs currently in the GWT broadcast buffer (cap 32).
+    pub cantor_buffer_occupancy: u32,
+    /// Smoothed metacognitive depth from dream surprise (0.0-1.0).
+    pub cantor_metacognitive_depth: f64,
+    /// Resonance boost from coherent CRHV pairs (0.0-1.0).
+    pub cantor_resonance_boost: f64,
+    /// Depth histogram: counts of CRHVs at each recursive depth level (6 bins).
+    pub cantor_depth_histogram: [u32; 6],
+    /// EMA of dream consolidation surprise (0.0-1.0).
+    pub cantor_dream_surprise: f64,
+    /// Number of entries in the cleanup engine codebook.
+    pub cantor_codebook_size: u32,
 }
 
 /// Per-module execution timings in microseconds for overhead profiling.

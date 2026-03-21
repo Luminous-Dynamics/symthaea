@@ -14,7 +14,7 @@ use std::fmt;
 
 /// A single proposed change to a feedback variable.
 #[derive(Debug, Clone, Copy)]
-pub(crate) enum FeedbackProposal {
+pub enum FeedbackProposal {
     /// Additive delta: `value += delta`
     Add(f64),
     /// Multiplicative factor: `value *= factor`
@@ -27,7 +27,7 @@ pub(crate) enum FeedbackProposal {
 ///
 /// Higher-priority proposals have more weight in consensus integration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(crate) enum Priority {
+pub enum Priority {
     /// Aesthetic/flow/harmony signals (weight 0.5x)
     Aesthetic = 0,
     /// Default: cognitive signals — binding, reasoning, surprise (weight 1.0x)
@@ -68,7 +68,7 @@ impl Default for Priority {
 
 /// An attributed proposal — who proposed what, at what priority.
 #[derive(Debug, Clone)]
-pub(crate) struct AttributedProposal {
+pub struct AttributedProposal {
     /// Subsystem that made this proposal (static str for zero-alloc attribution)
     pub source: &'static str,
     /// The proposal itself
@@ -88,7 +88,7 @@ pub(crate) struct AttributedProposal {
 ///
 /// Reset at the start of each cycle via `clear()`.
 #[derive(Debug, Clone)]
-pub(crate) struct ProposalCollector {
+pub struct ProposalCollector {
     proposals: Vec<AttributedProposal>,
     /// Cached integration result — invalidated on every `propose()`, lazily
     /// recomputed on `integrate()`. Avoids O(n²) when helpers sync fields.
@@ -154,6 +154,11 @@ impl ProposalCollector {
     /// Number of proposals collected this cycle.
     pub fn len(&self) -> usize {
         self.proposals.len()
+    }
+
+    /// Whether no proposals have been collected.
+    pub fn is_empty(&self) -> bool {
+        self.proposals.is_empty()
     }
 
     /// Clear all proposals (called at cycle start).
@@ -427,7 +432,7 @@ impl Default for ProposalCollector {
 
 /// Result of integrating proposals.
 #[derive(Debug, Clone)]
-pub(crate) struct IntegrationResult {
+pub struct IntegrationResult {
     pub effective: f64,
     pub n_sets: usize,
     pub n_adds: usize,

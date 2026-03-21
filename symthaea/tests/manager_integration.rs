@@ -220,61 +220,62 @@ fn managers_survive_reset() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[test]
-fn phase_timings_populated() {
+fn core_pipeline_timings_populated() {
     let mut svc = create_service();
 
-    let result = svc.cycle("test phase timing instrumentation");
+    let result = svc.cycle("test core pipeline timing instrumentation");
     let t = &result.metadata.module_timings_us;
 
-    // All 4 phase timings should be non-zero
+    // Core pipeline timings should be non-zero (replaced phase_* fields)
     assert!(
-        t.phase_perception > 0,
-        "Phase 1 (perception) timing should be > 0"
+        t.core_hdc_encode > 0,
+        "Core HDC encode timing should be > 0"
+    );
+    assert!(t.core_cfc_step > 0, "Core CfC step timing should be > 0");
+    assert!(
+        t.consciousness_engine > 0,
+        "Consciousness engine timing should be > 0"
     );
     assert!(
-        t.phase_dynamics > 0,
-        "Phase 2 (dynamics) timing should be > 0"
+        t.metadata_assembly > 0,
+        "Metadata assembly timing should be > 0"
     );
-    assert!(
-        t.phase_feedback > 0,
-        "Phase 3 (feedback) timing should be > 0"
-    );
-    assert!(t.phase_output > 0, "Phase 4 (output) timing should be > 0");
 
-    // Sum of phases should approximate total cycle time
-    let phase_sum = t.phase_perception + t.phase_dynamics + t.phase_feedback + t.phase_output;
+    // Sum of core timings should be positive
+    let core_sum =
+        t.core_hdc_encode + t.core_cfc_step + t.consciousness_engine + t.metadata_assembly;
     assert!(
-        phase_sum > 0,
-        "Sum of phase timings should be positive: {phase_sum}"
+        core_sum > 0,
+        "Sum of core pipeline timings should be positive: {core_sum}"
     );
 }
 
 #[test]
-fn phase_timings_stable_across_cycles() {
+fn core_timings_stable_across_cycles() {
     let mut svc = create_service();
 
-    let mut perception_times = Vec::new();
-    let mut dynamics_times = Vec::new();
+    let mut encode_times = Vec::new();
+    let mut cfc_times = Vec::new();
 
     for i in 0..20 {
         let result = svc.cycle(INPUTS[i % INPUTS.len()]);
         let t = &result.metadata.module_timings_us;
-        perception_times.push(t.phase_perception);
-        dynamics_times.push(t.phase_dynamics);
+        encode_times.push(t.core_hdc_encode);
+        cfc_times.push(t.core_cfc_step);
     }
 
     // All timings should be non-zero after warmup
-    for (i, &t) in perception_times.iter().enumerate() {
-        assert!(t > 0, "Perception timing zero at cycle {i}");
+    for (i, &t) in encode_times.iter().enumerate() {
+        assert!(t > 0, "HDC encode timing zero at cycle {i}");
     }
-    for (i, &t) in dynamics_times.iter().enumerate() {
-        assert!(t > 0, "Dynamics timing zero at cycle {i}");
+    for (i, &t) in cfc_times.iter().enumerate() {
+        assert!(t > 0, "CfC step timing zero at cycle {i}");
     }
 }
 
-/// Budget check: warn if any phase exceeds 25ms (half of 50ms budget).
+/// Budget check: warn if any core phase exceeds 25ms (half of 50ms budget).
 #[test]
-fn no_phase_exceeds_budget_half() {
+fn no_core_phase_exceeds_budget_half() {
     let mut svc = create_service();
 
     // Warmup
@@ -288,28 +289,28 @@ fn no_phase_exceeds_budget_half() {
 
     let budget_half_us = 25_000; // 25ms = half of 50ms cycle budget
                                  // These are soft assertions — CI machines may be slow
-    if t.phase_perception > budget_half_us {
+    if t.core_hdc_encode > budget_half_us {
         eprintln!(
-            "WARNING: Phase 1 (perception) took {}us > {}us budget half",
-            t.phase_perception, budget_half_us
+            "WARNING: HDC encode took {}us > {}us budget half",
+            t.core_hdc_encode, budget_half_us
         );
     }
-    if t.phase_dynamics > budget_half_us {
+    if t.core_cfc_step > budget_half_us {
         eprintln!(
-            "WARNING: Phase 2 (dynamics) took {}us > {}us budget half",
-            t.phase_dynamics, budget_half_us
+            "WARNING: CfC step took {}us > {}us budget half",
+            t.core_cfc_step, budget_half_us
         );
     }
-    if t.phase_feedback > budget_half_us {
+    if t.consciousness_engine > budget_half_us {
         eprintln!(
-            "WARNING: Phase 3 (feedback) took {}us > {}us budget half",
-            t.phase_feedback, budget_half_us
+            "WARNING: Consciousness engine took {}us > {}us budget half",
+            t.consciousness_engine, budget_half_us
         );
     }
-    if t.phase_output > budget_half_us {
+    if t.metadata_assembly > budget_half_us {
         eprintln!(
-            "WARNING: Phase 4 (output) took {}us > {}us budget half",
-            t.phase_output, budget_half_us
+            "WARNING: Metadata assembly took {}us > {}us budget half",
+            t.metadata_assembly, budget_half_us
         );
     }
 }

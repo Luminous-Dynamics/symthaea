@@ -6033,8 +6033,8 @@ fn test_100_cycles_no_panic_mixed_inputs() {
 #[cfg(feature = "reasoning_engine")]
 #[test]
 fn test_reasoning_engine_produces_strategy() {
-    let mut config = CognitiveLoopConfig::default();
-    config.enable_reasoning_engine = true;
+    let config = CognitiveLoopConfig::default();
+    // reasoning_engine is now compile-time feature-gated (cfg(feature = "reasoning_engine"))
     let mut service = CognitiveLoopService::new(config).unwrap();
 
     // Warm up

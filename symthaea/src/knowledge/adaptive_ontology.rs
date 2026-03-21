@@ -292,6 +292,32 @@ impl AdaptiveOntology {
         chain
     }
 
+    /// Return all concepts that have `parent` as their direct IS-A parent.
+    ///
+    /// Science: Collins & Quillian (1969) — bidirectional traversal of taxonomic hierarchies.
+    pub fn children_of(&self, parent: &str) -> Vec<String> {
+        self.primitives
+            .iter()
+            .filter_map(|(name, usage)| {
+                if usage.is_a_parent.as_deref() == Some(parent) {
+                    Some(name.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    /// Check whether `child` transitively IS-A `ancestor`.
+    ///
+    /// Walks the IS-A parent chain from `child` up to 20 steps looking for `ancestor`.
+    ///
+    /// Science: Collins & Quillian (1969) — spreading activation in semantic networks.
+    pub fn is_a(&self, child: &str, ancestor: &str) -> bool {
+        let chain = self.is_a_chain(child, 20);
+        chain.contains(&ancestor.to_string())
+    }
+
     /// Get all learned primitives (for inspection/telemetry)
     pub fn primitives(&self) -> &HashMap<String, PrimitiveUsage> {
         &self.primitives

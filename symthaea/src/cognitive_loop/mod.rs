@@ -146,7 +146,7 @@ pub(crate) mod episodic_persistence_manager;
 pub(crate) mod ethics_engine;
 pub(crate) mod ethics_values_manager;
 pub(crate) mod feature_integration_manager;
-pub(crate) mod feedback_state;
+pub mod feedback_state;
 pub(crate) mod fep_module;
 pub(crate) mod gwt_manager;
 mod helpers;
@@ -196,7 +196,12 @@ pub use managers::network_service_bridge::{
     NetworkServiceBridge, NetworkServiceBridgeHandle,
 };
 pub use managers::swarm_manager::{SwarmEvent, SwarmTelemetry};
-pub use subsystem_trait::{CognitiveSubsystem, CycleSnapshot, SubsystemOutput};
+pub use subsystem_trait::{output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput};
+
+#[cfg(feature = "advanced-manufacturing")]
+pub use managers::fabrication_manager::{
+    FabricationEvent, FabricationEventKind, FabricationManager, FabricationTelemetry,
+};
 
 #[cfg(feature = "mesh")]
 pub use managers::radio_dispatcher::{
@@ -509,7 +514,8 @@ pub struct CognitiveLoopService {
 
     /// State carried over between consecutive cycles (phi modulations, veto flags,
     /// urgency hysteresis, MCE boost, etc.). Reset via `CycleCarryover::default()`.
-    carryover: CycleCarryover,
+    /// Exposed for property testing; prefer accessors for production code.
+    pub carryover: CycleCarryover,
 
     // soul moved to ethics_values_manager
     /// Attention visualizer for debugging attention flow.
@@ -797,6 +803,21 @@ pub struct CognitiveLoopService {
     /// Interval 71 (co-prime). Feature-gated behind `neuroevolution`.
     #[cfg(feature = "neuroevolution")]
     pub(crate) neuroevolution_manager: managers::NeuroevolutionManager,
+
+    /// Reasoning Manager: reasoning reliability → LR modulation, confidence, trend affect.
+    /// Implements CognitiveSubsystem at interval 73. Feature-gated behind `reasoning_engine`.
+    #[cfg(feature = "reasoning_engine")]
+    reasoning_manager: managers::ReasoningManager,
+
+    /// Language Manager: Broca quality feedback → confidence, LR, consolidation.
+    /// Implements CognitiveSubsystem at interval 61. Feature-gated behind `ssm_language`.
+    #[cfg(feature = "ssm_language")]
+    language_manager: managers::LanguageManager,
+
+    /// Vision Manager: visual surprise → exploration, attention, habituation.
+    /// Implements CognitiveSubsystem at interval 17. Feature-gated behind `vision-manifold`.
+    #[cfg(feature = "vision-manifold")]
+    vision_manager: managers::VisionManager,
 
     /// Cantor dream: broadcast buffer, cleanup engine, activation, surprise, resonance.
     pub(crate) cantor_dream: cantor_dream_manager::CantorDreamManager,
