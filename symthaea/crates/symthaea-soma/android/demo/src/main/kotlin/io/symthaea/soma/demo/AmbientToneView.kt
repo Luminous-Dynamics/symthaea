@@ -51,6 +51,7 @@ class AmbientTone {
         Log.i("AmbientTone", "start() called, bufferSize=$bufferSize")
 
         job = scope.launch(Dispatchers.IO) {
+            Log.i("AmbientTone", "Coroutine started, building AudioTrack...")
             var audioTrack: AudioTrack? = null
             try {
                 audioTrack = AudioTrack.Builder()

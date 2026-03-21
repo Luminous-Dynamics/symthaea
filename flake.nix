@@ -63,6 +63,10 @@
             nixfmt
             nil  # Nix LSP
 
+            # libclang (needed by sweettest / bindgen for Holochain WASM builds)
+            llvmPackages.libclang
+            llvmPackages.clang
+
             # LaTeX (papers — HAI, psych-bench, stewardship)
             (texlive.combine {
               inherit (texlive)
@@ -86,6 +90,9 @@
             echo "  lum-stop   - Stop all services"
             echo ""
             echo "🌊 We flow with Nix!"
+
+            # libclang for bindgen (sweettest / Holochain WASM builds)
+            export LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib"
 
             # Project-specific setup
             export LUMINOUS_DEV=true

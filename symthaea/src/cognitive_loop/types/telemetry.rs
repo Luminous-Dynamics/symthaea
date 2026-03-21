@@ -1561,6 +1561,9 @@ pub struct CycleMetadata {
     /// Whether the `ssm_language` (Broca) feature is compiled in and active.
     #[serde(default)]
     pub ssm_language_enabled: bool,
+    /// Whether the `vision-manifold` feature is compiled in.
+    #[serde(default)]
+    pub vision_manifold_enabled: bool,
 
     // ── Immune System / Defense ──────────────────────────────────────────
     /// Current safety level label ("GREEN", "YELLOW", "ORANGE", "RED").
@@ -1727,6 +1730,48 @@ pub struct CycleMetadata {
     #[cfg(feature = "mathematics")]
     #[serde(default)]
     pub math_memory_hits: usize,
+
+    // ── Vision Manager Telemetry ──────────────────────────────────────────
+    /// Visual prediction error EMA (0.0-1.0). Smoothed visual surprise signal.
+    /// Science: Itti & Koch (2001) — saliency-driven attention.
+    #[serde(default)]
+    pub vision_pe_ema: f32,
+    /// Adaptive visual surprise threshold (0.05-0.8). Habituates upward.
+    /// Science: Rankin et al. (2009) — habituation dynamics.
+    #[serde(default)]
+    pub vision_surprise_threshold: f32,
+    /// Consecutive low-surprise cycles (habituation streak).
+    #[serde(default)]
+    pub vision_low_surprise_streak: u32,
+
+    // ── Language Manager Telemetry ────────────────────────────────────────
+    /// Broca generation quality EMA (0.0-1.0). Smoothed epistemic confidence.
+    /// Science: Clark (2013) — predictive processing quality signal.
+    #[serde(default)]
+    pub language_quality_ema: f32,
+    /// Language coherence EMA (0.0-1.0). Smoothed conversation coherence.
+    /// Science: Hagoort (2005) — unification model of language.
+    #[serde(default)]
+    pub language_coherence_ema: f32,
+    /// Consecutive low-coherence cycles (fluency degradation indicator).
+    #[serde(default)]
+    pub language_low_coherence_streak: u32,
+
+    // ── Reasoning Manager Telemetry ──────────────────────────────────────
+    /// Reasoning reliability EMA (0.0-1.0). Smoothed prediction confidence.
+    /// Science: Stanovich (2011) — individual differences in rational thinking.
+    #[serde(default)]
+    pub reasoning_reliability_ema: f64,
+    /// Cumulative reasoning quality signal (decayed).
+    /// Science: Koriat (2007) — metacognitive monitoring.
+    #[serde(default)]
+    pub reasoning_cumulative_quality: f64,
+    /// Consecutive rising confidence cycles.
+    #[serde(default)]
+    pub reasoning_rising_streak: u32,
+    /// Consecutive falling confidence cycles.
+    #[serde(default)]
+    pub reasoning_falling_streak: u32,
 }
 
 /// Therapeutic subsystem telemetry for CycleMetadata.

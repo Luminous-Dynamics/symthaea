@@ -15,6 +15,9 @@
 //! | [`GovernanceManager`] | governance events, neuromod contagion | 37 | Schultz (1997), Zak (2012) | `mycelix` |
 //! | [`FabricationManager`] | Cincinnati quality, twin readings, PoGF | 47 | Aston-Jones (2005), Schultz (1997) | `advanced-manufacturing` |
 //! | [`SentinelManager`] | governance anomaly, Sybil, dispatch loop | 67 | Aston-Jones & Cohen (2005) | `sentinel` |
+//! | [`VisionManager`] | visual surprise, habituation, saccade urgency | 17 | Itti & Koch (2001), Rankin (2009) | `vision-manifold` |
+//! | [`LanguageManager`] | Broca quality, coherence gating, consciousness cadence | 61 | Clark (2013), Hagoort (2005) | `ssm_language` |
+//! | [`ReasoningManager`] | reasoning reliability, epistemic gating, prediction trend | 73 | Stanovich (2011), Koriat (2007) | `reasoning_engine` |
 //!
 //! ## Architecture
 //!
@@ -109,6 +112,11 @@ pub(crate) use sentinel_manager::{
 #[cfg(feature = "neuroevolution")]
 pub use neuroevolution_manager::{NeuroevolutionManager, NeuroevolutionTelemetry};
 
+#[cfg(feature = "ssm_language")]
+pub mod language_manager;
+#[cfg(feature = "ssm_language")]
+pub use language_manager::LanguageManager;
+
 #[cfg(feature = "reasoning_engine")]
 pub mod reasoning_manager;
 #[cfg(feature = "reasoning_engine")]
@@ -134,3 +142,8 @@ pub use social_fabric_manager::SocialFabricManager;
 pub mod survival_manager;
 #[cfg(feature = "survival")]
 pub use survival_manager::SurvivalManager;
+
+#[cfg(feature = "vision-manifold")]
+pub mod vision_manager;
+#[cfg(feature = "vision-manifold")]
+pub use vision_manager::VisionManager;

@@ -31,16 +31,16 @@ pub use mycelix_finance_types;
 // Re-export all modules
 pub use anchors::*;
 pub use batch::*;
+pub use circuit_breaker::*;
+pub use consciousness_gating::*;
 pub use economics::*;
 pub use governance::*;
 pub use identity::*;
 pub use input_validation::*;
+pub use oracle_verification::*;
 pub use race_resolution::*;
 pub use rate_limit::*;
 pub use types::*;
-pub use circuit_breaker::*;
-pub use consciousness_gating::*;
-pub use oracle_verification::*;
 pub use update_chain::*;
 pub use validation::*;
 
@@ -809,7 +809,8 @@ pub mod consciousness_gating {
                 Err(wasm_error!(WasmErrorInner::Guest(
                     "Identity cluster unreachable — consciousness gating unavailable. \
                      Operations requiring Participant tier are suspended until \
-                     the identity cluster is restored.".into()
+                     the identity cluster is restored."
+                        .into()
                 )))
             }
         }
@@ -851,7 +852,8 @@ pub mod consciousness_gating {
                 Err(wasm_error!(WasmErrorInner::Guest(
                     "Identity cluster unreachable — consciousness gating unavailable. \
                      Operations requiring Citizen tier are suspended until \
-                     the identity cluster is restored.".into()
+                     the identity cluster is restored."
+                        .into()
                 )))
             }
         }
@@ -873,10 +875,7 @@ pub mod oracle_verification {
     ///
     /// Falls back to accepting the claimed rate if the oracle is unreachable
     /// (bootstrap/standalone mode), with a warning logged.
-    pub fn verify_oracle_rate(
-        item: &str,
-        claimed_rate: f64,
-    ) -> ExternResult<()> {
+    pub fn verify_oracle_rate(item: &str, claimed_rate: f64) -> ExternResult<()> {
         if !claimed_rate.is_finite() || claimed_rate <= 0.0 {
             return Err(wasm_error!(WasmErrorInner::Guest(
                 "Oracle rate must be a finite positive number".into()
@@ -885,42 +884,58 @@ pub mod oracle_verification {
 
         // Fetch consensus from price-oracle zome
         #[derive(Debug, Serialize)]
-        struct GetConsensusInput { item: String }
+        struct GetConsensusInput {
+            item: String,
+        }
         #[derive(Debug, Deserialize)]
-        struct ConsensusResult { median_price: f64 }
+        struct ConsensusResult {
+            median_price: f64,
+        }
 
         match call(
             CallTargetCell::Local,
             ZomeName::from("price_oracle"),
             FunctionName::from("get_consensus_price"),
             None,
-            GetConsensusInput { item: item.to_string() },
+            GetConsensusInput {
+                item: item.to_string(),
+            },
         ) {
-            Ok(ZomeCallResponse::Ok(result)) => {
-                match result.decode::<ConsensusResult>() {
-                    Ok(consensus) if consensus.median_price.is_finite() && consensus.median_price > 0.0 => {
-                        let deviation = (claimed_rate - consensus.median_price).abs() / consensus.median_price;
-                        if deviation > ORACLE_RATE_TOLERANCE {
-                            return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                                "Oracle rate {:.6} deviates {:.1}% from consensus {:.6} (max {}%)",
-                                claimed_rate, deviation * 100.0, consensus.median_price, ORACLE_RATE_TOLERANCE * 100.0
-                            ))));
-                        }
-                        Ok(())
+            Ok(ZomeCallResponse::Ok(result)) => match result.decode::<ConsensusResult>() {
+                Ok(consensus)
+                    if consensus.median_price.is_finite() && consensus.median_price > 0.0 =>
+                {
+                    let deviation =
+                        (claimed_rate - consensus.median_price).abs() / consensus.median_price;
+                    if deviation > ORACLE_RATE_TOLERANCE {
+                        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                            "Oracle rate {:.6} deviates {:.1}% from consensus {:.6} (max {}%)",
+                            claimed_rate,
+                            deviation * 100.0,
+                            consensus.median_price,
+                            ORACLE_RATE_TOLERANCE * 100.0
+                        ))));
                     }
-                    Ok(_) => {
-                        debug!("verify_oracle_rate: consensus price invalid, accepting claimed rate");
-                        Ok(())
-                    }
-                    Err(e) => {
-                        debug!("verify_oracle_rate: decode error: {:?}, accepting claimed rate", e);
-                        Ok(())
-                    }
+                    Ok(())
                 }
-            }
+                Ok(_) => {
+                    debug!("verify_oracle_rate: consensus price invalid, accepting claimed rate");
+                    Ok(())
+                }
+                Err(e) => {
+                    debug!(
+                        "verify_oracle_rate: decode error: {:?}, accepting claimed rate",
+                        e
+                    );
+                    Ok(())
+                }
+            },
             _ => {
                 // Oracle unreachable — accept with warning (bootstrap/standalone)
-                debug!("verify_oracle_rate: price oracle unreachable, accepting claimed rate {}", claimed_rate);
+                debug!(
+                    "verify_oracle_rate: price oracle unreachable, accepting claimed rate {}",
+                    claimed_rate
+                );
                 Ok(())
             }
         }
@@ -1033,7 +1048,10 @@ pub mod circuit_breaker {
     pub fn record_success(target: &str) {
         BREAKERS.with(|breakers| {
             let mut breakers = breakers.borrow_mut();
-            breakers.entry(target.to_string()).or_default().record_success();
+            breakers
+                .entry(target.to_string())
+                .or_default()
+                .record_success();
         })
     }
 
@@ -1041,15 +1059,16 @@ pub mod circuit_breaker {
     pub fn record_failure(target: &str, now_micros: i64) {
         BREAKERS.with(|breakers| {
             let mut breakers = breakers.borrow_mut();
-            breakers.entry(target.to_string()).or_default().record_failure(now_micros);
+            breakers
+                .entry(target.to_string())
+                .or_default()
+                .record_failure(now_micros);
         })
     }
 
     /// Get the current breaker state for a target (for telemetry/debugging).
     pub fn get_state(target: &str) -> Option<BreakerState> {
-        BREAKERS.with(|breakers| {
-            breakers.borrow().get(target).cloned()
-        })
+        BREAKERS.with(|breakers| breakers.borrow().get(target).cloned())
     }
 
     /// Reset a specific breaker (for testing or manual recovery).
@@ -1417,7 +1436,11 @@ mod tests {
         // Still blocked during cooldown
         assert!(circuit_breaker::check_breaker(target, opened_at + 1000).is_err());
         // Allowed after cooldown
-        assert!(circuit_breaker::check_breaker(target, opened_at + circuit_breaker::COOLDOWN_MICROS + 1).is_ok());
+        assert!(circuit_breaker::check_breaker(
+            target,
+            opened_at + circuit_breaker::COOLDOWN_MICROS + 1
+        )
+        .is_ok());
     }
 
     #[test]
@@ -1468,5 +1491,468 @@ mod tests {
             circuit_breaker::record_failure(target, (i + 10) * 1000);
         }
         assert!(circuit_breaker::check_breaker(target, 50_000).is_ok()); // still closed
+    }
+
+    // =========================================================================
+    // Consciousness gating logic tests
+    //
+    // These test the pure-logic types from mycelix-bridge-common that the
+    // consciousness_gating module relies on. The actual cross-cluster HDK
+    // calls cannot be unit-tested, but the tier evaluation, profile scoring,
+    // vote weighting, hysteresis, and governance requirements are all pure
+    // functions that we can exercise directly.
+    // =========================================================================
+
+    mod consciousness_gating_tests {
+        use mycelix_bridge_common::{
+            decay_reputation, evaluate_governance, requirement_for_basic,
+            requirement_for_constitutional, requirement_for_guardian, requirement_for_proposal,
+            requirement_for_voting, ConsciousnessCredential, ConsciousnessProfile,
+            ConsciousnessTier, GovernanceRequirement,
+        };
+
+        // --- Tier thresholds from combined score ---
+
+        #[test]
+        fn test_tier_observer_below_030() {
+            let profile = ConsciousnessProfile {
+                identity: 0.1,
+                reputation: 0.1,
+                community: 0.1,
+                engagement: 0.1,
+            };
+            // combined = 0.1*0.25 + 0.1*0.25 + 0.1*0.30 + 0.1*0.20 = 0.10
+            assert_eq!(profile.tier(), ConsciousnessTier::Observer);
+        }
+
+        #[test]
+        fn test_tier_participant_at_030() {
+            // Need combined >= 0.3. Use uniform 0.3 across all dimensions.
+            let profile = ConsciousnessProfile {
+                identity: 0.3,
+                reputation: 0.3,
+                community: 0.3,
+                engagement: 0.3,
+            };
+            // combined = 0.3
+            assert_eq!(profile.tier(), ConsciousnessTier::Participant);
+        }
+
+        #[test]
+        fn test_tier_citizen_at_040() {
+            let profile = ConsciousnessProfile {
+                identity: 0.4,
+                reputation: 0.4,
+                community: 0.4,
+                engagement: 0.4,
+            };
+            assert_eq!(profile.tier(), ConsciousnessTier::Citizen);
+        }
+
+        #[test]
+        fn test_tier_steward_at_060() {
+            let profile = ConsciousnessProfile {
+                identity: 0.6,
+                reputation: 0.6,
+                community: 0.6,
+                engagement: 0.6,
+            };
+            assert_eq!(profile.tier(), ConsciousnessTier::Steward);
+        }
+
+        #[test]
+        fn test_tier_guardian_at_080() {
+            let profile = ConsciousnessProfile {
+                identity: 0.8,
+                reputation: 0.8,
+                community: 0.8,
+                engagement: 0.8,
+            };
+            assert_eq!(profile.tier(), ConsciousnessTier::Guardian);
+        }
+
+        // --- ConsciousnessTier::min_score ---
+
+        #[test]
+        fn test_tier_min_scores() {
+            assert!((ConsciousnessTier::Observer.min_score() - 0.0).abs() < f64::EPSILON);
+            assert!((ConsciousnessTier::Participant.min_score() - 0.3).abs() < f64::EPSILON);
+            assert!((ConsciousnessTier::Citizen.min_score() - 0.4).abs() < f64::EPSILON);
+            assert!((ConsciousnessTier::Steward.min_score() - 0.6).abs() < f64::EPSILON);
+            assert!((ConsciousnessTier::Guardian.min_score() - 0.8).abs() < f64::EPSILON);
+        }
+
+        // --- Combined score calculation ---
+
+        #[test]
+        fn test_combined_score_weighted_average() {
+            let profile = ConsciousnessProfile {
+                identity: 1.0,
+                reputation: 0.0,
+                community: 0.0,
+                engagement: 0.0,
+            };
+            // identity * 0.25 = 0.25
+            assert!((profile.combined_score() - 0.25).abs() < 1e-10);
+
+            let profile2 = ConsciousnessProfile {
+                identity: 0.0,
+                reputation: 0.0,
+                community: 1.0,
+                engagement: 0.0,
+            };
+            // community * 0.30 = 0.30
+            assert!((profile2.combined_score() - 0.30).abs() < 1e-10);
+        }
+
+        #[test]
+        fn test_combined_score_full_profile() {
+            let profile = ConsciousnessProfile {
+                identity: 0.8,
+                reputation: 0.6,
+                community: 0.7,
+                engagement: 0.5,
+            };
+            // 0.8*0.25 + 0.6*0.25 + 0.7*0.30 + 0.5*0.20 = 0.20 + 0.15 + 0.21 + 0.10 = 0.66
+            let expected = 0.8 * 0.25 + 0.6 * 0.25 + 0.7 * 0.30 + 0.5 * 0.20;
+            assert!((profile.combined_score() - expected).abs() < 1e-10);
+        }
+
+        // --- Vote weight ---
+
+        #[test]
+        fn test_vote_weight_bp_by_tier() {
+            assert_eq!(ConsciousnessTier::Observer.vote_weight_bp(), 0);
+            assert_eq!(ConsciousnessTier::Participant.vote_weight_bp(), 5000);
+            assert_eq!(ConsciousnessTier::Citizen.vote_weight_bp(), 7500);
+            assert_eq!(ConsciousnessTier::Steward.vote_weight_bp(), 10000);
+            assert_eq!(ConsciousnessTier::Guardian.vote_weight_bp(), 10000);
+        }
+
+        #[test]
+        fn test_vote_weight_continuous_sigmoid() {
+            // Observer (low score) should have near-zero continuous weight
+            let observer = ConsciousnessProfile {
+                identity: 0.0,
+                reputation: 0.0,
+                community: 0.0,
+                engagement: 0.0,
+            };
+            assert!(observer.vote_weight_continuous() < 100.0);
+
+            // Guardian (high score) should have near-max continuous weight
+            let guardian = ConsciousnessProfile {
+                identity: 1.0,
+                reputation: 1.0,
+                community: 1.0,
+                engagement: 1.0,
+            };
+            assert!(guardian.vote_weight_continuous() > 9900.0);
+
+            // At the Citizen threshold (0.4), weight should be ~half of max (5000)
+            let citizen_boundary = ConsciousnessProfile {
+                identity: 0.4,
+                reputation: 0.4,
+                community: 0.4,
+                engagement: 0.4,
+            };
+            let weight = citizen_boundary.vote_weight_continuous();
+            assert!(
+                (weight - 5000.0).abs() < 200.0,
+                "At threshold, sigmoid should be near midpoint: got {}",
+                weight
+            );
+        }
+
+        // --- Governance requirements ---
+
+        #[test]
+        fn test_governance_requirement_tiers() {
+            let basic = requirement_for_basic();
+            assert_eq!(basic.min_tier, ConsciousnessTier::Participant);
+            assert!(basic.min_identity.is_none());
+
+            let proposal = requirement_for_proposal();
+            assert_eq!(proposal.min_tier, ConsciousnessTier::Participant);
+            assert_eq!(proposal.min_identity, Some(0.25));
+
+            let voting = requirement_for_voting();
+            assert_eq!(voting.min_tier, ConsciousnessTier::Citizen);
+
+            let constitutional = requirement_for_constitutional();
+            assert_eq!(constitutional.min_tier, ConsciousnessTier::Steward);
+            assert_eq!(constitutional.min_identity, Some(0.5));
+            assert_eq!(constitutional.min_community, Some(0.3));
+
+            let guardian = requirement_for_guardian();
+            assert_eq!(guardian.min_tier, ConsciousnessTier::Guardian);
+            assert_eq!(guardian.min_identity, Some(0.7));
+            assert_eq!(guardian.min_community, Some(0.5));
+        }
+
+        // --- Hysteresis ---
+
+        #[test]
+        fn test_tier_hysteresis_prevents_oscillation() {
+            // Profile right at the Citizen boundary (0.4) — score exactly 0.4
+            let profile = ConsciousnessProfile {
+                identity: 0.4,
+                reputation: 0.4,
+                community: 0.4,
+                engagement: 0.4,
+            };
+            assert_eq!(profile.combined_score(), 0.4);
+
+            // Without hysteresis, from_score gives Citizen
+            assert_eq!(profile.tier(), ConsciousnessTier::Citizen);
+
+            // With hysteresis, if currently Citizen, we stay Citizen (no demotion
+            // because score is not below threshold - margin)
+            let tier = profile.tier_with_hysteresis(ConsciousnessTier::Citizen);
+            assert_eq!(tier, ConsciousnessTier::Citizen);
+
+            // With hysteresis, if currently Participant, we stay Participant
+            // (promotion requires threshold + margin = 0.45)
+            let tier = profile.tier_with_hysteresis(ConsciousnessTier::Participant);
+            assert_eq!(tier, ConsciousnessTier::Participant);
+        }
+
+        #[test]
+        fn test_tier_hysteresis_allows_clear_promotion() {
+            // Score well above Citizen threshold + margin (0.4 + 0.05 = 0.45)
+            let profile = ConsciousnessProfile {
+                identity: 0.5,
+                reputation: 0.5,
+                community: 0.5,
+                engagement: 0.5,
+            };
+            // combined = 0.5, which is >= 0.45 (Citizen + margin)
+            let tier = profile.tier_with_hysteresis(ConsciousnessTier::Participant);
+            assert!(tier >= ConsciousnessTier::Citizen);
+        }
+
+        // --- Profile validation ---
+
+        #[test]
+        fn test_profile_is_valid() {
+            let valid = ConsciousnessProfile {
+                identity: 0.5,
+                reputation: 0.5,
+                community: 0.5,
+                engagement: 0.5,
+            };
+            assert!(valid.is_valid());
+
+            let nan_profile = ConsciousnessProfile {
+                identity: f64::NAN,
+                reputation: 0.5,
+                community: 0.5,
+                engagement: 0.5,
+            };
+            assert!(!nan_profile.is_valid());
+
+            let inf_profile = ConsciousnessProfile {
+                identity: 0.5,
+                reputation: f64::INFINITY,
+                community: 0.5,
+                engagement: 0.5,
+            };
+            assert!(!inf_profile.is_valid());
+
+            let neg_inf_profile = ConsciousnessProfile {
+                identity: 0.5,
+                reputation: 0.5,
+                community: f64::NEG_INFINITY,
+                engagement: 0.5,
+            };
+            assert!(!neg_inf_profile.is_valid());
+        }
+
+        // --- Profile clamping ---
+
+        #[test]
+        fn test_profile_clamped() {
+            let out_of_range = ConsciousnessProfile {
+                identity: 1.5,
+                reputation: -0.3,
+                community: f64::NAN,
+                engagement: f64::INFINITY,
+            };
+            let clamped = out_of_range.clamped();
+            assert_eq!(clamped.identity, 1.0);
+            assert_eq!(clamped.reputation, 0.0);
+            assert_eq!(clamped.community, 0.0); // NaN -> 0.0
+            assert_eq!(clamped.engagement, 0.0); // Infinity -> 0.0
+            assert!(clamped.is_valid());
+        }
+
+        // --- Zero profile ---
+
+        #[test]
+        fn test_zero_profile() {
+            let zero = ConsciousnessProfile::zero();
+            assert_eq!(zero.identity, 0.0);
+            assert_eq!(zero.reputation, 0.0);
+            assert_eq!(zero.community, 0.0);
+            assert_eq!(zero.engagement, 0.0);
+            assert!(zero.is_valid());
+            assert_eq!(zero.tier(), ConsciousnessTier::Observer);
+            assert_eq!(zero.combined_score(), 0.0);
+        }
+
+        // --- Reputation decay ---
+
+        #[test]
+        fn test_decay_reputation_zero_days() {
+            let profile = ConsciousnessProfile {
+                identity: 0.5,
+                reputation: 0.8,
+                community: 0.5,
+                engagement: 0.5,
+            };
+            let decayed = decay_reputation(&profile, 0.0);
+            // No decay with 0 elapsed days
+            assert!((decayed.reputation - 0.8).abs() < 1e-10);
+            // Other dimensions unchanged
+            assert_eq!(decayed.identity, profile.identity);
+            assert_eq!(decayed.community, profile.community);
+            assert_eq!(decayed.engagement, profile.engagement);
+        }
+
+        #[test]
+        fn test_decay_reputation_positive_days() {
+            let profile = ConsciousnessProfile {
+                identity: 0.5,
+                reputation: 1.0,
+                community: 0.5,
+                engagement: 0.5,
+            };
+            let decayed = decay_reputation(&profile, 30.0);
+            // After 30 days with 0.998^30 decay: 1.0 * 0.998^30 ≈ 0.9418
+            assert!(decayed.reputation < 1.0);
+            assert!(decayed.reputation > 0.9);
+            // Identity, community, engagement unchanged
+            assert_eq!(decayed.identity, 0.5);
+            assert_eq!(decayed.community, 0.5);
+            assert_eq!(decayed.engagement, 0.5);
+        }
+
+        #[test]
+        fn test_decay_reputation_large_elapsed() {
+            let profile = ConsciousnessProfile {
+                identity: 0.5,
+                reputation: 1.0,
+                community: 0.5,
+                engagement: 0.5,
+            };
+            // After 1000 days, reputation should be very low
+            let decayed = decay_reputation(&profile, 1000.0);
+            assert!(decayed.reputation < 0.2);
+            assert!(decayed.reputation >= 0.0);
+        }
+
+        #[test]
+        fn test_decay_reputation_negative_days_unchanged() {
+            let profile = ConsciousnessProfile {
+                identity: 0.5,
+                reputation: 0.7,
+                community: 0.5,
+                engagement: 0.5,
+            };
+            let decayed = decay_reputation(&profile, -5.0);
+            // Negative elapsed days returns profile unchanged
+            assert!((decayed.reputation - 0.7).abs() < 1e-10);
+        }
+
+        // --- Evaluate governance (pure function) ---
+
+        #[test]
+        fn test_evaluate_governance_eligible_participant() {
+            let cred = ConsciousnessCredential::from_unified_consciousness(
+                "did:mycelix:test".into(),
+                0.5, // unified_consciousness -> engagement
+                0.5, // identity
+                0.5, // reputation
+                0.5, // community
+                "did:mycelix:bridge".into(),
+                1_000_000,
+            );
+            let req = requirement_for_basic();
+            // not expired (now < expires_at)
+            let result = evaluate_governance(&cred, &req, 2_000_000);
+            assert!(
+                result.eligible,
+                "Participant+ should be eligible for basic ops: {:?}",
+                result.reasons
+            );
+        }
+
+        #[test]
+        fn test_evaluate_governance_observer_rejected() {
+            let cred = ConsciousnessCredential::from_unified_consciousness(
+                "did:mycelix:test".into(),
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                "did:mycelix:bridge".into(),
+                1_000_000,
+            );
+            let req = requirement_for_basic();
+            let result = evaluate_governance(&cred, &req, 2_000_000);
+            assert!(
+                !result.eligible,
+                "Observer should be rejected for basic ops"
+            );
+            assert_eq!(result.tier, ConsciousnessTier::Observer);
+        }
+
+        // --- Tier ordering ---
+
+        #[test]
+        fn test_tier_ordering() {
+            assert!(ConsciousnessTier::Observer < ConsciousnessTier::Participant);
+            assert!(ConsciousnessTier::Participant < ConsciousnessTier::Citizen);
+            assert!(ConsciousnessTier::Citizen < ConsciousnessTier::Steward);
+            assert!(ConsciousnessTier::Steward < ConsciousnessTier::Guardian);
+        }
+
+        // --- Tier degrade / upgrade ---
+
+        #[test]
+        fn test_tier_degrade() {
+            assert_eq!(
+                ConsciousnessTier::Guardian.degrade(1),
+                ConsciousnessTier::Steward
+            );
+            assert_eq!(
+                ConsciousnessTier::Guardian.degrade(4),
+                ConsciousnessTier::Observer
+            );
+            assert_eq!(
+                ConsciousnessTier::Observer.degrade(1),
+                ConsciousnessTier::Observer
+            );
+            assert_eq!(
+                ConsciousnessTier::Citizen.degrade(2),
+                ConsciousnessTier::Observer
+            );
+        }
+
+        #[test]
+        fn test_tier_upgrade_capped() {
+            assert_eq!(
+                ConsciousnessTier::Observer.upgrade_capped(ConsciousnessTier::Guardian),
+                ConsciousnessTier::Participant
+            );
+            assert_eq!(
+                ConsciousnessTier::Steward.upgrade_capped(ConsciousnessTier::Steward),
+                ConsciousnessTier::Steward
+            );
+            assert_eq!(
+                ConsciousnessTier::Observer.upgrade_capped(ConsciousnessTier::Participant),
+                ConsciousnessTier::Participant
+            );
+        }
     }
 }

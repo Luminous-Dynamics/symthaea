@@ -245,3 +245,108 @@ describe('FabricationService', () => {
     expect(a).toBe(b);
   });
 });
+
+// ============================================================================
+// Deep Bridge Client Tests — verify prototype shape and async method signatures
+// ============================================================================
+
+describe('GovernanceBridgeClient — API shape', () => {
+  it('should have queryGovernance async method', () => {
+    const mock = createMockClient();
+    const client = getGovernanceBridgeClient(mock as any);
+    expect(typeof client.queryGovernance).toBe('function');
+  });
+
+  it('should have requestExecution async method', () => {
+    const mock = createMockClient();
+    const client = getGovernanceBridgeClient(mock as any);
+    expect(typeof client.requestExecution).toBe('function');
+  });
+
+  it('should have getPendingExecutions async method', () => {
+    const mock = createMockClient();
+    const client = getGovernanceBridgeClient(mock as any);
+    expect(typeof client.getPendingExecutions).toBe('function');
+  });
+
+  it('should have acknowledgeExecution async method', () => {
+    const mock = createMockClient();
+    const client = getGovernanceBridgeClient(mock as any);
+    expect(typeof client.acknowledgeExecution).toBe('function');
+  });
+
+  it('should have broadcastGovernanceEvent async method', () => {
+    const mock = createMockClient();
+    const client = getGovernanceBridgeClient(mock as any);
+    expect(typeof client.broadcastGovernanceEvent).toBe('function');
+  });
+
+  it('should have getRecentEvents async method', () => {
+    const mock = createMockClient();
+    const client = getGovernanceBridgeClient(mock as any);
+    expect(typeof client.getRecentEvents).toBe('function');
+  });
+
+  it('should have getEventsByProposal async method', () => {
+    const mock = createMockClient();
+    const client = getGovernanceBridgeClient(mock as any);
+    expect(typeof client.getEventsByProposal).toBe('function');
+  });
+});
+
+describe('FinanceBridgeClient — API shape', () => {
+  it('should have queryCredit async method', () => {
+    const mock = createMockClient();
+    const client = getFinanceBridgeClient(mock as any);
+    expect(typeof client.queryCredit).toBe('function');
+  });
+
+  it('should have processPayment async method', () => {
+    const mock = createMockClient();
+    const client = getFinanceBridgeClient(mock as any);
+    expect(typeof client.processPayment).toBe('function');
+  });
+
+  it('should have getPaymentHistory async method', () => {
+    const mock = createMockClient();
+    const client = getFinanceBridgeClient(mock as any);
+    expect(typeof client.getPaymentHistory).toBe('function');
+  });
+
+  it('should have broadcastFinanceEvent async method', () => {
+    const mock = createMockClient();
+    const client = getFinanceBridgeClient(mock as any);
+    expect(typeof client.broadcastFinanceEvent).toBe('function');
+  });
+
+  it('should have getRecentEvents async method', () => {
+    const mock = createMockClient();
+    const client = getFinanceBridgeClient(mock as any);
+    expect(typeof client.getRecentEvents).toBe('function');
+  });
+});
+
+// ============================================================================
+// Deep Support/Food/Transport — zome name validation
+// ============================================================================
+
+describe('Domain zome exports — deep', () => {
+  it('SUPPORT_ZOMES should contain all support domain zomes', () => {
+    expect(SUPPORT_ZOMES).toContain('support_tickets');
+    expect(SUPPORT_ZOMES).toContain('support_knowledge');
+    expect(SUPPORT_ZOMES).toContain('support_diagnostics');
+  });
+
+  it('FOOD_ZOMES should contain all food domain zomes', () => {
+    expect(FOOD_ZOMES).toContain('food_production');
+    expect(FOOD_ZOMES).toContain('food_distribution');
+    expect(FOOD_ZOMES).toContain('food_preservation');
+    expect(FOOD_ZOMES).toContain('food_knowledge');
+  });
+
+  it('TRANSPORT_ZOMES should contain all transport domain zomes', () => {
+    expect(TRANSPORT_ZOMES).toContain('transport_routes');
+    expect(TRANSPORT_ZOMES).toContain('transport_sharing');
+    expect(TRANSPORT_ZOMES).toContain('transport_impact');
+  });
+});

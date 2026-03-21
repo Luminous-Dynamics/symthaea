@@ -17,8 +17,9 @@ use symthaea_types::N_HARMONIES;
 
 use crate::{
     Anomaly, CantorInfo, DreamInfo, DriveInfo, FabricationInfo, GovernanceInfo, ImmuneInfo,
-    IntegrityInfo, KnowledgeInfo, LearningInfo, MoralCompass, Narrative, NeuroBath, PerceptionInfo,
-    PulseDelta, PulseSnapshot, ReasoningInfo, SparklinePoint, SubstrateInfo, SwarmInfo, Vitals,
+    IntegrityInfo, KnowledgeInfo, LanguageInfo, LearningInfo, MeshConsciousnessInfo, MoralCompass,
+    Narrative, NeuroBath, PerceptionInfo, PulseDelta, PulseSnapshot, ReasoningInfo, SparklinePoint,
+    SpectrumInfo, SubstrateInfo, SwarmInfo, VisionInfo, Vitals,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -457,17 +458,21 @@ pub fn generate_pulse_html(
     write_governance_pane(&mut html, &current.governance);
     write_glyph_pane(&mut html, &current.glyph);
     write_swarm_pane(&mut html, &current.swarm);
+    write_mesh_consciousness_pane(&mut html, &current.mesh_consciousness, &current.spectrum);
     write_knowledge_pane(&mut html, &current.knowledge);
     write_cantor_pane(&mut html, &current.cantor);
     write_perception_pane(&mut html, &current.perception);
     write_drive_pane(&mut html, &current.drive);
     write_learning_pane(&mut html, &current.learning);
+    write_vision_pane(&mut html, &current.vision);
+    write_language_pane(&mut html, &current.language);
     write_reasoning_pane(&mut html, &current.reasoning);
     write_dream_pane(&mut html, &current.dream);
     write_immune_pane(&mut html, &current.immune);
     write_sovereign_pane(&mut html, &current.sovereign);
     write_neuroevolution_pane(&mut html, &current.neuroevolution);
     write_fabrication_pane(&mut html, &current.fabrication);
+    write_mrp_pane(&mut html, &current.fabrication);
     write_narrative_pane(&mut html, narrative);
     if !timeline.is_empty() {
         write_timeline_pane(&mut html, timeline, current);
@@ -2091,6 +2096,113 @@ fn write_swarm_pane(html: &mut String, swarm: &SwarmInfo) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Pane 7b+: Mesh Consciousness — Distributed Mind Network
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn write_mesh_consciousness_pane(
+    html: &mut String,
+    mesh: &MeshConsciousnessInfo,
+    spectrum: &SpectrumInfo,
+) {
+    let active = mesh.consciousness_peers > 0
+        || mesh.is_offline
+        || mesh.threat_count > 0
+        || mesh.reconnection_count > 0;
+
+    if !active && spectrum.known_peers == 0 {
+        return; // Don't show empty pane when mesh is unused
+    }
+
+    let (status_label, status_color) = if mesh.is_offline {
+        ("OFFLINE", "#c76b5a")
+    } else if mesh.threat_count > 0 {
+        ("THREATENED", "#e8a547")
+    } else if mesh.consciousness_peers == 0 {
+        ("SOLITARY", "#8a9a8a")
+    } else if mesh.collective_divergence > 0.15 {
+        ("DIVERGING", "#e8c547")
+    } else {
+        ("HARMONIZED", "#7ec8a0")
+    };
+
+    let _ = write!(
+        html,
+        r##"<div class="pane">
+<h2>Mesh Consciousness</h2>
+<div style="text-align:center;margin-bottom:12px">
+  <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:{color};box-shadow:0 0 12px {color};margin-right:8px;vertical-align:middle"></span>
+  <span style="color:{color};font-weight:bold;font-size:1.1em;vertical-align:middle">{label}</span>
+</div>
+<table style="width:100%;font-size:0.88em">
+<tr><td>Collective &Phi;</td><td style="text-align:right;color:{phi_color}">{phi:.3}</td></tr>
+<tr><td>&Phi; Divergence</td><td style="text-align:right;color:{div_color}">{div:.4}</td></tr>
+<tr><td>Consciousness Peers</td><td style="text-align:right">{peers}</td></tr>
+<tr><td>Sharing Cadence</td><td style="text-align:right">{cadence} cy</td></tr>
+<tr><td>Network Health</td><td style="text-align:right;color:{health_color}">{health}</td></tr>
+<tr><td>Best Relay Score</td><td style="text-align:right">{relay:.3}</td></tr>
+<tr><td>Threat Observations</td><td style="text-align:right;color:{threat_color}">{threats}</td></tr>
+<tr><td>Offline Buffer</td><td style="text-align:right">{buffer}</td></tr>
+<tr><td>Reconnections</td><td style="text-align:right">{reconnections}</td></tr>
+<tr><td>Encryption Sessions</td><td style="text-align:right">{enc}</td></tr>
+<tr><td>Jamming Streak</td><td style="text-align:right;color:{jam_color}">{jams}</td></tr>
+</table>"##,
+        color = status_color,
+        label = status_label,
+        phi_color = if mesh.collective_phi > 0.5 {
+            "#e8c547"
+        } else {
+            "#8a9a8a"
+        },
+        phi = mesh.collective_phi,
+        div_color = if mesh.collective_divergence > 0.15 {
+            "#c76b5a"
+        } else {
+            "#7ec8a0"
+        },
+        div = mesh.collective_divergence,
+        peers = mesh.consciousness_peers,
+        cadence = mesh.sharing_cadence,
+        health_color = match mesh.network_health.as_str() {
+            "AllTiersUp" => "#7ec8a0",
+            "LocalDown" => "#e8c547",
+            "MetroOnly" => "#e8a547",
+            "Blackout" => "#c76b5a",
+            _ => "#8a9a8a",
+        },
+        health = mesh.network_health,
+        relay = mesh.best_relay_score,
+        threat_color = if mesh.threat_count > 0 {
+            "#c76b5a"
+        } else {
+            "#8a9a8a"
+        },
+        threats = mesh.threat_count,
+        buffer = mesh.offline_buffer_size,
+        reconnections = mesh.reconnection_count,
+        enc = spectrum.encryption_sessions,
+        jam_color = if spectrum.jamming_streak > 0 {
+            "#c76b5a"
+        } else {
+            "#8a9a8a"
+        },
+        jams = spectrum.jamming_streak,
+    );
+
+    // Phi convergence sparkline (if history available)
+    if mesh.phi_history.len() >= 2 {
+        html.push_str("<div style=\"text-align:center;margin-top:10px\">");
+        html.push_str(
+            "<span style=\"font-size:0.75em;color:#8a9a8a\">&Phi; Convergence</span><br>",
+        );
+        let data: Vec<f64> = mesh.phi_history.iter().map(|&v| v as f64).collect();
+        write_sparkline(html, &data, "#e8c547", 180, 30);
+        html.push_str("</div>");
+    }
+
+    html.push_str("</div>\n");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Pane 7c: Governance Metacognition
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -2745,6 +2857,94 @@ fn write_learning_pane(html: &mut String, learning: &LearningInfo) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Pane: Vision Manager (feature-gated)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn write_vision_pane(html: &mut String, vision: &VisionInfo) {
+    if !vision.enabled {
+        return;
+    }
+    let pe_color = health_color(1.0 - vision.pe_ema as f64);
+    let habit_label = if vision.low_surprise_streak > 10 {
+        "HABITUATED"
+    } else if vision.low_surprise_streak > 0 {
+        "habituating"
+    } else {
+        "alert"
+    };
+    let habit_color = if vision.low_surprise_streak > 10 {
+        "#8a9a8a"
+    } else {
+        "#7ec8a0"
+    };
+
+    let _ = write!(
+        html,
+        r##"<div class="pane">
+<h2>Vision</h2>
+<table style="width:100%;font-size:0.88em">
+<tr><td>PE EMA</td><td style="text-align:right;color:{pe_c}">{pe:.3}</td></tr>
+<tr><td>Surprise Threshold</td><td style="text-align:right">{thresh:.3}</td></tr>
+<tr><td>Habituation</td><td style="text-align:right;color:{hc}">{hl} ({streak})</td></tr>
+</table>
+</div>
+"##,
+        pe_c = pe_color,
+        pe = vision.pe_ema,
+        thresh = vision.surprise_threshold,
+        hc = habit_color,
+        hl = habit_label,
+        streak = vision.low_surprise_streak,
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Pane: Language Manager (feature-gated)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn write_language_pane(html: &mut String, lang: &LanguageInfo) {
+    if !lang.enabled {
+        return;
+    }
+    let quality_color = health_color(lang.quality_ema as f64);
+    let coherence_color = health_color(lang.coherence_ema as f64);
+    let fluency_label = if lang.low_coherence_streak >= 10 {
+        "DEGRADED"
+    } else if lang.low_coherence_streak > 0 {
+        "degrading"
+    } else {
+        "fluent"
+    };
+    let fluency_color = if lang.low_coherence_streak >= 10 {
+        "#c76b5a"
+    } else if lang.low_coherence_streak > 0 {
+        "#e8c547"
+    } else {
+        "#7ec8a0"
+    };
+
+    let _ = write!(
+        html,
+        r##"<div class="pane">
+<h2>Language</h2>
+<table style="width:100%;font-size:0.88em">
+<tr><td>Quality EMA</td><td style="text-align:right;color:{qc}">{q:.3}</td></tr>
+<tr><td>Coherence EMA</td><td style="text-align:right;color:{cc}">{c:.3}</td></tr>
+<tr><td>Fluency</td><td style="text-align:right;color:{fc}">{fl} ({streak})</td></tr>
+</table>
+</div>
+"##,
+        qc = quality_color,
+        q = lang.quality_ema,
+        cc = coherence_color,
+        c = lang.coherence_ema,
+        fc = fluency_color,
+        fl = fluency_label,
+        streak = lang.low_coherence_streak,
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Pane: Reasoning Engine (feature-gated)
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -2777,6 +2977,9 @@ fn write_reasoning_pane(html: &mut String, reasoning: &ReasoningInfo) {
 <tr><td>Plan Confidence</td><td style="text-align:right">{plan:.3}</td></tr>
 <tr><td>Tool Gate</td><td style="text-align:right;color:{gate_color}">{gate}</td></tr>
 <tr><td>Meta Confidence</td><td style="text-align:right">{meta:.3}</td></tr>
+<tr><td>Reliability EMA</td><td style="text-align:right;color:{rel_color}">{rel:.3}</td></tr>
+<tr><td>Quality (cum.)</td><td style="text-align:right">{qual:.3}</td></tr>
+<tr><td>Trend</td><td style="text-align:right;color:{trend_color}">{trend}</td></tr>
 </table>
 </div>
 "##,
@@ -2793,6 +2996,23 @@ fn write_reasoning_pane(html: &mut String, reasoning: &ReasoningInfo) {
             "open"
         },
         meta = reasoning.meta_reasoning_confidence,
+        rel_color = health_color(reasoning.reliability_ema),
+        rel = reasoning.reliability_ema,
+        qual = reasoning.cumulative_quality,
+        trend_color = if reasoning.rising_streak >= 3 {
+            "#7ec8a0"
+        } else if reasoning.falling_streak >= 3 {
+            "#c76b5a"
+        } else {
+            "#8a9a8a"
+        },
+        trend = if reasoning.rising_streak >= 3 {
+            format!("rising ({})", reasoning.rising_streak)
+        } else if reasoning.falling_streak >= 3 {
+            format!("falling ({})", reasoning.falling_streak)
+        } else {
+            "stable".into()
+        },
     );
 }
 
@@ -3023,6 +3243,77 @@ fn write_fabrication_pane(html: &mut String, fab: &FabricationInfo) {
         } else {
             "#8a9a8a"
         },
+    );
+}
+
+// MRP & Defect Prediction Pane
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn write_mrp_pane(html: &mut String, fab: &FabricationInfo) {
+    let has_mrp = fab.mrp_work_order_count > 0 || fab.mrp_planned_orders > 0;
+    let has_defect = fab.defect_confidence > 1e-6;
+
+    if !has_mrp && !has_defect {
+        return; // Don't render empty pane.
+    }
+
+    let (mrp_label, mrp_color) = if !has_mrp {
+        ("IDLE", "#8a9a8a")
+    } else if fab.mrp_feasible {
+        ("FEASIBLE", "#7ec8a0")
+    } else {
+        ("SHORTAGE", "#c76b5a")
+    };
+
+    let defect_pct = (fab.defect_prediction * 100.0).clamp(0.0, 100.0);
+    let defect_color = if fab.defect_prediction >= 0.7 {
+        "#7ec8a0"
+    } else if fab.defect_prediction >= 0.4 {
+        "#e8c547"
+    } else {
+        "#c76b5a"
+    };
+
+    let confidence_pct = (fab.defect_confidence * 100.0).clamp(0.0, 100.0);
+
+    let _ = write!(
+        html,
+        r##"<div class="pane">
+<h2>MRP &amp; Prediction</h2>
+<div style="text-align:center;margin-bottom:12px">
+  <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:{mrp_color};box-shadow:0 0 12px {mrp_color};margin-right:8px;vertical-align:middle"></span>
+  <span style="color:{mrp_color};font-weight:bold;font-size:1.1em;vertical-align:middle">{mrp_label}</span>
+</div>
+<table style="width:100%;font-size:0.88em">
+<tr><td>Work Orders</td><td style="text-align:right">{wo_count}</td></tr>
+<tr><td>Planned Orders</td><td style="text-align:right">{planned}</td></tr>
+<tr><td>Shortages</td><td style="text-align:right;color:{shortage_color}">{shortages}</td></tr>
+</table>
+<div style="margin-top:12px">
+  <div style="font-size:0.85em;margin-bottom:4px">Defect Prediction Quality</div>
+  <div style="background:rgba(30,30,30,0.4);border-radius:6px;height:18px;overflow:hidden">
+    <div style="width:{defect_pct:.0}%;height:100%;background:{defect_color};border-radius:6px;transition:width 0.3s"></div>
+  </div>
+  <div style="display:flex;justify-content:space-between;font-size:0.8em;margin-top:2px">
+    <span>{defect_pct:.1}%</span>
+    <span style="color:#8a9a8a">conf {confidence_pct:.0}%</span>
+  </div>
+</div>
+</div>
+"##,
+        mrp_color = mrp_color,
+        mrp_label = mrp_label,
+        wo_count = fab.mrp_work_order_count,
+        planned = fab.mrp_planned_orders,
+        shortages = fab.mrp_shortages_count,
+        shortage_color = if fab.mrp_shortages_count > 0 {
+            "#c76b5a"
+        } else {
+            "#8a9a8a"
+        },
+        defect_pct = defect_pct,
+        defect_color = defect_color,
+        confidence_pct = confidence_pct,
     );
 }
 
@@ -4277,10 +4568,11 @@ fn write_sovereign_pane(html: &mut String, sov: &super::SovereignInfo) {
 mod tests {
     use super::*;
     use crate::{
-        Anomaly, CantorInfo, DreamInfo, DriveInfo, GlyphInfo, GovernanceInfo, IntegrityInfo,
-        KnowledgeInfo, LearningInfo, MoralCompass, Narrative, NeuroBath, PerceptionInfo,
-        PulseSnapshot, ReasoningInfo, SparklinePoint, SpectrumInfo, SubstrateInfo, SwarmInfo,
-        Vitals,
+        Anomaly, CantorInfo, DreamInfo, DriveInfo, FabricationInfo, GlyphInfo, GovernanceInfo,
+        ImmuneInfo, IntegrityInfo, KnowledgeInfo, LanguageInfo, LearningInfo,
+        MeshConsciousnessInfo, MoralCompass, Narrative, NeuroBath, NeuroevolutionInfo,
+        PerceptionInfo, PulseSnapshot, ReasoningInfo, SovereignInfo, SparklinePoint, SpectrumInfo,
+        SubstrateInfo, SwarmInfo, VisionInfo, Vitals,
     };
     use symthaea_types::N_HARMONIES;
 
@@ -4411,8 +4703,15 @@ mod tests {
             perception: PerceptionInfo::default(),
             drive: DriveInfo::default(),
             learning: LearningInfo::default(),
+            vision: VisionInfo::default(),
+            language: LanguageInfo::default(),
             reasoning: ReasoningInfo::default(),
             dream: DreamInfo::default(),
+            immune: ImmuneInfo::default(),
+            sovereign: SovereignInfo::default(),
+            neuroevolution: NeuroevolutionInfo::default(),
+            fabrication: FabricationInfo::default(),
+            mesh_consciousness: MeshConsciousnessInfo::default(),
         }
     }
 

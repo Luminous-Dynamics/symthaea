@@ -354,6 +354,34 @@ pub struct SpectrumInfo {
     pub tier_loss_ema: [f64; 3],
 }
 
+/// Mesh consciousness integration snapshot — consciousness-aware routing,
+/// collective Phi convergence, store-and-forward, distributed immunity.
+#[derive(Serialize, Deserialize, Default)]
+pub struct MeshConsciousnessInfo {
+    /// Collective Phi across all mesh peers (trust-weighted mean).
+    pub collective_phi: f32,
+    /// Collective Phi divergence (variance — high = disagreement).
+    pub collective_divergence: f32,
+    /// Number of consciousness-tracked peers.
+    pub consciousness_peers: usize,
+    /// Adaptive sharing cadence (cycles between consciousness broadcasts).
+    pub sharing_cadence: u32,
+    /// Current network health: "AllTiersUp", "LocalDown", "MetroOnly", "Blackout".
+    pub network_health: String,
+    /// Active threat observations.
+    pub threat_count: usize,
+    /// Store-and-forward buffer size (experiences during offline).
+    pub offline_buffer_size: usize,
+    /// Whether currently offline (no mesh connectivity).
+    pub is_offline: bool,
+    /// Total reconnection events this session.
+    pub reconnection_count: u32,
+    /// Highest-Phi peer trust score (relay quality indicator).
+    pub best_relay_score: f32,
+    /// Phi convergence history (last N collective Phi values).
+    pub phi_history: Vec<f32>,
+}
+
 /// Immune system / defense snapshot.
 #[derive(Serialize, Deserialize, Default)]
 pub struct ImmuneInfo {
@@ -465,6 +493,40 @@ pub struct LearningInfo {
     pub feedback_diversity: f32,
 }
 
+/// Vision manager snapshot (meaningful only when vision-manifold feature is enabled).
+#[derive(Serialize, Deserialize, Default)]
+pub struct VisionInfo {
+    /// Whether the `vision-manifold` feature is compiled in.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Visual prediction error EMA (0.0-1.0).
+    #[serde(default)]
+    pub pe_ema: f32,
+    /// Adaptive visual surprise threshold (0.05-0.8).
+    #[serde(default)]
+    pub surprise_threshold: f32,
+    /// Consecutive low-surprise cycles (habituation streak).
+    #[serde(default)]
+    pub low_surprise_streak: u32,
+}
+
+/// Language manager snapshot (meaningful only when ssm_language feature is enabled).
+#[derive(Serialize, Deserialize, Default)]
+pub struct LanguageInfo {
+    /// Whether the `ssm_language` feature is compiled in.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Broca generation quality EMA (0.0-1.0).
+    #[serde(default)]
+    pub quality_ema: f32,
+    /// Language coherence EMA (0.0-1.0).
+    #[serde(default)]
+    pub coherence_ema: f32,
+    /// Consecutive low-coherence cycles (fluency degradation indicator).
+    #[serde(default)]
+    pub low_coherence_streak: u32,
+}
+
 /// Reasoning engine snapshot (meaningful only when reasoning_engine feature is enabled).
 #[derive(Serialize, Deserialize, Default)]
 pub struct ReasoningInfo {
@@ -480,6 +542,18 @@ pub struct ReasoningInfo {
     pub gate_blocked: bool,
     #[serde(default)]
     pub meta_reasoning_confidence: f64,
+    /// Reasoning reliability EMA (0.0-1.0).
+    #[serde(default)]
+    pub reliability_ema: f64,
+    /// Cumulative reasoning quality signal (decayed).
+    #[serde(default)]
+    pub cumulative_quality: f64,
+    /// Consecutive rising confidence cycles.
+    #[serde(default)]
+    pub rising_streak: u32,
+    /// Consecutive falling confidence cycles.
+    #[serde(default)]
+    pub falling_streak: u32,
 }
 
 /// Dream and memory consolidation snapshot.
@@ -573,6 +647,24 @@ pub struct FabricationInfo {
     pub active_print_jobs: u32,
     /// Reward EMA.
     pub reward_ema: f32,
+    /// MRP planned orders count.
+    #[serde(default)]
+    pub mrp_planned_orders: u32,
+    /// MRP feasibility status.
+    #[serde(default)]
+    pub mrp_feasible: bool,
+    /// MRP shortage count.
+    #[serde(default)]
+    pub mrp_shortages_count: u32,
+    /// MRP work order count in scope.
+    #[serde(default)]
+    pub mrp_work_order_count: u32,
+    /// Defect prediction quality score (0.0-1.0).
+    #[serde(default)]
+    pub defect_prediction: f32,
+    /// Defect prediction confidence (0.0-1.0).
+    #[serde(default)]
+    pub defect_confidence: f32,
 }
 
 /// CfC-HDC neuroevolution snapshot.
@@ -630,6 +722,10 @@ pub struct PulseSnapshot {
     #[serde(default)]
     pub learning: LearningInfo,
     #[serde(default)]
+    pub vision: VisionInfo,
+    #[serde(default)]
+    pub language: LanguageInfo,
+    #[serde(default)]
     pub reasoning: ReasoningInfo,
     #[serde(default)]
     pub dream: DreamInfo,
@@ -641,6 +737,8 @@ pub struct PulseSnapshot {
     pub neuroevolution: NeuroevolutionInfo,
     #[serde(default)]
     pub fabrication: FabricationInfo,
+    #[serde(default)]
+    pub mesh_consciousness: MeshConsciousnessInfo,
 }
 
 /// Computed delta between two pulse snapshots for the comparison view.
@@ -1512,6 +1610,27 @@ fn main() -> Result<()> {
             encryption_sessions: m.spectrum_encryption_sessions,
             ..SpectrumInfo::default()
         },
+        // Mesh consciousness: aggregated from spectrum + swarm telemetry.
+        // Full data comes from ConsciousnessAwareRouter when mesh feature is active.
+        mesh_consciousness: MeshConsciousnessInfo {
+            collective_phi: m.swarm_mean_peer_phi,
+            collective_divergence: 0.0, // populated from router when wired
+            consciousness_peers: m.swarm_connected_peers,
+            sharing_cadence: 50, // default, updated from router
+            network_health: match m.spectrum_network_health {
+                0 => "AllTiersUp".into(),
+                1 => "LocalDown".into(),
+                2 => "MetroOnly".into(),
+                3 => "Blackout".into(),
+                _ => "Unknown".into(),
+            },
+            threat_count: 0,
+            offline_buffer_size: 0,
+            is_offline: m.spectrum_network_health == 3,
+            reconnection_count: 0,
+            best_relay_score: 0.0,
+            phi_history: Vec::new(),
+        },
         perception: PerceptionInfo {
             attention_focus: m.attention.attention_schema_focus,
             attention_fatigue: m.attention.attention_fatigue,
@@ -1540,6 +1659,18 @@ fn main() -> Result<()> {
             feedback_priority_counts: m.feedback_priority_counts,
             feedback_diversity: m.feedback_diversity,
         },
+        vision: VisionInfo {
+            enabled: m.vision_manifold_enabled,
+            pe_ema: m.vision_pe_ema,
+            surprise_threshold: m.vision_surprise_threshold,
+            low_surprise_streak: m.vision_low_surprise_streak,
+        },
+        language: LanguageInfo {
+            enabled: m.ssm_language_enabled,
+            quality_ema: m.language_quality_ema,
+            coherence_ema: m.language_coherence_ema,
+            low_coherence_streak: m.language_low_coherence_streak,
+        },
         reasoning: ReasoningInfo {
             enabled: m.reasoning_engine_enabled,
             chain_depth: m.reasoning_chain_depth,
@@ -1547,6 +1678,10 @@ fn main() -> Result<()> {
             plan_confidence: m.reasoning_plan_confidence,
             gate_blocked: m.reasoning_gate_blocked,
             meta_reasoning_confidence: m.meta_reasoning_confidence,
+            reliability_ema: m.reasoning_reliability_ema,
+            cumulative_quality: m.reasoning_cumulative_quality,
+            rising_streak: m.reasoning_rising_streak,
+            falling_streak: m.reasoning_falling_streak,
         },
         dream: DreamInfo {
             dream_insights: m.memory.dream_insights,
@@ -1620,6 +1755,7 @@ fn main() -> Result<()> {
             pog_score_ema: m.fabrication_pog_score_ema,
             active_print_jobs: m.fabrication_active_jobs,
             reward_ema: m.fabrication_reward_ema,
+            ..FabricationInfo::default()
         },
     };
 
@@ -1969,6 +2105,18 @@ fn main() -> Result<()> {
                     feedback_priority_counts: wm.feedback_priority_counts,
                     feedback_diversity: wm.feedback_diversity,
                 },
+                vision: VisionInfo {
+                    enabled: wm.vision_manifold_enabled,
+                    pe_ema: wm.vision_pe_ema,
+                    surprise_threshold: wm.vision_surprise_threshold,
+                    low_surprise_streak: wm.vision_low_surprise_streak,
+                },
+                language: LanguageInfo {
+                    enabled: wm.ssm_language_enabled,
+                    quality_ema: wm.language_quality_ema,
+                    coherence_ema: wm.language_coherence_ema,
+                    low_coherence_streak: wm.language_low_coherence_streak,
+                },
                 reasoning: ReasoningInfo {
                     enabled: wm.reasoning_engine_enabled,
                     chain_depth: wm.reasoning_chain_depth,
@@ -1976,6 +2124,10 @@ fn main() -> Result<()> {
                     plan_confidence: wm.reasoning_plan_confidence,
                     gate_blocked: wm.reasoning_gate_blocked,
                     meta_reasoning_confidence: wm.meta_reasoning_confidence,
+                    reliability_ema: wm.reasoning_reliability_ema,
+                    cumulative_quality: wm.reasoning_cumulative_quality,
+                    rising_streak: wm.reasoning_rising_streak,
+                    falling_streak: wm.reasoning_falling_streak,
                 },
                 dream: DreamInfo {
                     dream_insights: wm.memory.dream_insights,
@@ -2035,7 +2187,9 @@ fn main() -> Result<()> {
                     pog_score_ema: wm.fabrication_pog_score_ema,
                     active_print_jobs: wm.fabrication_active_jobs,
                     reward_ema: wm.fabrication_reward_ema,
+                    ..FabricationInfo::default()
                 },
+                mesh_consciousness: MeshConsciousnessInfo::default(),
             };
 
             // Delta against previous snapshot
@@ -2218,11 +2372,14 @@ mod tests {
             perception: PerceptionInfo::default(),
             drive: DriveInfo::default(),
             learning: LearningInfo::default(),
+            vision: VisionInfo::default(),
+            language: LanguageInfo::default(),
             reasoning: ReasoningInfo::default(),
             dream: DreamInfo::default(),
             sovereign: SovereignInfo::default(),
             neuroevolution: NeuroevolutionInfo::default(),
             fabrication: FabricationInfo::default(),
+            mesh_consciousness: MeshConsciousnessInfo::default(),
         }
     }
 

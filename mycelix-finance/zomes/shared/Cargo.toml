@@ -16,6 +16,7 @@ mycelix_finance_types = { path = "../../types" }
 
 [dev-dependencies]
 proptest = "1"
+mycelix-bridge-common = { path = "../../../crates/mycelix-bridge-common" }
 
 [lints.rust]
 unsafe_code = "forbid"
