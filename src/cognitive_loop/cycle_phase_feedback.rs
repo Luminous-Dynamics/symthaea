@@ -227,7 +227,8 @@ impl CognitiveLoopService {
         let context_phi_weight = consciousness_metrics.context_phi_weight;
 
         // ── Phase 18: Context Phi Weight → Unified Psi modulation ────────────
-        let context_phi_applied = context_phi_weight > 0.0 && context_phi_weight != 1.0;
+        let context_phi_applied =
+            context_phi_weight > 0.0 && (context_phi_weight - 1.0).abs() > f64::EPSILON;
         if context_phi_applied {
             let scale =
                 CONTEXT_PHI_SCALE_BASE as f64 + context_phi_weight * CONTEXT_PHI_SCALE_RANGE as f64;

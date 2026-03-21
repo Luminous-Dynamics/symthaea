@@ -3058,36 +3058,29 @@ impl CognitiveLoopService {
                         };
                         let top_matches: Vec<_> = matches.into_iter().take(recall_k).collect();
 
-                        let best_match_sim = top_matches
+                        // Compute similarities once; reuse for both max-sim and argmax.
+                        let sims: Vec<f32> = top_matches
                             .iter()
                             .map(|m| {
                                 helpers::cosine_f32(&perception.encoding.compressed_state, &m.hv)
                             })
-                            .fold(0.0f32, f32::max);
+                            .collect();
+                        let best_match_sim = sims.iter().copied().fold(0.0f32, f32::max);
                         let match_timestamps: Vec<u64> =
                             top_matches.iter().map(|m| m.timestamp).collect();
                         resonator_best_sim = best_match_sim;
 
                         if best_match_sim > RESONATOR_SIMILARITY_PRIME_THRESHOLD {
-                            let best_ep = top_matches.iter().max_by(|a, b| {
-                                let sa: f32 = perception
-                                    .encoding
-                                    .compressed_state
-                                    .iter()
-                                    .zip(a.hv.iter())
-                                    .map(|(x, y)| x * y)
-                                    .sum();
-                                let sb: f32 = perception
-                                    .encoding
-                                    .compressed_state
-                                    .iter()
-                                    .zip(b.hv.iter())
-                                    .map(|(x, y)| x * y)
-                                    .sum();
-                                sa.partial_cmp(&sb).unwrap_or(std::cmp::Ordering::Equal)
-                            });
-                            if let Some(ep) = best_ep {
-                                self.stats.last_resonator_prediction = Some(ep.hv.clone());
+                            let best_idx = sims
+                                .iter()
+                                .enumerate()
+                                .max_by(|(_, a), (_, b)| {
+                                    a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+                                })
+                                .map(|(i, _)| i);
+                            if let Some(idx) = best_idx {
+                                self.stats.last_resonator_prediction =
+                                    Some(top_matches[idx].hv.clone());
                             }
                         }
 

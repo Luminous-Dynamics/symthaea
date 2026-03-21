@@ -315,6 +315,14 @@ if ! $DRY_RUN; then
         ok "Removed $REMOVED_MEMBERS missing workspace members"
     fi
 
+    # Remove monorepo-only dependencies that escape the standalone tree.
+    # These are dev-dependencies that point to ../crates/ (monorepo root)
+    # and don't have stubs in the standalone repo.
+    sed -i '/^mycelix-bridge-common.*path.*"\.\./d' "$TOML"
+    # Strip any remaining path deps that point outside the standalone tree
+    sed -i '/path\s*=\s*"\.\.\//d' "$TOML"
+    ok "Stripped monorepo-only path dependencies"
+
     if $REWRITE_OK; then
         ok "Cargo.toml fixups verified"
     else

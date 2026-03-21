@@ -24,7 +24,7 @@ features = [
     "Window", "Document", "Element", "HtmlElement",
     "HtmlCanvasElement", "CanvasRenderingContext2d",
     "HtmlInputElement", "HtmlButtonElement",
-    "Worker", "MessageEvent", "ErrorEvent",
+    "Worker", "WorkerOptions", "WorkerType", "MessageEvent", "ErrorEvent",
     "Blob", "BlobPropertyBag", "Url",
     "Performance",
     "KeyboardEvent", "MouseEvent",

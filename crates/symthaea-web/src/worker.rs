@@ -61,9 +61,11 @@ impl EngineWorker {
     pub fn new() -> Self {
         let pending: Arc<Mutex<HashMap<u32, ResolverFn>>> = Arc::new(Mutex::new(HashMap::new()));
 
-        // Attempt to create the worker; gracefully degrade if the
-        // spore-worker.js asset is not present (e.g. during dev builds).
-        let worker = Worker::new("./assets/spore-worker.js").ok();
+        // Attempt to create the worker as an ES module (spore-worker.js uses `import`).
+        // Gracefully degrade if the asset is not present (e.g. during dev builds).
+        let opts = web_sys::WorkerOptions::new();
+        opts.set_type(web_sys::WorkerType::Module);
+        let worker = Worker::new_with_options("./assets/spore-worker.js", &opts).ok();
 
         if let Some(ref w) = worker {
             // Set up the onmessage handler to resolve pending promises.
