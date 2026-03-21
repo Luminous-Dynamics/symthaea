@@ -148,7 +148,7 @@ impl ConsciousnessOptimizer {
             if current_phi > prev_phi {
                 let action_vec = BinaryHV::random((5000 + action_taken) as u64);
                 let high_phi_vec = BinaryHV::random(6000); // Represents high consciousness
-                let strength = ((current_phi - prev_phi) as f32).min(1.0) as f64;
+                let strength = (current_phi - prev_phi).min(1.0);
 
                 self.causal_model
                     .add_causal_link(action_vec, high_phi_vec, strength);

@@ -5,6 +5,14 @@
 
 use serde::{Deserialize, Serialize};
 
+// Guard: total_cycles is `usize` and wraps after ~20 years at 30Hz on 64-bit.
+// On 32-bit, it wraps after ~49 days — too short for production.
+// Fail at compile time if the platform is not 64-bit.
+const _: () = assert!(
+    std::mem::size_of::<usize>() >= 8,
+    "Symthaea requires a 64-bit platform (usize >= 8 bytes)"
+);
+
 /// Statistics for the cognitive loop
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct LoopStats {
