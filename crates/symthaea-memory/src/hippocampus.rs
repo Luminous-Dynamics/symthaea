@@ -482,7 +482,8 @@ impl HippocampusActor {
 
         for memory in memories.iter_mut() {
             // Decay based on time since last access
-            let age_hours = (now - memory.last_accessed) as f64 / (1000.0 * 60.0 * 60.0);
+            let age_hours =
+                now.saturating_sub(memory.last_accessed) as f64 / (1000.0 * 60.0 * 60.0);
             let decay = (age_hours * self.decay_rate).min(0.5);
             memory.strength = (memory.strength - decay).max(0.0);
 

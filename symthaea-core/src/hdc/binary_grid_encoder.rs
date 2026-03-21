@@ -10,6 +10,9 @@
 
 use super::BinaryHV;
 
+/// An input-output grid pair: `(input_grid, output_grid)` where each grid is `Vec<Vec<u8>>`.
+pub type GridPair = (Vec<Vec<u8>>, Vec<Vec<u8>>);
+
 /// Encodes 2D color grids into BinaryHV vectors using XOR binding.
 ///
 /// Cell encoding: `row_hv ⊕ col_hv ⊕ color_hv`.
@@ -117,7 +120,7 @@ impl BinaryGridEncoder {
     ///
     /// Returns a `DiscoveredRule` with the consensus rule, consistency score,
     /// and generalization estimate.
-    pub fn discover_rule(&self, examples: &[(Vec<Vec<u8>>, Vec<Vec<u8>>)]) -> DiscoveredRule {
+    pub fn discover_rule(&self, examples: &[GridPair]) -> DiscoveredRule {
         if examples.is_empty() {
             return DiscoveredRule::empty();
         }
@@ -169,7 +172,7 @@ impl BinaryGridEncoder {
                 .iter()
                 .enumerate()
                 .filter(|(i, _)| *i != hold_out)
-                .map(|(_, r)| r.clone())
+                .map(|(_, r)| *r)
                 .collect();
             let train_consensus = self.bundle_rules(&train_rules);
 

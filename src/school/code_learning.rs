@@ -935,7 +935,12 @@ pub struct CodeLearningEngine {
     /// Optional real-time distillation collector — writes training pairs to JSONL.
     /// When set, successful native generations are streamed to disk immediately
     /// (in addition to being cached in `distillation_cache`).
+    /// Distillation collector requires ssm_language feature (symthaea-broca).
+    /// When the feature is disabled, this is a unit-type placeholder.
+    #[cfg(feature = "ssm_language")]
     distillation_collector: Option<crate::language::distillation::DistillationCollector>,
+    #[cfg(not(feature = "ssm_language"))]
+    distillation_collector: (),
     /// Optional coding experience store — persists error patterns and fix strategies
     /// across sessions. When set, compilation failures and fixes are recorded,
     /// and learned templates are stored for future native generation.
@@ -948,8 +953,6 @@ impl CodeLearningEngine {
     /// Uses simulation-mode executor by default. Call `with_real_execution()`
     /// for actual compilation.
     pub fn new(generator: CodeGenerator) -> Self {
-        let distillation_collector =
-            crate::language::distillation::DistillationCollector::from_env();
         Self {
             generator,
             executor: CodeExecutor::new(),
@@ -961,15 +964,17 @@ impl CodeLearningEngine {
             predictions: PredictionTracker::new(),
             error_tracker: ErrorPatternTracker::new(),
             distillation_records: Vec::new(),
-            distillation_collector,
+            #[cfg(feature = "ssm_language")]
+            distillation_collector: crate::language::distillation::DistillationCollector::from_env(
+            ),
+            #[cfg(not(feature = "ssm_language"))]
+            distillation_collector: (),
             experience_store: None,
         }
     }
 
     /// Create with real (non-simulated) code execution.
     pub fn with_real_execution(generator: CodeGenerator) -> Self {
-        let distillation_collector =
-            crate::language::distillation::DistillationCollector::from_env();
         Self {
             generator,
             executor: CodeExecutor::with_real_execution(),
@@ -981,7 +986,11 @@ impl CodeLearningEngine {
             predictions: PredictionTracker::new(),
             error_tracker: ErrorPatternTracker::new(),
             distillation_records: Vec::new(),
-            distillation_collector,
+            #[cfg(feature = "ssm_language")]
+            distillation_collector: crate::language::distillation::DistillationCollector::from_env(
+            ),
+            #[cfg(not(feature = "ssm_language"))]
+            distillation_collector: (),
             experience_store: None,
         }
     }
@@ -996,6 +1005,7 @@ impl CodeLearningEngine {
     }
 
     /// Set an explicit distillation collector (overrides env-var auto-detection).
+    #[cfg(feature = "ssm_language")]
     pub fn with_distillation_collector(
         mut self,
         collector: crate::language::distillation::DistillationCollector,
@@ -1196,7 +1206,8 @@ impl CodeLearningEngine {
                     total_retries: retries + llm_retries,
                 });
 
-                // Stream to distillation collector if active
+                // Stream to distillation collector if active (requires ssm_language)
+                #[cfg(feature = "ssm_language")]
                 if let Some(ref collector) = self.distillation_collector {
                     let channels = symthaea_broca::encoder::ThoughtChannels::default();
                     collector.record(&channels, &src);

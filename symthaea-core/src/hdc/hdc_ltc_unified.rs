@@ -1125,7 +1125,8 @@ impl HdcLtcUnifiedNeuron {
         let new_norm = self.state.norm();
         let old_mean = self.running_mean;
         self.running_mean = (1.0 - alpha) * self.running_mean + alpha * new_norm;
-        self.running_var = (1.0 - alpha) * self.running_var + alpha * (new_norm - old_mean).powi(2);
+        let diff_sq = (new_norm - old_mean).powi(2).min(1e6);
+        self.running_var = (1.0 - alpha) * self.running_var + alpha * diff_sq;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

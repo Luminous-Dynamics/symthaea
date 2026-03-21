@@ -469,15 +469,16 @@ impl SemanticMemory {
             return 0.0;
         }
 
-        let mut dot = 0.0f32;
-        let mut entry_mag_sq = 0.0f32;
+        let mut dot = 0.0f64;
+        let mut entry_mag_sq = 0.0f64;
 
         for i in 0..min_len {
-            dot += query[i] * entry[i];
-            entry_mag_sq += entry[i] * entry[i];
+            dot += query[i] as f64 * entry[i] as f64;
+            entry_mag_sq += entry[i] as f64 * entry[i] as f64;
         }
 
-        let entry_mag = entry_mag_sq.sqrt();
+        let entry_mag = entry_mag_sq.sqrt() as f32;
+        let dot = dot as f32;
         if entry_mag < 1e-10 {
             return 0.0;
         }

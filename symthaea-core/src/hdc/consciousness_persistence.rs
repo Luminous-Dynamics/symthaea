@@ -299,7 +299,7 @@ impl ConsciousnessSnapshot {
             .map(|d| d.as_millis() as u64)
             .unwrap_or(0);
 
-        (now - self.timestamp) as f64 / 1000.0
+        now.saturating_sub(self.timestamp) as f64 / 1000.0
     }
 }
 
