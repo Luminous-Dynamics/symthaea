@@ -83,8 +83,8 @@ impl DivergentThinkingBenchmark {
             // Lapse_rate reduces exploration weight, modeling attentional
             // narrowing that constrains divergent search (Martindale, 1999).
             let lapse_explore_penalty = config.lapse_rate as f32 * 0.10;
-            let explore_weight = 0.52 + (i as f32 / n_uses as f32) * 0.22 - lapse_explore_penalty;
-            let cat_weight = 0.12;
+            let explore_weight = 0.56 + (i as f32 / n_uses as f32) * 0.24 - lapse_explore_penalty;
+            let cat_weight = 0.11;
             let obj_weight = 1.0 - explore_weight - cat_weight;
 
             let use_hv = ContinuousHV::weighted_bundle(

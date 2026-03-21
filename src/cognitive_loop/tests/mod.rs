@@ -26,6 +26,7 @@ mod moral_and_drives;
 mod phase_coverage;
 mod phase_results;
 mod proptest_cross_coupling;
+mod proptest_feedback_consensus;
 // proptest_feedback_loops: references MCE_NARRATIVE/MCE_SOCIAL/RESONANCE_FLOW constants
 // that don't exist in thresholds.rs yet. Uncomment when those constants are added.
 // mod proptest_feedback_loops;

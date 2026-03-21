@@ -100,7 +100,7 @@ impl ConceptualBlendingBenchmark {
                     // Cross-space mapping: bind roles with PERMUTED fillers from B
                     // (not just role_i⊕filler_b_i which = concept_b; instead, the
                     // permutation creates a genuinely novel cross-space alignment)
-                    let shift = (blend_idx / 4) as i32 + 1;
+                    let shift = blend_idx / 4 + 1;
                     let cross: Vec<BinaryHV> = roles
                         .iter()
                         .zip(fillers_b.iter())
@@ -117,7 +117,7 @@ impl ConceptualBlendingBenchmark {
                     // Selective projection: mix features with role permutation to
                     // create novel structure within the recombination
                     let split = (xor_shift(&mut rng) as usize % (n_features - 1)) + 1;
-                    let shift = (blend_idx / 4) as i32 + 2;
+                    let shift = blend_idx / 4 + 2;
                     let mixed: Vec<BinaryHV> = (0..n_features)
                         .map(|i| {
                             if i < split {
@@ -132,7 +132,7 @@ impl ConceptualBlendingBenchmark {
                 _ => {
                     // Emergent structure: multi-scale permutation creates patterns
                     // not present in either parent (Ward, 1994: "creative cognition")
-                    let shift = (blend_idx / 4) as i32 + 1;
+                    let shift = blend_idx / 4 + 1;
                     let permuted = concept_a.permute(shift);
                     permuted.bind(&concept_b.permute(shift + 1))
                 }

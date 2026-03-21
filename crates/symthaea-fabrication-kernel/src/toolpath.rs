@@ -4,7 +4,7 @@
 //! suitable for FDM 3D printers. Handles preamble/postamble, extrusion
 //! calculation, retraction on long travel moves, and temperature control.
 
-use crate::slicer::{Contour, Point2, Segment2, SliceConfig, SliceLayer};
+use crate::slicer::{Contour, Point2, SliceConfig, SliceLayer};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -387,6 +387,7 @@ pub fn generate_gcode(
         }
 
         // Then infill lines.
+        #[allow(unused_assignments)]
         if !layer.infill_lines.is_empty() {
             commands.push(GCodeCommand::Comment("Infill".into()));
             for seg in &layer.infill_lines {
@@ -439,6 +440,8 @@ pub fn generate_gcode(
             }
         }
     }
+    // Retraction state is loop-internal; silence clippy for the final write.
+    let _ = retracted;
 
     // ── Postamble ────────────────────────────────────────────────────
     commands.push(GCodeCommand::Comment("Cooldown".into()));
@@ -457,7 +460,7 @@ pub fn generate_gcode(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::slicer::SliceConfig;
+    use crate::slicer::{Segment2, SliceConfig};
 
     fn square_contour() -> Contour {
         Contour {

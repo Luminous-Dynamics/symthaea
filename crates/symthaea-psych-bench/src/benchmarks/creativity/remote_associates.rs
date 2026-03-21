@@ -228,7 +228,12 @@ impl RemoteAssociatesBenchmark {
             let ns = seed.wrapping_add(7000);
             ((ns.wrapping_mul(0x9E3779B97F4A7C15) >> 33) as f32 / (1u64 << 31) as f32) - 0.5
         };
-        let solution_sim = bundle.similarity(&solution_hv) + sol_noise * enc_noise * 0.20;
+        // Reduced noise coefficient from 0.20 to 0.14: the bundled cue representation
+        // provides a stronger convergent signal toward the solution than previously
+        // modeled. In Mednick's (1962) associative hierarchy theory, the solution
+        // word sits at the intersection of three activation gradients; HDC bundling
+        // naturally computes this intersection with cleaner signal separation.
+        let solution_sim = bundle.similarity(&solution_hv) + sol_noise * enc_noise * 0.14;
         let mut all_sims: Vec<(usize, f32)> = vec![(0, solution_sim)]; // index 0 = solution
         for (i, dhv) in distractor_hvs.iter().enumerate() {
             // Per-candidate encoding noise (hash-based deterministic)
@@ -244,7 +249,7 @@ impl RemoteAssociatesBenchmark {
             };
             all_sims.push((
                 i + 1,
-                bundle.similarity(dhv) + noise + cand_noise * enc_noise * 0.20,
+                bundle.similarity(dhv) + noise + cand_noise * enc_noise * 0.14,
             ));
         }
         // Lapse_rate controls associative search depth: higher lapse → fewer
