@@ -14,10 +14,11 @@ use serde::{Deserialize, Serialize};
 // ---------------------------------------------------------------------------
 
 /// Which printer backend to instantiate.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum PrinterBackend {
     /// Fully in-memory mock (no hardware required).
+    #[default]
     Mock,
     /// OctoPrint REST API.
     OctoPrint { url: String },
@@ -25,12 +26,6 @@ pub enum PrinterBackend {
     Moonraker { url: String },
     /// Generic HTTP printer endpoint.
     Custom { url: String },
-}
-
-impl Default for PrinterBackend {
-    fn default() -> Self {
-        Self::Mock
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -215,7 +210,9 @@ impl HardwareConfig {
                 let key = self.printer.api_key.as_deref().unwrap_or("");
                 Box::new(OctoPrintClient::new(url.as_str(), key))
             }
-            PrinterBackend::Moonraker { url } => Box::new(MoonrakerClient::new(url.as_str())),
+            PrinterBackend::Moonraker { url } => {
+                Box::new(MoonrakerClient::new(url.as_str()))
+            }
             PrinterBackend::Custom { url } => {
                 // Custom backends fall back to OctoPrint protocol for now.
                 let key = self.printer.api_key.as_deref().unwrap_or("");

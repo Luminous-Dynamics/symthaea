@@ -189,7 +189,7 @@ impl CincinnatiMonitor {
         let stats = self
             .channel_stats
             .entry(reading.channel.clone())
-            .or_insert_with(ChannelStats::new);
+            .or_default();
         stats.update(reading.value);
 
         // Update EMA baseline.
@@ -384,11 +384,7 @@ mod tests {
         for i in 0..50 {
             let r = make_reading("temperature_nozzle", 210.0 + (i as f64 * 0.01), i * 100);
             let alert = monitor.ingest_reading(r);
-            assert!(
-                alert.is_none(),
-                "stable reading {} triggered false alarm",
-                i
-            );
+            assert!(alert.is_none(), "stable reading {} triggered false alarm", i);
         }
         assert_eq!(monitor.anomaly_count(), 0);
     }
