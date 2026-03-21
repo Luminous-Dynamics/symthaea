@@ -919,14 +919,17 @@ pub fn train_with_adam(
         let mut neg_seed = epoch as u64 * 1000003 + 42;
 
         let num_pairs = curriculum_order.len();
+        if epoch == 0 {
+            eprintln!("  [epoch 0] starting {num_pairs} pairs...");
+        }
         for (pair_idx, &dataset_idx) in curriculum_order.iter().enumerate() {
-            if pair_idx > 0 && pair_idx % 500 == 0 {
+            if pair_idx % 500 == 0 {
                 let running_loss = if total_tokens > 0 {
                     total_loss / total_tokens as f32
                 } else {
                     0.0
                 };
-                tracing::info!(
+                eprintln!(
                     "  [epoch {epoch}] pair {pair_idx}/{num_pairs} running_loss={running_loss:.4}"
                 );
             }
@@ -1472,12 +1475,14 @@ fn apply_weight_tied_gradient(
     let mut sum_sq = 0.0f32;
     let mut was_clipped = false;
 
+    // Sparse gradient: skip embeddings with negligible error
+    let error_threshold = 1e-4;
+
     for i in 0..n {
         let prob = exps[i] / sum_exp;
         let error = if i == target { prob - 1.0 } else { prob };
 
-        // Skip tiny gradients
-        if error.abs() < 1e-6 {
+        if error.abs() < error_threshold {
             continue;
         }
 
@@ -1535,11 +1540,17 @@ fn apply_weight_tied_gradient_adam(
     let mut sum_sq = 0.0f32;
     let mut was_clipped = false;
 
+    // Sparse gradient: only update embeddings with |error| above threshold.
+    // For vocab=4096, most tokens have prob≈0 and error≈0.
+    // Target token always updated (error = prob - 1.0).
+    // This reduces per-token work from O(vocab × dim) to O(k × dim) where k ≈ 50-100.
+    let error_threshold = 1e-4;
+
     for i in 0..n {
         let prob = exps[i] / sum_exp;
         let error = if i == target { prob - 1.0 } else { prob };
 
-        if error.abs() < 1e-6 {
+        if error.abs() < error_threshold {
             continue;
         }
 
@@ -1555,11 +1566,13 @@ fn apply_weight_tied_gradient_adam(
             .collect();
 
         // Check if any gradient was actually clipped
-        for &val in output_slice {
-            let raw = scale * error * val;
-            if raw.abs() > grad_clip {
-                was_clipped = true;
-                break;
+        if !was_clipped {
+            for &val in output_slice {
+                let raw = scale * error * val;
+                if raw.abs() > grad_clip {
+                    was_clipped = true;
+                    break;
+                }
             }
         }
 

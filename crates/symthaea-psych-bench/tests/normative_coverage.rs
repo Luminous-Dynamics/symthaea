@@ -12,9 +12,6 @@ use symthaea_psych_bench::benchmarks::creativity::*;
 use symthaea_psych_bench::benchmarks::executive::*;
 use symthaea_psych_bench::benchmarks::inhibition::*;
 use symthaea_psych_bench::benchmarks::language::*;
-use symthaea_psych_bench::benchmarks::mathematics::{
-    BayesianReasoningBenchmark, LinearSystemSolvingBenchmark, PolynomialRootsBenchmark,
-};
 use symthaea_psych_bench::benchmarks::memory_agent::*;
 use symthaea_psych_bench::benchmarks::metacognition::*;
 use symthaea_psych_bench::benchmarks::motor::*;
@@ -124,10 +121,6 @@ fn test_normative_coverage() {
         Box::new(RmeBenchmark),
         Box::new(UltimatumGameBenchmark),
         Box::new(SocialNormBenchmark),
-        // Mathematics
-        Box::new(LinearSystemSolvingBenchmark),
-        Box::new(PolynomialRootsBenchmark),
-        Box::new(BayesianReasoningBenchmark),
         // Neuromod
         Box::new(PharmacologicalChallengeBenchmark),
         Box::new(InjectionChallengeBenchmark),

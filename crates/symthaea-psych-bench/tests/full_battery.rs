@@ -416,6 +416,7 @@ fn regression_against_baseline() {
     report.add(AlternateUsesBenchmark.run(&config));
     report.add(DivergentThinkingBenchmark.run(&config));
     report.add(ConceptualBlendingBenchmark.run(&config));
+    report.add(InsightProblemBenchmark.run(&config));
     report.add(ButlinIndicatorSuite.run(&config));
     report.add(GoNoGoBenchmark.run(&config));
     report.add(StopSignalBenchmark.run(&config));

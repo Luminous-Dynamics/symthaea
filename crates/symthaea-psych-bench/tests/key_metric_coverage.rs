@@ -79,6 +79,7 @@ fn test_key_metric_exists_in_output() {
         Box::new(RemoteAssociatesBenchmark),
         Box::new(DivergentThinkingBenchmark),
         Box::new(ConceptualBlendingBenchmark),
+        Box::new(InsightProblemBenchmark),
         // Butlin
         Box::new(ButlinIndicatorSuite),
         // Inhibition

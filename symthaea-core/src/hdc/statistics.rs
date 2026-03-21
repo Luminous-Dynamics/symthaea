@@ -992,7 +992,7 @@ mod tests {
     #[test]
     fn test_skewness_symmetric() {
         // Symmetric distribution should have ~0 skewness
-        let data: Vec<f64> = (0..100).map(|i| (i as f64 - 50.0)).collect();
+        let data: Vec<f64> = (0..100).map(|i| i as f64 - 50.0).collect();
         assert!(skewness(&data).abs() < 0.1);
     }
 

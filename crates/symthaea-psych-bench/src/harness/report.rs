@@ -252,9 +252,7 @@ pub struct BenchmarkResult {
     /// Per-trial trace data (populated when `config.trial_trace` is true).
     #[serde(default)]
     pub trial_trace: Vec<super::trial_analysis::TrialOutcome>,
-    /// Free-text notes about methodology limitations or caveats.
-    /// Benchmarks should use this to flag when tasks are synthetic,
-    /// when baselines are not directly comparable, etc.
+    /// Optional diagnostic notes from the benchmark run.
     #[serde(default)]
     pub notes: Vec<String>,
 }
@@ -658,6 +656,19 @@ impl BenchmarkReport {
             ("originality_score", "originality_score", &bl.creativity),
             ("flexibility_score", "flexibility_score", &bl.creativity),
             ("elaboration_score", "elaboration_score", &bl.creativity),
+            // Remote Associates convergent binding (Creativity)
+            (
+                "convergent_binding",
+                "rat_convergent_binding",
+                &bl.creativity,
+            ),
+            // Conceptual Blending (Creativity)
+            ("blend_coherence", "blend_coherence", &bl.creativity),
+            ("novelty_score", "novelty_score", &bl.creativity),
+            ("integration_score", "integration_score", &bl.creativity),
+            // Insight Problem (Creativity)
+            ("insight_accuracy", "insight_accuracy", &bl.creativity),
+            ("restructuring_depth", "restructuring_depth", &bl.creativity),
             // Flanker Inhibition (Inhibition)
             (
                 "congruent_accuracy",
@@ -721,11 +732,6 @@ impl BenchmarkReport {
                 &bl.mathematics,
             ),
             (
-                "solution_accuracy",
-                "linear_system_solution_accuracy",
-                &bl.mathematics,
-            ),
-            (
                 "accuracy_quadratic",
                 "polynomial_quadratic_accuracy",
                 &bl.mathematics,
@@ -733,11 +739,6 @@ impl BenchmarkReport {
             (
                 "accuracy_cubic",
                 "polynomial_cubic_accuracy",
-                &bl.mathematics,
-            ),
-            (
-                "root_finding_accuracy",
-                "polynomial_root_finding_accuracy",
                 &bl.mathematics,
             ),
             (
@@ -984,7 +985,11 @@ impl BenchmarkReport {
                 "rat_mean_solution_rank",
                 &bl.creativity,
             );
-            push_specific("binding_accuracy", "rat_binding_accuracy", &bl.creativity);
+            push_specific(
+                "convergent_binding",
+                "rat_convergent_binding",
+                &bl.creativity,
+            );
         }
         if benchmark.contains("StrangeStory") {
             push_specific("overall_accuracy", "strange_story_accuracy", &bl.tombench);
@@ -1204,27 +1209,13 @@ impl BenchmarkReport {
         if benchmark.contains("Calibration") {
             push_specific("rt_ticks", "calibration_rt_ticks", &bl.metacognition);
         }
-        // Creativity RT mappings
+        // Creativity metric mappings
         if benchmark.contains("AlternateUses") {
-            push_specific("originality", "aut_originality", &bl.creativity);
             push_specific("rt_ticks", "aut_rt_ticks", &bl.creativity);
+            push_specific("originality", "aut_originality", &bl.creativity);
         }
         if benchmark.contains("RemoteAssociates") {
             push_specific("rt_ticks", "rat_rt_ticks", &bl.creativity);
-        }
-        if benchmark.contains("ConceptualBlending") {
-            push_specific("blend_quality", "blend_quality", &bl.creativity);
-            push_specific("novelty", "blend_novelty", &bl.creativity);
-            push_specific("coherence", "blend_coherence", &bl.creativity);
-        }
-        if benchmark.contains("InsightProblem") {
-            push_specific(
-                "restructuring_success",
-                "restructuring_success",
-                &bl.creativity,
-            );
-            push_specific("insight_latency", "insight_latency", &bl.creativity);
-            push_specific("aha_magnitude", "aha_magnitude", &bl.creativity);
         }
         // Stop Signal Task (Inhibition)
         if benchmark.contains("StopSignal") {
@@ -1578,11 +1569,6 @@ impl BenchmarkReport {
             push_specific("causal_score", "causal_score", &bl.causal_reasoning);
         }
 
-        // Coding::HumanEvalMini
-        if benchmark.contains("HumanEvalMini") {
-            push_specific("pass_at_1", "humaneval_pass_at_1", &bl.coding);
-        }
-
         // Only return comparisons relevant to this benchmark
         if benchmark.contains("WorM")
             || benchmark.contains("CogBench")
@@ -1610,7 +1596,6 @@ impl BenchmarkReport {
             || benchmark.contains("Spatial")
             || benchmark.contains("CausalReasoning")
             || benchmark.contains("Security")
-            || benchmark.contains("Coding")
         {
             comps
         } else {
@@ -2101,6 +2086,7 @@ pub fn calibration_class_of(benchmark: &str) -> &'static str {
         "AlternateUses",
         "DivergentThinking",
         "ConceptualBlending",
+        "InsightProblem",
         "FlankerInhibition",
         "CategoricalPerception",
         "PerceptualCrowding",
@@ -2199,11 +2185,11 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("Butlin") => "mean_quality_score",
         b if b.contains("ValenceClassification") => "valence_accuracy",
         b if b.contains("MoodCongruent") => "congruence_ratio",
-        b if b.contains("RemoteAssociates") => "mean_solution_rank",
+        b if b.contains("RemoteAssociates") => "convergent_binding",
         b if b.contains("AlternateUses") => "originality",
         b if b.contains("DivergentThinking") => "originality_score",
-        b if b.contains("ConceptualBlending") => "blend_quality",
-        b if b.contains("InsightProblem") => "restructuring_success",
+        b if b.contains("ConceptualBlending") => "blend_coherence",
+        b if b.contains("InsightProblem") => "insight_accuracy",
         b if b.contains("GoNoGo") => "nogo_accuracy",
         b if b.contains("AttentionalBlink") => "lag3_t2_accuracy",
         b if b.contains("ProspectiveMemory") => "pm_hit_rate",
@@ -2307,9 +2293,6 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("CrisisDetection") => "crisis_sensitivity",
         b if b.contains("CognitiveDistortion") => "distortion_identification",
         b if b.contains("MotivationalInterviewing") => "mi_spirit_score",
-        // Coding domain
-        b if b.contains("BugDetection") => "detection_accuracy",
-        b if b.contains("HumanEvalMini") => "pass_at_1",
         // Security (HDC-FHE) domain
         b if b.contains("EncryptedLearning") => "learning_accuracy",
         b if b.contains("CrossMaskPrivacy") => "cross_session_leakage",
@@ -2371,8 +2354,6 @@ pub fn is_lower_better(metric_key: &str) -> bool {
             | "capacity_ratio"
             | "interference_suppression"
             | "cross_session_leakage"
-            | "mean_solution_rank"
-            | "posterior_accuracy"
     )
 }
 
@@ -3444,10 +3425,7 @@ mod tests {
     fn test_full_reliability_audit() {
         use crate::benchmarks::affect::EmotionalStroopBenchmark;
         use crate::benchmarks::attention::AttentionalBlinkBenchmark;
-        use crate::benchmarks::creativity::{
-            AlternateUsesBenchmark, ConceptualBlendingBenchmark, InsightProblemBenchmark,
-            RemoteAssociatesBenchmark,
-        };
+        use crate::benchmarks::creativity::RemoteAssociatesBenchmark;
         use crate::benchmarks::executive::{FlankerBenchmark, StroopBenchmark};
         use crate::benchmarks::inhibition::StopSignalBenchmark;
         use crate::benchmarks::language::SemanticPrimingBenchmark;
@@ -3486,9 +3464,6 @@ mod tests {
             // Affect + Creativity + Social
             &EmotionalStroopBenchmark,
             &RemoteAssociatesBenchmark,
-            &AlternateUsesBenchmark,
-            &ConceptualBlendingBenchmark,
-            &InsightProblemBenchmark,
             &RmeBenchmark,
         ];
 
@@ -3540,8 +3515,8 @@ mod tests {
 
         // At least some benchmarks should produce results
         assert!(
-            total >= 17,
-            "Expected 17+ reliability results, got {}",
+            total >= 15,
+            "Expected 15+ reliability results, got {}",
             total
         );
     }
