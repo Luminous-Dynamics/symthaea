@@ -525,7 +525,7 @@ jobs:
             ${{ runner.os }}-cargo-wasm-
 
       - name: Install wasm-bindgen CLI
-        run: cargo install wasm-bindgen-cli --version 0.2.114
+        run: cargo install wasm-bindgen-cli --version 0.2.108
 
       - name: Install wasm-opt (binaryen)
         run: |
