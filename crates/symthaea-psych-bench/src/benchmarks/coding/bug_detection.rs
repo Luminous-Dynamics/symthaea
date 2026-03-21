@@ -68,6 +68,7 @@ impl BugCategory {
 }
 
 /// A code snippet with a known bug.
+#[allow(dead_code)]
 struct BugSnippet {
     buggy_code: &'static str,
     fixed_code: &'static str,
@@ -373,8 +374,8 @@ impl BugDetectionBenchmark {
             category_deltas[snippet.bug_category.index()].push(delta);
         }
 
-        for cat_idx in 0..n_categories {
-            let proto = BinaryHV::bundle(&category_deltas[cat_idx]);
+        for deltas in &category_deltas {
+            let proto = BinaryHV::bundle(deltas);
             category_prototypes.push(proto);
         }
 

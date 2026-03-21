@@ -74,7 +74,7 @@ fn encode_probability(
     }
 
     if hvs.is_empty() {
-        return zero_anchor.clone();
+        return *zero_anchor;
     }
     BinaryHV::bundle(&hvs)
 }

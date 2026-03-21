@@ -836,10 +836,13 @@ impl PhenomenalLayerAnalyzer {
     }
 
     fn compute_unity(&self, activation: &[f32]) -> f64 {
+        if activation.is_empty() {
+            return 0.5;
+        }
         // Simplified unity measure based on activation distribution
-        let mean: f32 = activation.iter().sum::<f32>() / activation.len() as f32;
-        let variance: f32 =
-            activation.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / activation.len() as f32;
+        let n = activation.len() as f32;
+        let mean: f32 = activation.iter().sum::<f32>() / n;
+        let variance: f32 = activation.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / n;
 
         // Lower variance = higher unity (more coherent representation)
         let normalized_var = (variance / 10.0).min(1.0);

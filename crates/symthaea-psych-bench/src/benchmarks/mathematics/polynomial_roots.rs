@@ -33,7 +33,7 @@ fn xor_shift(s: &mut u64) -> u64 {
 /// Encode an integer value as a BinaryHV via permutation from a base vector.
 fn encode_integer(base: &BinaryHV, value: i32) -> BinaryHV {
     if value == 0 {
-        return base.clone();
+        return *base;
     }
     let abs_val = value.unsigned_abs() as usize;
     if value > 0 {
@@ -72,7 +72,7 @@ fn evaluate_candidate(
     // Build evaluation HV: for each degree, bind the candidate raised to that
     // power with the degree role. This creates a "query" vector.
     let mut eval_bindings = Vec::new();
-    let mut power_hv = value_base.clone(); // x^0 = base
+    let mut power_hv = *value_base; // x^0 = base
     for role in degree_roles.iter().rev() {
         eval_bindings.push(role.bind(&power_hv));
         // x^(k+1) = bind_temporal(x^k, x) — non-commutative power encoding

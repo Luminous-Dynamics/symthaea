@@ -294,7 +294,7 @@ impl RemoteAssociatesBenchmark {
         let fractional_offset = if rank_pos > 0 {
             // How far solution's similarity is below the candidate just above it
             let above_sim = all_sims[rank_pos - 1].1;
-            let gap = (above_sim - sol_sim_val).max(0.0).min(0.1);
+            let gap = (above_sim - sol_sim_val).clamp(0.0, 0.1);
             gap as f64 * 5.0 // scale to [0, 0.5]
         } else {
             // Rank 1: how far above the next candidate
@@ -303,7 +303,7 @@ impl RemoteAssociatesBenchmark {
             } else {
                 0.0
             };
-            let margin = (sol_sim_val - below_sim).max(0.0).min(0.1);
+            let margin = (sol_sim_val - below_sim).clamp(0.0, 0.1);
             -(margin as f64 * 5.0) // negative offset = better than rank 1.0
         };
         let mean_rank = (rank as f64 + fractional_offset).max(0.5);

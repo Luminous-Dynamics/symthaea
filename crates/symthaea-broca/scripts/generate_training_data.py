@@ -239,6 +239,24 @@ def query_ollama(prompt: str, model: str = "qwen2.5-coder:7b") -> str | None:
         return None
 
 
+def quality_check(text: str, intent_name: str, desc: dict, model: str) -> bool:
+    """Use LLM as judge to verify text matches intent/tone conditioning."""
+    judge_prompt = f"""Rate if this text matches the specified intent and tone. Reply with ONLY "yes" or "no".
+
+Intent: {INTENT_DESCRIPTIONS[intent_name]}
+Certainty: {desc['epistemic']}
+Tone: {desc['valence']} valence, {desc['warmth']}, {desc['formality']}
+
+Text: "{text}"
+
+Does this text match the intent and tone? Reply ONLY "yes" or "no"."""
+
+    result = query_ollama(judge_prompt, model)
+    if result is None:
+        return True  # Assume pass on failure
+    return result.strip().lower().startswith("yes")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Generate Broca training data via LLM")
     parser.add_argument("--output", "-o", required=True, help="Output JSONL path")
@@ -246,6 +264,8 @@ def main():
     parser.add_argument("--model", "-m", default="qwen2.5-coder:7b", help="Ollama model")
     parser.add_argument("--seed", "-s", type=int, default=42, help="Random seed")
     parser.add_argument("--append", action="store_true", help="Append to existing file")
+    parser.add_argument("--quality-filter", action="store_true",
+                        help="Use LLM judge to filter low-quality samples")
     args = parser.parse_args()
 
     random.seed(args.seed)
@@ -278,6 +298,12 @@ def main():
             if len(words) > 80:
                 text = " ".join(words[:80])
 
+            # Quality filter: use LLM judge to verify intent/tone match
+            if args.quality_filter:
+                if not quality_check(text, intent_name, desc, args.model):
+                    failed += 1
+                    continue
+
             sample = {
                 "channels": channels,
                 "target_text": text,
@@ -289,7 +315,8 @@ def main():
             generated += 1
 
             if (i + 1) % 10 == 0:
-                print(f"  [{i+1}/{args.count}] generated={generated}, failed={failed}")
+                filtered = f", filtered={failed}" if args.quality_filter else ""
+                print(f"  [{i+1}/{args.count}] generated={generated}{filtered}")
 
     print(f"\nDone: {generated} samples written to {output_path}")
     if failed > 0:

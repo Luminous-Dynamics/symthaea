@@ -46,7 +46,7 @@ impl ConceptualBlendingBenchmark {
         let mut rng = seed ^ 0xA5A5A5A5A5A5A5A5;
 
         // Number of features per concept (3-6, influenced by WM capacity)
-        let n_features = (config.working_memory_capacity as usize).clamp(3, 6);
+        let n_features = config.working_memory_capacity.clamp(3, 6);
 
         // Lapse_rate degrades blending precision — models reduced cognitive
         // control during conceptual integration (Beaty et al., 2016; executive

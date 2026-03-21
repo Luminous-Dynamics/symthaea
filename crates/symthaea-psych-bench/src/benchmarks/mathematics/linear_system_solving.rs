@@ -43,7 +43,7 @@ struct TrialResult {
 /// opposite direction (by using a complementary shift).
 fn encode_integer(base: &BinaryHV, value: i32) -> BinaryHV {
     if value == 0 {
-        return base.clone();
+        return *base;
     }
     let abs_val = value.unsigned_abs() as usize;
     if value > 0 {
@@ -80,7 +80,7 @@ fn solve_component(
         .zip(b_hvs.iter())
         .map(|(row, b)| {
             // Bundle row info with b vector info for this equation
-            let combined = BinaryHV::bundle(&[row.bind(col_role), b.clone()]);
+            let combined = BinaryHV::bundle(&[row.bind(col_role), *b]);
             col_role.bind(&combined) // unbind to extract component estimate
         })
         .collect();
@@ -144,16 +144,8 @@ impl LinearSystemSolvingBenchmark {
             let b_base = BinaryHV::random(xor_shift(&mut rng));
 
             // Encode rows
-            let row1 = encode_row(
-                &[col1_role.clone(), col2_role.clone()],
-                &[a11, a12],
-                &value_base,
-            );
-            let row2 = encode_row(
-                &[col1_role.clone(), col2_role.clone()],
-                &[a21, a22],
-                &value_base,
-            );
+            let row1 = encode_row(&[col1_role, col2_role], &[a11, a12], &value_base);
+            let row2 = encode_row(&[col1_role, col2_role], &[a21, a22], &value_base);
 
             // Encode b vector entries
             let b1_hv = encode_integer(&b_base, b1);
@@ -161,8 +153,8 @@ impl LinearSystemSolvingBenchmark {
 
             // Solve for x1 and x2 via HDC unbinding
             let solved_x1 = solve_component(
-                &[row1.clone(), row2.clone()],
-                &[b1_hv.clone(), b2_hv.clone()],
+                &[row1, row2],
+                &[b1_hv, b2_hv],
                 &col1_role,
                 &value_base,
                 -8..=8,

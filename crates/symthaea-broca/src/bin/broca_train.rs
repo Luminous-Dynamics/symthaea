@@ -138,6 +138,8 @@ fn main() {
         merge_token_loss_weight: opts.merge_token_loss_weight,
         enable_fusion_during_training: opts.enable_fusion,
         fusion_warmup_epochs: opts.fusion_warmup_epochs,
+        contrastive_weight: opts.contrastive_weight,
+        contrastive_margin: opts.contrastive_margin,
         ..Default::default()
     };
 
@@ -348,6 +350,10 @@ struct TrainOpts {
     fusion_warmup_epochs: usize,
     /// Disable thought-seeded CfC initial state.
     no_thought_seed: bool,
+    /// Contrastive intent loss weight (default: 0.0 = off).
+    contrastive_weight: f32,
+    /// Contrastive margin (default: 0.0).
+    contrastive_margin: f32,
 }
 
 fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
@@ -381,6 +387,8 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
         enable_fusion: false,
         fusion_warmup_epochs: 0,
         no_thought_seed: false,
+        contrastive_weight: 0.0,
+        contrastive_margin: 0.0,
     };
 
     let mut i = 1;
@@ -554,6 +562,22 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
             "--no-thought-seed" => {
                 opts.no_thought_seed = true;
             }
+            "--contrastive" => {
+                i += 1;
+                opts.contrastive_weight = args
+                    .get(i)
+                    .ok_or("--contrastive requires a number")?
+                    .parse()
+                    .map_err(|_| "--contrastive must be a float")?;
+            }
+            "--contrastive-margin" => {
+                i += 1;
+                opts.contrastive_margin = args
+                    .get(i)
+                    .ok_or("--contrastive-margin requires a number")?
+                    .parse()
+                    .map_err(|_| "--contrastive-margin must be a float")?;
+            }
             "--fusion" => {
                 opts.enable_fusion = true;
             }
@@ -616,5 +640,7 @@ fn print_usage() {
     );
     eprintln!("  --merge-bias F       Merge-token loss weight (default: 1.5, 1.0 = off)");
     eprintln!("  --no-thought-seed    Disable thought-seeded CfC initial state");
+    eprintln!("  --contrastive F      Contrastive intent loss weight (default: 0.0 = off)");
+    eprintln!("  --contrastive-margin F  Margin for contrastive hinge (default: 0.0)");
     eprintln!("  --help, -h           Show this help message");
 }

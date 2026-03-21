@@ -336,12 +336,13 @@ impl OcrSystem {
 
         // Calculate contrast (std deviation of pixel values)
         let pixels: Vec<u8> = gray.pixels().map(|p| p[0]).collect();
-        let mean: f32 = pixels.iter().map(|&p| p as f32).sum::<f32>() / pixels.len() as f32;
+        let n = pixels.len().max(1) as f32;
+        let mean: f32 = pixels.iter().map(|&p| p as f32).sum::<f32>() / n;
         let variance: f32 = pixels
             .iter()
             .map(|&p| (p as f32 - mean).powi(2))
             .sum::<f32>()
-            / pixels.len() as f32;
+            / n;
         let std_dev = variance.sqrt();
 
         // Good contrast: std dev > 30 (on 0-255 scale)

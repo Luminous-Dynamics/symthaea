@@ -34,6 +34,7 @@ use symthaea_core::hdc::BinaryHV;
 pub struct HumanEvalMiniBenchmark;
 
 /// A HumanEval-style programming problem.
+#[allow(dead_code)]
 struct HumanEvalProblem {
     id: usize,
     name: &'static str,
@@ -291,7 +292,7 @@ impl HumanEvalMiniBenchmark {
                 0.35 + difficulty_noise_base,
             ];
 
-            let mut candidates = vec![correct_candidate.clone()];
+            let mut candidates = vec![correct_candidate];
             for &corruption in &distractor_corruptions {
                 let noise_level = corruption as f32;
                 let distractor = correct_candidate.add_noise(noise_level, xor_shift(&mut rng));
@@ -302,7 +303,7 @@ impl HumanEvalMiniBenchmark {
             let spec_query = if lapse_flip_prob > 0.0 {
                 spec_hv.add_noise(lapse_flip_prob, xor_shift(&mut rng))
             } else {
-                spec_hv.clone()
+                spec_hv
             };
 
             // Score each candidate against the specification query
@@ -424,7 +425,7 @@ impl HumanEvalMiniBenchmark {
             }
 
             // Bind all characters in the window
-            let mut trigram = char_hvs[0].clone();
+            let mut trigram = char_hvs[0];
             for hv in &char_hvs[1..] {
                 trigram = trigram.bind(hv);
             }

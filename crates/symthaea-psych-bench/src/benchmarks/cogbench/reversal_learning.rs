@@ -71,9 +71,7 @@ impl ReversalLearningBenchmark {
 
         for _trial in 0..max_trials {
             trials_since_event += 1;
-            if post_reversal_countdown > 0 {
-                post_reversal_countdown -= 1;
-            }
+            post_reversal_countdown = post_reversal_countdown.saturating_sub(1);
 
             // Score each stimulus: similarity of its learned association to reward_hv
             let score_a = assoc_a.similarity(&reward_hv) as f64;

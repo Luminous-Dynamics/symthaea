@@ -55,12 +55,12 @@ impl InsightProblemBenchmark {
         // More WM = more constraints the solver can track simultaneously,
         // which paradoxically makes restructuring harder (more to rearrange)
         // but also provides more restructuring strategies.
-        let n_constraints = (config.working_memory_capacity as usize).clamp(3, 6);
+        let n_constraints = config.working_memory_capacity.clamp(3, 6);
 
         // Number of restructuring strategies available = WM capacity - 1.
         // Models the cognitive resource allocation for exploring alternative
         // representations (Ash & Wiley, 2006; working memory and insight).
-        let n_strategies = ((config.working_memory_capacity as usize) - 1).clamp(2, 5);
+        let n_strategies = (config.working_memory_capacity - 1).clamp(2, 5);
 
         // Lapse_rate reduces the number of restructuring attempts.
         // Models attentional lapses that interrupt the restructuring process
@@ -102,7 +102,7 @@ impl InsightProblemBenchmark {
                 if i % 2 == 0 {
                     r.permute(1 + (i % 3))
                 } else {
-                    r.clone()
+                    *r
                 }
             })
             .collect();
@@ -116,7 +116,7 @@ impl InsightProblemBenchmark {
             .map(|(i, f)| {
                 if i < n_constraints / 2 {
                     // Keep original filler (shared constraint)
-                    f.clone()
+                    *f
                 } else {
                     // New filler (relaxed constraint)
                     BinaryHV::random(xor_shift(&mut rng))
@@ -204,11 +204,11 @@ impl InsightProblemBenchmark {
                     2 => {
                         // Strategy: Partial re-bundling — combine subsets.
                         // Take first half from original, second half from permuted roles.
-                        let split = (n_constraints + 1) / 2;
+                        let split = n_constraints.div_ceil(2);
                         let mixed: Vec<BinaryHV> = (0..n_constraints)
                             .map(|i| {
                                 if i < split {
-                                    bindings[i].clone()
+                                    bindings[i]
                                 } else {
                                     let perm_shift = cycle + 1;
                                     roles[i].permute(perm_shift).bind(&fillers[i])
@@ -221,12 +221,12 @@ impl InsightProblemBenchmark {
                         // Strategy: Temporal re-encoding via bind_temporal.
                         // Encode the constraints as a temporal sequence rather than
                         // a simultaneous bundle — reveals sequential dependencies.
-                        let mut accum = bindings[0].clone();
+                        let mut accum = bindings[0];
                         for b in &bindings[1..] {
                             accum = accum.bind_temporal(b);
                         }
                         // Blend temporal and spatial representations
-                        BinaryHV::bundle(&[accum, problem_repr.clone()])
+                        BinaryHV::bundle(&[accum, problem_repr])
                     }
                     _ => {
                         // Strategy: Creative noise — perturb and explore.

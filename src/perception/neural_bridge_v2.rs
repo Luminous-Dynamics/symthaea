@@ -358,9 +358,10 @@ impl NeuralBridgeV2 {
 
         // 1. Projection margin uncertainty (how close to decision boundary)
         let margins: Vec<f32> = continuous.iter().map(|x| x.abs()).collect();
-        let avg_margin = margins.iter().sum::<f32>() / margins.len() as f32;
+        let n = margins.len().max(1) as f32;
+        let avg_margin = margins.iter().sum::<f32>() / n;
         let low_margin_count = margins.iter().filter(|&&m| m < 0.1).count();
-        let margin_uncertainty = low_margin_count as f32 / margins.len() as f32;
+        let margin_uncertainty = low_margin_count as f32 / n;
 
         if margin_uncertainty > 0.1 {
             uncertainty_sources.push(UncertaintySource::ProjectionMargin {

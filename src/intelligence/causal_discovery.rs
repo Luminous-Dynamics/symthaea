@@ -400,6 +400,9 @@ impl CausalDiscoveryEngine {
 
     /// RECI: Regression Error-based Causal Inference
     fn reci_score(&self, x: &[f64], y: &[f64]) -> f64 {
+        if x.is_empty() || y.is_empty() {
+            return 0.0;
+        }
         let res_xy = self.linear_residuals(x, y);
         let res_yx = self.linear_residuals(y, x);
 
@@ -418,6 +421,9 @@ impl CausalDiscoveryEngine {
 
     /// Robust RECI using Theil-Sen regression
     fn robust_reci_score(&self, x: &[f64], y: &[f64]) -> f64 {
+        if x.is_empty() || y.is_empty() {
+            return 0.0;
+        }
         let res_xy = self.theil_sen_residuals(x, y);
         let res_yx = self.theil_sen_residuals(y, x);
 
@@ -1167,6 +1173,9 @@ impl<'a> ParallelPredictHelper<'a> {
     }
 
     fn reci_score(x: &[f64], y: &[f64]) -> f64 {
+        if x.is_empty() || y.is_empty() {
+            return 0.0;
+        }
         let res_xy = Self::linear_residuals(x, y);
         let res_yx = Self::linear_residuals(y, x);
         let mse_xy = res_xy.iter().map(|r| r.powi(2)).sum::<f64>() / x.len() as f64;

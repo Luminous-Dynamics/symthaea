@@ -331,7 +331,7 @@ impl ContinuousMind {
             }
         }
 
-        let pairs = self.working_memory.len() * (self.working_memory.len() - 1) / 2;
+        let pairs = self.working_memory.len() * self.working_memory.len().saturating_sub(1) / 2;
         if pairs > 0 {
             self.state.consciousness_level = (total_integration / pairs as f64).clamp(0.0, 1.0);
         }

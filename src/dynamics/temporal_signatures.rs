@@ -186,12 +186,13 @@ impl TrajectoryFeatures {
         // Convergence (inverse of recent variance)
         let recent_len = (history.len() / 4).max(5);
         let recent = &history[history.len().saturating_sub(recent_len)..];
-        let recent_mean: f32 = recent.iter().sum::<f32>() / recent.len() as f32;
+        let n = recent.len().max(1) as f32;
+        let recent_mean: f32 = recent.iter().sum::<f32>() / n;
         let recent_var: f32 = recent
             .iter()
             .map(|&t| (t - recent_mean).powi(2))
             .sum::<f32>()
-            / recent.len() as f32;
+            / n;
         let convergence = 1.0 / (1.0 + recent_var * 10.0);
 
         Self {

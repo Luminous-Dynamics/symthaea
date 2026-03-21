@@ -281,6 +281,22 @@ pub struct TrainingConfig {
     /// After fusion_warmup, fusion flags are enabled for the remainder.
     /// Default 0 (enable from the start when enable_fusion_during_training=true).
     pub fusion_warmup_epochs: usize,
+
+    // ── Contrastive Intent Loss ──
+    /// Weight for contrastive intent loss (0.0 = disabled).
+    /// After processing each training pair's token sequence, the final CfC output HV
+    /// is compared against a randomly sampled negative pair's thought HV (different intent).
+    /// Loss = weight × max(0, similarity(output, neg_thought) - margin).
+    /// This trains the CfC to produce intent-discriminative outputs — different intents
+    /// should map to different regions of HDC space.
+    ///
+    /// Science: Contrastive learning (Chen et al. 2020, SimCLR) adapted to thought-space.
+    /// Recommended: 0.1-0.3.
+    pub contrastive_weight: f32,
+    /// Margin for contrastive loss hinge. Similarity below this is penalty-free.
+    /// Default 0.0 (any positive similarity incurs loss).
+    /// Higher values (e.g., 0.1) allow some overlap between intents.
+    pub contrastive_margin: f32,
 }
 
 impl Default for TrainingConfig {
@@ -315,6 +331,8 @@ impl Default for TrainingConfig {
             merge_token_loss_weight: 1.0, // 1.0 = disabled; use --merge-bias 1.5 to enable
             enable_fusion_during_training: false,
             fusion_warmup_epochs: 0,
+            contrastive_weight: 0.0,
+            contrastive_margin: 0.0,
         }
     }
 }
@@ -805,6 +823,37 @@ pub fn train_with_adam(
         || config.enable_anomaly_response
         || track_alignment;
 
+    // Pre-compute per-pair intent indices for contrastive sampling.
+    // Group pairs by intent (argmax of channels 0-7) so we can sample negatives
+    // with different intents efficiently.
+    let contrastive_enabled = config.contrastive_weight > 0.0;
+    let pair_intents: Vec<usize> = if contrastive_enabled {
+        dataset
+            .pairs
+            .iter()
+            .map(|p| {
+                (0..8usize.min(p.channels.len()))
+                    .max_by(|&a, &b| p.channels[a].total_cmp(&p.channels[b]))
+                    .unwrap_or(0)
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+    // Pre-encode all thought HVs for contrastive negative lookup
+    let contrastive_thought_hvs: Vec<_> = if contrastive_enabled {
+        dataset
+            .pairs
+            .iter()
+            .map(|p| {
+                let channels = p.to_thought_channels();
+                generator.encoder().encode(&channels)
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
     for epoch in 0..config.epochs {
         // Training-time fusion: enable/disable fusion flags based on epoch.
         // Before fusion_warmup: raw CfC path (learn basic dynamics).
@@ -1023,6 +1072,32 @@ pub fn train_with_adam(
 
                 prev_token = target_id;
                 global_step += 1;
+            }
+
+            // Contrastive intent loss: after processing the full token sequence,
+            // compare final CfC output against a negative example's thought HV.
+            // Different intents should produce different output representations.
+            if contrastive_enabled {
+                let my_intent = pair_intents[dataset_idx];
+                // Deterministic negative sampling: find a pair with a different intent
+                let neg_seed_val = (epoch * 100003 + pair_idx * 1009 + 7) % dataset.pairs.len();
+                let neg_idx = (neg_seed_val..neg_seed_val + dataset.pairs.len())
+                    .map(|i| i % dataset.pairs.len())
+                    .find(|&i| pair_intents[i] != my_intent)
+                    .unwrap_or((neg_seed_val + 1) % dataset.pairs.len());
+
+                let output_hv = generator.controller().output_hv();
+                let neg_thought = &contrastive_thought_hvs[neg_idx];
+                let neg_sim = output_hv.similarity(neg_thought);
+
+                // Hinge loss: penalize when output is too similar to negative thought
+                let contrastive_loss =
+                    config.contrastive_weight * (neg_sim - config.contrastive_margin).max(0.0);
+                if contrastive_loss > 0.0 {
+                    total_loss += contrastive_loss;
+                    // Count as 1 token equivalent for averaging
+                    total_tokens += 1;
+                }
             }
         }
 

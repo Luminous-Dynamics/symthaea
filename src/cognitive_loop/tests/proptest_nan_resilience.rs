@@ -68,4 +68,19 @@ proptest! {
         prop_assert!(result >= -1.0 && result <= 1.0,
             "cosine_f32 out of [-1,1]: {}", result);
     }
+
+    /// Working memory pair calculation never underflows, even with 0 or 1 items.
+    #[test]
+    fn prop_working_memory_pairs_no_underflow(
+        n in 0usize..200,
+    ) {
+        // Mirrors mind/tick.rs:334 — must use saturating_sub to avoid usize underflow
+        let pairs = n * n.saturating_sub(1) / 2;
+        // pairs should be the triangular number T(n-1)
+        if n < 2 {
+            prop_assert_eq!(pairs, 0, "pairs must be 0 for n={}", n);
+        } else {
+            prop_assert_eq!(pairs, n * (n - 1) / 2, "pairs mismatch for n={}", n);
+        }
+    }
 }
