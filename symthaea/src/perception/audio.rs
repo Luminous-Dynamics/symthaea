@@ -279,6 +279,14 @@ impl AudioPerception {
     /// Extract prosody features from audio
     fn extract_prosody(&self, samples: &[f32], _hvs: &[symthaea_stt::HV16]) -> ProsodyFeatures {
         // Simple prosody extraction
+        if samples.is_empty() {
+            return ProsodyFeatures {
+                avg_pitch: 0.0,
+                pitch_variance: 0.0,
+                avg_energy: 0.0,
+                speaking_rate: 0.0,
+            };
+        }
         let energy: f32 = samples.iter().map(|x| x.abs()).sum::<f32>() / samples.len() as f32;
 
         // Count zero crossings as rough pitch proxy
