@@ -60,8 +60,12 @@ pub mod hardware_probe;
 pub mod neuroevolution;
 
 pub mod causal;
+pub mod global_workspace;
 pub mod immune;
+pub mod knowledge;
+pub mod memory_consolidation;
 pub mod reasoning;
+pub mod social_tom;
 
 #[cfg(feature = "wasm")]
 pub mod quickening;

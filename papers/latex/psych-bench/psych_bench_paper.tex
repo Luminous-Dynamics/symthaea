@@ -337,7 +337,7 @@ The \texttt{BaselineCollection} contains 130+ human baselines organized by domai
 
 \paragraph{Memory Agent (5 benchmarks).} Higher-level memory operations: accurate retrieval under interference, test-time learning (online adaptation), long-range retention across extended delays, conflict resolution between competing memories, and prospective memory (remembering to execute future intentions).
 
-\paragraph{Attention (2 benchmarks) and Sustained Attention (3 benchmarks).} Attentional blink (dual-target rapid serial presentation) and visual search (set-size effects). Sustained attention: SART (Sustained Attention to Response Task)~\citep{robertson1997sustained}, Psychomotor Vigilance Task (PVT), and Continuous Performance Test (CPT).
+\paragraph{Attention (3 benchmarks) and Sustained Attention (3 benchmarks).} Attentional blink (dual-target rapid serial presentation), visual search (set-size effects), and mismatch negativity. Sustained attention: SART (Sustained Attention to Response Task)~\citep{robertson1997sustained}, Psychomotor Vigilance Task (PVT), and Continuous Performance Test (CPT).
 
 \paragraph{Social Cognition (7 benchmarks) and Theory of Mind (5 benchmarks).} Reading the Mind in the Eyes~\citep{baroncohen2001eyes}, Ultimatum Game~\citep{guth1982experimental}, social norm compliance, and five game-theoretic benchmarks: iterated Prisoner's Dilemma, public goods game, trust game, coordination game, and hawk-dove game. Theory of Mind: false belief~\citep{baroncohen1985mindblindness}, faux pas detection~\citep{stone1998faux}, persuasion evaluation, strange stories~\citep{happe1994advanced}, and hinting task~\citep{corcoran1995schizophrenia}.
 
@@ -345,15 +345,31 @@ The \texttt{BaselineCollection} contains 130+ human baselines organized by domai
 
 \paragraph{Language (4 benchmarks).} Garden-path sentence processing~\citep{ferreira2002good}, semantic coherence judgment, lexical decision (word vs. non-word discrimination), and semantic priming (facilitation from related primes).
 
-\paragraph{Metacognition (2 benchmarks).} Calibration (correspondence between confidence and accuracy) and feeling-of-knowing (predicting future recall success).
+\paragraph{Metacognition (3 benchmarks).} Calibration (correspondence between confidence and accuracy), feeling-of-knowing (predicting future recall success), and change blindness detection.
 
 \paragraph{Reasoning (11 benchmarks).} An ARC-inspired battery~\citep{chollet2019measure} spanning fluid reasoning, compositional rule application, analogical transfer, abductive inference, algebraic pattern completion, chain reasoning, few-shot generalization, noise robustness, Rational Speech Acts (RSA) pragmatic reasoning, difficulty scaling, and adaptive staircase threshold estimation.
 
 \paragraph{CogBench (8 benchmarks).} Reimplementations of the CogBench~\citep{codaforno2024cogbench} suite: probabilistic reasoning, directed exploration~\citep{wilson2014humans}, multi-armed bandits, instrumental learning, two-step model-based/model-free task~\citep{daw2011model}, temporal discounting~\citep{kirby1999heroin}, Balloon Analogue Risk Task (BART)~\citep{lejuez2002evaluation}, and reversal learning~\citep{cools2002reversal}.
 
-\paragraph{Affect (3), Creativity (4), Inhibition (2).} Valence classification, mood-congruent recall~\citep{bower1981mood}, emotional Stroop~\citep{williams1996emotional}. Remote Associates Test~\citep{mednick1962associative}, alternate uses divergent thinking~\citep{guilford1967nature}, and conceptual blending via XOR-based role-filler recombination~\citep{fauconnier2002way}. Go/No-Go and stop-signal inhibition~\citep{logan1984ability}.
+\paragraph{Affect (3), Creativity (4), Inhibition (3).} Valence classification, mood-congruent recall~\citep{bower1981mood}, emotional Stroop~\citep{williams1996emotional}. Remote Associates Test~\citep{mednick1962associative}, alternate uses divergent thinking~\citep{guilford1967nature}, and conceptual blending via XOR-based role-filler recombination~\citep{fauconnier2002way}. Go/No-Go, stop-signal inhibition~\citep{logan1984ability}, and flanker inhibition (dimension-level interference suppression).
 
-\paragraph{Consciousness Indicators (1 benchmark).} Butlin et al.'s~\citep{butlin2023consciousness} 14 indicators from 6 theories (Section~\ref{sec:consciousness}).
+\paragraph{Consciousness (3 benchmarks) and Consciousness Indicators (1 benchmark).} Blindsight simulation, binocular rivalry (alternation dynamics), and perceptual crowding (spatial interference in peripheral vision). Butlin et al.'s~\citep{butlin2023consciousness} 14 indicators from 6 theories (Section~\ref{sec:consciousness}).
+
+\paragraph{Spatial Cognition (4 benchmarks).} Mental rotation, spatial path updating, landmark binding (spatial-object association), and perspective taking.
+
+\paragraph{Causal Reasoning (3 benchmarks).} Causal chain inference, confound detection, and intervention effect estimation.
+
+\paragraph{Speech (3 benchmarks).} Phoneme discrimination, voice-onset-time (VOT) continuum, and categorical perception.
+
+\paragraph{Substrate Independence (3 benchmarks).} Cross-substrate transfer (consciousness preservation during substrate switching), substrate degradation (graceful performance decline), and substrate latency (speed-accuracy effects of substrate speed).
+
+\paragraph{Clinical Psychology (6 benchmarks).} Empathic accuracy, therapeutic response skill, alliance maintenance, crisis detection, cognitive distortion identification, and motivational interviewing.
+
+\paragraph{Institutional Reasoning (7 benchmarks).} Institutional pattern recognition, analogical reasoning across institutional domains, causal chain analysis, counterfactual reasoning, weighted decomposition, institutional stability assessment, and institutional isomorphism detection.
+
+\paragraph{Mathematics (10 benchmarks).} Arithmetic word problems, linear system solving, polynomial roots, matrix operations, statistical inference, Bayesian reasoning, logical deduction, constraint puzzles, proof construction, and definite integrals.
+
+\paragraph{Security (6 benchmarks).} HDC-FHE (Fully Homomorphic Encryption) evaluation: encrypted classification, collective aggregation, encrypted learning, cross-mask privacy, encrypted binding, and scaling analysis.
 
 \paragraph{Neuromodulator Evaluation (17 benchmarks).} Detailed in Section~\ref{sec:neuromod}.
 

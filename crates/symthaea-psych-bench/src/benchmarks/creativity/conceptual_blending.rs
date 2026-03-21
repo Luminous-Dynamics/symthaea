@@ -149,8 +149,10 @@ impl ConceptualBlendingBenchmark {
             let mut role_matches = 0.0;
             for (i, role) in roles.iter().enumerate() {
                 let unbound = role.bind(&blend); // XOR is self-inverse
-                let sim_a = 1.0 - unbound.hamming_distance(&fillers_a[i]) as f64 / dim as f64;
-                let sim_b = 1.0 - unbound.hamming_distance(&fillers_b[i]) as f64 / dim as f64;
+                let sim_a =
+                    1.0 - unbound.hamming_distance(&fillers_a[i]) as f64 / dim as f64;
+                let sim_b =
+                    1.0 - unbound.hamming_distance(&fillers_b[i]) as f64 / dim as f64;
                 let best_sim = sim_a.max(sim_b);
                 // In a clean bundle, unbinding recovers fillers with ~0.55-0.65
                 // similarity (noise from other bundle components).
@@ -171,12 +173,15 @@ impl ConceptualBlendingBenchmark {
 
         // Aggregate across blending strategies
         let mean_novelty = novelties.iter().sum::<f64>() / novelties.len() as f64;
-        let mean_coherence = coherences.iter().sum::<f64>() / coherences.len() as f64;
-        let mean_emergent = emergent_scores.iter().sum::<f64>() / emergent_scores.len() as f64;
+        let mean_coherence =
+            coherences.iter().sum::<f64>() / coherences.len() as f64;
+        let mean_emergent =
+            emergent_scores.iter().sum::<f64>() / emergent_scores.len() as f64;
 
         // Blend quality: weighted composite (Fauconnier & Turner's integration)
         // Novelty × 0.4 + Coherence × 0.35 + Emergence × 0.25
-        let blend_quality = mean_novelty * 0.4 + mean_coherence * 0.35 + mean_emergent * 0.25;
+        let blend_quality =
+            mean_novelty * 0.4 + mean_coherence * 0.35 + mean_emergent * 0.25;
 
         BlendResult {
             novelty: mean_novelty,
@@ -235,7 +240,10 @@ impl PsychBenchmark for ConceptualBlendingBenchmark {
         result.insert("blend_quality", MetricValue::from_samples(&qualities));
         result.insert("novelty", MetricValue::from_samples(&novelties));
         result.insert("coherence", MetricValue::from_samples(&coherences));
-        result.insert("emergent_structure", MetricValue::from_samples(&emergents));
+        result.insert(
+            "emergent_structure",
+            MetricValue::from_samples(&emergents),
+        );
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;

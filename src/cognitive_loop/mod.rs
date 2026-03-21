@@ -814,6 +814,11 @@ pub struct CognitiveLoopService {
     #[cfg(feature = "ssm_language")]
     language_manager: managers::LanguageManager,
 
+    /// Vision Manager: visual surprise → exploration, attention, habituation.
+    /// Implements CognitiveSubsystem at interval 17. Feature-gated behind `vision-manifold`.
+    #[cfg(feature = "vision-manifold")]
+    vision_manager: managers::VisionManager,
+
     /// Cantor dream: broadcast buffer, cleanup engine, activation, surprise, resonance.
     pub(crate) cantor_dream: cantor_dream_manager::CantorDreamManager,
 

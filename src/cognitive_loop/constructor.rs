@@ -1143,6 +1143,8 @@ impl CognitiveLoopService {
             reasoning_manager: super::managers::ReasoningManager::default(),
             #[cfg(feature = "ssm_language")]
             language_manager: super::managers::LanguageManager::default(),
+            #[cfg(feature = "vision-manifold")]
+            vision_manager: super::managers::VisionManager::default(),
             security_telemetry: crate::swarm::SecurityTelemetry::default(),
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
             streaming_inference: if enable_streaming_inference {

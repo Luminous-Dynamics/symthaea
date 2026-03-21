@@ -47,10 +47,7 @@ fn main() {
             timestamp_ms: i * 100,
         });
     }
-    println!(
-        "  Baseline established. Anomaly count: {}",
-        monitor.anomaly_count()
-    );
+    println!("  Baseline established. Anomaly count: {}", monitor.anomaly_count());
 
     // Inject anomalous reading
     println!("  Injecting temperature spike (350°C vs ~210°C baseline)...");
@@ -70,10 +67,8 @@ fn main() {
     let mfg_reading = monitor.to_manufacturing_reading();
     println!(
         "  → ManufacturingReading: tol={:.2} surface={:.2} throughput={:.2} energy={:.2}",
-        mfg_reading.tolerance,
-        mfg_reading.surface_quality,
-        mfg_reading.throughput,
-        mfg_reading.energy_cost
+        mfg_reading.tolerance, mfg_reading.surface_quality,
+        mfg_reading.throughput, mfg_reading.energy_cost
     );
 
     // ── 2. ManufacturingTwin: FEP-based process monitoring ──────────────
@@ -147,10 +142,7 @@ fn main() {
     let fail_path = [
         ("Start print", AutonomyEvent::PrintStarted("JOB-002".into())),
         ("Print done (q=0.25)", AutonomyEvent::PrintCompleted(0.25)),
-        (
-            "QC failed",
-            AutonomyEvent::QcFailed("Delamination detected".into()),
-        ),
+        ("QC failed", AutonomyEvent::QcFailed("Delamination detected".into())),
     ];
     for (desc, event) in &fail_path {
         autonomy2.apply(event.clone());

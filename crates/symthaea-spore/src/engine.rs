@@ -366,6 +366,12 @@ pub struct SporeEngine {
     reasoning: ReasoningEngine,
     immune: ImmuneSystem,
     causal: CausalDiscovery,
+
+    // Phase 9-12: Social, Knowledge, Memory Consolidation, Global Workspace
+    social: crate::social_tom::SocialMind,
+    knowledge: crate::knowledge::KnowledgeEngine,
+    consolidator: crate::memory_consolidation::MemoryConsolidator,
+    workspace: crate::global_workspace::GlobalWorkspace,
 }
 
 impl SporeEngine {
@@ -465,6 +471,10 @@ impl SporeEngine {
             reasoning: ReasoningEngine::new(),
             immune: ImmuneSystem::new(),
             causal: CausalDiscovery::new(),
+            social: crate::social_tom::SocialMind::new(),
+            knowledge: crate::knowledge::KnowledgeEngine::with_defaults(),
+            consolidator: crate::memory_consolidation::MemoryConsolidator::with_defaults(),
+            workspace: crate::global_workspace::GlobalWorkspace::new(),
         }
     }
 
@@ -571,17 +581,11 @@ impl SporeEngine {
         // PE-driven production (no manual decay — reuptake handles that).
         // Immune lr_factor attenuates production under threat conditions.
         // DA: reward prediction error (Schultz 1997)
-        self.bath
-            .dopamine
-            .produce(prediction_error * 0.08 * lr_factor);
+        self.bath.dopamine.produce(prediction_error * 0.08 * lr_factor);
         // NE: arousal/alertness from surprise (Aston-Jones & Cohen 2005)
-        self.bath
-            .noradrenaline
-            .produce(prediction_error * 0.10 * lr_factor);
+        self.bath.noradrenaline.produce(prediction_error * 0.10 * lr_factor);
         // 5-HT: contentment from low surprise (Dayan & Huys 2009)
-        self.bath
-            .serotonin
-            .produce((1.0 - prediction_error) * 0.04 * lr_factor);
+        self.bath.serotonin.produce((1.0 - prediction_error) * 0.04 * lr_factor);
         // OT: baseline social presence — doesn't require BLE peers
         self.bath.oxytocin.produce(0.003);
 
@@ -730,6 +734,79 @@ impl SporeEngine {
             ("serotonin", neuromods[2] as f64),
             ("harmony", harmony_alignment as f64),
         ]);
+
+        // ── Phase 9-12: Social ToM, Knowledge, Consolidation, GWT ───────
+
+        // Global Workspace: submit perception, reasoning, and emotional state.
+        self.workspace.submit(
+            "perception",
+            input_text.unwrap_or("hv_input"),
+            prediction_error.clamp(0.0, 1.0),
+        );
+        self.workspace.submit(
+            "emotion",
+            if neuromods[2] > 0.6 { "contentment" } else if neuromods[0] > 0.6 { "excitement" } else { "neutral" },
+            ((neuromods[0] + neuromods[2]) * 0.5).clamp(0.0, 1.0),
+        );
+        self.workspace.submit(
+            "consciousness",
+            if consciousness_level > 0.5 { "high_awareness" } else { "low_awareness" },
+            consciousness_level,
+        );
+
+        // Run workspace competition
+        let _competition = self.workspace.compete();
+
+        // Social ToM: observe user input as partner interaction.
+        if let Some(text) = input_text {
+            self.social.observe_partner("user", text);
+
+            // Apply empathic neuromodulation
+            let emp = self.social.empathic_modulation();
+            self.bath.oxytocin.level = (self.bath.oxytocin.level + emp.oxytocin_delta).clamp(0.0, 1.0);
+            self.bath.noradrenaline.level = (self.bath.noradrenaline.level + emp.norepinephrine_delta).clamp(0.0, 1.0);
+            self.bath.serotonin.level = (self.bath.serotonin.level + emp.serotonin_delta).clamp(0.0, 1.0);
+            self.bath.dopamine.level = (self.bath.dopamine.level + emp.dopamine_delta).clamp(0.0, 1.0);
+        }
+
+        // Knowledge: learn from high-confidence cycle outputs.
+        if consciousness_level > 0.3 {
+            if let Some(text) = input_text {
+                let source = if prediction_error < 0.3 { "observed" } else { "inferred" };
+                // Extract a simple fact from the input
+                let words: Vec<&str> = text.split_whitespace().collect();
+                if words.len() >= 2 {
+                    self.knowledge.learn(
+                        words[0],
+                        "context",
+                        &words[1..].join(" "),
+                        source,
+                        self.cycle_count,
+                    );
+                }
+            }
+        }
+
+        // Periodic knowledge decay (every 100 cycles)
+        if self.cycle_count % 100 == 0 {
+            self.knowledge.confidence_decay(100);
+        }
+
+        // Memory consolidation: record episode if salience > threshold.
+        let salience = consciousness_level * 0.6 + prediction_error * 0.4;
+        if salience > 0.1 {
+            self.consolidator.record(
+                input_text.unwrap_or("hv_cycle"),
+                consciousness_level,
+                prediction_error,
+                self.cycle_count,
+            );
+        }
+
+        // Periodic consolidation (every 50 cycles — dream replay).
+        if self.cycle_count % 50 == 0 && self.cycle_count > 0 {
+            let _consolidation = self.consolidator.consolidate();
+        }
 
         // Auto-checkpoint
         if self.checkpoint_interval > 0 && self.cycle_count % self.checkpoint_interval == 0 {
@@ -2037,8 +2114,7 @@ impl SporeEngine {
             self.bath.oxytocin.effective(),
         ];
         let harmony = self.evaluate_harmony_alignment(self.last_consciousness);
-        self.reasoning
-            .run(input, self.last_consciousness, 0.0, &neuromods, harmony)
+        self.reasoning.run(input, self.last_consciousness, 0.0, &neuromods, harmony)
     }
 
     /// Assess an input for threats. Returns ThreatAssessment.
@@ -2166,6 +2242,67 @@ impl SporeEngine {
             .encode_sentence(text)
             .unwrap_or_else(|_| vec![0i8; HDC_DIMENSION]);
         encoded.iter().map(|&x| x as f32).collect()
+    }
+
+    // ======================================================================
+    // Social Theory of Mind
+    // ======================================================================
+
+    /// Get the social mind state (partners, empathy, coherence).
+    pub fn social_mind_state(&self) -> crate::social_tom::SocialMindState {
+        self.social.state()
+    }
+
+    /// Social coherence score (0-1).
+    pub fn social_coherence(&self) -> f32 {
+        self.social.social_coherence()
+    }
+
+    // ======================================================================
+    // Knowledge Engine
+    // ======================================================================
+
+    /// Query knowledge facts about a subject.
+    pub fn knowledge_query(&mut self, subject: &str) -> crate::knowledge::QueryResult {
+        self.knowledge.query_about(subject)
+    }
+
+    /// Knowledge engine statistics.
+    pub fn knowledge_stats(&self) -> crate::knowledge::KnowledgeStats {
+        self.knowledge.stats()
+    }
+
+    // ======================================================================
+    // Memory Consolidation
+    // ======================================================================
+
+    /// Trigger memory consolidation (dream replay).
+    pub fn memory_consolidate(&mut self) -> crate::memory_consolidation::ConsolidationResult {
+        self.consolidator.consolidate()
+    }
+
+    /// Memory consolidation statistics.
+    pub fn consolidation_stats(&self) -> crate::memory_consolidation::ConsolidationStats {
+        self.consolidator.stats()
+    }
+
+    // ======================================================================
+    // Global Workspace
+    // ======================================================================
+
+    /// Get the current workspace state.
+    pub fn workspace_state(&self) -> crate::global_workspace::WorkspaceState {
+        self.workspace.state()
+    }
+
+    /// Whether the workspace has reached ignition (conscious experience).
+    pub fn workspace_ignition(&self) -> bool {
+        self.workspace.ignition_check()
+    }
+
+    /// Workspace Phi contribution.
+    pub fn workspace_phi_contribution(&self) -> f32 {
+        self.workspace.workspace_phi_contribution()
     }
 }
 

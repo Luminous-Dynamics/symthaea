@@ -27,10 +27,10 @@ pub mod toolpath;
 pub mod validate;
 
 pub mod cincinnati_live;
-pub mod defect_prediction;
 pub mod hardware_config;
 pub mod nurbs;
 pub mod step_import;
+pub mod defect_prediction;
 
 pub use bsp::{csg_intersect, csg_subtract};
 pub use csg::{BooleanOp, CSGNode, Primitive, Transform3D};

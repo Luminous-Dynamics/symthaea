@@ -80,7 +80,10 @@ pub fn basis_function(knots: &[f32], i: usize, degree: u32, t: f32) -> f32 {
     }
 
     // Right term: (t_{i+p+1} - t) / (t_{i+p+1} - t_{i+1})  *  N_{i+1, p-1}(t)
-    let denom_right = knots.get(i + degree as usize + 1).copied().unwrap_or(0.0)
+    let denom_right = knots
+        .get(i + degree as usize + 1)
+        .copied()
+        .unwrap_or(0.0)
         - knots.get(i + 1).copied().unwrap_or(0.0);
     if denom_right.abs() > 1e-10 {
         if let Some(&k) = knots.get(i + degree as usize + 1) {
@@ -261,16 +264,10 @@ impl NurbsSurface {
         let dv = self.degree_v as usize;
 
         let u_start = self.knots_u.get(du).copied().unwrap_or(0.0);
-        let u_end = self
-            .knots_u
-            .get(rows)
-            .copied()
+        let u_end = self.knots_u.get(rows).copied()
             .unwrap_or_else(|| self.knots_u.last().copied().unwrap_or(1.0));
         let v_start = self.knots_v.get(dv).copied().unwrap_or(0.0);
-        let v_end = self
-            .knots_v
-            .get(cols)
-            .copied()
+        let v_end = self.knots_v.get(cols).copied()
             .unwrap_or_else(|| self.knots_v.last().copied().unwrap_or(1.0));
 
         // Evaluate grid
@@ -369,7 +366,10 @@ impl NurbsSurface {
         Self {
             degree_u: 1,
             degree_v: 1,
-            control_points: vec![vec![corners[0], corners[1]], vec![corners[2], corners[3]]],
+            control_points: vec![
+                vec![corners[0], corners[1]],
+                vec![corners[2], corners[3]],
+            ],
             weights: vec![vec![1.0, 1.0], vec![1.0, 1.0]],
             knots_u: vec![0.0, 0.0, 1.0, 1.0],
             knots_v: vec![0.0, 0.0, 1.0, 1.0],

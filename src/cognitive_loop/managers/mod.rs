@@ -139,3 +139,8 @@ pub use social_fabric_manager::SocialFabricManager;
 pub mod survival_manager;
 #[cfg(feature = "survival")]
 pub use survival_manager::SurvivalManager;
+
+#[cfg(feature = "vision-manifold")]
+pub mod vision_manager;
+#[cfg(feature = "vision-manifold")]
+pub use vision_manager::VisionManager;

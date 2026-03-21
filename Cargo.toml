@@ -621,6 +621,7 @@ serial_test = "3.2"
 symthaea-broca = { path = "crates/symthaea-broca" }
 symthaea-crucible = { path = "crates/symthaea-crucible" }
 symthaea-mycelix-conductor = { path = "crates/symthaea-mycelix-conductor" }
+mycelix-bridge-common = { path = "../crates/mycelix-bridge-common" }
 tempfile = "3.8"  # For perception tests
 
 # Binaries

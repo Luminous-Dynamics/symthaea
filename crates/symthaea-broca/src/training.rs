@@ -244,6 +244,7 @@ pub struct TrainingConfig {
     pub coherence_collapse_threshold: f32,
 
     // ── Training-Time Fusion ──
+
     /// Weight for coherence alignment loss (0.0 = disabled).
     /// When > 0, adds `weight * (1 - cosine(output_hv, thought_hv))` to per-token loss.
     /// This trains the CfC to keep output representationally aligned with input thought.
@@ -251,6 +252,7 @@ pub struct TrainingConfig {
     pub coherence_alignment_weight: f32,
 
     // ── Training-Time Fusion ──
+
     /// Enable fusion flags on the generator's controller during training.
     /// When true, compositional logits, adaptive dt, and adaptive alpha are
     /// activated before the training loop begins, so BPTT gradients flow through
@@ -2948,7 +2950,11 @@ mod tests {
         let mut dataset = TrainingDataset::default();
         for intent in 0..4 {
             let channels = ThoughtChannels::with_intent(intent);
-            dataset.push(TrainingPair::new(channels, "hello world".to_string(), &tok));
+            dataset.push(TrainingPair::new(
+                channels,
+                "hello world".to_string(),
+                &tok,
+            ));
         }
 
         // Pre-training baseline
@@ -2980,11 +2986,7 @@ mod tests {
 
         // Verify all metrics are finite
         for m in &metrics {
-            assert!(
-                m.avg_loss.is_finite(),
-                "Loss should be finite at epoch {}",
-                m.epoch
-            );
+            assert!(m.avg_loss.is_finite(), "Loss should be finite at epoch {}", m.epoch);
         }
 
         // Verify fusion training changed behavior (weights updated)

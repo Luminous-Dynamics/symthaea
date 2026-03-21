@@ -115,6 +115,14 @@ export class SporeEngine {
      */
     inject_neuromodulator(name: string, amount: number): void;
     /**
+     * Query knowledge facts about a subject. Returns QueryResult as JS object.
+     */
+    knowledge_query(subject: string): any;
+    /**
+     * Knowledge engine statistics: fact count, contradiction count, etc.
+     */
+    knowledge_stats(): any;
+    /**
      * Load trained Broca checkpoint weights from a binary buffer.
      *
      * The checkpoint file (broca-spore-v1.bin) contains trained token embeddings,
@@ -140,6 +148,10 @@ export class SporeEngine {
      * complexity of the response via Lempel-Ziv compression.
      */
     measure_pci(perturbation_magnitude: number, observation_cycles: number): any;
+    /**
+     * Trigger memory consolidation (dream replay). Returns ConsolidationResult.
+     */
+    memory_consolidate(): any;
     /**
      * Memory subsystem statistics.
      */
@@ -167,6 +179,10 @@ export class SporeEngine {
      */
     set_substrate(substrate: string): void;
     /**
+     * Social mind state: partners, empathy level, coherence.
+     */
+    social_mind_state(): any;
+    /**
      * Run a split-brain experiment. Returns SplitBrainResult as JS object.
      *
      * Partitions the network into hemispheres and measures whether splitting
@@ -189,6 +205,14 @@ export class SporeEngine {
      * Human-readable topology report.
      */
     topology_report(): string;
+    /**
+     * Whether the workspace has reached ignition (conscious experience).
+     */
+    workspace_ignition(): boolean;
+    /**
+     * Current workspace state: broadcast, contents, history.
+     */
+    workspace_state(): any;
 }
 
 /**
@@ -240,20 +264,26 @@ export interface InitOutput {
     readonly sporeengine_harmony_alignment: (a: number) => number;
     readonly sporeengine_honest_confidence: (a: number) => number;
     readonly sporeengine_inject_neuromodulator: (a: number, b: number, c: number, d: number) => void;
+    readonly sporeengine_knowledge_query: (a: number, b: number, c: number, d: number) => void;
+    readonly sporeengine_knowledge_stats: (a: number, b: number) => void;
     readonly sporeengine_load_broca_checkpoint: (a: number, b: number, c: number, d: number) => void;
     readonly sporeengine_load_broca_pipeline_checkpoint: (a: number, b: number, c: number, d: number) => void;
     readonly sporeengine_measure_pci: (a: number, b: number, c: number, d: number) => void;
+    readonly sporeengine_memory_consolidate: (a: number, b: number) => void;
     readonly sporeengine_memory_stats: (a: number, b: number) => void;
     readonly sporeengine_neuromod_state: (a: number, b: number) => void;
     readonly sporeengine_new: (a: number, b: number) => void;
     readonly sporeengine_reasoning_cycle: (a: number, b: number, c: number, d: number) => void;
     readonly sporeengine_safety_level: (a: number, b: number) => void;
     readonly sporeengine_set_substrate: (a: number, b: number, c: number) => void;
+    readonly sporeengine_social_mind_state: (a: number, b: number) => void;
     readonly sporeengine_split_brain_experiment: (a: number, b: number, c: number) => void;
     readonly sporeengine_substrate_feasibility: (a: number) => number;
     readonly sporeengine_threat_assessment: (a: number, b: number, c: number, d: number) => void;
     readonly sporeengine_topology_analysis: (a: number, b: number) => void;
     readonly sporeengine_topology_report: (a: number, b: number) => void;
+    readonly sporeengine_workspace_ignition: (a: number) => number;
+    readonly sporeengine_workspace_state: (a: number, b: number) => void;
     readonly __wbindgen_export: (a: number, b: number) => number;
     readonly __wbindgen_export2: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_export3: (a: number) => void;

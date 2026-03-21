@@ -963,11 +963,7 @@ impl BenchmarkReport {
         }
         if benchmark.contains("RemoteAssociates") {
             push_specific("overall_accuracy", "rat_overall_accuracy", &bl.creativity);
-            push_specific(
-                "mean_solution_rank",
-                "rat_mean_solution_rank",
-                &bl.creativity,
-            );
+            push_specific("mean_solution_rank", "rat_mean_solution_rank", &bl.creativity);
         }
         if benchmark.contains("StrangeStory") {
             push_specific("overall_accuracy", "strange_story_accuracy", &bl.tombench);

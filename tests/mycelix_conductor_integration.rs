@@ -115,10 +115,13 @@ async fn test_mock_dispatch_loop_processes_multiple_commands() {
     // Collect 3 outcomes
     let mut outcomes = Vec::new();
     for _ in 0..3 {
-        let outcome = tokio::time::timeout(std::time::Duration::from_secs(5), outcome_rx.recv())
-            .await
-            .expect("should receive within timeout")
-            .expect("channel should not be closed");
+        let outcome = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            outcome_rx.recv(),
+        )
+        .await
+        .expect("should receive within timeout")
+        .expect("channel should not be closed");
         outcomes.push(outcome);
     }
 
@@ -191,8 +194,9 @@ async fn test_failing_transport_returns_rejection() {
 #[tokio::test]
 #[ignore = "requires running Holochain conductor with mycelix-unified hApp"]
 async fn test_real_conductor_proposal_submission() {
-    let config = ConductorConfig::from_env()
-        .expect("Set MYCELIX_CONDUCTOR_URL, MYCELIX_APP_TOKEN, MYCELIX_APP_ID env vars");
+    let config = ConductorConfig::from_env().expect(
+        "Set MYCELIX_CONDUCTOR_URL, MYCELIX_APP_TOKEN, MYCELIX_APP_ID env vars",
+    );
 
     // This test would use a real transport implementation.
     // For now, just verify config parsing works.

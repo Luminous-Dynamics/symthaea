@@ -38,6 +38,7 @@ drawable consciousness_circle
 drawable ic_soma_background
 drawable ic_soma_foreground
 id avatarRow
+id bottomHint
 id bottomSheet
 id brocaText
 id btnCheckpoint

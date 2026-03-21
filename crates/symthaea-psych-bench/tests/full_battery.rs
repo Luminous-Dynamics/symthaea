@@ -21,10 +21,7 @@ use symthaea_psych_bench::benchmarks::{
         TemporalDiscountingBenchmark, TwoStepBenchmark,
     },
     consciousness::{BinocularRivalryBenchmark, BlindSightBenchmark, PerceptualCrowdingBenchmark},
-    creativity::{
-        AlternateUsesBenchmark, ConceptualBlendingBenchmark, DivergentThinkingBenchmark,
-        RemoteAssociatesBenchmark,
-    },
+    creativity::{AlternateUsesBenchmark, ConceptualBlendingBenchmark, DivergentThinkingBenchmark, RemoteAssociatesBenchmark},
     executive::{
         DualTaskBenchmark, FlankerBenchmark, IowaGamblingBenchmark,
         RavensProgressiveMatricesBenchmark, StroopBenchmark, TowerOfLondonBenchmark,

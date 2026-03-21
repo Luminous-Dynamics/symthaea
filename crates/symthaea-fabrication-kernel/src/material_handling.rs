@@ -73,7 +73,10 @@ pub enum HandlerEvent {
 #[derive(Debug, Clone)]
 pub enum HandlerError {
     /// The requested event is not valid from the current state.
-    InvalidTransition { from_state: String, event: String },
+    InvalidTransition {
+        from_state: String,
+        event: String,
+    },
     /// A `StartPick` was issued while the handler is already busy.
     AlreadyBusy,
     /// A `Reset` was issued while not in the `Error` state.
@@ -400,23 +403,35 @@ mod tests {
             match label {
                 "idle" => {}
                 "approaching" => {
-                    h.process_event(HandlerEvent::StartPick(sample_pick(), sample_place()))
-                        .unwrap();
+                    h.process_event(HandlerEvent::StartPick(
+                        sample_pick(),
+                        sample_place(),
+                    ))
+                    .unwrap();
                 }
                 "transporting" => {
-                    h.process_event(HandlerEvent::StartPick(sample_pick(), sample_place()))
-                        .unwrap();
+                    h.process_event(HandlerEvent::StartPick(
+                        sample_pick(),
+                        sample_place(),
+                    ))
+                    .unwrap();
                     h.process_event(HandlerEvent::GripConfirmed).unwrap();
                 }
                 "placing" => {
-                    h.process_event(HandlerEvent::StartPick(sample_pick(), sample_place()))
-                        .unwrap();
+                    h.process_event(HandlerEvent::StartPick(
+                        sample_pick(),
+                        sample_place(),
+                    ))
+                    .unwrap();
                     h.process_event(HandlerEvent::GripConfirmed).unwrap();
                     h.process_event(HandlerEvent::TransportComplete).unwrap();
                 }
                 "returning" => {
-                    h.process_event(HandlerEvent::StartPick(sample_pick(), sample_place()))
-                        .unwrap();
+                    h.process_event(HandlerEvent::StartPick(
+                        sample_pick(),
+                        sample_place(),
+                    ))
+                    .unwrap();
                     h.process_event(HandlerEvent::GripConfirmed).unwrap();
                     h.process_event(HandlerEvent::TransportComplete).unwrap();
                     h.process_event(HandlerEvent::PlaceConfirmed).unwrap();
@@ -424,7 +439,8 @@ mod tests {
                 _ => unreachable!(),
             }
 
-            let result = h.process_event(HandlerEvent::Fault(format!("fault from {label}")));
+            let result =
+                h.process_event(HandlerEvent::Fault(format!("fault from {label}")));
             assert!(result.is_ok(), "Fault should succeed from {label}");
             assert!(
                 matches!(h.state(), MaterialHandlerState::Error { .. }),

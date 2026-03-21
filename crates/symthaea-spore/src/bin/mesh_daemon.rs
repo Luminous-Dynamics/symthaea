@@ -156,7 +156,7 @@ fn main() {
             consciousness_level: result.consciousness_level,
             phi: result.substrate_feasibility, // effective phi
             valence: result.neuromodulators[2] - 0.5, // serotonin as valence proxy
-            arousal: result.neuromodulators[1], // norepinephrine as arousal
+            arousal: result.neuromodulators[1],         // norepinephrine as arousal
             harmony_alignment: result.harmony_alignment,
         };
 

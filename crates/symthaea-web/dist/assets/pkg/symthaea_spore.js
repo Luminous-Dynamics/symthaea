@@ -383,6 +383,47 @@ export class SporeEngine {
         wasm.sporeengine_inject_neuromodulator(this.__wbg_ptr, ptr0, len0, amount);
     }
     /**
+     * Query knowledge facts about a subject. Returns QueryResult as JS object.
+     * @param {string} subject
+     * @returns {any}
+     */
+    knowledge_query(subject) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            const ptr0 = passStringToWasm0(subject, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+            const len0 = WASM_VECTOR_LEN;
+            wasm.sporeengine_knowledge_query(retptr, this.__wbg_ptr, ptr0, len0);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return takeObject(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * Knowledge engine statistics: fact count, contradiction count, etc.
+     * @returns {any}
+     */
+    knowledge_stats() {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.sporeengine_knowledge_stats(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return takeObject(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
      * Load trained Broca checkpoint weights from a binary buffer.
      *
      * The checkpoint file (broca-spore-v1.bin) contains trained token embeddings,
@@ -444,6 +485,25 @@ export class SporeEngine {
         try {
             const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
             wasm.sporeengine_measure_pci(retptr, this.__wbg_ptr, perturbation_magnitude, observation_cycles);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return takeObject(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * Trigger memory consolidation (dream replay). Returns ConsolidationResult.
+     * @returns {any}
+     */
+    memory_consolidate() {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.sporeengine_memory_consolidate(retptr, this.__wbg_ptr);
             var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
             var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
             var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
@@ -569,6 +629,25 @@ export class SporeEngine {
         wasm.sporeengine_set_substrate(this.__wbg_ptr, ptr0, len0);
     }
     /**
+     * Social mind state: partners, empathy level, coherence.
+     * @returns {any}
+     */
+    social_mind_state() {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.sporeengine_social_mind_state(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return takeObject(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
      * Run a split-brain experiment. Returns SplitBrainResult as JS object.
      *
      * Partitions the network into hemispheres and measures whether splitting
@@ -658,6 +737,33 @@ export class SporeEngine {
         } finally {
             wasm.__wbindgen_add_to_stack_pointer(16);
             wasm.__wbindgen_export4(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
+     * Whether the workspace has reached ignition (conscious experience).
+     * @returns {boolean}
+     */
+    workspace_ignition() {
+        const ret = wasm.sporeengine_workspace_ignition(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    /**
+     * Current workspace state: broadcast, contents, history.
+     * @returns {any}
+     */
+    workspace_state() {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.sporeengine_workspace_state(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return takeObject(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
         }
     }
 }

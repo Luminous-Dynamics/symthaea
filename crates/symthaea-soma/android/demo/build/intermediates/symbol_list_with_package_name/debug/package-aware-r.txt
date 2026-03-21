@@ -3206,6 +3206,7 @@ id beginning
 id bestChoice
 id blocking
 id bottom
+id bottomHint
 id bottomSheet
 id bounce
 id bounceBoth

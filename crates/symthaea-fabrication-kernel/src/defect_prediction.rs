@@ -277,11 +277,8 @@ impl DefectPredictor {
         }
 
         // Sort by expected improvement descending
-        adjustments.sort_by(|a, b| {
-            b.expected_improvement
-                .partial_cmp(&a.expected_improvement)
-                .unwrap()
-        });
+        adjustments
+            .sort_by(|a, b| b.expected_improvement.partial_cmp(&a.expected_improvement).unwrap());
 
         adjustments
     }
@@ -397,10 +394,7 @@ mod tests {
             p.train(&sample_input(), 0.95);
         }
         let adjustments = p.suggest_adjustments(&input, 0.99);
-        assert!(
-            !adjustments.is_empty(),
-            "Should suggest at least one adjustment"
-        );
+        assert!(!adjustments.is_empty(), "Should suggest at least one adjustment");
         for adj in &adjustments {
             assert!(
                 adj.suggested_value >= adj.current_value,
@@ -429,10 +423,7 @@ mod tests {
         }
         let c100 = p.predict(&input).confidence;
         assert!(c100 >= c50);
-        assert!(
-            (c100 - 1.0).abs() < 1e-6,
-            "100 samples should give confidence=1.0"
-        );
+        assert!((c100 - 1.0).abs() < 1e-6, "100 samples should give confidence=1.0");
     }
 
     #[test]

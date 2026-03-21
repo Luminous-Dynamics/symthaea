@@ -8,11 +8,7 @@ use std::time::Instant;
 
 use super::phase_results::{DynamicsPhaseResult, FeedbackPhaseResult, PerceptionPhaseResult};
 use super::thresholds::{
-    // Round 23: output-phase constants
-    ADAPTIVE_THRESHOLD_SCALE_LOWER,
-    ADAPTIVE_THRESHOLD_SCALE_UPPER,
     ANOMALY_RECOVERY_PSI_MULTIPLIER,
-    ANTI_MONOPOLY_DAMPEN_SCALE,
     ATTENTION_SCHEMA_FATIGUE_THRESHOLD,
     BINDING_STRENGTH_TELEMETRY_HIGH,
     BINDING_STRENGTH_TELEMETRY_LOW,
@@ -27,7 +23,6 @@ use super::thresholds::{
     CONSCIOUSNESS_STATE_LEVEL_LOW,
     CONSOLIDATION_CONSCIOUSNESS_OFFSET,
     CONSOLIDATION_THRESHOLD_MIN,
-    DOMINANT_CONCENTRATION_MONOPOLY_THRESHOLD,
     EMBODIED_AGENCY_STABLE_MAX,
     EMBODIED_AGENCY_STABLE_MIN,
     EPISTEMIC_PHI_HIGH,
@@ -35,12 +30,10 @@ use super::thresholds::{
     EPISTEMIC_UNCERTAINTY_EMA_CURRENT,
     EPISTEMIC_UNCERTAINTY_EMA_PRIOR,
     ERROR_SLOPE_CONSOLIDATION_THRESHOLD,
-    FEEDBACK_INTEGRATION_RATE_LOWER,
     FEP_ACCURACY_EFFICIENCY_THRESHOLD,
     FEP_COMPLEXITY_EFFICIENCY_THRESHOLD,
     FLOW_INTENSITY_FEEDBACK,
     FLOW_INTENSITY_LR_THRESHOLD,
-    FULL_DAMPEN_ESCAPE_EXPLORATION,
     HARMONIES_ALIGNMENT_HIGH,
     HARMONIES_ALIGNMENT_LOW,
     HOLOGRAPHIC_UNITY_HIGH,
@@ -62,16 +55,23 @@ use super::thresholds::{
     PROPOSAL_CONFLICT_EXPLORATION,
     RESONATOR_SIMILARITY_HIGH,
     RESONATOR_SIMILARITY_LOW,
-    SUBSTRATE_TAU_DEVIATION_THRESHOLD,
-    SUBSTRATE_TAU_FACTOR_MINIMUM,
-    SUBSYSTEM_EXPLORATION_REQUEST_NUDGE,
-    SUBSYSTEM_REST_REQUEST_LR_SCALE,
     TEMPORAL_COHERENCE_HIGH,
     TEMPORAL_COHERENCE_LOW,
-    URGENCY_ESCALATION_AROUSAL_BOOST,
-    URGENCY_ESCALATION_EXPLORATION_SCALE,
     VALUE_CACHE_HIT_RATE_HIGH,
     VALUE_CACHE_HIT_RATE_LOW,
+    // Round 23: output-phase constants
+    ADAPTIVE_THRESHOLD_SCALE_LOWER,
+    ADAPTIVE_THRESHOLD_SCALE_UPPER,
+    ANTI_MONOPOLY_DAMPEN_SCALE,
+    DOMINANT_CONCENTRATION_MONOPOLY_THRESHOLD,
+    FEEDBACK_INTEGRATION_RATE_LOWER,
+    FULL_DAMPEN_ESCAPE_EXPLORATION,
+    SUBSYSTEM_EXPLORATION_REQUEST_NUDGE,
+    SUBSYSTEM_REST_REQUEST_LR_SCALE,
+    SUBSTRATE_TAU_DEVIATION_THRESHOLD,
+    SUBSTRATE_TAU_FACTOR_MINIMUM,
+    URGENCY_ESCALATION_AROUSAL_BOOST,
+    URGENCY_ESCALATION_EXPLORATION_SCALE,
 };
 use super::{CognitiveLoopService, CycleResult};
 
@@ -1534,9 +1534,7 @@ impl CognitiveLoopService {
         // by 20% toward cycle-start to prevent single-subsystem monopoly.
         // Dehaene (2014): GWT prevents single-module monopoly via ignition competition.
         let dominant_concentration = self.feedback_state.dominant_source_concentration();
-        if dominant_concentration > DOMINANT_CONCENTRATION_MONOPOLY_THRESHOLD
-            && self.feedback_state.total_proposals() > 4
-        {
+        if dominant_concentration > DOMINANT_CONCENTRATION_MONOPOLY_THRESHOLD && self.feedback_state.total_proposals() > 4 {
             // Apply a mild Scale(0.97) to all channels from "anti_monopoly" source
             self.feedback_state.confidence.propose(
                 "anti_monopoly",
@@ -1610,11 +1608,11 @@ impl CognitiveLoopService {
             >= super::thresholds::FULL_DAMPEN_FREEZE_THRESHOLD
         {
             // Reset threshold scale toward neutral to break the dampening spiral
-            self.carryover.learning.adaptive_threshold_scale =
-                self.carryover.learning.adaptive_threshold_scale.clamp(
-                    ADAPTIVE_THRESHOLD_SCALE_LOWER as f64,
-                    ADAPTIVE_THRESHOLD_SCALE_UPPER as f64,
-                );
+            self.carryover.learning.adaptive_threshold_scale = self
+                .carryover
+                .learning
+                .adaptive_threshold_scale
+                .clamp(ADAPTIVE_THRESHOLD_SCALE_LOWER as f64, ADAPTIVE_THRESHOLD_SCALE_UPPER as f64);
             // Gentle exploration boost to escape the suppressed state
             self.adjust_exploration("full_dampen_escape", FULL_DAMPEN_ESCAPE_EXPLORATION);
         }
@@ -1622,12 +1620,9 @@ impl CognitiveLoopService {
         // Session 9 Item 8: Substrate tau → feedback integration rate.
         // Fast substrates (tau < 1.0) apply consensus more aggressively;
         // slow substrates (tau > 1.0) blend more gently with cycle-start values.
-        let feedback_consensus = if (self.substrate_manager.tau_factor as f64 - 1.0).abs()
-            > SUBSTRATE_TAU_DEVIATION_THRESHOLD as f64
-        {
-            let tau =
-                (self.substrate_manager.tau_factor as f64).max(SUBSTRATE_TAU_FACTOR_MINIMUM as f64); // Guard: prevent div-by-zero
-                                                                                                     // Integration strength: tau=0.5 → 100% consensus, tau=2.0 → 50% consensus
+        let feedback_consensus = if (self.substrate_manager.tau_factor as f64 - 1.0).abs() > SUBSTRATE_TAU_DEVIATION_THRESHOLD as f64 {
+            let tau = (self.substrate_manager.tau_factor as f64).max(SUBSTRATE_TAU_FACTOR_MINIMUM as f64); // Guard: prevent div-by-zero
+            // Integration strength: tau=0.5 → 100% consensus, tau=2.0 → 50% consensus
             let integration_rate = if tau.is_finite() {
                 (1.0_f64 / tau).clamp(FEEDBACK_INTEGRATION_RATE_LOWER as f64, 1.0)
             } else {
@@ -1696,9 +1691,8 @@ impl CognitiveLoopService {
             // ESCALATE_URGENCY: A subsystem detected a critical situation.
             // Boost arousal and suppress exploration to focus on the threat.
             if integrated.has_flag(output_flags::ESCALATE_URGENCY) {
-                self.emotion_contagion.arousal = (self.emotion_contagion.arousal
-                    + URGENCY_ESCALATION_AROUSAL_BOOST)
-                    .clamp(0.0, 1.0);
+                self.emotion_contagion.arousal =
+                    (self.emotion_contagion.arousal + URGENCY_ESCALATION_AROUSAL_BOOST).clamp(0.0, 1.0);
                 self.scale_exploration("urgency_escalation", URGENCY_ESCALATION_EXPLORATION_SCALE);
                 tracing::debug!(
                     cycle = self.stats.total_cycles,
@@ -1730,10 +1724,7 @@ impl CognitiveLoopService {
             // Already handled via exploration_delta averaging, but flag provides
             // a discrete signal — give an additional nudge.
             if integrated.has_flag(output_flags::REQUEST_EXPLORATION) {
-                self.adjust_exploration(
-                    "subsystem_request_explore",
-                    SUBSYSTEM_EXPLORATION_REQUEST_NUDGE,
-                );
+                self.adjust_exploration("subsystem_request_explore", SUBSYSTEM_EXPLORATION_REQUEST_NUDGE);
             }
 
             // ANOMALY_DETECTED: One or more subsystems detected anomalous conditions.

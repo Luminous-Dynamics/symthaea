@@ -87,6 +87,7 @@ pub struct LanguageControllerConfig {
     pub dt_max: f32,
 
     // ── W3.1: Orthogonal Positional Encoding ──
+
     /// Replace cyclic permutation with Gram-Schmidt orthogonal position bases.
     #[serde(default)]
     pub enable_orthogonal_positions: bool,
@@ -144,7 +145,8 @@ impl Default for LanguageControllerConfig {
             // Benchmark-validated (Mar 20): -1.83 perplexity solo, -3.98 in combo.
             enable_compositional_logits: true,
             compositional_alpha: default_compositional_alpha(),
-            adaptive_compositional_alpha: false,
+            // Benchmark-validated (Mar 21, release): +0.075 coherence, zero ppl cost.
+            adaptive_compositional_alpha: true,
             enable_adaptive_dt: false,
             dt_min: default_dt_min(),
             dt_max: default_dt_max(),

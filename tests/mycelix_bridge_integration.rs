@@ -10,14 +10,14 @@
 #![cfg(feature = "mycelix")]
 
 use mycelix_bridge_common::consciousness_profile::{
-    continuous_vote_weight, decay_reputation, evaluate_governance_with_reputation,
-    VOTE_WEIGHT_MAX_BP, VOTE_WEIGHT_TEMPERATURE,
-};
-use mycelix_bridge_common::consciousness_profile::{
     evaluate_governance, requirement_for_basic, requirement_for_constitutional,
     requirement_for_guardian, requirement_for_proposal, requirement_for_voting,
     ConsciousnessCredential, ConsciousnessProfile, ConsciousnessTier, ReputationState,
     REPUTATION_DECAY_PER_DAY,
+};
+use mycelix_bridge_common::consciousness_profile::{
+    continuous_vote_weight, decay_reputation, evaluate_governance_with_reputation,
+    VOTE_WEIGHT_MAX_BP, VOTE_WEIGHT_TEMPERATURE,
 };
 
 /// Convenience: a timestamp well before any credential expiry.
@@ -118,54 +118,24 @@ fn test_governance_thresholds_guardian() {
 #[test]
 fn test_consciousness_tier_from_score() {
     // Observer: score < 0.3
-    assert_eq!(
-        ConsciousnessTier::from_score(0.0),
-        ConsciousnessTier::Observer
-    );
-    assert_eq!(
-        ConsciousnessTier::from_score(0.29),
-        ConsciousnessTier::Observer
-    );
+    assert_eq!(ConsciousnessTier::from_score(0.0), ConsciousnessTier::Observer);
+    assert_eq!(ConsciousnessTier::from_score(0.29), ConsciousnessTier::Observer);
 
     // Participant: 0.3 <= score < 0.4
-    assert_eq!(
-        ConsciousnessTier::from_score(0.3),
-        ConsciousnessTier::Participant
-    );
-    assert_eq!(
-        ConsciousnessTier::from_score(0.39),
-        ConsciousnessTier::Participant
-    );
+    assert_eq!(ConsciousnessTier::from_score(0.3), ConsciousnessTier::Participant);
+    assert_eq!(ConsciousnessTier::from_score(0.39), ConsciousnessTier::Participant);
 
     // Citizen: 0.4 <= score < 0.6
-    assert_eq!(
-        ConsciousnessTier::from_score(0.4),
-        ConsciousnessTier::Citizen
-    );
-    assert_eq!(
-        ConsciousnessTier::from_score(0.59),
-        ConsciousnessTier::Citizen
-    );
+    assert_eq!(ConsciousnessTier::from_score(0.4), ConsciousnessTier::Citizen);
+    assert_eq!(ConsciousnessTier::from_score(0.59), ConsciousnessTier::Citizen);
 
     // Steward: 0.6 <= score < 0.8
-    assert_eq!(
-        ConsciousnessTier::from_score(0.6),
-        ConsciousnessTier::Steward
-    );
-    assert_eq!(
-        ConsciousnessTier::from_score(0.79),
-        ConsciousnessTier::Steward
-    );
+    assert_eq!(ConsciousnessTier::from_score(0.6), ConsciousnessTier::Steward);
+    assert_eq!(ConsciousnessTier::from_score(0.79), ConsciousnessTier::Steward);
 
     // Guardian: score >= 0.8
-    assert_eq!(
-        ConsciousnessTier::from_score(0.8),
-        ConsciousnessTier::Guardian
-    );
-    assert_eq!(
-        ConsciousnessTier::from_score(1.0),
-        ConsciousnessTier::Guardian
-    );
+    assert_eq!(ConsciousnessTier::from_score(0.8), ConsciousnessTier::Guardian);
+    assert_eq!(ConsciousnessTier::from_score(1.0), ConsciousnessTier::Guardian);
 }
 
 // ============================================================================
@@ -225,10 +195,7 @@ fn test_evaluate_governance_accepts_eligible() {
         "Profile with combined=0.5 should be eligible for basic governance, reasons: {:?}",
         result.reasons
     );
-    assert!(
-        result.weight_bp > 0,
-        "Eligible agent should have vote weight > 0"
-    );
+    assert!(result.weight_bp > 0, "Eligible agent should have vote weight > 0");
     assert!(
         result.tier >= ConsciousnessTier::Participant,
         "Tier should be at least Participant"
@@ -257,15 +224,9 @@ fn test_evaluate_governance_rejects_below_threshold() {
         !result.eligible,
         "Profile with combined=0.1 should be rejected for basic governance"
     );
-    assert_eq!(
-        result.weight_bp, 0,
-        "Rejected agent should have zero vote weight"
-    );
+    assert_eq!(result.weight_bp, 0, "Rejected agent should have zero vote weight");
     assert_eq!(result.tier, ConsciousnessTier::Observer);
-    assert!(
-        !result.reasons.is_empty(),
-        "Should provide rejection reason"
-    );
+    assert!(!result.reasons.is_empty(), "Should provide rejection reason");
 }
 
 #[test]
@@ -341,10 +302,7 @@ fn test_profile_roundtrip_clamped() {
     let clamped = extreme.clamped();
     assert!(clamped.is_valid(), "Clamped profile should be valid");
     assert_eq!(clamped.identity, 0.0, "NaN should clamp to 0.0");
-    assert_eq!(
-        clamped.reputation, 0.0,
-        "Infinity is not finite, so sanitize() returns 0.0"
-    );
+    assert_eq!(clamped.reputation, 0.0, "Infinity is not finite, so sanitize() returns 0.0");
     assert_eq!(clamped.community, 0.0, "Negative should clamp to 0.0");
     assert_eq!(clamped.engagement, 1.0, "Over 1.0 should clamp to 1.0");
 
@@ -366,14 +324,10 @@ fn test_from_unified_consciousness_bridge() {
     let reputation = 0.6;
     let community = 0.9;
 
-    let profile = ConsciousnessProfile::from_unified_consciousness(
-        c_unified, identity, reputation, community,
-    );
+    let profile =
+        ConsciousnessProfile::from_unified_consciousness(c_unified, identity, reputation, community);
 
-    assert_eq!(
-        profile.engagement, c_unified,
-        "C_unified maps to engagement"
-    );
+    assert_eq!(profile.engagement, c_unified, "C_unified maps to engagement");
     assert_eq!(profile.identity, identity);
     assert_eq!(profile.reputation, reputation);
     assert_eq!(profile.community, community);
@@ -466,8 +420,7 @@ fn test_blacklisted_reputation_blocks_governance() {
 #[test]
 fn test_continuous_vote_weight_sigmoid() {
     // At threshold, weight should be ~50% of max
-    let at_threshold =
-        continuous_vote_weight(0.4, 0.4, VOTE_WEIGHT_TEMPERATURE, VOTE_WEIGHT_MAX_BP);
+    let at_threshold = continuous_vote_weight(0.4, 0.4, VOTE_WEIGHT_TEMPERATURE, VOTE_WEIGHT_MAX_BP);
     assert!(
         (at_threshold - VOTE_WEIGHT_MAX_BP / 2.0).abs() < 1.0,
         "At threshold, weight should be ~{}, got {}",
@@ -524,7 +477,10 @@ fn test_expired_credential_rejected() {
     let req = requirement_for_basic();
     let result = evaluate_governance(&cred, &req, NOW);
 
-    assert!(!result.eligible, "Expired credential should be rejected");
+    assert!(
+        !result.eligible,
+        "Expired credential should be rejected"
+    );
     assert!(
         result.reasons.iter().any(|r| r.contains("expired")),
         "Should mention expiry in reasons: {:?}",
