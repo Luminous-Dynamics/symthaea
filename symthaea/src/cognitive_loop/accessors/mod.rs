@@ -680,4 +680,27 @@ mod tests {
         assert_eq!(summary.scenario_count, 0, "no scenarios before cycles");
         assert_eq!(summary.beta_0, 0);
     }
+
+    /// Smoke test: instantiate default CLS and call every accessor group.
+    /// Catches field-path regressions after refactors without testing values.
+    #[test]
+    fn accessor_smoke_all_groups() {
+        let s = make_service();
+
+        // Behavior accessors
+        let _ = s.in_flow();
+        let _ = s.flow_intensity();
+        let _ = s.flow_streak();
+        let _ = s.flow_learning_boost();
+        let _ = s.emotional_valence();
+        let _ = s.emotional_arousal();
+        let _ = s.is_bored();
+        let _ = s.current_strategy();
+        let _ = s.is_confident();
+
+        // System accessors
+        let _ = s.stats();
+        let _ = s.config();
+        let _ = s.prediction_confidence();
+    }
 }

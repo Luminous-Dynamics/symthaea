@@ -233,6 +233,33 @@ pub fn validate() {
     assert!(GOV_REPUTATION_GAIN_SHT > 0.0 && GOV_REPUTATION_GAIN_SHT <= 0.10);
     assert!(GOV_COLLECTIVE_PHI_ECB > 0.0 && GOV_COLLECTIVE_PHI_ECB <= 0.05);
     assert!(GOV_CONSCIOUSNESS_MODULATION > 0.0 && GOV_CONSCIOUSNESS_MODULATION <= 0.10);
+
+    // 20. Psi→neuromod ordering (Round 22)
+    assert!(
+        PSI_NE_THRESHOLD < PSI_5HT_THRESHOLD,
+        "PSI_NE_THRESHOLD ({}) must be < PSI_5HT_THRESHOLD ({})",
+        PSI_NE_THRESHOLD,
+        PSI_5HT_THRESHOLD
+    );
+    assert!(
+        PSI_5HT_THRESHOLD < PSI_DA_THRESHOLD,
+        "PSI_5HT_THRESHOLD ({}) must be < PSI_DA_THRESHOLD ({})",
+        PSI_5HT_THRESHOLD,
+        PSI_DA_THRESHOLD
+    );
+
+    // 21. Epistemic budget ordering
+    assert!(
+        EPISTEMIC_BUDGET_CONTRACT_THRESHOLD < EPISTEMIC_BUDGET_EXPAND_THRESHOLD,
+        "EPISTEMIC_BUDGET_CONTRACT_THRESHOLD ({}) must be < EPISTEMIC_BUDGET_EXPAND_THRESHOLD ({})",
+        EPISTEMIC_BUDGET_CONTRACT_THRESHOLD,
+        EPISTEMIC_BUDGET_EXPAND_THRESHOLD
+    );
+
+    // 22. FEP surprise caps positive
+    assert!(FEP_COMPLEXITY_PENALTY_CAP > 0.0);
+    assert!(FEP_SURPRISE_EXPLORE_CAP > 0.0);
+    assert!(FEP_SURPRISE_EXPLORE_SCALE > 0.0);
 }
 
 #[cfg(test)]
@@ -1955,5 +1982,46 @@ mod tests {
         assert!(THERMO_CRITICAL_CURIOSITY_BOOST > 1.0);
         assert!(THERMO_FLOW_LR_BOOST > 1.0);
         assert!(HOMEOSTASIS_DRIFT_RATE > 0.0 && HOMEOSTASIS_DRIFT_RATE < 1.0);
+    }
+
+    #[test]
+    fn test_psi_neuromod_ordering() {
+        assert!(PSI_NE_THRESHOLD < PSI_5HT_THRESHOLD);
+        assert!(PSI_5HT_THRESHOLD < PSI_DA_THRESHOLD);
+        assert!(PSI_DA_THRESHOLD <= 1.0);
+        assert!(PSI_NE_THRESHOLD > 0.0);
+        // Caps must be positive and bounded
+        assert!(PSI_DA_CAP > 0.0 && PSI_DA_CAP <= 0.5);
+        assert!(PSI_5HT_CAP > 0.0 && PSI_5HT_CAP <= 0.5);
+        assert!(PSI_NE_CAP > 0.0 && PSI_NE_CAP <= 0.5);
+    }
+
+    #[test]
+    fn test_epistemic_budget_ordering() {
+        assert!(EPISTEMIC_BUDGET_CONTRACT_THRESHOLD < EPISTEMIC_BUDGET_EXPAND_THRESHOLD);
+        assert!(EPISTEMIC_BUDGET_CONTRACT_BASE > 0.0 && EPISTEMIC_BUDGET_CONTRACT_BASE < 1.0);
+        assert!(EPISTEMIC_BUDGET_EXPAND_CAP > 0.0 && EPISTEMIC_BUDGET_EXPAND_CAP < 1.0);
+    }
+
+    #[test]
+    fn test_fep_surprise_params() {
+        assert!(FEP_COMPLEXITY_PENALTY_CAP > 0.0);
+        assert!(FEP_COMPLEXITY_LR_SCALE > 0.0 && FEP_COMPLEXITY_LR_SCALE < 1.0);
+        assert!(FEP_SURPRISE_EXPLORE_CAP > 0.0);
+        assert!(FEP_SURPRISE_EXPLORE_SCALE > 0.0 && FEP_SURPRISE_EXPLORE_SCALE < 1.0);
+        assert!(FEP_SURPRISE_EXPLORE_SECONDARY_CAP > 0.0);
+        assert!(FEP_SURPRISE_EXPLORE_SECONDARY_SCALE > 0.0);
+    }
+
+    #[test]
+    fn test_stillness_budget_params() {
+        assert!(STILLNESS_BUDGET_THRESHOLD > 0.0 && STILLNESS_BUDGET_THRESHOLD < 1.0);
+        assert!(STILLNESS_BUDGET_CONTRACT_CAP > 0.0 && STILLNESS_BUDGET_CONTRACT_CAP < 1.0);
+    }
+
+    #[test]
+    fn test_knowledge_alert_params() {
+        assert!(KNOWLEDGE_ALERT_EXPLORE_CAP > 0.0 && KNOWLEDGE_ALERT_EXPLORE_CAP < 1.0);
+        assert!(KNOWLEDGE_CONTRADICTION_FLOOR > 0.0 && KNOWLEDGE_CONTRADICTION_FLOOR < 1.0);
     }
 }

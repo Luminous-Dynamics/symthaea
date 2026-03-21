@@ -1138,3 +1138,42 @@ pub const HOT_DEPTH_DEFAULT: f64 = 0.5;
 
 /// Default CPG sync index when CPG feature is disabled.
 pub const CPG_SYNC_DEFAULT: f64 = 0.5;
+
+// ─── Output phase: anti-monopoly & subsystem flags (Dehaene 2014) ───────────
+
+/// Dominant source concentration threshold for anti-monopoly dampening.
+/// Basis: Dehaene (2014) — GWT prevents single-module monopoly.
+pub const DOMINANT_CONCENTRATION_MONOPOLY_THRESHOLD: f32 = 0.6;
+
+/// Anti-monopoly dampening scale applied to all feedback channels.
+pub const ANTI_MONOPOLY_DAMPEN_SCALE: f64 = 0.97;
+
+/// Adaptive threshold scale lower bound (prevents over-dampening).
+pub const ADAPTIVE_THRESHOLD_SCALE_LOWER: f64 = 0.9;
+
+/// Adaptive threshold scale upper bound (prevents runaway amplification).
+pub const ADAPTIVE_THRESHOLD_SCALE_UPPER: f64 = 1.1;
+
+/// Exploration boost to escape full-dampening spiral.
+pub const FULL_DAMPEN_ESCAPE_EXPLORATION: f32 = 0.02;
+
+/// Substrate tau factor deviation threshold for feedback integration modulation.
+pub const SUBSTRATE_TAU_DEVIATION_THRESHOLD: f32 = 0.05;
+
+/// Minimum tau factor guard to prevent division by zero.
+pub const SUBSTRATE_TAU_FACTOR_MINIMUM: f32 = 0.01;
+
+/// Feedback integration rate lower bound (slow substrates).
+pub const FEEDBACK_INTEGRATION_RATE_LOWER: f32 = 0.5;
+
+/// Urgency escalation arousal boost when ESCALATE_URGENCY flag set.
+pub const URGENCY_ESCALATION_AROUSAL_BOOST: f32 = 0.1;
+
+/// Urgency escalation exploration dampening scale.
+pub const URGENCY_ESCALATION_EXPLORATION_SCALE: f32 = 0.7;
+
+/// Learning rate scale for subsystem rest request.
+pub const SUBSYSTEM_REST_REQUEST_LR_SCALE: f32 = 0.9;
+
+/// Exploration nudge for subsystem exploration request.
+pub const SUBSYSTEM_EXPLORATION_REQUEST_NUDGE: f32 = 0.02;
