@@ -1088,18 +1088,27 @@ impl BlocDetection {
     }
 }
 
-/// Compute Jaccard similarity between two vote histories.
+/// Compute Jaccard similarity between two vote histories with binomial
+/// significance testing.
 ///
 /// Jaccard(A, B) = |agreements| / |shared proposals|
 /// where "agreement" means both agents voted the same way (For/For or Against/Against).
 ///
-/// Returns 0.0 if fewer than `min_shared` proposals in common (insufficient data).
+/// Returns `(similarity, shared_count, agreement_count, is_significant)`.
+///
+/// Significance is determined by a normal approximation to the binomial test:
+/// given a base agreement rate of 0.55 (honest agents agree on obvious proposals),
+/// is the observed agreement rate statistically unlikely (z >= 3.09, p < 0.001)?
+///
+/// The base rate of 0.55 was empirically determined by 100K-agent simulation
+/// (March 2026): honest agents with quality-based voting agree ~55% of the time.
+/// Raw Jaccard threshold of 0.90 produces massive false positives at scale
+/// without this correction.
 pub fn jaccard_vote_similarity(
     votes_a: &[VoteRecord],
     votes_b: &[VoteRecord],
     min_shared: usize,
-) -> (f64, u64, u64) {
-    // Build lookup: proposal_id → choice for agent B
+) -> (f64, u64, u64, bool) {
     let b_choices: std::collections::HashMap<&str, &VoteChoice> = votes_b
         .iter()
         .map(|v| (v.proposal_id.as_str(), &v.choice))
@@ -1118,7 +1127,7 @@ pub fn jaccard_vote_similarity(
     }
 
     if (shared as usize) < min_shared {
-        return (0.0, shared, agreements);
+        return (0.0, shared, agreements, false);
     }
 
     let similarity = if shared > 0 {
@@ -1127,7 +1136,22 @@ pub fn jaccard_vote_similarity(
         0.0
     };
 
-    (similarity, shared, agreements)
+    // Binomial significance test (normal approximation, valid for shared >= 10)
+    // H0: agreement rate = base_rate (0.55)
+    // H1: agreement rate > base_rate (coordination)
+    let base_rate = 0.55;
+    let n = shared as f64;
+    let expected = n * base_rate;
+    let std_dev = (n * base_rate * (1.0 - base_rate)).sqrt();
+    let z_score = if std_dev > 0.0 {
+        (agreements as f64 - expected) / std_dev
+    } else {
+        0.0
+    };
+    // z >= 3.09 → p < 0.001 (one-tailed)
+    let is_significant = z_score >= 3.09 && similarity >= 0.90;
+
+    (similarity, shared, agreements, is_significant)
 }
 
 /// Circuit breaker outcome — enforceable governance safeguard.
@@ -2840,7 +2864,7 @@ mod tests {
             make_vote_record("p2", VoteChoice::Against),
             make_vote_record("p3", VoteChoice::For),
         ];
-        let (sim, shared, agreements) = jaccard_vote_similarity(&votes_a, &votes_b, 1);
+        let (sim, shared, agreements, _sig) = jaccard_vote_similarity(&votes_a, &votes_b, 1);
         assert!((sim - 1.0).abs() < f64::EPSILON);
         assert_eq!(shared, 3);
         assert_eq!(agreements, 3);
@@ -2856,7 +2880,7 @@ mod tests {
             make_vote_record("p1", VoteChoice::Against),
             make_vote_record("p2", VoteChoice::Against),
         ];
-        let (sim, shared, agreements) = jaccard_vote_similarity(&votes_a, &votes_b, 1);
+        let (sim, shared, agreements, _sig) = jaccard_vote_similarity(&votes_a, &votes_b, 1);
         assert!(sim.abs() < f64::EPSILON);
         assert_eq!(shared, 2);
         assert_eq!(agreements, 0);
@@ -2876,7 +2900,7 @@ mod tests {
             make_vote_record("p5", VoteChoice::For),   // not shared
         ];
         // Shared: p1, p2 (2 proposals). Agreements: p1 (1).
-        let (sim, shared, agreements) = jaccard_vote_similarity(&votes_a, &votes_b, 1);
+        let (sim, shared, agreements, _sig) = jaccard_vote_similarity(&votes_a, &votes_b, 1);
         assert!((sim - 0.5).abs() < f64::EPSILON);
         assert_eq!(shared, 2);
         assert_eq!(agreements, 1);
@@ -2887,7 +2911,7 @@ mod tests {
         let votes_a = vec![make_vote_record("p1", VoteChoice::For)];
         let votes_b = vec![make_vote_record("p1", VoteChoice::For)];
         // min_shared = 5 but only 1 shared → returns 0.0
-        let (sim, shared, _) = jaccard_vote_similarity(&votes_a, &votes_b, 5);
+        let (sim, shared, _, _sig) = jaccard_vote_similarity(&votes_a, &votes_b, 5);
         assert!(sim.abs() < f64::EPSILON);
         assert_eq!(shared, 1);
     }
@@ -2896,7 +2920,7 @@ mod tests {
     fn test_jaccard_no_overlap() {
         let votes_a = vec![make_vote_record("p1", VoteChoice::For)];
         let votes_b = vec![make_vote_record("p2", VoteChoice::For)];
-        let (sim, shared, agreements) = jaccard_vote_similarity(&votes_a, &votes_b, 1);
+        let (sim, shared, agreements, _sig) = jaccard_vote_similarity(&votes_a, &votes_b, 1);
         assert!(sim.abs() < f64::EPSILON);
         assert_eq!(shared, 0);
         assert_eq!(agreements, 0);

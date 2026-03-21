@@ -1,0 +1,15 @@
+[workspace]
+
+[package]
+name = "mycelix-governance-sim"
+version = "0.1.0"
+edition = "2021"
+description = "100K-agent mechanism design simulation for Mycelix governance, economy, and reputation"
+
+[[bin]]
+name = "governance-sim"
+path = "src/main.rs"
+
+[dependencies]
+rand = "0.8"
+rayon = "1.10"

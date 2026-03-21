@@ -3652,10 +3652,11 @@ pub fn detect_voting_blocs(input: DetectBlocsInput) -> ExternResult<Record> {
             let votes_a = &voter_histories[&voters[i]];
             let votes_b = &voter_histories[&voters[j]];
 
-            let (similarity, shared, agreements) =
+            let (similarity, shared, agreements, is_significant) =
                 jaccard_vote_similarity(votes_a, votes_b, min_shared);
 
-            if similarity >= threshold {
+            // Require BOTH high similarity AND statistical significance
+            if is_significant && similarity >= threshold {
                 correlated_pairs.push(CorrelatedPair {
                     agent_a: voters[i].clone(),
                     agent_b: voters[j].clone(),
