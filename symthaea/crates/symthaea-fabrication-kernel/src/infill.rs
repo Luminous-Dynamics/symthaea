@@ -503,7 +503,7 @@ pub fn generate_infill_for_layer(
     };
 
     // Generate pattern.
-    let result = match config.pattern {
+    match config.pattern {
         InfillPattern::Rectilinear => {
             generate_infill_at_angle(layer, &edges, bb_min, bb_max, angle_rad, spacing)
         }
@@ -525,9 +525,7 @@ pub fn generate_infill_for_layer(
             nozzle_diameter,
             angle_rad,
         ),
-    };
-
-    result
+    }
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────
