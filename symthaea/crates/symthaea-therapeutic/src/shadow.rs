@@ -486,7 +486,11 @@ impl ShadowDetector {
                     .fragments
                     .iter()
                     .enumerate()
-                    .min_by(|(_, a), (_, b)| a.pressure().partial_cmp(&b.pressure()).unwrap())
+                    .min_by(|(_, a), (_, b)| {
+                        a.pressure()
+                            .partial_cmp(&b.pressure())
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    })
                     .map(|(i, _)| i)
                 {
                     self.fragments.swap_remove(min_idx);
@@ -517,7 +521,7 @@ impl ShadowDetector {
             .collect();
 
         // Sort by pressure descending
-        candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         for (idx, _) in candidates {
             if self.dream_queue.len() >= self.dream_queue_max {
