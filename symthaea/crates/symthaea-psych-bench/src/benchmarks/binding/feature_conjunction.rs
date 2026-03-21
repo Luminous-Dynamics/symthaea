@@ -114,8 +114,25 @@ impl FeatureConjunctionBenchmark {
                     &[1.0 - noise_frac, noise_frac],
                 );
 
-                // Query: does target exist in scene? Compare target to scene
+                // Query: does target exist in scene? Compare target to scene.
+                // Dual-evidence detection: check both the full conjunction binding
+                // AND individual feature-role bindings. Treisman & Gelade (1980)
+                // showed that conjunction detection involves serial verification
+                // of individual features. The dual-evidence approach models this:
+                // if the conjunction similarity is ambiguous, individual feature
+                // evidence can disambiguate (Wolfe, 1994 "Guided Search 2.0").
                 let target_sim = noisy_scene.similarity(&target_hv);
+                // Individual feature evidence (weaker signal but independent)
+                let target_color_sim = noisy_scene.similarity(
+                    &color_hvs[target_color].bind(&role_color),
+                );
+                let target_shape_sim = noisy_scene.similarity(
+                    &shape_hvs[target_shape].bind(&role_shape),
+                );
+                // Combine: conjunction (primary) + feature average (secondary)
+                let target_combined = target_sim * 0.7
+                    + (target_color_sim + target_shape_sim) * 0.15;
+
                 // Compare random non-target to scene as foil
                 xor_shift(&mut rng);
                 let foil_color = 1 + (rng as usize % (n_colors - 1));
@@ -124,9 +141,17 @@ impl FeatureConjunctionBenchmark {
                     .bind(&role_color)
                     .bind(&shape_hvs[foil_shape].bind(&role_shape));
                 let foil_sim = noisy_scene.similarity(&foil_hv);
+                let foil_color_sim = noisy_scene.similarity(
+                    &color_hvs[foil_color].bind(&role_color),
+                );
+                let foil_shape_sim = noisy_scene.similarity(
+                    &shape_hvs[foil_shape].bind(&role_shape),
+                );
+                let foil_combined = foil_sim * 0.7
+                    + (foil_color_sim + foil_shape_sim) * 0.15;
 
                 conj_total += 1;
-                if target_sim > foil_sim {
+                if target_combined > foil_combined {
                     conj_correct += 1;
                 }
             }

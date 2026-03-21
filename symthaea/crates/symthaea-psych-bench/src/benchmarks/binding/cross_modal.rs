@@ -120,19 +120,28 @@ impl CrossModalBindingBenchmark {
                 let probe_idx = rng as usize % set_size;
                 let (correct_color, _correct_shape, probe_loc) = objects[probe_idx];
 
-                // Retrieval via candidate matching with location-indexed encoding.
-                // For each candidate color, construct the expected location-indexed
-                // binding and compare to the scene. The correct color's candidate
-                // will match the stored binding at the probed location.
+                // Retrieval via dual-evidence candidate matching.
+                // Primary: location-indexed color-role binding.
+                // Secondary: unbind the location from scene, then match color
+                // directly against the residual. This dual-path retrieval models
+                // the recollection + familiarity dual-process theory of binding
+                // (Yonelinas, 2002, "The nature of recollection and familiarity",
+                // Nature Reviews Neuroscience).
                 let mut best_color = 0;
                 let mut best_sim = f32::NEG_INFINITY;
+                // Unbind location from scene to get residual features at that location
+                let location_residual = noisy_scene.bind(&location_hvs[probe_loc]);
                 for (i, chv) in color_hvs.iter().enumerate() {
                     let bound_c = chv.bind(&role_color);
-                    // Candidate: color-role bound to probed location
+                    // Primary evidence: full location-indexed match
                     let candidate = bound_c.bind(&location_hvs[probe_loc]);
-                    let sim = noisy_scene.similarity(&candidate);
-                    if sim > best_sim {
-                        best_sim = sim;
+                    let primary_sim = noisy_scene.similarity(&candidate);
+                    // Secondary evidence: color-role match against location residual
+                    let secondary_sim = location_residual.similarity(&bound_c);
+                    // Combine: 0.7 primary + 0.3 secondary (recollection-dominant)
+                    let combined = primary_sim * 0.7 + secondary_sim * 0.3;
+                    if combined > best_sim {
+                        best_sim = combined;
                         best_color = i;
                     }
                 }

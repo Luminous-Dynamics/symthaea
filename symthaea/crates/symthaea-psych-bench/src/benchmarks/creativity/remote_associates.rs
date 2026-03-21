@@ -167,7 +167,30 @@ impl RemoteAssociatesBenchmark {
             .iter()
             .map(|c| adapter.encode(&Word(c.to_string()), dim))
             .collect();
-        let bundle = ContinuousHV::bundle_owned(&cue_hvs);
+        // Multi-level associative bundling: combine direct cue representations
+        // with pairwise bindings. The bindings capture compound associations
+        // (e.g., "cottage-swiss" → cheese) that the flat bundle misses.
+        // Kenett et al. (2014, Creativity Research Journal) showed that creative
+        // associative thinking involves both direct and mediated associations
+        // through network spreading activation (Mednick, 1962).
+        let pair_01 = cue_hvs[0].bind(&cue_hvs[1]);
+        let pair_02 = cue_hvs[0].bind(&cue_hvs[2]);
+        let pair_12 = cue_hvs[1].bind(&cue_hvs[2]);
+        let raw_bundle = ContinuousHV::weighted_bundle(
+            &[&cue_hvs[0], &cue_hvs[1], &cue_hvs[2], &pair_01, &pair_02, &pair_12],
+            &[1.0, 1.0, 1.0, 0.5, 0.5, 0.5],
+        );
+
+        // Lapse_rate degrades associative binding coherence: higher lapse → noisier
+        // bundle representation, modeling reduced spreading activation depth
+        // (Mednick 1962; individual differences in associative search breadth).
+        let bundle = if config.lapse_rate > 0.0 {
+            let corruption = (config.lapse_rate * 1.6) as f32; // up to 40% binding disruption
+            let noise_hv = ContinuousHV::random(dim, config.trial_seed("creativity", "rat_lapse", trial_idx));
+            ContinuousHV::weighted_bundle(&[&raw_bundle, &noise_hv], &[1.0 - corruption, corruption])
+        } else {
+            raw_bundle
+        };
 
         // Encode solution and distractors
         let solution_hv = adapter.encode(&Word(triad.solution.to_string()), dim);
@@ -182,6 +205,10 @@ impl RemoteAssociatesBenchmark {
         // discriminability between solution and distractors (Mednick, 1962 RAT;
         // individual differences in spreading activation noise).
         let enc_noise = config.effective_noise() as f32;
+        // Lapse_rate amplifies encoding noise, modeling reduced associative search
+        // depth and noisier semantic representations (Mednick, 1962; Beaty et al., 2014).
+        let lapse_noise_boost = config.lapse_rate as f32 * 0.15;
+        let enc_noise = enc_noise + lapse_noise_boost;
         // Time pressure: 0.08/unit noise disrupts similarity ranking, modeling reduced search
         // depth in associative retrieval under deadline (Mednick, 1962 RAT; Luce, 1986).
         let pressure_noise = config.time_pressure as f32 * 0.08;
@@ -209,13 +236,47 @@ impl RemoteAssociatesBenchmark {
                 bundle.similarity(dhv) + noise + cand_noise * enc_noise * 0.20,
             ));
         }
+        // Lapse_rate controls associative search depth: higher lapse → fewer
+        // candidates considered before committing to a response, modeling
+        // premature search termination (Mednick, 1962; reduced spreading
+        // activation breadth). This creates stable per-subject differences.
+        if config.lapse_rate > 0.0 && all_sims.len() > 2 {
+            let search_cutoff = {
+                let hash = seed.wrapping_mul(0x517CC1B727220A95).wrapping_add(trial_idx as u64 * 31);
+                (hash >> 32) as f64 / (1u64 << 32) as f64
+            };
+            // Higher lapse → higher chance of dropping last candidate(s)
+            let drop_prob = config.lapse_rate * 2.0; // up to 50% chance at max lapse
+            if search_cutoff < drop_prob {
+                // Remove last candidate from consideration (wasn't "found")
+                all_sims.truncate(all_sims.len() - 1);
+            }
+        }
+
         all_sims.sort_by(|(_, a), (_, b)| b.total_cmp(a));
 
         // Accuracy: solution ranks first. Lapse model can flip correctness.
-        let rank = all_sims.iter().position(|(idx, _)| *idx == 0).unwrap_or(9) + 1;
+        let rank = all_sims.iter().position(|(idx, _)| *idx == 0).unwrap_or(all_sims.len()) + 1;
         let correct = config.check_correct(rank == 1, "remote_associates", trial_idx);
         let accuracy = if correct { 1.0 } else { 0.0 };
-        let mean_rank = rank as f64;
+        // Fractional rank: integer rank + similarity-margin interpolation for
+        // continuous individual differences (rank alone is integer 1-4, too coarse
+        // for reliable ICC). Margin captures how close the solution was to adjacent
+        // candidates, reflecting associative search depth.
+        let sol_sim_val = all_sims.iter().find(|(idx, _)| *idx == 0).map(|(_, s)| *s).unwrap_or(0.0);
+        let rank_pos = rank - 1; // 0-indexed position in sorted list
+        let fractional_offset = if rank_pos > 0 {
+            // How far solution's similarity is below the candidate just above it
+            let above_sim = all_sims[rank_pos - 1].1;
+            let gap = (above_sim - sol_sim_val).max(0.0).min(0.1);
+            gap as f64 * 5.0 // scale to [0, 0.5]
+        } else {
+            // Rank 1: how far above the next candidate
+            let below_sim = if all_sims.len() > 1 { all_sims[1].1 } else { 0.0 };
+            let margin = (sol_sim_val - below_sim).max(0.0).min(0.1);
+            -(margin as f64 * 5.0) // negative offset = better than rank 1.0
+        };
+        let mean_rank = (rank as f64 + fractional_offset).max(0.5);
 
         // Binding-based associative recall: cue1.bind(cue2) similarity to solution
         let binding = cue_hvs[0].bind(&cue_hvs[1]);

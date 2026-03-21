@@ -56,7 +56,10 @@ impl DivergentThinkingBenchmark {
         // WM capacity influences how many uses can be generated
         let n_uses = config.working_memory_capacity.clamp(3, 12);
 
-        let noise_scale = 0.3 + config.effective_noise() as f32 * 0.2;
+        // Lapse_rate increases encoding noise, modeling reduced associative
+        // precision under attentional lapses (Zabelina & Robinson, 2010).
+        let lapse_noise = config.lapse_rate as f32 * 0.15;
+        let noise_scale = 0.3 + config.effective_noise() as f32 * 0.2 + lapse_noise;
 
         // Generate uses by exploring HDC space
         let mut use_hvs: Vec<ContinuousHV> = Vec::new();
@@ -77,7 +80,11 @@ impl DivergentThinkingBenchmark {
             // Higher exploration weights produce uses more distant from the object
             // prototype, matching human divergent thinking where later responses
             // are more original (serial order effect; Silvia et al. 2008).
-            let explore_weight = 0.52 + (i as f32 / n_uses as f32) * 0.22;
+            // Lapse_rate reduces exploration weight, modeling attentional
+            // narrowing that constrains divergent search (Martindale, 1999).
+            let lapse_explore_penalty = config.lapse_rate as f32 * 0.10;
+            let explore_weight =
+                0.52 + (i as f32 / n_uses as f32) * 0.22 - lapse_explore_penalty;
             let cat_weight = 0.12;
             let obj_weight = 1.0 - explore_weight - cat_weight;
 

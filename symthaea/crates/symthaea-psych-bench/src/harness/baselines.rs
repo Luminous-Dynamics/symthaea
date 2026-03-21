@@ -1455,6 +1455,18 @@ pub fn creativity_baselines() -> BTreeMap<&'static str, Baseline> {
         },
     );
 
+    // Remote Associates Test mean solution rank (Bowden & Jung-Beeman, 2003)
+    // With ~50% accuracy across 4 candidates, mean rank ≈ 1.75 (is_lower_better)
+    m.insert(
+        "rat_mean_solution_rank",
+        Baseline {
+            value: 1.75,
+            sd: Some(0.50),
+            source: "Bowden & Jung-Beeman (2003), derived from 50% accuracy over 4 candidates",
+            population: "human adults",
+        },
+    );
+
     // Alternate Uses Task fluency (Torrance, 1974)
     m.insert(
         "aut_fluency",
@@ -1511,6 +1523,35 @@ pub fn creativity_baselines() -> BTreeMap<&'static str, Baseline> {
             value: 0.35,
             sd: Some(0.12),
             source: "Guilford (1967), inter-response distinctiveness",
+            population: "human adults",
+        },
+    );
+
+    // Conceptual Blending (Fauconnier & Turner, 2002; Ward, 1994)
+    m.insert(
+        "blend_quality",
+        Baseline {
+            value: 0.52,
+            sd: Some(0.14),
+            source: "Ward (1994), composite creativity score for conceptual combination",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "blend_novelty",
+        Baseline {
+            value: 0.48,
+            sd: Some(0.16),
+            source: "Wisniewski (1997), semantic distance in conceptual combinations",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "blend_coherence",
+        Baseline {
+            value: 0.65,
+            sd: Some(0.12),
+            source: "Fauconnier & Turner (2002), blend structural consistency ratings",
             population: "human adults",
         },
     );

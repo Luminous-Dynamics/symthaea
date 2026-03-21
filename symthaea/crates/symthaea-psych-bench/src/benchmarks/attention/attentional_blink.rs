@@ -67,9 +67,13 @@ impl AttentionalBlinkBenchmark {
         // Attention depletion model parameters
         // Working memory capacity modulates attention pool — higher WM capacity
         // supports greater attentional resource availability (Vogel et al., 2005).
+        // Lapse_rate reduces effective capacity and increases T1 cost, modeling
+        // attention-gate efficiency (Dux & Marois, 2009; individual differences
+        // in attentional control capacity).
         let wm_bonus = (config.working_memory_capacity as f64 - 4.0) * 0.04;
-        let attention_capacity: f64 = (1.0 + wm_bonus).clamp(0.7, 1.3);
-        let t1_cost: f64 = 0.75; // T1 processing depletes attention
+        let lapse_capacity_penalty = config.lapse_rate * 0.35; // up to -8.75% capacity
+        let attention_capacity: f64 = (1.0 + wm_bonus - lapse_capacity_penalty).clamp(0.7, 1.3);
+        let t1_cost: f64 = 0.75 + config.lapse_rate * 0.30; // lapse increases T1 consolidation cost
         let recovery_rate: f64 = 0.12; // Per-lag recovery
                                        // Encoding noise degrades target discrimination
         let enc_noise = config.effective_noise() as f32;
@@ -147,6 +151,11 @@ impl AttentionalBlinkBenchmark {
                 }
 
                 // T2 detection — attention depleted by T1 processing
+                // Lapse_rate degrades attention recovery: higher lapse → slower recovery
+                // from the attentional blink, producing larger blink magnitude.
+                // This models attention-gate sluggishness (Di Lollo et al., 2005).
+                let lapse_recovery_penalty = config.lapse_rate * 0.7;
+                let effective_recovery = recovery_rate * (1.0 - lapse_recovery_penalty);
                 let attention_available = if t1_detected {
                     if config.ssm_backend {
                         // SSM path: T1 depletes attention (negative pulse),
@@ -160,10 +169,12 @@ impl AttentionalBlinkBenchmark {
                         }
                         // SSM output is negative (decaying from -1 input); map to [0, 1]
                         // attention = 1.0 + ssm_out  (ssm_out in ~[-1, 0] range)
-                        (1.0 + ssm_out as f64).clamp(0.0, attention_capacity)
+                        let base = (1.0 + ssm_out as f64).clamp(0.0, attention_capacity);
+                        // Lapse penalty slows SSM recovery at short lags
+                        (base - lapse_recovery_penalty * 0.3).clamp(0.0, attention_capacity)
                     } else {
                         let depleted = attention_capacity - t1_cost;
-                        let recovered = recovery_rate * (lag as f64 - 1.0);
+                        let recovered = effective_recovery * (lag as f64 - 1.0);
                         (depleted + recovered).clamp(0.0, attention_capacity)
                     }
                 } else {
