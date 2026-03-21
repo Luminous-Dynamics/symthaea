@@ -130,8 +130,8 @@ impl AgentResult {
             "iterations_used": self.iterations_used,
             "consciousness": {
                 "avg_phi": avg_phi,
-                "min_phi": self.phi_trace.iter().cloned().fold(f32::MAX, f32::min),
-                "max_phi": self.phi_trace.iter().cloned().fold(f32::MIN, f32::max),
+                "min_phi": self.phi_trace.iter().cloned().fold(f32::MAX, f32::min).min(avg_phi),
+                "max_phi": self.phi_trace.iter().cloned().fold(f32::MIN, f32::max).max(avg_phi),
                 "phi_trace": self.phi_trace,
                 "samples": self.phi_trace.len(),
             },

@@ -311,6 +311,8 @@ impl BrocaGenerator {
         // 3. Optionally reset controller state (skip for multi-turn continuity)
         if reset_state {
             self.controller.reset();
+            // Seed CfC neurons from thought HV so early tokens are thought-dependent
+            self.controller.seed_from_thought(&thought_hv);
         }
 
         // 4. Re-seed sampling RNG for reproducibility

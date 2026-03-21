@@ -107,6 +107,13 @@ pub struct FabricationTelemetry {
     pub pog_score_ema: f32,
     pub active_print_jobs: u32,
     pub reward_ema: f32,
+    // MRP & defect prediction fields (populated via inject_mrp_status / inject_defect_prediction).
+    pub mrp_planned_orders: u32,
+    pub mrp_feasible: bool,
+    pub mrp_shortages_count: u32,
+    pub mrp_work_order_count: u32,
+    pub defect_prediction: f32,
+    pub defect_confidence: f32,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -135,6 +142,14 @@ pub struct FabricationManager {
     reward_ema: f64,
     current_cycle: u64,
     confidence_nudge_acc: f64,
+    // MRP snapshot (injected externally via Mycelix bridge).
+    mrp_planned_orders: u32,
+    mrp_feasible: bool,
+    mrp_shortages_count: u32,
+    mrp_work_order_count: u32,
+    // Defect prediction snapshot.
+    defect_prediction: f32,
+    defect_confidence: f32,
 }
 
 impl Default for FabricationManager {
@@ -159,6 +174,12 @@ impl Default for FabricationManager {
             reward_ema: 0.0,
             current_cycle: 0,
             confidence_nudge_acc: 0.0,
+            mrp_planned_orders: 0,
+            mrp_feasible: true,
+            mrp_shortages_count: 0,
+            mrp_work_order_count: 0,
+            defect_prediction: 0.0,
+            defect_confidence: 0.0,
         }
     }
 }
@@ -203,6 +224,26 @@ impl FabricationManager {
         self.active_print_jobs
     }
 
+    /// Update MRP status snapshot (called from Mycelix bridge or external source).
+    pub fn inject_mrp_status(
+        &mut self,
+        planned_orders: u32,
+        feasible: bool,
+        shortages: u32,
+        work_orders: u32,
+    ) {
+        self.mrp_planned_orders = planned_orders;
+        self.mrp_feasible = feasible;
+        self.mrp_shortages_count = shortages;
+        self.mrp_work_order_count = work_orders;
+    }
+
+    /// Update defect prediction snapshot (called from DefectPredictor output).
+    pub fn inject_defect_prediction(&mut self, quality: f32, confidence: f32) {
+        self.defect_prediction = quality.clamp(0.0, 1.0);
+        self.defect_confidence = confidence.clamp(0.0, 1.0);
+    }
+
     pub fn nudge_confidence(&mut self, delta: f64) {
         if delta.is_finite() {
             self.confidence_nudge_acc =
@@ -222,6 +263,12 @@ impl FabricationManager {
             pog_score_ema: self.pog_score_ema,
             active_print_jobs: self.active_print_jobs,
             reward_ema: self.reward_ema as f32,
+            mrp_planned_orders: self.mrp_planned_orders,
+            mrp_feasible: self.mrp_feasible,
+            mrp_shortages_count: self.mrp_shortages_count,
+            mrp_work_order_count: self.mrp_work_order_count,
+            defect_prediction: self.defect_prediction,
+            defect_confidence: self.defect_confidence,
         }
     }
 

@@ -173,25 +173,22 @@ pub fn DreamsPage() -> impl IntoView {
 
             <GlassPanel title="Dream Journal">
                 <div class="wisdom-journal">
-                    {move || {
-                        let log = dream_log.get();
-                        if log.is_empty() {
-                            vec![view! {
-                                <div class="wisdom-empty">
-                                    "No dream sessions yet. Start one to begin counterfactual learning."
+                    <Show when=move || dream_log.get().is_empty()>
+                        <div class="wisdom-empty">
+                            "No dream sessions yet. Start one to begin counterfactual learning."
+                        </div>
+                    </Show>
+                    <For
+                        each=move || dream_log.get()
+                        key=|entry| entry.clone()
+                        children=move |entry: String| {
+                            view! {
+                                <div class="wisdom-entry">
+                                    <div class="w-context">{entry}</div>
                                 </div>
-                            }]
-                        } else {
-                            log.iter().map(|entry| {
-                                let entry = entry.clone();
-                                view! {
-                                    <div class="wisdom-entry">
-                                        <div class="w-context">{entry}</div>
-                                    </div>
-                                }
-                            }).collect::<Vec<_>>()
+                            }
                         }
-                    }}
+                    />
                 </div>
             </GlassPanel>
         </div>

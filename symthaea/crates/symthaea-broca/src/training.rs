@@ -249,6 +249,19 @@ pub struct TrainingConfig {
     /// This trains the CfC to keep output representationally aligned with input thought.
     /// Recommended: 0.1-0.3.
     pub coherence_alignment_weight: f32,
+    /// Curriculum annealing for coherence alignment: start at this weight and
+    /// linearly decay to `coherence_alignment_weight` over training.
+    /// Default 0.0 (disabled — use constant weight).
+    /// When > `coherence_alignment_weight`, early epochs emphasize alignment
+    /// (keeping CfC in thought-aligned space) while later epochs let CE loss dominate.
+    /// Recommended: 1.0 (anneal from 1.0 → 0.2 over training).
+    pub coherence_alignment_start_weight: f32,
+    /// Merge-token loss bias: multiplicative weight for multi-byte BPE merge tokens.
+    /// When > 1.0, the CE loss for tokens that represent merged subwords (e.g. "ing",
+    /// "tion") is scaled up, nudging the model toward proper words over raw byte
+    /// sequences (e.g. `<0x69> <0x6E> <0x67>` → `ing`).
+    /// Default 1.5. Set to 1.0 to disable.
+    pub merge_token_loss_weight: f32,
 
     // ── Training-Time Fusion ──
     /// Enable fusion flags on the generator's controller during training.
@@ -293,6 +306,8 @@ impl Default for TrainingConfig {
             smoke_test_coherence_threshold: 0.05,
             coherence_collapse_threshold: 0.05,
             coherence_alignment_weight: 0.0,
+            coherence_alignment_start_weight: 0.0,
+            merge_token_loss_weight: 1.5,
             enable_fusion_during_training: false,
             fusion_warmup_epochs: 0,
         }
@@ -761,8 +776,25 @@ pub fn train_with_adam(
 
     let mut force_train_network = false;
 
+    // Build merge-token set for loss biasing: tokens that are multi-byte BPE merges
+    // (not byte tokens like <0xHH>, not special tokens like <bos>/<eos>/<thought>)
+    let merge_token_ids: std::collections::HashSet<usize> = if config.merge_token_loss_weight > 1.0
+    {
+        let tokenizer = generator.tokenizer();
+        (0..vocab_size)
+            .filter(|&id| {
+                let s = tokenizer.token_str(id as u32);
+                // Merge tokens are multi-char strings that aren't special tokens
+                s.len() > 1 && !s.starts_with('<')
+            })
+            .collect()
+    } else {
+        std::collections::HashSet::new()
+    };
+
     // Track whether coherence telemetry is needed
-    let track_alignment = config.coherence_alignment_weight > 0.0;
+    let track_alignment =
+        config.coherence_alignment_weight > 0.0 || config.coherence_alignment_start_weight > 0.0;
     let track_coherence = config.coherence_loss_weight > 0.0
         || config.enable_diagnostics
         || config.enable_anomaly_response
@@ -800,6 +832,22 @@ pub fn train_with_adam(
             config.coherence_loss_weight
         };
 
+        // Curriculum coherence alignment: anneal from start_weight → alignment_weight
+        let effective_alignment_weight = if config.coherence_alignment_start_weight
+            > config.coherence_alignment_weight
+        {
+            let progress = if config.epochs > 1 {
+                epoch as f32 / (config.epochs - 1) as f32
+            } else {
+                1.0
+            };
+            config.coherence_alignment_start_weight
+                + progress
+                    * (config.coherence_alignment_weight - config.coherence_alignment_start_weight)
+        } else {
+            config.coherence_alignment_weight
+        };
+
         // Log phase transition
         if config.network_warmup_epochs > 0 && epoch == config.network_warmup_epochs {
             tracing::info!(
@@ -831,6 +879,8 @@ pub fn train_with_adam(
             };
             if !should_carry {
                 generator.controller_mut().reset();
+                // Seed CfC from thought so training sees thought-dependent initial states
+                generator.controller_mut().seed_from_thought(&thought_hv);
             }
 
             // Teacher-forced forward pass
@@ -868,7 +918,14 @@ pub fn train_with_adam(
                 };
 
                 // Cross-entropy loss: -log(softmax[target])
-                let raw_loss = cross_entropy_loss(&logits, target_id as usize);
+                // Merge-token bias: weight multi-byte BPE tokens higher to prefer
+                // proper word tokens over raw byte sequences
+                let merge_weight = if merge_token_ids.contains(&(target_id as usize)) {
+                    config.merge_token_loss_weight
+                } else {
+                    1.0
+                };
+                let raw_loss = cross_entropy_loss(&logits, target_id as usize) * merge_weight;
 
                 // Coherence tracking + gated loss weighting
                 // (Bengio et al. 2009 — curriculum learning: focus on learnable examples)
@@ -886,9 +943,10 @@ pub fn train_with_adam(
                         raw_loss
                     };
                     // Coherence alignment loss: penalizes output-thought divergence
-                    if track_alignment {
+                    // Uses curriculum-annealed weight when start_weight > final weight
+                    if track_alignment && effective_alignment_weight > 0.0 {
                         let alignment_penalty =
-                            config.coherence_alignment_weight * (1.0 - coherence).max(0.0);
+                            effective_alignment_weight * (1.0 - coherence).max(0.0);
                         adjusted_loss += alignment_penalty;
                     }
                     adjusted_loss

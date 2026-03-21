@@ -980,6 +980,12 @@ impl CognitiveLoopService {
             metadata.fabrication_active_jobs = ft.active_print_jobs;
             metadata.fabrication_reward_ema = ft.reward_ema;
             metadata.fabrication_prediction_coherence = ft.prediction_coherence;
+            metadata.fabrication_mrp_planned_orders = ft.mrp_planned_orders;
+            metadata.fabrication_mrp_feasible = ft.mrp_feasible;
+            metadata.fabrication_mrp_shortages = ft.mrp_shortages_count;
+            metadata.fabrication_mrp_work_orders = ft.mrp_work_order_count;
+            metadata.fabrication_defect_prediction = ft.defect_prediction;
+            metadata.fabrication_defect_confidence = ft.defect_confidence;
         }
 
         // ── Spectrum Manager telemetry ──

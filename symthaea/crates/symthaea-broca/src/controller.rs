@@ -140,6 +140,14 @@ fn default_orthogonal_position_count() -> usize {
     512
 }
 
+fn default_true() -> bool {
+    true
+}
+
+fn default_thought_seed_scale() -> f32 {
+    0.3
+}
+
 impl Default for LanguageControllerConfig {
     fn default() -> Self {
         Self {
@@ -164,6 +172,8 @@ impl Default for LanguageControllerConfig {
             dt_max: default_dt_max(),
             enable_orthogonal_positions: false,
             orthogonal_position_count: default_orthogonal_position_count(),
+            enable_thought_seeding: true,
+            thought_seed_scale: default_thought_seed_scale(),
         }
     }
 }
@@ -417,6 +427,34 @@ impl LanguageController {
         self.coherence_for_dt = 1.0;
         self.last_effective_dt = self.config.dt_per_token;
         self.last_logit_hv = None;
+    }
+
+    /// Seed CfC neuron states from the thought HV.
+    ///
+    /// Projects the thought HV into each neuron's state with per-layer binding
+    /// to create distinct but thought-correlated initial states. This makes
+    /// early generation tokens depend on the input thought (not just zeros),
+    /// giving coherence monitoring a non-trivial baseline.
+    pub fn seed_from_thought(&mut self, thought_hv: &ContinuousHV) {
+        if !self.config.enable_thought_seeding {
+            return;
+        }
+        let scale = self.config.thought_seed_scale;
+        if scale <= 0.0 {
+            return;
+        }
+        for layer_idx in 0..self.network.n_layers() {
+            // Bind thought with layer index to create distinct seed per layer
+            let layer_seed = thought_hv.permute(layer_idx + 1);
+            let scaled = layer_seed.scale(scale);
+            if let Some(layer) = self.network.layer_mut(layer_idx) {
+                for (neuron_idx, neuron) in layer.iter_mut().enumerate() {
+                    // Further differentiate per neuron via additional permutation
+                    let neuron_seed = scaled.permute(neuron_idx + 1);
+                    neuron.set_state(neuron_seed);
+                }
+            }
+        }
     }
 
     /// Get the effective dt used in the last forward_step (for BPTT consistency).
