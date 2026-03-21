@@ -85,6 +85,113 @@ pub fn ExperimentsPage() -> impl IntoView {
                 </pre>
             </GlassPanel>
         </Show>
+
+        <SubstrateComparison />
+    }
+}
+
+/// Multi-substrate consciousness comparison.
+#[component]
+fn SubstrateComparison() -> impl IntoView {
+    let state = use_context::<AppState>().expect("AppState");
+    let engine = use_context::<EngineWorker>().expect("EngineWorker");
+
+    let (running, set_running) = signal(false);
+    let (results, set_results) = signal(Vec::<(String, f32)>::new());
+
+    let engine_run = engine.clone();
+    let on_compare = move |_| {
+        let engine = engine_run.clone();
+        set_running.set(true);
+        set_results.set(Vec::new());
+        wasm_bindgen_futures::spawn_local(async move {
+            let params = js_sys::Object::new();
+            let substrates = js_sys::Array::new();
+            for s in &[
+                "BiologicalNeurons",
+                "SiliconDigital",
+                "QuantumComputer",
+                "PhotonicProcessor",
+                "NeuromorphicChip",
+            ] {
+                substrates.push(&wasm_bindgen::JsValue::from_str(s));
+            }
+            let _ = js_sys::Reflect::set(&params, &"substrates".into(), &substrates);
+            let _ =
+                js_sys::Reflect::set(&params, &"cycles".into(), &wasm_bindgen::JsValue::from(30));
+            let promise = engine.send("multiSubstrate", &params.into());
+            match JsFuture::from(promise).await {
+                Ok(result) => {
+                    let mut items = Vec::new();
+                    for name in &[
+                        "BiologicalNeurons",
+                        "SiliconDigital",
+                        "QuantumComputer",
+                        "PhotonicProcessor",
+                        "NeuromorphicChip",
+                    ] {
+                        if let Ok(data) = js_sys::Reflect::get(&result, &(*name).into()) {
+                            if js_sys::Array::is_array(&data) {
+                                let arr = js_sys::Array::from(&data);
+                                let last = arr.get(arr.length().saturating_sub(1));
+                                let consciousness =
+                                    js_sys::Reflect::get(&last, &"consciousness".into())
+                                        .ok()
+                                        .and_then(|v| v.as_f64())
+                                        .unwrap_or(0.0) as f32;
+                                items.push((name.to_string(), consciousness));
+                            }
+                        }
+                    }
+                    set_results.set(items);
+                }
+                Err(e) => {
+                    log::error!("Multi-substrate comparison failed: {:?}", e);
+                }
+            }
+            set_running.set(false);
+        });
+    };
+
+    let substrate_colors = [
+        ("BiologicalNeurons", "var(--leaf-green)"),
+        ("SiliconDigital", "var(--da-blue)"),
+        ("QuantumComputer", "#8b5cf6"),
+        ("PhotonicProcessor", "var(--solar-gold)"),
+        ("NeuromorphicChip", "var(--teal)"),
+    ];
+
+    view! {
+        <GlassPanel title="Multi-Substrate Comparison">
+            <p style="font-size: 0.78rem; color: var(--fg-dim); line-height: 1.5; margin-bottom: 1rem;">
+                "Run 30 consciousness cycles on each substrate type and compare final Phi levels. "
+                "Tests the Multiple Realizability thesis: same algorithm, different physics."
+            </p>
+            <button class="btn-action" on:click=on_compare
+                prop:disabled=move || !state.worker_ready.get() || running.get()
+            >
+                {move || if running.get() { "Comparing substrates..." } else { "Run Comparison" }}
+            </button>
+            <Show when=move || !results.get().is_empty()>
+                <div class="exp-bars" style="margin-top: 1rem;">
+                    {move || {
+                        results.get().iter().enumerate().map(|(i, (name, phi))| {
+                            let height = format!("{}px", (phi * 100.0) as u32);
+                            let color = substrate_colors.get(i).map(|c| c.1).unwrap_or("var(--fg-dim)");
+                            let short_name = name.replace("Neurons", "").replace("Computer", "").replace("Processor", "").replace("Chip", "");
+                            let phi_val = *phi;
+                            view! {
+                                <div class="exp-bar-col">
+                                    <div class="bar-value">{format!("{:.3}", phi_val)}</div>
+                                    <div class="bar-fill" style:height=height style:background=color />
+                                    <div class="bar-label">{short_name}</div>
+                                </div>
+                            }
+                        }).collect::<Vec<_>>()
+                    }}
+                </div>
+            </Show>
+        </GlassPanel>
     }
 }
 

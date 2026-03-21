@@ -1,34 +1,18 @@
 use leptos::prelude::*;
 
-/// Eight-point SVG radar chart for the Eight Harmonies.
-///
-/// For now renders a static placeholder; will be wired to live
-/// harmony scores from the SporeEngine worker.
+use crate::state::AppState;
+
+/// Eight-point SVG radar chart for the Eight Harmonies — reactive.
 #[component]
 pub fn HarmonyRadar() -> impl IntoView {
-    // The eight harmonies: MC, RC, DC, WE, AR, EA, AM, SS
-    let labels = ["MC", "RC", "DC", "WE", "AR", "EA", "AM", "SS"];
-    // Default values (will become reactive once worker is wired)
-    let values = [0.5_f32; 8];
+    let state = use_context::<AppState>().expect("AppState");
+    let labels = ["RC", "PSF", "IW", "IP", "UI", "SR", "EP", "SS"];
 
     let cx = 90.0_f32;
     let cy = 90.0_f32;
     let r = 70.0_f32;
 
-    // Build polygon points
-    let points: String = values
-        .iter()
-        .enumerate()
-        .map(|(i, v)| {
-            let angle = (i as f32 / 8.0) * std::f32::consts::TAU - std::f32::consts::FRAC_PI_2;
-            let x = cx + angle.cos() * r * v;
-            let y = cy + angle.sin() * r * v;
-            format!("{x:.1},{y:.1}")
-        })
-        .collect::<Vec<_>>()
-        .join(" ");
-
-    // Label positions (slightly outside the chart)
+    // Label positions (static — outside the chart)
     let label_elems: Vec<_> = labels
         .iter()
         .enumerate()
@@ -47,8 +31,22 @@ pub fn HarmonyRadar() -> impl IntoView {
                 <circle cx={cx.to_string()} cy={cy.to_string()} r={(r * 0.33).to_string()} fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="0.5" />
                 <circle cx={cx.to_string()} cy={cy.to_string()} r={(r * 0.66).to_string()} fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="0.5" />
                 <circle cx={cx.to_string()} cy={cy.to_string()} r={r.to_string()} fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="0.5" />
-                // Data polygon
-                <polygon points={points} fill="rgba(126,200,160,0.15)" stroke="var(--leaf-green)" stroke-width="1.5" />
+                // Reactive data polygon
+                <polygon
+                    points=move || {
+                        let scores = state.harmony_scores.get();
+                        scores.iter().enumerate().map(|(i, v)| {
+                            let angle = (i as f32 / 8.0) * std::f32::consts::TAU - std::f32::consts::FRAC_PI_2;
+                            let x = cx + angle.cos() * r * v;
+                            let y = cy + angle.sin() * r * v;
+                            format!("{x:.1},{y:.1}")
+                        }).collect::<Vec<_>>().join(" ")
+                    }
+                    fill="rgba(126,200,160,0.15)"
+                    stroke="var(--leaf-green)"
+                    stroke-width="1.5"
+                    style="transition: all 0.5s ease;"
+                />
                 // Labels
                 {label_elems
                     .into_iter()
@@ -68,6 +66,9 @@ pub fn HarmonyRadar() -> impl IntoView {
                     })
                     .collect::<Vec<_>>()}
             </svg>
+            <div style="text-align: center; font-size: 0.6rem; color: var(--fg-muted); margin-top: 0.2rem;">
+                {move || state.dominant_harmony.get()}
+            </div>
         </div>
     }
 }

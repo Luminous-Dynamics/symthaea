@@ -43,8 +43,18 @@ function startLoop(intervalMs) {
       if (cycleCount % 5 === 0) {
         try { neuromods = JSON.parse(engine.neuromod_state()); } catch (_) {}
       }
+      // Every 10th cycle, include harmony scores
+      let harmonies = null;
+      if (cycleCount % 10 === 0) {
+        try {
+          harmonies = {
+            scores: JSON.parse(engine.harmony_scores()),
+            dominant: engine.dominant_harmony()
+          };
+        } catch (_) {}
+      }
 
-      self.postMessage({ type: 'cycle', result: { ...result, neuromods }, hv });
+      self.postMessage({ type: 'cycle', result: { ...result, neuromods, harmonies }, hv });
     } catch (e) {
       self.postMessage({ type: 'error', error: e.message });
     }
@@ -159,6 +169,9 @@ self.onmessage = async function(e) {
         break;
       case 'neuromodState':
         if (engine) result = JSON.parse(engine.neuromod_state());
+        break;
+      case 'harmonyScores':
+        if (engine) result = { scores: JSON.parse(engine.harmony_scores()), dominant: engine.dominant_harmony() };
         break;
       case 'getOutputHV':
         if (engine) result = Array.from(engine.get_output_hv());

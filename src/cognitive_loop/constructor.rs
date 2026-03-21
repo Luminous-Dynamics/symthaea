@@ -519,6 +519,10 @@ impl CognitiveLoopService {
         let enable_hierarchical_bundling = config.enable_hierarchical_bundling;
         let genesis_phrase_for_bundler = config.genesis_phrase.clone();
         let enable_mesh_time = config.enable_mesh_time;
+        #[cfg(feature = "ssm_language")]
+        let broca_nsm_semantic = config.enable_broca_nsm_semantic;
+        #[cfg(feature = "ssm_language")]
+        let broca_nsm_gate = config.enable_broca_nsm_gate;
         let mut service = Self {
             config,
             encoder,
@@ -542,9 +546,12 @@ impl CognitiveLoopService {
                                 "symthaea-broca-default",
                             )
                         });
+                    let mut broca_config = symthaea_broca::BrocaConfig::default();
+                    broca_config.enable_nsm_semantic = broca_nsm_semantic;
+                    broca_config.enable_nsm_gate = broca_nsm_gate;
                     Some(super::broca_bridge::BrocaManager::new(
                         &genesis,
-                        symthaea_broca::BrocaConfig::default(),
+                        broca_config,
                         broca_checkpoint_path.as_deref(),
                     ))
                 } else {
@@ -557,12 +564,6 @@ impl CognitiveLoopService {
                 } else {
                     None
                 },
-                #[cfg(feature = "ssm_language")]
-                grounded_understanding:
-                    symthaea_core::hdc::grounded_understanding::GroundedUnderstanding::new()
-                        .with_depth(
-                            symthaea_core::hdc::grounded_understanding::UnderstandingDepth::Surface,
-                        ),
             },
             adaptive_behavior,
             prediction_confidence: 0.5_f64, // Start neutral

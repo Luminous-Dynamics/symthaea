@@ -1459,13 +1459,15 @@ pub fn creativity_baselines() -> BTreeMap<&'static str, Baseline> {
     );
 
     // Remote Associates Test mean solution rank (Bowden & Jung-Beeman, 2003)
-    // With ~50% accuracy across 4 candidates, mean rank ≈ 1.75 (is_lower_better)
+    // With ~50% accuracy across 10 candidates (1 solution + 9 distractors),
+    // E[rank] ≈ 0.5×1 + 0.5×4 = 2.5 (humans cluster wrong answers on
+    // semantically close distractors, not uniform over 2-10).
     m.insert(
         "rat_mean_solution_rank",
         Baseline {
-            value: 1.75,
-            sd: Some(0.50),
-            source: "Bowden & Jung-Beeman (2003), derived from 50% accuracy over 4 candidates",
+            value: 2.50,
+            sd: Some(1.50),
+            source: "Bowden & Jung-Beeman (2003), derived from 50% accuracy over 10 candidates",
             population: "human adults",
         },
     );

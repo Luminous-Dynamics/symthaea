@@ -876,6 +876,8 @@ pub fn train_with_adam(
         let mut total_tokens = 0usize;
         let mut coherence_sum = 0.0f32;
         let mut coherence_count = 0usize;
+        let mut contrastive_loss_sum = 0.0f32;
+        let mut contrastive_count = 0usize;
 
         // Adaptive coherence weight: ramp from 0 to config value over warmup epochs
         let effective_coherence_weight = if config.coherence_warmup_epochs > 0
@@ -1093,6 +1095,8 @@ pub fn train_with_adam(
                 // Hinge loss: penalize when output is too similar to negative thought
                 let contrastive_loss =
                     config.contrastive_weight * (neg_sim - config.contrastive_margin).max(0.0);
+                contrastive_loss_sum += contrastive_loss;
+                contrastive_count += 1;
                 if contrastive_loss > 0.0 {
                     total_loss += contrastive_loss;
                     // Count as 1 token equivalent for averaging
@@ -1148,10 +1152,16 @@ pub fn train_with_adam(
             );
             // Unbuffered progress (tracing stderr is internally buffered when piped)
             use std::io::Write;
-            let _ = writeln!(
+            let _ =
+                writeln!(
                 std::io::stderr(),
-                "[epoch] {epoch}/{} loss={avg_loss:.6}{val_str}{coh_str} tokens={total_tokens}",
+                "[epoch] {epoch}/{} loss={avg_loss:.6}{val_str}{coh_str}{} tokens={total_tokens}",
                 config.epochs,
+                if contrastive_count > 0 {
+                    format!(" contra={:.4}", contrastive_loss_sum / contrastive_count as f32)
+                } else {
+                    String::new()
+                },
             );
             std::io::stderr().flush().ok();
         }

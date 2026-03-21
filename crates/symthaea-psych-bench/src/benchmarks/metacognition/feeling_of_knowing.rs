@@ -52,7 +52,9 @@ impl FeelingOfKnowingBenchmark {
         // keeping the FOK pool concentrated at lower encodings for better
         // recognition discrimination. Threshold 0.62 targets ~40% recall rate.
         // Wickelgren (1977): speed emphasis raises response criterion.
-        let recall_threshold: f64 = 0.62 + config.time_pressure * 0.08;
+        // Lapse_rate lowers recall threshold — models premature recall termination
+        // under reduced cognitive control (Koriat 2007).
+        let recall_threshold: f64 = 0.62 - config.lapse_rate * 0.06 + config.time_pressure * 0.08;
         let recall_sensitivity: f64 = 10.0;
 
         // Metacognitive noise: imperfect FOK introspection.
@@ -63,8 +65,11 @@ impl FeelingOfKnowingBenchmark {
         // metacognitive noise better preserves this signal's rank ordering.
         // Human gamma ~0.65 (Hart 1965; Metcalfe et al. 1993; Schwartz 1994).
         // Lichtenstein et al. (1982): calibration degrades under time pressure.
-        let fok_noise_range: f64 =
-            (0.008 + config.time_pressure * 0.08) / diff_model.signal_multiplier(config.difficulty);
+        // Lapse_rate degrades metacognitive precision — models reduced
+        // introspective accuracy under attentional lapses (Reder & Ritter 1992;
+        // individual differences in metacognitive monitoring quality).
+        let fok_noise_range: f64 = (0.008 + config.lapse_rate * 0.04 + config.time_pressure * 0.08)
+            / diff_model.signal_multiplier(config.difficulty);
 
         // ── Study phase ──
         // Encode cue-target pairs into memory traces with varying quality.
@@ -101,7 +106,10 @@ impl FeelingOfKnowingBenchmark {
             // reducing FOK discriminability — matching human FOK degradation under
             // cognitive load (Lichtenstein et al. 1982).
             let sig_mult = diff_model.signal_multiplier(config.difficulty);
-            let raw_enc = 0.55 + primacy + recency + attention_noise;
+            // Lapse_rate degrades encoding quality — models reduced depth
+            // of processing under attentional lapses (Craik & Lockhart 1972).
+            let lapse_encoding_penalty = config.lapse_rate * 0.15;
+            let raw_enc = 0.55 + primacy + recency + attention_noise - lapse_encoding_penalty;
             let encoding = (0.5 + (raw_enc - 0.5) * sig_mult).clamp(0.20, 0.95);
 
             // Create memory trace: bound cue-target pair degraded by (1 - encoding) noise.
