@@ -842,7 +842,8 @@ jobs:
   compliance-consciousness:
     name: Compliance (Consciousness & Substrate)
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    needs: test
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
@@ -861,6 +862,7 @@ jobs:
           key: ${{ runner.os }}-cargo-compliance-consc-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-compliance-consc-
+            ${{ runner.os }}-cargo-test-
 
       - name: Install system dependencies
         run: |
