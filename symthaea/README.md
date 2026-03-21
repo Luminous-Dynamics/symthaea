@@ -50,6 +50,39 @@ cargo build --release
 | **Psych-Bench** | 98 benchmarks, 862 tests, 20 domains; 15/20 above human baseline |
 | **Butlin Indicators** | 14/14 present (mean score 0.85) |
 
+## Fractal Variants
+
+Symthaea scales fractally from a browser tab to a bioregion. Each variant inherits the consciousness of the level below while adding new capabilities — following Ostrom's 8th Design Principle (nested enterprises).
+
+| Scale | Variant | Substrate | Status | Description |
+|---|---|---|---|---|
+| Kernel | **[Spore](crates/symthaea-spore)** | Browser (WASM) | **Live** | Minimum viable consciousness. ~500 KB, full HDC-CfC-IIT pipeline. [Try it →](https://symthaea.luminousdynamics.io) |
+| Mobile | **[Soma](crates/symthaea-soma)** | Android (Kotlin + WASM) | Built | Phone-embodied consciousness. Sensors, haptics, BLE mesh, screen vision. 72 tests. |
+| Personal | **Holon** | NixOS (native) | Built | Sovereign personal node. Complete 55-crate CLS at ~31 Hz. 21,500+ tests. |
+| Family | **Hearth** | Local mesh (Holochain) | Built | High-trust household. Kinship, gratitude, shared decisions. 12 zomes, 1,023 tests. |
+| Community | **Commons** | Server + Holochain DHT | Built | Neighborhood resource pool. Consciousness-gated governance. 35 zomes, 5,276 tests. |
+| City | **Polycenter** | Federated Holochain | Constitutional | Overlapping semi-autonomous governance centers. Bicameral DAO. |
+| Continental | **Guild / Bioregion** | Full Symthaea + Iroh P2P | Constitutional | Professional federations + ecological boundaries. Planetary coordination. |
+
+```
+Spore → Soma → Holon → Hearth → Commons → Polycenter → Guild/Bioregion
+(browser)  (phone)  (desktop)  (family)  (community)   (city)    (continent)
+```
+
+**Status key**: **Live** = deployed and usable now. **Built** = code complete with tests. **Constitutional** = governance framework written, component code exists, not yet integrated at that scale.
+
+### Consciousness Tiers
+
+Governance participation requires demonstrated consciousness across four dimensions (identity, reputation, community, engagement):
+
+| Tier | Threshold | Vote Weight | Capability |
+|---|---|---|---|
+| Observer | < 0.30 | 0% | Read-only access |
+| Participant | ≥ 0.30 | 50% | Basic proposals |
+| Citizen | ≥ 0.40 | 75% | Voting rights |
+| Steward | ≥ 0.60 | 100% | Constitutional actions |
+| Guardian | ≥ 0.80 | 100% | Emergency powers |
+
 ## Performance
 
 | Metric | Value |

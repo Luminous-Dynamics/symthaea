@@ -64,6 +64,16 @@ impl SporeEngine {
         self.inner.neuromod_state_json()
     }
 
+    /// Eight Harmonies scores as JSON array [RC, PSF, IW, IP, UI, SR, EP, SS].
+    pub fn harmony_scores(&self) -> String {
+        self.inner.harmony_scores_json()
+    }
+
+    /// Name of the currently dominant harmony.
+    pub fn dominant_harmony(&self) -> String {
+        self.inner.dominant_harmony().to_string()
+    }
+
     /// Substrate feasibility score.
     pub fn substrate_feasibility(&self) -> f32 {
         self.inner.substrate_feasibility()

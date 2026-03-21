@@ -204,6 +204,26 @@ export class SporeEngine {
         }
     }
     /**
+     * Name of the currently dominant harmony.
+     * @returns {string}
+     */
+    dominant_harmony() {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.sporeengine_dominant_harmony(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            deferred1_0 = r0;
+            deferred1_1 = r1;
+            return getStringFromWasm0(r0, r1);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+            wasm.__wbindgen_export4(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
      * Run a dream cycle — simulate counterfactual alternatives.
      * @returns {any}
      */
@@ -339,6 +359,31 @@ export class SporeEngine {
         }
     }
     /**
+     * Generate text aware of user input.
+     * Injects intent signals so generated language relates to user message.
+     * Returns GenerationResult as JS object with `text`, `num_tokens`, `eos_terminated`.
+     * @param {string} input
+     * @param {number} max_tokens
+     * @returns {any}
+     */
+    generate_text_with_input(input, max_tokens) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            const ptr0 = passStringToWasm0(input, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+            const len0 = WASM_VECTOR_LEN;
+            wasm.sporeengine_generate_text_with_input(retptr, this.__wbg_ptr, ptr0, len0, max_tokens);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return takeObject(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
      * Get the current network output hypervector (16,384 f32 values).
      * Used for live waveform visualization in the browser demo.
      * @returns {Float32Array}
@@ -363,6 +408,26 @@ export class SporeEngine {
     harmony_alignment() {
         const ret = wasm.sporeengine_harmony_alignment(this.__wbg_ptr);
         return ret;
+    }
+    /**
+     * Eight Harmonies scores as JSON array [RC, PSF, IW, IP, UI, SR, EP, SS].
+     * @returns {string}
+     */
+    harmony_scores() {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.sporeengine_harmony_scores(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            deferred1_0 = r0;
+            deferred1_1 = r1;
+            return getStringFromWasm0(r0, r1);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+            wasm.__wbindgen_export4(deferred1_0, deferred1_1, 1);
+        }
     }
     /**
      * Honest confidence in the consciousness measurement (0.0-0.95).

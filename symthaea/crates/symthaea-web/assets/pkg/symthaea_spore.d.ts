@@ -64,6 +64,10 @@ export class SporeEngine {
      */
     cycle_hv(hv: Float32Array): any;
     /**
+     * Name of the currently dominant harmony.
+     */
+    dominant_harmony(): string;
+    /**
      * Run a dream cycle — simulate counterfactual alternatives.
      */
     dream_cycle(): any;
@@ -98,6 +102,12 @@ export class SporeEngine {
      */
     generate_text(max_tokens: number): any;
     /**
+     * Generate text aware of user input.
+     * Injects intent signals so generated language relates to user message.
+     * Returns GenerationResult as JS object with `text`, `num_tokens`, `eos_terminated`.
+     */
+    generate_text_with_input(input: string, max_tokens: number): any;
+    /**
      * Get the current network output hypervector (16,384 f32 values).
      * Used for live waveform visualization in the browser demo.
      */
@@ -106,6 +116,10 @@ export class SporeEngine {
      * Current harmony alignment score (0.0-1.0).
      */
     harmony_alignment(): number;
+    /**
+     * Eight Harmonies scores as JSON array [RC, PSF, IW, IP, UI, SR, EP, SS].
+     */
+    harmony_scores(): string;
     /**
      * Honest confidence in the consciousness measurement (0.0-0.95).
      */
@@ -252,6 +266,7 @@ export interface InitOutput {
     readonly sporeengine_cycle: (a: number, b: number, c: number, d: number) => void;
     readonly sporeengine_cycle_count: (a: number) => bigint;
     readonly sporeengine_cycle_hv: (a: number, b: number, c: number, d: number) => void;
+    readonly sporeengine_dominant_harmony: (a: number, b: number) => void;
     readonly sporeengine_dream_cycle: (a: number, b: number) => void;
     readonly sporeengine_dream_session: (a: number, b: number, c: number) => void;
     readonly sporeengine_dream_stats: (a: number, b: number) => void;
@@ -260,8 +275,10 @@ export interface InitOutput {
     readonly sporeengine_fep_cycle: (a: number, b: number) => void;
     readonly sporeengine_free_energy: (a: number) => number;
     readonly sporeengine_generate_text: (a: number, b: number, c: number) => void;
+    readonly sporeengine_generate_text_with_input: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly sporeengine_get_output_hv: (a: number, b: number) => void;
     readonly sporeengine_harmony_alignment: (a: number) => number;
+    readonly sporeengine_harmony_scores: (a: number, b: number) => void;
     readonly sporeengine_honest_confidence: (a: number) => number;
     readonly sporeengine_inject_neuromodulator: (a: number, b: number, c: number, d: number) => void;
     readonly sporeengine_knowledge_query: (a: number, b: number, c: number, d: number) => void;

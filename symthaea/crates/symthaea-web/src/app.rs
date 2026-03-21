@@ -81,6 +81,28 @@ pub fn App() -> impl IntoView {
                                 state.neuromods.set(vals);
                             }
                         }
+                        // Harmony scores from enriched broadcast
+                        if let Ok(hm) = js_sys::Reflect::get(&result, &"harmonies".into()) {
+                            if !hm.is_undefined() && !hm.is_null() {
+                                if let Ok(scores_arr) = js_sys::Reflect::get(&hm, &"scores".into())
+                                {
+                                    if js_sys::Array::is_array(&scores_arr) {
+                                        let arr = js_sys::Array::from(&scores_arr);
+                                        let mut vals = [0.5_f32; 8];
+                                        for i in 0..8.min(arr.length() as usize) {
+                                            vals[i] =
+                                                arr.get(i as u32).as_f64().unwrap_or(0.5) as f32;
+                                        }
+                                        state.harmony_scores.set(vals);
+                                    }
+                                }
+                                if let Ok(dom) = js_sys::Reflect::get(&hm, &"dominant".into()) {
+                                    if let Some(s) = dom.as_string() {
+                                        state.dominant_harmony.set(s);
+                                    }
+                                }
+                            }
+                        }
                         state.cycle_count.update(|c| *c += 1);
                     }
                 }

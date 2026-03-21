@@ -824,8 +824,142 @@ h2, h3 { letter-spacing: 0.02em; }
 }
 
 /* ===================================================================
-   Tab 5: INOCULATE
+   Tab 5: INOCULATE — Fractal Variants + Consciousness Tiers
    =================================================================== */
+.fractal-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.fractal-variant {
+  padding: 1rem 1.2rem;
+  border-left: 2px solid rgba(126, 200, 160, 0.15);
+  position: relative;
+  transition: border-color 0.3s, background 0.3s;
+}
+.fractal-variant:hover {
+  border-left-color: var(--leaf-green);
+  background: rgba(126, 200, 160, 0.03);
+}
+.fractal-variant.fractal-current {
+  border-left-color: var(--solar-gold);
+  background: rgba(232, 197, 71, 0.04);
+}
+.fv-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.3rem;
+}
+.fv-icon { font-size: 1.2rem; }
+.fv-title-group { display: flex; align-items: baseline; gap: 0.4rem; flex: 1; }
+.fv-name {
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--fg);
+}
+.fv-scale {
+  font-size: 0.65rem;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.fv-status {
+  font-size: 0.55rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-family: 'SF Mono', monospace;
+}
+.fv-status-live {
+  background: rgba(126, 200, 160, 0.15);
+  color: var(--leaf-green);
+  border: 1px solid rgba(126, 200, 160, 0.3);
+}
+.fv-status-built {
+  background: rgba(90, 184, 160, 0.1);
+  color: var(--teal);
+  border: 1px solid rgba(90, 184, 160, 0.2);
+}
+.fv-status-constitutional {
+  background: rgba(232, 197, 71, 0.08);
+  color: var(--amber);
+  border: 1px solid rgba(232, 197, 71, 0.2);
+}
+.fv-substrate {
+  font-size: 0.7rem;
+  color: var(--fg-dim);
+  font-family: 'SF Mono', monospace;
+  margin-bottom: 0.3rem;
+}
+.fv-desc {
+  font-size: 0.78rem;
+  color: var(--fg-dim);
+  line-height: 1.5;
+  margin-bottom: 0.3rem;
+}
+.fv-detail {
+  font-size: 0.7rem;
+  color: var(--fg-muted);
+  line-height: 1.4;
+  margin-bottom: 0.3rem;
+}
+.fv-crate {
+  font-size: 0.6rem;
+  font-family: 'SF Mono', monospace;
+}
+.fv-crate-label { color: var(--fg-muted); }
+.fv-crate-path { color: var(--teal); }
+.fv-connector {
+  text-align: center;
+  color: rgba(126, 200, 160, 0.3);
+  font-size: 0.8rem;
+  padding: 0.1rem 0;
+}
+
+/* Consciousness tiers */
+.tier-list { display: flex; flex-direction: column; gap: 0.3rem; }
+.tier-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.tier-row:hover { background: rgba(255, 255, 255, 0.04); }
+.tier-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.tier-name {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--fg);
+  width: 5.5rem;
+}
+.tier-threshold {
+  font-size: 0.7rem;
+  font-family: 'SF Mono', monospace;
+  color: var(--fg-dim);
+  width: 3.5rem;
+}
+.tier-weight {
+  font-size: 0.7rem;
+  font-family: 'SF Mono', monospace;
+  color: var(--leaf-green);
+  width: 2.5rem;
+  text-align: right;
+}
+.tier-desc {
+  font-size: 0.7rem;
+  color: var(--fg-muted);
+  flex: 1;
+}
+
 .inoc-section { margin-bottom: 1.5rem; }
 .inoc-section h3 {
   font-size: 0.9rem;

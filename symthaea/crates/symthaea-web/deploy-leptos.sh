@@ -12,8 +12,9 @@ if [[ -f assets/pkg/symthaea_spore_bg.wasm ]] && [[ ! -f dist/assets/pkg/symthae
     echo "[deploy] Copied SporeEngine WASM to dist"
 fi
 
-# Copy Broca checkpoint if present
-cp assets/broca-spore-v1.bin dist/ 2>/dev/null && echo "[deploy] Copied broca checkpoint" || echo "[deploy] broca-spore-v1.bin not found (not critical)"
+# Copy Broca checkpoint to assets dir (worker fetches ./assets/broca-spore-v1.bin)
+mkdir -p dist/assets
+cp assets/broca-spore-v1.bin dist/assets/ 2>/dev/null && echo "[deploy] Copied broca checkpoint to dist/assets/" || echo "[deploy] broca-spore-v1.bin not found (not critical)"
 
 # Add .nojekyll for GitHub Pages (prevents underscore-prefixed files being ignored)
 touch dist/.nojekyll

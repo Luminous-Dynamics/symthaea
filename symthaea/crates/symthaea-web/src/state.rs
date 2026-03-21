@@ -27,6 +27,10 @@ pub struct AppState {
     /// Free energy (FEP)
     pub free_energy: RwSignal<f32>,
     pub fep_mode: RwSignal<String>,
+    /// Eight Harmonies scores [RC, PSF, IW, IP, UI, SR, EP, SS]
+    pub harmony_scores: RwSignal<[f32; 8]>,
+    /// Dominant harmony name
+    pub dominant_harmony: RwSignal<String>,
 }
 
 impl AppState {
@@ -50,6 +54,8 @@ impl AppState {
             wisdom_count: RwSignal::new(0),
             free_energy: RwSignal::new(0.0),
             fep_mode: RwSignal::new("exploring".to_string()),
+            harmony_scores: RwSignal::new([0.5; 8]),
+            dominant_harmony: RwSignal::new("Resonant Coherence".to_string()),
         }
     }
 }

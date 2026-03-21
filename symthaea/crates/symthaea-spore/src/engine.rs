@@ -2089,6 +2089,17 @@ impl SporeEngine {
         }
     }
 
+    /// JSON array of per-harmony scores [RC, PSF, IW, IP, UI, SR, EP, SS].
+    pub fn harmony_scores_json(&self) -> String {
+        let c = self.last_consciousness;
+        let scores: Vec<f32> = Harmony::all()
+            .iter()
+            .map(|h| self.harmony_score(h, c))
+            .collect();
+        serde_json::to_string(&scores)
+            .unwrap_or_else(|_| "[0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5]".into())
+    }
+
     /// Build the epistemic status that accompanies every cycle result.
     fn build_epistemic_status(&self) -> EpistemicStatus {
         // Gap between hypothetical feasibility and evidence confidence.
@@ -2611,11 +2622,11 @@ mod tests {
         // At least our engine is active (other parallel tests may also
         // create/drop engines, so we only check count > 0).
         assert!(SporeEngine::active_instance_count() >= 1);
-        let count_with = SporeEngine::active_instance_count();
         drop(engine);
-        // After drop, count should decrease (but concurrent tests can
-        // create engines simultaneously, so just check it's not absurd).
-        assert!(SporeEngine::active_instance_count() <= count_with);
+        // After drop, we only verify the engine was successfully created
+        // and dropped without panic. We cannot assert count relationships
+        // because concurrent tests create/drop engines in parallel,
+        // making any count comparison inherently racy.
     }
 
     #[test]
