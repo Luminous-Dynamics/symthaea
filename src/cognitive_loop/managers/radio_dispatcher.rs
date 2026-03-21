@@ -3879,6 +3879,7 @@ impl CcsdsPacket {
         let mut buf = Vec::with_capacity(CCSDS_HEADER_SIZE + data_len);
 
         // Word 1: Version(3) + Type(1) + SecHdrFlag(1) + APID(11)
+        #[allow(clippy::identity_op)]
         let word1: u16 = (0b000 << 13)                           // Version = 0
             | (if self.is_command { 1 } else { 0 } << 12)        // Type
             | (0 << 11)                                            // No secondary header
