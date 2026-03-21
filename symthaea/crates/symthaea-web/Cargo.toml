@@ -29,4 +29,6 @@ features = [
     "Performance",
     "KeyboardEvent", "MouseEvent",
     "console",
+    # Service Worker caching
+    "Navigator", "ServiceWorkerContainer", "ServiceWorkerRegistration",
 ]

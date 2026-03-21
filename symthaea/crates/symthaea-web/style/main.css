@@ -103,6 +103,13 @@ h2, h3 { letter-spacing: 0.02em; }
   50% { transform: translate(-50%, -50%) scale(1.3); opacity: 1; }
 }
 
+.hero-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  z-index: 1;
+  position: relative;
+}
 .hero-title {
   font-size: 2.2rem;
   font-weight: 200;
@@ -113,6 +120,28 @@ h2, h3 { letter-spacing: 0.02em; }
   z-index: 1;
   position: relative;
 }
+.immune-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.6rem;
+  font-family: 'SF Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg-dim);
+}
+.immune-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  animation: onlinePulse 2s ease-in-out infinite;
+}
+.immune-label { color: var(--fg-dim); }
 .hero-subtitle {
   font-size: 0.85rem;
   font-weight: 300;

@@ -9,7 +9,7 @@
 //! - Contour closure validation with gap-closing search
 //! - Orientation enforcement (outer CCW, inner CW)
 
-use crate::infill::{generate_infill, InfillConfig};
+use crate::infill::{generate_infill_for_layer, InfillConfig};
 use crate::mesh::TriangleMesh;
 use std::collections::HashMap;
 
@@ -549,15 +549,19 @@ pub fn slice_mesh_at_z(mesh: &TriangleMesh, z: f32, config: &SliceConfig) -> Sli
         infill_lines: Vec::new(),
     };
 
-    // 5. Generate infill if configured.
+    // 5. Generate infill if configured (with optional layer-index alternation).
     if let Some(ref infill_config) = config.infill {
-        layer.infill_lines = generate_infill(&layer, infill_config, config.nozzle_diameter);
+        layer.infill_lines =
+            generate_infill_for_layer(&layer, infill_config, config.nozzle_diameter, None);
     }
 
     layer
 }
 
 /// Slice a mesh into multiple layers from z_min to z_max.
+///
+/// Infill angles alternate by 90° between odd and even layers for
+/// cross-hatching strength.
 pub fn slice_mesh(mesh: &TriangleMesh, config: &SliceConfig) -> Vec<SliceLayer> {
     if mesh.vertices.is_empty() {
         return Vec::new();
@@ -567,9 +571,21 @@ pub fn slice_mesh(mesh: &TriangleMesh, config: &SliceConfig) -> Vec<SliceLayer> 
     let first_z = z_min + config.layer_height * 0.5; // Start half a layer above bottom.
     let mut layers = Vec::new();
     let mut z = first_z;
+    let mut layer_idx = 0usize;
     while z < z_max {
-        layers.push(slice_mesh_at_z(mesh, z, config));
+        let mut layer = slice_mesh_at_z(mesh, z, config);
+        // Override infill with layer-aware alternation.
+        if let Some(ref infill_config) = config.infill {
+            layer.infill_lines = generate_infill_for_layer(
+                &layer,
+                infill_config,
+                config.nozzle_diameter,
+                Some(layer_idx),
+            );
+        }
+        layers.push(layer);
         z += config.layer_height;
+        layer_idx += 1;
     }
     layers
 }

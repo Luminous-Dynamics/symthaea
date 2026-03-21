@@ -46,30 +46,40 @@ impl ResolverFn {
     }
 }
 
+/// Broadcast handler callback (for fire-and-forget messages from the worker).
+struct BroadcastHandler(SendWrapper<Box<dyn Fn(JsValue)>>);
+
+// SAFETY: WASM is single-threaded.
+unsafe impl Send for BroadcastHandler {}
+unsafe impl Sync for BroadcastHandler {}
+
 /// Bridge to the SporeEngine Web Worker.
 ///
 /// Messages use a correlation-ID protocol:
 ///   send:  `{ id, action, ...params }`
 ///   recv:  `{ id, type: "response"|"error", result|error }`
+///
+/// Fire-and-forget messages (no `id`) are routed to the broadcast handler.
 #[derive(Clone)]
 pub struct EngineWorker {
     worker: Arc<SendWrapper<Option<Worker>>>,
     pending: Arc<Mutex<HashMap<u32, ResolverFn>>>,
+    broadcast: Arc<Mutex<Option<BroadcastHandler>>>,
 }
 
 impl EngineWorker {
     pub fn new() -> Self {
         let pending: Arc<Mutex<HashMap<u32, ResolverFn>>> = Arc::new(Mutex::new(HashMap::new()));
+        let broadcast: Arc<Mutex<Option<BroadcastHandler>>> = Arc::new(Mutex::new(None));
 
         // Attempt to create the worker as an ES module (spore-worker.js uses `import`).
-        // Gracefully degrade if the asset is not present (e.g. during dev builds).
         let opts = web_sys::WorkerOptions::new();
         opts.set_type(web_sys::WorkerType::Module);
         let worker = Worker::new_with_options("./assets/spore-worker.js", &opts).ok();
 
         if let Some(ref w) = worker {
-            // Set up the onmessage handler to resolve pending promises.
             let pending_clone = pending.clone();
+            let broadcast_clone = broadcast.clone();
             let onmessage = Closure::wrap(Box::new(move |e: MessageEvent| {
                 let data = e.data();
 
@@ -80,6 +90,7 @@ impl EngineWorker {
                     .map(|v| v as u32);
 
                 if let Some(id) = id {
+                    // Correlated response — resolve the pending promise
                     let mut map = pending_clone.lock().unwrap();
                     if let Some(resolver) = map.remove(&id) {
                         let msg_type = js_sys::Reflect::get(&data, &"type".into())
@@ -99,9 +110,13 @@ impl EngineWorker {
                             resolver.call(&result);
                         }
                     }
+                } else {
+                    // Fire-and-forget broadcast (cycle updates, battery_progress, etc.)
+                    let handler = broadcast_clone.lock().unwrap();
+                    if let Some(ref h) = *handler {
+                        (h.0 .0)(data);
+                    }
                 }
-                // Messages without an id (e.g. cycle broadcasts, battery_progress)
-                // are fire-and-forget and intentionally ignored here.
             }) as Box<dyn FnMut(MessageEvent)>);
 
             w.set_onmessage(Some(onmessage.as_ref().unchecked_ref()));
@@ -113,7 +128,15 @@ impl EngineWorker {
         Self {
             worker: Arc::new(SendWrapper(worker)),
             pending,
+            broadcast,
         }
+    }
+
+    /// Set the broadcast handler for fire-and-forget messages from the worker.
+    /// Called once after AppState is available.
+    pub fn set_broadcast_handler(&self, handler: impl Fn(JsValue) + 'static) {
+        let mut guard = self.broadcast.lock().unwrap();
+        *guard = Some(BroadcastHandler(SendWrapper(Box::new(handler))));
     }
 
     /// Returns `true` if the underlying Web Worker was created successfully.
