@@ -122,7 +122,7 @@ class ParticleFieldView @JvmOverloads constructor(
     private fun updateParticles() {
         if (width == 0 || height == 0) return
         val cx = width / 2f
-        val cy = height * 0.40f
+        val cy = height * 0.42f  // Match mandala center
 
         val activeCount = when (particleStyle) {
             ParticleStyle.MYCELIUM -> (20 + consciousnessLevel * 20).toInt().coerceIn(20, 40)
@@ -243,7 +243,7 @@ class ParticleFieldView @JvmOverloads constructor(
                     // STARS + MYCELIUM: standard twinkle
                     p.phase += 0.02f
                     val twinkle = 0.5f + 0.5f * sin(p.phase)
-                    p.alpha = p.baseAlpha * twinkle * (0.5f + consciousnessLevel * 0.5f)
+                    p.alpha = p.baseAlpha * twinkle * (0.7f + consciousnessLevel * 0.3f)
                 }
             }
         }

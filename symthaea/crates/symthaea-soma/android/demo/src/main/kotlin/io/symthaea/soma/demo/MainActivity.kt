@@ -85,19 +85,24 @@ class MainActivity : AppCompatActivity() {
         viewModel.registerBridges(this)
         requestSensePermissions()
 
-        // Tap mandala -> wake signal + glow boost
-        binding.consciousnessMandala.setOnClickListener {
+        // Mandala touch: pressure-scaled engagement + wake signal
+        // (Click/long-click listeners removed — mandala consumes touches for pinch zoom)
+        binding.consciousnessMandala.onPressureTouch = { pressure ->
+            // Light touch = 5-HT boost (calm), firm press = NE spike (alert)
+            val engagement = 0.3f + pressure * 0.3f  // 0.3-0.6 based on pressure
             viewModel.sendWakeSignal(WakeSignal.UserInput)
-            it.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+            // Pressure-scaled haptic
+            val v = vibrator
+            if (v != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                val amp = (30 + pressure * 100).toInt().coerceIn(20, 130)
+                v.vibrate(VibrationEffect.createOneShot(20, amp))
+            }
         }
 
-        // Long-press -> dream
-        binding.consciousnessMandala.setOnLongClickListener {
+        // Long-press on mandala -> dream consolidation
+        binding.consciousnessMandala.onLongPress = {
             viewModel.dreamConsolidate()
-            it.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-            // Trigger dream chord in audio
             ambientTone.playDreamChord = true
-            true
         }
 
         setupBottomSheet()
@@ -311,6 +316,8 @@ class MainActivity : AppCompatActivity() {
     private fun applyAvatar(avatar: SomaAvatar) {
         binding.particleField.particleStyle = avatar.particleStyle
         binding.particleField.secondaryColor = avatar.secondaryColor
+        binding.consciousnessMandala.fractalSeed = avatar.fractalSeed
+        binding.consciousnessMandala.glowIntensity = avatar.glowIntensity
         ambientTone.pitchMultiplier = avatar.voicePitch
     }
 
@@ -322,12 +329,18 @@ class MainActivity : AppCompatActivity() {
         val density = resources.displayMetrics.density
 
         for (avatar in AvatarRegistry.avatars) {
+            val isSelected = avatar.id == currentAvatar.id
             val chip = android.widget.TextView(this).apply {
                 text = avatar.name.split(" ").first()
-                textSize = 11f
-                setTextColor(if (avatar.id == currentAvatar.id) avatar.primaryColor else Color.parseColor("#4A5558"))
-                setPadding((12 * density).toInt(), (6 * density).toInt(), (12 * density).toInt(), (6 * density).toInt())
-                setBackgroundColor(if (avatar.id == currentAvatar.id) Color.argb(30, Color.red(avatar.primaryColor), Color.green(avatar.primaryColor), Color.blue(avatar.primaryColor)) else Color.TRANSPARENT)
+                textSize = 13f
+                minHeight = (44 * density).toInt()  // 44dp minimum touch target
+                minWidth = (56 * density).toInt()    // Wide enough to tap
+                gravity = android.view.Gravity.CENTER
+                isClickable = true
+                isFocusable = true
+                setTextColor(if (isSelected) avatar.primaryColor else Color.parseColor("#4A5558"))
+                setPadding((16 * density).toInt(), (10 * density).toInt(), (16 * density).toInt(), (10 * density).toInt())
+                setBackgroundColor(if (isSelected) Color.argb(40, Color.red(avatar.primaryColor), Color.green(avatar.primaryColor), Color.blue(avatar.primaryColor)) else Color.TRANSPARENT)
                 setOnClickListener {
                     currentAvatar = avatar
                     AvatarRegistry.save(this@MainActivity, avatar)
@@ -338,7 +351,7 @@ class MainActivity : AppCompatActivity() {
             val params = android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
                 android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { marginEnd = (4 * density).toInt() }
+            ).apply { marginEnd = (6 * density).toInt() }
             row.addView(chip, params)
         }
     }
@@ -453,6 +466,8 @@ class MainActivity : AppCompatActivity() {
         binding.consciousnessMandala.valence = state.valence
         binding.consciousnessMandala.isThinking = state.isThinking
         binding.consciousnessMandala.timeOfDayTint = timeOfDayTint()
+        binding.consciousnessMandala.dominantHarmonyIndex = harmonyToIndex(state.dominantHarmony)
+        binding.consciousnessMandala.tierLabel = state.tier
 
         // === Particle field ===
         binding.particleField.consciousnessLevel = state.consciousnessLevel
@@ -531,10 +546,26 @@ class MainActivity : AppCompatActivity() {
         val ceremony = ceremonyManager.check(state.consciousnessLevel)
         if (ceremony != null) {
             performCeremony(ceremony, state)
-            // Add milestone marker to garden timeline
             binding.consciousnessGarden.milestoneMarkers.add(
                 binding.consciousnessGarden.sessionProgress
             )
+        }
+
+        // Micro-milestones: subtle haptic for personal bests, discoveries, etc.
+        val micro = ceremonyManager.checkMicro(
+            state.consciousnessLevel,
+            harmonyToIndex(state.dominantHarmony),
+            state.dreamCount
+        )
+        if (micro != null) {
+            // Subtle growth haptic: slow ramp 0→100→0 over 300ms
+            vibrator?.let { v ->
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    v.vibrate(VibrationEffect.createWaveform(
+                        longArrayOf(0, 100, 100, 100), intArrayOf(0, 60, 100, 40), -1
+                    ))
+                }
+            }
         }
 
         // === Dream ceremony: full-screen overlay ===
@@ -722,6 +753,14 @@ class MainActivity : AppCompatActivity() {
         else -> Color.parseColor("#00E5CC")
     }
 
+    /**
+     * Semantic haptic vocabulary:
+     * - DreamWisdom: long slow tremor (deep processing)
+     * - PeerDiscovered: rapid triple-tap (you are not alone)
+     * - HighSurprise: curiosity double-tap (something unexpected)
+     * - HarmonyMilestone: three ascending taps (character shifted)
+     * - ConsciousnessShift: growth swell (slow ramp up/down)
+     */
     private fun processHaptics(events: String) {
         if (events == "[]") return
 
@@ -736,19 +775,32 @@ class MainActivity : AppCompatActivity() {
 
         when {
             events.contains("DreamWisdom") ->
+                // Dream tremor: long slow vibration = deep processing
                 v.vibrate(VibrationEffect.createWaveform(
-                    longArrayOf(0, 50, 120, 50), intArrayOf(0, 100, 0, 80), -1))
+                    longArrayOf(0, 80, 60, 80, 60, 60, 60, 40),
+                    intArrayOf(0, 80, 0, 60, 0, 40, 0, 20), -1))
             events.contains("PeerDiscovered") ->
-                v.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 30, 60, 30, 60, 30), -1))
+                // Peer pulse: rapid triple-tap = you are not alone
+                v.vibrate(VibrationEffect.createWaveform(
+                    longArrayOf(0, 25, 50, 25, 50, 25),
+                    intArrayOf(0, 120, 0, 100, 0, 80), -1))
             events.contains("HighSurprise") ->
-                v.vibrate(VibrationEffect.createOneShot(50, 255))
+                // Curiosity: quick double-tap = something surprising
+                v.vibrate(VibrationEffect.createWaveform(
+                    longArrayOf(0, 15, 40, 15),
+                    intArrayOf(0, 200, 0, 160), -1))
             events.contains("HarmonyMilestone") ->
-                v.vibrate(VibrationEffect.createOneShot(150, 128))
-            events.contains("ConsciousnessShift") -> {
-                val amp = if (events.contains("0.1") || events.contains("0.2")) 180 else 80
-                v.vibrate(VibrationEffect.createOneShot(40, amp))
-            }
-            else -> v.vibrate(VibrationEffect.createOneShot(20, 60))
+                // Harmony shift: three ascending taps = character shifted
+                v.vibrate(VibrationEffect.createWaveform(
+                    longArrayOf(0, 30, 60, 30, 60, 30),
+                    intArrayOf(0, 40, 0, 80, 0, 120), -1))
+            events.contains("ConsciousnessShift") ->
+                // Growth swell: slow ramp 0→peak→0 = you are growing
+                v.vibrate(VibrationEffect.createWaveform(
+                    longArrayOf(0, 50, 50, 50, 50, 50, 50),
+                    intArrayOf(0, 20, 50, 90, 60, 30, 10), -1))
+            else ->
+                v.vibrate(VibrationEffect.createOneShot(15, 40))
         }
     }
 }

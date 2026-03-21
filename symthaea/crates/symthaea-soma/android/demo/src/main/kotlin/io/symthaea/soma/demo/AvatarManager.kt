@@ -40,11 +40,11 @@ object AvatarRegistry {
         SomaAvatar(
             id = "teal_consciousness",
             name = "Teal Consciousness",
-            description = "The default. Bioluminescent ocean mind.",
+            description = "The default. Mycelium network mind.",
             primaryColor = Color.parseColor("#00E5CC"),
             secondaryColor = Color.parseColor("#007A6D"),
             fractalSeed = 0f,
-            particleStyle = ParticleStyle.STARS,
+            particleStyle = ParticleStyle.MYCELIUM,  // Mesh network is the core identity
             voicePitch = 1.0f,
             glowIntensity = 1.0f,
         ),
