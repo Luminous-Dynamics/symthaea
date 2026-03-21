@@ -1,7 +1,7 @@
 // Web Worker for Spore consciousness engine.
 // Keeps experiments and heavy cycles off the main thread.
 
-import init, { SporeEngine, generate_flake, generate_disko_config, generate_hardware_nix } from './pkg/symthaea_spore.js';
+import init, { SporeEngine } from './pkg/symthaea_spore.js';
 
 let engine = null;
 let running = false;
@@ -284,16 +284,6 @@ self.onmessage = async function(e) {
         result = { text };
         break;
       }
-      // Flake generation from hardware probe
-      case 'generateFlake':
-        result = generate_flake(params.hardwareJson, params.path || '/', params.hostname || 'guardian');
-        break;
-      case 'generateDiskoConfig':
-        result = generate_disko_config(params.hardwareJson);
-        break;
-      case 'generateHardwareNix':
-        result = generate_hardware_nix(params.hardwareJson);
-        break;
       default:
         throw new Error(`Unknown action: ${action}`);
     }

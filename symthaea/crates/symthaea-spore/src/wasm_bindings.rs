@@ -157,6 +157,43 @@ impl SporeEngine {
     }
 
     // ======================================================================
+    // Reasoning engine (7-step cognitive cycle)
+    // ======================================================================
+
+    /// Run a 7-step reasoning cycle on the given input.
+    /// Returns the full ReasoningCycle trace as a JS object.
+    pub fn reasoning_cycle(&mut self, input: &str) -> Result<JsValue, JsError> {
+        let result = self.inner.reasoning_cycle(input);
+        serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    // ======================================================================
+    // Immune system (threat detection + defense cascade)
+    // ======================================================================
+
+    /// Assess an input for threats. Returns ThreatAssessment as JS object.
+    pub fn threat_assessment(&mut self, input: &str) -> Result<JsValue, JsError> {
+        let result = self.inner.threat_assessment(input);
+        serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    /// Current safety level as a string ("Green", "Yellow", "Orange", "Red").
+    pub fn safety_level(&self) -> String {
+        self.inner.safety_level().to_string()
+    }
+
+    // ======================================================================
+    // Causal discovery
+    // ======================================================================
+
+    /// Get the current causal graph as a JS object.
+    /// Returns { edges: [...], variables: [...] }.
+    pub fn causal_graph(&self) -> Result<JsValue, JsError> {
+        let graph = self.inner.causal_graph();
+        serde_wasm_bindgen::to_value(graph).map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    // ======================================================================
     // Dream engine
     // ======================================================================
 
