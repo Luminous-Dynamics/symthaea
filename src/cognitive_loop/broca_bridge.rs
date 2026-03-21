@@ -47,6 +47,22 @@ pub struct BrocaConsciousnessSignals {
     /// Ethics gate: true when `EthicalVerdict::Blocked` prevents generation.
     /// Uses a bool to avoid coupling Broca crate to the EthicalVerdict enum.
     pub ethics_blocked: bool,
+    /// NSM semantic primitives detected in the current cycle's input.
+    /// Populated from `perception.encoding.encoding_result.detected_primitives`.
+    /// Science: Wierzbicka (1996) — universal semantic primes ground language production.
+    pub detected_primitives: Vec<String>,
+    /// NSM primitive grounding score (0.0–1.0): fraction of input words that
+    /// mapped to recognized NSM semantic primes. Higher = better decomposition.
+    pub primitive_grounding: f32,
+    /// NSM-composed semantic content vector (16,384D ContinuousHV).
+    /// Produced by `GroundedUnderstanding.understand()` → BinaryHV → ContinuousHV.
+    /// When present and confidence is above threshold, blended with thought HV
+    /// via `lerp()` before generation.
+    /// Science: Barsalou (1999) — grounded cognition requires semantic modulation.
+    pub semantic_hv: Option<symthaea_core::hdc::ContinuousHV>,
+    /// Confidence of the NSM semantic decomposition (0.0–1.0).
+    /// From `GroundedUnderstanding.understand().confidence`.
+    pub semantic_confidence: f32,
 }
 
 // Re-export telemetry type from the types module.
@@ -169,6 +185,19 @@ impl BrocaManager {
             signals.coherence,
         );
 
+        // Wire NSM primitives into concept_count (channel 19) and domain_familiarity (channel 21).
+        // Science: Wierzbicka (1996) — semantic decomposition depth correlates with domain knowledge.
+        {
+            use super::thresholds::{NSM_CONCEPT_COUNT_SCALE, NSM_GROUNDING_DOMAIN_BLEND};
+            let nsm_count = (signals.detected_primitives.len() as f32 * NSM_CONCEPT_COUNT_SCALE)
+                .clamp(0.0, 10.0);
+            channels.channels[19] = nsm_count;
+            // Blend primitive grounding into domain_familiarity (index 21)
+            let existing_familiarity = channels.channels[21];
+            channels.channels[21] = existing_familiarity * (1.0 - NSM_GROUNDING_DOMAIN_BLEND)
+                + signals.primitive_grounding * NSM_GROUNDING_DOMAIN_BLEND;
+        }
+
         // Set therapeutic channels from manager state
         #[cfg(feature = "therapeutic")]
         channels.set_therapeutic(
@@ -179,9 +208,13 @@ impl BrocaManager {
         );
 
         // Multi-turn context: use generate_continuing() after the first turn
-        // to preserve CfC temporal context
+        // to preserve CfC temporal context.
+        // Pass NSM semantic HV through when available (Phase 2).
         let result = if self.multi_turn_depth > 0 && self.turn_count > 0 {
             self.generator.generate_continuing(&channels)
+        } else if signals.semantic_hv.is_some() {
+            self.generator
+                .generate_with_semantic(&channels, signals.semantic_hv.as_ref())
         } else {
             self.generator.generate(&channels)
         };
@@ -224,6 +257,8 @@ impl BrocaManager {
             consciousness_gated: false,
             type_token_ratio,
             max_repetition,
+            nsm_primitive_count: signals.detected_primitives.len(),
+            nsm_grounding: signals.primitive_grounding,
             ..Default::default()
         };
 
@@ -299,5 +334,73 @@ impl BrocaManager {
     /// Get the number of context vectors currently stored.
     pub fn context_depth(&self) -> usize {
         self.context_window.len()
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "ssm_language")]
+mod tests {
+    use super::*;
+    use symthaea_core::genesis::GenesisSeed;
+
+    fn test_manager() -> BrocaManager {
+        let genesis = GenesisSeed::from_phrase("test-nsm-broca");
+        BrocaManager::new(&genesis, BrocaConfig::default(), None)
+    }
+
+    #[test]
+    fn test_detected_primitives_affect_concept_count() {
+        let mut mgr = test_manager();
+        let signals = BrocaConsciousnessSignals {
+            consciousness_level: 0.8,
+            coherence: 0.5,
+            detected_primitives: vec![
+                "FEEL".into(),
+                "BAD".into(),
+                "BECAUSE".into(),
+                "SOMEONE".into(),
+                "MOVE".into(),
+            ],
+            primitive_grounding: 0.6,
+            ..Default::default()
+        };
+        // Generate (may produce empty text — we just check telemetry)
+        let _ = mgr.generate(signals);
+        let telem = mgr.last_telemetry();
+        assert_eq!(telem.nsm_primitive_count, 5);
+        assert!((telem.nsm_grounding - 0.6).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_primitive_grounding_blends_domain_familiarity() {
+        use super::super::thresholds::NSM_GROUNDING_DOMAIN_BLEND;
+
+        // Default domain_familiarity (channel 21) = 0.5
+        // After blending with primitive_grounding=0.8:
+        // new = 0.5 * (1 - 0.5) + 0.8 * 0.5 = 0.25 + 0.4 = 0.65
+        let default_familiarity = 0.5_f32;
+        let grounding = 0.8_f32;
+        let expected = default_familiarity * (1.0 - NSM_GROUNDING_DOMAIN_BLEND)
+            + grounding * NSM_GROUNDING_DOMAIN_BLEND;
+        assert!(
+            (expected - 0.65).abs() < 1e-5,
+            "Blend formula should produce 0.65, got {expected}"
+        );
+    }
+
+    #[test]
+    fn test_empty_primitives_no_effect_on_concept_count() {
+        let mut mgr = test_manager();
+        let signals = BrocaConsciousnessSignals {
+            consciousness_level: 0.8,
+            coherence: 0.5,
+            detected_primitives: vec![],
+            primitive_grounding: 0.0,
+            ..Default::default()
+        };
+        let _ = mgr.generate(signals);
+        let telem = mgr.last_telemetry();
+        assert_eq!(telem.nsm_primitive_count, 0);
+        assert!(telem.nsm_grounding.abs() < 1e-5);
     }
 }

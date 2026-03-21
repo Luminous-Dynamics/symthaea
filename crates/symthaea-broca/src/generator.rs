@@ -22,52 +22,6 @@ use crate::tokenizer::BpeTokenizer;
 
 use symthaea_core::genesis::GenesisSeed;
 
-/// Programming language for code generation mode.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub enum CodeLanguage {
-    /// Rust programming language.
-    Rust,
-    /// Python programming language.
-    Python,
-    /// Nix expression language.
-    Nix,
-}
-
-/// Generation mode: natural language text or structured code.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
-pub enum GenerationMode {
-    /// Natural language text generation (default).
-    #[default]
-    Text,
-    /// Code generation with stricter gating.
-    Code { language: CodeLanguage },
-}
-
-impl GenerationMode {
-    /// Temperature to use for this mode. Code mode uses a lower temperature
-    /// (0.3) to produce more deterministic, syntactically correct output.
-    pub fn temperature(&self) -> Option<f32> {
-        match self {
-            Self::Text => None, // Use configured temperature
-            Self::Code { .. } => Some(0.3),
-        }
-    }
-
-    /// Default max tokens for this mode. Code mode defaults to 256
-    /// (double the text default of 128) to accommodate function bodies.
-    pub fn default_max_tokens(&self) -> Option<usize> {
-        match self {
-            Self::Text => None, // Use configured max_tokens
-            Self::Code { .. } => Some(256),
-        }
-    }
-
-    /// Whether this mode is code generation.
-    pub fn is_code(&self) -> bool {
-        matches!(self, Self::Code { .. })
-    }
-}
-
 /// Sampling strategy for token selection.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub enum SamplingStrategy {
@@ -115,9 +69,18 @@ pub struct BrocaConfig {
     /// BPE vocab stores spaces as separate tokens. Untrained models don't emit them.
     #[serde(default = "default_auto_spacing")]
     pub enable_auto_spacing: bool,
-    /// Generation mode: text (default) or code with language-specific gating.
+    /// Enable NSM semantic content blending into thought HV (Phase 2).
+    /// When true and a semantic_hv is provided, it is blended with the
+    /// thought HV before generation via linear interpolation.
+    /// Science: Barsalou (1999) — grounded cognition requires semantic modulation.
     #[serde(default)]
-    pub mode: GenerationMode,
+    pub enable_nsm_semantic: bool,
+    /// Blend weight for NSM semantic HV into thought HV (0.0–1.0).
+    /// Higher values give more weight to the NSM semantic content.
+    /// Default 0.3: ~30% semantic modulation for meaningful influence
+    /// without overwhelming procedural dynamics.
+    #[serde(default = "default_nsm_semantic_alpha")]
+    pub nsm_semantic_alpha: f32,
 }
 
 fn default_repetition_penalty() -> f32 {
@@ -126,6 +89,10 @@ fn default_repetition_penalty() -> f32 {
 
 fn default_auto_spacing() -> bool {
     true
+}
+
+fn default_nsm_semantic_alpha() -> f32 {
+    0.3
 }
 
 impl Default for BrocaConfig {
@@ -143,7 +110,8 @@ impl Default for BrocaConfig {
             repetition_penalty: default_repetition_penalty(),
             sampling_seed: None,
             enable_auto_spacing: true,
-            mode: GenerationMode::default(),
+            enable_nsm_semantic: false,
+            nsm_semantic_alpha: default_nsm_semantic_alpha(),
         }
     }
 }
@@ -309,6 +277,23 @@ impl BrocaGenerator {
         self.generate_with_callback(channels, &mut |_| {})
     }
 
+    /// Generate with an optional NSM semantic content vector.
+    ///
+    /// When `semantic_hv` is provided and `enable_nsm_semantic` is true,
+    /// the semantic HV is blended with the thought HV via linear interpolation
+    /// before entering the CfC generation loop. This gives the generator
+    /// actual semantic content (NSM-composed meaning) rather than just
+    /// metadata about the thought.
+    ///
+    /// Science: Barsalou (1999) — grounded cognition requires ~30% semantic modulation.
+    pub fn generate_with_semantic(
+        &mut self,
+        channels: &ThoughtChannels,
+        semantic_hv: Option<&symthaea_core::hdc::ContinuousHV>,
+    ) -> GenerationResult {
+        self.generate_internal_with_semantic(channels, &mut |_| {}, true, semantic_hv)
+    }
+
     /// Generate continuing from the current CfC state (multi-turn context).
     ///
     /// Unlike `generate()`, this does NOT reset the controller state,
@@ -335,9 +320,32 @@ impl BrocaGenerator {
         on_token: &mut dyn FnMut(&str),
         reset_state: bool,
     ) -> GenerationResult {
+        self.generate_internal_with_semantic(channels, on_token, reset_state, None)
+    }
+
+    /// Internal generation with configurable state reset and optional NSM semantic HV.
+    fn generate_internal_with_semantic(
+        &mut self,
+        channels: &ThoughtChannels,
+        on_token: &mut dyn FnMut(&str),
+        reset_state: bool,
+        semantic_hv: Option<&symthaea_core::hdc::ContinuousHV>,
+    ) -> GenerationResult {
         // 1. Encode thought channels once
         let thought_hv_original = self.encoder.encode(channels);
         let mut thought_hv = thought_hv_original.clone();
+
+        // 1b. Blend NSM semantic content into thought HV if enabled and provided.
+        // This gives the generator actual compositional meaning (e.g., FEEL(BAD) ⊗ BECAUSE ⊗ MOVE(AWAY))
+        // rather than just scalar metadata about the thought.
+        if self.config.enable_nsm_semantic {
+            if let Some(sem_hv) = semantic_hv {
+                let alpha = self.config.nsm_semantic_alpha.clamp(0.0, 1.0);
+                if alpha > 0.0 {
+                    thought_hv.lerp_in_place(sem_hv, 1.0 - alpha, alpha);
+                }
+            }
+        }
 
         // 2. Compute max tokens (consciousness-gated, then time-pressure-adjusted)
         let pre_pressure_tokens = if self.config.enable_consciousness_gating {
@@ -345,17 +353,11 @@ impl BrocaGenerator {
         } else {
             self.config.gating.base_max_tokens
         };
-        let pre_mode_tokens = crate::gating::time_pressure_adjusted_max_tokens(
+        let max_tokens = crate::gating::time_pressure_adjusted_max_tokens(
             pre_pressure_tokens,
             channels.time_pressure(),
             self.config.gating.time_pressure_max_reduction,
         );
-        // Code mode overrides max_tokens to 256 (unless explicitly set higher)
-        let max_tokens = if let Some(code_max) = self.config.mode.default_max_tokens() {
-            pre_mode_tokens.max(code_max)
-        } else {
-            pre_mode_tokens
-        };
 
         // Time pressure reduction as a fraction of pre-pressure tokens removed
         let time_pressure_reduction = if pre_pressure_tokens > 0 {
@@ -404,24 +406,6 @@ impl BrocaGenerator {
             // Apply frequency-scaled repetition penalty
             if rep_penalty > 1.0 + 1e-6 {
                 apply_repetition_penalty(&mut logits, &tokens, rep_penalty);
-            }
-
-            // Code mode: apply stricter epistemic gating on identifier/keyword tokens.
-            // Suppresses tokens that the model is less confident about, reducing
-            // hallucinated identifiers and incorrect keywords.
-            if self.config.mode.is_code() {
-                let error_likelihood = channels.error_likelihood();
-                let type_confidence = channels.type_confidence();
-                // When type confidence is low or error likelihood is high,
-                // suppress logits for code tokens more aggressively
-                let code_suppression = (1.0 - type_confidence) * 0.5 + error_likelihood * 0.5;
-                if code_suppression > 0.1 {
-                    for (idx, logit) in logits.iter_mut().enumerate() {
-                        if self.tokenizer.is_code_token(idx as u32) {
-                            *logit -= code_suppression * 2.0;
-                        }
-                    }
-                }
             }
 
             // Apply gating and compute audit trail values
@@ -651,20 +635,14 @@ impl BrocaGenerator {
     }
 
     /// Sample a token from logits using the configured strategy.
-    ///
-    /// In code generation mode, temperature is overridden to 0.3 for
-    /// more deterministic, syntactically correct output.
     fn sample(&mut self, logits: &[f32]) -> u32 {
-        let code_temp = self.config.mode.temperature();
         match &self.config.sampling {
             SamplingStrategy::Greedy => greedy_sample(logits),
             SamplingStrategy::TopK { k, temperature } => {
-                let temp = code_temp.unwrap_or(*temperature);
-                top_k_sample(logits, *k, temp, self.sampling_rng.as_mut())
+                top_k_sample(logits, *k, *temperature, self.sampling_rng.as_mut())
             }
             SamplingStrategy::TopP { p, temperature } => {
-                let temp = code_temp.unwrap_or(*temperature);
-                top_p_sample(logits, *p, temp, self.sampling_rng.as_mut())
+                top_p_sample(logits, *p, *temperature, self.sampling_rng.as_mut())
             }
         }
     }
@@ -697,21 +675,6 @@ impl BrocaGenerator {
     /// Get reference to the config.
     pub fn config(&self) -> &BrocaConfig {
         &self.config
-    }
-
-    /// Set the generation mode (text or code).
-    ///
-    /// In code mode:
-    /// - Temperature is overridden to 0.3 for more deterministic output
-    /// - Stricter epistemic gating is applied to identifier/keyword tokens
-    /// - Max tokens defaults to 256 (instead of 128) to accommodate function bodies
-    pub fn set_mode(&mut self, mode: GenerationMode) {
-        self.config.mode = mode;
-    }
-
-    /// Get the current generation mode.
-    pub fn mode(&self) -> GenerationMode {
-        self.config.mode
     }
 }
 
@@ -1904,123 +1867,5 @@ mod tests {
             "Mean pairwise Jaccard similarity {mean_jaccard:.4} too high — \
              outputs are too similar across intents"
         );
-    }
-
-    // ── Code generation mode tests ──
-
-    #[test]
-    fn test_generation_mode_default_is_text() {
-        let config = BrocaConfig::default();
-        assert_eq!(config.mode, GenerationMode::Text);
-    }
-
-    #[test]
-    fn test_set_mode_code() {
-        let genesis = test_genesis();
-        let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
-
-        assert_eq!(gen.mode(), GenerationMode::Text);
-        gen.set_mode(GenerationMode::Code {
-            language: CodeLanguage::Rust,
-        });
-        assert_eq!(
-            gen.mode(),
-            GenerationMode::Code {
-                language: CodeLanguage::Rust
-            }
-        );
-    }
-
-    #[test]
-    fn test_code_mode_generation_produces_tokens() {
-        let genesis = test_genesis();
-        let mut config = test_config();
-        config.mode = GenerationMode::Code {
-            language: CodeLanguage::Rust,
-        };
-
-        let mut gen = BrocaGenerator::new(&genesis, config);
-        let channels = ThoughtChannels::default();
-        let result = gen.generate(&channels);
-
-        assert!(
-            result.num_tokens > 0,
-            "Code mode should generate at least 1 token"
-        );
-        // All token IDs should be valid
-        for &id in &result.token_ids {
-            assert!(
-                (id as usize) < gen.tokenizer().vocab_size(),
-                "Token ID {id} exceeds vocab size"
-            );
-        }
-    }
-
-    #[test]
-    fn test_code_mode_max_tokens_at_least_256() {
-        let mode = GenerationMode::Code {
-            language: CodeLanguage::Rust,
-        };
-        assert_eq!(mode.default_max_tokens(), Some(256));
-    }
-
-    #[test]
-    fn test_code_mode_temperature_is_0_3() {
-        let mode = GenerationMode::Code {
-            language: CodeLanguage::Python,
-        };
-        assert_eq!(mode.temperature(), Some(0.3));
-    }
-
-    #[test]
-    fn test_text_mode_no_temperature_override() {
-        let mode = GenerationMode::Text;
-        assert_eq!(mode.temperature(), None);
-        assert_eq!(mode.default_max_tokens(), None);
-    }
-
-    #[test]
-    fn test_code_mode_deterministic() {
-        let genesis = test_genesis();
-        let mut config = test_config();
-        config.mode = GenerationMode::Code {
-            language: CodeLanguage::Rust,
-        };
-        config.sampling_seed = Some(42);
-        config.sampling = SamplingStrategy::TopK {
-            k: 10,
-            temperature: 1.0, // Will be overridden to 0.3 by code mode
-        };
-
-        let channels = ThoughtChannels::default();
-
-        let mut gen1 = BrocaGenerator::new(&genesis, config.clone());
-        let result1 = gen1.generate(&channels);
-
-        let mut gen2 = BrocaGenerator::new(&genesis, config);
-        let result2 = gen2.generate(&channels);
-
-        assert_eq!(
-            result1.token_ids, result2.token_ids,
-            "Code mode with same seed should be deterministic"
-        );
-    }
-
-    #[test]
-    fn test_code_language_variants() {
-        assert!(GenerationMode::Code {
-            language: CodeLanguage::Rust
-        }
-        .is_code());
-        assert!(GenerationMode::Code {
-            language: CodeLanguage::Python
-        }
-        .is_code());
-        assert!(GenerationMode::Code {
-            language: CodeLanguage::Nix
-        }
-        .is_code());
-        assert!(!GenerationMode::Text.is_code());
     }
 }

@@ -337,7 +337,12 @@ impl PacAnalyzer {
             }
         }
 
-        let mi = kl / (n_bins as f64).ln();
+        let ln_bins = (n_bins as f64).ln();
+        let mi = if ln_bins > 0.0 {
+            (kl / ln_bins).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
 
         // Preferred phase: phase bin with max mean amplitude
         let preferred_bin = mean_amps

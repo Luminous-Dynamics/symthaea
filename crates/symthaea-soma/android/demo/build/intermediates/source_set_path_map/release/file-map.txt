@@ -33,7 +33,6 @@ io.symthaea.soma.demo-pngs-31 /srv/luminous-dynamics/symthaea/crates/symthaea-so
 io.symthaea.soma.demo-resValues-32 /srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/build/generated/res/resValues/release
 io.symthaea.soma.demo-packageReleaseResources-33 /srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/build/intermediates/incremental/release/packageReleaseResources/merged.dir
 io.symthaea.soma.demo-packageReleaseResources-34 /srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/build/intermediates/incremental/release/packageReleaseResources/stripped.dir
-io.symthaea.soma.demo-merged-not-compiled-resources-35 /srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/build/intermediates/merged-not-compiled-resources/release
-io.symthaea.soma.demo-merged_res-36 /srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/build/intermediates/merged_res/release
-io.symthaea.soma.demo-main-37 /srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/res
-io.symthaea.soma.demo-release-38 /srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/release/res
+io.symthaea.soma.demo-merged_res-35 /srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/build/intermediates/merged_res/release
+io.symthaea.soma.demo-main-36 /srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/res
+io.symthaea.soma.demo-release-37 /srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/release/res

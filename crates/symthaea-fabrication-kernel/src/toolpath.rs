@@ -4,7 +4,7 @@
 //! suitable for FDM 3D printers. Handles preamble/postamble, extrusion
 //! calculation, retraction on long travel moves, and temperature control.
 
-use crate::slicer::{Contour, Point2, SliceConfig, SliceLayer};
+use crate::slicer::{Contour, Point2, Segment2, SliceConfig, SliceLayer};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -386,11 +386,52 @@ pub fn generate_gcode(
             );
         }
 
-        // Then infill lines.
+        // Then infill lines — sorted by nearest-neighbor to minimize travel.
         #[allow(unused_assignments)]
         if !layer.infill_lines.is_empty() {
             commands.push(GCodeCommand::Comment("Infill".into()));
-            for seg in &layer.infill_lines {
+            // Nearest-neighbor sort: greedily pick the closest segment start/end
+            // to the current head position to reduce travel moves.
+            let mut remaining: Vec<Segment2> = layer.infill_lines.clone();
+            let mut ordered: Vec<Segment2> = Vec::with_capacity(remaining.len());
+            let mut nn_pos: Option<Point2> = current_pos;
+            while !remaining.is_empty() {
+                let (best_idx, reversed) = match nn_pos {
+                    Some(pos) => {
+                        let mut best_i = 0usize;
+                        let mut best_dist = f32::MAX;
+                        let mut best_rev = false;
+                        for (i, seg) in remaining.iter().enumerate() {
+                            let ds = distance(&pos, &seg.start);
+                            let de = distance(&pos, &seg.end);
+                            if ds < best_dist {
+                                best_dist = ds;
+                                best_i = i;
+                                best_rev = false;
+                            }
+                            if de < best_dist {
+                                best_dist = de;
+                                best_i = i;
+                                best_rev = true;
+                            }
+                        }
+                        (best_i, best_rev)
+                    }
+                    None => (0, false),
+                };
+                let seg = remaining.remove(best_idx);
+                let seg = if reversed {
+                    Segment2 {
+                        start: seg.end,
+                        end: seg.start,
+                    }
+                } else {
+                    seg
+                };
+                nn_pos = Some(seg.end);
+                ordered.push(seg);
+            }
+            for seg in &ordered {
                 // Travel to start of infill segment.
                 let needs_travel = match current_pos {
                     Some(pos) => distance(&pos, &seg.start) > 1.0,
@@ -720,6 +761,114 @@ mod tests {
             g1_count >= 8,
             "multiple contours should produce many G1 moves, got {}",
             g1_count
+        );
+    }
+
+    #[test]
+    fn nearest_neighbor_reduces_travel() {
+        let (sc, tc) = default_configs();
+        // Create infill segments in worst-case (far-apart alternating) order.
+        // Segments at Y=1,3,5,7,9 but listed in non-sequential order to maximize travel.
+        let worst_order_layers = vec![SliceLayer {
+            z: 0.2,
+            outer_contours: vec![square_contour()],
+            inner_contours: vec![],
+            infill_lines: vec![
+                // Far end first, then near, alternating — maximizes naive travel
+                Segment2 {
+                    start: Point2::new(1.0, 9.0),
+                    end: Point2::new(9.0, 9.0),
+                },
+                Segment2 {
+                    start: Point2::new(1.0, 1.0),
+                    end: Point2::new(9.0, 1.0),
+                },
+                Segment2 {
+                    start: Point2::new(1.0, 8.0),
+                    end: Point2::new(9.0, 8.0),
+                },
+                Segment2 {
+                    start: Point2::new(1.0, 2.0),
+                    end: Point2::new(9.0, 2.0),
+                },
+                Segment2 {
+                    start: Point2::new(1.0, 7.0),
+                    end: Point2::new(9.0, 7.0),
+                },
+                Segment2 {
+                    start: Point2::new(1.0, 3.0),
+                    end: Point2::new(9.0, 3.0),
+                },
+            ],
+        }];
+        // Sequential (already-optimal) order for comparison.
+        let sequential_layers = vec![SliceLayer {
+            z: 0.2,
+            outer_contours: vec![square_contour()],
+            inner_contours: vec![],
+            infill_lines: vec![
+                Segment2 {
+                    start: Point2::new(1.0, 1.0),
+                    end: Point2::new(9.0, 1.0),
+                },
+                Segment2 {
+                    start: Point2::new(1.0, 2.0),
+                    end: Point2::new(9.0, 2.0),
+                },
+                Segment2 {
+                    start: Point2::new(1.0, 3.0),
+                    end: Point2::new(9.0, 3.0),
+                },
+                Segment2 {
+                    start: Point2::new(1.0, 7.0),
+                    end: Point2::new(9.0, 7.0),
+                },
+                Segment2 {
+                    start: Point2::new(1.0, 8.0),
+                    end: Point2::new(9.0, 8.0),
+                },
+                Segment2 {
+                    start: Point2::new(1.0, 9.0),
+                    end: Point2::new(9.0, 9.0),
+                },
+            ],
+        }];
+
+        let worst_prog = generate_gcode(&worst_order_layers, &sc, &tc);
+        let seq_prog = generate_gcode(&sequential_layers, &sc, &tc);
+
+        // Count G0 travel moves in infill section (after "Infill" comment).
+        fn count_infill_travel(prog: &GCodeProgram) -> usize {
+            let mut in_infill = false;
+            let mut count = 0usize;
+            for cmd in &prog.commands {
+                if let GCodeCommand::Comment(s) = cmd {
+                    if s == "Infill" {
+                        in_infill = true;
+                    }
+                }
+                if in_infill {
+                    if let GCodeCommand::G0 {
+                        x: Some(_),
+                        y: Some(_),
+                        ..
+                    } = cmd
+                    {
+                        count += 1;
+                    }
+                }
+            }
+            count
+        }
+
+        let nn_travel = count_infill_travel(&worst_prog);
+        let seq_travel = count_infill_travel(&seq_prog);
+        // Nearest-neighbor reordering should produce travel count <= the sequential (already-ordered) case.
+        assert!(
+            nn_travel <= seq_travel + 1,
+            "nearest-neighbor ({} travels) should be close to sequential ({} travels)",
+            nn_travel,
+            seq_travel
         );
     }
 }

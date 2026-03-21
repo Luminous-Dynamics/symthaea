@@ -12,12 +12,14 @@ pub fn ImmuneStatus() -> impl IntoView {
     let engine = use_context::<EngineWorker>().expect("EngineWorker");
 
     // Poll safety level every ~3 seconds
+    let state_poll = state.clone();
+    let engine_poll = engine.clone();
     Effect::new(move |_| {
-        if !state.worker_ready.get() {
+        if !state_poll.worker_ready.get() {
             return;
         }
-        let engine = engine.clone();
-        let state = state.clone();
+        let engine = engine_poll.clone();
+        let state = state_poll.clone();
         wasm_bindgen_futures::spawn_local(async move {
             loop {
                 let promise = engine.send_simple("safetyLevel");

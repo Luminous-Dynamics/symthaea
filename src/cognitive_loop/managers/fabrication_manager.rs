@@ -773,4 +773,35 @@ mod tests {
         let _output = mgr.process(&default_snapshot());
         assert!(mgr.last_manufacturing_fe.is_finite());
     }
+
+    #[test]
+    fn inject_defect_prediction_shows_in_telemetry() {
+        let mut mgr = FabricationManager::default();
+        mgr.inject_defect_prediction(0.85, 0.72);
+        let t = mgr.telemetry();
+        assert!(
+            (t.defect_prediction - 0.85).abs() < 1e-6,
+            "defect_prediction should be 0.85, got {}",
+            t.defect_prediction
+        );
+        assert!(
+            (t.defect_confidence - 0.72).abs() < 1e-6,
+            "defect_confidence should be 0.72, got {}",
+            t.defect_confidence
+        );
+    }
+
+    #[test]
+    fn inject_mrp_status_shows_in_telemetry() {
+        let mut mgr = FabricationManager::default();
+        mgr.inject_mrp_status(5, false, 2, 10);
+        let t = mgr.telemetry();
+        assert_eq!(t.mrp_planned_orders, 5, "mrp_planned_orders should be 5");
+        assert!(!t.mrp_feasible, "mrp_feasible should be false");
+        assert_eq!(t.mrp_shortages_count, 2, "mrp_shortages_count should be 2");
+        assert_eq!(
+            t.mrp_work_order_count, 10,
+            "mrp_work_order_count should be 10"
+        );
+    }
 }

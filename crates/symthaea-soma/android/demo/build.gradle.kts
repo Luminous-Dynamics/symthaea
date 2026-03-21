@@ -10,7 +10,7 @@ android {
     buildToolsVersion = "34.0.0"
 
     defaultConfig {
-        applicationId = "io.symthaea.soma"  // Production app ID (not .demo)
+        applicationId = "io.symthaea.soma.demo"
         minSdk = 26  // Android 8.0+ (covers 95%+ of active devices)
         targetSdk = 34
         versionCode = 1
@@ -41,12 +41,7 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            isMinifyEnabled = false  // Disabled until ProGuard rules are tuned
             signingConfig = signingConfigs.getByName("release")
         }
         debug {

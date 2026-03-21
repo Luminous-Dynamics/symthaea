@@ -16,6 +16,8 @@ pub enum InfillPattern {
     Rectilinear,
     /// Two perpendicular passes per layer (0° and 90° relative to base angle).
     Grid,
+    /// Hexagonal honeycomb — inherently multi-directional, high strength-to-weight.
+    Honeycomb,
 }
 
 /// Configuration for infill generation.
@@ -79,6 +81,81 @@ impl Contour {
             max_y = max_y.max(p.y);
         }
         (Point2::new(min_x, min_y), Point2::new(max_x, max_y))
+    }
+}
+
+// ── Contour inset ────────────────────────────────────────────────────────
+
+impl Contour {
+    /// Shrink the contour inward by `offset` mm (positive = inward for CCW contours).
+    ///
+    /// Uses parallel offset: each edge is moved inward by `offset` along its
+    /// inward normal, then consecutive offset edges are intersected to compute
+    /// new vertices. Returns `None` if the contour collapses (zero or negative area).
+    pub fn inset(&self, offset: f32) -> Option<Contour> {
+        let n = self.points.len();
+        if n < 3 {
+            return None;
+        }
+
+        // For CCW contours, the inward normal of edge (a→b) is the left normal
+        // of the direction vector, i.e. (-dy, dx) normalised.
+        // We move each edge inward by `offset` along this normal.
+
+        // Build offset lines: each as a point on the line + direction vector.
+        // Represent as (point, direction) pairs, then intersect consecutive pairs.
+        let mut offset_lines: Vec<(Point2, Point2)> = Vec::with_capacity(n);
+        for i in 0..n {
+            let j = (i + 1) % n;
+            let a = self.points[i];
+            let b = self.points[j];
+            let dx = b.x - a.x;
+            let dy = b.y - a.y;
+            let len = (dx * dx + dy * dy).sqrt();
+            if len < 1e-8 {
+                // Degenerate edge — skip by using the same point twice.
+                offset_lines.push((a, b));
+                continue;
+            }
+            // Inward normal for CCW contour: left of direction = (-dy, dx) / len
+            let nx = -dy / len;
+            let ny = dx / len;
+            // Offset both endpoints of the edge.
+            let oa = Point2::new(a.x + nx * offset, a.y + ny * offset);
+            let ob = Point2::new(b.x + nx * offset, b.y + ny * offset);
+            offset_lines.push((oa, ob));
+        }
+
+        // Intersect consecutive offset lines to get new vertices.
+        let mut new_points: Vec<Point2> = Vec::with_capacity(n);
+        for i in 0..n {
+            let j = (i + 1) % n;
+            let (p1, p2) = offset_lines[i];
+            let (p3, p4) = offset_lines[j];
+
+            // Line-line intersection of (p1→p2) and (p3→p4).
+            let d1x = p2.x - p1.x;
+            let d1y = p2.y - p1.y;
+            let d2x = p4.x - p3.x;
+            let d2y = p4.y - p3.y;
+            let denom = d1x * d2y - d1y * d2x;
+
+            let pt = if denom.abs() < 1e-8 {
+                // Parallel lines — use midpoint of the shared endpoint.
+                Point2::new((p2.x + p3.x) * 0.5, (p2.y + p3.y) * 0.5)
+            } else {
+                let t = ((p3.x - p1.x) * d2y - (p3.y - p1.y) * d2x) / denom;
+                Point2::new(p1.x + t * d1x, p1.y + t * d1y)
+            };
+            new_points.push(pt);
+        }
+
+        let result = Contour { points: new_points };
+        // Reject degenerate results (zero or negative area).
+        if result.signed_area() <= 0.0 {
+            return None;
+        }
+        Some(result)
     }
 }
 
@@ -210,6 +287,132 @@ fn generate_infill_at_angle(
     result
 }
 
+/// Generate a hexagonal honeycomb infill pattern.
+///
+/// Generates a grid of regular hexagons covering the bounding box and clips
+/// each hex edge against the contour boundaries using the same even-odd
+/// intersection logic used by the scan-line infill.
+///
+/// Hex geometry: for a given `spacing` (line-to-line distance), the hex
+/// circumradius is `R = spacing * 2.0 / sqrt(3)`. Columns are separated by
+/// `3 * R / 2`, rows by `R * sqrt(3) / 2` (staggered).
+fn generate_honeycomb_infill(
+    _layer: &SliceLayer,
+    edges: &[(Point2, Point2)],
+    bb_min: Point2,
+    bb_max: Point2,
+    spacing: f32,
+    _nozzle_diameter: f32,
+) -> Vec<Segment2> {
+    let sqrt3: f32 = 3.0f32.sqrt();
+    // Circumradius of each hexagon.
+    let r = spacing * 2.0 / sqrt3;
+    // Column stride (center-to-center horizontal).
+    let col_stride = r * 1.5;
+    // Row stride (center-to-center vertical).
+    let row_stride = r * sqrt3 / 2.0;
+
+    // Angles for the 6 vertices of a regular hexagon (flat-top orientation).
+    let hex_angles: [f32; 6] = [
+        0.0,
+        std::f32::consts::FRAC_PI_3,
+        2.0 * std::f32::consts::FRAC_PI_3,
+        std::f32::consts::PI,
+        4.0 * std::f32::consts::FRAC_PI_3,
+        5.0 * std::f32::consts::FRAC_PI_3,
+    ];
+
+    // Enumerate hex centers covering the bounding box (with margin).
+    let x_start = bb_min.x - r * 2.0;
+    let x_end = bb_max.x + r * 2.0;
+    let y_start = bb_min.y - r * 2.0;
+    let y_end = bb_max.y + r * 2.0;
+
+    let mut result = Vec::new();
+
+    let mut col = 0i32;
+    let mut cx = x_start;
+    while cx < x_end {
+        let mut row = 0i32;
+        let mut cy = y_start + if col % 2 == 1 { row_stride } else { 0.0 };
+        while cy < y_end {
+            // Generate the 6 edges of this hexagon.
+            let vertices: Vec<Point2> = hex_angles
+                .iter()
+                .map(|&a| Point2::new(cx + r * a.cos(), cy + r * a.sin()))
+                .collect();
+
+            for i in 0..6 {
+                let j = (i + 1) % 6;
+                let a = vertices[i];
+                let b = vertices[j];
+
+                // Clip this hex edge against the contour using even-odd intersections.
+                // Find all t values where the segment (a→b) intersects any contour edge.
+                let seg_dx = b.x - a.x;
+                let seg_dy = b.y - a.y;
+                let seg_len_sq = seg_dx * seg_dx + seg_dy * seg_dy;
+                if seg_len_sq < 1e-10 {
+                    row += 1;
+                    cy += row_stride * 2.0;
+                    continue;
+                }
+
+                let mut t_values: Vec<f32> = vec![0.0, 1.0];
+                for &(ea, eb) in edges {
+                    // Intersection of segment a→b with edge ea→eb.
+                    let e_dx = eb.x - ea.x;
+                    let e_dy = eb.y - ea.y;
+                    let denom = seg_dx * e_dy - seg_dy * e_dx;
+                    if denom.abs() < 1e-10 {
+                        continue;
+                    }
+                    let t = ((ea.x - a.x) * e_dy - (ea.y - a.y) * e_dx) / denom;
+                    let u = ((ea.x - a.x) * seg_dy - (ea.y - a.y) * seg_dx) / denom;
+                    if (0.0..=1.0).contains(&t) && (0.0..=1.0).contains(&u) {
+                        t_values.push(t);
+                    }
+                }
+                t_values.sort_by(|x, y| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal));
+                t_values.dedup_by(|x, y| (*x - *y).abs() < 1e-8);
+
+                // Emit segments whose midpoints are inside the contour(s).
+                for w in t_values.windows(2) {
+                    let t_mid = (w[0] + w[1]) * 0.5;
+                    let mid = Point2::new(a.x + t_mid * seg_dx, a.y + t_mid * seg_dy);
+
+                    // Even-odd test: count crossings from mid toward +X across all edges.
+                    let mut inside = false;
+                    for &(ea, eb) in edges {
+                        if ((ea.y > mid.y) != (eb.y > mid.y))
+                            && (mid.x < (eb.x - ea.x) * (mid.y - ea.y) / (eb.y - ea.y) + ea.x)
+                        {
+                            inside = !inside;
+                        }
+                    }
+
+                    if inside {
+                        let seg_start = Point2::new(a.x + w[0] * seg_dx, a.y + w[0] * seg_dy);
+                        let seg_end = Point2::new(a.x + w[1] * seg_dx, a.y + w[1] * seg_dy);
+                        if seg_start.dist(seg_end) > 1e-4 {
+                            result.push(Segment2 {
+                                start: seg_start,
+                                end: seg_end,
+                            });
+                        }
+                    }
+                }
+            }
+            row += 1;
+            cy += row_stride * 2.0;
+        }
+        col += 1;
+        cx += col_stride;
+    }
+
+    result
+}
+
 /// Generate infill line segments for a sliced layer.
 ///
 /// Produces parallel scan lines at the configured angle and density,
@@ -251,27 +454,64 @@ pub fn generate_infill_for_layer(
         };
     let angle_rad = base_angle.to_radians();
 
+    // Build inset contours (shrink by half a nozzle diameter) so infill does
+    // not overlap the perimeter walls. Fall back to the original contours if
+    // the inset collapses any of them.
+    let inset_amount = nozzle_diameter * 0.5;
+    let inset_outer: Vec<Contour> = layer
+        .outer_contours
+        .iter()
+        .filter_map(|c| c.inset(inset_amount))
+        .collect();
+    let inset_inner: Vec<Contour> = layer
+        .inner_contours
+        .iter()
+        .filter_map(|c| c.inset(-inset_amount)) // inner contours are CW; inset outward
+        .collect();
+
+    // Use inset contours for edge collection and bounding box if we have them.
+    let clip_layer_storage: Option<SliceLayer> = if inset_outer.is_empty() {
+        None
+    } else {
+        Some(SliceLayer {
+            z: layer.z,
+            outer_contours: inset_outer,
+            inner_contours: inset_inner,
+            infill_lines: Vec::new(),
+        })
+    };
+    let clip_layer: &SliceLayer = clip_layer_storage.as_ref().unwrap_or(layer);
+
     // Collect all edges.
-    let edges = collect_edges(layer);
+    let edges = collect_edges(clip_layer);
     if edges.is_empty() {
         return Vec::new();
     }
 
     // Get bounding box.
-    let (bb_min, bb_max) = match layer_bounding_box(layer) {
+    let (bb_min, bb_max) = match layer_bounding_box(clip_layer) {
         Some(bb) => bb,
         None => return Vec::new(),
     };
 
-    // First pass at the base angle.
-    let mut result = generate_infill_at_angle(layer, &edges, bb_min, bb_max, angle_rad, spacing);
-
-    // Grid pattern: add a second perpendicular pass.
-    if config.pattern == InfillPattern::Grid {
-        let perp = angle_rad + std::f32::consts::FRAC_PI_2;
-        let pass2 = generate_infill_at_angle(layer, &edges, bb_min, bb_max, perp, spacing);
-        result.extend(pass2);
-    }
+    // Generate pattern.
+    let result = match config.pattern {
+        InfillPattern::Rectilinear => {
+            generate_infill_at_angle(clip_layer, &edges, bb_min, bb_max, angle_rad, spacing)
+        }
+        InfillPattern::Grid => {
+            let mut segs =
+                generate_infill_at_angle(clip_layer, &edges, bb_min, bb_max, angle_rad, spacing);
+            let perp = angle_rad + std::f32::consts::FRAC_PI_2;
+            segs.extend(generate_infill_at_angle(
+                clip_layer, &edges, bb_min, bb_max, perp, spacing,
+            ));
+            segs
+        }
+        InfillPattern::Honeycomb => {
+            generate_honeycomb_infill(clip_layer, &edges, bb_min, bb_max, spacing, nozzle_diameter)
+        }
+    };
 
     result
 }
@@ -555,6 +795,147 @@ mod tests {
             no_alt.len(),
             explicit_none.len(),
             "None layer_index should match generate_infill"
+        );
+    }
+
+    // ── Contour inset ────────────────────────────────────────────────
+
+    #[test]
+    fn inset_square_shrinks() {
+        let c = square_contour(10.0);
+        let inset = c.inset(1.0).expect("inset should produce valid contour");
+        // Each vertex should be roughly 1mm inward from the original.
+        for pt in &inset.points {
+            assert!(pt.x >= 0.9 && pt.x <= 9.1, "x={} not inset", pt.x);
+            assert!(pt.y >= 0.9 && pt.y <= 9.1, "y={} not inset", pt.y);
+        }
+        // Area should be smaller.
+        assert!(
+            inset.signed_area().abs() < c.signed_area().abs(),
+            "inset area {} should be < original {}",
+            inset.signed_area().abs(),
+            c.signed_area().abs()
+        );
+    }
+
+    #[test]
+    fn inset_tiny_contour_returns_none() {
+        // A 0.1mm square with 1mm inset should collapse to None.
+        let c = square_contour(0.1);
+        let result = c.inset(1.0);
+        assert!(
+            result.is_none(),
+            "inset larger than contour should return None"
+        );
+    }
+
+    #[test]
+    fn infill_with_inset_stays_inside_perimeter() {
+        let layer = square_layer(20.0);
+        let config = InfillConfig {
+            pattern: InfillPattern::Rectilinear,
+            density: 0.5,
+            angle_degrees: 0.0,
+        };
+        let lines = generate_infill(&layer, &config, 0.4);
+        let nozzle_diameter = 0.4f32;
+        let inset_amount = nozzle_diameter * 0.5;
+        // All infill endpoints should be at least inset_amount inside the 20mm boundary.
+        for seg in &lines {
+            assert!(
+                seg.start.x >= inset_amount - 0.1 && seg.start.x <= 20.0 - inset_amount + 0.1,
+                "start.x={} outside inset boundary",
+                seg.start.x
+            );
+            assert!(
+                seg.end.x >= inset_amount - 0.1 && seg.end.x <= 20.0 - inset_amount + 0.1,
+                "end.x={} outside inset boundary",
+                seg.end.x
+            );
+        }
+    }
+
+    // ── Honeycomb pattern ────────────────────────────────────────────
+
+    #[test]
+    fn honeycomb_produces_lines() {
+        let layer = square_layer(20.0);
+        let config = InfillConfig {
+            pattern: InfillPattern::Honeycomb,
+            density: 0.2,
+            angle_degrees: 0.0,
+        };
+        let lines = generate_infill(&layer, &config, 0.4);
+        assert!(
+            !lines.is_empty(),
+            "honeycomb infill on 20mm square should produce segments"
+        );
+    }
+
+    #[test]
+    fn honeycomb_respects_hole() {
+        let layer = hole_layer();
+        let config = InfillConfig {
+            pattern: InfillPattern::Honeycomb,
+            density: 0.3,
+            angle_degrees: 0.0,
+        };
+        let lines = generate_infill(&layer, &config, 0.4);
+        assert!(
+            !lines.is_empty(),
+            "honeycomb on layer with hole should produce segments"
+        );
+        // No segment midpoint should land inside the hole (3,3)→(7,7).
+        for seg in &lines {
+            let mx = (seg.start.x + seg.end.x) * 0.5;
+            let my = (seg.start.y + seg.end.y) * 0.5;
+            let in_hole = mx > 3.1 && mx < 6.9 && my > 3.1 && my < 6.9;
+            assert!(
+                !in_hole,
+                "segment midpoint ({:.2},{:.2}) is inside hole",
+                mx, my
+            );
+        }
+    }
+
+    #[test]
+    fn honeycomb_more_directions_than_rectilinear() {
+        let layer = square_layer(20.0);
+        let honeycomb_config = InfillConfig {
+            pattern: InfillPattern::Honeycomb,
+            density: 0.3,
+            angle_degrees: 0.0,
+        };
+        let rect_config = InfillConfig {
+            pattern: InfillPattern::Rectilinear,
+            density: 0.3,
+            angle_degrees: 0.0,
+        };
+        let hc_lines = generate_infill(&layer, &honeycomb_config, 0.4);
+        let rect_lines = generate_infill(&layer, &rect_config, 0.4);
+
+        // Honeycomb has 3 directions; rectilinear has 1.
+        // Count distinct directions (quantised to 30° buckets) — honeycomb
+        // should have more direction variety.
+        fn direction_buckets(segs: &[Segment2]) -> std::collections::HashSet<i32> {
+            segs.iter()
+                .map(|s| {
+                    let dx = s.end.x - s.start.x;
+                    let dy = s.end.y - s.start.y;
+                    let angle_deg = dy.atan2(dx).to_degrees();
+                    // Quantise to 30° buckets, normalise to [0, 180).
+                    let normalised = ((angle_deg % 180.0) + 180.0) % 180.0;
+                    (normalised / 30.0) as i32
+                })
+                .collect()
+        }
+        let hc_dirs = direction_buckets(&hc_lines);
+        let rect_dirs = direction_buckets(&rect_lines);
+        assert!(
+            hc_dirs.len() > rect_dirs.len(),
+            "honeycomb ({} directions) should have more directions than rectilinear ({})",
+            hc_dirs.len(),
+            rect_dirs.len()
         );
     }
 }

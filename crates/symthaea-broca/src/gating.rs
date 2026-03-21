@@ -2254,7 +2254,7 @@ mod tests {
         #[test]
         fn test_high_distress_suppresses_directives() {
             let mut channels = ThoughtChannels::default();
-            channels.channels[30] = 0.9; // client_distress_level = high
+            channels.channels[26] = 0.9; // client_distress_level = high
 
             let should_logit = TherapeuticGate::apply("should", &channels, 0.0);
             assert!(
@@ -2267,7 +2267,7 @@ mod tests {
         #[test]
         fn test_high_distress_boosts_validating() {
             let mut channels = ThoughtChannels::default();
-            channels.channels[30] = 0.9; // client_distress_level = high
+            channels.channels[26] = 0.9; // client_distress_level = high
 
             let understand_logit = TherapeuticGate::apply("understand", &channels, 0.0);
             assert!(
@@ -2280,7 +2280,7 @@ mod tests {
         #[test]
         fn test_low_alliance_suppresses_directives() {
             let mut channels = ThoughtChannels::default();
-            channels.channels[29] = 0.1; // alliance_quality = low
+            channels.channels[25] = 0.1; // alliance_quality = low
 
             let must_logit = TherapeuticGate::apply("must", &channels, 0.0);
             assert!(
@@ -2293,7 +2293,7 @@ mod tests {
         #[test]
         fn test_crisis_mode_suppresses_directives_boosts_crisis() {
             let mut channels = ThoughtChannels::default();
-            channels.channels[28] = 7.0; // therapeutic_intent = crisis
+            channels.channels[24] = 7.0; // therapeutic_intent = crisis
 
             let should_logit = TherapeuticGate::apply("should", &channels, 0.0);
             let call_logit = TherapeuticGate::apply("call", &channels, 0.0);
@@ -2319,8 +2319,8 @@ mod tests {
         #[test]
         fn test_depth_exceeds_alliance_suppresses() {
             let mut channels = ThoughtChannels::default();
-            channels.channels[29] = 0.3; // alliance
-            channels.channels[31] = 0.8; // depth > alliance + 0.2
+            channels.channels[25] = 0.3; // alliance
+            channels.channels[27] = 0.8; // depth > alliance + 0.2
 
             let correct_logit = TherapeuticGate::apply("correct", &channels, 0.0);
             assert!(
@@ -2333,7 +2333,7 @@ mod tests {
         #[test]
         fn test_reflective_intent_boosts_reflective() {
             let mut channels = ThoughtChannels::default();
-            channels.channels[28] = 2.0; // therapeutic_intent = reflect
+            channels.channels[24] = 2.0; // therapeutic_intent = reflect
 
             let wonder_logit = TherapeuticGate::apply("I wonder", &channels, 0.0);
             assert!(
@@ -2358,7 +2358,7 @@ mod tests {
         #[test]
         fn test_e2e_high_distress_directive_vs_validating_spread() {
             let mut channels = ThoughtChannels::default();
-            channels.channels[30] = 0.9; // High distress
+            channels.channels[26] = 0.9; // High distress
 
             let directive_words = ["should", "must", "wrong"];
             let validating_words = ["understand", "hear", "notice"];
@@ -2469,5 +2469,312 @@ mod tests {
                 "Hedging tokens should be boosted relative to non-hedging: hedge={hedge_val} vs generic={generic_val}"
             );
         }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NSM SEMANTIC GATE — Phase 3: token selection guided by NSM primes
+//
+// Maps detected NSM semantic primes to token IDs, then boosts logits for
+// tokens that express active primes. Follows the EpistemicGate pattern.
+//
+// Science: Collins & Loftus (1975) — spreading activation strengthens
+// semantically related lexical entries.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+use std::collections::{HashMap, HashSet};
+
+/// Maps NSM semantic primes to BPE token IDs that express them.
+///
+/// Built once from the tokenizer vocabulary, then reused per-generation.
+/// Analogous to `EpistemicGate` but for semantic content rather than epistemic status.
+pub struct NsmSemanticGate {
+    /// prime name (lowercased) → set of token IDs that express this prime.
+    prime_to_tokens: HashMap<String, Vec<u32>>,
+    /// Reverse: token_id → set of prime names this token expresses.
+    token_to_primes: HashMap<u32, Vec<String>>,
+}
+
+/// Word → NSM prime mappings for the most common English words.
+/// This is a minimal lexicon; GroundedUnderstanding has a more complete one.
+const NSM_WORD_PRIMES: &[(&str, &[&str])] = &[
+    // Mental predicates
+    ("think", &["THINK"]),
+    ("know", &["KNOW"]),
+    ("want", &["WANT"]),
+    ("feel", &["FEEL"]),
+    ("see", &["SEE"]),
+    ("hear", &["HEAR"]),
+    // Evaluators
+    ("good", &["GOOD"]),
+    ("bad", &["BAD"]),
+    ("right", &["GOOD"]),
+    ("wrong", &["BAD"]),
+    // Actions
+    ("do", &["DO"]),
+    ("happen", &["HAPPEN"]),
+    ("move", &["MOVE"]),
+    ("touch", &["TOUCH"]),
+    // Logical
+    ("not", &["NOT"]),
+    ("maybe", &["MAYBE"]),
+    ("can", &["CAN"]),
+    ("because", &["BECAUSE"]),
+    ("if", &["IF"]),
+    // Substantives
+    ("someone", &["SOMEONE"]),
+    ("something", &["SOMETHING"]),
+    ("people", &["PEOPLE"]),
+    ("body", &["BODY"]),
+    // Existence
+    ("is", &["BE"]),
+    ("are", &["BE"]),
+    ("have", &["HAVE"]),
+    ("has", &["HAVE"]),
+    ("exist", &["BE"]),
+    // Time
+    ("now", &["NOW"]),
+    ("before", &["BEFORE"]),
+    ("after", &["AFTER"]),
+    // Space
+    ("here", &["HERE"]),
+    ("above", &["ABOVE"]),
+    ("below", &["BELOW"]),
+    ("near", &["NEAR"]),
+    ("far", &["FAR"]),
+    ("inside", &["INSIDE"]),
+    // Quantifiers
+    ("all", &["ALL"]),
+    ("some", &["SOME"]),
+    ("much", &["MUCH"]),
+    ("many", &["MUCH"]),
+    ("little", &["LITTLE"]),
+    ("few", &["LITTLE"]),
+    // Speech
+    ("say", &["SAY"]),
+    ("said", &["SAY"]),
+    ("tell", &["SAY"]),
+    ("true", &["TRUE"]),
+    ("word", &["WORDS"]),
+    // Intensifiers
+    ("very", &["VERY"]),
+    ("more", &["MORE"]),
+    // Emotional composite words
+    ("sad", &["FEEL", "BAD"]),
+    ("happy", &["FEEL", "GOOD"]),
+    ("angry", &["FEEL", "BAD"]),
+    ("afraid", &["FEEL", "BAD"]),
+    ("love", &["FEEL", "GOOD", "WANT"]),
+    ("hate", &["FEEL", "BAD", "NOT", "WANT"]),
+    // Life
+    ("live", &["LIVE"]),
+    ("die", &["DIE"]),
+    ("alive", &["LIVE"]),
+    ("dead", &["DIE"]),
+];
+
+impl NsmSemanticGate {
+    /// Build the prime↔token reverse index from the tokenizer vocabulary.
+    pub fn new(tokenizer: &BpeTokenizer) -> Self {
+        let mut prime_to_tokens: HashMap<String, Vec<u32>> = HashMap::new();
+        let mut token_to_primes: HashMap<u32, Vec<String>> = HashMap::new();
+
+        for &(word, primes) in NSM_WORD_PRIMES {
+            let token_id = tokenizer.token_id(word);
+            if token_id != tokenizer.unk_id {
+                for &prime in primes {
+                    let prime_upper = prime.to_uppercase();
+                    prime_to_tokens
+                        .entry(prime_upper.clone())
+                        .or_default()
+                        .push(token_id);
+                    token_to_primes
+                        .entry(token_id)
+                        .or_default()
+                        .push(prime_upper);
+                }
+            }
+        }
+
+        // Deduplicate
+        for tokens in prime_to_tokens.values_mut() {
+            tokens.sort_unstable();
+            tokens.dedup();
+        }
+        for primes in token_to_primes.values_mut() {
+            primes.sort_unstable();
+            primes.dedup();
+        }
+
+        Self {
+            prime_to_tokens,
+            token_to_primes,
+        }
+    }
+
+    /// Boost logits for tokens that express active NSM primes.
+    ///
+    /// For each active prime, adds `boost` to the logit of every token that
+    /// expresses that prime. Tokens expressing multiple active primes get
+    /// multiple boosts (spreading activation).
+    pub fn apply(&self, logits: &mut [f32], active_primes: &[String], boost: f32) {
+        if boost == 0.0 || active_primes.is_empty() {
+            return;
+        }
+        for prime_name in active_primes {
+            let key = prime_name.to_uppercase();
+            if let Some(token_ids) = self.prime_to_tokens.get(&key) {
+                for &tid in token_ids {
+                    if (tid as usize) < logits.len() {
+                        logits[tid as usize] += boost;
+                    }
+                }
+            }
+        }
+    }
+
+    /// Get the primes expressed by a given token ID.
+    pub fn primes_for_token(&self, token_id: u32) -> &[String] {
+        self.token_to_primes
+            .get(&token_id)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
+    }
+
+    /// Number of primes mapped.
+    pub fn num_primes(&self) -> usize {
+        self.prime_to_tokens.len()
+    }
+}
+
+/// Tracks which active NSM primes have been "expressed" by generated tokens.
+///
+/// Prime coverage = expressed_primes / active_primes (0.0–1.0).
+/// High coverage = the generated text semantically covers the intended meaning.
+///
+/// Science: Grice (1975) — cooperative principle; covering intended semantic
+/// content signals communicative success.
+pub struct NsmCoherenceTracker {
+    /// Active primes for this generation (uppercased).
+    active_primes: HashSet<String>,
+    /// Primes that have been expressed by generated tokens so far.
+    expressed_primes: HashSet<String>,
+}
+
+impl NsmCoherenceTracker {
+    /// Create a new tracker for the given active primes.
+    pub fn new(active_primes: &[String]) -> Self {
+        Self {
+            active_primes: active_primes.iter().map(|p| p.to_uppercase()).collect(),
+            expressed_primes: HashSet::new(),
+        }
+    }
+
+    /// Observe a generated token and update prime coverage.
+    pub fn observe_token(&mut self, token_id: u32, gate: &NsmSemanticGate) {
+        for prime in gate.primes_for_token(token_id) {
+            if self.active_primes.contains(prime) {
+                self.expressed_primes.insert(prime.clone());
+            }
+        }
+    }
+
+    /// Current prime coverage (0.0–1.0).
+    pub fn prime_coverage(&self) -> f32 {
+        if self.active_primes.is_empty() {
+            return 0.0;
+        }
+        self.expressed_primes.len() as f32 / self.active_primes.len() as f32
+    }
+
+    /// Number of active primes.
+    pub fn active_count(&self) -> usize {
+        self.active_primes.len()
+    }
+
+    /// Number of expressed primes.
+    pub fn expressed_count(&self) -> usize {
+        self.expressed_primes.len()
+    }
+}
+
+#[cfg(test)]
+mod nsm_tests {
+    use super::*;
+
+    fn test_tokenizer() -> BpeTokenizer {
+        BpeTokenizer::default_4k()
+    }
+
+    #[test]
+    fn test_nsm_gate_construction() {
+        let tok = test_tokenizer();
+        let gate = NsmSemanticGate::new(&tok);
+        // Should have mapped at least some primes
+        assert!(gate.num_primes() > 0, "Should map at least some primes");
+    }
+
+    #[test]
+    fn test_nsm_gate_boosts_prime_tokens() {
+        let tok = test_tokenizer();
+        let gate = NsmSemanticGate::new(&tok);
+
+        let mut logits = vec![0.0_f32; tok.vocab_size()];
+        let active = vec!["FEEL".to_string(), "BAD".to_string()];
+        gate.apply(&mut logits, &active, 0.5);
+
+        // At least one logit should have been boosted
+        let boosted_count = logits.iter().filter(|&&v| v > 0.0).count();
+        assert!(
+            boosted_count > 0,
+            "At least one token should be boosted for FEEL+BAD"
+        );
+    }
+
+    #[test]
+    fn test_nsm_gate_no_effect_when_disabled() {
+        let tok = test_tokenizer();
+        let gate = NsmSemanticGate::new(&tok);
+
+        let mut logits = vec![1.0_f32; tok.vocab_size()];
+        let original = logits.clone();
+
+        // Empty primes → no change
+        gate.apply(&mut logits, &[], 0.5);
+        assert_eq!(logits, original);
+
+        // Zero boost → no change
+        let mut logits2 = original.clone();
+        gate.apply(&mut logits2, &["FEEL".to_string()], 0.0);
+        assert_eq!(logits2, original);
+    }
+
+    #[test]
+    fn test_nsm_coherence_tracker_coverage() {
+        let tok = test_tokenizer();
+        let gate = NsmSemanticGate::new(&tok);
+
+        let active = vec!["FEEL".to_string(), "BAD".to_string(), "BECAUSE".to_string()];
+        let mut tracker = NsmCoherenceTracker::new(&active);
+
+        assert_eq!(tracker.active_count(), 3);
+        assert_eq!(tracker.expressed_count(), 0);
+        assert!((tracker.prime_coverage() - 0.0).abs() < 1e-5);
+
+        // Observe "feel" token — should cover FEEL prime
+        let feel_id = tok.token_id("feel");
+        if feel_id != tok.unk_id {
+            tracker.observe_token(feel_id, &gate);
+            assert!(
+                tracker.expressed_count() > 0,
+                "Observing 'feel' should express FEEL prime"
+            );
+        }
+    }
+
+    #[test]
+    fn test_nsm_coherence_tracker_empty_primes() {
+        let tracker = NsmCoherenceTracker::new(&[]);
+        assert!((tracker.prime_coverage() - 0.0).abs() < 1e-5);
     }
 }

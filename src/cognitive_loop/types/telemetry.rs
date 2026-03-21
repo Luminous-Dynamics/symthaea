@@ -2047,6 +2047,14 @@ pub struct BrocaGenerationTelemetry {
     /// Maximum consecutive repetitions of a single token (lower = better).
     #[serde(default)]
     pub max_repetition: usize,
+    /// Number of NSM semantic primitives detected in the input for this generation.
+    /// Science: Wierzbicka (1996) — universal semantic primes ground language production.
+    #[serde(default)]
+    pub nsm_primitive_count: usize,
+    /// NSM primitive grounding score (0.0–1.0): fraction of input words that
+    /// mapped to recognized NSM semantic primes. Higher = better semantic decomposition.
+    #[serde(default)]
+    pub nsm_grounding: f32,
 }
 
 /// Memory-resonator subsystem telemetry: dreams, codebook, replay.

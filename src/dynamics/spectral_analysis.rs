@@ -729,7 +729,7 @@ impl SpectralAnalyzer {
         let mut entropy = 0.0;
         for &p in &spectrum.psd {
             let prob = p / total;
-            if prob > 0.0 {
+            if prob > 1e-15 {
                 entropy -= prob * prob.log2();
             }
         }

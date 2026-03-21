@@ -1827,13 +1827,14 @@ impl HdcLtcUnifiedNetwork {
     #[inline]
     fn cache_layer_output(&mut self, layer_idx: usize) {
         let neurons = &self.layers[layer_idx];
-        let inv_n = 1.0 / neurons.len() as f32;
-
-        // Direct accumulation avoids cloning + intermediate Vec
         let output = &mut self.layer_outputs[layer_idx];
         for v in output.values.iter_mut() {
             *v = 0.0;
         }
+        if neurons.is_empty() {
+            return;
+        }
+        let inv_n = 1.0 / neurons.len() as f32;
         for neuron in neurons {
             for (o, &s) in output.values.iter_mut().zip(neuron.state().values.iter()) {
                 *o += s;
@@ -1944,12 +1945,21 @@ impl HdcLtcUnifiedNetwork {
             .flat_map(|layer| layer.iter().map(|n| n.stats()))
             .collect();
 
-        let avg_norm = all_stats.iter().map(|s| s.state_norm).sum::<f32>() / all_stats.len() as f32;
-        let avg_weight_norm =
-            all_stats.iter().map(|s| s.weight_norm).sum::<f32>() / all_stats.len() as f32;
+        let n = all_stats.len();
+        if n == 0 {
+            return UnifiedNetworkStats {
+                n_neurons: 0,
+                n_layers: self.layers.len(),
+                avg_state_norm: 0.0,
+                avg_weight_norm: 0.0,
+                total_updates: 0,
+            };
+        }
+        let avg_norm = all_stats.iter().map(|s| s.state_norm).sum::<f32>() / n as f32;
+        let avg_weight_norm = all_stats.iter().map(|s| s.weight_norm).sum::<f32>() / n as f32;
 
         UnifiedNetworkStats {
-            n_neurons: all_stats.len(),
+            n_neurons: n,
             n_layers: self.layers.len(),
             avg_state_norm: avg_norm,
             avg_weight_norm,
