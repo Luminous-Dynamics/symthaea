@@ -23,7 +23,7 @@ use symthaea_core::hdc::{
 /// GPU-resident pre-normalized embedding matrix for accelerated logit computation.
 /// Converts 4,096 × 16,384 individual cosine similarities into a single matrix-vector
 /// multiply on GPU (or optimized CPU tensor ops via candle).
-#[cfg(feature = "mamba-cpu")]
+#[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
 pub struct GpuEmbeddingCache {
     /// Pre-normalized embedding matrix [vocab_size, HDC_DIMENSION] on device.
     embeddings: candle_core::Tensor,
@@ -32,7 +32,7 @@ pub struct GpuEmbeddingCache {
     device: candle_core::Device,
 }
 
-#[cfg(feature = "mamba-cpu")]
+#[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
 impl std::fmt::Debug for GpuEmbeddingCache {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("GpuEmbeddingCache")
@@ -42,7 +42,7 @@ impl std::fmt::Debug for GpuEmbeddingCache {
     }
 }
 
-#[cfg(feature = "mamba-cpu")]
+#[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
 impl Clone for GpuEmbeddingCache {
     fn clone(&self) -> Self {
         Self {
@@ -251,7 +251,7 @@ pub struct LanguageController {
     last_logit_hv: Option<ContinuousHV>,
     /// GPU-resident embedding matrix for accelerated logit computation.
     /// Shape: [vocab_size, HDC_DIMENSION]. Pre-normalized rows.
-    #[cfg(feature = "mamba-cpu")]
+    #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
     gpu_embeddings: Option<GpuEmbeddingCache>,
 }
 
@@ -298,7 +298,7 @@ impl LanguageController {
             None
         };
 
-        #[cfg(feature = "mamba-cpu")]
+        #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
         let gpu_embeddings = Self::build_gpu_cache(&token_embeddings);
 
         Self {
@@ -312,14 +312,14 @@ impl LanguageController {
             coherence_for_dt: 1.0,
             last_effective_dt: config.dt_per_token,
             last_logit_hv: None,
-            #[cfg(feature = "mamba-cpu")]
+            #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
             gpu_embeddings,
         }
     }
 
     /// Build GPU/candle embedding cache from token embeddings.
     /// Falls back to None if device initialization fails.
-    #[cfg(feature = "mamba-cpu")]
+    #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
     fn build_gpu_cache(token_embeddings: &[ContinuousHV]) -> Option<GpuEmbeddingCache> {
         use candle_core::{Device, Tensor};
 
@@ -368,7 +368,7 @@ impl LanguageController {
         let scale = self.config.logit_scale;
 
         // Try GPU/candle accelerated path
-        #[cfg(feature = "mamba-cpu")]
+        #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
         if let Some(ref cache) = self.gpu_embeddings {
             if let Ok(logits) = self.compute_logits_candle(output_hv, cache, scale) {
                 return logits;
@@ -393,7 +393,7 @@ impl LanguageController {
     /// Candle-accelerated logit computation via batched matrix-vector multiply.
     /// Embeddings are pre-normalized, so: cosine_sim = dot(emb_normalized, query_normalized).
     /// Result: logits = scale * (E_norm @ q_norm), single BLAS gemv.
-    #[cfg(feature = "mamba-cpu")]
+    #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
     fn compute_logits_candle(
         &self,
         output_hv: &ContinuousHV,
@@ -669,7 +669,7 @@ impl LanguageController {
         };
         self.token_embeddings.push(emb);
         // Invalidate GPU cache — will be rebuilt on next compute_logits if needed
-        #[cfg(feature = "mamba-cpu")]
+        #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
         {
             self.gpu_embeddings = Self::build_gpu_cache(&self.token_embeddings);
         }
@@ -802,7 +802,7 @@ impl LanguageController {
 
     /// Rebuild the GPU embedding cache after training updates.
     /// Call after modifying embeddings (e.g., after gradient updates or normalization).
-    #[cfg(feature = "mamba-cpu")]
+    #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
     pub fn rebuild_gpu_cache(&mut self) {
         self.gpu_embeddings = Self::build_gpu_cache(&self.token_embeddings);
     }
@@ -823,7 +823,7 @@ impl LanguageController {
             }
         }
         // Rebuild GPU cache with updated norms
-        #[cfg(feature = "mamba-cpu")]
+        #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
         self.rebuild_gpu_cache();
     }
 

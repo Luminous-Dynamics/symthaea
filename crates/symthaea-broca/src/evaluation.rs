@@ -23,6 +23,8 @@ pub struct EvalConfig {
     pub per_intent_breakdown: bool,
     /// Maximum tokens to generate per sample (for English ratio / coherence).
     pub max_gen_tokens: usize,
+    /// Maximum number of eval pairs to process (0 = all).
+    pub eval_limit: usize,
 }
 
 impl Default for EvalConfig {
@@ -33,6 +35,7 @@ impl Default for EvalConfig {
             compute_english_ratio: true,
             per_intent_breakdown: true,
             max_gen_tokens: 64,
+            eval_limit: 0,
         }
     }
 }
@@ -143,9 +146,20 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
     let mut intent_accum: HashMap<String, (f32, f32, f32, f32, usize, usize)> = HashMap::new();
     // (sum_ce, sum_ce_tokens_f, sum_english_ratio, sum_coherence, gen_count, count)
 
-    for pair in &config.dataset.pairs {
+    let pairs: &[_] = if config.eval_limit > 0 && config.eval_limit < config.dataset.pairs.len() {
+        &config.dataset.pairs[..config.eval_limit]
+    } else {
+        &config.dataset.pairs
+    };
+
+    let total_pairs = pairs.len();
+    for (pair_idx, pair) in pairs.iter().enumerate() {
         if pair.target_ids.is_empty() {
             continue;
+        }
+
+        if (pair_idx + 1) % 10 == 0 || pair_idx == 0 {
+            eprintln!("  eval [{}/{}]", pair_idx + 1, total_pairs);
         }
 
         let channels = pair.to_thought_channels();
@@ -1174,6 +1188,7 @@ mod tests {
             compute_english_ratio: false,
             per_intent_breakdown: false,
             max_gen_tokens: 16,
+            eval_limit: 0,
         };
 
         let result = evaluate(&mut gen, &eval_config);
@@ -1202,6 +1217,7 @@ mod tests {
             compute_english_ratio: true,
             per_intent_breakdown: false,
             max_gen_tokens: 16,
+            eval_limit: 0,
         };
 
         let result = evaluate(&mut gen, &eval_config);
@@ -1235,6 +1251,7 @@ mod tests {
             compute_english_ratio: false,
             per_intent_breakdown: true,
             max_gen_tokens: 16,
+            eval_limit: 0,
         };
 
         let result = evaluate(&mut gen, &eval_config);
@@ -1302,6 +1319,7 @@ mod tests {
             compute_english_ratio: false,
             per_intent_breakdown: false,
             max_gen_tokens: 16,
+            eval_limit: 0,
         };
 
         let result = evaluate(&mut gen, &eval_config);

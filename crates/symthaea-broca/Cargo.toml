@@ -77,6 +77,8 @@ parallel = ["dep:rayon"]
 mamba-cpu = ["dep:candle-core", "dep:candle-nn", "dep:hf-hub", "dep:tokenizers"]
 # Mamba with CUDA GPU acceleration (default for local dev)
 mamba = ["mamba-cpu", "candle-core/cuda"]
+# GPU-accelerated logit computation only (candle-core matmul, no Mamba model)
+gpu-logits = ["dep:candle-core"]
 # Legacy alias
 cuda = ["mamba"]
 hf-tokenizer = ["dep:tokenizers"]

@@ -251,12 +251,16 @@ impl HumanEvalMiniBenchmark {
         let lapse_flip_prob = config.lapse_rate as f32 * 0.35;
 
         // Difficulty scales noise via the tier system
-        let difficulty_noise_base = config.difficulty * 0.10;
+        let difficulty_noise_base = config.difficulty * 0.02;
 
         // Role vectors for encoding problem components
         let role_sig = BinaryHV::random(xor_shift(&mut rng));
         let role_doc = BinaryHV::random(xor_shift(&mut rng));
         let role_correct = BinaryHV::random(xor_shift(&mut rng));
+
+        // "Common error" pattern vector — represents systematic mistakes
+        // (e.g., off-by-one, wrong return type). Shared across problems.
+        let common_error_pattern = BinaryHV::random(xor_shift(&mut rng));
 
         let mut passes = 0u32;
         let mut total = 0u32;
@@ -265,7 +269,7 @@ impl HumanEvalMiniBenchmark {
         let mut discriminations = Vec::new();
         let mut task_trace = Vec::new();
 
-        for problem in &probs {
+        for (prob_idx, problem) in probs.iter().enumerate() {
             let tier_idx = (problem.difficulty as usize).saturating_sub(1).min(3);
             tier_total[tier_idx] += 1;
             total += 1;
@@ -283,40 +287,81 @@ impl HumanEvalMiniBenchmark {
             // This represents a solution that fully matches the specification.
             let correct_candidate = spec_hv.bind(&role_correct);
 
-            // Generate distractors with increasing corruption
-            // Distractor quality decreases with problem difficulty (harder problems
-            // have more plausible wrong answers)
-            let distractor_corruptions = [
-                0.15 + difficulty_noise_base + (problem.difficulty as f64 - 1.0) * 0.04,
-                0.25 + difficulty_noise_base + (problem.difficulty as f64 - 1.0) * 0.03,
-                0.35 + difficulty_noise_base,
-            ];
+            // Difficulty-dependent noise on the query encoding itself.
+            // This models the imprecision of code comprehension — harder problems
+            // are harder to encode accurately, making discrimination noisier.
+            // Tier 1 (easy): low query noise → easier to pick the right answer.
+            // Tier 3 (hard): high query noise → query drifts, distractors compete.
+            let query_noise = match problem.difficulty {
+                1 => 0.02 + difficulty_noise_base, // easy
+                2 => 0.04 + difficulty_noise_base, // medium
+                _ => 0.07 + difficulty_noise_base, // hard
+            };
 
+            // Generate 3 plausible distractors using different error strategies:
             let mut candidates = vec![correct_candidate];
-            for &corruption in &distractor_corruptions {
-                let noise_level = corruption as f32;
-                let distractor = correct_candidate.add_noise(noise_level, xor_shift(&mut rng));
-                candidates.push(distractor);
-            }
 
-            // Apply lapse corruption to the spec (simulates impaired comprehension)
-            let spec_query = if lapse_flip_prob > 0.0 {
-                spec_hv.add_noise(lapse_flip_prob, xor_shift(&mut rng))
+            // Distractor 1: "Almost right" — very light noise on the correct answer.
+            // Models a solution with a subtle bug (e.g., off-by-one edge case).
+            // At 16,384D, add_noise(0.01) gives similarity ~0.98, but the query
+            // itself is noised, so the margin becomes razor-thin.
+            let d1 = correct_candidate.add_noise(0.01_f32, xor_shift(&mut rng));
+            candidates.push(d1);
+
+            // Distractor 2: "Right answer, wrong problem" — encode a DIFFERENT
+            // problem's correct solution. Uses the next problem's spec (wrapping).
+            let other_idx = (prob_idx + 1) % probs.len();
+            let other_sig = Self::encode_string(probs[other_idx].signature, xor_shift(&mut rng));
+            let other_doc = Self::encode_string(probs[other_idx].docstring, xor_shift(&mut rng));
+            let other_spec =
+                BinaryHV::bundle(&[role_sig.bind(&other_sig), role_doc.bind(&other_doc)]);
+            let d2 = other_spec.bind(&role_correct);
+            candidates.push(d2);
+
+            // Distractor 3: "Systematic mistake" — correct solution blended with
+            // a common error pattern. Bundle averages the two, creating a vector
+            // that is ~0.75 similar to the correct answer — plausible but wrong.
+            let d3 = BinaryHV::bundle(&[correct_candidate, common_error_pattern]);
+            candidates.push(d3);
+
+            // Apply difficulty-dependent query noise + lapse corruption.
+            // Query noise models imprecise problem comprehension — harder problems
+            // produce noisier internal representations, reducing discrimination.
+            let total_query_noise = query_noise as f32 + lapse_flip_prob;
+            let spec_query = if total_query_noise > 0.0 {
+                spec_hv.add_noise(total_query_noise.min(0.49), xor_shift(&mut rng))
             } else {
                 spec_hv
             };
 
-            // Score each candidate against the specification query
+            // Score each candidate against the (noised) specification query
             let query = spec_query.bind(&role_correct);
             let mut similarities: Vec<f64> = candidates
                 .iter()
                 .map(|c| c.similarity(&query) as f64)
                 .collect();
 
-            // Add per-test-case noise based on problem complexity
-            // More test cases = more chances for subtle errors to emerge,
-            // which helps discrimination (Kanerva 2009 — ensembles improve accuracy)
-            let test_case_bonus = (problem.n_test_cases as f64 - 3.0).max(0.0) * 0.005;
+            // Decision noise: independent per-candidate noise models the
+            // imprecision of comparing code solutions (Ratcliff 1978 — drift
+            // diffusion). Harder problems have more decision noise because
+            // the evaluator is less certain about correctness criteria.
+            let decision_noise_scale = match problem.difficulty {
+                1 => 0.02 + difficulty_noise_base, // easy: low noise
+                2 => 0.05 + difficulty_noise_base, // medium
+                _ => 0.09 + difficulty_noise_base, // hard: high noise
+            };
+            for sim in similarities.iter_mut() {
+                // Pseudo-gaussian from uniform: (u1 + u2 + u3 - 1.5) / ~0.87
+                let u1 = (xor_shift(&mut rng) % 10000) as f64 / 10000.0;
+                let u2 = (xor_shift(&mut rng) % 10000) as f64 / 10000.0;
+                let u3 = (xor_shift(&mut rng) % 10000) as f64 / 10000.0;
+                let noise = (u1 + u2 + u3 - 1.5) * decision_noise_scale / 0.87;
+                *sim += noise;
+            }
+
+            // Add per-test-case bonus: more test cases = more signal to
+            // discriminate correct from incorrect (Kanerva 2009 — ensembles)
+            let test_case_bonus = (problem.n_test_cases as f64 - 3.0).max(0.0) * 0.002;
             similarities[0] += test_case_bonus;
 
             // Find best candidate
@@ -551,6 +596,7 @@ mod tests {
     #[test]
     fn test_above_chance() {
         // With 4-AFC (1 correct + 3 distractors), chance = 0.25
+        // After ceiling-effect fix, expect 0.40-0.90 range (not 1.0)
         let config = BenchmarkConfig {
             trials_per_condition: 20,
             ..Default::default()
@@ -560,6 +606,11 @@ mod tests {
         assert!(
             p > 0.30,
             "pass_at_1 should beat 4-AFC chance (0.25), got {}",
+            p
+        );
+        assert!(
+            p < 0.98,
+            "pass_at_1 should not be at ceiling (was {}), distractors too easy",
             p
         );
     }

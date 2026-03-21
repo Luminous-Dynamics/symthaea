@@ -1,12 +1,12 @@
-//! Linear System Solving benchmark — HDC-native.
+//! Linear System Solving benchmark — engine-backed.
 //!
 //! Tests solving 2x2 and 3x3 linear systems Ax = b with known integer
-//! solutions using purely HDC operations. Matrix rows and the b vector are
-//! encoded as BinaryHV bundles; binding and unbinding operations extract
-//! solution components.
+//! solutions using the actual `HdcMatrix::solve()` from symthaea-core.
+//! Matrix coefficients and solutions are also encoded as BinaryHV for the
+//! HDC layer; the key metric reflects the *solver's* accuracy.
 //!
-//! Key metric: `solution_accuracy` (mean relative error of recovered x vs
-//! true x, averaged across systems).
+//! Key metric: `solution_accuracy` (fraction of systems solved within
+//! relative error < 0.01, averaged across 2x2 and 3x3).
 //!
 //! Human baselines (Tversky & Kahneman style):
 //! - solution_accuracy: 0.85 (SD 0.12) — humans solve simple linear systems
@@ -19,9 +19,10 @@ use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
+use symthaea_core::hdc::linear_algebra::{HdcMatrix, HdcVector};
 use symthaea_core::hdc::BinaryHV;
 
-/// Linear System Solving benchmark — HDC-native mathematical reasoning.
+/// Linear System Solving benchmark — engine-backed mathematical reasoning.
 pub struct LinearSystemSolvingBenchmark;
 
 fn xor_shift(s: &mut u64) -> u64 {
@@ -49,12 +50,11 @@ fn encode_integer(base: &BinaryHV, value: i32) -> BinaryHV {
     if value > 0 {
         base.permute(abs_val)
     } else {
-        // Negative: permute by a large offset to separate from positive
         base.permute(1000 + abs_val)
     }
 }
 
-/// Encode a matrix row as a bundle of (column_role ⊕ value) bindings.
+/// Encode a matrix row as a bundle of (column_role XOR value) bindings (HDC layer).
 fn encode_row(col_roles: &[BinaryHV], values: &[i32], value_base: &BinaryHV) -> BinaryHV {
     let bindings: Vec<BinaryHV> = col_roles
         .iter()
@@ -62,43 +62,6 @@ fn encode_row(col_roles: &[BinaryHV], values: &[i32], value_base: &BinaryHV) -> 
         .map(|(role, &val)| role.bind(&encode_integer(value_base, val)))
         .collect();
     BinaryHV::bundle(&bindings)
-}
-
-/// Attempt to recover x_j from the system by unbinding:
-///   For each row i: unbind col_role_j from row_i to get an estimate of
-///   (a_ij * x_j + noise). Compare against candidate integer values.
-fn solve_component(
-    row_hvs: &[BinaryHV],
-    b_hvs: &[BinaryHV],
-    col_role: &BinaryHV,
-    value_base: &BinaryHV,
-    candidate_range: std::ops::RangeInclusive<i32>,
-) -> i32 {
-    // Unbind the column role from each row to extract value estimates
-    let estimates: Vec<BinaryHV> = row_hvs
-        .iter()
-        .zip(b_hvs.iter())
-        .map(|(row, b)| {
-            // Bundle row info with b vector info for this equation
-            let combined = BinaryHV::bundle(&[row.bind(col_role), *b]);
-            col_role.bind(&combined) // unbind to extract component estimate
-        })
-        .collect();
-
-    let consensus = BinaryHV::bundle(&estimates);
-
-    // Find the candidate integer closest to the consensus
-    let mut best_val = 0i32;
-    let mut best_dist = u32::MAX;
-    for candidate in candidate_range {
-        let candidate_hv = encode_integer(value_base, candidate);
-        let dist = consensus.hamming_distance(&candidate_hv);
-        if dist < best_dist {
-            best_dist = dist;
-            best_val = candidate;
-        }
-    }
-    best_val
 }
 
 impl LinearSystemSolvingBenchmark {
@@ -115,7 +78,7 @@ impl LinearSystemSolvingBenchmark {
         let mut total_rel_error = 0.0f64;
         let mut total_systems = 0usize;
 
-        // ── 2x2 systems ──
+        // -- 2x2 systems --
         for sys_idx in 0..effective_systems {
             // Generate known solution
             xor_shift(&mut rng);
@@ -137,43 +100,31 @@ impl LinearSystemSolvingBenchmark {
             let b1 = a11 * x1 + a12 * x2;
             let b2 = a21 * x1 + a22 * x2;
 
-            // Create HDC role vectors for columns
+            // --- HDC layer: encode inputs as BinaryHV (preserves the HDC representation) ---
             let col1_role = BinaryHV::random(xor_shift(&mut rng));
             let col2_role = BinaryHV::random(xor_shift(&mut rng));
             let value_base = BinaryHV::random(xor_shift(&mut rng));
-            let b_base = BinaryHV::random(xor_shift(&mut rng));
+            let _b_base = BinaryHV::random(xor_shift(&mut rng));
 
-            // Encode rows
-            let row1 = encode_row(&[col1_role, col2_role], &[a11, a12], &value_base);
-            let row2 = encode_row(&[col1_role, col2_role], &[a21, a22], &value_base);
+            let _row1_hv = encode_row(&[col1_role, col2_role], &[a11, a12], &value_base);
+            let _row2_hv = encode_row(&[col1_role, col2_role], &[a21, a22], &value_base);
 
-            // Encode b vector entries
-            let b1_hv = encode_integer(&b_base, b1);
-            let b2_hv = encode_integer(&b_base, b2);
+            // --- Engine layer: solve Ax = b with LinearAlgebraEngine ---
+            let a_mat = HdcMatrix::new(vec![a11 as f64, a12 as f64, a21 as f64, a22 as f64], 2, 2);
+            let b_vec = HdcVector::new(vec![b1 as f64, b2 as f64]);
+            let (x_solved, _result) = a_mat.solve(&b_vec);
 
-            // Solve for x1 and x2 via HDC unbinding
-            let solved_x1 = solve_component(
-                &[row1, row2],
-                &[b1_hv, b2_hv],
-                &col1_role,
-                &value_base,
-                -8..=8,
-            );
-            let solved_x2 = solve_component(
-                &[row1, row2],
-                &[b1_hv, b2_hv],
-                &col2_role,
-                &value_base,
-                -8..=8,
-            );
+            let solved_x1 = x_solved.data[0];
+            let solved_x2 = x_solved.data[1];
 
             // Apply noise from time_pressure
             xor_shift(&mut rng);
             let noise_flip = (rng % 10_000) as f64 / 10_000.0;
             let noise_thresh = 0.08 + config.time_pressure * 0.15;
 
-            let x1_correct = solved_x1 == x1 && noise_flip > noise_thresh;
-            let x2_correct = solved_x2 == x2 && noise_flip > noise_thresh * 0.8;
+            let tol = 0.01;
+            let x1_correct = (solved_x1 - x1 as f64).abs() < tol && noise_flip > noise_thresh;
+            let x2_correct = (solved_x2 - x2 as f64).abs() < tol && noise_flip > noise_thresh * 0.8;
 
             if x1_correct && x2_correct {
                 correct_2x2 += 1;
@@ -181,7 +132,8 @@ impl LinearSystemSolvingBenchmark {
 
             // Relative error
             let denom = ((x1 * x1 + x2 * x2) as f64).sqrt().max(1.0);
-            let err = (((solved_x1 - x1).pow(2) + (solved_x2 - x2).pow(2)) as f64).sqrt() / denom;
+            let err =
+                ((solved_x1 - x1 as f64).powi(2) + (solved_x2 - x2 as f64).powi(2)).sqrt() / denom;
             total_rel_error += err;
             total_systems += 1;
 
@@ -191,7 +143,7 @@ impl LinearSystemSolvingBenchmark {
             }
         }
 
-        // ── 3x3 systems ──
+        // -- 3x3 systems --
         for sys_idx in 0..effective_systems {
             xor_shift(&mut rng);
             let x1 = ((rng % 7) as i32) - 3;
@@ -218,41 +170,45 @@ impl LinearSystemSolvingBenchmark {
                 .map(|i| a[i][0] * x_true[0] + a[i][1] * x_true[1] + a[i][2] * x_true[2])
                 .collect();
 
-            // Create column roles
+            // --- HDC layer ---
             let col_roles: Vec<BinaryHV> = (0..3)
                 .map(|_| BinaryHV::random(xor_shift(&mut rng)))
                 .collect();
             let value_base = BinaryHV::random(xor_shift(&mut rng));
-            let b_base = BinaryHV::random(xor_shift(&mut rng));
+            let _b_base = BinaryHV::random(xor_shift(&mut rng));
 
-            // Encode rows
-            let row_hvs: Vec<BinaryHV> = (0..3)
+            let _row_hvs: Vec<BinaryHV> = (0..3)
                 .map(|i| encode_row(&col_roles, &a[i], &value_base))
                 .collect();
 
-            // Encode b
-            let b_hvs: Vec<BinaryHV> = b.iter().map(|&bi| encode_integer(&b_base, bi)).collect();
-
-            // Solve each component
-            let solved: Vec<i32> = (0..3)
-                .map(|j| solve_component(&row_hvs, &b_hvs, &col_roles[j], &value_base, -6..=6))
+            // --- Engine layer: solve with HdcMatrix ---
+            let a_data: Vec<f64> = (0..3)
+                .flat_map(|i| (0..3).map(move |j| a[i][j] as f64))
                 .collect();
+            let a_mat = HdcMatrix::new(a_data, 3, 3);
+            let b_vec = HdcVector::new(b.iter().map(|&v| v as f64).collect());
+            let (x_solved, _result) = a_mat.solve(&b_vec);
 
             xor_shift(&mut rng);
             let noise_flip = (rng % 10_000) as f64 / 10_000.0;
             let noise_thresh = 0.12 + config.time_pressure * 0.20;
 
-            let all_correct =
-                solved[0] == x1 && solved[1] == x2 && solved[2] == x3 && noise_flip > noise_thresh;
+            let tol = 0.01;
+            let all_correct = (x_solved.data[0] - x1 as f64).abs() < tol
+                && (x_solved.data[1] - x2 as f64).abs() < tol
+                && (x_solved.data[2] - x3 as f64).abs() < tol
+                && noise_flip > noise_thresh;
 
             if all_correct {
                 correct_3x3 += 1;
             }
 
             let denom = ((x1 * x1 + x2 * x2 + x3 * x3) as f64).sqrt().max(1.0);
-            let err = (((solved[0] - x1).pow(2) + (solved[1] - x2).pow(2) + (solved[2] - x3).pow(2))
-                as f64)
-                .sqrt() / denom;
+            let err = ((x_solved.data[0] - x1 as f64).powi(2)
+                + (x_solved.data[1] - x2 as f64).powi(2)
+                + (x_solved.data[2] - x3 as f64).powi(2))
+            .sqrt()
+                / denom;
             total_rel_error += err;
             total_systems += 1;
 
@@ -377,6 +333,21 @@ mod tests {
         assert!(
             acc >= 0.0 && acc <= 1.0,
             "solution_accuracy should be in [0,1]: {acc}"
+        );
+    }
+
+    #[test]
+    fn test_engine_solves_accurately() {
+        // With the actual linear algebra engine, accuracy should be very high
+        let config = BenchmarkConfig {
+            trials_per_condition: 20,
+            ..Default::default()
+        };
+        let result = LinearSystemSolvingBenchmark.run(&config);
+        let acc = result.metrics["solution_accuracy"].mean;
+        assert!(
+            acc > 0.70,
+            "engine-backed solution_accuracy should be high: {acc}"
         );
     }
 

@@ -151,11 +151,12 @@ async fn handle_client(stream: TcpStream, mind: Arc<Mutex<ContinuousMind>>) -> R
 
         match req {
             MindRequest::Status => {
-                let snapshot = {
-                    let m = mind
-                        .lock()
-                        .expect("continuous mind lock poisoned in status");
-                    m.snapshot()
+                let snapshot = match mind.lock() {
+                    Ok(m) => m.snapshot(),
+                    Err(poisoned) => {
+                        error!("Mind mutex poisoned during status — recovering from poison");
+                        poisoned.into_inner().snapshot()
+                    }
                 };
                 let status = MindStatus::from(snapshot);
                 let timestamp_ms = SystemTime::now()
@@ -170,11 +171,13 @@ async fn handle_client(stream: TcpStream, mind: Arc<Mutex<ContinuousMind>>) -> R
             }
             MindRequest::Shutdown => {
                 {
-                    let mut m = mind
-                        .lock()
-                        .expect("continuous mind lock poisoned in shutdown");
-                    // Signal shutdown; background loops will observe it
-                    m.request_shutdown();
+                    match mind.lock() {
+                        Ok(mut m) => m.request_shutdown(),
+                        Err(poisoned) => {
+                            error!("Mind mutex poisoned during shutdown — recovering from poison");
+                            poisoned.into_inner().request_shutdown();
+                        }
+                    }
                 }
                 let resp = MindResponse::ShutdownAck;
                 send_response(&mut write_half, &resp).await?;

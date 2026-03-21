@@ -99,6 +99,7 @@ fn main() {
             compute_english_ratio: true,
             per_intent_breakdown: true,
             max_gen_tokens: 64,
+            eval_limit: opts.eval_limit,
         };
 
         let result = evaluation::evaluate(&mut generator, &eval_config);
@@ -200,6 +201,7 @@ struct EvalOpts {
     top_k: Option<usize>,
     top_p: Option<f32>,
     interactive: bool,
+    eval_limit: usize,
 }
 
 fn parse_args(args: &[String]) -> Result<EvalOpts, String> {
@@ -212,6 +214,7 @@ fn parse_args(args: &[String]) -> Result<EvalOpts, String> {
         top_k: None,
         top_p: None,
         interactive: false,
+        eval_limit: 0,
     };
 
     let mut i = 1;
@@ -266,6 +269,14 @@ fn parse_args(args: &[String]) -> Result<EvalOpts, String> {
             }
             "--interactive" | "-i" => {
                 opts.interactive = true;
+            }
+            "--eval-limit" => {
+                i += 1;
+                opts.eval_limit = args
+                    .get(i)
+                    .ok_or("--eval-limit requires a number")?
+                    .parse()
+                    .map_err(|_| "--eval-limit must be a number")?;
             }
             "--help" | "-h" => {
                 print_usage();

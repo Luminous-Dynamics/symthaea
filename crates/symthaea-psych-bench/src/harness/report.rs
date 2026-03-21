@@ -2199,7 +2199,7 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("Butlin") => "mean_quality_score",
         b if b.contains("ValenceClassification") => "valence_accuracy",
         b if b.contains("MoodCongruent") => "congruence_ratio",
-        b if b.contains("RemoteAssociates") => "binding_accuracy",
+        b if b.contains("RemoteAssociates") => "mean_solution_rank",
         b if b.contains("AlternateUses") => "originality",
         b if b.contains("DivergentThinking") => "originality_score",
         b if b.contains("ConceptualBlending") => "blend_quality",

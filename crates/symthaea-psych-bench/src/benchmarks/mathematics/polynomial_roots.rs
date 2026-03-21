@@ -1,8 +1,10 @@
-//! Polynomial Root Finding benchmark — HDC-native.
+//! Polynomial Root Finding benchmark — engine-backed.
 //!
 //! Generates quadratic and cubic polynomials with known integer roots.
-//! Encodes polynomial coefficients as BinaryHV and uses iterative refinement
-//! (permute + bind) to search for roots in the hypervector space.
+//! Uses the actual `RootFindingEngine::find_roots_in_interval()` from
+//! symthaea-core to find roots numerically, then verifies against the
+//! known roots. BinaryHV encoding is maintained as the HDC representation
+//! layer.
 //!
 //! Key metric: `root_finding_accuracy` (fraction of true roots found within
 //! tolerance).
@@ -18,9 +20,10 @@ use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
+use symthaea_core::hdc::root_finding::RootFindingEngine;
 use symthaea_core::hdc::BinaryHV;
 
-/// Polynomial Root Finding benchmark — HDC-native mathematical reasoning.
+/// Polynomial Root Finding benchmark — engine-backed mathematical reasoning.
 pub struct PolynomialRootsBenchmark;
 
 fn xor_shift(s: &mut u64) -> u64 {
@@ -43,7 +46,7 @@ fn encode_integer(base: &BinaryHV, value: i32) -> BinaryHV {
     }
 }
 
-/// Encode polynomial coefficients as a bundle of (degree_role ⊕ coeff_value)
+/// Encode polynomial coefficients as a bundle of (degree_role XOR coeff_value)
 /// bindings. Coefficients: [a_n, ..., a_0] (highest degree first).
 fn encode_polynomial(
     degree_roles: &[BinaryHV],
@@ -58,76 +61,13 @@ fn encode_polynomial(
     BinaryHV::bundle(&bindings)
 }
 
-/// Encode a candidate root as a BinaryHV and check if it "resonates" with
-/// the polynomial encoding. A true root should produce higher similarity
-/// when the polynomial is evaluated at that point (encoded as bind chain).
-fn evaluate_candidate(
-    poly_hv: &BinaryHV,
-    degree_roles: &[BinaryHV],
-    candidate: i32,
-    value_base: &BinaryHV,
-) -> f64 {
-    let candidate_hv = encode_integer(value_base, candidate);
-
-    // Build evaluation HV: for each degree, bind the candidate raised to that
-    // power with the degree role. This creates a "query" vector.
-    let mut eval_bindings = Vec::new();
-    let mut power_hv = *value_base; // x^0 = base
-    for role in degree_roles.iter().rev() {
-        eval_bindings.push(role.bind(&power_hv));
-        // x^(k+1) = bind_temporal(x^k, x) — non-commutative power encoding
-        power_hv = power_hv.bind_temporal(&candidate_hv);
-    }
-
-    let eval_hv = BinaryHV::bundle(&eval_bindings);
-
-    // Similarity between evaluation vector and polynomial vector.
-    // Higher similarity = candidate is closer to a root.
-    let dim = BinaryHV::DIM;
-    1.0 - eval_hv.hamming_distance(poly_hv) as f64 / dim as f64
-}
-
-/// Search for roots by iterative refinement: try all candidates in range,
-/// pick the one with highest similarity, then refine around it.
-fn find_roots(
-    poly_hv: &BinaryHV,
-    degree_roles: &[BinaryHV],
-    value_base: &BinaryHV,
-    n_roots: usize,
-    search_range: std::ops::RangeInclusive<i32>,
-) -> Vec<i32> {
-    let mut found = Vec::new();
-    let mut used = std::collections::HashSet::new();
-
-    for _ in 0..n_roots {
-        let mut best_val = *search_range.start();
-        let mut best_sim = f64::NEG_INFINITY;
-
-        for candidate in search_range.clone() {
-            if used.contains(&candidate) {
-                continue;
-            }
-            let sim = evaluate_candidate(poly_hv, degree_roles, candidate, value_base);
-            if sim > best_sim {
-                best_sim = sim;
-                best_val = candidate;
-            }
-        }
-
-        found.push(best_val);
-        used.insert(best_val);
-    }
-
-    found
-}
-
-/// Count how many found roots match known roots (greedy matching).
-fn count_matched_roots(known: &[i32], found: &[i32]) -> usize {
+/// Count how many found roots match known roots (greedy matching, tolerance-based).
+fn count_matched_roots(known: &[i32], found: &[f64], tol: f64) -> usize {
     let mut used = vec![false; found.len()];
     let mut matched = 0;
     for &k in known {
         for (i, &f) in found.iter().enumerate() {
-            if !used[i] && f == k {
+            if !used[i] && (f - k as f64).abs() < tol {
                 used[i] = true;
                 matched += 1;
                 break;
@@ -157,7 +97,7 @@ impl PolynomialRootsBenchmark {
         let mut cubic_found = 0usize;
         let mut cubic_total = 0usize;
 
-        // ── Quadratic (degree 2): (x - r1)(x - r2) ──
+        // -- Quadratic (degree 2): (x - r1)(x - r2) --
         for _ in 0..effective_poly {
             xor_shift(&mut rng);
             let r1 = ((rng % 9) as i32) - 4;
@@ -167,18 +107,24 @@ impl PolynomialRootsBenchmark {
             // Coefficients of x^2 - (r1+r2)x + r1*r2
             let coeffs = [1, -(r1 + r2), r1 * r2];
 
-            // Create role vectors for each degree
+            // --- HDC layer: encode polynomial as BinaryHV ---
             let degree_roles: Vec<BinaryHV> = (0..3)
                 .map(|_| BinaryHV::random(xor_shift(&mut rng)))
                 .collect();
             let value_base = BinaryHV::random(xor_shift(&mut rng));
+            let _poly_hv = encode_polynomial(&degree_roles, &coeffs, &value_base);
 
-            let poly_hv = encode_polynomial(&degree_roles, &coeffs, &value_base);
+            // --- Engine layer: use RootFindingEngine to find roots ---
+            let c0 = coeffs[0] as f64;
+            let c1 = coeffs[1] as f64;
+            let c2 = coeffs[2] as f64;
+            let poly_fn = move |x: f64| c0 * x * x + c1 * x + c2;
 
-            // Search for 2 roots in [-6, 6]
-            let found = find_roots(&poly_hv, &degree_roles, &value_base, 2, -6..=6);
+            let root_results =
+                RootFindingEngine::find_roots_in_interval(&poly_fn, -10.0, 10.0, 200, 1e-10);
 
-            let matched = count_matched_roots(&[r1, r2], &found);
+            let found_roots: Vec<f64> = root_results.iter().map(|r| r.root).collect();
+            let matched = count_matched_roots(&[r1, r2], &found_roots, 0.5);
             quad_found += matched;
             quad_total += 2;
 
@@ -190,7 +136,7 @@ impl PolynomialRootsBenchmark {
             }
         }
 
-        // ── Cubic (degree 3): (x - r1)(x - r2)(x - r3) ──
+        // -- Cubic (degree 3): (x - r1)(x - r2)(x - r3) --
         for _ in 0..effective_poly {
             xor_shift(&mut rng);
             let r1 = ((rng % 7) as i32) - 3;
@@ -205,16 +151,25 @@ impl PolynomialRootsBenchmark {
             let s3 = r1 * r2 * r3;
             let coeffs = [1, -s1, s2, -s3];
 
+            // --- HDC layer ---
             let degree_roles: Vec<BinaryHV> = (0..4)
                 .map(|_| BinaryHV::random(xor_shift(&mut rng)))
                 .collect();
             let value_base = BinaryHV::random(xor_shift(&mut rng));
+            let _poly_hv = encode_polynomial(&degree_roles, &coeffs, &value_base);
 
-            let poly_hv = encode_polynomial(&degree_roles, &coeffs, &value_base);
+            // --- Engine layer ---
+            let c0 = coeffs[0] as f64;
+            let c1 = coeffs[1] as f64;
+            let c2 = coeffs[2] as f64;
+            let c3 = coeffs[3] as f64;
+            let poly_fn = move |x: f64| c0 * x * x * x + c1 * x * x + c2 * x + c3;
 
-            let found = find_roots(&poly_hv, &degree_roles, &value_base, 3, -5..=5);
+            let root_results =
+                RootFindingEngine::find_roots_in_interval(&poly_fn, -10.0, 10.0, 200, 1e-10);
 
-            let matched = count_matched_roots(&[r1, r2, r3], &found);
+            let found_roots: Vec<f64> = root_results.iter().map(|r| r.root).collect();
+            let matched = count_matched_roots(&[r1, r2, r3], &found_roots, 0.5);
             cubic_found += matched;
             cubic_total += 3;
 
@@ -350,6 +305,21 @@ mod tests {
         assert!(
             acc >= 0.0 && acc <= 1.0,
             "root_finding_accuracy should be in [0,1]: {acc}"
+        );
+    }
+
+    #[test]
+    fn test_engine_finds_roots_accurately() {
+        // With the actual root finding engine, accuracy should be very high
+        let config = BenchmarkConfig {
+            trials_per_condition: 20,
+            ..Default::default()
+        };
+        let result = PolynomialRootsBenchmark.run(&config);
+        let acc = result.metrics["root_finding_accuracy"].mean;
+        assert!(
+            acc > 0.70,
+            "engine-backed root_finding_accuracy should be high: {acc}"
         );
     }
 

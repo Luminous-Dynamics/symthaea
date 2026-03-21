@@ -263,6 +263,7 @@ fn main() {
             compute_english_ratio: true,
             per_intent_breakdown: true,
             max_gen_tokens: 64,
+            eval_limit: 0,
         };
 
         let result = evaluation::evaluate(&mut generator, &eval_config);
