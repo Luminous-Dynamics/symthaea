@@ -177,19 +177,49 @@ class ConsciousnessViewModel : ViewModel() {
                     val dream = e.dreamJournalLatest()
                     val haptics = e.hapticDrain()
 
-                    // Generate Broca text every ~50 cycles (~5s)
-                    // Uses SporeEngine's BrocaLite with trained checkpoint
+                    // Generate text every ~50 cycles (~5s)
+                    // Priority: 1) Holon full Broca  2) ConsciousnessPoet  3) BrocaLite fallback
                     if (tick % 50 == 0L) {
-                        try {
-                            val brocaJson = e.generateText(16)
-                            val obj = JSONObject(brocaJson)
-                            val rawText = obj.optString("text", "")
-                            val text = cleanBrocaText(rawText)
-                            if (text.isNotBlank()) {
-                                lastBrocaText = text
-                                android.util.Log.d("SomaBroca", "text: $text")
-                            }
-                        } catch (_: Exception) {}
+                        var text: String? = null
+
+                        // Try Holon full Broca pipeline first (desktop)
+                        if (holonWs?.isConnected == true && holonWs?.hasBroca == true) {
+                            try {
+                                text = holonWs?.requestBrocaText(
+                                    result.consciousnessLevel,
+                                    compass.dominantHarmony,
+                                    result.neuromodulators,
+                                    WakeState.fromCode(compass.wakeState).name,
+                                )
+                            } catch (_: Exception) {}
+                        }
+
+                        // Fall back to ConsciousnessPoet (curated, high quality)
+                        if (text.isNullOrBlank()) {
+                            text = ConsciousnessPoet.generate(
+                                consciousness = result.consciousnessLevel,
+                                harmony = compass.dominantHarmony,
+                                neuromod = result.neuromodulators,
+                                wakeState = WakeState.fromCode(compass.wakeState).name,
+                                dreamCount = compass.dreamCount,
+                                predictionError = result.predictionError,
+                            )
+                        }
+
+                        // Last resort: BrocaLite on-device
+                        if (text.isNullOrBlank()) {
+                            try {
+                                val brocaJson = e.generateText(16)
+                                val obj = JSONObject(brocaJson)
+                                val rawText = obj.optString("text", "")
+                                text = cleanBrocaText(rawText)
+                            } catch (_: Exception) {}
+                        }
+
+                        if (!text.isNullOrBlank()) {
+                            lastBrocaText = text
+                            android.util.Log.d("SomaBroca", "text: $text")
+                        }
                     }
 
                     // Auto-checkpoint every 500 cycles (~50s)
@@ -335,17 +365,27 @@ class ConsciousnessViewModel : ViewModel() {
         viewModelScope.launch {
             var text: String? = null
 
-            // Try local Ollama first
-            try {
-                text = ollamaBridge.generate(userText, _state.value.consciousnessLevel)
-            } catch (_: Exception) {}
+            // 1) Try Holon desktop (full Broca + Ollama on desktop)
+            if (holonWs?.isConnected == true) {
+                try {
+                    text = holonWs?.converse(userText, _state.value.consciousnessLevel)
+                } catch (_: Exception) {}
+            }
 
-            // Fall back to BrocaLite
+            // 2) Try local Ollama
+            if (text.isNullOrBlank()) {
+                try {
+                    text = ollamaBridge.generate(userText, _state.value.consciousnessLevel)
+                } catch (_: Exception) {}
+            }
+
+            // 3) Fall back to BrocaLite on-device
             if (text.isNullOrBlank()) {
                 text = withContext(dispatcher) {
                     try {
                         val json = engine?.generateTextWithInput(userText, 20) ?: return@withContext null
-                        JSONObject(json).optString("text", "")
+                        val raw = JSONObject(json).optString("text", "")
+                        cleanBrocaText(raw)
                     } catch (_: Exception) { null }
                 }
             }
