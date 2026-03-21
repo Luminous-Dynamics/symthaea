@@ -748,7 +748,10 @@ impl CognitiveLoopService {
                 );
                 binder.add_representation(linguistic_repr);
                 if self.consciousness_state.affective_bridge.is_some() {
-                    let affect_seed = (affective_valence * 1000.0) as u64;
+                    // Map [-1.0, 1.0] → [0, 2000] so negative valences get distinct seeds.
+                    // Without this, negative f32→u64 saturates to 0, collapsing all negative
+                    // emotions into the same hypervector (Rust 2021+ float-to-uint semantics).
+                    let affect_seed = ((affective_valence + 1.0) * 1000.0) as u64;
                     let affective_hv = symthaea_core::hdc::binary_hv::BinaryHV::random(affect_seed);
                     binder.update_modality(Modality::Affective, affective_hv);
                 }

@@ -918,7 +918,19 @@ pub fn train_with_adam(
         // LCG state for negative sampling (varies per epoch)
         let mut neg_seed = epoch as u64 * 1000003 + 42;
 
+        let num_pairs = curriculum_order.len();
         for (pair_idx, &dataset_idx) in curriculum_order.iter().enumerate() {
+            if pair_idx > 0 && pair_idx % 500 == 0 {
+                let running_loss = if total_tokens > 0 {
+                    total_loss / total_tokens as f32
+                } else {
+                    0.0
+                };
+                tracing::info!(
+                    "  [epoch {epoch}] pair {pair_idx}/{num_pairs} running_loss={running_loss:.4}"
+                );
+            }
+
             let pair = &dataset.pairs[dataset_idx];
             if pair.target_ids.is_empty() {
                 continue;

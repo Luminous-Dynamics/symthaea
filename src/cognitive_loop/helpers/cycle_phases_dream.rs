@@ -154,7 +154,7 @@ impl CognitiveLoopService {
                 5 // urgent: dream every 5 cycles
             } else if combined_pressure > 0.4 {
                 // interpolate 20→5 over [0.4, 0.7]
-                let t = (combined_pressure - 0.4) / 0.3;
+                let t = ((combined_pressure - 0.4) / 0.3).min(1.0);
                 20 - (t * 15.0) as usize
             } else {
                 20 // base rate

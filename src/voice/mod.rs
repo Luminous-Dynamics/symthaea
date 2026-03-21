@@ -612,7 +612,12 @@ fn resample_audio(samples: &[f32], rate: f32) -> Vec<f32> {
     if samples.is_empty() || rate <= 0.0 {
         return samples.to_vec();
     }
-    let out_len = (samples.len() as f32 / rate).clamp(0.0, samples.len() as f32 * 4.0) as usize;
+    let raw_len = samples.len() as f32 / rate;
+    let out_len = if raw_len.is_finite() {
+        raw_len.clamp(0.0, samples.len() as f32 * 4.0) as usize
+    } else {
+        samples.len() // NaN/Inf rate → pass through unchanged
+    };
     let mut output = Vec::with_capacity(out_len);
     for i in 0..out_len {
         let src_pos = i as f32 * rate;
