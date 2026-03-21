@@ -669,6 +669,7 @@ END-ISO-10303-21;";
             layer_height: 0.2,
             nozzle_diameter: 0.4,
             tolerance: 1e-3,
+            ..SliceConfig::default()
         };
         let layers = slice_mesh(&mesh, &slice_config);
         assert!(

@@ -4,7 +4,7 @@
 //! suitable for FDM 3D printers. Handles preamble/postamble, extrusion
 //! calculation, retraction on long travel moves, and temperature control.
 
-use crate::slicer::{Contour, Point2, SliceConfig, SliceLayer};
+use crate::slicer::{Contour, Point2, Segment2, SliceConfig, SliceLayer};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -385,6 +385,59 @@ pub fn generate_gcode(
                 &mut retracted,
             );
         }
+
+        // Then infill lines.
+        if !layer.infill_lines.is_empty() {
+            commands.push(GCodeCommand::Comment("Infill".into()));
+            for seg in &layer.infill_lines {
+                // Travel to start of infill segment.
+                let needs_travel = match current_pos {
+                    Some(pos) => distance(&pos, &seg.start) > 1.0,
+                    None => true,
+                };
+
+                if needs_travel {
+                    if !retracted {
+                        cumulative_e -= config.retract_distance_mm as f64;
+                        commands.push(GCodeCommand::G1 {
+                            x: None,
+                            y: None,
+                            z: None,
+                            e: Some(cumulative_e as f32),
+                            f: Some(config.retract_speed_mm_s * 60.0),
+                        });
+                        retracted = true;
+                    }
+                    commands.push(GCodeCommand::G0 {
+                        x: Some(seg.start.x),
+                        y: Some(seg.start.y),
+                        z: None,
+                        f: Some(config.travel_speed_mm_s * 60.0),
+                    });
+                    cumulative_e += config.retract_distance_mm as f64;
+                    commands.push(GCodeCommand::G1 {
+                        x: None,
+                        y: None,
+                        z: None,
+                        e: Some(cumulative_e as f32),
+                        f: Some(config.retract_speed_mm_s * 60.0),
+                    });
+                    retracted = false;
+                }
+
+                // Extrude to end of infill segment.
+                let d = distance(&seg.start, &seg.end) as f64;
+                cumulative_e += d * e_per_mm;
+                commands.push(GCodeCommand::G1 {
+                    x: Some(seg.end.x),
+                    y: Some(seg.end.y),
+                    z: None,
+                    e: Some(cumulative_e as f32),
+                    f: Some(config.print_speed_mm_s * 60.0),
+                });
+                current_pos = Some(seg.end);
+            }
+        }
     }
 
     // ── Postamble ────────────────────────────────────────────────────
@@ -422,6 +475,7 @@ mod tests {
             z: 0.2,
             outer_contours: vec![square_contour()],
             inner_contours: vec![],
+            infill_lines: vec![],
         }]
     }
 
@@ -431,6 +485,7 @@ mod tests {
                 z: 0.2,
                 outer_contours: vec![square_contour()],
                 inner_contours: vec![],
+                infill_lines: vec![],
             },
             SliceLayer {
                 z: 0.4,
@@ -443,6 +498,7 @@ mod tests {
                     ],
                 }],
                 inner_contours: vec![],
+                infill_lines: vec![],
             },
         ]
     }
@@ -600,6 +656,40 @@ mod tests {
     }
 
     #[test]
+    fn gcode_with_infill() {
+        let (sc, tc) = default_configs();
+        let layers = vec![SliceLayer {
+            z: 0.2,
+            outer_contours: vec![square_contour()],
+            inner_contours: vec![],
+            infill_lines: vec![
+                Segment2 {
+                    start: Point2::new(1.0, 2.0),
+                    end: Point2::new(9.0, 2.0),
+                },
+                Segment2 {
+                    start: Point2::new(1.0, 5.0),
+                    end: Point2::new(9.0, 5.0),
+                },
+            ],
+        }];
+        let program = generate_gcode(&layers, &sc, &tc);
+        // Should have the infill comment.
+        assert!(
+            gcode_string_contains(&program, "Infill"),
+            "should contain Infill comment"
+        );
+        // Infill should add extrusion beyond just the contour.
+        let contour_only = generate_gcode(&single_layer(), &sc, &tc);
+        assert!(
+            program.total_extrusion_mm > contour_only.total_extrusion_mm,
+            "infill should add extrusion: {} vs {}",
+            program.total_extrusion_mm,
+            contour_only.total_extrusion_mm
+        );
+    }
+
+    #[test]
     fn multiple_contours_per_layer() {
         let (sc, tc) = default_configs();
         let layers = vec![SliceLayer {
@@ -613,6 +703,7 @@ mod tests {
                     Point2::new(3.0, 7.0),
                 ],
             }],
+            infill_lines: vec![],
         }];
         let program = generate_gcode(&layers, &sc, &tc);
         // Both contours should produce extrusion moves.

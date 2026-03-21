@@ -86,6 +86,11 @@ impl LanguageManager {
     pub fn coherence_ema(&self) -> f32 {
         self.coherence_ema
     }
+
+    /// Consecutive low-coherence cycles (fluency degradation indicator).
+    pub fn low_coherence_streak(&self) -> u32 {
+        self.low_coherence_streak
+    }
 }
 
 impl CognitiveSubsystem for LanguageManager {
@@ -346,5 +351,58 @@ mod tests {
             lm.low_coherence_streak, 0,
             "Streak should reset when coherence recovers"
         );
+    }
+
+    // ── Property Tests ────────────────────────────────────────────────────
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn prop_language_lr_floor_holds(
+            psi in 0.0f64..0.2
+        ) {
+            let mut lm = LanguageManager::default();
+            let snap = snapshot_with(0.5, 0.5, psi);
+            let output = lm.process(&snap);
+            prop_assert!(output.lr_modulation >= LanguageManager::CONSCIOUSNESS_LR_FLOOR,
+                "LR floor violated: {} for psi={}", output.lr_modulation, psi);
+        }
+
+        #[test]
+        fn prop_language_quality_ema_bounded(
+            epistemic in 0.0f32..1.0,
+            coherence in 0.0f32..1.0
+        ) {
+            let mut lm = LanguageManager::default();
+            let snap = snapshot_with(epistemic, coherence, 0.5);
+            for _ in 0..100 {
+                lm.process(&snap);
+            }
+            prop_assert!(lm.quality_ema() >= 0.0,
+                "quality_ema below 0: {}", lm.quality_ema());
+            prop_assert!(lm.quality_ema() <= 1.0,
+                "quality_ema above 1: {}", lm.quality_ema());
+            prop_assert!(lm.coherence_ema() >= 0.0,
+                "coherence_ema below 0: {}", lm.coherence_ema());
+            prop_assert!(lm.coherence_ema() <= 1.0,
+                "coherence_ema above 1: {}", lm.coherence_ema());
+        }
+
+        #[test]
+        fn prop_language_output_bounded(
+            epistemic in 0.0f32..1.0,
+            coherence in 0.0f32..1.0,
+            psi in 0.0f64..1.0
+        ) {
+            let mut lm = LanguageManager::default();
+            let snap = snapshot_with(epistemic, coherence, psi);
+            let output = lm.process(&snap);
+            prop_assert!(output.confidence_delta.abs() < 0.1,
+                "confidence_delta out of bounds: {}", output.confidence_delta);
+            prop_assert!(output.lr_modulation >= 0.5,
+                "lr_modulation below 0.5: {}", output.lr_modulation);
+            prop_assert!(output.lr_modulation <= 1.5,
+                "lr_modulation above 1.5: {}", output.lr_modulation);
+        }
     }
 }

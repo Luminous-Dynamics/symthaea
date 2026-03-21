@@ -1068,6 +1068,75 @@ impl CognitiveLoopService {
         }
     }
 
+    /// Cross-couple visual surprise → prediction confidence modulation.
+    ///
+    /// High visual prediction error (PE EMA > 0.4) → reduce prediction confidence
+    /// to encourage exploratory attention toward novel visual input. Low surprise
+    /// (< 0.1) with elevated confidence → gentle pull-back toward baseline.
+    ///
+    /// Science: Itti & Koch (2001) — bottom-up saliency captures attention.
+    #[cfg(feature = "vision-manifold")]
+    pub(crate) fn cross_couple_vision_attention(&mut self) {
+        let visual_pe = self.vision_manager.visual_pe_ema();
+
+        if visual_pe > 0.4 {
+            // High visual surprise → reduce confidence (attention proxy for exploration)
+            let nudge = ((visual_pe - 0.4) * 0.05) as f64;
+            self.prediction_confidence = (self.prediction_confidence - nudge).clamp(0.0, 1.0);
+        } else if visual_pe < 0.1 && self.prediction_confidence < 0.7 {
+            // Low visual surprise → gentle confidence recovery
+            self.prediction_confidence = (self.prediction_confidence + 0.002).min(1.0);
+        }
+    }
+
+    /// Cross-couple language quality → prediction confidence & learning rate.
+    ///
+    /// Sustained high generation quality (quality_ema > 0.7 AND coherence > 0.5)
+    /// → confidence boost. Low coherence (< 0.3) → LR dampening (language
+    /// subsystem struggling, slow down to consolidate).
+    ///
+    /// Science: Clark (2013) — predictive processing confidence from generation success.
+    #[cfg(feature = "ssm_language")]
+    pub(crate) fn cross_couple_language_confidence(&mut self) {
+        let quality = self.language_manager.quality_ema();
+        let coherence = self.language_manager.coherence_ema();
+
+        // High quality generation → confidence boost
+        if quality > 0.7 && coherence > 0.5 {
+            let boost = ((quality - 0.7) * 0.02) as f64;
+            self.prediction_confidence = (self.prediction_confidence + boost).min(1.0);
+        }
+
+        // Low coherence → LR dampening (language subsystem struggling)
+        if coherence < 0.3 {
+            self.carryover.learning.subsystem_lr_factor *= 0.95;
+        }
+    }
+
+    /// Cross-couple reasoning reliability → exploration modulation.
+    ///
+    /// Falling reasoning reliability (falling_streak > 3) → boost exploration
+    /// via LR increase (reasoning failures should trigger novelty-seeking).
+    /// High reliability (> 0.8) → dampen LR (exploit current reasoning strategy).
+    ///
+    /// Science: Carver & Scheier (1998) — discrepancy reducing vs. creating loops.
+    #[cfg(feature = "reasoning_engine")]
+    pub(crate) fn cross_couple_reasoning_exploration(&mut self) {
+        let falling = self.reasoning_manager.falling_streak();
+        let reliability = self.reasoning_manager.reliability_ema();
+
+        // Falling reliability → exploration boost (break out of failing strategy)
+        if falling > 3 {
+            let boost = (falling as f64 - 3.0).min(5.0) * 0.01;
+            self.carryover.learning.subsystem_lr_factor *= 1.0 + boost as f32;
+        }
+
+        // High reliability → LR dampening (conserve current strategy)
+        if reliability > 0.8 {
+            self.carryover.learning.subsystem_lr_factor *= 0.97;
+        }
+    }
+
     /// Access the resonant speech module (read-only).
     pub fn resonant_speech(&self) -> &crate::resonant_speech::ResonantSpeech {
         &self.resonant_speech

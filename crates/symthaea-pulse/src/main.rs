@@ -493,6 +493,40 @@ pub struct LearningInfo {
     pub feedback_diversity: f32,
 }
 
+/// Vision manager snapshot (meaningful only when vision-manifold feature is enabled).
+#[derive(Serialize, Deserialize, Default)]
+pub struct VisionInfo {
+    /// Whether the `vision-manifold` feature is compiled in.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Visual prediction error EMA (0.0-1.0).
+    #[serde(default)]
+    pub pe_ema: f32,
+    /// Adaptive visual surprise threshold (0.05-0.8).
+    #[serde(default)]
+    pub surprise_threshold: f32,
+    /// Consecutive low-surprise cycles (habituation streak).
+    #[serde(default)]
+    pub low_surprise_streak: u32,
+}
+
+/// Language manager snapshot (meaningful only when ssm_language feature is enabled).
+#[derive(Serialize, Deserialize, Default)]
+pub struct LanguageInfo {
+    /// Whether the `ssm_language` feature is compiled in.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Broca generation quality EMA (0.0-1.0).
+    #[serde(default)]
+    pub quality_ema: f32,
+    /// Language coherence EMA (0.0-1.0).
+    #[serde(default)]
+    pub coherence_ema: f32,
+    /// Consecutive low-coherence cycles (fluency degradation indicator).
+    #[serde(default)]
+    pub low_coherence_streak: u32,
+}
+
 /// Reasoning engine snapshot (meaningful only when reasoning_engine feature is enabled).
 #[derive(Serialize, Deserialize, Default)]
 pub struct ReasoningInfo {
@@ -508,6 +542,18 @@ pub struct ReasoningInfo {
     pub gate_blocked: bool,
     #[serde(default)]
     pub meta_reasoning_confidence: f64,
+    /// Reasoning reliability EMA (0.0-1.0).
+    #[serde(default)]
+    pub reliability_ema: f64,
+    /// Cumulative reasoning quality signal (decayed).
+    #[serde(default)]
+    pub cumulative_quality: f64,
+    /// Consecutive rising confidence cycles.
+    #[serde(default)]
+    pub rising_streak: u32,
+    /// Consecutive falling confidence cycles.
+    #[serde(default)]
+    pub falling_streak: u32,
 }
 
 /// Dream and memory consolidation snapshot.
@@ -601,6 +647,24 @@ pub struct FabricationInfo {
     pub active_print_jobs: u32,
     /// Reward EMA.
     pub reward_ema: f32,
+    /// MRP planned orders count.
+    #[serde(default)]
+    pub mrp_planned_orders: u32,
+    /// MRP feasibility status.
+    #[serde(default)]
+    pub mrp_feasible: bool,
+    /// MRP shortage count.
+    #[serde(default)]
+    pub mrp_shortages_count: u32,
+    /// MRP work order count in scope.
+    #[serde(default)]
+    pub mrp_work_order_count: u32,
+    /// Defect prediction quality score (0.0-1.0).
+    #[serde(default)]
+    pub defect_prediction: f32,
+    /// Defect prediction confidence (0.0-1.0).
+    #[serde(default)]
+    pub defect_confidence: f32,
 }
 
 /// CfC-HDC neuroevolution snapshot.
@@ -657,6 +721,10 @@ pub struct PulseSnapshot {
     pub drive: DriveInfo,
     #[serde(default)]
     pub learning: LearningInfo,
+    #[serde(default)]
+    pub vision: VisionInfo,
+    #[serde(default)]
+    pub language: LanguageInfo,
     #[serde(default)]
     pub reasoning: ReasoningInfo,
     #[serde(default)]
@@ -1591,6 +1659,18 @@ fn main() -> Result<()> {
             feedback_priority_counts: m.feedback_priority_counts,
             feedback_diversity: m.feedback_diversity,
         },
+        vision: VisionInfo {
+            enabled: m.vision_manifold_enabled,
+            pe_ema: m.vision_pe_ema,
+            surprise_threshold: m.vision_surprise_threshold,
+            low_surprise_streak: m.vision_low_surprise_streak,
+        },
+        language: LanguageInfo {
+            enabled: m.ssm_language_enabled,
+            quality_ema: m.language_quality_ema,
+            coherence_ema: m.language_coherence_ema,
+            low_coherence_streak: m.language_low_coherence_streak,
+        },
         reasoning: ReasoningInfo {
             enabled: m.reasoning_engine_enabled,
             chain_depth: m.reasoning_chain_depth,
@@ -1598,6 +1678,10 @@ fn main() -> Result<()> {
             plan_confidence: m.reasoning_plan_confidence,
             gate_blocked: m.reasoning_gate_blocked,
             meta_reasoning_confidence: m.meta_reasoning_confidence,
+            reliability_ema: m.reasoning_reliability_ema,
+            cumulative_quality: m.reasoning_cumulative_quality,
+            rising_streak: m.reasoning_rising_streak,
+            falling_streak: m.reasoning_falling_streak,
         },
         dream: DreamInfo {
             dream_insights: m.memory.dream_insights,
@@ -2020,6 +2104,18 @@ fn main() -> Result<()> {
                     feedback_priority_counts: wm.feedback_priority_counts,
                     feedback_diversity: wm.feedback_diversity,
                 },
+                vision: VisionInfo {
+                    enabled: wm.vision_manifold_enabled,
+                    pe_ema: wm.vision_pe_ema,
+                    surprise_threshold: wm.vision_surprise_threshold,
+                    low_surprise_streak: wm.vision_low_surprise_streak,
+                },
+                language: LanguageInfo {
+                    enabled: wm.ssm_language_enabled,
+                    quality_ema: wm.language_quality_ema,
+                    coherence_ema: wm.language_coherence_ema,
+                    low_coherence_streak: wm.language_low_coherence_streak,
+                },
                 reasoning: ReasoningInfo {
                     enabled: wm.reasoning_engine_enabled,
                     chain_depth: wm.reasoning_chain_depth,
@@ -2027,6 +2123,10 @@ fn main() -> Result<()> {
                     plan_confidence: wm.reasoning_plan_confidence,
                     gate_blocked: wm.reasoning_gate_blocked,
                     meta_reasoning_confidence: wm.meta_reasoning_confidence,
+                    reliability_ema: wm.reasoning_reliability_ema,
+                    cumulative_quality: wm.reasoning_cumulative_quality,
+                    rising_streak: wm.reasoning_rising_streak,
+                    falling_streak: wm.reasoning_falling_streak,
                 },
                 dream: DreamInfo {
                     dream_insights: wm.memory.dream_insights,
@@ -2270,6 +2370,8 @@ mod tests {
             perception: PerceptionInfo::default(),
             drive: DriveInfo::default(),
             learning: LearningInfo::default(),
+            vision: VisionInfo::default(),
+            language: LanguageInfo::default(),
             reasoning: ReasoningInfo::default(),
             dream: DreamInfo::default(),
             sovereign: SovereignInfo::default(),

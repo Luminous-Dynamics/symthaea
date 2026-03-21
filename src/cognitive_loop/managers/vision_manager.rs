@@ -80,6 +80,11 @@ impl VisionManager {
         self.surprise_threshold
     }
 
+    /// Consecutive low-surprise cycles (habituation streak).
+    pub fn low_surprise_streak(&self) -> u32 {
+        self.low_surprise_streak
+    }
+
     fn mean_surprise(&self) -> f32 {
         if self.surprise_count == 0 {
             return 0.0;
@@ -314,5 +319,56 @@ mod tests {
     fn test_restore_rejects_short_data() {
         let mut vm = VisionManager::default();
         assert!(vm.restore(&[0u8; 5]).is_err());
+    }
+
+    // ── Property Tests ────────────────────────────────────────────────────
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn prop_vision_exploration_bounded(
+            pe in 0.0f32..1.0,
+            state_val in -1.0f32..1.0
+        ) {
+            let mut vm = VisionManager::default();
+            let mut snap = CycleSnapshot::default();
+            snap.prediction_error = pe;
+            for s in snap.compressed_state.iter_mut() { *s = state_val; }
+            let output = vm.process(&snap);
+            prop_assert!(output.exploration_delta.abs() < 1.0,
+                "exploration_delta out of bounds: {}", output.exploration_delta);
+            prop_assert!(output.arousal_delta.abs() < 1.0,
+                "arousal_delta out of bounds: {}", output.arousal_delta);
+        }
+
+        #[test]
+        fn prop_vision_threshold_bounded(
+            pe in 0.0f32..1.0
+        ) {
+            let mut vm = VisionManager::default();
+            let snap = CycleSnapshot { prediction_error: pe, ..Default::default() };
+            for _ in 0..100 {
+                vm.process(&snap);
+            }
+            prop_assert!(vm.surprise_threshold() >= 0.05,
+                "threshold below min: {}", vm.surprise_threshold());
+            prop_assert!(vm.surprise_threshold() <= 0.8,
+                "threshold above max: {}", vm.surprise_threshold());
+        }
+
+        #[test]
+        fn prop_vision_pe_ema_bounded(
+            pe in 0.0f32..1.0
+        ) {
+            let mut vm = VisionManager::default();
+            let snap = CycleSnapshot { prediction_error: pe, ..Default::default() };
+            for _ in 0..50 {
+                vm.process(&snap);
+            }
+            prop_assert!(vm.visual_pe_ema() >= 0.0,
+                "pe_ema below 0: {}", vm.visual_pe_ema());
+            prop_assert!(vm.visual_pe_ema() <= 1.0,
+                "pe_ema above 1: {}", vm.visual_pe_ema());
+        }
     }
 }

@@ -313,8 +313,8 @@ fn full_battery_report() {
     // Verify all benchmarks produced results
     assert_eq!(
         report.results.len(),
-        134,
-        "Expected 134 benchmark results, got {}",
+        135,
+        "Expected 135 benchmark results, got {}",
         report.results.len()
     );
 

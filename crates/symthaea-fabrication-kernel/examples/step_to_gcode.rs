@@ -116,6 +116,7 @@ fn main() {
         layer_height: 0.2,
         nozzle_diameter: 0.4,
         tolerance: 1e-3,
+        ..SliceConfig::default()
     };
     let layers = slice_mesh(&mesh, &slice_config);
     let total_contours: usize = layers

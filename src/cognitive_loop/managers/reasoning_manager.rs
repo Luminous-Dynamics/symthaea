@@ -86,6 +86,16 @@ impl ReasoningManager {
     pub fn cumulative_quality(&self) -> f64 {
         self.cumulative_quality
     }
+
+    /// Consecutive cycles of rising prediction confidence.
+    pub fn rising_streak(&self) -> u32 {
+        self.rising_streak
+    }
+
+    /// Consecutive cycles of falling prediction confidence.
+    pub fn falling_streak(&self) -> u32 {
+        self.falling_streak
+    }
 }
 
 impl CognitiveSubsystem for ReasoningManager {
@@ -448,5 +458,57 @@ mod tests {
             rm.cumulative_quality,
             peak
         );
+    }
+
+    // ── Property Tests ────────────────────────────────────────────────────
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn prop_reasoning_reliability_converges(
+            conf in 0.0f64..1.0
+        ) {
+            let mut rm = ReasoningManager::default();
+            let snap = snapshot_with_reasoning(conf, 0.5, 0.5);
+            for _ in 0..200 {
+                rm.process(&snap);
+            }
+            // EMA should converge near the input value
+            let diff = (rm.reliability_ema() - conf).abs();
+            prop_assert!(diff < 0.15,
+                "reliability_ema {} didn't converge toward {}", rm.reliability_ema(), conf);
+        }
+
+        #[test]
+        fn prop_reasoning_output_bounded(
+            conf in 0.0f64..1.0,
+            epistemic in 0.0f32..1.0,
+            psi in 0.0f64..1.0
+        ) {
+            let mut rm = ReasoningManager::default();
+            let snap = snapshot_with_reasoning(conf, epistemic, psi);
+            let output = rm.process(&snap);
+            prop_assert!(output.lr_modulation >= 0.5,
+                "lr_modulation below 0.5: {}", output.lr_modulation);
+            prop_assert!(output.lr_modulation <= 1.5,
+                "lr_modulation above 1.5: {}", output.lr_modulation);
+            prop_assert!(output.confidence_delta.abs() < 0.1,
+                "confidence_delta out of bounds: {}", output.confidence_delta);
+            prop_assert!(output.valence_delta.abs() < 0.1,
+                "valence_delta out of bounds: {}", output.valence_delta);
+        }
+
+        #[test]
+        fn prop_reasoning_cumulative_quality_non_negative(
+            epistemic in 0.0f32..1.0
+        ) {
+            let mut rm = ReasoningManager::default();
+            let snap = snapshot_with_reasoning(0.5, epistemic, 0.5);
+            for _ in 0..100 {
+                rm.process(&snap);
+            }
+            prop_assert!(rm.cumulative_quality() >= 0.0,
+                "cumulative_quality negative: {}", rm.cumulative_quality());
+        }
     }
 }

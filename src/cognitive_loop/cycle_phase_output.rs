@@ -1063,6 +1063,32 @@ impl CognitiveLoopService {
                 self.swarm_manager.fhe_cycles_since_aggregation();
         }
 
+        // ── Vision Manager telemetry ──
+        #[cfg(feature = "vision-manifold")]
+        {
+            metadata.vision_pe_ema = self.vision_manager.visual_pe_ema();
+            metadata.vision_surprise_threshold = self.vision_manager.surprise_threshold();
+            metadata.vision_low_surprise_streak = self.vision_manager.low_surprise_streak();
+            metadata.vision_manifold_enabled = true;
+        }
+
+        // ── Language Manager telemetry ──
+        #[cfg(feature = "ssm_language")]
+        {
+            metadata.language_quality_ema = self.language_manager.quality_ema();
+            metadata.language_coherence_ema = self.language_manager.coherence_ema();
+            metadata.language_low_coherence_streak = self.language_manager.low_coherence_streak();
+        }
+
+        // ── Reasoning Manager telemetry ──
+        #[cfg(feature = "reasoning_engine")]
+        {
+            metadata.reasoning_reliability_ema = self.reasoning_manager.reliability_ema();
+            metadata.reasoning_cumulative_quality = self.reasoning_manager.cumulative_quality();
+            metadata.reasoning_rising_streak = self.reasoning_manager.rising_streak();
+            metadata.reasoning_falling_streak = self.reasoning_manager.falling_streak();
+        }
+
         // ── Causal explanation narrative (every 47 cycles, amortized) ──
         if self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0 {
             if let Some(ref explainer) = self.primitive_tier.causal_explainer {

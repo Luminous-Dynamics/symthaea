@@ -1022,6 +1022,21 @@ impl CognitiveLoopService {
         // (Damasio 1994, Lavie 2005)
         self.cross_couple_perception_drive();
 
+        // Vision→Attention: visual surprise → prediction confidence modulation
+        // (Itti & Koch 2001)
+        #[cfg(feature = "vision-manifold")]
+        self.cross_couple_vision_attention();
+
+        // Language→Confidence: generation quality → prediction confidence & LR
+        // (Clark 2013)
+        #[cfg(feature = "ssm_language")]
+        self.cross_couple_language_confidence();
+
+        // Reasoning→Exploration: falling reliability → LR boost, high reliability → LR dampen
+        // (Carver & Scheier 1998)
+        #[cfg(feature = "reasoning_engine")]
+        self.cross_couple_reasoning_exploration();
+
         // ── Phase 17: Self-model accuracy tracking ───────────────────────
         let self_model_accuracy = self.carryover.learning.self_model_accuracy;
         if let Some((made_at, pred_confidence, pred_urgency)) =

@@ -77,6 +77,8 @@ fn test_key_metric_exists_in_output() {
         // Creativity
         Box::new(AlternateUsesBenchmark),
         Box::new(RemoteAssociatesBenchmark),
+        Box::new(DivergentThinkingBenchmark),
+        Box::new(ConceptualBlendingBenchmark),
         // Butlin
         Box::new(ButlinIndicatorSuite),
         // Inhibition

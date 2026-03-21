@@ -15,6 +15,7 @@ pub mod export;
 #[cfg(feature = "analytical")]
 pub mod generative;
 pub mod import;
+pub mod infill;
 pub mod manufacturing;
 pub mod material_handling;
 pub mod mesh;
@@ -36,6 +37,7 @@ pub use bsp::{csg_intersect, csg_subtract};
 pub use csg::{BooleanOp, CSGNode, Primitive, Transform3D};
 pub use export::{export_3mf, export_stl};
 pub use import::{parse_ascii_stl, parse_binary_stl, parse_stl, StlError};
+pub use infill::{generate_infill, InfillConfig, InfillPattern};
 pub use mesh::TriangleMesh;
 pub use primitives::*;
 pub use simulator::{ForceHV, PhysicsBackend, SimState};
