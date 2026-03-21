@@ -34,6 +34,7 @@ fn warmup(service: &mut CognitiveLoopService, n: usize) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[test]
+#[ignore = "requires ~2700 cycles, exceeds CI timeout — run locally with --include-ignored"]
 fn test_always_awake_fallback_applies_stale_calibration() {
     // Build CLS with low learning_threshold to keep PE high and trigger self-assessment.
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig {

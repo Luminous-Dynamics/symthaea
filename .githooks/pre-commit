@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Pre-commit hook: cargo fmt check on staged Rust files
+# Opt-in: git config core.hooksPath .githooks
+
+set -e
+
+# Only check if there are staged .rs files
+STAGED_RS=$(git diff --cached --name-only --diff-filter=ACM | grep '\.rs$' || true)
+if [ -z "$STAGED_RS" ]; then
+    exit 0
+fi
+
+# cargo fmt --check (requires nix shell for toolchain)
+if ! command -v cargo &> /dev/null; then
+    echo "pre-commit: cargo not found (run inside nix develop), skipping fmt check"
+    exit 0
+fi
+
+echo "pre-commit: checking cargo fmt..."
+
+# Check each workspace that has staged files
+FMT_FAILED=0
+for ws in symthaea symthaea/symthaea-core; do
+    if echo "$STAGED_RS" | grep -q "^${ws}/"; then
+        if [ -f "${ws}/Cargo.toml" ]; then
+            if ! cargo fmt --all --check --manifest-path "${ws}/Cargo.toml" 2>/dev/null; then
+                FMT_FAILED=1
+            fi
+        fi
+    fi
+done
+
+if [ "$FMT_FAILED" -eq 1 ]; then
+    echo ""
+    echo "pre-commit: formatting issues found. Run 'cargo fmt' to fix."
+    exit 1
+fi
+
+# Optional clippy (only if PRECOMMIT_CLIPPY=1)
+if [ "${PRECOMMIT_CLIPPY:-0}" = "1" ]; then
+    echo "pre-commit: running clippy..."
+    cargo clippy --quiet -- -D warnings 2>/dev/null || {
+        echo "pre-commit: clippy warnings found."
+        exit 1
+    }
+fi
