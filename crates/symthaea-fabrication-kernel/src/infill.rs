@@ -333,7 +333,6 @@ fn generate_honeycomb_infill(
     let mut col = 0i32;
     let mut cx = x_start;
     while cx < x_end {
-        let mut row = 0i32;
         let mut cy = y_start + if col % 2 == 1 { row_stride } else { 0.0 };
         while cy < y_end {
             // Generate the 6 edges of this hexagon.
@@ -353,7 +352,6 @@ fn generate_honeycomb_infill(
                 let seg_dy = b.y - a.y;
                 let seg_len_sq = seg_dx * seg_dx + seg_dy * seg_dy;
                 if seg_len_sq < 1e-10 {
-                    row += 1;
                     cy += row_stride * 2.0;
                     continue;
                 }
@@ -403,7 +401,6 @@ fn generate_honeycomb_infill(
                     }
                 }
             }
-            row += 1;
             cy += row_stride * 2.0;
         }
         col += 1;
@@ -495,7 +492,7 @@ pub fn generate_infill_for_layer(
     };
 
     // Generate pattern.
-    let result = match config.pattern {
+    match config.pattern {
         InfillPattern::Rectilinear => {
             generate_infill_at_angle(clip_layer, &edges, bb_min, bb_max, angle_rad, spacing)
         }
@@ -511,9 +508,7 @@ pub fn generate_infill_for_layer(
         InfillPattern::Honeycomb => {
             generate_honeycomb_infill(clip_layer, &edges, bb_min, bb_max, spacing, nozzle_diameter)
         }
-    };
-
-    result
+    }
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────
