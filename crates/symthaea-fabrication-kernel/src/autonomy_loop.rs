@@ -311,9 +311,6 @@ mod tests {
 
         let events = loop_.to_fabrication_events();
         assert_eq!(events.len(), 1);
-        assert!(matches!(
-            events[0].kind,
-            FabricationEventDataKind::QcPassed
-        ));
+        assert!(matches!(events[0].kind, FabricationEventDataKind::QcPassed));
     }
 }

@@ -112,9 +112,11 @@ impl KnowledgeEngine {
         self.total_learns += 1;
 
         // Check for existing identical fact → boost confidence
-        if let Some(existing) = self.facts.iter_mut().find(|f| {
-            f.subject == subject && f.predicate == predicate && f.object == object
-        }) {
+        if let Some(existing) = self
+            .facts
+            .iter_mut()
+            .find(|f| f.subject == subject && f.predicate == predicate && f.object == object)
+        {
             existing.confidence = (existing.confidence + 0.1).clamp(0.0, 1.0);
             existing.access_count += 1;
             return;
@@ -172,7 +174,11 @@ impl KnowledgeEngine {
             .collect();
 
         let total_matches = matches.len();
-        matches.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
+        matches.sort_by(|a, b| {
+            b.confidence
+                .partial_cmp(&a.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         QueryResult {
             facts: matches,
@@ -196,7 +202,11 @@ impl KnowledgeEngine {
             .collect();
 
         let total_matches = matches.len();
-        matches.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
+        matches.sort_by(|a, b| {
+            b.confidence
+                .partial_cmp(&a.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         QueryResult {
             facts: matches,

@@ -2188,7 +2188,9 @@ fn write_mesh_consciousness_pane(
     // Phi convergence sparkline (if history available)
     if mesh.phi_history.len() >= 2 {
         html.push_str("<div style=\"text-align:center;margin-top:10px\">");
-        html.push_str("<span style=\"font-size:0.75em;color:#8a9a8a\">&Phi; Convergence</span><br>");
+        html.push_str(
+            "<span style=\"font-size:0.75em;color:#8a9a8a\">&Phi; Convergence</span><br>",
+        );
         let data: Vec<f64> = mesh.phi_history.iter().map(|&v| v as f64).collect();
         write_sparkline(html, &data, "#e8c547", 180, 30);
         html.push_str("</div>");

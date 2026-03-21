@@ -231,10 +231,7 @@ fn core_pipeline_timings_populated() {
         t.core_hdc_encode > 0,
         "Core HDC encode timing should be > 0"
     );
-    assert!(
-        t.core_cfc_step > 0,
-        "Core CfC step timing should be > 0"
-    );
+    assert!(t.core_cfc_step > 0, "Core CfC step timing should be > 0");
     assert!(
         t.consciousness_engine > 0,
         "Consciousness engine timing should be > 0"
@@ -245,7 +242,8 @@ fn core_pipeline_timings_populated() {
     );
 
     // Sum of core timings should be positive
-    let core_sum = t.core_hdc_encode + t.core_cfc_step + t.consciousness_engine + t.metadata_assembly;
+    let core_sum =
+        t.core_hdc_encode + t.core_cfc_step + t.consciousness_engine + t.metadata_assembly;
     assert!(
         core_sum > 0,
         "Sum of core pipeline timings should be positive: {core_sum}"
@@ -290,7 +288,7 @@ fn no_core_phase_exceeds_budget_half() {
     let t = &result.metadata.module_timings_us;
 
     let budget_half_us = 25_000; // 25ms = half of 50ms cycle budget
-    // These are soft assertions — CI machines may be slow
+                                 // These are soft assertions — CI machines may be slow
     if t.core_hdc_encode > budget_half_us {
         eprintln!(
             "WARNING: HDC encode took {}us > {}us budget half",

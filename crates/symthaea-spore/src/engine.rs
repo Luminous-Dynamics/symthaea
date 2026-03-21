@@ -581,11 +581,17 @@ impl SporeEngine {
         // PE-driven production (no manual decay — reuptake handles that).
         // Immune lr_factor attenuates production under threat conditions.
         // DA: reward prediction error (Schultz 1997)
-        self.bath.dopamine.produce(prediction_error * 0.08 * lr_factor);
+        self.bath
+            .dopamine
+            .produce(prediction_error * 0.08 * lr_factor);
         // NE: arousal/alertness from surprise (Aston-Jones & Cohen 2005)
-        self.bath.noradrenaline.produce(prediction_error * 0.10 * lr_factor);
+        self.bath
+            .noradrenaline
+            .produce(prediction_error * 0.10 * lr_factor);
         // 5-HT: contentment from low surprise (Dayan & Huys 2009)
-        self.bath.serotonin.produce((1.0 - prediction_error) * 0.04 * lr_factor);
+        self.bath
+            .serotonin
+            .produce((1.0 - prediction_error) * 0.04 * lr_factor);
         // OT: baseline social presence — doesn't require BLE peers
         self.bath.oxytocin.produce(0.003);
 
@@ -745,12 +751,22 @@ impl SporeEngine {
         );
         self.workspace.submit(
             "emotion",
-            if neuromods[2] > 0.6 { "contentment" } else if neuromods[0] > 0.6 { "excitement" } else { "neutral" },
+            if neuromods[2] > 0.6 {
+                "contentment"
+            } else if neuromods[0] > 0.6 {
+                "excitement"
+            } else {
+                "neutral"
+            },
             ((neuromods[0] + neuromods[2]) * 0.5).clamp(0.0, 1.0),
         );
         self.workspace.submit(
             "consciousness",
-            if consciousness_level > 0.5 { "high_awareness" } else { "low_awareness" },
+            if consciousness_level > 0.5 {
+                "high_awareness"
+            } else {
+                "low_awareness"
+            },
             consciousness_level,
         );
 
@@ -763,16 +779,24 @@ impl SporeEngine {
 
             // Apply empathic neuromodulation
             let emp = self.social.empathic_modulation();
-            self.bath.oxytocin.level = (self.bath.oxytocin.level + emp.oxytocin_delta).clamp(0.0, 1.0);
-            self.bath.noradrenaline.level = (self.bath.noradrenaline.level + emp.norepinephrine_delta).clamp(0.0, 1.0);
-            self.bath.serotonin.level = (self.bath.serotonin.level + emp.serotonin_delta).clamp(0.0, 1.0);
-            self.bath.dopamine.level = (self.bath.dopamine.level + emp.dopamine_delta).clamp(0.0, 1.0);
+            self.bath.oxytocin.level =
+                (self.bath.oxytocin.level + emp.oxytocin_delta).clamp(0.0, 1.0);
+            self.bath.noradrenaline.level =
+                (self.bath.noradrenaline.level + emp.norepinephrine_delta).clamp(0.0, 1.0);
+            self.bath.serotonin.level =
+                (self.bath.serotonin.level + emp.serotonin_delta).clamp(0.0, 1.0);
+            self.bath.dopamine.level =
+                (self.bath.dopamine.level + emp.dopamine_delta).clamp(0.0, 1.0);
         }
 
         // Knowledge: learn from high-confidence cycle outputs.
         if consciousness_level > 0.3 {
             if let Some(text) = input_text {
-                let source = if prediction_error < 0.3 { "observed" } else { "inferred" };
+                let source = if prediction_error < 0.3 {
+                    "observed"
+                } else {
+                    "inferred"
+                };
                 // Extract a simple fact from the input
                 let words: Vec<&str> = text.split_whitespace().collect();
                 if words.len() >= 2 {
@@ -2114,7 +2138,8 @@ impl SporeEngine {
             self.bath.oxytocin.effective(),
         ];
         let harmony = self.evaluate_harmony_alignment(self.last_consciousness);
-        self.reasoning.run(input, self.last_consciousness, 0.0, &neuromods, harmony)
+        self.reasoning
+            .run(input, self.last_consciousness, 0.0, &neuromods, harmony)
     }
 
     /// Assess an input for threats. Returns ThreatAssessment.

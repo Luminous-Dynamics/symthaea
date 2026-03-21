@@ -185,7 +185,13 @@ fn main() {
     for (rank, (name, weight)) in importance.iter().enumerate() {
         let bar_len = (weight.abs() * 40.0).round() as usize;
         let bar: String = "#".repeat(bar_len.min(40));
-        println!("  {:>2}. {:<20} weight={:+.4}  |{}", rank + 1, name, weight, bar);
+        println!(
+            "  {:>2}. {:<20} weight={:+.4}  |{}",
+            rank + 1,
+            name,
+            weight,
+            bar
+        );
     }
 
     // -----------------------------------------------------------------------

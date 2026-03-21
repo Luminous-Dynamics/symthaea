@@ -151,8 +151,19 @@ impl SocialMind {
 
         // Simple sentiment heuristic (WASM-compatible, no NLP crate needed)
         let lower = input_text.to_lowercase();
-        let positive_words = ["happy", "great", "love", "good", "excellent", "wonderful", "yes", "thank"];
-        let negative_words = ["sad", "bad", "angry", "hate", "terrible", "no", "wrong", "fear"];
+        let positive_words = [
+            "happy",
+            "great",
+            "love",
+            "good",
+            "excellent",
+            "wonderful",
+            "yes",
+            "thank",
+        ];
+        let negative_words = [
+            "sad", "bad", "angry", "hate", "terrible", "no", "wrong", "fear",
+        ];
         let arousal_words = ["urgent", "excited", "panic", "amazing", "critical", "hurry"];
 
         let pos_count = positive_words.iter().filter(|w| lower.contains(*w)).count() as f32;
@@ -227,15 +238,28 @@ impl SocialMind {
         }
 
         let n = self.partners.len() as f32;
-        let avg_valence: f32 = self.partners.iter().map(|p| p.believed_valence).sum::<f32>() / n;
-        let avg_arousal: f32 = self.partners.iter().map(|p| p.believed_arousal).sum::<f32>() / n;
+        let avg_valence: f32 = self
+            .partners
+            .iter()
+            .map(|p| p.believed_valence)
+            .sum::<f32>()
+            / n;
+        let avg_arousal: f32 = self
+            .partners
+            .iter()
+            .map(|p| p.believed_arousal)
+            .sum::<f32>()
+            / n;
         let avg_trust: f32 = self.partners.iter().map(|p| p.trust).sum::<f32>() / n;
 
         let empathy = self.empathy_level;
 
         EmpathicModulation {
             // Social bonding increases with trust and positive valence
-            oxytocin_delta: EMPATHY_OXYTOCIN_SCALE * empathy * avg_trust * (0.5 + avg_valence * 0.5),
+            oxytocin_delta: EMPATHY_OXYTOCIN_SCALE
+                * empathy
+                * avg_trust
+                * (0.5 + avg_valence * 0.5),
             // Shared arousal from partners
             norepinephrine_delta: EMPATHY_NE_SCALE * empathy * avg_arousal,
             // Contentment from positive social environment
@@ -282,8 +306,8 @@ impl SocialMind {
     pub fn update_accuracy(&mut self, name: &str, was_correct: bool) {
         if let Some(partner) = self.partners.iter_mut().find(|p| p.name == name) {
             let signal = if was_correct { 1.0 } else { 0.0 };
-            partner.prediction_accuracy =
-                partner.prediction_accuracy * (1.0 - ACCURACY_EMA_ALPHA) + signal * ACCURACY_EMA_ALPHA;
+            partner.prediction_accuracy = partner.prediction_accuracy * (1.0 - ACCURACY_EMA_ALPHA)
+                + signal * ACCURACY_EMA_ALPHA;
         }
     }
 
@@ -393,8 +417,14 @@ mod tests {
         mind.observe_partner("carol", "Everything is great and wonderful!");
 
         let mods = mind.empathic_modulation();
-        assert!(mods.oxytocin_delta > 0.0, "positive partners should boost oxytocin");
-        assert!(mods.serotonin_delta >= 0.0, "positive valence should not decrease serotonin");
+        assert!(
+            mods.oxytocin_delta > 0.0,
+            "positive partners should boost oxytocin"
+        );
+        assert!(
+            mods.serotonin_delta >= 0.0,
+            "positive valence should not decrease serotonin"
+        );
     }
 
     #[test]
