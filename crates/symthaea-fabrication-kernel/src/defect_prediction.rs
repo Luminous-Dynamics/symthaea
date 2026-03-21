@@ -176,7 +176,11 @@ impl DefectPredictor {
         }
 
         // Sort by contribution descending
-        risk_factors.sort_by(|a, b| b.contribution.partial_cmp(&a.contribution).unwrap());
+        risk_factors.sort_by(|a, b| {
+            b.contribution
+                .partial_cmp(&a.contribution)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         PredictionOutput {
             predicted_quality,
@@ -232,7 +236,11 @@ impl DefectPredictor {
             .zip(self.weights.iter())
             .map(|(name, &w)| (name.to_string(), w))
             .collect();
-        importance.sort_by(|a, b| b.1.abs().partial_cmp(&a.1.abs()).unwrap());
+        importance.sort_by(|a, b| {
+            b.1.abs()
+                .partial_cmp(&a.1.abs())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         importance
     }
 

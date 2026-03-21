@@ -79,7 +79,7 @@ fn classify_plaintext(test: &BinaryHV, prototypes: &[BinaryHV]) -> (usize, Vec<f
     let predicted = sims
         .iter()
         .enumerate()
-        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
         .map(|(i, _)| i)
         .unwrap_or(0);
     (predicted, sims)
@@ -94,7 +94,7 @@ fn classify_encrypted(test: &EncryptedHV, prototypes: &[EncryptedHV]) -> (usize,
     let predicted = sims
         .iter()
         .enumerate()
-        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
         .map(|(i, _)| i)
         .unwrap_or(0);
     (predicted, sims)

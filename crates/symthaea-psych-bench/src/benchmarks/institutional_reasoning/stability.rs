@@ -120,7 +120,7 @@ impl InstitutionalStabilityBenchmark {
         let min_stability = ceilings
             .iter()
             .copied()
-            .min_by(|a, b| a.partial_cmp(b).unwrap())
+            .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap_or(0.0);
 
         let variance = if ceilings.len() > 1 {

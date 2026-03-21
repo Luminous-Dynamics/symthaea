@@ -73,7 +73,7 @@ fn cross_section_from_mesh(mesh: &TriangleMesh) -> CrossSection {
         (max[1] - min[1]) as f64,
         (max[2] - min[2]) as f64,
     ];
-    extents.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    extents.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     // The two shorter dimensions form the cross-section
     let width = extents[0].max(0.001);
     let height = extents[1].max(0.001);

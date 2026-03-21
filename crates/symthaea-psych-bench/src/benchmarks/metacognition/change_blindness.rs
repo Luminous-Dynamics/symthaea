@@ -234,7 +234,9 @@ impl ChangeBlindnessBenchmark {
                                 (i, 1.0 - sim as f64) // lower similarity = higher saliency
                             })
                             .collect();
-                        saliency.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+                        saliency.sort_by(|a, b| {
+                            b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
+                        });
 
                         for look in 0..max_looks {
                             // Saliency-ordered search: attend to most-changed objects first
