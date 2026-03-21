@@ -721,6 +721,11 @@ impl BenchmarkReport {
                 &bl.mathematics,
             ),
             (
+                "solution_accuracy",
+                "linear_system_solution_accuracy",
+                &bl.mathematics,
+            ),
+            (
                 "accuracy_quadratic",
                 "polynomial_quadratic_accuracy",
                 &bl.mathematics,
@@ -728,6 +733,11 @@ impl BenchmarkReport {
             (
                 "accuracy_cubic",
                 "polynomial_cubic_accuracy",
+                &bl.mathematics,
+            ),
+            (
+                "root_finding_accuracy",
+                "polynomial_root_finding_accuracy",
                 &bl.mathematics,
             ),
             (
@@ -2362,6 +2372,7 @@ pub fn is_lower_better(metric_key: &str) -> bool {
             | "interference_suppression"
             | "cross_session_leakage"
             | "mean_solution_rank"
+            | "posterior_accuracy"
     )
 }
 

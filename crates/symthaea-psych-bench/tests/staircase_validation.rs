@@ -163,12 +163,13 @@ fn staircase_produces_reversals() {
     let staircase_cfg = StaircaseConfig {
         max_reversals: 4,
         max_steps: 40,
+        start_difficulty: 0.7,
         ..Default::default()
     };
     let result = run_staircase(&bench, &base_config(), &staircase_cfg);
 
-    // With 40 steps and start_difficulty=0.3, the staircase should
-    // encounter at least 1 reversal
+    // With 40 steps and start_difficulty=0.7, the staircase should
+    // encounter at least 1 reversal (starting mid-range avoids ceiling)
     assert!(
         result.n_reversals >= 1,
         "{}: no reversals in {} steps (trajectory: {:?})",

@@ -30,5 +30,6 @@ mod proptest_feedback_consensus;
 // proptest_feedback_loops: references MCE_NARRATIVE/MCE_SOCIAL/RESONANCE_FLOW constants
 // that don't exist in thresholds.rs yet. Uncomment when those constants are added.
 // mod proptest_feedback_loops;
+mod proptest_nan_resilience;
 mod proptest_substrate;
 mod subsystems;

@@ -260,6 +260,14 @@ pub fn validate() {
     assert!(FEP_COMPLEXITY_PENALTY_CAP > 0.0);
     assert!(FEP_SURPRISE_EXPLORE_CAP > 0.0);
     assert!(FEP_SURPRISE_EXPLORE_SCALE > 0.0);
+
+    // 23. Broca quality cadence ordering
+    assert!(
+        BROCA_QUALITY_CADENCE_THRESHOLD < BROCA_QUALITY_HIGH_THRESHOLD,
+        "BROCA_QUALITY_CADENCE_THRESHOLD ({}) must be < BROCA_QUALITY_HIGH_THRESHOLD ({})",
+        BROCA_QUALITY_CADENCE_THRESHOLD,
+        BROCA_QUALITY_HIGH_THRESHOLD
+    );
 }
 
 #[cfg(test)]

@@ -209,12 +209,15 @@ impl BrocaManager {
 
         // Multi-turn context: use generate_continuing() after the first turn
         // to preserve CfC temporal context.
-        // Pass NSM semantic HV through when available (Phase 2).
+        // Pass NSM semantic HV and active primes through when available.
         let result = if self.multi_turn_depth > 0 && self.turn_count > 0 {
             self.generator.generate_continuing(&channels)
-        } else if signals.semantic_hv.is_some() {
-            self.generator
-                .generate_with_semantic(&channels, signals.semantic_hv.as_ref())
+        } else if signals.semantic_hv.is_some() || !signals.detected_primitives.is_empty() {
+            self.generator.generate_with_semantic(
+                &channels,
+                signals.semantic_hv.as_ref(),
+                &signals.detected_primitives,
+            )
         } else {
             self.generator.generate(&channels)
         };
@@ -259,6 +262,7 @@ impl BrocaManager {
             max_repetition,
             nsm_primitive_count: signals.detected_primitives.len(),
             nsm_grounding: signals.primitive_grounding,
+            nsm_prime_coverage: result.nsm_prime_coverage,
             ..Default::default()
         };
 

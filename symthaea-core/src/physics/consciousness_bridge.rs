@@ -188,13 +188,14 @@ impl PhysicsConsciousnessBridge {
         use crate::consciousness_metrics::TruePhiCalculator;
         let calc = TruePhiCalculator::new();
 
-        // Helper to normalize phi to [0, 1] range
+        // Normalize phi per-component to make levels comparable.
+        // Using Φ/n (linear normalization) rather than Φ/(n*(n-1)/2*4.0) (quadratic)
+        // because the quadratic denominator suppresses signal at higher composition levels.
+        // Science: Tononi (2004) — Φ should scale with integration, not be penalized by size.
         let normalize_phi = |components: &[ContinuousHV]| -> f32 {
             let result = calc.compute_true_phi(components);
-            let n = components.len();
-            let max_pairs = if n > 1 { (n * (n - 1)) / 2 } else { 1 };
-            let max_phi = (max_pairs as f64) * 4.0;
-            (result.phi / max_phi).min(1.0) as f32
+            let n = components.len().max(1) as f64;
+            (result.phi / n).min(1.0) as f32
         };
 
         // Level 0: Fundamental particles (quarks and electron)

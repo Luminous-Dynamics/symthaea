@@ -81,6 +81,18 @@ pub struct BrocaConfig {
     /// without overwhelming procedural dynamics.
     #[serde(default = "default_nsm_semantic_alpha")]
     pub nsm_semantic_alpha: f32,
+    /// Enable NSM semantic gate: boost logits for tokens expressing active primes.
+    /// Science: Collins & Loftus (1975) — spreading activation in semantic networks.
+    #[serde(default)]
+    pub enable_nsm_gate: bool,
+    /// Logit boost per active prime for NSM-aligned tokens (0.0–2.0).
+    #[serde(default = "default_nsm_prime_logit_boost")]
+    pub nsm_prime_logit_boost: f32,
+    /// Scale for NSM coverage modulation of veto threshold (0.0–0.5).
+    /// High prime coverage relaxes veto; low coverage tightens it.
+    /// Science: Grice (1975) — cooperative principle.
+    #[serde(default = "default_nsm_coverage_veto_scale")]
+    pub nsm_coverage_veto_scale: f32,
 }
 
 fn default_repetition_penalty() -> f32 {
@@ -93,6 +105,14 @@ fn default_auto_spacing() -> bool {
 
 fn default_nsm_semantic_alpha() -> f32 {
     0.3
+}
+
+fn default_nsm_prime_logit_boost() -> f32 {
+    0.5
+}
+
+fn default_nsm_coverage_veto_scale() -> f32 {
+    0.1
 }
 
 impl Default for BrocaConfig {
@@ -112,6 +132,9 @@ impl Default for BrocaConfig {
             enable_auto_spacing: true,
             enable_nsm_semantic: false,
             nsm_semantic_alpha: default_nsm_semantic_alpha(),
+            enable_nsm_gate: false,
+            nsm_prime_logit_boost: default_nsm_prime_logit_boost(),
+            nsm_coverage_veto_scale: default_nsm_coverage_veto_scale(),
         }
     }
 }
@@ -142,6 +165,8 @@ pub struct GatingTraceEntry {
     /// Lower values mean the system is more tolerant of coherence drift.
     /// Equal to the base veto threshold when coherence feedback is disabled.
     pub confidence_veto_threshold: f32,
+    /// NSM semantic logit boost applied at this position (0.0 when disabled).
+    pub nsm_boost: f32,
 }
 
 /// Result of a single generation.
@@ -168,6 +193,9 @@ pub struct GenerationResult {
     /// Number of consecutive tokens with output-thought similarity < 0.05.
     /// When >= 3, suggests hallucination (output drifted far from thought intent).
     pub hallucination_flag: bool,
+    /// NSM prime coverage: fraction of active primes expressed by generated tokens (0.0–1.0).
+    /// Higher = the text semantically covered the intended meaning.
+    pub nsm_prime_coverage: f32,
     /// Back-projected HDC vectors for each generated token (Liquid-Mamba only).
     #[cfg(feature = "mamba-cpu")]
     pub output_hvs: Vec<symthaea_core::hdc::ContinuousHV>,
@@ -290,8 +318,15 @@ impl BrocaGenerator {
         &mut self,
         channels: &ThoughtChannels,
         semantic_hv: Option<&symthaea_core::hdc::ContinuousHV>,
+        active_primes: &[String],
     ) -> GenerationResult {
-        self.generate_internal_with_semantic(channels, &mut |_| {}, true, semantic_hv)
+        self.generate_internal_with_semantic(
+            channels,
+            &mut |_| {},
+            true,
+            semantic_hv,
+            active_primes,
+        )
     }
 
     /// Generate continuing from the current CfC state (multi-turn context).
@@ -320,7 +355,7 @@ impl BrocaGenerator {
         on_token: &mut dyn FnMut(&str),
         reset_state: bool,
     ) -> GenerationResult {
-        self.generate_internal_with_semantic(channels, on_token, reset_state, None)
+        self.generate_internal_with_semantic(channels, on_token, reset_state, None, &[])
     }
 
     /// Internal generation with configurable state reset and optional NSM semantic HV.
@@ -330,6 +365,7 @@ impl BrocaGenerator {
         on_token: &mut dyn FnMut(&str),
         reset_state: bool,
         semantic_hv: Option<&symthaea_core::hdc::ContinuousHV>,
+        active_primes: &[String],
     ) -> GenerationResult {
         // 1. Encode thought channels once
         let thought_hv_original = self.encoder.encode(channels);
@@ -377,6 +413,18 @@ impl BrocaGenerator {
         if let Some(seed) = self.config.sampling_seed {
             self.sampling_rng = Some(StdRng::seed_from_u64(seed));
         }
+
+        // 4b. Construct NSM gate and tracker if enabled and primes are provided.
+        let nsm_gate = if self.config.enable_nsm_gate && !active_primes.is_empty() {
+            Some(crate::gating::NsmSemanticGate::new(&self.tokenizer))
+        } else {
+            None
+        };
+        let mut nsm_tracker = if nsm_gate.is_some() {
+            Some(crate::gating::NsmCoherenceTracker::new(active_primes))
+        } else {
+            None
+        };
 
         // 5. Autoregressive generation loop
         let mut tokens = Vec::new();
@@ -468,6 +516,19 @@ impl BrocaGenerator {
                 TherapeuticGate::apply_to_logits(&mut logits, channels, &self.tokenizer);
             }
 
+            // NSM semantic gate: boost logits for tokens expressing active primes.
+            // Inserted after epistemic/emotional/therapeutic gates, before coherence feedback.
+            let this_nsm_boost = if let Some(ref gate) = nsm_gate {
+                gate.apply(
+                    &mut logits,
+                    active_primes,
+                    self.config.nsm_prime_logit_boost,
+                );
+                self.config.nsm_prime_logit_boost
+            } else {
+                0.0
+            };
+
             // Coherence feedback: scale thought HV to strengthen binding when coherence drifts
             let mut this_binding_weight = 1.0f32;
             let mut this_veto = false;
@@ -514,7 +575,17 @@ impl BrocaGenerator {
 
                 // Semantic veto: mid-sentence self-correction
                 // Gated by: min position, max vetoes, refractory period
+                // NSM coverage relaxes veto: high prime coverage means semantically on-track
+                // even if cosine coherence is low (different representation spaces).
+                let nsm_veto_relaxed = if let Some(ref tracker) = nsm_tracker {
+                    let coverage = tracker.prime_coverage();
+                    // High coverage relaxes: subtract from veto willingness
+                    coverage > 0.6 // Don't veto if >60% of primes expressed
+                } else {
+                    false
+                };
                 if self.config.enable_semantic_veto
+                    && !nsm_veto_relaxed
                     && self.coherence_feedback.should_veto_with_confidence(
                         channels.response_confidence(),
                         self.config.gating.confidence_veto_scale,
@@ -567,12 +638,18 @@ impl BrocaGenerator {
                 emotional_boost: this_emotional_boost,
                 time_pressure_reduction,
                 confidence_veto_threshold: this_confidence_veto_threshold,
+                nsm_boost: this_nsm_boost,
             });
 
             tokens_since_veto += 1;
 
             // Sample next token
             let next_token = self.sample(&logits);
+
+            // Observe token for NSM prime coverage tracking
+            if let (Some(ref mut tracker), Some(ref gate)) = (&mut nsm_tracker, &nsm_gate) {
+                tracker.observe_token(next_token, gate);
+            }
 
             // Check EOS
             if next_token == self.tokenizer.eos_id {
@@ -627,6 +704,10 @@ impl BrocaGenerator {
             coherence_dynamics,
             gating_trace,
             hallucination_flag,
+            nsm_prime_coverage: nsm_tracker
+                .as_ref()
+                .map(|t| t.prime_coverage())
+                .unwrap_or(0.0),
             #[cfg(feature = "mamba-cpu")]
             output_hvs: Vec::new(),
             #[cfg(feature = "mamba-cpu")]

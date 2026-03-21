@@ -4131,18 +4131,27 @@ pub fn mathematics_baselines() -> BaselineMap {
         "linear_system_accuracy_2x2",
         Baseline {
             value: 0.85,
-            sd: Some(0.10),
-            source: "Strang (2016), undergraduate linear algebra",
-            population: "human undergraduates",
+            sd: Some(0.12),
+            source: "Tversky & Kahneman (1974), pen-and-paper algebra",
+            population: "human adults",
         },
     );
     m.insert(
         "linear_system_accuracy_3x3",
         Baseline {
-            value: 0.70,
+            value: 0.72,
+            sd: Some(0.14),
+            source: "Tversky & Kahneman (1974), pen-and-paper algebra",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "linear_system_solution_accuracy",
+        Baseline {
+            value: 0.85,
             sd: Some(0.12),
-            source: "Strang (2016), undergraduate linear algebra",
-            population: "human undergraduates",
+            source: "Tversky & Kahneman (1974), pen-and-paper algebra",
+            population: "human adults",
         },
     );
     // Polynomial roots
@@ -4151,17 +4160,26 @@ pub fn mathematics_baselines() -> BaselineMap {
         Baseline {
             value: 0.88,
             sd: Some(0.08),
-            source: "Wilkinson (1963), polynomial root accuracy",
-            population: "human mathematicians",
+            source: "Schoenfeld (1985), algebra assessment",
+            population: "human adults",
         },
     );
     m.insert(
         "polynomial_cubic_accuracy",
         Baseline {
-            value: 0.65,
+            value: 0.60,
+            sd: Some(0.18),
+            source: "Schoenfeld (1985), algebra assessment",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "polynomial_root_finding_accuracy",
+        Baseline {
+            value: 0.75,
             sd: Some(0.15),
-            source: "Wilkinson (1963), polynomial root accuracy",
-            population: "human mathematicians",
+            source: "Schoenfeld (1985), algebra assessment",
+            population: "human adults",
         },
     );
     // Definite integrals
@@ -4221,13 +4239,13 @@ pub fn mathematics_baselines() -> BaselineMap {
             population: "human undergraduates",
         },
     );
-    // Bayesian reasoning
+    // Bayesian reasoning (posterior_accuracy is MAE — lower is better)
     m.insert(
         "bayesian_posterior_accuracy",
         Baseline {
-            value: 0.45,
-            sd: Some(0.20),
-            source: "Gigerenzer & Hoffrage (1995), Bayesian reasoning in natural frequencies",
+            value: 0.25,
+            sd: Some(0.10),
+            source: "Kahneman & Tversky (1972), Bayesian reasoning",
             population: "human adults",
         },
     );

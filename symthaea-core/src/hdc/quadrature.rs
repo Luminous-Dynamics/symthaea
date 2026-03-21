@@ -169,7 +169,231 @@ fn gauss_legendre_nodes(n: usize) -> (Vec<f64>, Vec<f64>) {
                 0.066_671_344_308_688,
             ],
         ),
-        _ => gauss_legendre_nodes(5), // Default fallback
+        _ => panic!(
+            "Gauss-Legendre nodes/weights not available for n={n}. Supported: 1,2,3,4,5,7,10"
+        ),
+    }
+}
+
+/// Return pre-computed Gauss-Legendre nodes and weights on `[-1, 1]`.
+///
+/// Supported orders: 1, 2, 3, 4, 5, 7, 10. Panics on unsupported `n`.
+/// This is a public wrapper around the internal `gauss_legendre_nodes` function.
+pub fn gauss_legendre_nodes_weights(n: usize) -> (Vec<f64>, Vec<f64>) {
+    gauss_legendre_nodes(n)
+}
+
+// ─── Free-standing Functions ─────────────────────────────────────────────────
+// Pure numerical routines with no HDC coupling.
+
+/// Lightweight result for the free-standing quadrature functions.
+#[derive(Debug, Clone, Copy)]
+pub struct QuadratureResultBasic {
+    /// Approximate value of the integral.
+    pub value: f64,
+    /// Estimated absolute error (0.0 when no estimate is available).
+    pub error_estimate: f64,
+    /// Number of function evaluations used.
+    pub evaluations: usize,
+}
+
+/// Composite trapezoidal rule for `∫[a,b] f(x) dx` with `n` sub-intervals.
+///
+/// Error is O(h^2) where h = (b-a)/n.
+pub fn trapezoid<F: Fn(f64) -> f64>(f: F, a: f64, b: f64, n: usize) -> QuadratureResultBasic {
+    if n == 0 || (b - a).abs() < f64::EPSILON {
+        return QuadratureResultBasic {
+            value: 0.0,
+            error_estimate: 0.0,
+            evaluations: if n == 0 { 0 } else { 2 },
+        };
+    }
+    let h = (b - a) / n as f64;
+    let mut sum = 0.5 * (f(a) + f(b));
+    for i in 1..n {
+        sum += f(a + i as f64 * h);
+    }
+    QuadratureResultBasic {
+        value: sum * h,
+        error_estimate: 0.0,
+        evaluations: n + 1,
+    }
+}
+
+/// Composite Simpson's 1/3 rule (free-standing).
+///
+/// `n` must be even; it is rounded up if odd. Error is O(h^4).
+pub fn simpson_free<F: Fn(f64) -> f64>(f: F, a: f64, b: f64, n: usize) -> QuadratureResultBasic {
+    let n = if n < 2 {
+        2
+    } else if n % 2 != 0 {
+        n + 1
+    } else {
+        n
+    };
+    if (b - a).abs() < f64::EPSILON {
+        return QuadratureResultBasic {
+            value: 0.0,
+            error_estimate: 0.0,
+            evaluations: 2,
+        };
+    }
+    let h = (b - a) / n as f64;
+    let mut sum = f(a) + f(b);
+    for i in 1..n {
+        let coeff = if i % 2 == 0 { 2.0 } else { 4.0 };
+        sum += coeff * f(a + i as f64 * h);
+    }
+    QuadratureResultBasic {
+        value: sum * h / 3.0,
+        error_estimate: 0.0,
+        evaluations: n + 1,
+    }
+}
+
+/// Gauss-Legendre quadrature on `[a, b]` (free-standing).
+pub fn gauss_legendre_basic<F: Fn(f64) -> f64>(
+    f: F,
+    a: f64,
+    b: f64,
+    n_points: usize,
+) -> QuadratureResultBasic {
+    if (b - a).abs() < f64::EPSILON {
+        return QuadratureResultBasic {
+            value: 0.0,
+            error_estimate: 0.0,
+            evaluations: 0,
+        };
+    }
+    let (nodes, weights) = gauss_legendre_nodes_weights(n_points);
+    let half_len = 0.5 * (b - a);
+    let mid = 0.5 * (a + b);
+    let mut sum = 0.0;
+    for (xi, wi) in nodes.iter().zip(weights.iter()) {
+        sum += wi * f(mid + half_len * xi);
+    }
+    QuadratureResultBasic {
+        value: sum * half_len,
+        error_estimate: 0.0,
+        evaluations: n_points,
+    }
+}
+
+/// Adaptive Simpson's rule (free-standing) with recursive subdivision.
+pub fn adaptive_simpson_basic<F: Fn(f64) -> f64>(
+    f: &F,
+    a: f64,
+    b: f64,
+    tol: f64,
+    max_depth: usize,
+) -> QuadratureResultBasic {
+    let mut evals = 0usize;
+    let value = adaptive_simpson_recurse(f, a, b, tol, max_depth, &mut evals);
+    QuadratureResultBasic {
+        value,
+        error_estimate: tol,
+        evaluations: evals,
+    }
+}
+
+fn adaptive_simpson_recurse<F: Fn(f64) -> f64>(
+    f: &F,
+    a: f64,
+    b: f64,
+    tol: f64,
+    depth: usize,
+    evals: &mut usize,
+) -> f64 {
+    let mid = 0.5 * (a + b);
+    let h_whole = (b - a) / 6.0;
+    let fa = f(a);
+    let fm = f(mid);
+    let fb = f(b);
+    *evals += 3;
+    let whole = h_whole * (fa + 4.0 * fm + fb);
+
+    let lm = 0.5 * (a + mid);
+    let rm = 0.5 * (mid + b);
+    let flm = f(lm);
+    let frm = f(rm);
+    *evals += 2;
+
+    let left = (mid - a) / 6.0 * (fa + 4.0 * flm + fm);
+    let right = (b - mid) / 6.0 * (fm + 4.0 * frm + fb);
+    let refined = left + right;
+    let err = (refined - whole) / 15.0;
+
+    if depth == 0 || err.abs() < tol {
+        refined + err
+    } else {
+        adaptive_simpson_recurse(f, a, mid, tol * 0.5, depth - 1, evals)
+            + adaptive_simpson_recurse(f, mid, b, tol * 0.5, depth - 1, evals)
+    }
+}
+
+/// Romberg integration (Richardson extrapolation on the trapezoid rule).
+///
+/// Builds a triangular table up to `max_order` rows. Stops early if the
+/// difference between successive diagonal entries is below `tol`.
+pub fn romberg<F: Fn(f64) -> f64>(
+    f: F,
+    a: f64,
+    b: f64,
+    max_order: usize,
+    tol: f64,
+) -> QuadratureResultBasic {
+    if (b - a).abs() < f64::EPSILON {
+        return QuadratureResultBasic {
+            value: 0.0,
+            error_estimate: 0.0,
+            evaluations: 0,
+        };
+    }
+    let max_order = max_order.max(1);
+    let mut r = vec![vec![0.0f64; max_order]; max_order];
+    let mut total_evals = 2usize;
+
+    // R[0][0] = single-interval trapezoid
+    r[0][0] = 0.5 * (b - a) * (f(a) + f(b));
+
+    for i in 1..max_order {
+        let n = 1usize << i; // 2^i sub-intervals
+        let h = (b - a) / n as f64;
+
+        // Add new midpoints
+        let mut new_sum = 0.0;
+        for k in 0..(1usize << (i - 1)) {
+            new_sum += f(a + (2 * k + 1) as f64 * h);
+        }
+        total_evals += 1usize << (i - 1);
+        r[i][0] = 0.5 * r[i - 1][0] + h * new_sum;
+
+        // Richardson extrapolation
+        for j in 1..=i {
+            let factor = 4.0_f64.powi(j as i32);
+            r[i][j] = (factor * r[i][j - 1] - r[i - 1][j - 1]) / (factor - 1.0);
+        }
+
+        let err = (r[i][i] - r[i - 1][i - 1]).abs();
+        if err < tol {
+            return QuadratureResultBasic {
+                value: r[i][i],
+                error_estimate: err,
+                evaluations: total_evals,
+            };
+        }
+    }
+
+    let last = max_order - 1;
+    let err = if max_order >= 2 {
+        (r[last][last] - r[last - 1][last - 1]).abs()
+    } else {
+        0.0
+    };
+    QuadratureResultBasic {
+        value: r[last][last],
+        error_estimate: err,
+        evaluations: total_evals,
     }
 }
 
@@ -597,5 +821,185 @@ mod tests {
         let result = QuadratureEngine::integrate(&|x| x.exp(), 0.0, 1.0);
         let expected = std::f64::consts::E - 1.0;
         assert!((result.value - expected).abs() < 1e-8);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Phase 1c: Free-standing function tests
+    // ══════════════════════════════════════════════════════════════════════
+
+    use std::f64::consts::{E, PI};
+
+    // ── Known integrals ───────────────────────────────────────────────────
+
+    #[test]
+    fn trapezoid_x_squared() {
+        let r = trapezoid(|x| x * x, 0.0, 1.0, 1000);
+        assert!((r.value - 1.0 / 3.0).abs() < 1e-6, "got {}", r.value);
+        assert_eq!(r.evaluations, 1001);
+    }
+
+    #[test]
+    fn simpson_free_x_squared_exact() {
+        let r = simpson_free(|x| x * x, 0.0, 1.0, 2);
+        assert!((r.value - 1.0 / 3.0).abs() < 1e-14, "got {}", r.value);
+    }
+
+    #[test]
+    fn simpson_free_sin_integral() {
+        let r = simpson_free(|x| x.sin(), 0.0, PI, 100);
+        assert!((r.value - 2.0).abs() < 1e-10, "got {}", r.value);
+    }
+
+    #[test]
+    fn trapezoid_exp_integral() {
+        let expected = E - 1.0;
+        let r = trapezoid(|x| x.exp(), 0.0, 1.0, 10_000);
+        assert!((r.value - expected).abs() < 1e-7, "got {}", r.value);
+    }
+
+    #[test]
+    fn gauss_legendre_basic_exp_integral() {
+        let expected = E - 1.0;
+        let r = gauss_legendre_basic(|x| x.exp(), 0.0, 1.0, 10);
+        assert!((r.value - expected).abs() < 1e-12, "got {}", r.value);
+        assert_eq!(r.evaluations, 10);
+    }
+
+    // ── Gaussian integral ─────────────────────────────────────────────────
+
+    #[test]
+    fn gaussian_integral_test() {
+        let expected = PI.sqrt() * 0.9999779095030014;
+        let r = gauss_legendre_basic(|x| (-x * x).exp(), -3.0, 3.0, 10);
+        assert!((r.value - expected).abs() < 1e-8, "got {}", r.value);
+    }
+
+    // ── Polynomial exactness of Gauss-Legendre ────────────────────────────
+
+    #[test]
+    fn gauss_legendre_exact_degree_2n_minus_1() {
+        // n=3 integrates degree 5 exactly
+        let r = gauss_legendre_basic(|x| x.powi(5), -1.0, 1.0, 3);
+        assert!(r.value.abs() < 1e-14, "x^5 got {}", r.value);
+
+        let expected = 2.0 / 5.0 - 2.0 / 3.0 + 4.0;
+        let r = gauss_legendre_basic(|x| x.powi(4) + x.powi(3) - x * x + 2.0, -1.0, 1.0, 3);
+        assert!((r.value - expected).abs() < 1e-13, "poly got {}", r.value);
+    }
+
+    #[test]
+    fn gauss_legendre_n2_exact_cubic() {
+        let r = gauss_legendre_basic(|x| x.powi(3), -1.0, 1.0, 2);
+        assert!(r.value.abs() < 1e-14, "x^3 got {}", r.value);
+
+        let r = gauss_legendre_basic(|x| x * x, -1.0, 1.0, 2);
+        assert!((r.value - 2.0 / 3.0).abs() < 1e-14, "x^2 got {}", r.value);
+    }
+
+    // ── Adaptive Simpson (free-standing) ──────────────────────────────────
+
+    #[test]
+    fn adaptive_basic_sin() {
+        let r = adaptive_simpson_basic(&|x: f64| x.sin(), 0.0, PI, 1e-12, 20);
+        assert!((r.value - 2.0).abs() < 1e-12, "got {}", r.value);
+    }
+
+    #[test]
+    fn adaptive_tighter_tolerance_more_accurate() {
+        let loose = adaptive_simpson_basic(&|x: f64| x.sin(), 0.0, PI, 1e-4, 20);
+        let tight = adaptive_simpson_basic(&|x: f64| x.sin(), 0.0, PI, 1e-12, 20);
+        let exact = 2.0;
+        assert!((tight.value - exact).abs() <= (loose.value - exact).abs() + 1e-15);
+        assert!(tight.evaluations >= loose.evaluations);
+    }
+
+    // ── Romberg ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn romberg_sin_test() {
+        let r = romberg(|x| x.sin(), 0.0, PI, 10, 1e-12);
+        assert!(
+            (r.value - 2.0).abs() < 1e-12,
+            "got {} err {}",
+            r.value,
+            r.error_estimate
+        );
+    }
+
+    #[test]
+    fn romberg_exp_test() {
+        let expected = E - 1.0;
+        let r = romberg(|x| x.exp(), 0.0, 1.0, 10, 1e-12);
+        assert!((r.value - expected).abs() < 1e-12, "got {}", r.value);
+    }
+
+    #[test]
+    fn romberg_polynomial_test() {
+        let r = romberg(|x| 3.0 * x.powi(3) - x + 1.0, 0.0, 2.0, 8, 1e-14);
+        assert!((r.value - 12.0).abs() < 1e-12, "got {}", r.value);
+    }
+
+    // ── Method comparison ─────────────────────────────────────────────────
+
+    #[test]
+    fn higher_order_needs_fewer_points() {
+        let exact = 2.0;
+        let target_err = 1e-6;
+
+        let t = trapezoid(|x| x.sin(), 0.0, PI, 2000);
+        assert!((t.value - exact).abs() < target_err);
+
+        let s = simpson_free(|x| x.sin(), 0.0, PI, 20);
+        assert!((s.value - exact).abs() < target_err);
+
+        let g = gauss_legendre_basic(|x| x.sin(), 0.0, PI, 7);
+        assert!((g.value - exact).abs() < target_err);
+
+        assert!(g.evaluations < s.evaluations);
+        assert!(s.evaluations < t.evaluations);
+    }
+
+    // ── Edge cases ────────────────────────────────────────────────────────
+
+    #[test]
+    fn zero_width_interval_all_methods() {
+        assert_eq!(trapezoid(|x| x.sin(), 1.0, 1.0, 100).value, 0.0);
+        assert_eq!(simpson_free(|x| x.sin(), 1.0, 1.0, 100).value, 0.0);
+        assert_eq!(gauss_legendre_basic(|x| x.sin(), 1.0, 1.0, 5).value, 0.0);
+        assert_eq!(romberg(|x| x.sin(), 1.0, 1.0, 5, 1e-10).value, 0.0);
+    }
+
+    #[test]
+    fn constant_function_all_methods() {
+        let c = 7.0;
+        let (a, b) = (-2.0, 5.0);
+        let expected = c * (b - a);
+
+        assert!((trapezoid(|_| c, a, b, 1).value - expected).abs() < 1e-10);
+        assert!((simpson_free(|_| c, a, b, 2).value - expected).abs() < 1e-10);
+        assert!((gauss_legendre_basic(|_| c, a, b, 2).value - expected).abs() < 1e-10);
+        assert!((romberg(|_| c, a, b, 3, 1e-10).value - expected).abs() < 1e-10);
+    }
+
+    #[test]
+    fn simpson_free_rounds_n_to_even() {
+        let r = simpson_free(|x| x * x, 0.0, 1.0, 3);
+        assert!((r.value - 1.0 / 3.0).abs() < 1e-14, "got {}", r.value);
+        assert_eq!(r.evaluations, 5);
+    }
+
+    #[test]
+    fn gauss_legendre_weights_sum_to_two() {
+        for n in [1, 2, 3, 4, 5, 7, 10] {
+            let (_, weights) = gauss_legendre_nodes_weights(n);
+            let sum: f64 = weights.iter().sum();
+            assert!((sum - 2.0).abs() < 1e-14, "n={n} weight sum={sum}");
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "not available for n=6")]
+    fn gauss_legendre_unsupported_n_panics() {
+        gauss_legendre_nodes_weights(6);
     }
 }

@@ -15472,6 +15472,8 @@ name = "symthaea-fabrication-kernel"
 version = "0.5.0"
 dependencies = [
  "anyhow",
+ "criterion",
+ "proptest",
  "rand 0.8.5",
  "serde",
  "serde_json",

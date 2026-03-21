@@ -1212,20 +1212,7 @@ impl CognitiveLoopService {
             }
         }
 
-        // ── Vision surprise → exploration urgency ────────────────────────
-        // Friston (2010): free energy (surprise) is the fundamental drive for active inference.
-        #[cfg(feature = "vision-manifold")]
-        {
-            use super::thresholds::{
-                VISION_SURPRISE_EXPLORATION_SCALE, VISION_SURPRISE_EXPLORATION_THRESHOLD,
-            };
-            let mean_surp = perception.vision_mean_surprise;
-            if mean_surp > VISION_SURPRISE_EXPLORATION_THRESHOLD {
-                let boost = (mean_surp - VISION_SURPRISE_EXPLORATION_THRESHOLD)
-                    * VISION_SURPRISE_EXPLORATION_SCALE;
-                self.adjust_exploration_pri("vision_surprise", boost, Priority::Homeostatic);
-            }
-        }
+        // ── Vision surprise → exploration: delegated to VisionManager (interval 17) ──
 
         // ═══════════════════════════════════════════════════════════════════════
         // 1a–1a.2: Memory recall, resonator, binding, goals
@@ -4224,16 +4211,31 @@ impl CognitiveLoopService {
         };
         #[cfg(not(feature = "glyph_codex"))]
         let glyph_spacing_boost: usize = 0;
+        // Quality EMA → cadence: widen spacing when generation quality is poor.
+        // Science: Levelt (1989) — speech production monitoring adjusts output rate.
+        #[cfg(feature = "ssm_language")]
+        let quality_spacing_boost: usize = {
+            let qe = self.language_manager.quality_ema();
+            if qe < super::thresholds::BROCA_QUALITY_CADENCE_THRESHOLD {
+                2
+            } else {
+                0
+            }
+        };
+        #[cfg(not(feature = "ssm_language"))]
+        let quality_spacing_boost: usize = 0;
         let broca_min_spacing = if self.stats.tom_prediction_mismatch_ema > 0.5 {
             5 + fatigue_spacing_boost
                 + governance_spacing_boost
                 + cantor_spacing_boost
                 + glyph_spacing_boost
+                + quality_spacing_boost
         } else {
             7 + fatigue_spacing_boost
                 + governance_spacing_boost
                 + cantor_spacing_boost
                 + glyph_spacing_boost
+                + quality_spacing_boost
         };
         let broca_should_generate =
             broca_psi > 0.4 && broca_novelty && self.stats.total_cycles % broca_min_spacing != 0;
@@ -4373,12 +4375,11 @@ impl CognitiveLoopService {
                     + result.long_coherence * BROCA_QUALITY_LONG_COHERENCE_WEIGHT;
                 let broca_quality = broca_quality.clamp(0.0, 1.0);
 
-                self.stats.broca_quality_ema = if self.stats.broca_generation_count == 0 {
-                    broca_quality
-                } else {
-                    self.stats.broca_quality_ema * BROCA_QUALITY_EMA_MOMENTUM
-                        + broca_quality * BROCA_QUALITY_EMA_ALPHA
-                };
+                // EMA computed by LanguageManager; bridge to stats for backward compat.
+                #[cfg(feature = "ssm_language")]
+                {
+                    self.stats.broca_quality_ema = self.language_manager.quality_ema();
+                }
                 self.stats.broca_generation_count += 1;
 
                 if broca_quality < BROCA_LOW_QUALITY_THRESHOLD {
@@ -4392,7 +4393,7 @@ impl CognitiveLoopService {
                     broca.consciousness_threshold = (broca.consciousness_threshold
                         + BROCA_CONSCIOUSNESS_THRESHOLD_INCREASE)
                         .min(BROCA_CONSCIOUSNESS_THRESHOLD_MAX);
-                } else if self.stats.broca_quality_ema > BROCA_QUALITY_HIGH_THRESHOLD
+                } else if self.language_manager.quality_ema() > BROCA_QUALITY_HIGH_THRESHOLD
                     && broca.consciousness_threshold > BROCA_CONSCIOUSNESS_THRESHOLD_MIN
                 {
                     broca.consciousness_threshold = (broca.consciousness_threshold
@@ -4426,27 +4427,8 @@ impl CognitiveLoopService {
         if let Some((final_coherence, broca_quality, veto_triggered, deferred_sem_pe)) =
             broca_feedback
         {
-            if final_coherence > super::thresholds::BROCA_COHERENT_THRESHOLD {
-                self.adjust_confidence_pri(
-                    "broca_coherent",
-                    (final_coherence - super::thresholds::BROCA_COHERENT_THRESHOLD)
-                        * super::thresholds::BROCA_COHERENT_CONFIDENCE_SCALE,
-                    Priority::Aesthetic,
-                );
-            } else if final_coherence < BROCA_INCOHERENT_THRESHOLD {
-                self.scale_confidence_pri(
-                    "broca_incoherent",
-                    1.0 - (BROCA_INCOHERENT_THRESHOLD - final_coherence)
-                        * BROCA_INCOHERENT_DAMPEN_RATE,
-                    Priority::Aesthetic,
-                );
-            }
-
-            if broca_quality > BROCA_QUALITY_LR_THRESHOLD {
-                let lr_boost =
-                    1.0 + (broca_quality - BROCA_QUALITY_LR_THRESHOLD) * BROCA_QUALITY_LR_SCALE;
-                self.scale_lr_pri("broca_quality", lr_boost, Priority::Aesthetic);
-            }
+            // ── Coherence → confidence: delegated to LanguageManager (confidence_delta) ──
+            // ── Quality → LR boost: delegated to LanguageManager (lr_modulation) ──
 
             if veto_triggered {
                 self.scale_exploration_pri(
@@ -4502,8 +4484,9 @@ impl CognitiveLoopService {
         }
 
         // Broca quality → attention budget (Levelt 1989 — monitoring loop)
-        if self.stats.broca_quality_ema > 0.7 {
-            let contraction = 1.0 - (self.stats.broca_quality_ema - 0.7) * 0.15;
+        let broca_qe = self.language_manager.quality_ema();
+        if broca_qe > 0.7 {
+            let contraction = 1.0 - (broca_qe - 0.7) * 0.15;
             self.scale_confidence_pri("broca_attention_contract", contraction, Priority::Aesthetic);
         }
     }

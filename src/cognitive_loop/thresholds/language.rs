@@ -75,6 +75,10 @@ pub const BROCA_QUALITY_LR_THRESHOLD: f32 = 0.6;
 /// Broca quality LR boost scale.
 pub const BROCA_QUALITY_LR_SCALE: f32 = 0.1;
 
+/// Quality EMA threshold below which Broca cadence widens by 2 cycles.
+/// Science: Levelt (1989) — speech production monitoring adjusts output rate.
+pub const BROCA_QUALITY_CADENCE_THRESHOLD: f32 = 0.4;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // HOMEOSTASIS VELOCITY / VALENCE
 // Science: Cannon (1929) — homeostatic regulation; Sokolov (1963) — habituation.
