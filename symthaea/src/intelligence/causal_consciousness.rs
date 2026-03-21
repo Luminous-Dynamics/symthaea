@@ -1033,7 +1033,11 @@ impl ThresholdTuner {
             nonlin_threshold: nonlin_t,
             corr_threshold: corr_t,
             kurtosis_threshold: kurt_t,
-            accuracy: correct as f64 / data.len() as f64,
+            accuracy: if data.is_empty() {
+                0.0
+            } else {
+                correct as f64 / data.len() as f64
+            },
             n_correct: correct,
             n_total: data.len(),
         }
@@ -1298,7 +1302,11 @@ impl RandomThresholdSearch {
             nonlin_threshold: nonlin_t,
             corr_threshold: corr_t,
             kurtosis_threshold: kurt_t,
-            accuracy: correct as f64 / data.len() as f64,
+            accuracy: if data.is_empty() {
+                0.0
+            } else {
+                correct as f64 / data.len() as f64
+            },
             n_correct: correct,
             n_total: data.len(),
         }
