@@ -2055,6 +2055,11 @@ pub struct BrocaGenerationTelemetry {
     /// mapped to recognized NSM semantic primes. Higher = better semantic decomposition.
     #[serde(default)]
     pub nsm_grounding: f32,
+    /// NSM prime coverage: fraction of active primes expressed by generated tokens (0.0–1.0).
+    /// Higher = the generated text semantically covered the intended meaning.
+    /// Science: Grice (1975) — cooperative principle; semantic coverage = communicative success.
+    #[serde(default)]
+    pub nsm_prime_coverage: f32,
 }
 
 /// Memory-resonator subsystem telemetry: dreams, codebook, replay.

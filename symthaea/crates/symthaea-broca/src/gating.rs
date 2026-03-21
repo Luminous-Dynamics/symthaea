@@ -2571,6 +2571,76 @@ const NSM_WORD_PRIMES: &[(&str, &[&str])] = &[
     ("die", &["DIE"]),
     ("alive", &["LIVE"]),
     ("dead", &["DIE"]),
+    ("died", &["DIE"]),
+    // — Additional entries synced from LexicalGrounding —
+    // Pronouns
+    ("me", &["I"]),
+    ("my", &["I"]),
+    ("your", &["YOU"]),
+    ("somebody", &["SOMEONE"]),
+    // Emotion composites (richer decompositions)
+    ("joy", &["FEEL", "GOOD"]),
+    ("joyful", &["FEEL", "GOOD"]),
+    ("grief", &["FEEL", "BAD", "DIE"]),
+    ("calm", &["FEEL", "GOOD"]),
+    ("peaceful", &["FEEL", "GOOD"]),
+    ("anxious", &["FEEL", "BAD", "MAYBE"]),
+    ("worried", &["THINK", "BAD", "MAYBE"]),
+    ("excited", &["FEEL", "GOOD"]),
+    ("surprised", &["FEEL", "KNOW"]),
+    ("fear", &["FEEL", "BAD", "MAYBE"]),
+    // Mental verbs
+    ("believe", &["THINK", "TRUE"]),
+    ("need", &["WANT"]),
+    ("understand", &["KNOW", "THINK"]),
+    ("remember", &["KNOW", "BEFORE"]),
+    ("forget", &["KNOW", "NOT"]),
+    // Action verbs
+    ("go", &["MOVE"]),
+    ("come", &["MOVE"]),
+    ("leave", &["MOVE", "FAR"]),
+    ("left", &["MOVE", "FAR", "BEFORE"]),
+    ("stay", &["MOVE", "NOT"]),
+    ("give", &["DO"]),
+    ("take", &["DO"]),
+    ("make", &["DO"]),
+    ("put", &["DO", "MOVE"]),
+    ("get", &["HAVE"]),
+    // Evaluators
+    ("great", &["GOOD", "VERY"]),
+    ("wonderful", &["GOOD", "VERY"]),
+    ("terrible", &["BAD", "VERY"]),
+    ("false", &["TRUE", "NOT"]),
+    // Descriptors
+    ("big", &["BIG"]),
+    ("small", &["SMALL"]),
+    ("this", &["THIS"]),
+    ("same", &["SAME"]),
+    ("other", &["OTHER"]),
+    // Logical
+    ("no", &["NOT"]),
+    ("cannot", &["CAN", "NOT"]),
+    // Relational
+    ("friend", &["SOMEONE", "GOOD", "WANT"]),
+    ("enemy", &["SOMEONE", "BAD"]),
+    ("family", &["PEOPLE", "LIKE"]),
+    ("child", &["SOMEONE", "SMALL"]),
+    // Spatial
+    ("where", &["WHERE"]),
+    ("there", &["FAR"]),
+    ("on", &["ON"]),
+    // Temporal
+    ("when", &["WHEN"]),
+    ("long", &["LONG_TIME"]),
+    ("short", &["SHORT_TIME"]),
+    // Quantifiers
+    ("one", &["ONE"]),
+    ("two", &["TWO"]),
+    // Intensifiers
+    ("really", &["VERY"]),
+    ("less", &["MORE", "NOT"]),
+    // Social
+    ("with", &["WITH"]),
 ];
 
 impl NsmSemanticGate {
