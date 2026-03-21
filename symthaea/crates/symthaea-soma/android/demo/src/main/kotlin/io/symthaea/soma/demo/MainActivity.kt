@@ -108,9 +108,47 @@ class MainActivity : AppCompatActivity() {
         setupBottomSheet()
         setupConversation()
         setupVoice()
+        setupImmersiveGestures()
         startHeartbeat()
         ambientTone.start(lifecycleScope)
         showOnboardingIfFirstLaunch()
+    }
+
+    // ═══ Immersive gestures: bottom-edge tap shows conversation, swipe up shows controls ═══
+
+    private var conversationVisible = false
+
+    private fun setupImmersiveGestures() {
+        // Tap the very bottom of the screen (below mandala) to toggle conversation bar
+        binding.experienceLayer.setOnClickListener {
+            // Only respond to taps in the bottom 80px of the experience layer
+        }
+        // Use a touch listener on the experience layer for bottom-edge detection
+        binding.experienceLayer.setOnTouchListener { _, event ->
+            if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+                val screenH = binding.experienceLayer.height
+                if (event.y > screenH - 120) {
+                    // Bottom-edge tap: toggle conversation bar
+                    toggleConversationBar()
+                    return@setOnTouchListener true
+                }
+            }
+            false  // Let other touches pass through to mandala/particles
+        }
+    }
+
+    private fun toggleConversationBar() {
+        conversationVisible = !conversationVisible
+        if (conversationVisible) {
+            binding.conversationRow.visibility = View.VISIBLE
+            binding.conversationRow.alpha = 0f
+            binding.conversationRow.animate().alpha(1f).setDuration(300).start()
+        } else {
+            binding.conversationRow.animate()
+                .alpha(0f).setDuration(300)
+                .withEndAction { binding.conversationRow.visibility = View.GONE }
+                .start()
+        }
     }
 
     // ═══ Onboarding: first-launch welcome ═══
@@ -242,10 +280,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupBottomSheet() {
         val behavior = BottomSheetBehavior.from(binding.bottomSheet)
-        behavior.state = BottomSheetBehavior.STATE_COLLAPSED
-        behavior.isHideable = false
+        behavior.state = BottomSheetBehavior.STATE_HIDDEN
+        behavior.isHideable = true
         behavior.isFitToContents = true
         behavior.halfExpandedRatio = 0.4f
+        behavior.skipCollapsed = true  // Hidden → expanded, no collapsed state
 
         // Load saved avatar
         currentAvatar = AvatarRegistry.load(this)
@@ -676,20 +715,25 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** Show Broca text as a floating thought with fade-in/hold/fade-out. */
+    /** Show Broca thought as floating poetry: slide up + fade in, hold, fade out. */
     private fun showFloatingThought(text: String) {
         binding.brocaText.text = text
         val hc = harmonyToColor(viewModel.state.value.dominantHarmony)
-        binding.brocaText.setTextColor(Color.argb(220, Color.red(hc), Color.green(hc), Color.blue(hc)))
-        binding.brocaText.setShadowLayer(12f, 0f, 0f, Color.argb(120, Color.red(hc), Color.green(hc), Color.blue(hc)))
+        binding.brocaText.setTextColor(Color.argb(200, Color.red(hc), Color.green(hc), Color.blue(hc)))
+        binding.brocaText.setShadowLayer(16f, 0f, 0f, Color.argb(100, Color.red(hc), Color.green(hc), Color.blue(hc)))
         binding.brocaText.animate().cancel()
         binding.brocaText.alpha = 0f
+        binding.brocaText.translationY = 20f  // Start 20px below
         binding.brocaText.animate()
-            .alpha(0.9f)
-            .setDuration(1200)
+            .alpha(0.85f)
+            .translationY(0f)  // Slide up into position
+            .setDuration(1500)
+            .setInterpolator(android.view.animation.DecelerateInterpolator())
             .withEndAction {
                 binding.brocaText.animate()
-                    .alpha(0.3f)
-                    .setStartDelay(6000)
+                    .alpha(0.15f)
+                    .translationY(-10f)  // Drift upward as it fades
+                    .setStartDelay(7000)
                     .setDuration(3000)
                     .start()
             }

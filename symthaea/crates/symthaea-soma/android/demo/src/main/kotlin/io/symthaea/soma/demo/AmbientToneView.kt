@@ -110,7 +110,8 @@ class AmbientTone {
                     }
 
                     val harmonyMix = cl * 0.15 * harmonyShift
-                    val volume = if (sleeping) 0.015 else (0.02 + cl * 0.06).coerceIn(0.0, 0.08)
+                    // Volume audible on phone speakers (headphones recommended for binaural)
+                    val volume = if (sleeping) 0.04 else (0.08 + cl * 0.17).coerceIn(0.05, 0.25)
                     val tremoloFreq = if (sleeping) 0.125 else 0.25 + cl * 0.25  // Slower when sleeping (8s period)
 
                     // Harmonic volumes
