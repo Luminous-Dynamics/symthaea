@@ -60,6 +60,9 @@ pub const BROCA_CONSCIOUSNESS_THRESHOLD_DECREASE: f32 = 0.02;
 /// Minimum consciousness threshold for Broca generation.
 pub const BROCA_CONSCIOUSNESS_THRESHOLD_MIN: f32 = 0.1;
 
+/// Broca quality EMA threshold below which cadence widens (generation slows).
+pub const BROCA_QUALITY_CADENCE_THRESHOLD: f32 = 0.4;
+
 /// Broca quality EMA threshold above which threshold can decrease.
 pub const BROCA_QUALITY_HIGH_THRESHOLD: f32 = 0.7;
 
