@@ -210,9 +210,7 @@ impl HardwareConfig {
                 let key = self.printer.api_key.as_deref().unwrap_or("");
                 Box::new(OctoPrintClient::new(url.as_str(), key))
             }
-            PrinterBackend::Moonraker { url } => {
-                Box::new(MoonrakerClient::new(url.as_str()))
-            }
+            PrinterBackend::Moonraker { url } => Box::new(MoonrakerClient::new(url.as_str())),
             PrinterBackend::Custom { url } => {
                 // Custom backends fall back to OctoPrint protocol for now.
                 let key = self.printer.api_key.as_deref().unwrap_or("");
