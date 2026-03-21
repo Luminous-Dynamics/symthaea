@@ -204,22 +204,6 @@ pub struct GatingConfig {
     #[serde(default = "default_confidence_veto_scale")]
     pub confidence_veto_scale: f32,
 
-    /// Enable temperature-based epistemic gating (default: true).
-    /// Temperature mode divides ALL logits by an epistemic-dependent factor,
-    /// producing a flatter distribution while applying mild additive adjustments.
-    /// Legacy mode uses strong additive penalties (collapses vocab to ~25 words).
-    #[serde(default = "default_epistemic_temperature_mode")]
-    pub epistemic_temperature_mode: bool,
-    /// Temperature divisor for Uncertain epistemic level (default 1.3).
-    #[serde(default = "default_uncertain_temperature")]
-    pub uncertain_temperature: f32,
-    /// Temperature divisor for Unknown epistemic level (default 1.5).
-    #[serde(default = "default_unknown_temperature")]
-    pub unknown_temperature: f32,
-    /// Temperature divisor for OOD epistemic level (default 1.8).
-    #[serde(default = "default_ood_temperature")]
-    pub ood_temperature: f32,
-
     // ── Per-backend overrides ──
     /// Optional per-backend gating scale factors for Liquid-Mamba path.
     /// When set, Mamba gating multiplies the base penalties/boosts by these factors.
@@ -255,7 +239,26 @@ pub struct GatingConfig {
     #[serde(default)]
     pub enable_spectral_gating: bool,
     /// Minimum spectral quality threshold (0.0-1.0). Default 0.1.
+    #[serde(default = "default_spectral_quality_threshold")]
     pub spectral_quality_threshold: f32,
+
+    // ── Temperature-based epistemic gating (Round 2) ──
+
+    /// Enable temperature-based epistemic gating (default: true).
+    /// Temperature mode divides ALL logits by an epistemic-dependent factor,
+    /// producing a flatter distribution while applying mild additive adjustments.
+    /// Legacy mode uses strong additive penalties (collapses vocab to ~25 words).
+    #[serde(default = "default_epistemic_temperature_mode")]
+    pub epistemic_temperature_mode: bool,
+    /// Temperature divisor for Uncertain epistemic level (default 1.3).
+    #[serde(default = "default_uncertain_temperature")]
+    pub uncertain_temperature: f32,
+    /// Temperature divisor for Unknown epistemic level (default 1.5).
+    #[serde(default = "default_unknown_temperature")]
+    pub unknown_temperature: f32,
+    /// Temperature divisor for OOD epistemic level (default 1.8).
+    #[serde(default = "default_ood_temperature")]
+    pub ood_temperature: f32,
 }
 
 impl Default for GatingConfig {
@@ -296,7 +299,8 @@ impl Default for GatingConfig {
             unknown_temperature: 1.5,
             ood_temperature: 1.8,
             mamba_gating_overrides: None,
-            enable_algebraic_correction: false,
+            // Benchmark-validated (Mar 20): +0.071 coherence, zero perplexity cost.
+            enable_algebraic_correction: true,
             algebraic_correction_strength: 0.3,
             enable_soft_veto: false,
             veto_rewind_alpha: 0.5,
@@ -416,6 +420,10 @@ fn default_unknown_temperature() -> f32 {
 
 fn default_ood_temperature() -> f32 {
     1.8
+}
+
+fn default_spectral_quality_threshold() -> f32 {
+    0.1
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

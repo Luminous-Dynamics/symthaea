@@ -142,9 +142,11 @@ impl Default for LanguageControllerConfig {
             backbone_tau: default_backbone_tau(),
             gradient_attenuation: default_gradient_attenuation(),
             parallel_threshold: default_parallel_threshold(),
-            enable_compositional_logits: false,
+            // Benchmark-validated (Mar 20): -1.83 perplexity solo, -3.98 in combo.
+            enable_compositional_logits: true,
             compositional_alpha: default_compositional_alpha(),
-            adaptive_compositional_alpha: false,
+            // Benchmark-validated (Mar 21, release): +0.075 coherence, zero ppl cost.
+            adaptive_compositional_alpha: true,
             enable_adaptive_dt: false,
             dt_min: default_dt_min(),
             dt_max: default_dt_max(),
@@ -179,6 +181,8 @@ pub struct LanguageController {
     token_embeddings: Vec<ContinuousHV>,
     /// Position base vector — permute(base, pos) for positional encoding.
     position_base: ContinuousHV,
+    /// Orthogonal position vectors (Gram-Schmidt). Used when enable_orthogonal_positions.
+    orthogonal_positions: Option<Vec<ContinuousHV>>,
     /// Current learning rate.
     learning_rate: f32,
     /// Configuration.
@@ -186,8 +190,11 @@ pub struct LanguageController {
     /// Current sequence position (reset between generations).
     current_pos: usize,
     /// Coherence feedback from the generator (Phase 3: adaptive dt).
-    /// Updated each step via `set_coherence_feedback()`.
     coherence_for_dt: f32,
+    /// Last effective dt used in forward_step_with_dt (for BPTT consistency).
+    last_effective_dt: f32,
+    /// Cached refined output HV from last forward_step (for coherence measurement).
+    last_logit_hv: Option<ContinuousHV>,
 }
 
 impl LanguageController {
@@ -224,14 +231,26 @@ impl LanguageController {
         let position_base =
             ContinuousHV::from_genesis(genesis, "broca::position_base", HDC_DIMENSION);
 
+        let orthogonal_positions = if config.enable_orthogonal_positions {
+            let count = config.orthogonal_position_count.max(1);
+            use rand::RngCore;
+            let seed: u64 = genesis.domain("broca::orthogonal_positions").next_u64();
+            Some(ContinuousHV::orthogonal_set(HDC_DIMENSION, count, seed))
+        } else {
+            None
+        };
+
         Self {
             network,
             token_embeddings,
             position_base,
+            orthogonal_positions,
             learning_rate: config.learning_rate,
             config: config.clone(),
             current_pos: 0,
             coherence_for_dt: 1.0,
+            last_effective_dt: config.dt_per_token,
+            last_logit_hv: None,
         }
     }
 
@@ -384,6 +403,21 @@ impl LanguageController {
         self.network.reset();
         self.current_pos = 0;
         self.coherence_for_dt = 1.0;
+        self.last_effective_dt = self.config.dt_per_token;
+        self.last_logit_hv = None;
+    }
+
+    /// Get the effective dt used in the last forward_step (for BPTT consistency).
+    pub fn last_effective_dt(&self) -> f32 {
+        self.last_effective_dt
+    }
+
+    /// Get the refined output HV from the last forward step.
+    /// When compositional logits are enabled, returns the thought-conditioned output.
+    pub fn refined_output_hv(&self) -> ContinuousHV {
+        self.last_logit_hv
+            .clone()
+            .unwrap_or_else(|| self.network.output().normalize())
     }
 
     /// Set coherence feedback for adaptive dt (Phase 3).
@@ -485,9 +519,13 @@ impl LanguageController {
         pos: usize,
         active_indices: &[usize],
     ) -> Vec<f32> {
-        // 1. Compose input (same as forward_step)
+        // 1. Compose input (consistent with forward_step_with_dt)
         let token_emb = self.get_token_embedding(prev_token_id);
-        let pos_emb = self.position_base.permute(pos);
+        let pos_emb = if let Some(ref positions) = self.orthogonal_positions {
+            positions[pos % positions.len()].clone()
+        } else {
+            self.position_base.permute(pos)
+        };
         let input_hv = thought_hv.bind(&token_emb).bind(&pos_emb);
 
         let dt = if self.config.dt_per_token.is_finite() && self.config.dt_per_token > 0.0 {
@@ -499,8 +537,24 @@ impl LanguageController {
         // 2. Evolve network dynamics
         self.network.evolve_closed_form(dt, &input_hv);
 
-        // 3. Get normalized output
+        // 3. Get normalized output + compositional refinement (consistent with forward_step)
         let output_hv = self.network.output().normalize();
+        let logit_hv = if self.config.enable_compositional_logits {
+            let base_alpha = self.config.compositional_alpha.clamp(0.0, 1.0);
+            let alpha = if self.config.adaptive_compositional_alpha {
+                base_alpha * (1.0 - self.coherence_for_dt.clamp(0.0, 1.0))
+            } else {
+                base_alpha
+            };
+            if alpha > 1e-6 {
+                let correction = output_hv.bind(thought_hv).normalize();
+                ContinuousHV::weighted_bundle(&[&output_hv, &correction], &[1.0 - alpha, alpha])
+            } else {
+                output_hv
+            }
+        } else {
+            output_hv
+        };
 
         // 4. Sparse logits: only compute similarity for active indices
         let mut logits = vec![f32::NEG_INFINITY; self.token_embeddings.len()];
@@ -509,7 +563,7 @@ impl LanguageController {
         let scale = self.config.logit_scale;
         for &i in active_indices {
             if i < self.token_embeddings.len() {
-                let mut s = scale * output_hv.similarity(&self.token_embeddings[i]) * inv_temp;
+                let mut s = scale * logit_hv.similarity(&self.token_embeddings[i]) * inv_temp;
                 if !s.is_finite() {
                     s = 0.0;
                 }

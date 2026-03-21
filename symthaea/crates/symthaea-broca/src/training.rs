@@ -312,6 +312,12 @@ pub struct EpochMetrics {
     pub validation_loss: Option<f32>,
     /// Mean output-thought coherence this epoch (if coherence_loss_weight > 0 or diagnostics enabled).
     pub mean_coherence: Option<f32>,
+    /// Mean adaptive dt used this epoch (when enable_adaptive_dt is on).
+    pub adaptive_dt_mean: Option<f32>,
+    /// Min adaptive dt observed this epoch.
+    pub adaptive_dt_min: Option<f32>,
+    /// Max adaptive dt observed this epoch.
+    pub adaptive_dt_max: Option<f32>,
 }
 
 /// Gradient flow diagnostics: tracks per-step L2 norms, clipping events,
@@ -986,6 +992,9 @@ pub fn train_with_adam(
             num_pairs: dataset.len(),
             validation_loss,
             mean_coherence: epoch_mean_coherence,
+            adaptive_dt_mean: None,
+            adaptive_dt_min: None,
+            adaptive_dt_max: None,
         });
 
         if (epoch + 1) % config.report_interval.max(1) == 0 || epoch == 0 {
