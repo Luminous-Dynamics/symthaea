@@ -1434,6 +1434,8 @@ pub fn issue_consciousness_credential(did: String) -> ExternResult<Consciousness
         issued_at: now_us,
         expires_at: now_us + ConsciousnessCredential::DEFAULT_TTL_US,
         issuer: format!("did:mycelix:{}", agent_info()?.agent_initial_pubkey),
+        trajectory_commitment: None,
+        extensions: Default::default(),
     })
 }
 

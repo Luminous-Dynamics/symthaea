@@ -72,6 +72,10 @@ pub struct ConsciousnessCredential {
     pub issued_at: u64,
     pub expires_at: u64,
     pub issuer: String,
+    #[serde(default)]
+    pub trajectory_commitment: Option<[u8; 32]>,
+    #[serde(default)]
+    pub extensions: std::collections::HashMap<String, Vec<u8>>,
 }
 
 // ============================================================================
