@@ -29,6 +29,7 @@ use symthaea_psych_bench::benchmarks::clinical::{
     AllianceMaintenanceBenchmark, CognitiveDistortionBenchmark, CrisisDetectionBenchmark,
     EmpathicAccuracyBenchmark, MotivationalInterviewingBenchmark, TherapeuticResponseBenchmark,
 };
+use symthaea_psych_bench::benchmarks::coding::{BugDetectionBenchmark, HumanEvalMiniBenchmark};
 use symthaea_psych_bench::benchmarks::cogbench::{
     BartBenchmark, HorizonBenchmark, InstrumentalLearningBenchmark,
     ProbabilisticReasoningBenchmark, RestlessBanditBenchmark, ReversalLearningBenchmark,
@@ -271,6 +272,9 @@ fn all_benchmarks() -> Vec<Box<dyn PsychBenchmark + Send + Sync>> {
         Box::new(CrossMaskPrivacyBenchmark),
         Box::new(EncryptedBindingBenchmark),
         Box::new(ScalingAnalysisBenchmark),
+        // Coding (2)
+        Box::new(HumanEvalMiniBenchmark),
+        Box::new(BugDetectionBenchmark),
         // Neuromod (14 — trait-based)
         Box::new(AttentionNetworkBenchmark),
         Box::new(MoodInductionBenchmark),

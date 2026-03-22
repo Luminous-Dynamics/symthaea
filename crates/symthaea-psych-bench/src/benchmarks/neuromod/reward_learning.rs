@@ -89,6 +89,13 @@ impl RewardLearningBenchmark {
         let mut phase2_b_choices = 0usize;
         let mut recent_rpe_magnitude = 0.0_f64; // EMA of |negative RPE|
 
+        // Sliding window for reversal criterion (Cools et al., 2002):
+        // standard reversal paradigms use a moving window (e.g., 5 consecutive
+        // correct choices) rather than cumulative rate, which is biased against
+        // early reversal detection.
+        const WINDOW_SIZE: usize = 5;
+        let mut recent_choices: [usize; WINDOW_SIZE] = [0; WINDOW_SIZE];
+
         for trial in 0..40 {
             // Surprise-driven exploration: boost temperature when recent negative
             // RPE is high (unexpected non-reward increases uncertainty → exploration)
@@ -128,9 +135,14 @@ impl RewardLearningBenchmark {
                 }
             }
 
-            if !reversal_criterion_met && trial > 5 {
-                let recent_b = phase2_b_choices as f64 / (trial + 1) as f64;
-                if recent_b > criterion {
+            // Update sliding window
+            recent_choices[trial % WINDOW_SIZE] = choice;
+
+            // Sliding window criterion: 4/5 recent choices must be B (choice==1)
+            // Only check after enough trials for a full window
+            if !reversal_criterion_met && trial >= WINDOW_SIZE - 1 {
+                let window_b: usize = recent_choices.iter().filter(|&&c| c == 1).count();
+                if window_b >= 4 {
                     reversal_criterion_trials = trial + 1;
                     reversal_criterion_met = true;
                 }
