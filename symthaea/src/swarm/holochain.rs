@@ -62,6 +62,7 @@
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
 use std::num::NonZeroUsize;
+use std::collections::VecDeque;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 // ============================================================================
@@ -114,7 +115,7 @@ pub struct AgentInfo {
     pub nickname: Option<String>,
 
     /// Historical Φ values (consciousness metric)
-    pub phi_history: Vec<f64>,
+    pub phi_history: VecDeque<f64>,
 
     /// Computed reputation score (0.0 to 1.0)
     pub reputation_score: f64,
@@ -152,7 +153,7 @@ impl AgentInfo {
         Self {
             agent_key,
             nickname: None,
-            phi_history: Vec::new(),
+            phi_history: VecDeque::new(),
             reputation_score: 0.5, // Start neutral
             vouched_by: Vec::new(),
             interaction_count: 0,
@@ -178,9 +179,9 @@ impl AgentInfo {
 
     /// Record a new Φ reading
     pub fn record_phi(&mut self, phi: f64) {
-        self.phi_history.push(phi);
+        self.phi_history.push_back(phi);
         if self.phi_history.len() > 100 {
-            self.phi_history.remove(0);
+            self.phi_history.pop_front();
         }
         self.last_active = SystemTime::now()
             .duration_since(UNIX_EPOCH)

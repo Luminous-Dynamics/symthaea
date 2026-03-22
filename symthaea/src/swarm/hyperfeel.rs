@@ -47,7 +47,7 @@
 //! - Enables swarm-wide emotional coherence
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::time::{Duration, Instant};
 
 /// Affective state for swarm transmission
@@ -378,7 +378,7 @@ pub struct Hyperfeel {
     coherence: SwarmCoherence,
 
     /// History of coherence readings
-    coherence_history: Vec<SwarmCoherence>,
+    coherence_history: VecDeque<SwarmCoherence>,
 
     /// Last broadcast time
     last_broadcast: Instant,
@@ -418,7 +418,7 @@ impl Hyperfeel {
             mirrored_state: AffectiveState::neutral(),
             peers: HashMap::new(),
             coherence: SwarmCoherence::new(),
-            coherence_history: Vec::new(),
+            coherence_history: VecDeque::new(),
             last_broadcast: Instant::now(),
             sequence: 0,
             stats: HyperfeelStats::default(),
@@ -519,7 +519,7 @@ impl Hyperfeel {
         let dominant_mood = centroid.dominant_emotion();
 
         // Compute stability (how much coherence has changed)
-        let stability = if let Some(prev) = self.coherence_history.last() {
+        let stability = if let Some(prev) = self.coherence_history.back() {
             1.0 - (prev.alignment - alignment).abs()
         } else {
             0.5
@@ -544,9 +544,9 @@ impl Hyperfeel {
         }
 
         // Store in history (keep last 100)
-        self.coherence_history.push(coherence.clone());
+        self.coherence_history.push_back(coherence.clone());
         if self.coherence_history.len() > 100 {
-            self.coherence_history.remove(0);
+            self.coherence_history.pop_front();
         }
 
         self.coherence = coherence;
