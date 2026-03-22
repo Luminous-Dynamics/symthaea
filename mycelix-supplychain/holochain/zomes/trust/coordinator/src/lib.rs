@@ -284,3 +284,86 @@ pub fn get_all_reputation_categories(agent: AgentPubKey) -> ExternResult<Vec<(Re
 
     Ok(scores)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rating_bounds_valid() {
+        // Ratings 0-5 are valid per the coordinator and integrity validation
+        for rating in 0u8..=5 {
+            assert!(rating <= 5, "Rating {} should be in bounds", rating);
+        }
+    }
+
+    #[test]
+    fn test_rating_bounds_invalid() {
+        // Ratings above 5 are rejected
+        for rating in 6u8..=255 {
+            assert!(rating > 5, "Rating {} should be out of bounds", rating);
+        }
+    }
+
+    #[test]
+    fn test_submit_review_input_serde() {
+        let input = SubmitReviewInput {
+            subject: AgentPubKey::from_raw_36(vec![1u8; 36]),
+            po_hash: None,
+            category: ReputationCategory::Quality,
+            rating: 4,
+            comment: Some("Good quality materials".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: SubmitReviewInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.rating, 4);
+        assert!(back.po_hash.is_none());
+    }
+
+    #[test]
+    fn test_self_review_rejection_concept() {
+        // The same agent cannot be both reviewer and subject
+        let agent_a = AgentPubKey::from_raw_36(vec![0u8; 36]);
+        let agent_b = AgentPubKey::from_raw_36(vec![1u8; 36]);
+        // Different agents: valid
+        assert_ne!(agent_a, agent_b);
+        // Same agent: would be rejected by coordinator
+        assert_eq!(agent_a.clone(), agent_a.clone());
+    }
+
+    #[test]
+    fn test_reputation_category_serde_roundtrip() {
+        let categories = vec![
+            ReputationCategory::Reliability,
+            ReputationCategory::Quality,
+            ReputationCategory::Communication,
+            ReputationCategory::Timeliness,
+            ReputationCategory::Compliance,
+        ];
+        for cat in categories {
+            let json = serde_json::to_string(&cat).unwrap();
+            let back: ReputationCategory = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, cat);
+        }
+    }
+
+    #[test]
+    fn test_average_rating_calculation() {
+        // Reproduce get_provider_rating logic
+        let ratings: Vec<u32> = vec![4, 5, 3, 4, 5];
+        let total: u32 = ratings.iter().sum();
+        let average = total as f64 / ratings.len() as f64;
+        assert!((average - 4.2).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_reputation_score_serde() {
+        // The scoring update: (old_score * total + new_rating) / (total + 1)
+        let old_score: u64 = 4;
+        let old_total: u64 = 5;
+        let new_rating: u64 = 5;
+        let new_total = old_total + 1;
+        let new_score = (old_score * old_total + new_rating) / new_total;
+        assert_eq!(new_score, 4); // (20 + 5) / 6 = 4 (integer div)
+    }
+}

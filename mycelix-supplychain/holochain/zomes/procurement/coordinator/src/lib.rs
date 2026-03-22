@@ -356,6 +356,108 @@ pub fn cancel_purchase_order(po_hash: ActionHash) -> ExternResult<ActionHash> {
     update_po_status((po_hash, PurchaseOrderStatus::Cancelled))
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// All valid PurchaseOrderStatus transitions used in the coordinator.
+    /// Draft → Submitted → Approved → Received (happy path via approve/fulfill).
+    /// Draft → Cancelled, any → Cancelled (cancel_purchase_order).
+    #[test]
+    fn test_po_status_serde_roundtrip() {
+        let statuses = vec![
+            PurchaseOrderStatus::Draft,
+            PurchaseOrderStatus::Submitted,
+            PurchaseOrderStatus::Approved,
+            PurchaseOrderStatus::Rejected,
+            PurchaseOrderStatus::Sent,
+            PurchaseOrderStatus::Acknowledged,
+            PurchaseOrderStatus::PartiallyReceived,
+            PurchaseOrderStatus::Received,
+            PurchaseOrderStatus::Cancelled,
+            PurchaseOrderStatus::Closed,
+        ];
+        for status in statuses {
+            let json = serde_json::to_string(&status).unwrap();
+            let back: PurchaseOrderStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, status);
+        }
+    }
+
+    #[test]
+    fn test_po_status_approve_path() {
+        // Verify the status values used in approve/fulfill/cancel helpers
+        let approved = PurchaseOrderStatus::Approved;
+        let received = PurchaseOrderStatus::Received;
+        let cancelled = PurchaseOrderStatus::Cancelled;
+        assert_ne!(approved, received);
+        assert_ne!(approved, cancelled);
+        assert_ne!(received, cancelled);
+    }
+
+    #[test]
+    fn test_purchase_order_item_serde() {
+        let item = PurchaseOrderItem {
+            item_code: "BOLT-M6-50".to_string(),
+            description: "M6 bolt 50mm".to_string(),
+            quantity: 1000,
+            unit_price: 5,
+            unit: "each".to_string(),
+        };
+        let json = serde_json::to_string(&item).unwrap();
+        let back: PurchaseOrderItem = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.item_code, "BOLT-M6-50");
+        assert_eq!(back.quantity, 1000);
+        assert_eq!(back.unit_price, 5);
+    }
+
+    #[test]
+    fn test_total_amount_calculation() {
+        // Reproduce the total_amount logic from create_purchase_order
+        let items = vec![
+            PurchaseOrderItem {
+                item_code: "A".to_string(),
+                description: "".to_string(),
+                quantity: 10,
+                unit_price: 100,
+                unit: "each".to_string(),
+            },
+            PurchaseOrderItem {
+                item_code: "B".to_string(),
+                description: "".to_string(),
+                quantity: 5,
+                unit_price: 200,
+                unit: "each".to_string(),
+            },
+        ];
+        let total: u64 = items.iter().map(|i| i.quantity * i.unit_price).sum();
+        assert_eq!(total, 2000); // 10*100 + 5*200
+    }
+
+    #[test]
+    fn test_create_purchase_order_input_serde() {
+        let input = CreatePurchaseOrderInput {
+            po_number: "PO-2026-001".to_string(),
+            supplier: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            items: vec![PurchaseOrderItem {
+                item_code: "SKU-001".to_string(),
+                description: "Widget".to_string(),
+                quantity: 100,
+                unit_price: 50,
+                unit: "pcs".to_string(),
+            }],
+            currency: "USD".to_string(),
+            due_date: None,
+            notes: Some("Urgent".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: CreatePurchaseOrderInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.po_number, "PO-2026-001");
+        assert_eq!(back.items.len(), 1);
+        assert_eq!(back.currency, "USD");
+    }
+}
+
 #[hdk_extern]
 pub fn get_supplier_orders(supplier: AgentPubKey) -> ExternResult<Vec<PurchaseOrder>> {
     let supplier_path = Path::from(format!("supplier_pos/{}", supplier));

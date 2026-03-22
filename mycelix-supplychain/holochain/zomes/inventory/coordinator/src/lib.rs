@@ -70,6 +70,11 @@ pub fn create_item(input: CreateItemInput) -> ExternResult<ActionHash> {
     let cat_hash = ensure_path(cat_path, LinkTypes::CategoryToItems)?;
     create_link(cat_hash, action_hash.clone(), LinkTypes::CategoryToItems, ())?;
 
+    // Link SKU path to item for cross-cluster lookups
+    let sku_path = Path::from(format!("sku/{}", item.sku)).typed(LinkTypes::SkuToItem)?;
+    sku_path.ensure()?;
+    create_link(sku_path.path_entry_hash()?, action_hash.clone(), LinkTypes::SkuToItem, ())?;
+
     Ok(action_hash)
 }
 
@@ -314,6 +319,64 @@ pub fn get_item_movements(item_hash: ActionHash) -> ExternResult<Vec<StockMoveme
 }
 
 // ============================================================================
+// SKU-Based Cross-Cluster Lookup
+// ============================================================================
+
+/// Input for querying inventory by SKU (used by manufacturing MRP bridge).
+#[derive(Serialize, Deserialize, Debug)]
+pub struct InventoryQueryInput {
+    pub sku: String,
+}
+
+/// Inventory level result returned to the manufacturing planning zome.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct InventoryLevel {
+    pub sku: String,
+    pub quantity: u64,
+    pub source: String,
+}
+
+/// Look up available stock for a SKU.
+///
+/// Called by the manufacturing planning zome via:
+/// `call(CallTargetCell::OtherRole("supplychain"), "inventory", "get_stock_level_by_sku", ...)`
+#[hdk_extern]
+pub fn get_stock_level_by_sku(input: InventoryQueryInput) -> ExternResult<Option<InventoryLevel>> {
+    if input.sku.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "SKU must not be empty".to_string()
+        )));
+    }
+
+    // Look up the item hash via the SKU path
+    let sku_path = Path::from(format!("sku/{}", input.sku)).typed(LinkTypes::SkuToItem)?;
+    let filter = LinkTypeFilter::try_from(LinkTypes::SkuToItem)?;
+    let links = get_links(
+        LinkQuery::new(sku_path.path_entry_hash()?, filter),
+        GetStrategy::default(),
+    )?;
+
+    // Take the most recent link (last one wins)
+    let item_hash = match links.last().and_then(|l| l.target.clone().into_action_hash()) {
+        Some(h) => h,
+        None => return Ok(None),
+    };
+
+    // Sum available stock across all locations
+    let levels = get_stock_levels(item_hash)?;
+    let quantity: u64 = levels
+        .iter()
+        .map(|l| l.quantity.saturating_sub(l.reserved))
+        .sum();
+
+    Ok(Some(InventoryLevel {
+        sku: input.sku,
+        quantity,
+        source: "supplychain".to_string(),
+    }))
+}
+
+// ============================================================================
 // Advanced Queries
 // ============================================================================
 
@@ -345,4 +408,60 @@ pub fn get_low_stock_items(_: ()) -> ExternResult<Vec<(InventoryItem, u64)>> {
     }
 
     Ok(low_stock)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_inventory_query_input_serde() {
+        let input = InventoryQueryInput { sku: "BOLT-M6".to_string() };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: InventoryQueryInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.sku, "BOLT-M6");
+    }
+
+    #[test]
+    fn test_inventory_level_serde() {
+        let level = InventoryLevel {
+            sku: "NUT-M6".to_string(),
+            quantity: 250,
+            source: "supplychain".to_string(),
+        };
+        let json = serde_json::to_string(&level).unwrap();
+        let back: InventoryLevel = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.sku, "NUT-M6");
+        assert_eq!(back.quantity, 250);
+        assert_eq!(back.source, "supplychain");
+    }
+
+    #[test]
+    fn test_inventory_level_clone() {
+        let level = InventoryLevel {
+            sku: "WIDGET-A".to_string(),
+            quantity: 0,
+            source: "supplychain".to_string(),
+        };
+        let cloned = level.clone();
+        assert_eq!(cloned.sku, level.sku);
+        assert_eq!(cloned.quantity, level.quantity);
+    }
+
+    #[test]
+    fn test_available_stock_math_saturating_sub() {
+        // Verify that reserved > quantity saturates to 0 (no underflow)
+        let quantity: u64 = 5;
+        let reserved: u64 = 10;
+        let available = quantity.saturating_sub(reserved);
+        assert_eq!(available, 0);
+    }
+
+    #[test]
+    fn test_available_stock_math_normal() {
+        let quantity: u64 = 100;
+        let reserved: u64 = 30;
+        let available = quantity.saturating_sub(reserved);
+        assert_eq!(available, 70);
+    }
 }

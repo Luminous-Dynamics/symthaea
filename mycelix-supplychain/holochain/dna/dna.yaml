@@ -11,6 +11,16 @@ integrity:
       path: ../target/wasm32-unknown-unknown/release/verification_integrity.wasm
     - name: bridge_integrity
       path: ../target/wasm32-unknown-unknown/release/bridge_integrity.wasm
+    - name: procurement_integrity
+      path: ../target/wasm32-unknown-unknown/release/procurement_integrity.wasm
+    - name: inventory_integrity
+      path: ../target/wasm32-unknown-unknown/release/inventory_integrity.wasm
+    - name: logistics_integrity
+      path: ../target/wasm32-unknown-unknown/release/logistics_integrity.wasm
+    - name: payments_integrity
+      path: ../target/wasm32-unknown-unknown/release/payments_integrity.wasm
+    - name: trust_integrity
+      path: ../target/wasm32-unknown-unknown/release/trust_integrity.wasm
 coordinator:
   zomes:
     - name: claims_coordinator
@@ -26,3 +36,23 @@ coordinator:
       path: ../target/wasm32-unknown-unknown/release/bridge_coordinator.wasm
       dependencies:
         - name: bridge_integrity
+    - name: procurement_coordinator
+      path: ../target/wasm32-unknown-unknown/release/procurement_coordinator.wasm
+      dependencies:
+        - name: procurement_integrity
+    - name: inventory_coordinator
+      path: ../target/wasm32-unknown-unknown/release/inventory_coordinator.wasm
+      dependencies:
+        - name: inventory_integrity
+    - name: logistics_coordinator
+      path: ../target/wasm32-unknown-unknown/release/logistics_coordinator.wasm
+      dependencies:
+        - name: logistics_integrity
+    - name: payments_coordinator
+      path: ../target/wasm32-unknown-unknown/release/payments_coordinator.wasm
+      dependencies:
+        - name: payments_integrity
+    - name: trust_coordinator
+      path: ../target/wasm32-unknown-unknown/release/trust_coordinator.wasm
+      dependencies:
+        - name: trust_integrity

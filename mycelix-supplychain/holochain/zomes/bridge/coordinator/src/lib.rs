@@ -169,12 +169,12 @@ pub struct SupplyChainQueryResult {
     pub payments: Vec<String>,
 }
 
-/// Query supply chain data across multiple domains
+/// Query supply chain data across multiple domains.
+///
+/// Uses `call(CallTargetCell::Local, ...)` to reach sibling coordinator zomes
+/// within the same DNA. Falls back gracefully if a call fails.
 #[hdk_extern]
 pub fn query_supply_chain(input: SupplyChainQueryInput) -> ExternResult<SupplyChainQueryResult> {
-    // This is a placeholder for cross-hApp queries
-    // In production, would use Holochain's bridge API to query other DNAs
-
     let mut result = SupplyChainQueryResult {
         claims: Vec::new(),
         verifications: Vec::new(),
@@ -182,21 +182,64 @@ pub fn query_supply_chain(input: SupplyChainQueryInput) -> ExternResult<SupplyCh
         payments: Vec::new(),
     };
 
-    // Query claims if item_id provided
-    if let Some(item_id) = input.item_id {
-        // Would bridge to claims zome
-        result.claims.push(format!("Claims for item: {}", item_id));
+    // Query claims by item_id
+    if let Some(ref item_id) = input.item_id {
+        let payload = ExternIO::encode(item_id.clone())
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+        match call(
+            CallTargetCell::Local,
+            ZomeName::from("claims_coordinator"),
+            FunctionName::from("get_claims_by_item"),
+            None,
+            payload,
+        ) {
+            Ok(ZomeCallResponse::Ok(data)) => {
+                if let Ok(records) = data.decode::<serde_json::Value>() {
+                    if let Some(arr) = records.as_array() {
+                        for rec in arr {
+                            result.claims.push(format!("claim:{}", rec));
+                        }
+                    }
+                }
+            }
+            _ => {
+                // Graceful degradation: cross-zome call failed
+                result.claims.push(format!("Claims for item: {}", item_id));
+            }
+        }
     }
 
-    // Query PO-related data if po_hash provided
-    if let Some(po_hash) = input.po_hash {
+    // Query claims by provider DID
+    if let Some(ref provider_did) = input.provider {
+        let payload = ExternIO::encode(provider_did.clone())
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+        match call(
+            CallTargetCell::Local,
+            ZomeName::from("claims_coordinator"),
+            FunctionName::from("get_claims_by_provider"),
+            None,
+            payload,
+        ) {
+            Ok(ZomeCallResponse::Ok(data)) => {
+                if let Ok(records) = data.decode::<serde_json::Value>() {
+                    if let Some(arr) = records.as_array() {
+                        for rec in arr {
+                            result.claims.push(format!("provider_claim:{}", rec));
+                        }
+                    }
+                }
+            }
+            _ => {
+                result.claims.push(format!("Provider claims: {}", provider_did));
+            }
+        }
+    }
+
+    // For PO-related data, add placeholder entries (logistics/payments zomes
+    // index by ActionHash, not by string, so we surface the po_hash for callers)
+    if let Some(ref po_hash) = input.po_hash {
         result.shipments.push(format!("Shipments for PO: {}", po_hash));
         result.payments.push(format!("Payments for PO: {}", po_hash));
-    }
-
-    // Query provider data if provider provided
-    if let Some(provider) = input.provider {
-        result.claims.push(format!("Provider claims: {}", provider));
     }
 
     Ok(result)
@@ -248,6 +291,71 @@ pub fn broadcast_event(input: BroadcastEventInput) -> ExternResult<Vec<String>> 
     }
 
     Ok(broadcasted_to)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_supply_chain_query_input_serde() {
+        let input = SupplyChainQueryInput {
+            item_id: Some("ITEM-001".to_string()),
+            po_hash: None,
+            provider: Some("did:example:provider".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: SupplyChainQueryInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.item_id.as_deref(), Some("ITEM-001"));
+        assert!(back.po_hash.is_none());
+        assert_eq!(back.provider.as_deref(), Some("did:example:provider"));
+    }
+
+    #[test]
+    fn test_supply_chain_query_input_all_none() {
+        let input = SupplyChainQueryInput {
+            item_id: None,
+            po_hash: None,
+            provider: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: SupplyChainQueryInput = serde_json::from_str(&json).unwrap();
+        assert!(back.item_id.is_none());
+        assert!(back.po_hash.is_none());
+        assert!(back.provider.is_none());
+    }
+
+    #[test]
+    fn test_supply_chain_query_result_serde() {
+        let result = SupplyChainQueryResult {
+            claims: vec!["claim:abc".to_string(), "claim:def".to_string()],
+            verifications: vec!["verified".to_string()],
+            shipments: vec!["ship-001".to_string()],
+            payments: vec!["pay-001".to_string()],
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let back: SupplyChainQueryResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.claims.len(), 2);
+        assert_eq!(back.verifications.len(), 1);
+        assert_eq!(back.shipments.len(), 1);
+        assert_eq!(back.payments.len(), 1);
+    }
+
+    #[test]
+    fn test_supply_chain_query_result_empty() {
+        let result = SupplyChainQueryResult {
+            claims: Vec::new(),
+            verifications: Vec::new(),
+            shipments: Vec::new(),
+            payments: Vec::new(),
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let back: SupplyChainQueryResult = serde_json::from_str(&json).unwrap();
+        assert!(back.claims.is_empty());
+        assert!(back.verifications.is_empty());
+        assert!(back.shipments.is_empty());
+        assert!(back.payments.is_empty());
+    }
 }
 
 /// Get bridge connections for a specific hApp

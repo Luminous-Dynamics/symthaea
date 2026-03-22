@@ -51,7 +51,7 @@ pub enum EntryTypes {
 
 #[hdk_link_types]
 pub enum LinkTypes {
-    AllItems, CategoryToItems, ItemToStockLevels, ItemToMovements, LocationToStock,
+    AllItems, CategoryToItems, ItemToStockLevels, ItemToMovements, LocationToStock, SkuToItem,
 }
 
 #[hdk_extern]

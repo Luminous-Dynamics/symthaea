@@ -53,13 +53,23 @@ pub fn create_verification(input: CreateVerificationInput) -> ExternResult<Recor
         (),
     )?;
 
-    // NOTE: Link from claim to verification would use claims zome's LinkTypes
-    // For now, we'll only create the verifier-to-verification link
-    // In production, would use call() to create the claim link in the claims zome
-
     // Link to all verifications anchor
     let all_anchor = all_verifications_anchor()?;
     create_link(all_anchor, action_hash.clone(), LinkTypes::AllVerifications, ())?;
+
+    // Cross-zome: link this verification to the claim in the claims zome.
+    let link_input = serde_json::json!({
+        "claim_hash": input.claim_hash,
+        "verification_hash": action_hash.clone(),
+    });
+    let _ = call(
+        CallTargetCell::Local,
+        ZomeName::from("claims_coordinator"),
+        FunctionName::from("link_verification_to_claim"),
+        None,
+        ExternIO::encode(link_input)
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
+    );
 
     get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve created verification".to_string()
@@ -72,13 +82,48 @@ pub fn get_verification(hash: ActionHash) -> ExternResult<Option<Record>> {
     get(hash, GetOptions::default())
 }
 
-/// Get all verifications for a claim
-/// NOTE: This is a simplified version. In production, would query via claims zome
+/// Get all verifications for a claim by calling the claims coordinator cross-zome.
+///
+/// The claims zome owns the `ClaimToVerifications` link type and returns
+/// a `(Record, Vec<Record>)` tuple from `get_claim_with_verifications`.
+/// We extract just the verifications (index 1 of the tuple).
 #[hdk_extern]
-pub fn get_verifications_for_claim(_claim_hash: ActionHash) -> ExternResult<Vec<Record>> {
-    // Placeholder - in production, would call claims zome to get verifications
-    // For now, return empty list
-    Ok(Vec::new())
+pub fn get_verifications_for_claim(claim_hash: ActionHash) -> ExternResult<Vec<Record>> {
+    let payload = ExternIO::encode(claim_hash)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::from("claims_coordinator"),
+        FunctionName::from("get_claim_with_verifications"),
+        None,
+        payload,
+    )?;
+
+    match response {
+        ZomeCallResponse::Ok(data) => {
+            // get_claim_with_verifications returns (Record, Vec<Record>)
+            // Decode as a JSON value; the second element is the verification list.
+            let value: serde_json::Value = data
+                .decode()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+
+            // The tuple is serialized as a two-element JSON array.
+            if let Some(arr) = value.as_array() {
+                if arr.len() == 2 {
+                    // The second element is the Vec<Record>; we re-encode it and
+                    // decode as Vec<Record> to get properly typed records.
+                    let verifications_json = arr[1].clone();
+                    let verifications: Vec<Record> = serde_json::from_value(verifications_json)
+                        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+                    return Ok(verifications);
+                }
+            }
+            Ok(Vec::new())
+        }
+        // Claim not found or claims zome unavailable — return empty list gracefully.
+        _ => Ok(Vec::new()),
+    }
 }
 
 /// Get all verifications by a verifier

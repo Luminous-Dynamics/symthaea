@@ -223,3 +223,128 @@ pub fn get_po_shipments(po_hash: ActionHash) -> ExternResult<Vec<Shipment>> {
     }
     Ok(shipments)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Test every valid status transition (from the `is_valid_status_transition` function).
+    #[test]
+    fn test_valid_status_transitions() {
+        // Normal forward chain
+        assert!(is_valid_status_transition(&ShipmentStatus::Created, &ShipmentStatus::PickedUp));
+        assert!(is_valid_status_transition(&ShipmentStatus::PickedUp, &ShipmentStatus::InTransit));
+        assert!(is_valid_status_transition(&ShipmentStatus::InTransit, &ShipmentStatus::OutForDelivery));
+        assert!(is_valid_status_transition(&ShipmentStatus::OutForDelivery, &ShipmentStatus::Delivered));
+    }
+
+    /// Exception can be raised from any source state.
+    #[test]
+    fn test_exception_from_any_state() {
+        let all_states = vec![
+            ShipmentStatus::Created,
+            ShipmentStatus::PickedUp,
+            ShipmentStatus::InTransit,
+            ShipmentStatus::OutForDelivery,
+            ShipmentStatus::Delivered,
+            ShipmentStatus::Exception,
+            ShipmentStatus::Returned,
+        ];
+        for state in &all_states {
+            assert!(
+                is_valid_status_transition(state, &ShipmentStatus::Exception),
+                "Expected Exception to be valid from {:?}", state
+            );
+        }
+    }
+
+    /// Returned can be raised from any source state.
+    #[test]
+    fn test_returned_from_any_state() {
+        let all_states = vec![
+            ShipmentStatus::Created,
+            ShipmentStatus::PickedUp,
+            ShipmentStatus::InTransit,
+            ShipmentStatus::OutForDelivery,
+            ShipmentStatus::Delivered,
+            ShipmentStatus::Exception,
+            ShipmentStatus::Returned,
+        ];
+        for state in &all_states {
+            assert!(
+                is_valid_status_transition(state, &ShipmentStatus::Returned),
+                "Expected Returned to be valid from {:?}", state
+            );
+        }
+    }
+
+    /// Invalid transitions must be rejected.
+    #[test]
+    fn test_invalid_status_transitions() {
+        // Skipping steps is not allowed
+        assert!(!is_valid_status_transition(&ShipmentStatus::Created, &ShipmentStatus::InTransit));
+        assert!(!is_valid_status_transition(&ShipmentStatus::Created, &ShipmentStatus::Delivered));
+        assert!(!is_valid_status_transition(&ShipmentStatus::PickedUp, &ShipmentStatus::OutForDelivery));
+        assert!(!is_valid_status_transition(&ShipmentStatus::InTransit, &ShipmentStatus::Delivered));
+        // Going backwards is not allowed
+        assert!(!is_valid_status_transition(&ShipmentStatus::Delivered, &ShipmentStatus::InTransit));
+        assert!(!is_valid_status_transition(&ShipmentStatus::InTransit, &ShipmentStatus::PickedUp));
+        // Same state is not a valid transition
+        assert!(!is_valid_status_transition(&ShipmentStatus::Created, &ShipmentStatus::Created));
+    }
+
+    #[test]
+    fn test_shipment_status_serde_roundtrip() {
+        let statuses = vec![
+            ShipmentStatus::Created,
+            ShipmentStatus::PickedUp,
+            ShipmentStatus::InTransit,
+            ShipmentStatus::OutForDelivery,
+            ShipmentStatus::Delivered,
+            ShipmentStatus::Exception,
+            ShipmentStatus::Returned,
+        ];
+        for status in statuses {
+            let json = serde_json::to_string(&status).unwrap();
+            let back: ShipmentStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, status);
+        }
+    }
+
+    #[test]
+    fn test_create_shipment_input_serde() {
+        let input = CreateShipmentInput {
+            tracking_number: "TRACK-001".to_string(),
+            po_hash: None,
+            carrier: "FedEx".to_string(),
+            origin: Address {
+                name: "Warehouse".to_string(),
+                street: "123 Main St".to_string(),
+                city: "Dallas".to_string(),
+                state: "TX".to_string(),
+                postal_code: "75001".to_string(),
+                country: "US".to_string(),
+            },
+            destination: Address {
+                name: "Customer".to_string(),
+                street: "456 Oak Ave".to_string(),
+                city: "Austin".to_string(),
+                state: "TX".to_string(),
+                postal_code: "78701".to_string(),
+                country: "US".to_string(),
+            },
+            items: vec![ShipmentItem {
+                sku: "BOLT-M6".to_string(),
+                description: "M6 Bolt".to_string(),
+                quantity: 100,
+                weight_kg: Some(0.5),
+            }],
+            estimated_delivery: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: CreateShipmentInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.tracking_number, "TRACK-001");
+        assert_eq!(back.carrier, "FedEx");
+        assert_eq!(back.items.len(), 1);
+    }
+}

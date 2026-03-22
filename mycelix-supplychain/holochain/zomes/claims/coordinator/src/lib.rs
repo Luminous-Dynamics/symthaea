@@ -244,6 +244,32 @@ pub fn verify_claim_authenticity(claim_hash: ActionHash) -> ExternResult<bool> {
     Ok(!claim.issuer.is_empty() && !claim.item_id.is_empty())
 }
 
+/// Input for linking a verification back to its parent claim.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LinkVerificationInput {
+    pub claim_hash: ActionHash,
+    pub verification_hash: ActionHash,
+}
+
+/// Called by the verification coordinator via cross-zome `call()` to register
+/// a newly-created verification under the claim it belongs to.
+#[hdk_extern]
+pub fn link_verification_to_claim(input: LinkVerificationInput) -> ExternResult<ActionHash> {
+    // Verify the claim exists before creating the link
+    if get(input.claim_hash.clone(), GetOptions::default())?.is_none() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Claim not found".to_string()
+        )));
+    }
+
+    create_link(
+        input.claim_hash,
+        input.verification_hash,
+        LinkTypes::ClaimToVerifications,
+        (),
+    )
+}
+
 /// Get claim with its verification records
 #[hdk_extern]
 pub fn get_claim_with_verifications(claim_hash: ActionHash) -> ExternResult<(Record, Vec<Record>)> {
@@ -285,4 +311,44 @@ fn hash_identifier(identifier: &str) -> ExternResult<EntryHash> {
 /// Get the anchor for all claims
 fn all_claims_anchor() -> ExternResult<EntryHash> {
     hash_identifier("all_claims")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_link_verification_input_serde() {
+        let input = LinkVerificationInput {
+            claim_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            verification_hash: ActionHash::from_raw_36(vec![1u8; 36]),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: LinkVerificationInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.claim_hash, input.claim_hash);
+        assert_eq!(back.verification_hash, input.verification_hash);
+    }
+
+    #[test]
+    fn test_link_verification_input_hashes_differ() {
+        let claim = ActionHash::from_raw_36(vec![0u8; 36]);
+        let verification = ActionHash::from_raw_36(vec![1u8; 36]);
+        assert_ne!(claim, verification);
+    }
+
+    #[test]
+    fn test_create_claim_input_serde() {
+        let input = CreateClaimInput {
+            item_id: "ITEM-123".to_string(),
+            claim_type: "PRODUCED".to_string(),
+            data: r#"{"factory":"XYZ"}"#.to_string(),
+            issuer: "did:example:producer".to_string(),
+            previous_claim: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: CreateClaimInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.item_id, "ITEM-123");
+        assert_eq!(back.claim_type, "PRODUCED");
+        assert!(back.previous_claim.is_none());
+    }
 }

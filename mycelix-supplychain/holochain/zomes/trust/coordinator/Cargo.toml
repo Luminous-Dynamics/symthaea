@@ -10,5 +10,6 @@ name = "trust_coordinator"
 [dependencies]
 hdk.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 holochain_serialized_bytes.workspace = true
 trust_integrity = { path = "../integrity" }

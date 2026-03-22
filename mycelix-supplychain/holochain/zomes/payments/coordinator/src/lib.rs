@@ -194,3 +194,76 @@ pub fn get_po_total_paid(po_hash: ActionHash) -> ExternResult<u64> {
         .sum();
     Ok(total)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_payment_status_serde_roundtrip() {
+        let statuses = vec![
+            PaymentStatus::Pending,
+            PaymentStatus::Authorized,
+            PaymentStatus::Captured,
+            PaymentStatus::Completed,
+            PaymentStatus::Failed,
+            PaymentStatus::Refunded,
+            PaymentStatus::Disputed,
+        ];
+        for status in statuses {
+            let json = serde_json::to_string(&status).unwrap();
+            let back: PaymentStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, status);
+        }
+    }
+
+    #[test]
+    fn test_payment_method_serde_roundtrip() {
+        let methods = vec![
+            PaymentMethod::BankTransfer,
+            PaymentMethod::CreditCard,
+            PaymentMethod::Crypto,
+            PaymentMethod::Escrow,
+            PaymentMethod::LetterOfCredit,
+        ];
+        for method in methods {
+            let json = serde_json::to_string(&method).unwrap();
+            let back: PaymentMethod = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, method);
+        }
+    }
+
+    #[test]
+    fn test_create_payment_input_serde() {
+        let input = CreatePaymentInput {
+            po_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            amount: 50_000,
+            currency: "USD".to_string(),
+            method: PaymentMethod::BankTransfer,
+            payee: AgentPubKey::from_raw_36(vec![1u8; 36]),
+            reference: "INV-2026-001".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: CreatePaymentInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.amount, 50_000);
+        assert_eq!(back.currency, "USD");
+        assert_eq!(back.reference, "INV-2026-001");
+    }
+
+    #[test]
+    fn test_payment_completed_filter() {
+        // Simulate the get_po_total_paid filter logic
+        struct FakePayment { status: PaymentStatus, amount: u64 }
+        let payments = vec![
+            FakePayment { status: PaymentStatus::Completed, amount: 100 },
+            FakePayment { status: PaymentStatus::Pending, amount: 200 },
+            FakePayment { status: PaymentStatus::Completed, amount: 300 },
+            FakePayment { status: PaymentStatus::Failed, amount: 400 },
+        ];
+        let total: u64 = payments.iter()
+            .filter(|p| p.status == PaymentStatus::Completed)
+            .map(|p| p.amount)
+            .sum();
+        assert_eq!(total, 400); // 100 + 300
+    }
+}

@@ -143,3 +143,25 @@ roles:
         network_seed: ~
         properties: ~
       clone_limit: 0
+
+  - name: supplychain
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./supplychain/holochain/dna/supplychain.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: manufacturing
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./manufacturing/dna/manufacturing.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
