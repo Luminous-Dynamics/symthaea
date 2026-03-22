@@ -229,6 +229,7 @@ fn requirements_for(substrate: SubstrateType) -> SubstrateRequirements {
         SubstrateType::BiochemicalComputer => SubstrateRequirements::biochemical_computer(),
         SubstrateType::HybridSystem => SubstrateRequirements::hybrid_system(),
         SubstrateType::ExoticSubstrate => SubstrateRequirements::exotic_substrate(),
+        SubstrateType::SpacecraftComputer => SubstrateRequirements::spacecraft_computer(),
         _ => SubstrateRequirements::silicon_digital(),
     }
 }

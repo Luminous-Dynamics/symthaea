@@ -6,10 +6,12 @@
 use conjunctions_integrity::*;
 use hdk::prelude::*;
 use mycelix_space_shared::{
-    compute_staleness, AlertPriority, AlertType, ConjunctionAlert, ConjunctionAssessment,
-    ConjunctionDataMessage, ManeuverAlert, ManeuverType as SharedManeuverType, PaginatedResponse,
-    PaginationParams, QualityScore, ScreenInput, SpaceError, SpaceErrorCode, SpaceSignal,
-    SpaceTimestamp, StalenessAwareAssessment, StalenessConfig, TleWithMetadata,
+    compute_staleness, gate_space_operation, requirement_for_conjunction_creation,
+    requirement_for_negotiation, requirement_for_risk_update, AlertPriority, AlertType,
+    ConjunctionAlert, ConjunctionAssessment, ConjunctionDataMessage, ManeuverAlert,
+    ManeuverType as SharedManeuverType, PaginatedResponse, PaginationParams, QualityScore,
+    ScreenInput, SpaceError, SpaceErrorCode, SpaceSignal, SpaceTimestamp,
+    StalenessAwareAssessment, StalenessConfig, TleWithMetadata,
 };
 use orbital_mechanics::conjunction::ConjunctionAnalyzer;
 use orbital_mechanics::propagator::Propagator;
@@ -64,6 +66,15 @@ pub enum ConjunctionSignal {
     CdmUpdate { event_id: String, version: u32 },
     /// Maneuver announcement
     ManeuverAnnounced { event_id: String, norad_id: u32 },
+    /// Signal emitted when a conjunction's risk level changes during re-screening
+    RiskLevelChanged {
+        event_hash: ActionHash,
+        event_id: String,
+        previous_risk: String,
+        new_risk: String,
+        new_pc: f64,
+        new_miss_distance_km: f64,
+    },
 }
 
 /// Risk level threshold for automatic alerts
@@ -76,6 +87,7 @@ const ALERT_THRESHOLD: RiskLevel = RiskLevel::Medium;
 /// analysis. Otherwise, the manually-provided values are used (backward compatible).
 #[hdk_extern]
 pub fn create_conjunction_event(input: CreateEventInput) -> ExternResult<ActionHash> {
+    gate_space_operation(&requirement_for_conjunction_creation(), "create_conjunction_event")?;
     if input.event_id.is_empty() || input.event_id.len() > 256 {
         return Err(SpaceError::new(
             SpaceErrorCode::InvalidInput,
@@ -256,6 +268,7 @@ pub struct CreateEventInput {
 /// threshold upward, or a standard update alert if already above threshold.
 #[hdk_extern]
 pub fn update_conjunction_risk(input: UpdateRiskInput) -> ExternResult<ActionHash> {
+    gate_space_operation(&requirement_for_risk_update(), "update_conjunction_risk")?;
     // Get the current event
     let record = get(input.event_hash.clone(), GetOptions::default())?.ok_or(
         SpaceError::new(SpaceErrorCode::EventNotFound, "Conjunction event not found")
@@ -318,6 +331,7 @@ pub struct UpdateRiskInput {
 /// signal. Use `supersedes` to indicate which prior CDM this replaces.
 #[hdk_extern]
 pub fn submit_cdm(input: SubmitCdmInput) -> ExternResult<ActionHash> {
+    gate_space_operation(&requirement_for_conjunction_creation(), "submit_cdm")?;
     if input.cdm.conjunction_id.is_empty() || input.cdm.conjunction_id.len() > 256 {
         return Err(SpaceError::new(
             SpaceErrorCode::InvalidInput,
@@ -362,6 +376,7 @@ pub struct SubmitCdmInput {
 /// Announce an avoidance maneuver
 #[hdk_extern]
 pub fn announce_maneuver(input: AnnounceManeuverInput) -> ExternResult<ActionHash> {
+    gate_space_operation(&requirement_for_negotiation(), "announce_maneuver")?;
     if input.event_id.is_empty() || input.event_id.len() > 256 {
         return Err(SpaceError::new(
             SpaceErrorCode::InvalidInput,
@@ -448,6 +463,7 @@ pub struct AnnounceManeuverInput {
 /// a `ManeuverExecuted` alert signal.
 #[hdk_extern]
 pub fn mark_maneuver_executed(input: ManeuverExecutedInput) -> ExternResult<ActionHash> {
+    gate_space_operation(&requirement_for_negotiation(), "mark_maneuver_executed")?;
     // Get the current maneuver
     let record = get(input.maneuver_hash.clone(), GetOptions::default())?.ok_or(
         SpaceError::new(SpaceErrorCode::NotFound, "Maneuver not found")
@@ -1084,6 +1100,213 @@ fn convert_lib_risk_to_integrity(level: orbital_mechanics::conjunction::RiskLeve
         orbital_mechanics::conjunction::RiskLevel::Medium => RiskLevel::Medium,
         orbital_mechanics::conjunction::RiskLevel::High => RiskLevel::High,
         orbital_mechanics::conjunction::RiskLevel::Emergency => RiskLevel::Emergency,
+    }
+}
+
+// =============================================================================
+// Re-screening
+// =============================================================================
+
+/// Re-screen an existing conjunction event with fresh TLE data.
+///
+/// Fetches the existing event, retrieves the latest TLEs for both objects
+/// from the orbital_objects zome, re-runs conjunction analysis at the
+/// original TCA, and updates the event if the risk level changed.
+/// Emits a `RiskLevelChanged` signal when the risk level changes.
+#[hdk_extern]
+pub fn rescreen_conjunction(event_hash: ActionHash) -> ExternResult<ConjunctionEvent> {
+    // 1. Get the existing conjunction event
+    let record = get(event_hash.clone(), GetOptions::default())?.ok_or(
+        SpaceError::new(SpaceErrorCode::EventNotFound, "Conjunction event not found")
+            .with_context(format!("hash: {}", event_hash))
+            .into_wasm_error(),
+    )?;
+
+    let event: ConjunctionEvent = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            SpaceError::new(
+                SpaceErrorCode::InvalidInput,
+                format!("Failed to deserialize: {:?}", e),
+            )
+            .into_wasm_error()
+        })?
+        .ok_or(
+            SpaceError::new(
+                SpaceErrorCode::InvalidInput,
+                "Entry is not a ConjunctionEvent",
+            )
+            .into_wasm_error(),
+        )?;
+
+    // Skip re-screening for terminal states
+    match event.status {
+        EventStatus::Passed | EventStatus::Collision | EventStatus::Mitigated => {
+            return Ok(event);
+        }
+        _ => {}
+    }
+
+    // 2. Fetch latest TLEs for both objects via cross-zome call
+    let norad_ids = vec![event.primary_norad_id, event.secondary_norad_id];
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("orbital_objects"),
+        FunctionName::new("get_latest_tles"),
+        None,
+        norad_ids,
+    )?;
+
+    let response_bytes = match response {
+        ZomeCallResponse::Ok(bytes) => bytes,
+        ZomeCallResponse::Unauthorized(..) => {
+            return Err(SpaceError::new(
+                SpaceErrorCode::Unauthorized,
+                "Unauthorized cross-zome call to orbital_objects",
+            )
+            .into_wasm_error());
+        }
+        _ => {
+            return Err(SpaceError::new(
+                SpaceErrorCode::InvalidInput,
+                "Cross-zome call to orbital_objects failed",
+            )
+            .into_wasm_error());
+        }
+    };
+
+    let tle_lines: Vec<TleLinesResponse> = response_bytes.decode().map_err(|e| {
+        SpaceError::new(
+            SpaceErrorCode::InvalidInput,
+            format!("Failed to decode TLE response: {:?}", e),
+        )
+        .into_wasm_error()
+    })?;
+
+    let tle_map: std::collections::HashMap<u32, &TleLinesResponse> =
+        tle_lines.iter().map(|t| (t.norad_id, t)).collect();
+
+    let primary_tle_data = tle_map.get(&event.primary_norad_id).ok_or_else(|| {
+        SpaceError::new(
+            SpaceErrorCode::NotFound,
+            format!(
+                "No TLE found for primary object {}",
+                event.primary_norad_id
+            ),
+        )
+        .into_wasm_error()
+    })?;
+
+    let secondary_tle_data = tle_map.get(&event.secondary_norad_id).ok_or_else(|| {
+        SpaceError::new(
+            SpaceErrorCode::NotFound,
+            format!(
+                "No TLE found for secondary object {}",
+                event.secondary_norad_id
+            ),
+        )
+        .into_wasm_error()
+    })?;
+
+    // 3. Parse TLEs and re-run screening
+    let primary_tle =
+        TwoLineElement::parse_lines(None, &primary_tle_data.line1, &primary_tle_data.line2)
+            .map_err(|e| {
+                SpaceError::new(
+                    SpaceErrorCode::TleParseError,
+                    format!("Invalid primary TLE: {}", e),
+                )
+                .into_wasm_error()
+            })?;
+
+    let secondary_tle =
+        TwoLineElement::parse_lines(None, &secondary_tle_data.line1, &secondary_tle_data.line2)
+            .map_err(|e| {
+                SpaceError::new(
+                    SpaceErrorCode::TleParseError,
+                    format!("Invalid secondary TLE: {}", e),
+                )
+                .into_wasm_error()
+            })?;
+
+    let primary_prop = Propagator::from_tle(&primary_tle).map_err(|e| {
+        SpaceError::new(
+            SpaceErrorCode::InvalidInput,
+            format!("Primary propagation init failed: {}", e),
+        )
+        .into_wasm_error()
+    })?;
+
+    let secondary_prop = Propagator::from_tle(&secondary_tle).map_err(|e| {
+        SpaceError::new(
+            SpaceErrorCode::InvalidInput,
+            format!("Secondary propagation init failed: {}", e),
+        )
+        .into_wasm_error()
+    })?;
+
+    // Propagate to original TCA
+    let tca_dt = event.tca.to_datetime();
+    let primary_state = primary_prop.propagate_to(tca_dt).map_err(|e| {
+        SpaceError::new(
+            SpaceErrorCode::InvalidInput,
+            format!("Primary propagation failed: {}", e),
+        )
+        .into_wasm_error()
+    })?;
+    let secondary_state = secondary_prop.propagate_to(tca_dt).map_err(|e| {
+        SpaceError::new(
+            SpaceErrorCode::InvalidInput,
+            format!("Secondary propagation failed: {}", e),
+        )
+        .into_wasm_error()
+    })?;
+
+    let analyzer = ConjunctionAnalyzer::new();
+    let assessment = analyzer.assess(&primary_state, &secondary_state);
+    let new_risk = convert_lib_risk_to_integrity(assessment.risk_level);
+    let new_pc = assessment.collision_probability.pc;
+    let new_miss = assessment.miss_distance_km;
+
+    // 4. If risk level changed, update the event and emit signal
+    let previous_risk = event.risk_level;
+    if new_risk != previous_risk
+        || (new_pc - event.max_pc).abs() > 1e-12
+        || (new_miss - event.miss_distance_km).abs() > 1e-6
+    {
+        let mut updated_event = event.clone();
+        updated_event.risk_level = new_risk;
+        updated_event.max_pc = new_pc;
+        updated_event.miss_distance_km = new_miss;
+        updated_event.updated_at = SpaceTimestamp::now();
+
+        update_entry(event_hash.clone(), &updated_event)?;
+
+        // Emit risk level changed signal if risk actually changed
+        if new_risk != previous_risk {
+            let signal = ConjunctionSignal::RiskLevelChanged {
+                event_hash,
+                event_id: updated_event.event_id.clone(),
+                previous_risk: format!("{:?}", previous_risk),
+                new_risk: format!("{:?}", new_risk),
+                new_pc,
+                new_miss_distance_km: new_miss,
+            };
+            emit_signal(signal)?;
+
+            // Also emit standard alert signals for escalation/de-escalation
+            if previous_risk < ALERT_THRESHOLD && new_risk >= ALERT_THRESHOLD {
+                emit_risk_escalation_alert(&updated_event, previous_risk)?;
+            } else if new_risk >= ALERT_THRESHOLD {
+                emit_conjunction_alert(&updated_event)?;
+            }
+        }
+
+        Ok(updated_event)
+    } else {
+        // 5. No change -- return the original event
+        Ok(event)
     }
 }
 

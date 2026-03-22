@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Radio Dispatcher — Multi-Band Tiered Radio Architecture
 //!
 //! **Requires**: `feature = "mesh"`
@@ -3314,6 +3317,16 @@ pub enum OfflineExperienceKind {
     MoralEvent { salience: f32 },
     /// Threat detected while offline.
     ThreatDetected { threat_type: u8, severity: f32 },
+    /// Space situational awareness event (conjunction, debris alert, comm window).
+    #[cfg(feature = "space-alerts")]
+    SpaceEvent {
+        /// Alert type name (e.g. "ConjunctionWarning", "DebrisProximity").
+        alert_type: String,
+        /// Severity [0.0, 1.0].
+        severity: f32,
+        /// Seconds until event (negative = past).
+        time_to_event_seconds: f64,
+    },
 }
 
 /// Result of dream consolidation on the offline buffer.
@@ -3491,6 +3504,35 @@ impl StoreAndForward {
                 )
                 .into_bytes(),
             });
+        }
+
+        // Consolidate space events into alert summary
+        #[cfg(feature = "space-alerts")]
+        {
+            let space_events: Vec<_> = self
+                .offline_buffer
+                .iter()
+                .filter(|e| matches!(e.kind, OfflineExperienceKind::SpaceEvent { .. }))
+                .collect();
+            if !space_events.is_empty() {
+                let max_severity = space_events
+                    .iter()
+                    .filter_map(|e| match &e.kind {
+                        OfflineExperienceKind::SpaceEvent { severity, .. } => Some(*severity),
+                        _ => None,
+                    })
+                    .fold(0.0f32, f32::max);
+                patterns.push(ConsolidatedPattern {
+                    kind: "space_alert_summary".into(),
+                    confidence: max_severity,
+                    data: format!(
+                        "space_alerts:{},max_severity:{:.2}",
+                        space_events.len(),
+                        max_severity
+                    )
+                    .into_bytes(),
+                });
+            }
         }
 
         let experiences_consolidated = self.offline_buffer.len();

@@ -1447,3 +1447,314 @@ pub struct PaginatedResponse<T> {
     /// Whether there are more results after this page
     pub has_more: bool,
 }
+
+// =============================================================================
+// Universal Trust Fabric — Space-Domain Requirements
+// =============================================================================
+
+pub use mycelix_bridge_common::{ConsciousnessTier, GovernanceRequirement};
+
+/// Observer — anyone can submit TLEs (more data = better catalog)
+pub fn requirement_for_tle_submission() -> GovernanceRequirement {
+    GovernanceRequirement {
+        min_tier: ConsciousnessTier::Observer,
+        min_identity: None,
+        min_community: None,
+    }
+}
+
+/// Observer — low bar for sensor data, chi-square gating handles quality
+pub fn requirement_for_observation() -> GovernanceRequirement {
+    GovernanceRequirement {
+        min_tier: ConsciousnessTier::Observer,
+        min_identity: None,
+        min_community: None,
+    }
+}
+
+/// Participant — conjunction events affect operational decisions
+pub fn requirement_for_conjunction_creation() -> GovernanceRequirement {
+    GovernanceRequirement {
+        min_tier: ConsciousnessTier::Participant,
+        min_identity: Some(0.25),
+        min_community: None,
+    }
+}
+
+/// Citizen — risk updates influence maneuver decisions
+pub fn requirement_for_risk_update() -> GovernanceRequirement {
+    GovernanceRequirement {
+        min_tier: ConsciousnessTier::Citizen,
+        min_identity: None,
+        min_community: None,
+    }
+}
+
+/// Citizen — fusion results affect downstream screening
+pub fn requirement_for_fusion() -> GovernanceRequirement {
+    GovernanceRequirement {
+        min_tier: ConsciousnessTier::Citizen,
+        min_identity: None,
+        min_community: None,
+    }
+}
+
+/// Steward — financial commitment requires verified identity
+pub fn requirement_for_bounty_creation() -> GovernanceRequirement {
+    GovernanceRequirement {
+        min_tier: ConsciousnessTier::Steward,
+        min_identity: Some(0.5),
+        min_community: Some(0.3),
+    }
+}
+
+/// Citizen — claiming a bounty requires operational capability
+pub fn requirement_for_bounty_claim() -> GovernanceRequirement {
+    GovernanceRequirement {
+        min_tier: ConsciousnessTier::Citizen,
+        min_identity: Some(0.3),
+        min_community: None,
+    }
+}
+
+/// Steward — verification evidence integrity is critical
+pub fn requirement_for_bounty_verification() -> GovernanceRequirement {
+    GovernanceRequirement {
+        min_tier: ConsciousnessTier::Steward,
+        min_identity: Some(0.5),
+        min_community: Some(0.2),
+    }
+}
+
+/// Citizen — initiating negotiation requires coordination authority
+pub fn requirement_for_negotiation() -> GovernanceRequirement {
+    GovernanceRequirement {
+        min_tier: ConsciousnessTier::Citizen,
+        min_identity: Some(0.3),
+        min_community: Some(0.2),
+    }
+}
+
+/// Steward — cosigning is a binding operational agreement
+pub fn requirement_for_agreement_signing() -> GovernanceRequirement {
+    GovernanceRequirement {
+        min_tier: ConsciousnessTier::Steward,
+        min_identity: Some(0.5),
+        min_community: Some(0.3),
+    }
+}
+
+// =============================================================================
+// Space consciousness gate (bootstrap-aware)
+// =============================================================================
+
+/// Best-effort consciousness gate for space operations.
+///
+/// Attempts a cross-role call to the identity cluster's consciousness gating
+/// zome. If the identity cluster is unavailable (space hApp running standalone
+/// or during network bootstrap), falls back to bootstrap mode and allows the
+/// operation with a debug log.
+///
+/// This follows the same fail-open bootstrap pattern used by other Mycelix
+/// clusters when community membership is below the critical threshold.
+pub fn gate_space_operation(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> hdk::prelude::ExternResult<()> {
+    use hdk::prelude::*;
+    use mycelix_bridge_common::{
+        ConsciousnessCredential, evaluate_governance,
+    };
+
+    let agent = agent_info()?.agent_initial_pubkey;
+    let did = format!("did:mycelix:{}", agent);
+
+    // Try cross-role call to identity cluster's bridge zome
+    match call(
+        CallTargetCell::OtherRole("mycelix-identity".into()),
+        ZomeName::new("consciousness_gating"),
+        FunctionName::new("get_consciousness_credential"),
+        None,
+        did,
+    ) {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            match extern_io.decode::<ConsciousnessCredential>() {
+                Ok(credential) => {
+                    let now_us = sys_time()?.as_micros() as u64;
+                    let eligibility = evaluate_governance(&credential, requirement, now_us);
+                    if !eligibility.eligible {
+                        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                            "Consciousness gate denied for action '{}': requires {:?} tier, \
+                             agent has {:?}",
+                            action_name, requirement.min_tier, credential.tier
+                        ))));
+                    }
+                    Ok(())
+                }
+                Err(_) => {
+                    // Credential decode failed — bootstrap mode
+                    debug!(
+                        "Space consciousness gate: credential decode failed, \
+                         bootstrap mode for: {}",
+                        action_name
+                    );
+                    Ok(())
+                }
+            }
+        }
+        Ok(ZomeCallResponse::NetworkError(e)) => {
+            // Identity cluster unreachable — allow in bootstrap mode
+            debug!(
+                "Space consciousness gate: identity cluster unreachable ({}), \
+                 bootstrap mode for: {}",
+                e, action_name
+            );
+            Ok(())
+        }
+        Ok(_) => {
+            // Unexpected response variant — allow in bootstrap mode
+            debug!(
+                "Space consciousness gate: unexpected response, \
+                 bootstrap mode for: {}",
+                action_name
+            );
+            Ok(())
+        }
+        Err(_) => {
+            // Zome not found — standalone space hApp without identity cluster
+            debug!(
+                "Space consciousness gate: no identity cluster, \
+                 bootstrap mode for: {}",
+                action_name
+            );
+            Ok(())
+        }
+    }
+}
+
+// =============================================================================
+// Trust Fabric Tests
+// =============================================================================
+
+#[cfg(test)]
+mod trust_fabric_tests {
+    use super::*;
+
+    #[test]
+    fn test_requirement_tiers_are_ordered() {
+        // Verify tier progression: Observer < Participant < Citizen < Steward
+        assert!(
+            (requirement_for_tle_submission().min_tier as u8)
+                <= (requirement_for_conjunction_creation().min_tier as u8)
+        );
+        assert!(
+            (requirement_for_conjunction_creation().min_tier as u8)
+                <= (requirement_for_risk_update().min_tier as u8)
+        );
+        assert!(
+            (requirement_for_risk_update().min_tier as u8)
+                <= (requirement_for_bounty_creation().min_tier as u8)
+        );
+    }
+
+    #[test]
+    fn test_observer_requirements_have_no_minimums() {
+        let req = requirement_for_tle_submission();
+        assert_eq!(req.min_tier, ConsciousnessTier::Observer);
+        assert!(req.min_identity.is_none());
+        assert!(req.min_community.is_none());
+
+        let req = requirement_for_observation();
+        assert_eq!(req.min_tier, ConsciousnessTier::Observer);
+        assert!(req.min_identity.is_none());
+        assert!(req.min_community.is_none());
+    }
+
+    #[test]
+    fn test_steward_requirements_have_identity_and_community() {
+        let req = requirement_for_bounty_creation();
+        assert_eq!(req.min_tier, ConsciousnessTier::Steward);
+        assert!(req.min_identity.is_some());
+        assert!(req.min_community.is_some());
+
+        let req = requirement_for_agreement_signing();
+        assert_eq!(req.min_tier, ConsciousnessTier::Steward);
+        assert!(req.min_identity.is_some());
+        assert!(req.min_community.is_some());
+
+        let req = requirement_for_bounty_verification();
+        assert_eq!(req.min_tier, ConsciousnessTier::Steward);
+        assert!(req.min_identity.is_some());
+        assert!(req.min_community.is_some());
+    }
+
+    #[test]
+    fn test_citizen_requirements() {
+        let req = requirement_for_risk_update();
+        assert_eq!(req.min_tier, ConsciousnessTier::Citizen);
+
+        let req = requirement_for_fusion();
+        assert_eq!(req.min_tier, ConsciousnessTier::Citizen);
+
+        let req = requirement_for_bounty_claim();
+        assert_eq!(req.min_tier, ConsciousnessTier::Citizen);
+        assert!(req.min_identity.is_some());
+
+        let req = requirement_for_negotiation();
+        assert_eq!(req.min_tier, ConsciousnessTier::Citizen);
+        assert!(req.min_identity.is_some());
+        assert!(req.min_community.is_some());
+    }
+
+    #[test]
+    fn test_participant_conjunction_creation() {
+        let req = requirement_for_conjunction_creation();
+        assert_eq!(req.min_tier, ConsciousnessTier::Participant);
+        assert_eq!(req.min_identity, Some(0.25));
+        assert!(req.min_community.is_none());
+    }
+
+    #[test]
+    fn test_bounty_creation_is_stricter_than_claim() {
+        let create = requirement_for_bounty_creation();
+        let claim = requirement_for_bounty_claim();
+        assert!((create.min_tier as u8) >= (claim.min_tier as u8));
+        assert!(
+            create.min_identity.unwrap_or(0.0) >= claim.min_identity.unwrap_or(0.0)
+        );
+    }
+
+    #[test]
+    fn test_agreement_signing_is_stricter_than_negotiation() {
+        let sign = requirement_for_agreement_signing();
+        let negotiate = requirement_for_negotiation();
+        assert!((sign.min_tier as u8) >= (negotiate.min_tier as u8));
+        assert!(
+            sign.min_identity.unwrap_or(0.0) >= negotiate.min_identity.unwrap_or(0.0)
+        );
+    }
+
+    #[test]
+    fn test_all_identity_scores_bounded() {
+        let all_reqs = vec![
+            requirement_for_tle_submission(),
+            requirement_for_observation(),
+            requirement_for_conjunction_creation(),
+            requirement_for_risk_update(),
+            requirement_for_fusion(),
+            requirement_for_bounty_creation(),
+            requirement_for_bounty_claim(),
+            requirement_for_bounty_verification(),
+            requirement_for_negotiation(),
+            requirement_for_agreement_signing(),
+        ];
+        for req in &all_reqs {
+            if let Some(id) = req.min_identity {
+                assert!(id >= 0.0 && id <= 1.0, "identity out of bounds: {}", id);
+            }
+            if let Some(comm) = req.min_community {
+                assert!(comm >= 0.0 && comm <= 1.0, "community out of bounds: {}", comm);
+            }
+        }
+    }
+}

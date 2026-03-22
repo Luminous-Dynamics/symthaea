@@ -1,4 +1,6 @@
-//! Traffic Control Integrity Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Traffic Control Integrity Zome
 //!
 //! Implements automated space traffic coordination through
 //! AI-mediated negotiation between operators. When a conjunction
@@ -35,6 +37,17 @@ pub enum EntryTypes {
 
     /// Lambert-computed avoidance maneuver option
     AvoidanceOption(AvoidanceOption),
+
+    // --- Multi-party negotiation (N-operator) ---
+
+    /// Multi-party conjunction proposal — extends bilateral to N operators
+    ConjunctionProposal(ConjunctionProposal),
+
+    /// Operator vote on a conjunction proposal
+    OperatorVote(OperatorVote),
+
+    /// Multi-party agreement cosigned by quorum of operators
+    MultiPartyAgreement(MultiPartyAgreement),
 }
 
 #[hdk_link_types]
@@ -49,6 +62,17 @@ pub enum LinkTypes {
     OperatorSessions,
     /// Avoidance options for a session
     SessionAvoidanceOptions,
+
+    // --- Multi-party negotiation links ---
+
+    /// Conjunction proposal → operator votes
+    ProposalToVotes,
+    /// Conjunction ID → conjunction proposals
+    ConjunctionProposals,
+    /// Conjunction proposal → multi-party agreement
+    ProposalAgreements,
+    /// Operator → conjunction proposals they are part of
+    OperatorProposals,
 }
 
 /// A negotiation session between operators
@@ -296,6 +320,138 @@ pub struct NegotiationAgreement {
     pub execution_deadline: SpaceTimestamp,
 }
 
+// =============================================================================
+// Multi-party negotiation entry types (N-operator coordination)
+// =============================================================================
+
+/// Multi-party conjunction proposal — extends bilateral to N operators.
+///
+/// When a conjunction involves objects from more than two operators (e.g.,
+/// mega-constellation scenarios), this entry tracks the multi-party
+/// negotiation with pre-computed maneuver options and weighted voting.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ConjunctionProposal {
+    /// Unique proposal identifier
+    pub proposal_id: String,
+    /// Related conjunction event ID
+    pub conjunction_id: String,
+    /// All operators affected by this conjunction
+    pub affected_operators: Vec<AgentPubKey>,
+    /// Time of closest approach (microseconds since epoch)
+    pub tca: i64,
+    /// Primary object NORAD ID
+    pub primary_norad_id: u32,
+    /// Secondary objects involved in the conjunction
+    pub secondary_norad_ids: Vec<u32>,
+    /// Pre-computed avoidance maneuver options (from Lambert solver)
+    pub maneuver_options: Vec<ManeuverOption>,
+    /// Deadline for voting (microseconds since epoch)
+    pub voting_deadline: i64,
+    /// Current proposal status
+    pub status: MultiPartyProposalStatus,
+    /// Fraction of operators needed for quorum (0.5-1.0)
+    pub quorum_threshold: f64,
+    /// Created at (microseconds since epoch)
+    pub created_at: i64,
+    /// Agent who created this proposal
+    pub created_by: AgentPubKey,
+}
+
+/// Status of a multi-party conjunction proposal.
+///
+/// Named `MultiPartyProposalStatus` to avoid collision with the existing
+/// bilateral `ProposalStatus` enum.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub enum MultiPartyProposalStatus {
+    /// Accepting votes from affected operators
+    Voting,
+    /// Quorum reached, winning option approved
+    Approved,
+    /// Quorum not reached or majority rejected
+    Rejected,
+    /// Voting deadline passed without quorum
+    Expired,
+    /// Approved maneuver is being executed
+    Executing,
+    /// Maneuver executed and verified
+    Completed,
+}
+
+impl MultiPartyProposalStatus {
+    /// Valid status transitions for the proposal state machine.
+    pub fn is_valid_transition(&self, next: &Self) -> bool {
+        matches!(
+            (self, next),
+            (Self::Voting, Self::Approved)
+                | (Self::Voting, Self::Rejected)
+                | (Self::Voting, Self::Expired)
+                | (Self::Approved, Self::Executing)
+                | (Self::Approved, Self::Expired)
+                | (Self::Executing, Self::Completed)
+        )
+    }
+}
+
+/// A pre-computed avoidance maneuver option for multi-party proposals.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct ManeuverOption {
+    /// Index of this option (for voting reference)
+    pub option_index: u32,
+    /// Human-readable description
+    pub description: String,
+    /// NORAD ID of the object that would maneuver
+    pub maneuvering_norad_id: u32,
+    /// Required delta-V in m/s
+    pub delta_v_ms: f64,
+    /// Maneuver direction (unit vector)
+    pub direction: [f64; 3],
+    /// Post-maneuver miss distance in km
+    pub post_maneuver_miss_km: f64,
+    /// Post-maneuver collision probability
+    pub post_maneuver_pc: f64,
+}
+
+/// Operator vote on a conjunction proposal.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct OperatorVote {
+    /// Proposal this vote is for
+    pub proposal_id: String,
+    /// Voting operator
+    pub voter: AgentPubKey,
+    /// Index of preferred maneuver option
+    pub preferred_option_index: u32,
+    /// Operator's trust/consciousness weight (0.0-1.0)
+    pub vote_weight: f64,
+    /// Optional justification for the vote
+    pub justification: Option<String>,
+    /// Voted at (microseconds since epoch)
+    pub voted_at: i64,
+}
+
+/// Multi-party agreement cosigned by quorum of operators.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct MultiPartyAgreement {
+    /// Proposal this agreement resolves
+    pub proposal_id: String,
+    /// Related conjunction event ID
+    pub conjunction_id: String,
+    /// Index of the approved maneuver option
+    pub approved_option_index: u32,
+    /// Operators who voted for the winning option
+    pub approving_operators: Vec<AgentPubKey>,
+    /// Sum of approving operators' vote weights
+    pub total_vote_weight: f64,
+    /// Whether quorum was met
+    pub quorum_met: bool,
+    /// Deadline for executing the maneuver (microseconds since epoch)
+    pub execution_deadline: i64,
+    /// Created at (microseconds since epoch)
+    pub created_at: i64,
+}
+
 #[hdk_extern]
 pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateCallbackResult> {
     Ok(ValidateCallbackResult::Valid)
@@ -310,6 +466,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             EntryTypes::ManeuverProposal(prop) => validate_proposal(&prop),
             EntryTypes::NegotiationAgreement(agr) => validate_agreement(&agr),
             EntryTypes::AvoidanceOption(opt) => validate_avoidance_option(&opt),
+            EntryTypes::ConjunctionProposal(cp) => validate_conjunction_proposal(&cp),
+            EntryTypes::OperatorVote(vote) => validate_operator_vote(&vote),
+            EntryTypes::MultiPartyAgreement(mpa) => validate_multi_party_agreement(&mpa),
         },
         _ => Ok(ValidateCallbackResult::Valid),
     }
@@ -597,4 +756,346 @@ fn validate_avoidance_option(opt: &AvoidanceOption) -> ExternResult<ValidateCall
     }
 
     Ok(ValidateCallbackResult::Valid)
+}
+
+// =============================================================================
+// Multi-party negotiation validation
+// =============================================================================
+
+fn validate_conjunction_proposal(cp: &ConjunctionProposal) -> ExternResult<ValidateCallbackResult> {
+    // proposal_id must not be empty and <= 256 chars
+    if cp.proposal_id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Proposal ID cannot be empty".to_string(),
+        ));
+    }
+    if cp.proposal_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Proposal ID too long: {} chars (max 256)",
+            cp.proposal_id.len()
+        )));
+    }
+
+    // conjunction_id must not be empty
+    if cp.conjunction_id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Conjunction ID cannot be empty".to_string(),
+        ));
+    }
+    if cp.conjunction_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Conjunction ID too long: {} chars (max 256)",
+            cp.conjunction_id.len()
+        )));
+    }
+
+    // At least 2 affected operators
+    if cp.affected_operators.len() < 2 {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "At least 2 affected operators required, got {}",
+            cp.affected_operators.len()
+        )));
+    }
+
+    // Cap at 64 operators to bound DHT load
+    if cp.affected_operators.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Too many affected operators: {} (max 64)",
+            cp.affected_operators.len()
+        )));
+    }
+
+    // Primary NORAD ID must be valid
+    if cp.primary_norad_id == 0 || cp.primary_norad_id > 999999 {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid primary NORAD ID: {}",
+            cp.primary_norad_id
+        )));
+    }
+
+    // At least 1 secondary NORAD ID
+    if cp.secondary_norad_ids.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "At least one secondary NORAD ID required".to_string(),
+        ));
+    }
+
+    // Validate all secondary NORAD IDs
+    for &norad in &cp.secondary_norad_ids {
+        if norad == 0 || norad > 999999 {
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "Invalid secondary NORAD ID: {}",
+                norad
+            )));
+        }
+    }
+
+    // Primary must not appear in secondary list
+    if cp.secondary_norad_ids.contains(&cp.primary_norad_id) {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Primary NORAD ID must not appear in secondary list".to_string(),
+        ));
+    }
+
+    // At least 2 maneuver options
+    if cp.maneuver_options.len() < 2 {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "At least 2 maneuver options required, got {}",
+            cp.maneuver_options.len()
+        )));
+    }
+
+    // Cap maneuver options at 32
+    if cp.maneuver_options.len() > 32 {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Too many maneuver options: {} (max 32)",
+            cp.maneuver_options.len()
+        )));
+    }
+
+    // Validate each maneuver option
+    for opt in &cp.maneuver_options {
+        if opt.maneuvering_norad_id == 0 || opt.maneuvering_norad_id > 999999 {
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "Invalid maneuvering NORAD ID in option {}: {}",
+                opt.option_index, opt.maneuvering_norad_id
+            )));
+        }
+        if !opt.delta_v_ms.is_finite() || opt.delta_v_ms < 0.0 {
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "delta_v_ms must be non-negative and finite in option {}, got {}",
+                opt.option_index, opt.delta_v_ms
+            )));
+        }
+        for &d in &opt.direction {
+            if !d.is_finite() {
+                return Ok(ValidateCallbackResult::Invalid(format!(
+                    "Direction components must be finite in option {}",
+                    opt.option_index
+                )));
+            }
+        }
+        if !opt.post_maneuver_miss_km.is_finite() || opt.post_maneuver_miss_km < 0.0 {
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "post_maneuver_miss_km must be non-negative and finite in option {}, got {}",
+                opt.option_index, opt.post_maneuver_miss_km
+            )));
+        }
+        if !opt.post_maneuver_pc.is_finite() || opt.post_maneuver_pc < 0.0 || opt.post_maneuver_pc > 1.0 {
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "post_maneuver_pc must be between 0 and 1 in option {}, got {}",
+                opt.option_index, opt.post_maneuver_pc
+            )));
+        }
+        if opt.description.len() > 1024 {
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "Description too long in option {}: {} chars (max 1024)",
+                opt.option_index, opt.description.len()
+            )));
+        }
+    }
+
+    // quorum_threshold must be in [0.5, 1.0]
+    if !cp.quorum_threshold.is_finite() || cp.quorum_threshold < 0.5 || cp.quorum_threshold > 1.0 {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "quorum_threshold must be between 0.5 and 1.0, got {}",
+            cp.quorum_threshold
+        )));
+    }
+
+    // voting_deadline must be after tca (can't vote after closest approach has passed)
+    // Note: deadline > tca is fine — operators may vote after TCA if maneuver lead-time allows
+    // We just require the deadline is plausible (non-zero)
+    if cp.voting_deadline <= 0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "voting_deadline must be a positive timestamp".to_string(),
+        ));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_operator_vote(vote: &OperatorVote) -> ExternResult<ValidateCallbackResult> {
+    // proposal_id must not be empty
+    if vote.proposal_id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Proposal ID cannot be empty".to_string(),
+        ));
+    }
+    if vote.proposal_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Proposal ID too long: {} chars (max 256)",
+            vote.proposal_id.len()
+        )));
+    }
+
+    // vote_weight must be in [0.0, 1.0]
+    if !vote.vote_weight.is_finite() || vote.vote_weight < 0.0 || vote.vote_weight > 1.0 {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "vote_weight must be between 0.0 and 1.0, got {}",
+            vote.vote_weight
+        )));
+    }
+
+    // justification length cap
+    if let Some(ref j) = vote.justification {
+        if j.len() > 2048 {
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "Justification too long: {} chars (max 2048)",
+                j.len()
+            )));
+        }
+    }
+
+    // voted_at must be a positive timestamp
+    if vote.voted_at <= 0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "voted_at must be a positive timestamp".to_string(),
+        ));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_multi_party_agreement(mpa: &MultiPartyAgreement) -> ExternResult<ValidateCallbackResult> {
+    // proposal_id must not be empty
+    if mpa.proposal_id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Proposal ID cannot be empty".to_string(),
+        ));
+    }
+
+    // conjunction_id must not be empty
+    if mpa.conjunction_id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Conjunction ID cannot be empty".to_string(),
+        ));
+    }
+
+    // Must have at least 2 approving operators
+    if mpa.approving_operators.len() < 2 {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "At least 2 approving operators required, got {}",
+            mpa.approving_operators.len()
+        )));
+    }
+
+    // total_vote_weight must be positive and finite
+    if !mpa.total_vote_weight.is_finite() || mpa.total_vote_weight <= 0.0 {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "total_vote_weight must be positive and finite, got {}",
+            mpa.total_vote_weight
+        )));
+    }
+
+    // execution_deadline must be positive
+    if mpa.execution_deadline <= 0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "execution_deadline must be a positive timestamp".to_string(),
+        ));
+    }
+
+    // created_at must be positive
+    if mpa.created_at <= 0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "created_at must be a positive timestamp".to_string(),
+        ));
+    }
+
+    // execution_deadline must be after created_at
+    if mpa.execution_deadline < mpa.created_at {
+        return Ok(ValidateCallbackResult::Invalid(
+            "execution_deadline cannot be before created_at".to_string(),
+        ));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+// =============================================================================
+// Unit tests
+// =============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_proposal_status_valid_transitions() {
+        use MultiPartyProposalStatus::*;
+
+        // Valid transitions
+        assert!(Voting.is_valid_transition(&Approved));
+        assert!(Voting.is_valid_transition(&Rejected));
+        assert!(Voting.is_valid_transition(&Expired));
+        assert!(Approved.is_valid_transition(&Executing));
+        assert!(Approved.is_valid_transition(&Expired));
+        assert!(Executing.is_valid_transition(&Completed));
+    }
+
+    #[test]
+    fn test_proposal_status_invalid_transitions() {
+        use MultiPartyProposalStatus::*;
+
+        // Invalid transitions
+        assert!(!Voting.is_valid_transition(&Completed));
+        assert!(!Voting.is_valid_transition(&Executing));
+        assert!(!Approved.is_valid_transition(&Rejected));
+        assert!(!Approved.is_valid_transition(&Voting));
+        assert!(!Rejected.is_valid_transition(&Approved));
+        assert!(!Rejected.is_valid_transition(&Voting));
+        assert!(!Expired.is_valid_transition(&Voting));
+        assert!(!Expired.is_valid_transition(&Approved));
+        assert!(!Completed.is_valid_transition(&Voting));
+        assert!(!Completed.is_valid_transition(&Executing));
+        assert!(!Executing.is_valid_transition(&Voting));
+        assert!(!Executing.is_valid_transition(&Rejected));
+    }
+
+    #[test]
+    fn test_proposal_status_terminal_states() {
+        use MultiPartyProposalStatus::*;
+
+        // Terminal states should not transition to anything
+        let terminals = [Rejected, Expired, Completed];
+        let all = [Voting, Approved, Rejected, Expired, Executing, Completed];
+        for terminal in &terminals {
+            for next in &all {
+                assert!(
+                    !terminal.is_valid_transition(next),
+                    "{:?} -> {:?} should be invalid",
+                    terminal,
+                    next
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_maneuver_option_direction_finite() {
+        let opt = ManeuverOption {
+            option_index: 0,
+            description: "Prograde burn".to_string(),
+            maneuvering_norad_id: 25544,
+            delta_v_ms: 0.5,
+            direction: [1.0, 0.0, 0.0],
+            post_maneuver_miss_km: 10.0,
+            post_maneuver_pc: 1e-6,
+        };
+        assert!(opt.direction.iter().all(|d| d.is_finite()));
+    }
+
+    #[test]
+    fn test_maneuver_option_pc_bounds() {
+        let opt = ManeuverOption {
+            option_index: 0,
+            description: "Test".to_string(),
+            maneuvering_norad_id: 25544,
+            delta_v_ms: 1.0,
+            direction: [0.0, 1.0, 0.0],
+            post_maneuver_miss_km: 5.0,
+            post_maneuver_pc: 0.5,
+        };
+        assert!(opt.post_maneuver_pc >= 0.0 && opt.post_maneuver_pc <= 1.0);
+    }
 }

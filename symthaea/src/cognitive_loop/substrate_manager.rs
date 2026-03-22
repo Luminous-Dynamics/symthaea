@@ -440,6 +440,7 @@ impl SubstrateManager {
             SubstrateType::BiochemicalComputer => SubstrateRequirements::biochemical_computer(),
             SubstrateType::HybridSystem => SubstrateRequirements::hybrid_system(),
             SubstrateType::ExoticSubstrate => SubstrateRequirements::exotic_substrate(),
+            SubstrateType::SpacecraftComputer => SubstrateRequirements::spacecraft_computer(),
             _ => SubstrateRequirements::silicon_digital(),
         }
     }
@@ -488,6 +489,7 @@ impl SubstrateManager {
             SubstrateType::SiliconDigital => Some("silicon"),
             SubstrateType::QuantumComputer => Some("quantum"),
             SubstrateType::HybridSystem => Some("hybrid"),
+            SubstrateType::SpacecraftComputer => Some("spacecraft"),
             _ => None,
         }
     }

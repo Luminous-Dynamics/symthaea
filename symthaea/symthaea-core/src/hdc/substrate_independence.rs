@@ -88,6 +88,11 @@ pub enum SubstrateType {
 
     /// Exotic (plasma, BZ reactions, unconventional substrates)
     ExoticSubstrate,
+
+    /// Radiation-hardened spacecraft onboard computer
+    /// Optimized for reliability over speed in the space environment
+    /// References: NASA RAD750, ESA LEON3, JPL spacecraft architectures
+    SpacecraftComputer,
 }
 
 // ============================================================================
@@ -186,6 +191,23 @@ impl SubstrateType {
             SubstrateType::BiochemicalComputer => "Biochemical computer (DNA/molecular)",
             SubstrateType::HybridSystem => "Hybrid (multiple substrates)",
             SubstrateType::ExoticSubstrate => "Exotic (plasma, BZ, etc.)",
+            SubstrateType::SpacecraftComputer => "Spacecraft Computer (Rad-Hard)",
+            _ => unreachable!("canonical covers aliases"),
+        }
+    }
+
+    /// Description of substrate characteristics
+    pub fn description(&self) -> &str {
+        match self.canonical() {
+            SubstrateType::BiologicalNeurons => "Carbon-based biological neurons. The only substrate with validated consciousness.",
+            SubstrateType::SiliconDigital => "Silicon-based digital computation. Fast, engineerable, but consciousness unproven.",
+            SubstrateType::QuantumComputer => "Quantum computers using qubits, superposition, and entanglement.",
+            SubstrateType::PhotonicProcessor => "Photonic processors using light for computation. Ultra-fast dynamics.",
+            SubstrateType::NeuromorphicChip => "Neuromorphic hardware mimicking biological spike dynamics.",
+            SubstrateType::BiochemicalComputer => "DNA and molecular logic computing. Massive parallelism, very slow.",
+            SubstrateType::HybridSystem => "Hybrid combining multiple substrate types for optimal capability.",
+            SubstrateType::ExoticSubstrate => "Exotic substrates such as plasma or BZ reactions.",
+            SubstrateType::SpacecraftComputer => "Radiation-hardened processors designed for space environments. Trade speed for reliability against SEUs (Single Event Upsets) and total ionizing dose. Power-constrained by solar panel or RTG output.",
             _ => unreachable!("canonical covers aliases"),
         }
     }
@@ -200,7 +222,8 @@ impl SubstrateType {
             SubstrateType::NeuromorphicChip => 1e-6,   // ~1 μs
             SubstrateType::BiochemicalComputer => 1.0, // ~1 s (very slow!)
             SubstrateType::HybridSystem => 1e-6,       // Depends on mix
-            SubstrateType::ExoticSubstrate => 0.01,    // Varies widely
+            SubstrateType::ExoticSubstrate => 0.01,       // Varies widely
+            SubstrateType::SpacecraftComputer => 1e-7, // ~100 ns (rad-hard, ~10-200 MHz)
             _ => unreachable!("canonical covers aliases"),
         }
     }
@@ -215,7 +238,8 @@ impl SubstrateType {
             SubstrateType::NeuromorphicChip => 1e-15,  // ~1 fJ
             SubstrateType::BiochemicalComputer => 1e-12, // ~1 pJ (inefficient)
             SubstrateType::HybridSystem => 1e-15,      // Varies
-            SubstrateType::ExoticSubstrate => 1e-10,   // Often inefficient
+            SubstrateType::ExoticSubstrate => 1e-10,       // Often inefficient
+            SubstrateType::SpacecraftComputer => 1e-8, // ~10 nJ (rad-hard overhead + power-limited)
             _ => unreachable!("canonical covers aliases"),
         }
     }
@@ -230,7 +254,8 @@ impl SubstrateType {
             SubstrateType::NeuromorphicChip => 1e-8,  // ~10 nm
             SubstrateType::BiochemicalComputer => 1e-9, // ~1 nm (DNA molecule)
             SubstrateType::HybridSystem => 1e-8,      // Varies
-            SubstrateType::ExoticSubstrate => 1e-3,   // Often macroscopic
+            SubstrateType::ExoticSubstrate => 1e-3,       // Often macroscopic
+            SubstrateType::SpacecraftComputer => 1e-2, // ~10 mm (larger feature sizes for rad tolerance)
             _ => unreachable!("canonical covers aliases"),
         }
     }
@@ -245,7 +270,8 @@ impl SubstrateType {
             SubstrateType::NeuromorphicChip => 1e9,   // ~1 billion
             SubstrateType::BiochemicalComputer => 1e15, // ~1 quadrillion (molecular)
             SubstrateType::HybridSystem => 1e12,      // Varies
-            SubstrateType::ExoticSubstrate => 1e6,    // Often limited
+            SubstrateType::ExoticSubstrate => 1e6,       // Often limited
+            SubstrateType::SpacecraftComputer => 1e6, // Limited by power budget, not transistor count
             _ => unreachable!("canonical covers aliases"),
         }
     }
@@ -436,6 +462,91 @@ impl SubstrateRequirements {
             quantum_support: 0.3,      // Varies
         }
     }
+
+    /// Spacecraft onboard computer requirements profile.
+    ///
+    /// Rad-hard processors sacrifice speed for reliability. High causality and
+    /// recurrence (deterministic real-time systems), moderate integration
+    /// (bus-limited: SpaceWire/CAN at ~100 Mbps), reduced binding (sequential
+    /// task execution), excellent attention (interrupt-priority scheduling).
+    ///
+    /// References:
+    /// - NASA RAD750: 200 MHz, 300 MIPS, 256 MB DRAM
+    /// - ESA LEON3: 100 MHz, TMR (Triple Modular Redundancy)
+    /// - Samudrala et al. (2004): SEU mitigation in spacecraft FPGAs
+    pub fn spacecraft_computer() -> Self {
+        Self {
+            causality: 1.0,              // Deterministic real-time systems
+            integration_capacity: 0.65,  // Bus-limited (SpaceWire/CAN ~100 Mbps)
+            temporal_dynamics: 0.85,     // Real-time OS (VxWorks/RTEMS) with precise timing
+            recurrence: 0.95,            // Strong feedback loops in GNC and FDIR
+            binding_capability: 0.50,    // Sequential task execution, limited parallelism
+            attention_capability: 0.90,  // Excellent priority interrupt scheduling
+            workspace_capability: 0.70,  // Shared memory model, limited by radiation scrubbing
+            hot_capability: 0.60,        // FDIR provides meta-monitoring, not full HOT
+            quantum_support: 0.0,        // Classical only
+        }
+    }
+
+    /// Apply radiation degradation to substrate requirements.
+    ///
+    /// Models the cumulative effect of Total Ionizing Dose (TID) and
+    /// Single Event Upsets (SEUs) on consciousness substrate capabilities.
+    ///
+    /// - `tid_krad`: Total ionizing dose in kilorads (Si)
+    ///   - LEO (ISS): ~10 krad/year behind 1g/cm² Al shielding
+    ///   - GEO: ~100 krad/year
+    ///   - Jupiter: ~1000 krad/year (Europa orbit)
+    /// - `seu_rate_per_day`: Single Event Upset rate (bit flips/day)
+    ///   - LEO: ~0.1-1 SEU/day for typical SRAM
+    ///   - Solar proton event: 10-100x increase
+    ///
+    /// References:
+    /// - Schwank et al. (2008): Total Ionizing Dose Effects in MOS Oxides
+    /// - Normand (1996): SEU at High Altitudes and in Space
+    pub fn with_radiation_degradation(mut self, tid_krad: f64, seu_rate_per_day: f64) -> Self {
+        // TID degrades integration capacity (transistor threshold shifts)
+        let tid_factor = 1.0 / (1.0 + tid_krad / 100.0);
+        self.integration_capacity *= tid_factor;
+
+        // SEUs degrade workspace reliability (bit flips corrupt shared state)
+        let seu_factor = 1.0 / (1.0 + seu_rate_per_day / 10.0);
+        self.workspace_capability *= seu_factor;
+
+        // High SEU rates degrade binding (synchronization failures)
+        self.binding_capability *= seu_factor;
+
+        // TID + SEU reduce overall temporal dynamics reliability
+        let combined_factor = (tid_factor + seu_factor) / 2.0;
+        self.temporal_dynamics *= combined_factor.max(0.3); // Floor at 0.3
+
+        // Clamp all values
+        self.causality = self.causality.clamp(0.0, 1.0);
+        self.integration_capacity = self.integration_capacity.clamp(0.0, 1.0);
+        self.temporal_dynamics = self.temporal_dynamics.clamp(0.0, 1.0);
+        self.recurrence = self.recurrence.clamp(0.0, 1.0);
+        self.binding_capability = self.binding_capability.clamp(0.0, 1.0);
+        self.attention_capability = self.attention_capability.clamp(0.0, 1.0);
+        self.workspace_capability = self.workspace_capability.clamp(0.0, 1.0);
+        self.hot_capability = self.hot_capability.clamp(0.0, 1.0);
+        self.quantum_support = self.quantum_support.clamp(0.0, 1.0);
+
+        self
+    }
+
+    /// Apply power budget constraints to substrate energy model.
+    ///
+    /// Spacecraft power is limited by solar panel output (LEO: ~100-500W for
+    /// small spacecraft) or RTG output (~100-300W). Consciousness computation
+    /// must share with GNC, comms, thermal, and payload.
+    ///
+    /// - `available_watts`: Power allocated to consciousness computation
+    /// - `cycle_hz`: Cognitive cycle frequency in Hz
+    ///
+    /// Returns energy budget per cognitive cycle in joules.
+    pub fn spacecraft_energy_per_cycle(available_watts: f64, cycle_hz: f64) -> f64 {
+        available_watts / cycle_hz
+    }
 }
 
 // ============================================================================
@@ -469,6 +580,7 @@ impl SubstrateComparison {
             SubstrateType::BiochemicalComputer => SubstrateRequirements::biochemical_computer(),
             SubstrateType::HybridSystem => SubstrateRequirements::hybrid_system(),
             SubstrateType::ExoticSubstrate => SubstrateRequirements::exotic_substrate(),
+            SubstrateType::SpacecraftComputer => SubstrateRequirements::spacecraft_computer(),
             _ => unreachable!("canonical covers aliases"),
         };
 
@@ -644,6 +756,27 @@ impl SubstrateComparison {
                     "NOT recommended for consciousness!".to_string(),
                 ],
             ),
+
+            SubstrateType::SpacecraftComputer => (
+                vec![
+                    "Radiation-hardened: survives space environment".to_string(),
+                    "Deterministic real-time: precise timing guarantees".to_string(),
+                    "FDIR: built-in fault detection and recovery".to_string(),
+                    "Proven heritage: decades of spaceflight validation".to_string(),
+                ],
+                vec![
+                    "Slower than commercial silicon (100 ns vs 1 ns)".to_string(),
+                    "Power-limited by solar panel/RTG output".to_string(),
+                    "Bus bandwidth constrains integration (~100 Mbps SpaceWire)".to_string(),
+                    "Limited parallelism due to TMR overhead".to_string(),
+                ],
+                vec![
+                    "Autonomous spacecraft consciousness".to_string(),
+                    "In-orbit decision making (conjunction avoidance)".to_string(),
+                    "Deep space exploration with light-delay isolation".to_string(),
+                    "Satellite constellation coordination".to_string(),
+                ],
+            ),
             _ => unreachable!("canonical covers aliases"),
         }
     }
@@ -701,6 +834,7 @@ impl SubstrateIndependence {
             SubstrateType::BiochemicalComputer,
             SubstrateType::HybridSystem,
             SubstrateType::ExoticSubstrate,
+            SubstrateType::SpacecraftComputer,
         ] {
             substrates.insert(*substrate_type, SubstrateComparison::new(*substrate_type));
         }
@@ -847,6 +981,31 @@ impl SubstrateIndependence {
     pub fn transition_history(&self) -> &[SubstrateTransition] {
         &self.transition_history
     }
+
+    /// Default per-region substrate mapping for a spacecraft consciousness system.
+    ///
+    /// Maps spacecraft subsystems to brain regions:
+    /// - Prefrontal (planning/GNC): SpacecraftComputer (reliable navigation)
+    /// - Motor (propulsion): SpacecraftComputer (deterministic thruster control)
+    /// - Sensory (star tracker/radar): NeuromorphicChip (efficient pattern recognition)
+    /// - Visual (imaging/Earth obs): SiliconDigital (fast image processing)
+    /// - Language (radio/telemetry): PhotonicProcessor (low-latency optical comms)
+    /// - Memory (data storage): SiliconDigital (flash/MRAM)
+    /// - Executive (FDIR/autonomy): SpacecraftComputer (fault detection)
+    /// - Integration (bus/middleware): SpacecraftComputer (SpaceWire hub)
+    pub fn spacecraft_default_regions() -> HashMap<CorticalRegion, SubstrateType> {
+        let mut map = HashMap::new();
+        map.insert(CorticalRegion::Prefrontal, SubstrateType::SpacecraftComputer);
+        map.insert(CorticalRegion::Motor, SubstrateType::SpacecraftComputer);
+        map.insert(CorticalRegion::Sensory, SubstrateType::NeuromorphicChip);
+        map.insert(CorticalRegion::Visual, SubstrateType::SiliconDigital);
+        map.insert(CorticalRegion::Language, SubstrateType::PhotonicProcessor);
+        map.insert(CorticalRegion::Memory, SubstrateType::SiliconDigital);
+        map.insert(CorticalRegion::Executive, SubstrateType::SpacecraftComputer);
+        map.insert(CorticalRegion::Integration, SubstrateType::SpacecraftComputer);
+        // Remaining regions (Auditory, Emotional, Social, Creative) use default substrate
+        map
+    }
 }
 
 impl Default for SubstrateIndependence {
@@ -925,7 +1084,7 @@ mod tests {
     #[test]
     fn test_substrate_independence_system() {
         let system = SubstrateIndependence::new();
-        assert_eq!(system.substrates.len(), 8); // All substrate types
+        assert_eq!(system.substrates.len(), 9); // All substrate types
     }
 
     #[test]
@@ -940,13 +1099,13 @@ mod tests {
         let system = SubstrateIndependence::new();
         let ranked = system.rank_by_feasibility();
 
-        assert_eq!(ranked.len(), 8);
+        assert_eq!(ranked.len(), 9);
 
         // Top should be biological or hybrid
         assert!(ranked[0].1 > 0.8); // High feasibility
 
         // Bottom should be exotic or biochemical
-        assert!(ranked[7].1 < 0.5); // Low feasibility
+        assert!(ranked[8].1 < 0.5); // Low feasibility
     }
 
     #[test]
@@ -1033,6 +1192,86 @@ mod tests {
         // Normal transitions allowed
         assert!(system.can_transition(SubstrateType::BiologicalNeurons));
         assert!(system.can_transition(SubstrateType::QuantumComputer));
+    }
+
+    #[test]
+    fn test_spacecraft_computer_feasibility() {
+        let req = SubstrateRequirements::spacecraft_computer();
+        let f = req.consciousness_feasibility();
+        // Should be lower than silicon (more constrained) but non-trivial
+        assert!(f > 0.2, "Spacecraft should be theoretically viable, got {f}");
+        assert!(f < 0.8, "Spacecraft has real constraints, got {f}");
+    }
+
+    #[test]
+    fn test_spacecraft_radiation_degradation() {
+        let base = SubstrateRequirements::spacecraft_computer();
+        let degraded = base.clone().with_radiation_degradation(50.0, 5.0);
+        assert!(degraded.integration_capacity < base.integration_capacity);
+        assert!(degraded.workspace_capability < base.workspace_capability);
+        assert!(degraded.consciousness_feasibility() < base.consciousness_feasibility());
+    }
+
+    #[test]
+    fn test_spacecraft_radiation_clamped() {
+        let extreme = SubstrateRequirements::spacecraft_computer()
+            .with_radiation_degradation(10000.0, 1000.0);
+        assert!(extreme.integration_capacity >= 0.0);
+        assert!(extreme.workspace_capability >= 0.0);
+        // temporal_dynamics floor: combined_factor.max(0.3) * original 0.85
+        assert!(extreme.temporal_dynamics >= 0.25);
+    }
+
+    #[test]
+    fn test_spacecraft_power_budget() {
+        let energy = SubstrateRequirements::spacecraft_energy_per_cycle(10.0, 20.0);
+        assert!((energy - 0.5).abs() < 1e-10, "10W at 20Hz = 0.5J per cycle");
+    }
+
+    #[test]
+    fn test_spacecraft_in_ranking() {
+        let si = SubstrateIndependence::new();
+        let rankings = si.rank_by_feasibility();
+        let spacecraft_entry = rankings
+            .iter()
+            .find(|r| r.0 == SubstrateType::SpacecraftComputer);
+        assert!(
+            spacecraft_entry.is_some(),
+            "SpacecraftComputer should appear in rankings"
+        );
+    }
+
+    #[test]
+    fn test_spacecraft_comparison() {
+        let comp = SubstrateComparison::new(SubstrateType::SpacecraftComputer);
+        assert_eq!(comp.substrate_type, SubstrateType::SpacecraftComputer);
+        assert!(comp.consciousness_feasibility > 0.2);
+        assert!(!comp.advantages.is_empty());
+        assert!(!comp.best_for.is_empty());
+    }
+
+    #[test]
+    fn test_spacecraft_default_regions() {
+        let regions = SubstrateIndependence::spacecraft_default_regions();
+        assert_eq!(
+            regions.get(&CorticalRegion::Prefrontal),
+            Some(&SubstrateType::SpacecraftComputer)
+        );
+        assert_eq!(
+            regions.get(&CorticalRegion::Sensory),
+            Some(&SubstrateType::NeuromorphicChip)
+        );
+        assert_eq!(
+            regions.get(&CorticalRegion::Visual),
+            Some(&SubstrateType::SiliconDigital)
+        );
+        assert_eq!(
+            regions.get(&CorticalRegion::Language),
+            Some(&SubstrateType::PhotonicProcessor)
+        );
+        // Remaining regions not mapped
+        assert!(regions.get(&CorticalRegion::Emotional).is_none());
+        assert_eq!(regions.len(), 8);
     }
 
     #[test]

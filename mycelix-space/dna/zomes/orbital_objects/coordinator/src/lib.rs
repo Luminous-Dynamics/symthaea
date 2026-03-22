@@ -8,8 +8,9 @@
 
 use hdk::prelude::*;
 use mycelix_space_shared::{
-    compute_staleness, DataSourceType, QualityScore, SpaceError, SpaceErrorCode, SpaceTimestamp,
-    StalenessConfig, TleWithMetadata,
+    compute_staleness, gate_space_operation, requirement_for_negotiation,
+    requirement_for_tle_submission, DataSourceType, QualityScore, SpaceError, SpaceErrorCode,
+    SpaceTimestamp, StalenessConfig, TleWithMetadata,
 };
 use orbital_mechanics::tle::TwoLineElement;
 use orbital_objects_integrity::*;
@@ -17,6 +18,8 @@ use orbital_objects_integrity::*;
 /// Register a new orbital object in the catalog
 #[hdk_extern]
 pub fn register_object(input: RegisterObjectInput) -> ExternResult<ActionHash> {
+    gate_space_operation(&requirement_for_tle_submission(), "register_object")?;
+
     if input.intl_designator.is_empty() || input.intl_designator.len() > 256 {
         return Err(SpaceError::new(
             SpaceErrorCode::InvalidDesignator,
@@ -75,6 +78,8 @@ pub struct RegisterObjectInput {
 /// Submit a TLE for an object
 #[hdk_extern]
 pub fn submit_tle(input: SubmitTleInput) -> ExternResult<ActionHash> {
+    gate_space_operation(&requirement_for_tle_submission(), "submit_tle")?;
+
     if input.line1.is_empty() || input.line1.len() > 256 {
         return Err(SpaceError::new(
             SpaceErrorCode::InvalidInput,
@@ -163,6 +168,8 @@ pub struct SubmitTleInput {
 /// Claim operator status for an object
 #[hdk_extern]
 pub fn claim_operator(input: ClaimOperatorInput) -> ExternResult<ActionHash> {
+    gate_space_operation(&requirement_for_negotiation(), "claim_operator")?;
+
     if input.organization.is_empty() || input.organization.len() > 256 {
         return Err(SpaceError::new(
             SpaceErrorCode::InvalidInput,

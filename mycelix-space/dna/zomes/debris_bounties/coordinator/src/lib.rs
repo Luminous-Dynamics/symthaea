@@ -6,8 +6,9 @@
 use debris_bounties_integrity::*;
 use hdk::prelude::*;
 use mycelix_space_shared::{
-    validate_string_field, PaginatedResponse, PaginationParams, SpaceError, SpaceErrorCode,
-    SpaceTimestamp,
+    gate_space_operation, requirement_for_bounty_claim, requirement_for_bounty_creation,
+    requirement_for_bounty_verification, requirement_for_risk_update, validate_string_field,
+    PaginatedResponse, PaginationParams, SpaceError, SpaceErrorCode, SpaceTimestamp,
 };
 
 // =============================================================================
@@ -141,6 +142,8 @@ fn anchor_for_contributor(agent: &AgentPubKey) -> ExternResult<AnyLinkableHash> 
 /// target debris is being tracked (useful for UI warnings).
 #[hdk_extern]
 pub fn create_bounty(input: CreateBountyInput) -> ExternResult<ActionHash> {
+    gate_space_operation(&requirement_for_bounty_creation(), "create_bounty")?;
+
     // --- Input validation ---
     validate_string_field(&input.bounty_id, "bounty_id", 256).map_err(|e| e.into_wasm_error())?;
     validate_string_field(&input.justification, "justification", 2048)
@@ -247,6 +250,8 @@ pub struct CreateBountyInput {
 /// contributor's personal bounty index. Emits a `BountyContributed` signal.
 #[hdk_extern]
 pub fn contribute_to_bounty(input: ContributeInput) -> ExternResult<ActionHash> {
+    gate_space_operation(&requirement_for_bounty_claim(), "contribute_to_bounty")?;
+
     // --- Input validation ---
     validate_string_field(&input.bounty_id, "bounty_id", 256).map_err(|e| e.into_wasm_error())?;
     validate_string_field(&input.currency, "currency", 16).map_err(|e| e.into_wasm_error())?;
@@ -322,6 +327,8 @@ pub struct ContributeInput {
 /// Validates that the bounty is currently Open, then transitions to Claimed.
 #[hdk_extern]
 pub fn claim_bounty(input: ClaimBountyInput) -> ExternResult<ActionHash> {
+    gate_space_operation(&requirement_for_bounty_claim(), "claim_bounty")?;
+
     // --- Input validation ---
     validate_string_field(&input.organization, "organization", 256)
         .map_err(|e| e.into_wasm_error())?;
@@ -416,6 +423,8 @@ pub struct ClaimBountyInput {
 /// Emits a `VerificationSubmitted` signal.
 #[hdk_extern]
 pub fn submit_verification(input: SubmitVerificationInput) -> ExternResult<ActionHash> {
+    gate_space_operation(&requirement_for_bounty_verification(), "submit_verification")?;
+
     let agent = agent_info()?.agent_initial_pubkey;
 
     let signal_claim_id = input.claim_id.clone();
@@ -462,6 +471,8 @@ pub struct SubmitVerificationInput {
 /// Manages the ActiveBounties link: removes it when transitioning to a terminal state.
 #[hdk_extern]
 pub fn update_bounty_status(input: UpdateBountyStatusInput) -> ExternResult<ActionHash> {
+    gate_space_operation(&requirement_for_risk_update(), "update_bounty_status")?;
+
     let record = get(input.bounty_hash.clone(), GetOptions::default())?.ok_or(
         SpaceError::new(SpaceErrorCode::BountyNotFound, "Bounty not found")
             .with_context(format!("hash: {}", input.bounty_hash))

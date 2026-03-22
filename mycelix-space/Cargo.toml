@@ -6,6 +6,7 @@ members = [
 
     # Tools
     "tools/celestrak-demo",
+    "tools/screening-daemon",
 
     # Shared zome utilities
     "zomes/shared",
@@ -46,6 +47,11 @@ default-members = [
     "dna/zomes/traffic_control/integrity",
     "dna/zomes/traffic_control/coordinator",
 ]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
 
 [workspace.dependencies]
 # Holochain 0.6 compatible

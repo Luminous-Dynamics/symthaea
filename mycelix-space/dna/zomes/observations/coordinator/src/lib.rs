@@ -4,12 +4,14 @@
 
 use hdk::prelude::*;
 use mycelix_space_shared::{
+    gate_space_operation, requirement_for_fusion, requirement_for_observation,
     validate_latitude, validate_longitude, validate_string_field, GroundLocation,
     PaginatedResponse, PaginationParams, QualityScore, SpaceError, SpaceErrorCode, SpaceTimestamp,
+    TrustLevel,
 };
 use observations_integrity::*;
 use orbital_mechanics::covariance::CovarianceMatrix;
-use orbital_mechanics::fusion::{FusionPipeline, SensorMeasurement};
+use orbital_mechanics::fusion::{FusionPipeline, SensorMeasurement, TrustWeighting};
 use orbital_mechanics::state::{DataSource, StateVector as OmStateVector};
 
 // =============================================================================
@@ -72,6 +74,7 @@ fn anchor_for_all_sensors() -> ExternResult<AnyLinkableHash> {
 /// Returns the `ActionHash` of the created observation entry.
 #[hdk_extern]
 pub fn submit_observation(input: SubmitObservationInput) -> ExternResult<ActionHash> {
+    gate_space_operation(&requirement_for_observation(), "submit_observation")?;
     // --- Input validation ---
     validate_string_field(&input.sensor_id, "sensor_id", 256).map_err(|e| e.into_wasm_error())?;
 
@@ -194,6 +197,7 @@ pub struct SubmitObservationInput {
 /// `list_sensors()`. Returns the `ActionHash` of the created sensor entry.
 #[hdk_extern]
 pub fn register_sensor(input: RegisterSensorInput) -> ExternResult<ActionHash> {
+    gate_space_operation(&requirement_for_observation(), "register_sensor")?;
     // --- Input validation ---
     validate_string_field(&input.sensor_id, "sensor_id", 256).map_err(|e| e.into_wasm_error())?;
     validate_string_field(&input.name, "name", 256).map_err(|e| e.into_wasm_error())?;
@@ -368,6 +372,7 @@ fn anchor_for_object_fused_estimates(norad_id: u32) -> ExternResult<AnyLinkableH
 /// stores the result as a `FusedEstimate` entry linked to the object's anchor.
 #[hdk_extern]
 pub fn fuse_observations_for_object(norad_id: u32) -> ExternResult<FusedEstimate> {
+    gate_space_operation(&requirement_for_fusion(), "fuse_observations_for_object")?;
     if norad_id == 0 || norad_id > 999999 {
         return Err(
             SpaceError::new(SpaceErrorCode::InvalidInput, "NORAD ID must be 1-999999")
@@ -463,8 +468,19 @@ pub fn fuse_observations_for_object(norad_id: u32) -> ExternResult<FusedEstimate
         .into_wasm_error());
     }
 
-    // Run fusion pipeline
-    let pipeline = FusionPipeline::default();
+    // Build trust weighting from submitter trust levels.
+    // Each observation's sensor_id is mapped to its submitter's trust weight.
+    let mut trust_weighting = TrustWeighting::default();
+    for obs in &observations {
+        let trust_level = lookup_agent_trust_level(&obs.submitted_by);
+        trust_weighting
+            .sensor_trust
+            .entry(obs.sensor_id.clone())
+            .or_insert(trust_level.weight());
+    }
+
+    // Run fusion pipeline with trust-weighted quality
+    let pipeline = FusionPipeline::default().with_trust_weighting(trust_weighting);
     let fused = pipeline.fuse(&measurements).map_err(|e| {
         SpaceError::new(SpaceErrorCode::InvalidInput, "Fusion pipeline failed")
             .with_context(e)
@@ -544,6 +560,40 @@ pub fn get_fused_state(norad_id: u32) -> ExternResult<Option<FusedEstimate>> {
     }
 
     Ok(best)
+}
+
+// =============================================================================
+// Trust level lookup
+// =============================================================================
+
+/// Look up the trust level for an agent via cross-role call to the identity cluster.
+///
+/// Queries the identity cluster's `trust_credentials` zome for the agent's trust
+/// level. Falls back to `TrustLevel::Unverified` if:
+/// - The identity cluster is unreachable (standalone deployment)
+/// - The agent has no trust credential on file
+/// - Any deserialization or call error occurs
+///
+/// This is intentionally fail-open: observations are sensor data weighted by trust,
+/// not gated by it. Chi-square consistency checks in the fusion pipeline protect
+/// against bad data regardless of trust level.
+fn lookup_agent_trust_level(agent: &AgentPubKey) -> TrustLevel {
+    match call(
+        CallTargetCell::OtherRole("identity".into()),
+        ZomeName::from("trust_credentials"),
+        FunctionName::from("get_agent_trust_level"),
+        None,
+        agent.clone(),
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => {
+            result.decode::<TrustLevel>().unwrap_or(TrustLevel::Unverified)
+        }
+        _ => {
+            // Identity cluster unreachable or agent has no trust credential
+            // Default to Unverified — chi-square gating still protects against bad data
+            TrustLevel::Unverified
+        }
+    }
 }
 
 // =============================================================================

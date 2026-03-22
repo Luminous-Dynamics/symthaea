@@ -1,4 +1,6 @@
-//! Multi-Sensor Observation Fusion Pipeline
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Multi-Sensor Observation Fusion Pipeline
 //!
 //! Fuses observations from multiple sensors into a single best-estimate state
 //! with uncertainty. This is the core value proposition of a decentralized SSA
@@ -20,11 +22,57 @@
 //!   are unknown — appropriate for decentralized networks
 //! - **Weighted least-squares**: Classical approach for independent measurements
 
+use std::collections::HashMap;
+
 use chrono::{DateTime, Utc};
 use nalgebra::{Matrix6, Vector6};
 
 use crate::covariance::CovarianceMatrix;
 use crate::state::{DataSource, OrbitalState, StateVector};
+
+/// Trust-aware quality weighting for observation fusion.
+///
+/// When trust information is available, the effective quality of an observation
+/// is blended between raw data quality and the submitter's trust level:
+///
+///   effective_quality = data_quality * (trust_floor + (1 - trust_floor) * trust_weight)
+///
+/// This ensures that even untrusted sources contribute some information
+/// (trust_floor > 0), while trusted sources get full weight.
+///
+/// References:
+/// - Bar-Shalom & Li (2001): Estimation with Applications to Tracking
+/// - Mahalanobis gating remains the primary outlier defense
+#[derive(Debug, Clone)]
+pub struct TrustWeighting {
+    /// Minimum quality multiplier for untrusted sources (default: 0.3)
+    /// Range: 0.0-1.0. Higher values = more trust in unknown sources.
+    pub trust_floor: f64,
+    /// Per-sensor trust weights (sensor_id -> trust level 0.0-1.0)
+    pub sensor_trust: HashMap<String, f64>,
+}
+
+impl Default for TrustWeighting {
+    fn default() -> Self {
+        Self {
+            trust_floor: 0.3,
+            sensor_trust: HashMap::new(),
+        }
+    }
+}
+
+impl TrustWeighting {
+    /// Compute effective quality from raw quality and trust.
+    ///
+    /// Formula: quality * (floor + (1 - floor) * trust)
+    /// - Unknown sensors (not in map) get trust = 0.0 -> multiplied by floor only
+    /// - Fully trusted sensors get trust = 1.0 -> full quality
+    pub fn effective_quality(&self, raw_quality: f64, sensor_id: &str) -> f64 {
+        let trust = self.sensor_trust.get(sensor_id).copied().unwrap_or(0.0);
+        let multiplier = self.trust_floor + (1.0 - self.trust_floor) * trust;
+        (raw_quality * multiplier).clamp(0.0, 1.0)
+    }
+}
 
 /// A single sensor measurement with uncertainty.
 #[derive(Clone, Debug)]
@@ -68,6 +116,8 @@ pub struct FusionPipeline {
     pub min_quality: f64,
     /// Maximum observation age in seconds
     pub max_age_seconds: f64,
+    /// Optional trust weighting for per-sensor quality adjustment
+    pub trust_weighting: Option<TrustWeighting>,
 }
 
 impl Default for FusionPipeline {
@@ -76,6 +126,7 @@ impl Default for FusionPipeline {
             gating_threshold: 9.21, // Chi-square 99% threshold at 2 DOF
             min_quality: 0.1,
             max_age_seconds: 86400.0, // 24 hours
+            trust_weighting: None,
         }
     }
 }
@@ -104,6 +155,15 @@ impl FusionPipeline {
         self
     }
 
+    /// Set trust weighting for per-sensor quality adjustment.
+    ///
+    /// When set, the pipeline applies `TrustWeighting::effective_quality()` to
+    /// each measurement's quality score before filtering and fusion weighting.
+    pub fn with_trust_weighting(mut self, weighting: TrustWeighting) -> Self {
+        self.trust_weighting = Some(weighting);
+        self
+    }
+
     /// Main fusion entry point.
     ///
     /// Fuses multiple sensor measurements into a single best-estimate state:
@@ -124,11 +184,14 @@ impl FusionPipeline {
         }
 
         // Step 1: Filter by quality and age
+        // When trust weighting is configured, effective_quality is used for the
+        // quality threshold check and downstream quality accumulation.
         let now = Utc::now();
         let filtered: Vec<&SensorMeasurement> = measurements
             .iter()
             .filter(|m| {
-                m.quality >= self.min_quality
+                let effective_q = self.effective_quality_for(m);
+                effective_q >= self.min_quality
                     && (now - m.time).num_seconds().abs() as f64 <= self.max_age_seconds
             })
             .collect();
@@ -140,13 +203,14 @@ impl FusionPipeline {
         if filtered.len() == 1 {
             // Single measurement: just return it directly
             let m = filtered[0];
+            let effective_q = self.effective_quality_for(m);
             let state = OrbitalState::new(0, m.time, m.state.clone(), m.data_source.clone())
                 .with_covariance(m.covariance.clone());
 
             return Ok(FusedEstimate {
                 state,
                 contributing_sensors: vec![m.sensor_id.clone()],
-                fused_quality: m.quality,
+                fused_quality: effective_q,
                 chi_square_consistency: 0.0,
                 timestamp: m.time,
             });
@@ -170,7 +234,7 @@ impl FusionPipeline {
         let mut fused_state = propagated[0].0.clone();
         let mut fused_cov = propagated[0].1.clone();
         let mut contributing = vec![propagated[0].2.sensor_id.clone()];
-        let mut total_quality = propagated[0].2.quality;
+        let mut total_quality = self.effective_quality_for(propagated[0].2);
         let mut chi_square_sum = 0.0;
         let mut _gated_count = 0_u32;
 
@@ -210,7 +274,7 @@ impl FusionPipeline {
             }
 
             contributing.push(meas.sensor_id.clone());
-            total_quality += meas.quality;
+            total_quality += self.effective_quality_for(meas);
         }
 
         let n_contributing = contributing.len() as f64;
@@ -233,6 +297,15 @@ impl FusionPipeline {
             chi_square_consistency: chi_square_sum,
             timestamp: target_epoch,
         })
+    }
+
+    /// Compute effective quality for a measurement, applying trust weighting if configured.
+    fn effective_quality_for(&self, measurement: &SensorMeasurement) -> f64 {
+        if let Some(ref tw) = self.trust_weighting {
+            tw.effective_quality(measurement.quality, &measurement.sensor_id)
+        } else {
+            measurement.quality
+        }
     }
 }
 
@@ -721,6 +794,108 @@ mod tests {
         assert!(
             propagated.covariance.position_sigma() > m.covariance.position_sigma(),
             "Propagated uncertainty should grow"
+        );
+    }
+
+    // =========================================================================
+    // Trust weighting tests
+    // =========================================================================
+
+    #[test]
+    fn test_trust_floor_prevents_zero_weight() {
+        let tw = TrustWeighting::default(); // floor = 0.3
+        let eq = tw.effective_quality(1.0, "unknown_sensor");
+        assert!(
+            (eq - 0.3).abs() < 1e-10,
+            "Unknown sensor should get floor weight, got {}",
+            eq
+        );
+    }
+
+    #[test]
+    fn test_fully_trusted_gets_full_quality() {
+        let mut tw = TrustWeighting::default();
+        tw.sensor_trust.insert("trusted".to_string(), 1.0);
+        let eq = tw.effective_quality(0.8, "trusted");
+        assert!(
+            (eq - 0.8).abs() < 1e-10,
+            "Fully trusted should get raw quality, got {}",
+            eq
+        );
+    }
+
+    #[test]
+    fn test_partial_trust_blends() {
+        let mut tw = TrustWeighting {
+            trust_floor: 0.5,
+            sensor_trust: HashMap::new(),
+        };
+        tw.sensor_trust.insert("half".to_string(), 0.5);
+        let eq = tw.effective_quality(1.0, "half");
+        // floor + (1-floor) * trust = 0.5 + 0.5 * 0.5 = 0.75
+        assert!(
+            (eq - 0.75).abs() < 1e-10,
+            "Partial trust should blend: expected 0.75, got {}",
+            eq
+        );
+    }
+
+    #[test]
+    fn test_effective_quality_clamped() {
+        let mut tw = TrustWeighting::default();
+        tw.sensor_trust.insert("s".to_string(), 1.5); // Invalid but shouldn't crash
+        let eq = tw.effective_quality(1.5, "s");
+        assert!(eq <= 1.0, "Must be clamped to 1.0, got {}", eq);
+    }
+
+    #[test]
+    fn test_trust_weighting_default() {
+        let tw = TrustWeighting::default();
+        assert!(
+            (tw.trust_floor - 0.3).abs() < 1e-10,
+            "Default floor should be 0.3"
+        );
+        assert!(tw.sensor_trust.is_empty(), "Default should have no sensors");
+    }
+
+    #[test]
+    fn test_fuse_with_trust_weighting_reduces_untrusted_quality() {
+        let m_trusted = test_measurement(7000.0, 1.0, "trusted-sensor", 0.9);
+        let m_untrusted = test_measurement(7000.0, 1.0, "untrusted-sensor", 0.9);
+
+        let mut tw = TrustWeighting::default();
+        tw.sensor_trust.insert("trusted-sensor".to_string(), 1.0);
+        // untrusted-sensor not in map -> gets floor (0.3)
+
+        let pipeline = FusionPipeline::new().with_trust_weighting(tw);
+        let result = pipeline.fuse(&[m_trusted, m_untrusted]).unwrap();
+
+        // Fused quality should reflect trust weighting:
+        // trusted effective = 0.9 * 1.0 = 0.9
+        // untrusted effective = 0.9 * 0.3 = 0.27
+        // average = (0.9 + 0.27) / 2 = 0.585
+        assert!(
+            result.fused_quality < 0.9,
+            "Fused quality ({}) should be less than raw quality (0.9) due to untrusted sensor",
+            result.fused_quality
+        );
+    }
+
+    #[test]
+    fn test_fuse_without_trust_weighting_unchanged() {
+        let m1 = test_measurement(7000.0, 1.0, "sensor-1", 0.9);
+        let m2 = test_measurement(7000.0, 1.0, "sensor-2", 0.8);
+
+        let pipeline = FusionPipeline::new(); // No trust weighting
+        let result = pipeline.fuse(&[m1, m2]).unwrap();
+
+        // Without trust weighting, fused quality = average of raw qualities
+        let expected = (0.9 + 0.8) / 2.0;
+        assert!(
+            (result.fused_quality - expected).abs() < 1e-10,
+            "Without trust weighting, quality should be raw average: expected {}, got {}",
+            expected,
+            result.fused_quality
         );
     }
 }

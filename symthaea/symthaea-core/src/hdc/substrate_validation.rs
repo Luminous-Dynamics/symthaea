@@ -186,8 +186,55 @@ impl SubstrateValidationFramework {
         framework.add_silicon_knowledge();
         framework.add_quantum_knowledge();
         framework.add_hybrid_knowledge();
+        framework.add_spacecraft_knowledge();
 
         framework
+    }
+
+    fn add_spacecraft_knowledge(&mut self) {
+        let knowledge = SubstrateKnowledge {
+            substrate: "Spacecraft".to_string(),
+            evidence_level: EvidenceLevel::Theoretical,
+            known_facts: vec![
+                "Rad-hard processors (RAD750, LEON3) operate reliably in space".to_string(),
+                "No spacecraft system has demonstrated consciousness".to_string(),
+                "TMR and EDAC mitigate SEU-induced bit flips".to_string(),
+                "Real-time OS (VxWorks/RTEMS) provides deterministic scheduling".to_string(),
+            ],
+            unknown: vec![
+                "Whether radiation-constrained computation can support consciousness".to_string(),
+                "Impact of SEU-induced state corruption on integrated information".to_string(),
+                "Whether power budget allows sufficient computational density".to_string(),
+            ],
+            unvalidated_claims: vec![
+                "Spacecraft feasibility score (NO EMPIRICAL BASIS)".to_string(),
+                "FDIR constitutes meta-monitoring analogous to HOT (speculation)".to_string(),
+                "Autonomous spacecraft could achieve consciousness (untested)".to_string(),
+            ],
+            predictions: vec![
+                TestablePrediction::new(
+                    "Spacecraft computers can sustain Phi > 0 with sufficient integration",
+                    "Measurable Phi in radiation-hardened FPGA running consciousness loop",
+                    "No measurable Phi despite meeting architectural requirements",
+                    "Measure Phi on radiation-hardened FPGA running consciousness loop",
+                    8,
+                ),
+                TestablePrediction::new(
+                    "Radiation-induced bit flips reduce Phi proportionally to SEU rate",
+                    "Phi decreases measurably during simulated radiation exposure",
+                    "Phi remains stable despite radiation-induced bit flips",
+                    "Compare Phi before and after simulated radiation exposure",
+                    6,
+                ),
+            ],
+            hypothetical_feasibility: 0.38,
+            feasibility_rationale: "HYPOTHETICAL. More constrained than general silicon due to \
+                                   radiation hardening overhead, bus bandwidth limits, and power \
+                                   budget. NO EMPIRICAL VALIDATION of consciousness in any \
+                                   spacecraft system."
+                .to_string(),
+        };
+        self.substrates.insert("spacecraft".to_string(), knowledge);
     }
 
     fn add_biological_knowledge(&mut self) {
@@ -581,5 +628,15 @@ mod tests {
         assert_eq!(pred.difficulty, 5);
         assert!(!pred.tested);
         assert!(pred.result.is_none());
+    }
+
+    #[test]
+    fn test_spacecraft_is_theoretical() {
+        let framework = SubstrateValidationFramework::new();
+        let spacecraft = framework.get("spacecraft").unwrap();
+
+        assert_eq!(spacecraft.evidence_level, EvidenceLevel::Theoretical);
+        assert!(spacecraft.honest_confidence() < 0.2); // Low actual confidence
+        assert!(!spacecraft.predictions.is_empty());
     }
 }
