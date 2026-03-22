@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Swarm Manager — Distributed Peer Consciousness Integration
 //!
 //! Consolidates peer-to-peer swarm signals into a single [`CognitiveSubsystem`]
@@ -131,6 +134,64 @@ pub enum SwarmEvent {
         /// Creation timestamp (Unix seconds).
         created_at: u64,
     },
+
+    /// Waste/circular economy event from peer or external system.
+    ///
+    /// Basis: Ellen MacArthur Foundation (2015) — circular economy as
+    /// distributed feedback loop. High circularity signals system health;
+    /// low material entropy signals concentration risk.
+    #[cfg(feature = "circular")]
+    WasteCircularityUpdate {
+        /// Source peer or external system identifier.
+        source_id: String,
+        /// Material class being tracked (e.g., "plastic", "organic", "metal").
+        material_class: String,
+        /// Quantity in kg.
+        quantity_kg: f32,
+        /// Lifecycle stage: "collection", "processing", "remanufacturing", etc.
+        lifecycle_stage: String,
+        /// Circularity potential [0.0, 1.0] (1.0 = fully recyclable).
+        circularity_potential: f32,
+        /// Classification confidence [0.0, 1.0].
+        confidence: f32,
+    },
+
+    /// Space situational awareness alert from mycelix-space or ground network.
+    ///
+    /// Basis: Kahneman (2011) — threat salience drives attentional capture.
+    #[cfg(feature = "space-alerts")]
+    SpaceAlert {
+        /// Type of space alert.
+        alert_type: SpaceAlertType,
+        /// Severity (0.0–1.0): mapped from RiskLevel
+        /// (Negligible=0.1, Low=0.3, Medium=0.5, High=0.8, Emergency=1.0).
+        severity: f32,
+        /// Collision probability or alert confidence.
+        confidence: f32,
+        /// Seconds until event (negative = past).
+        time_to_event_seconds: f64,
+        /// Human-readable description.
+        description: String,
+    },
+}
+
+/// Type of space situational awareness alert.
+///
+/// Maps to mycelix-space conjunction screening, debris tracking,
+/// and traffic coordination subsystems.
+#[cfg(feature = "space-alerts")]
+#[derive(Debug, Clone)]
+pub enum SpaceAlertType {
+    /// Conjunction predicted between tracked objects.
+    ConjunctionWarning,
+    /// Debris approaching operational region.
+    DebrisProximity,
+    /// Communication window opening with relay satellite.
+    CommWindow,
+    /// Unexpected orbital behavior detected.
+    OrbitalAnomaly,
+    /// Maneuver announced by peer operator.
+    ManeuverAnnounced,
 }
 
 /// A threat pattern report from a peer, ready for SentinelManager consumption.
@@ -167,6 +228,24 @@ pub struct SwarmTelemetry {
     pub anomaly_count: u32,
     /// Number of peers that completed trust handshake verification.
     pub verified_peers: usize,
+    /// Total space alerts received (monotonic counter).
+    #[cfg(feature = "space-alerts")]
+    pub space_alert_count: u32,
+    /// Severity of most recent space alert [0.0, 1.0].
+    #[cfg(feature = "space-alerts")]
+    pub last_space_alert_severity: f32,
+    /// Total waste quantity tracked across network (kg).
+    #[cfg(feature = "circular")]
+    pub waste_total_kg: f32,
+    /// Mean circularity potential across tracked waste [0.0, 1.0].
+    #[cfg(feature = "circular")]
+    pub waste_mean_circularity: f32,
+    /// Number of waste events processed this interval.
+    #[cfg(feature = "circular")]
+    pub waste_events_processed: u32,
+    /// Confidence EMA for waste classifications [0.0, 1.0].
+    #[cfg(feature = "circular")]
+    pub waste_confidence_ema: f64,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -229,6 +308,43 @@ pub struct SwarmManager {
     /// Number of peers that completed the trust handshake.
     verified_peers: usize,
 
+    // ── Space alerts ─────────────────────────────────────────────────
+    /// Count of space alerts received (monotonic).
+    #[cfg(feature = "space-alerts")]
+    space_alert_count: u32,
+    /// Severity of most recent space alert.
+    #[cfg(feature = "space-alerts")]
+    last_space_alert_severity: f32,
+    /// Accumulated arousal delta from space alerts this interval.
+    #[cfg(feature = "space-alerts")]
+    space_arousal_acc: f32,
+    /// Accumulated valence delta from space alerts this interval.
+    #[cfg(feature = "space-alerts")]
+    space_valence_acc: f32,
+    /// Accumulated confidence delta from space alerts this interval.
+    #[cfg(feature = "space-alerts")]
+    space_confidence_acc: f32,
+    /// Accumulated exploration delta from space alerts this interval.
+    #[cfg(feature = "space-alerts")]
+    space_exploration_acc: f64,
+    /// Accumulated LR modulation from space comm windows this interval.
+    #[cfg(feature = "space-alerts")]
+    space_lr_acc: f64,
+
+    // ── Waste/Circular Economy tracking ─────────────────────────────────
+    /// Running total of waste tracked (kg).
+    #[cfg(feature = "circular")]
+    waste_total_kg: f32,
+    /// Running mean circularity potential [0.0, 1.0].
+    #[cfg(feature = "circular")]
+    waste_mean_circularity: f32,
+    /// Events processed this interval.
+    #[cfg(feature = "circular")]
+    waste_events_processed: u32,
+    /// Confidence EMA for waste classifications.
+    #[cfg(feature = "circular")]
+    waste_confidence_ema: f64,
+
     // ── Telemetry snapshot ──────────────────────────────────────────────
     /// Last computed telemetry (readable between process calls).
     last_telemetry: SwarmTelemetry,
@@ -275,6 +391,28 @@ impl Default for SwarmManager {
             pending_knowledge_shares: Vec::new(),
             pending_threat_patterns: Vec::new(),
             verified_peers: 0,
+            #[cfg(feature = "space-alerts")]
+            space_alert_count: 0,
+            #[cfg(feature = "space-alerts")]
+            last_space_alert_severity: 0.0,
+            #[cfg(feature = "space-alerts")]
+            space_arousal_acc: 0.0,
+            #[cfg(feature = "space-alerts")]
+            space_valence_acc: 0.0,
+            #[cfg(feature = "space-alerts")]
+            space_confidence_acc: 0.0,
+            #[cfg(feature = "space-alerts")]
+            space_exploration_acc: 0.0,
+            #[cfg(feature = "space-alerts")]
+            space_lr_acc: 0.0,
+            #[cfg(feature = "circular")]
+            waste_total_kg: 0.0,
+            #[cfg(feature = "circular")]
+            waste_mean_circularity: 0.0,
+            #[cfg(feature = "circular")]
+            waste_events_processed: 0,
+            #[cfg(feature = "circular")]
+            waste_confidence_ema: 0.0,
             last_telemetry: SwarmTelemetry::default(),
             #[cfg(feature = "fhe-wisdom")]
             wisdom_pool: symthaea_core::hdc::hdc_fhe::CollectiveWisdomPool::new(),
@@ -622,6 +760,109 @@ impl SwarmManager {
                 // passed through here for uniform channel draining.
                 // Sovereign Inoculation events — handled by dedicated managers.
                 SwarmEvent::TimeBeaconReceived { .. } | SwarmEvent::ContentAnnounced { .. } => {}
+
+                // Space situational awareness alerts — modulate arousal/valence/confidence.
+                #[cfg(feature = "space-alerts")]
+                SwarmEvent::SpaceAlert {
+                    ref alert_type,
+                    severity,
+                    confidence,
+                    time_to_event_seconds,
+                    ..
+                } => {
+                    // NaN/Inf guard on inputs
+                    let sev = if severity.is_finite() {
+                        severity.clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
+                    let conf = if confidence.is_finite() {
+                        confidence.clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
+                    let tte = if time_to_event_seconds.is_finite() {
+                        time_to_event_seconds
+                    } else {
+                        0.0
+                    };
+
+                    self.space_alert_count = self.space_alert_count.saturating_add(1);
+                    self.last_space_alert_severity = sev;
+
+                    // Urgency factor: events closer in time are more urgent
+                    let urgency = if tte > 0.0 {
+                        (1.0 / (1.0 + tte / 3600.0)) as f32
+                    } else {
+                        1.0 // Already happening or past
+                    };
+
+                    match alert_type {
+                        SpaceAlertType::ConjunctionWarning => {
+                            // Conjunction → heightened alertness, search for alternatives
+                            self.space_arousal_acc +=
+                                thresholds::SPACE_CONJUNCTION_AROUSAL * sev * urgency;
+                            self.space_exploration_acc +=
+                                thresholds::SPACE_CONJUNCTION_EXPLORATION as f64 * conf as f64;
+                        }
+                        SpaceAlertType::DebrisProximity => {
+                            // Debris → threat response (fight-or-flight analogue)
+                            self.space_arousal_acc +=
+                                thresholds::SPACE_DEBRIS_AROUSAL * sev * urgency;
+                            self.space_valence_acc +=
+                                thresholds::SPACE_DEBRIS_VALENCE * sev;
+                            self.space_confidence_acc +=
+                                thresholds::SPACE_DEBRIS_CONFIDENCE * sev;
+                        }
+                        SpaceAlertType::CommWindow => {
+                            // Communication window → opportunity, boost learning
+                            self.space_confidence_acc +=
+                                thresholds::SPACE_COMM_CONFIDENCE * conf;
+                            self.space_lr_acc +=
+                                thresholds::SPACE_COMM_LR_BOOST as f64 * conf as f64;
+                        }
+                        SpaceAlertType::OrbitalAnomaly => {
+                            // Anomaly → suspicious, elevate vigilance
+                            self.anomaly_streak = self.anomaly_streak.saturating_add(1);
+                            self.space_arousal_acc +=
+                                thresholds::SPACE_ANOMALY_AROUSAL * sev;
+                        }
+                        SpaceAlertType::ManeuverAnnounced => {
+                            // Maneuver announced → neutral information update
+                            self.space_confidence_acc +=
+                                thresholds::SPACE_MANEUVER_CONFIDENCE * conf;
+                        }
+                    }
+                }
+
+                // Waste/circular economy events — track material flows.
+                #[cfg(feature = "circular")]
+                SwarmEvent::WasteCircularityUpdate {
+                    quantity_kg,
+                    circularity_potential,
+                    confidence,
+                    ..
+                } => {
+                    let qty = if quantity_kg.is_finite() { quantity_kg.max(0.0) } else { 0.0 };
+                    let circ = if circularity_potential.is_finite() {
+                        circularity_potential.clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
+                    let conf = if confidence.is_finite() {
+                        confidence.clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
+                    self.waste_total_kg += qty;
+                    self.waste_events_processed += 1;
+                    // Running mean circularity
+                    let n = self.waste_events_processed as f32;
+                    self.waste_mean_circularity += (circ - self.waste_mean_circularity) / n;
+                    // Confidence EMA (alpha = 0.1)
+                    self.waste_confidence_ema =
+                        self.waste_confidence_ema * 0.9 + conf as f64 * 0.1;
+                }
             }
         }
     }
@@ -673,6 +914,18 @@ impl SwarmManager {
             federated_confidence: self.federated_confidence,
             anomaly_count: self.anomaly_streak,
             verified_peers: self.verified_peers,
+            #[cfg(feature = "space-alerts")]
+            space_alert_count: self.space_alert_count,
+            #[cfg(feature = "space-alerts")]
+            last_space_alert_severity: self.last_space_alert_severity,
+            #[cfg(feature = "circular")]
+            waste_total_kg: self.waste_total_kg,
+            #[cfg(feature = "circular")]
+            waste_mean_circularity: self.waste_mean_circularity,
+            #[cfg(feature = "circular")]
+            waste_events_processed: self.waste_events_processed,
+            #[cfg(feature = "circular")]
+            waste_confidence_ema: self.waste_confidence_ema,
         };
     }
 }
@@ -749,7 +1002,25 @@ impl CognitiveSubsystem for SwarmManager {
             output.flags |= output_flags::REQUEST_EXPLORATION;
         }
 
-        // ── 8. Update telemetry ─────────────────────────────────────────
+        // ── 8. Space alerts → arousal/valence/confidence/exploration ────
+        #[cfg(feature = "space-alerts")]
+        {
+            output.arousal_delta += self.space_arousal_acc;
+            output.valence_delta += self.space_valence_acc;
+            output.confidence_delta += self.space_confidence_acc as f64;
+            output.exploration_delta += self.space_exploration_acc;
+            if self.space_lr_acc > 0.0 {
+                output.lr_modulation *= 1.0 + self.space_lr_acc;
+            }
+            // Reset accumulators
+            self.space_arousal_acc = 0.0;
+            self.space_valence_acc = 0.0;
+            self.space_confidence_acc = 0.0;
+            self.space_exploration_acc = 0.0;
+            self.space_lr_acc = 0.0;
+        }
+
+        // ── 9. Update telemetry ─────────────────────────────────────────
         self.update_telemetry(affective_mag);
 
         output
@@ -1327,5 +1598,191 @@ mod tests {
         assert_eq!(mgr.wisdom_pool_count(), 1);
         let agg = mgr.try_aggregate_wisdom();
         assert!(agg.is_none()); // Not enough contributions
+    }
+
+    // ── Space alert tests ───────────────────────────────────────────────
+
+    #[cfg(feature = "space-alerts")]
+    #[test]
+    fn test_space_alert_conjunction_modulates_arousal() {
+        let mut sm = SwarmManager::default();
+        sm.connected_peers = 1;
+        sm.connectivity_ema = 0.5;
+
+        sm.inject_event(SwarmEvent::SpaceAlert {
+            alert_type: SpaceAlertType::ConjunctionWarning,
+            severity: 0.8,
+            confidence: 0.9,
+            time_to_event_seconds: 60.0,
+            description: "Close approach predicted".into(),
+        });
+
+        let snapshot = CycleSnapshot::default();
+        let output = sm.process(&snapshot);
+
+        assert!(
+            output.arousal_delta > 0.0,
+            "Conjunction should boost arousal: {}",
+            output.arousal_delta
+        );
+        assert!(
+            output.exploration_delta > 0.0,
+            "Conjunction should boost exploration: {}",
+            output.exploration_delta
+        );
+    }
+
+    #[cfg(feature = "space-alerts")]
+    #[test]
+    fn test_space_alert_debris_negative_valence() {
+        let mut sm = SwarmManager::default();
+        sm.connected_peers = 1;
+        sm.connectivity_ema = 0.5;
+
+        sm.inject_event(SwarmEvent::SpaceAlert {
+            alert_type: SpaceAlertType::DebrisProximity,
+            severity: 0.7,
+            confidence: 0.85,
+            time_to_event_seconds: 300.0,
+            description: "Debris fragment approaching".into(),
+        });
+
+        let snapshot = CycleSnapshot::default();
+        let output = sm.process(&snapshot);
+
+        assert!(
+            output.valence_delta < 0.0,
+            "Debris should induce negative valence: {}",
+            output.valence_delta
+        );
+        assert!(
+            output.arousal_delta > 0.0,
+            "Debris should boost arousal: {}",
+            output.arousal_delta
+        );
+        // Confidence should decrease from debris uncertainty
+        // (note: social buffering adds positive confidence, so check net effect
+        // by comparing with the social buffering contribution alone)
+        let mut sm_no_alert = SwarmManager::default();
+        sm_no_alert.connected_peers = 1;
+        sm_no_alert.connectivity_ema = 0.5;
+        let baseline = sm_no_alert.process(&snapshot);
+        assert!(
+            output.confidence_delta < baseline.confidence_delta,
+            "Debris should reduce confidence relative to baseline: {} vs {}",
+            output.confidence_delta,
+            baseline.confidence_delta
+        );
+    }
+
+    #[cfg(feature = "space-alerts")]
+    #[test]
+    fn test_space_alert_comm_window_boosts_confidence() {
+        let mut sm = SwarmManager::default();
+        sm.connected_peers = 1;
+        sm.connectivity_ema = 0.5;
+
+        sm.inject_event(SwarmEvent::SpaceAlert {
+            alert_type: SpaceAlertType::CommWindow,
+            severity: 0.3,
+            confidence: 0.95,
+            time_to_event_seconds: 120.0,
+            description: "Relay satellite in range".into(),
+        });
+
+        let snapshot = CycleSnapshot::default();
+        let output = sm.process(&snapshot);
+
+        assert!(
+            output.confidence_delta > 0.0,
+            "Comm window should boost confidence: {}",
+            output.confidence_delta
+        );
+        assert!(
+            output.lr_modulation > 1.0,
+            "Comm window should boost learning rate: {}",
+            output.lr_modulation
+        );
+    }
+
+    #[cfg(feature = "space-alerts")]
+    #[test]
+    fn test_space_alert_urgency_decay() {
+        let mut sm_near = SwarmManager::default();
+        sm_near.connected_peers = 1;
+        sm_near.connectivity_ema = 0.5;
+
+        sm_near.inject_event(SwarmEvent::SpaceAlert {
+            alert_type: SpaceAlertType::ConjunctionWarning,
+            severity: 0.8,
+            confidence: 0.9,
+            time_to_event_seconds: 10.0, // Very close
+            description: "Imminent".into(),
+        });
+
+        let mut sm_far = SwarmManager::default();
+        sm_far.connected_peers = 1;
+        sm_far.connectivity_ema = 0.5;
+
+        sm_far.inject_event(SwarmEvent::SpaceAlert {
+            alert_type: SpaceAlertType::ConjunctionWarning,
+            severity: 0.8,
+            confidence: 0.9,
+            time_to_event_seconds: 36000.0, // 10 hours away
+            description: "Distant".into(),
+        });
+
+        let snapshot = CycleSnapshot::default();
+        let out_near = sm_near.process(&snapshot);
+        let out_far = sm_far.process(&snapshot);
+
+        assert!(
+            out_near.arousal_delta > out_far.arousal_delta,
+            "Near event should produce higher arousal than far: {} vs {}",
+            out_near.arousal_delta,
+            out_far.arousal_delta
+        );
+    }
+
+    #[cfg(feature = "space-alerts")]
+    #[test]
+    fn test_space_alert_severity_clamped() {
+        let mut sm = SwarmManager::default();
+        sm.connected_peers = 1;
+        sm.connectivity_ema = 0.5;
+
+        // Inject with out-of-range values
+        sm.inject_event(SwarmEvent::SpaceAlert {
+            alert_type: SpaceAlertType::DebrisProximity,
+            severity: 5.0, // Over max
+            confidence: f32::NAN, // NaN
+            time_to_event_seconds: f64::INFINITY,
+            description: "Bad data".into(),
+        });
+
+        let snapshot = CycleSnapshot::default();
+        let output = sm.process(&snapshot);
+
+        assert!(
+            output.arousal_delta.is_finite(),
+            "NaN/Inf inputs should produce finite arousal: {}",
+            output.arousal_delta
+        );
+        assert!(
+            output.valence_delta.is_finite(),
+            "NaN/Inf inputs should produce finite valence: {}",
+            output.valence_delta
+        );
+        assert!(
+            output.confidence_delta.is_finite(),
+            "NaN/Inf inputs should produce finite confidence: {}",
+            output.confidence_delta
+        );
+
+        // Severity should have been clamped to 1.0
+        assert_eq!(
+            sm.last_space_alert_severity, 1.0,
+            "Severity should be clamped to 1.0"
+        );
     }
 }

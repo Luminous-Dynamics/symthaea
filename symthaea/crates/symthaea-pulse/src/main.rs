@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Symthaea Pulse — a human-friendly consciousness status card.
 //!
 //! Spins up a CognitiveLoopService, runs warmup + measurement cycles,
@@ -382,6 +385,22 @@ pub struct MeshConsciousnessInfo {
     pub phi_history: Vec<f32>,
 }
 
+/// Waste/circular economy telemetry snapshot for Pulse dashboard.
+///
+/// Groups waste tracking metrics from SwarmManager into a dashboard pane,
+/// enabling real-time monitoring of system-wide material flows.
+#[derive(Serialize, Deserialize, Default)]
+pub struct CircularEconomyInfo {
+    /// Total waste tracked across network (kg).
+    pub total_waste_kg: f32,
+    /// Mean circularity potential [0.0, 1.0].
+    pub mean_circularity: f32,
+    /// Waste events processed this interval.
+    pub events_processed: u32,
+    /// Classification confidence EMA [0.0, 1.0].
+    pub confidence_ema: f32,
+}
+
 /// Immune system / defense snapshot.
 #[derive(Serialize, Deserialize, Default)]
 pub struct ImmuneInfo {
@@ -739,6 +758,8 @@ pub struct PulseSnapshot {
     pub fabrication: FabricationInfo,
     #[serde(default)]
     pub mesh_consciousness: MeshConsciousnessInfo,
+    #[serde(default)]
+    pub circular_economy: CircularEconomyInfo,
 }
 
 /// Computed delta between two pulse snapshots for the comparison view.

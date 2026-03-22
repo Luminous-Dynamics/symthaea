@@ -523,6 +523,8 @@ humanoid-viewer = ["humanoid-mujoco", "symthaea-humanoid/viewer"]  # Humanoid wi
 # ── Storage ────────────────────────────────────────────────────────
 hdc-store = ["dep:symthaea-hdc-store"]  # Zero-copy mmap'd BinaryHV storage with persistent LSH
 fhe-wisdom = []                        # FHE collective wisdom pool for privacy-preserving peer learning
+space-alerts = []                      # Space situational awareness alerts from mycelix-space
+circular = []                          # Waste/circular economy tracking (SwarmEvent + telemetry)
 
 # ── Database backends ───────────────────────────────────────────────
 # DuckDB is an unconditional dep. Others deferred:

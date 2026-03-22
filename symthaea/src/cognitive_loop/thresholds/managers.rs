@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Manager intervals, governance, swarm, knowledge, trust, and sentinel constants.
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -466,6 +469,64 @@ pub const SWARM_ISOLATION_THRESHOLD: f64 = 0.2;
 
 /// Exploration boost when isolated (no connected peers).
 pub const SWARM_ISOLATION_EXPLORATION_BOOST: f64 = 0.05;
+
+// ── Space alerts (feature: space-alerts) ─────────────────────────────────
+
+/// Arousal delta from conjunction warning.
+/// Basis: Kahneman (2011) — threat salience drives attentional capture.
+pub const SPACE_CONJUNCTION_AROUSAL: f32 = 0.10;
+
+/// Arousal delta from debris proximity (fight-or-flight analogue).
+/// Basis: Cannon (1929) — acute threat triggers sympathetic arousal.
+pub const SPACE_DEBRIS_AROUSAL: f32 = 0.15;
+
+/// Valence delta from debris threat (negative affect).
+/// Basis: LeDoux (2003) — amygdala-mediated aversive valence.
+pub const SPACE_DEBRIS_VALENCE: f32 = -0.08;
+
+/// Confidence reduction from debris uncertainty.
+/// Basis: Kahneman & Tversky (1979) — uncertainty reduces decision confidence.
+pub const SPACE_DEBRIS_CONFIDENCE: f32 = -0.10;
+
+/// Confidence boost from communication window opportunity.
+/// Basis: Heinrichs (2003) — social/resource access buffers stress.
+pub const SPACE_COMM_CONFIDENCE: f32 = 0.05;
+
+/// Learning rate boost during communication windows.
+/// Basis: Schultz (1997) — reward prediction boosts dopaminergic learning.
+pub const SPACE_COMM_LR_BOOST: f32 = 0.10;
+
+/// Exploration boost from conjunction (search for alternatives).
+/// Basis: Aston-Jones & Cohen (2005) — threat uncertainty promotes exploration.
+pub const SPACE_CONJUNCTION_EXPLORATION: f32 = 0.05;
+
+/// Arousal delta from orbital anomaly detection.
+/// Basis: Sokolov (1963) — orienting response to unexpected stimuli.
+pub const SPACE_ANOMALY_AROUSAL: f32 = 0.08;
+
+/// Confidence boost from maneuver announcement (neutral information).
+pub const SPACE_MANEUVER_CONFIDENCE: f32 = 0.03;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CIRCULAR ECONOMY — Waste circularity → neuromodulator coupling
+// Basis: Ellen MacArthur Foundation (2015) — circular economy as feedback loop
+// McEwen (2007) — serotonin role in system stability/homeostatic confidence
+// Arnsten (2009) — noradrenaline vigilance to resource constraints
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Serotonin gain from high circularity potential (system health signal).
+/// Basis: McEwen (2007) — serotonin supports homeostatic confidence.
+pub const CIRCULAR_ECONOMY_SHT_GAIN: f32 = 0.15;
+
+/// Serotonin half-life (cycles) for circularity boost.
+pub const CIRCULAR_ECONOMY_SHT_HALFLIFE: f32 = 8.0;
+
+/// Noradrenaline gain from low material entropy (concentration risk).
+/// Basis: Arnsten (2009) — NE drives vigilance under resource constraint.
+pub const CIRCULAR_ECONOMY_NE_GAIN: f32 = 0.20;
+
+/// NE half-life (cycles) for waste vigilance — fast transient.
+pub const CIRCULAR_ECONOMY_NE_HALFLIFE: f32 = 4.0;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TRUST MANAGER — Violation response, anomaly detection
