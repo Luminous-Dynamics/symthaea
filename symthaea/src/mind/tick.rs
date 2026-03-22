@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Tick processing for the Continuous Mind.
 //!
 //! Contains the main cognitive cycle (`tick()`), dream processing,
@@ -447,9 +450,25 @@ impl ContinuousMind {
         let inbox = std::mem::take(&mut self.social_inbox);
         let mut observed = 0u64;
         let mut interactions = 0u64;
+        let mut peer_thoughts: Vec<ContinuousHV> = Vec::new();
         for msg in inbox {
             sc.observe_agent(&msg.agent_id, &msg.behavior, &msg.context);
             observed += 1;
+
+            // Active knowledge bundling: collect peer thoughts for WM integration.
+            // Trust-weighted: only bundle from agents with positive trust.
+            let trust = sc.get_relationship(&msg.agent_id)
+                .map(|r| r.trust)
+                .unwrap_or(0.5);
+            if trust > 0.3 {
+                // Scale peer thought by trust (0.3-1.0 → 0.0-0.7 weight)
+                let weight = (trust - 0.3).min(0.7);
+                let mut weighted = msg.behavior.clone();
+                for v in weighted.values.iter_mut() {
+                    *v *= weight as f32;
+                }
+                peer_thoughts.push(weighted);
+            }
 
             if let Some(outcome) = msg.interaction_outcome {
                 let interaction_type = if outcome >= 0.0 {
@@ -480,6 +499,45 @@ impl ContinuousMind {
                     agent = %msg.agent_id,
                     "Applied neuromodulator bath coupling"
                 );
+            }
+        }
+
+        // Active knowledge bundling: integrate peer thoughts into working memory.
+        // Bundle all trusted peer thoughts into a single social HV and push to WM.
+        // This enables collective consciousness emergence under partial information.
+        if !peer_thoughts.is_empty() {
+            let refs: Vec<&ContinuousHV> = peer_thoughts.iter().collect();
+            let social_bundle = ContinuousHV::bundle(&refs);
+
+            if self.working_memory.len() < self.config.working_memory_capacity {
+                self.working_memory.push(social_bundle);
+                self.working_memory_ticks.push(self.state.tick);
+                self.working_memory_sources.push(
+                    crate::memory::memory_coordinator::MemorySource::Social,
+                );
+                self.working_memory_verified.push(false);
+                self.working_memory_metadata
+                    .push(std::collections::HashMap::new());
+            } else {
+                // Evict oldest non-social item to make room for social integration
+                if let Some(pos) = self.working_memory_sources.iter().position(|s| {
+                    !matches!(s, crate::memory::memory_coordinator::MemorySource::Social)
+                }) {
+                    self.working_memory.remove(pos);
+                    self.working_memory_ticks.remove(pos);
+                    self.working_memory_sources.remove(pos);
+                    self.working_memory_verified.remove(pos);
+                    self.working_memory_metadata.remove(pos);
+
+                    self.working_memory.push(social_bundle);
+                    self.working_memory_ticks.push(self.state.tick);
+                    self.working_memory_sources.push(
+                        crate::memory::memory_coordinator::MemorySource::Social,
+                    );
+                    self.working_memory_verified.push(false);
+                    self.working_memory_metadata
+                        .push(std::collections::HashMap::new());
+                }
             }
         }
 

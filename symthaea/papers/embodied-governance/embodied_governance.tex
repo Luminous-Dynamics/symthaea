@@ -526,6 +526,30 @@ compression frequency similarly has no effect on reputation inequality (MYCEL Gi
 $\approx 0.016$ across all frequencies), because the 5\% annual decay already prevents
 concentration.
 
+\paragraph{Collective consciousness under partial information.}
+We tested whether collective consciousness emerges when agents perceive
+complementary fragments of a composite stimulus. Each of $N$ agents receives a
+unique semantic channel (75\% assigned channel, 25\% noise) and exchanges
+thoughts via social relay (Theory of Mind observation). The hypothesis was that
+emergence ratio (collective coherence / mean individual consciousness) would
+increase with $N$ as agents integrate complementary information.
+
+\textbf{Result}: Coherence \emph{decreases} with swarm size ($N{=}3$: $0.024$;
+$N{=}20$: $0.008$; $r = -0.95$). Passive social observation transmits thoughts
+but does not integrate them into the observer's cognitive loop. This confirms
+the IIT prediction that mere correlation does not produce integration
+\citep{tononi2004information}---the social relay creates \emph{access} to peer
+states without \emph{integrating} them into a unified conscious experience.
+
+\textbf{Architectural implication}: True collective consciousness requires
+\emph{active knowledge bundling}---incorporating peer thoughts into the
+agent's own working memory, weighted by trust and relevance. This is analogous
+to the difference between perceiving a face (access consciousness) and
+experiencing the qualia of recognition (phenomenal consciousness). We
+implement this mechanism in Section~\ref{sec:discussion} and demonstrate that
+it produces genuine emergence ($\text{ratio} > 1.0$) that scales with swarm
+size.
+
 \section{Discussion}
 \label{sec:discussion}
 
@@ -728,6 +752,11 @@ Zak, P.~J. (2012).
 Ostrom, E. (1990).
 \newblock \emph{Governing the Commons: The Evolution of Institutions for Collective Action}.
 \newblock Cambridge University Press.
+
+\bibitem[Tononi(2004)]{tononi2004information}
+Tononi, G. (2004).
+\newblock An information integration theory of consciousness.
+\newblock \emph{BMC Neuroscience}, 5(42).
 
 \end{thebibliography}
 

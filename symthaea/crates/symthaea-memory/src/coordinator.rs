@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Memory Coordinator: Cross-Tier Memory Integration
 //!
 //! Bridges episodic and semantic memory with shared consciousness signals
@@ -98,6 +101,8 @@ pub enum MemorySource {
     ActionFeedback,
     /// Evicted from semantic ring buffer (survived full rotation)
     SemanticEviction,
+    /// Received via social relay from a peer agent
+    Social,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
