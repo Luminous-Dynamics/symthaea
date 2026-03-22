@@ -2,6 +2,7 @@
 name = "trust_credential_integrity"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 description = "K-Vector trust credential integrity zome with ZKP support"
 
 [lib]

@@ -1,0 +1,17 @@
+[package]
+name = "legacy_probate"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "legacy_probate"
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+legacy_probate_integrity = { path = "../integrity" }
+legacy-types = { workspace = true }

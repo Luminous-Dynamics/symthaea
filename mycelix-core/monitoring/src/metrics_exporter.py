@@ -1,3 +1,6 @@
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 """
 Mycelix FL Metrics Exporter
 
@@ -546,11 +549,17 @@ metrics = MycelixMetrics()
 class MetricsExporter:
     """HTTP server for Prometheus metrics scraping."""
 
-    def __init__(self, port: int = 9100, host: str = "0.0.0.0"):
+    def __init__(self, port: int = 9100, host: str = None):
+        import os
+        if host is None:
+            host = os.getenv("METRICS_HOST", "127.0.0.1")
         self.port = port
         self.host = host
         self.app = web.Application()
         self.runner: Optional[web.AppRunner] = None
+        self._auth_token: Optional[str] = os.environ.get("METRICS_AUTH_TOKEN")
+        # Paths that never require authentication (load balancer probes)
+        self._unauthenticated_paths = {"/health", "/ready"}
         self._setup_routes()
 
     def _setup_routes(self):
@@ -560,8 +569,30 @@ class MetricsExporter:
         self.app.router.add_get("/ready", self._handle_ready)
         self.app.router.add_get("/json", self._handle_json)
 
+    def _check_auth(self, request: web.Request) -> Optional[web.Response]:
+        """Check Bearer token if METRICS_AUTH_TOKEN is set.
+
+        Returns None if auth passes, or a 401 Response if it fails.
+        Skips auth for health/ready probes.
+        """
+        if self._auth_token is None:
+            return None
+        if request.path in self._unauthenticated_paths:
+            return None
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header == f"Bearer {self._auth_token}":
+            return None
+        return web.Response(
+            text=json.dumps({"error": "Unauthorized", "detail": "Missing or invalid Bearer token"}),
+            status=401,
+            content_type="application/json",
+        )
+
     async def _handle_metrics(self, request: web.Request) -> web.Response:
         """Handle Prometheus metrics endpoint."""
+        auth_error = self._check_auth(request)
+        if auth_error is not None:
+            return auth_error
         try:
             output = metrics.export_prometheus()
             return web.Response(
@@ -588,6 +619,9 @@ class MetricsExporter:
 
     async def _handle_json(self, request: web.Request) -> web.Response:
         """Handle JSON metrics endpoint."""
+        auth_error = self._check_auth(request)
+        if auth_error is not None:
+            return auth_error
         try:
             output = metrics.export_json()
             return web.Response(
@@ -604,6 +638,13 @@ class MetricsExporter:
         await self.runner.setup()
         site = web.TCPSite(self.runner, self.host, self.port)
         await site.start()
+        if self._auth_token is None:
+            logger.warning(
+                "METRICS_AUTH_TOKEN is not set — metrics authentication is DISABLED. "
+                "Set the env var to require Bearer token auth on /metrics and /json endpoints."
+            )
+        else:
+            logger.info("Bearer token authentication enabled for metrics endpoints.")
         logger.info(f"Metrics server started on http://{self.host}:{self.port}")
 
     async def stop(self):

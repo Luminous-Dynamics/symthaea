@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! SIMD-Accelerated Operations for Continuous (f32) Hypervectors
 //!
 //! This module provides high-performance SIMD implementations for ContinuousHV operations:
@@ -68,6 +71,8 @@ pub fn dot_product_simd(a: &[f32], b: &[f32]) -> f32 {
     {
         #[cfg(target_arch = "aarch64")]
         if has_neon() {
+            // SAFETY: NEON availability verified by runtime feature detection (has_neon()).
+            // Input slices are validated for length and alignment above.
             return unsafe { dot_product_neon(a, b) };
         }
         dot_product_scalar(a, b)
@@ -337,6 +342,8 @@ pub fn bind_simd(a: &[f32], b: &[f32]) -> Vec<f32> {
     {
         #[cfg(target_arch = "aarch64")]
         if has_neon() {
+            // SAFETY: NEON availability verified by runtime feature detection (has_neon()).
+            // Input slices are validated for length and alignment above.
             unsafe { bind_neon(a, b, &mut result) };
             return result;
         }
@@ -502,6 +509,8 @@ pub fn bundle_simd(hvs: &[&[f32]], weights: &[f32]) -> Vec<f32> {
     {
         #[cfg(target_arch = "aarch64")]
         if has_neon() {
+            // SAFETY: NEON availability verified by runtime feature detection (has_neon()).
+            // All HVs have same dimension (asserted above), `result` is that size.
             unsafe { bundle_neon(hvs, weights, &mut result, inv_weight_sum) };
             return result;
         }
@@ -691,6 +700,8 @@ pub fn similarity_simd(a: &[f32], b: &[f32]) -> f32 {
     {
         #[cfg(target_arch = "aarch64")]
         if has_neon() {
+            // SAFETY: NEON availability verified by runtime feature detection (has_neon()).
+            // Input slices are validated for length and alignment above.
             return unsafe { similarity_neon(a, b) };
         }
         similarity_scalar_optimized(a, b)

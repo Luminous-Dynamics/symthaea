@@ -189,9 +189,43 @@ jobs:
           retention-days: 30
 
   test-all-features:
-    name: Test (CI-safe features)
+    name: Test CI-safe (${{ matrix.group }})
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Split into 5 groups to stay under runner preemption thresholds.
+          # Each group targets ~10 min wall-clock.
+          - group: core-infra
+            features: >-
+              parallel,service,shell,demo,api_module,
+              integrity,semantic-encoder,webcam,
+              nix-mind,identity,notifications
+          - group: core-media
+            features: >-
+              voice-tts,voice-stt,audio,vocal-tract,neural-vocoder,
+              embeddings,vision,perception,vision-manifold,foveation
+          - group: science-ai
+            features: >-
+              multi_agent,full_consciousness,full_perception,
+              full_language,magi_loop,reasoning_engine,code_generation,
+              wasm-sandbox,school_learning,benchmarks,all_benchmarks
+          - group: science-infra
+            features: >-
+              physics,physics-bridge,flight,humanoid,hal,
+              ssm-power,ssm_language,lancedb-backend,
+              integration_module,observability_module,support,web_research_module
+          - group: genesis
+            features: >-
+              genomics,cell-foundry,ectogenesis,nurture,population,
+              genesis,genesis-missions,fusion-twin,safety-agents,lab-controller,
+              materials,nuclear-forensics,water-prediction,physics-unification,
+              grid-scaling,fission-reactor,accelerator,threat-assessment,
+              datacenter,experiment-planner,strategic-materials,critical-minerals,
+              advanced-manufacturing,building-systems,design-production,
+              mycelix,unstable-examples
     steps:
       - uses: actions/checkout@v4
 
@@ -205,8 +239,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-test-all-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-test-all-${{ matrix.group }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
+            ${{ runner.os }}-cargo-test-all-${{ matrix.group }}-
             ${{ runner.os }}-cargo-test-all-
 
       - name: Install system dependencies
@@ -222,33 +257,16 @@ jobs:
             libespeak-ng-dev \
             cmake
 
-      - name: Run tests (CI-safe features)
+      - name: Run tests (${{ matrix.group }})
         uses: nick-fields/retry@v3
         with:
-          timeout_minutes: 55
+          timeout_minutes: 30
           max_attempts: 2
-          retry_on: error
           command: |
-            # Same CI-safe feature set as clippy (excludes GPU/MuJoCo/V4L2/cpal/I2C)
-            CI_FEATURES="parallel,service,shell,demo,api_module,\
-            voice-tts,voice-stt,audio,vocal-tract,neural-vocoder,\
-            embeddings,vision,perception,vision-manifold,foveation,\
-            integrity,semantic-encoder,neural-bridge,webcam,\
-            mesh,mesh-encryption,mesh-key-exchange,swarm,notifications,\
-            nix-mind,identity,physics,physics-bridge,\
-            flight,humanoid,hal,ssm-power,ssm_language,\
-            lancedb-backend,multi_agent,full_consciousness,full_perception,\
-            full_language,magi_loop,reasoning_engine,code_generation,\
-            wasm-sandbox,school_learning,benchmarks,all_benchmarks,\
-            integration_module,observability_module,support,web_research_module,\
-            genomics,cell-foundry,ectogenesis,nurture,population,genesis,\
-            genesis-missions,fusion-twin,safety-agents,lab-controller,\
-            materials,nuclear-forensics,water-prediction,physics-unification,\
-            grid-scaling,fission-reactor,accelerator,threat-assessment,\
-            datacenter,experiment-planner,strategic-materials,critical-minerals,\
-            advanced-manufacturing,building-systems,design-production,\
-            mycelix,unstable-examples"
-            cargo test -p symthaea --lib --features "$CI_FEATURES"
+            FEATURES="${{ matrix.features }}"
+            # Remove whitespace from YAML multiline
+            FEATURES=$(echo "$FEATURES" | tr -d '[:space:]' | sed 's/,,*/,/g; s/^,//; s/,$//')
+            cargo test -p symthaea --lib --features "$FEATURES"
 
   test-feature-matrix-critical:
     name: Test Feature Matrix (core/web_research/pathology)
@@ -631,6 +649,25 @@ jobs:
             fi
           }
 
+  sbom:
+    name: SBOM Generation
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-cyclonedx
+        run: cargo install cargo-cyclonedx
+      - name: Generate SBOM
+        run: cargo cyclonedx --format json --output-file symthaea-sbom.json
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: symthaea-sbom.json
+          retention-days: 90
+
   test-subcrates:
     name: Test Sub-Crates
     runs-on: ubuntu-latest
@@ -931,3 +968,14 @@ jobs:
           echo "Checking compliance documentation..."
           test -f COMPLIANCE.md || test -f docs/COMPLIANCE.md || echo "::warning::No COMPLIANCE.md found"
           echo "Documentation check complete"
+
+  secrets-scan:
+    name: Secrets Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -2,6 +2,7 @@
 name = "traffic_control"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 description = "Coordinator zome for automated space traffic coordination"
 
 [lib]

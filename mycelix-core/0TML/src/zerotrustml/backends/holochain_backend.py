@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""
+
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root"""
 Holochain Backend Implementation
 
 Decentralized DHT-based storage using Holochain conductor.
@@ -8,6 +11,7 @@ Provides immutable audit trail and agent-centric architecture.
 
 import asyncio
 import logging
+import os
 from typing import Dict, List, Optional, Any
 import time
 import json
@@ -61,14 +65,27 @@ class HolochainBackend(StorageBackend):
 
     def __init__(
         self,
-        admin_url: str = "ws://localhost:8888",
-        app_url: str = "ws://localhost:8889",
+        # wss:// by default — requires TLS certs on the Holochain conductor.
+        # Override with HOLOCHAIN_ADMIN_URL / HOLOCHAIN_APP_URL env vars for
+        # local dev (e.g. ws://localhost:8888).
+        admin_url: str = "wss://localhost:8888",
+        app_url: str = "wss://localhost:8889",
         app_id: str = "zerotrustml",
         timeout: int = 30
     ):
         super().__init__(BackendType.HOLOCHAIN)
-        self.admin_url = admin_url
-        self.app_url = app_url
+        self.admin_url = os.environ.get("HOLOCHAIN_ADMIN_URL", admin_url)
+        self.app_url = os.environ.get("HOLOCHAIN_APP_URL", app_url)
+        if self.admin_url.startswith("ws://"):
+            logger.warning(
+                "Holochain admin connection using insecure ws:// — "
+                "use wss:// with TLS certs in production"
+            )
+        if self.app_url.startswith("ws://"):
+            logger.warning(
+                "Holochain app connection using insecure ws:// — "
+                "use wss:// with TLS certs in production"
+            )
         self.app_id = app_id
         self.timeout = timeout
         self.admin_ws = None

@@ -2,6 +2,7 @@
 name = "price_oracle"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 description = "Price Oracle coordinator zome — consensus pricing with consciousness-gated reporting"
 
 [lib]

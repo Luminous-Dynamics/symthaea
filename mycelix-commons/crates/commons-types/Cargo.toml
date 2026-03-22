@@ -2,6 +2,7 @@
 name = "commons-types"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 description = "Shared types and utilities for all Mycelix Commons zomes"
 
 [dependencies]

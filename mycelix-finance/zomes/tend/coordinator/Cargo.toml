@@ -2,6 +2,7 @@
 name = "tend"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 description = "Time Exchange Network of Dignity (TEND) coordinator zome - Commons Charter Article I"
 
 [lib]

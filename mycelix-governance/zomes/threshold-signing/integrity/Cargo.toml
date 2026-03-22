@@ -2,6 +2,7 @@
 name = "threshold_signing_integrity"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 description = "Threshold signing integrity zome for DKG-based collective signatures"
 
 [lib]

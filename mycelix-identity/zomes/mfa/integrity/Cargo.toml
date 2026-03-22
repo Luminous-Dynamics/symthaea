@@ -2,6 +2,7 @@
 name = "mfa_integrity"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 description = "Multi-Factor Authentication integrity zome for MFDI spec"
 
 [lib]

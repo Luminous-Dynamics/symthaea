@@ -1,0 +1,32 @@
+[package]
+name = "mycelix-bridge-common-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+mycelix-bridge-common = { path = ".." }
+
+# Prevent this from interfering with workspace
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "fuzz_consciousness_profile"
+path = "fuzz_targets/fuzz_consciousness_profile.rs"
+doc = false
+
+[[bin]]
+name = "fuzz_offline_credential"
+path = "fuzz_targets/fuzz_offline_credential.rs"
+doc = false
+
+[[bin]]
+name = "fuzz_routing_dispatch"
+path = "fuzz_targets/fuzz_routing_dispatch.rs"
+doc = false

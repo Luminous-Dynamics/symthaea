@@ -2,6 +2,7 @@
 name = "verifiable_credential_integrity"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 description = "W3C Verifiable Credentials integrity zome"
 
 [lib]

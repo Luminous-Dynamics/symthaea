@@ -2,6 +2,7 @@
 name = "mycelix-bridge-common"
 version = "0.1.0"
 edition = "2021"
+license = "AGPL-3.0-or-later"
 description = "Shared bridge dispatch types and utilities for Mycelix cluster DNAs"
 
 [features]

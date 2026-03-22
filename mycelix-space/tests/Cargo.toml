@@ -67,6 +67,10 @@ path = "property_tests.rs"
 name = "proptest_orbital"
 path = "proptest_orbital.rs"
 
+[[test]]
+name = "space_coordination_e2e"
+path = "space_coordination_e2e.rs"
+
 # Sweettest Integration Tests (conductor-based)
 [[test]]
 name = "sweettest_integration"

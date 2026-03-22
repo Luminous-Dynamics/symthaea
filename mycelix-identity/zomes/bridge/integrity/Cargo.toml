@@ -2,6 +2,7 @@
 name = "identity_bridge_integrity"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 description = "Cross-hApp bridge integrity zome for Mycelix Identity"
 
 [lib]

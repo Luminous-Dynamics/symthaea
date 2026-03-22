@@ -1,4 +1,6 @@
-"""
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root"""
 ZeroTrustML Monitoring - Network monitoring and dashboard
 
 Provides monitoring and visualization tools for ZeroTrustML networks.
@@ -14,7 +16,7 @@ class Dashboard:
         self.nodes = nodes or []
         self.metrics = {}
 
-    async def start(self, host='0.0.0.0', port=8000):
+    async def start(self, host='127.0.0.1', port=8000):
         """Start the dashboard server"""
         print(f"📊 Starting ZeroTrustML Dashboard")
         print(f"   Listening on http://{host}:{port}")

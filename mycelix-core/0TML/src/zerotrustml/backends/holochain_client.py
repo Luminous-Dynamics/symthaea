@@ -1,4 +1,6 @@
-"""
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root"""
 Holochain Admin WebSocket Client for Zero-TrustML
 
 Working implementation based on successful connectivity testing.
@@ -14,10 +16,15 @@ Known Issues:
 - Async websockets library gets HTTP 400 from conductor
 """
 
+import logging
+import os
+
 import msgpack
 import websocket
 from typing import Any, Dict, Optional
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -37,15 +44,22 @@ class HolochainAdminClient:
     to Holochain 0.6.0-rc.1 conductor.
     """
 
-    def __init__(self, url: str = "ws://127.0.0.1:8888"):
+    def __init__(self, url: str = "wss://127.0.0.1:8888"):
         """
         Initialize client.
 
         Args:
-            url: WebSocket URL for conductor admin interface
-                 Default: ws://127.0.0.1:8888 (inside container)
+            url: WebSocket URL for conductor admin interface.
+                 Default: wss://127.0.0.1:8888 (requires TLS certs on conductor).
+                 Override with HOLOCHAIN_ADMIN_URL env var for local dev
+                 (e.g. ws://127.0.0.1:8888).
         """
-        self.url = url
+        self.url = os.environ.get("HOLOCHAIN_ADMIN_URL", url)
+        if self.url.startswith("ws://"):
+            logger.warning(
+                "Holochain admin connection using insecure ws:// — "
+                "use wss:// with TLS certs in production"
+            )
         self.ws: Optional[websocket.WebSocket] = None
         self.request_id = 0
 
@@ -224,12 +238,12 @@ class HolochainAdminClient:
 
 
 # Convenience function for quick testing
-def test_connection(url: str = "ws://127.0.0.1:8888"):
+def test_connection(url: str = "wss://127.0.0.1:8888"):
     """
     Test Holochain conductor connection.
 
     Args:
-        url: WebSocket URL
+        url: WebSocket URL (wss:// recommended; requires TLS certs on conductor)
 
     Returns:
         True if connection successful and can generate agent key
@@ -248,6 +262,6 @@ def test_connection(url: str = "ws://127.0.0.1:8888"):
 if __name__ == '__main__':
     # Run quick test
     import sys
-    url = sys.argv[1] if len(sys.argv) > 1 else "ws://127.0.0.1:8888"
+    url = sys.argv[1] if len(sys.argv) > 1 else "wss://127.0.0.1:8888"
     success = test_connection(url)
     sys.exit(0 if success else 1)

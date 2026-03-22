@@ -1,4 +1,6 @@
-"""
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root"""
 ZeroTrustML Monitoring CLI - Network monitoring and visualization
 
 Provides dashboard and monitoring tools for ZeroTrustML networks.
@@ -102,7 +104,7 @@ def main():
         epilog="""
 Examples:
   zerotrustml-monitor dashboard
-  zerotrustml-monitor dashboard --host 0.0.0.0 --port 8000
+  zerotrustml-monitor dashboard --host 127.0.0.1 --port 8000
   zerotrustml-monitor metrics
   zerotrustml-monitor health
   zerotrustml-monitor topology
@@ -118,7 +120,7 @@ For more information, visit: https://github.com/Luminous-Dynamics/0TML
 
     # Dashboard command
     dashboard_parser = subparsers.add_parser('dashboard', help='Start monitoring dashboard')
-    dashboard_parser.add_argument('--host', default='0.0.0.0', help='Host to bind to')
+    dashboard_parser.add_argument('--host', default='127.0.0.1', help='Host to bind to (use 0.0.0.0 for all interfaces)')
     dashboard_parser.add_argument('--port', type=int, default=8000, help='Port to bind to')
     dashboard_parser.set_defaults(func=dashboard_command)
 

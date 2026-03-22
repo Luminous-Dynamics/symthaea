@@ -2,6 +2,7 @@
 name = "factcheck"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 description = "Fact-checking API coordinator zome for cross-hApp verification"
 
 [lib]

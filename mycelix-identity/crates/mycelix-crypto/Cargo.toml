@@ -2,6 +2,7 @@
 name = "mycelix-crypto"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 description = "Crypto-agile types for Mycelix Identity (Ed25519, ML-DSA, hybrid, ML-KEM)"
 
 [features]

@@ -2,6 +2,7 @@
 name = "staking_coordinator"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 description = "Tri-asset staking coordinator zome with cryptographic proofs"
 
 [lib]

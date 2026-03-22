@@ -2,6 +2,7 @@
 name = "orbital-mechanics"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 description = "Orbital mechanics library for mycelix-space: SGP4 propagation, covariance, and conjunction analysis"
 
 [lib]

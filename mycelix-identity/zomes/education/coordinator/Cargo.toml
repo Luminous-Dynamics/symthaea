@@ -2,6 +2,7 @@
 name = "education_coordinator"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 description = "Legacy Bridge: Academic credential coordinator with CSV import and DNS-DID verification"
 
 [lib]

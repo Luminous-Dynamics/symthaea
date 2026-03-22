@@ -2,6 +2,7 @@
 name = "mfa_coordinator"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 description = "Multi-Factor Authentication coordinator zome for MFDI spec"
 
 [lib]

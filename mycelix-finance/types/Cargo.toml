@@ -2,6 +2,7 @@
 name = "mycelix_finance_types"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 description = "Shared economic type definitions for Mycelix Finance — no HDK/HDI dependency"
 
 [lib]

@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""
+
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root"""
 ZeroTrustML Phase 10 Coordinator - Modular Backend Implementation
 
 Integrates:
@@ -114,9 +117,11 @@ class Phase10Config:
     postgres_password: str = ""
 
     # Holochain Backend (optional)
+    # wss:// by default — requires TLS certs on the Holochain conductor.
+    # Override with HOLOCHAIN_ADMIN_URL / HOLOCHAIN_APP_URL env vars for local dev.
     holochain_enabled: bool = False
-    holochain_admin_url: str = "ws://localhost:8888"
-    holochain_app_url: str = "ws://localhost:8889"
+    holochain_admin_url: str = "wss://localhost:8888"
+    holochain_app_url: str = "wss://localhost:8889"
     holochain_app_id: str = "zerotrustml"
 
     # LocalFile Backend (optional - for testing)
@@ -146,6 +151,26 @@ class Phase10Config:
     encryption_enabled: bool = True  # Enable encryption by default for compliance
     encryption_key: Optional[bytes] = None  # If None, a key will be auto-generated
     encryption_key_env_var: str = "ZEROTRUSTML_ENCRYPTION_KEY"  # Load key from env var
+
+    def __post_init__(self):
+        # Allow env var overrides for Holochain URLs (local dev fallback)
+        self.holochain_admin_url = os.environ.get(
+            "HOLOCHAIN_ADMIN_URL", self.holochain_admin_url
+        )
+        self.holochain_app_url = os.environ.get(
+            "HOLOCHAIN_APP_URL", self.holochain_app_url
+        )
+        if self.holochain_enabled:
+            if self.holochain_admin_url.startswith("ws://"):
+                logger.warning(
+                    "Holochain admin URL using insecure ws:// — "
+                    "use wss:// with TLS certs in production"
+                )
+            if self.holochain_app_url.startswith("ws://"):
+                logger.warning(
+                    "Holochain app URL using insecure ws:// — "
+                    "use wss:// with TLS certs in production"
+                )
 
 
 class Phase10Coordinator:

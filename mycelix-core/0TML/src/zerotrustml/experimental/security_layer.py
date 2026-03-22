@@ -1,4 +1,6 @@
-"""
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root"""
 Security Layer for Hybrid ZeroTrustML
 
 Implements:
@@ -9,6 +11,8 @@ Implements:
 """
 
 import asyncio
+import logging
+import os
 import ssl
 import json
 import time
@@ -85,15 +89,48 @@ class SecurityManager:
         self._initialize_keys()
 
     def _load_or_generate_jwt_secret(self) -> bytes:
-        """Load or generate JWT secret"""
+        """Load or generate JWT secret.
+
+        Production deployments MUST set ZEROTRUSTML_JWT_SECRET (base64-encoded,
+        >= 32 bytes decoded) rather than relying on file-based storage.
+        """
+        import base64
+        import secrets as _secrets
+
+        logger = logging.getLogger(__name__)
+
+        # Prefer environment variable (production path)
+        env_secret = os.environ.get("ZEROTRUSTML_JWT_SECRET", "").strip()
+        if env_secret:
+            decoded = base64.b64decode(env_secret)
+            if len(decoded) < 32:
+                raise ValueError(
+                    "ZEROTRUSTML_JWT_SECRET must decode to >= 32 bytes"
+                )
+            return decoded
+
+        # Fall back to file-based storage (dev/legacy)
         secret_file = self.cert_dir / "jwt_secret.bin"
         if secret_file.exists():
+            logger.warning(
+                "Loading JWT secret from disk (%s) — set "
+                "ZEROTRUSTML_JWT_SECRET env var for production",
+                secret_file,
+            )
             return secret_file.read_bytes()
 
-        # Generate new secret
-        import secrets
-        secret = secrets.token_bytes(32)
+        # Generate new secret and persist with restrictive permissions
+        secret = _secrets.token_bytes(32)
         secret_file.write_bytes(secret)
+        try:
+            os.chmod(secret_file, 0o600)
+        except OSError:
+            pass  # Best-effort on platforms that don't support chmod
+        logger.warning(
+            "Generated new JWT secret at %s (owner-only perms). "
+            "Set ZEROTRUSTML_JWT_SECRET env var for production.",
+            secret_file,
+        )
         return secret
 
     def _initialize_keys(self):
@@ -183,7 +220,17 @@ class SecurityManager:
                 ))
 
     def get_ssl_context(self, is_server: bool = True) -> ssl.SSLContext:
-        """Create SSL context for WebSocket connections"""
+        """Create SSL context for WebSocket connections.
+
+        Server mode: loads this node's cert/key pair; does not verify client
+        hostname (standard for servers accepting many clients).
+
+        Client mode: verifies the server's certificate and hostname by default.
+        Set ZEROTRUSTML_INSECURE_TLS=1 to disable verification for LOCAL
+        DEVELOPMENT ONLY.
+        """
+        logger = logging.getLogger(__name__)
+
         if is_server:
             context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
             context.load_cert_chain(
@@ -192,8 +239,18 @@ class SecurityManager:
             )
         else:
             context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-            context.check_hostname = False
-            context.verify_mode = ssl.CERT_NONE  # In production, verify peer certificates
+
+            insecure = os.environ.get("ZEROTRUSTML_INSECURE_TLS", "").strip()
+            if insecure == "1":
+                logger.warning(
+                    "*** ZEROTRUSTML_INSECURE_TLS is set — TLS certificate "
+                    "verification DISABLED. DO NOT use this in production! ***"
+                )
+                context.check_hostname = False
+                context.verify_mode = ssl.CERT_NONE
+            else:
+                context.check_hostname = True
+                context.verify_mode = ssl.CERT_REQUIRED
 
         return context
 
@@ -303,9 +360,13 @@ class SecureMessageWrapper:
                 print(f"Signature verification failed for message from {sender_id}")
                 return None
 
-            # Check timestamp (prevent replay attacks)
+            # Check timestamp (prevent replay attacks).
+            # Default 60s — NIST SP 800-63B recommends short replay windows
+            # for authentication protocols to limit the utility of captured tokens.
+            # Override via ZEROTRUSTML_REPLAY_WINDOW_SECS env var if needed.
+            replay_window = int(os.environ.get("ZEROTRUSTML_REPLAY_WINDOW_SECS", "60"))
             msg_time = wrapped_message['timestamp']
-            if abs(time.time() - msg_time) > 300:  # 5 minute window
+            if abs(time.time() - msg_time) > replay_window:
                 print(f"Message from {sender_id} too old or from future")
                 return None
 

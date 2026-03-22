@@ -2,6 +2,7 @@
 name = "currency_mint"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 description = "Currency Factory coordinator zome - community-minted mutual credit currencies"
 
 [lib]

@@ -94,7 +94,6 @@ jobs:
 
       - name: Security audit
         run: cargo audit
-        continue-on-error: true
 
       - name: Check DID security
         run: |
@@ -133,3 +132,14 @@ jobs:
               cargo build --release --target wasm32-unknown-unknown --manifest-path "$zome/Cargo.toml"
             fi
           done
+
+  secrets-scan:
+    name: Secrets Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

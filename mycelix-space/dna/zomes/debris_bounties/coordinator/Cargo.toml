@@ -2,6 +2,7 @@
 name = "debris_bounties"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 description = "Coordinator zome for Kessler cleanup bounty system"
 
 [lib]

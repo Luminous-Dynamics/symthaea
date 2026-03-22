@@ -2,6 +2,7 @@
 name = "personal-types"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 description = "Shared types and utilities for all Mycelix Personal zomes"
 
 [dependencies]

@@ -1,0 +1,10 @@
+[package]
+name = "legacy-types"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Shared types for the Mycelix Legacy cluster — wills, estate, memorial"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
