@@ -880,7 +880,7 @@ We demonstrate \psychbench{} on the \symthaea{} Holographic Liquid Brain, a cogn
     width=0.85\textwidth, height=18cm,
     xlabel={Normative $z$-score (clamped to $\pm 3$)},
     xmin=-3.5, xmax=3.5,
-    ymin=0, ymax=84,
+    ymin=0, ymax=83,
     y tick label style={font=\scriptsize},
     x tick label style={font=\scriptsize},
     label style={font=\small},
@@ -891,14 +891,14 @@ We demonstrate \psychbench{} on the \symthaea{} Holographic Liquid Brain, a cogn
     ytick=\empty,
 ]
 % Shaded bands
-\fill[hlbgreen!10] (axis cs:-1,0) rectangle (axis cs:1,84);
-\fill[hlbyellow!10] (axis cs:1,0) rectangle (axis cs:2,84);
-\fill[hlbyellow!10] (axis cs:-2,0) rectangle (axis cs:-1,84);
-\fill[hlbred!10] (axis cs:2,0) rectangle (axis cs:3.5,84);
-\fill[hlbred!10] (axis cs:-3.5,0) rectangle (axis cs:-2,84);
+\fill[hlbgreen!10] (axis cs:-1,0) rectangle (axis cs:1,83);
+\fill[hlbyellow!10] (axis cs:1,0) rectangle (axis cs:2,83);
+\fill[hlbyellow!10] (axis cs:-2,0) rectangle (axis cs:-1,83);
+\fill[hlbred!10] (axis cs:2,0) rectangle (axis cs:3.5,83);
+\fill[hlbred!10] (axis cs:-3.5,0) rectangle (axis cs:-2,83);
 
 % Zero line
-\draw[gray, dashed] (axis cs:0,0) -- (axis cs:0,84);
+\draw[gray, dashed] (axis cs:0,0) -- (axis cs:0,83);
 
 % Plot clamped z-scores from CSV
 \addplot[only marks, mark=*, mark size=2pt, hlbblue]

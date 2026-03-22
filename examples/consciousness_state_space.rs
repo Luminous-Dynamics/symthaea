@@ -26,9 +26,8 @@
 //! cargo run --example consciousness_state_space -- --mode substrate --resolution 10
 //! ```
 
-use std::collections::HashMap;
 use symthaea::consciousness::consciousness_equation_v2::ConsciousnessEquationV2;
-use symthaea::consciousness::{ConsciousnessStateV2, CoreComponent, EquationConfig};
+use symthaea::consciousness::{ConsciousnessStateV2, CoreComponent};
 
 // ============================================================================
 // CONFIGURATION

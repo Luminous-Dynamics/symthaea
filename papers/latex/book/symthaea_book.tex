@@ -2275,7 +2275,7 @@ The flight control system (9,637 LOC Rust) implements a multi-rate architecture:
 
 The inner loop uses the CfC dynamics with $\Delta t = 2$~ms:
 \begin{equation}
-\hvx_{\text{motor}}(t + 2\text{ms}) = \xinf_{\text{motor}} + (\hvx_{\text{motor}}(t) - \xinf_{\text{motor}}) \cdot e^{-2/\tau_{\text{motor}}}
+\hvx_{\text{motor}}(t + 2\text{ms}) = \mathbf{x}_{\infty,\text{motor}} + (\hvx_{\text{motor}}(t) - \mathbf{x}_{\infty,\text{motor}}) \cdot e^{-2/\tau_{\text{motor}}}
 \end{equation}
 
 The outer loop uses $\Delta t = 40$~ms---the same CfC kernel with different time scaling, demonstrating the multi-scale processing capability of the unified architecture (Corollary to Theorem~\ref{thm:constant-time}).

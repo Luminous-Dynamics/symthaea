@@ -248,6 +248,12 @@ fn baseline_for_benchmark<'a>(
             Some(("psychedelic_proxy_peak", &bl.neuromod))
         }
 
+        // Coding
+        name if name.contains("HumanEvalMini") => Some(("humaneval_pass_at_1", &bl.coding)),
+        name if name.contains("BugDetection") => {
+            Some(("bug_detection_delta_magnitude", &bl.coding))
+        }
+
         _ => {
             // Try generic metric name lookup against all baseline maps
             let _ = metric; // suppress unused warning
