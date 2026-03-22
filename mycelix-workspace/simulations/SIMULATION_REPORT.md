@@ -91,6 +91,6 @@ not an economic lever. The exempt floor is the binding constraint.
 
 ## Data
 
-- **600** sweep CSV files
-- **12** publication figures (PNG + PDF)
+- **623** sweep CSV files
+- **14** publication figures (PNG + PDF)
 - **10** random seeds for statistical robustness
