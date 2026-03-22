@@ -912,15 +912,38 @@ impl LanguageController {
         // 4. Sparse logits: only compute similarity for active indices
         let mut logits = vec![f32::NEG_INFINITY; self.token_embeddings.len()];
         let inv_temp = 1.0 / self.config.logit_temperature.max(1e-6);
-
         let scale = self.config.logit_scale;
-        for &i in active_indices {
-            if i < self.token_embeddings.len() {
-                let mut s = scale * logit_hv.similarity(&self.token_embeddings[i]) * inv_temp;
-                if !s.is_finite() {
-                    s = 0.0;
+
+        // Use projection head when available (same path as compute_logits but sparse)
+        if let (Some(ref weights), Some(ref proj_embs), Some(proj_dim)) = (
+            &self.projection_weights,
+            &self.projected_embeddings,
+            self.config.projection_dim,
+        ) {
+            let proj_output = Self::project_and_normalize(logit_hv.as_slice(), weights, proj_dim);
+            for &i in active_indices {
+                if i < proj_embs.len() {
+                    let dot: f32 = proj_output
+                        .iter()
+                        .zip(proj_embs[i].iter())
+                        .map(|(a, b)| a * b)
+                        .sum();
+                    let mut s = scale * dot * inv_temp;
+                    if !s.is_finite() {
+                        s = 0.0;
+                    }
+                    logits[i] = s;
                 }
-                logits[i] = s;
+            }
+        } else {
+            for &i in active_indices {
+                if i < self.token_embeddings.len() {
+                    let mut s = scale * logit_hv.similarity(&self.token_embeddings[i]) * inv_temp;
+                    if !s.is_finite() {
+                        s = 0.0;
+                    }
+                    logits[i] = s;
+                }
             }
         }
 

@@ -3440,6 +3440,24 @@ impl Symthaea {
                         rationale,
                     },
                     GDC::QueryActiveProposals => DispatchCommand::QueryActiveProposals,
+                    GDC::EvaluateAsset {
+                        correlation_id,
+                        project_id,
+                        phi_score,
+                        harmony_alignment,
+                        per_harmony_scores,
+                        care_activation,
+                        meta_awareness,
+                        ..
+                    } => DispatchCommand::EvaluateAsset {
+                        correlation_id,
+                        project_id,
+                        phi_score,
+                        harmony_alignment,
+                        per_harmony_scores,
+                        care_activation,
+                        meta_awareness,
+                    },
                 };
                 if cmd_tx.send(dc).is_err() {
                     break;

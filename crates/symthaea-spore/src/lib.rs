@@ -39,6 +39,7 @@
 
 pub mod boot_consciousness;
 pub mod broca;
+pub mod broca_backend;
 #[cfg(feature = "broca-full")]
 pub mod broca_full;
 #[cfg(feature = "broca-pipeline")]

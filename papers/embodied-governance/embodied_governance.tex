@@ -463,6 +463,68 @@ Oxytocin is the dominant driver of cooperative behavior ($-21.7\%$).
 NE is essential for governance-relevant attentional allocation ($-41.2\%$).
 ECB has the strongest effect on consciousness coherence ($-5.7\%$), suggesting that the collective $\Phi$ signal promotes integrative processing.
 
+% ══════════════════════════════════════════════════════════════════════════════
+% POPULATION-SCALE SIMULATION (added from simulation suite)
+% ══════════════════════════════════════════════════════════════════════════════
+
+\subsection{Population-Scale Governance Simulation}
+\label{sec:population-sim}
+
+To validate consciousness-gated governance beyond single-agent dynamics, we conducted
+agent-based simulations with 100 heterogeneous agents managing 10 shared renewable resources.
+Parameters are calibrated against Ostrom's~(\citeyear{ostrom1990}) documentation of the
+Spanish Huerta irrigation system.
+
+\paragraph{Model.}
+Ten behavioral strategies span the cooperative--adversarial spectrum: Steward, Moderate,
+Cooperator, Altruist, Seasonal, Strategic Cooperator, Capture Seeker (cooperative); and
+Defector, Free Rider, Overextractor (defecting). Agents interact on a Watts-Strogatz
+small-world network ($k{=}4$ nearest $+$ 2 random long-range) and observe cooperation
+among neighbors. Resources follow logistic regeneration with maintenance-dependent yields.
+Cooperative agents share a sustainable extraction budget (70\% of regeneration), while
+defectors extract directly from stock (2--5\%/day), making their impact additive.
+
+\paragraph{Governance modes.}
+Five conditions are compared: (1)~Consciousness-Gated (sigmoid vote weight, tier-scaled
+monitoring, complex proposals including emergency rationing and regeneration investment);
+(2)~Flat (equal weight, $1$-person-$1$-vote); (3)~Plutocratic (weight $\propto$
+cumulative extraction, with regulatory capture---50\% detection reduction for high
+extractors); (4)~Random exclusion; (5)~No governance (open access).
+
+\paragraph{Key findings (mean $\pm$ SD, $n{=}10$ seeds).}
+\begin{enumerate}[nosep]
+  \item \textbf{Governance vs.\ collapse}: Any governance mechanism maintains sustainability
+    $>$89\%, while ungoverned commons collapse to 0\% at all defector fractions
+    ($p < 0.001$).
+  \item \textbf{Robustness under adversarial conditions}: At high defector fractions
+    ($\geq$60\%), plutocratic governance degrades (regulatory capture allows defectors to
+    block conservation proposals), while consciousness-gated governance remains stable
+    (Figure~\ref{fig:voting-comparison}). Consciousness gating trades $\sim$5\%
+    sustainability (due to tier-based quota multipliers) for maximal robustness.
+  \item \textbf{Substrate degradation resilience}: When consciousness scores degrade
+    (simulating substrate deterioration), the system self-balances---degraded agents lose
+    tier-based multipliers, reducing aggregate extraction. Sustainability \emph{increases}
+    under mild degradation ($\delta \leq 0.005$/day).
+\end{enumerate}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.8\textwidth]{../../mycelix-workspace/simulations/figures/fig_commons_voting_comparison.png}
+  \caption{Sustainability index vs.\ defector fraction across five governance modes.
+    Consciousness-gated governance (blue) is most robust under high adversarial pressure,
+    while plutocratic governance (red) degrades at $\geq$60\% defectors due to regulatory
+    capture. No governance (dashed) produces total collapse.}
+  \label{fig:voting-comparison}
+\end{figure}
+
+\paragraph{Macro-economic findings.}
+Companion simulations of the triple-currency system (SAP/TEND/MYCEL) reveal that demurrage
+rate has no significant effect on transaction velocity within constitutional bounds
+(1--5\%, $F(4,45) < 1$, n.s.)---the exempt floor is the binding constraint. Jubilee
+compression frequency similarly has no effect on reputation inequality (MYCEL Gini
+$\approx 0.016$ across all frequencies), because the 5\% annual decay already prevents
+concentration.
+
 \section{Discussion}
 \label{sec:discussion}
 
@@ -660,6 +722,11 @@ Wei, D., Lee, D., Cox, C.~D., et~al. (2015).
 Zak, P.~J. (2012).
 \newblock \emph{The Moral Molecule: How Trust Works}.
 \newblock Dutton.
+
+\bibitem[Ostrom(1990)]{ostrom1990}
+Ostrom, E. (1990).
+\newblock \emph{Governing the Commons: The Evolution of Institutions for Collective Action}.
+\newblock Cambridge University Press.
 
 \end{thebibliography}
 

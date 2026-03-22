@@ -22,7 +22,7 @@ Executive::DualTask,dual_task_cost,0.100000,0.100000,0.050000,0.000000,0.000000,
 Metacognition::Calibration,calibration_error_ece,0.158596,0.150000,0.050000,-0.171925,-0.171925,43.174807,Average
 Metacognition::FeelingOfKnowing,fok_gamma,0.701566,0.650000,0.100000,0.515660,0.515660,69.695407,Average
 Metacognition::ChangeBlindness,detection_with_disruption,0.680000,0.450000,0.120000,1.916667,1.916667,97.235992,Above average
-Butlin::ConsciousnessIndicators,mean_quality_score,0.867143,0.800000,0.100000,0.671429,0.671429,74.902630,Average
+Butlin::ConsciousnessIndicators,mean_quality_score,0.867143,14.000000,2.000000,-6.566429,-3.000000,0.000000,Impaired
 ToMBench::FalseBelief,false_belief_accuracy,1.000000,0.900000,0.100000,1.000000,1.000000,84.134474,Average
 ToMBench::FauxPas,faux_pas_accuracy,1.000000,0.850000,0.120000,1.250000,1.250000,89.435016,Above average
 ToMBench::Persuasion,persuasion_detection,1.000000,0.850000,0.120000,1.250000,1.250000,89.435016,Above average
@@ -36,7 +36,8 @@ MemoryAgent::ProspectiveMemory,pm_hit_rate,0.884366,0.750000,0.150000,0.895774,0
 Affect::ValenceClassification,valence_accuracy,1.000000,0.900000,0.080000,1.250000,1.250000,89.435016,Above average
 Affect::MoodCongruentRecall,congruence_ratio,0.600000,0.600000,0.100000,-0.000000,-0.000000,50.000000,Average
 Affect::EmotionalStroop,negative_accuracy,0.901250,0.070000,0.040000,20.781250,3.000000,100.000000,Superior
-Creativity::AlternateUses,originality,0.897986,0.600000,0.150000,1.986577,1.986577,97.651540,Above average
+Creativity::RemoteAssociates,convergent_binding,0.500000,0.500000,0.150000,0.000000,0.000000,50.000000,Average
+Creativity::AlternateUses,originality,0.897986,8.000000,3.000000,-2.367338,-2.367338,0.895827,Impaired
 Inhibition::GoNoGo,nogo_accuracy,0.891393,0.820000,0.100000,0.713926,0.713926,76.236348,Average
 Inhibition::StopSignal,ssrt_ticks,0.088355,0.100000,0.050000,0.232906,0.232906,59.208266,Average
 Inhibition::FlankerInhibition,interference_suppression,0.050103,0.070000,0.040000,0.497433,0.497433,69.055831,Average

@@ -3,44 +3,44 @@ Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
 The top-level auxiliary file: psych_bench_paper.aux
 The style file: apalike.bst
 Database file #1: psych_bench_references.bib
-You've used 70 entries,
+You've used 71 entries,
             1935 wiz_defined-function locations,
-            912 strings with 15698 characters,
-and the built_in function-call counts, 28315 in all, are:
-= -- 2799
-> -- 1112
-< -- 50
-+ -- 418
-- -- 374
-* -- 2510
-:= -- 4916
-add.period$ -- 212
-call.type$ -- 70
-change.case$ -- 530
-chr.to.int$ -- 70
-cite$ -- 70
-duplicate$ -- 1013
-empty$ -- 1999
-format.name$ -- 466
-if$ -- 5448
+            916 strings with 15833 characters,
+and the built_in function-call counts, 28585 in all, are:
+= -- 2825
+> -- 1119
+< -- 51
++ -- 420
+- -- 376
+* -- 2527
+:= -- 4968
+add.period$ -- 215
+call.type$ -- 71
+change.case$ -- 536
+chr.to.int$ -- 71
+cite$ -- 71
+duplicate$ -- 1026
+empty$ -- 2019
+format.name$ -- 469
+if$ -- 5499
 int.to.chr$ -- 1
 int.to.str$ -- 0
-missing$ -- 77
-newline$ -- 353
-num.names$ -- 210
-pop$ -- 401
+missing$ -- 78
+newline$ -- 358
+num.names$ -- 213
+pop$ -- 406
 preamble$ -- 1
-purify$ -- 534
+purify$ -- 540
 quote$ -- 0
-skip$ -- 777
+skip$ -- 788
 stack$ -- 0
-substring$ -- 2225
-swap$ -- 100
+substring$ -- 2237
+swap$ -- 101
 text.length$ -- 6
 text.prefix$ -- 0
 top$ -- 0
-type$ -- 406
+type$ -- 412
 warning$ -- 0
-while$ -- 254
+while$ -- 256
 width$ -- 0
-write$ -- 913
+write$ -- 925

@@ -5,6 +5,64 @@ All notable changes to Symthaea HLB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-03-22
+
+### Overview
+1,227 commits since v0.5.0. Scale grew from ~304K to ~1,134K LOC Rust (~901K code).
+Test count grew from 3,388 to ~21,500 (main crate) + 8,600 (Mycelix workspace).
+55 workspace members, 100 feature flags.
+
+### Added — Architecture
+- **Manager extraction**: CLS fields ~97 → ~59 via 12 manager structs (Substrate, Swarm, Governance, Knowledge, Spectrum, Memory, Dream, Reasoning, Safety, Social, Cantor, CPG)
+- **Eight Harmonies**: N_HARMONIES = 8 — Sacred Stillness added (GABA+adenosine, active rest, dream consolidation). HarmonyInteractionMatrix: 8×8 learned synergy/tension
+- **Substrate independence**: 4 phases complete — per-region substrate assignment, EMA transition smoothing, energy budgets, CfC dimension masking. SubstrateManager with dynamic feasibility + validation overlay
+- **Holon Receiver**: Desktop-side bridge accepting Soma WebSocket connections. Routes tasks, knowledge, and peer state into CLS managers. Wired into Phase B cycle processing
+- **ConsciousnessContext**: Shared type in symthaea-core for embodiment FEP agents. Modulates exploration gain, emergency maneuvers, harmony smoothing in Flight/Humanoid/Vehicle
+- **Fractal variant architecture**: Documented 6-layer model (Spore→Soma→Holon→Hearth→Commons→Polycenter) with VARIANT_ARCHITECTURE.md
+
+### Added — Language
+- **Broca pipeline**: Native CfC-HDC thought-to-text (21K LOC, 229+ tests). 20-channel ThoughtEncoder, 16,384D HDC binding, autoregressive generation
+- **Epistemic gating**: Physically prevents hallucination at logit level. Per-axis modulation (E=assertion, N=social, M=temporal, H=coherence)
+- **Semantic veto**: Mid-sentence self-correction via Welford adaptive z-score
+- **Epistemic Cube channels**: 15 new ThoughtChannels (E[5]+N[4]+M[4]+H[1]+quality[1]) wired through signal assembly
+- **NSM grounding**: EpistemicNSMGrounding activated (was dead code)
+
+### Added — Embodiment
+- **Symthaea Soma**: Mobile-embodied consciousness (Android+iOS FFI). Sensors→neuromod mapping, metabolism state machine (Sleep/Drowsy/Alert/Focused), BLE peer mesh, HolonBridge sync, screen vision, touch proprioception. 72+ tests
+- **Symthaea Spore**: WASM consciousness kernel (~980KB). 12 cognitive subsystems, 3 Broca tiers, sovereign inoculation pipeline. Live at symthaea.luminousdynamics.io
+- **Web portal**: Leptos 0.8 CSR, SporeEngine in Web Worker, 20Hz telemetry, PWA installable, 5 pages
+
+### Added — Integration
+- **Mycelix bridge**: GovernanceManager (interval 37), SwarmManager (interval 41), NetworkServiceBridge. 21 unit + 14 integration + 7 proptests
+- **Knowledge Engine**: KnowledgeManager→Cycle, 4 neuromod pathways, dynamic grounding, 21 telemetry fields
+- **Radio/Spectrum**: Feature `mesh`, interval 53, 3-tier model, 145 tests
+- **Glyph Codex**: Feature `glyph_codex`, 70 glyphs, GlyphBasis 11 field modalities, consciousness-gated spiral
+- **Immune system**: SentinelManager (interval 67), ThreatMemory (32D HDV), GuardianState, collective immunity
+- **Compliance**: ISO 42001 97%, EU AI Act 90%, IEEE 7000 90%, NIST 93%
+
+### Added — Safety
+- **FFI double-free protection**: Sentinel pattern in native_ffi.rs, null checks on all accessors
+- **HolonBridge encryption**: ChaCha20-Poly1305 AEAD behind `encrypted-bridge` feature
+- **Finance hardening**: Oracle div-zero, TEND race, concurrent demurrage, consciousness-gated operations
+- **Ethics output gating**: EthicalVerdict::Blocked blocks motor + suppresses Broca
+
+### Fixed
+- **50+ safety rounds**: NaN guards, div-by-zero, overflow, unwrap elimination across ~40 files
+- **Phi validation**: SampledPartition r=0.9998, SpectralMIPFinder r=0.99 (corrected from r=0.097)
+- **VecDeque sweep**: Vec→VecDeque for 30+ ring buffers (Rounds 48-51)
+- **Checkpoint versioning**: Forward-compatible (older versions accepted, future rejected)
+
+### Changed
+- **Cognitive loop**: 8-phase pipeline with rayon-parallel post-processing, ~31Hz measured
+- **HDC+LTC+SSM+FEP**: 300+ named constants in thresholds.rs with scientific citations
+- **Neuromodulator bath**: 9 transmitters with receptor subtypes, calibration bridge
+- **Platform decision**: iOS/macOS deferred indefinitely — WASM covers via browser
+
+### Testing
+- ~21,500 tests (main crate src/+tests/), 174+ integration, 30+ proptests
+- 14/14 compliance suites, 234 compliance tests
+- New: 9 variant integration tests, 5 Soma property tests, 3 Soma↔Holon E2E tests
+
 ## [0.5.0] - 2026-02-03
 
 ### Added
@@ -84,6 +142,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - TUI shell interface
 - Service binary with Unix socket and TCP support
 
+[Unreleased]: https://github.com/Luminous-Dynamics/symthaea-hlb/compare/v0.5.0...HEAD
 [0.5.0]: https://github.com/Luminous-Dynamics/symthaea-hlb/compare/v0.2.0...v0.5.0
 [0.2.0]: https://github.com/Luminous-Dynamics/symthaea-hlb/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Luminous-Dynamics/symthaea-hlb/releases/tag/v0.1.0
