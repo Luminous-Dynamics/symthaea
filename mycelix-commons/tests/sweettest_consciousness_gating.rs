@@ -1,4 +1,6 @@
-//! # Consciousness Gating Sweettest — Commons Cluster
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Consciousness Gating Sweettest — Commons Cluster
 //!
 //! Verifies that governance functions in the commons cluster are properly
 //! gated by consciousness credentials, proving the full wiring from
@@ -75,8 +77,9 @@ fn commons_dna_path() -> PathBuf {
 
 /// Property transfer requires proposal-level consciousness gate.
 /// Without identity bridge, initiate_transfer should be blocked.
-/// NOTE: cfg-gated because Citizen(0.5) fallback passes proposal tier (0.4)
-#[cfg(feature = "identity_cluster")]
+/// With fail-closed credential behavior (commit e9e2889fd), identity partition
+/// now returns Err, so this test works without the identity_cluster feature.
+
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_property_transfer_requires_proposal() {
@@ -159,8 +162,9 @@ async fn test_housing_budget_requires_constitutional() {
 /// Verify the audit trail is maintained even when gate rejects.
 /// Bridge health should remain healthy after gate failures, and
 /// total_events should be non-negative.
-/// NOTE: cfg-gated because Citizen(0.5) fallback passes proposal tier (0.4)
-#[cfg(feature = "identity_cluster")]
+/// With fail-closed credential behavior (commit e9e2889fd), identity partition
+/// now returns Err, so this test works without the identity_cluster feature.
+
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_gate_rejection_audit_logged() {
@@ -383,8 +387,7 @@ pub struct ReviewApplicationInput {
 
 /// Food distribution's list_product is gated at basic level.
 /// Without consciousness credentials, listing a product should fail.
-/// NOTE: cfg-gated because Citizen(0.5) fallback passes basic tier (0.3)
-#[cfg(feature = "identity_cluster")]
+/// With fail-closed credential behavior, identity partition now returns Err.
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_food_distribution_create_requires_basic() {
@@ -435,8 +438,9 @@ async fn test_food_distribution_create_requires_basic() {
 /// Care matching's suggest_match is gated at proposal level.
 /// (accept_match is gated at basic level — we test suggest_match
 /// to cover a different gate tier than food-distribution's basic.)
-/// NOTE: cfg-gated because Citizen(0.5) fallback passes proposal tier (0.4)
-#[cfg(feature = "identity_cluster")]
+/// With fail-closed credential behavior (commit e9e2889fd), identity partition
+/// now returns Err, so this test works without the identity_cluster feature.
+
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_care_matching_create_requires_proposal() {
@@ -477,8 +481,7 @@ async fn test_care_matching_create_requires_proposal() {
 
 /// Mutual aid governance's cast_vote requires voting-level consciousness.
 /// This tests a higher gate tier than basic or proposal.
-/// NOTE: cfg-gated because Citizen(0.5) fallback passes Citizen tier (voting requires Citizen)
-#[cfg(feature = "identity_cluster")]
+/// With fail-closed credential behavior, identity partition now returns Err.
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_mutualaid_governance_requires_voting() {
@@ -527,8 +530,7 @@ async fn test_mutualaid_governance_requires_voting() {
 
 /// Water steward's define_watershed requires voting-level consciousness.
 /// Tests that ecological governance operations are properly gated.
-/// NOTE: cfg-gated because Citizen(0.5) fallback passes Citizen tier (voting requires Citizen)
-#[cfg(feature = "identity_cluster")]
+/// With fail-closed credential behavior, identity partition now returns Err.
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_water_steward_dispatch_requires_voting() {
@@ -576,8 +578,7 @@ async fn test_water_steward_dispatch_requires_voting() {
 
 /// Housing membership's review_application requires voting-level consciousness.
 /// Tests that membership governance is protected by consciousness gating.
-/// NOTE: cfg-gated because Citizen(0.5) fallback passes Citizen tier (voting requires Citizen)
-#[cfg(feature = "identity_cluster")]
+/// With fail-closed credential behavior, identity partition now returns Err.
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_housing_membership_add_requires_voting() {
@@ -626,7 +627,6 @@ async fn test_housing_membership_add_requires_voting() {
 /// succeed without any credentials.
 /// NOTE: cfg-gated because this test calls both food_distribution (LAND) and
 /// mutualaid_governance (CARE) — needs unified DNA which OOMs on 32GB system
-#[cfg(feature = "identity_cluster")]
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_read_operations_not_gated_commons() {
@@ -666,8 +666,7 @@ async fn test_read_operations_not_gated_commons() {
 /// The rejection error message from commons gates should contain useful
 /// debugging context (consciousness, credential, identity, etc.) rather
 /// than a generic error.
-/// NOTE: cfg-gated because Citizen(0.5) fallback passes Citizen tier (voting requires Citizen)
-#[cfg(feature = "identity_cluster")]
+/// With fail-closed credential behavior, identity partition now returns Err.
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_rejection_message_is_specific_commons() {
@@ -716,8 +715,7 @@ async fn test_rejection_message_is_specific_commons() {
 /// The bridge credential cache must not serve fabricated credentials.
 /// After a failed credential fetch, a second attempt should also fail
 /// — proving cache consistency.
-/// NOTE: cfg-gated because Citizen(0.5) fallback passes Citizen tier (voting requires Citizen)
-#[cfg(feature = "identity_cluster")]
+/// With fail-closed credential behavior, identity partition now returns Err.
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_cache_consistency_commons() {
@@ -775,8 +773,9 @@ async fn test_cache_consistency_commons() {
 /// register_property (proposal gate) should be blocked, but
 /// get_property (no gate) should succeed. Verifies the gate is
 /// selectively applied per-function, not blanket-blocking the zome.
-/// NOTE: cfg-gated because Citizen(0.5) fallback passes proposal tier (0.4)
-#[cfg(feature = "identity_cluster")]
+/// With fail-closed credential behavior (commit e9e2889fd), identity partition
+/// now returns Err, so this test works without the identity_cluster feature.
+
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_cross_zome_gate_property_to_bridge() {

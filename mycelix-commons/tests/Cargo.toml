@@ -43,6 +43,10 @@ path = "cross_domain_sweettest.rs"
 name = "sweettest_consciousness_gating"
 path = "sweettest_consciousness_gating.rs"
 
+[[test]]
+name = "sweettest_security_hardening"
+path = "sweettest_security_hardening.rs"
+
 [features]
 identity_cluster = []
 civic_cluster = []
