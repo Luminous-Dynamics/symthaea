@@ -4272,7 +4272,9 @@ impl CognitiveLoopService {
             // which won't match — that's fine, we just skip them.
             let matched_primes: Vec<SemanticPrime> = detected_primitives
                 .iter()
-                .filter_map(|name| symthaea_core::hdc::universal_semantics::SemanticPrime::from_name(name))
+                .filter_map(|name| {
+                    symthaea_core::hdc::universal_semantics::SemanticPrime::from_name(name)
+                })
                 .collect();
             if matched_primes.is_empty() {
                 (None, 0.0)

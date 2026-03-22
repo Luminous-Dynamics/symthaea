@@ -2681,10 +2681,7 @@ impl NsmSemanticGate {
         let all_words: Vec<&str> = NSM_WORD_PRIMES.iter().map(|&(w, _)| w).collect();
         for &word in &all_words {
             if let Some(primes) = lexicon.decompose(word) {
-                let prime_strs: Vec<&str> = primes
-                    .iter()
-                    .map(|p| p.as_gate_name())
-                    .collect();
+                let prime_strs: Vec<&str> = primes.iter().map(|p| p.as_gate_name()).collect();
                 gate.register_word(tokenizer, word, &prime_strs);
             } else {
                 // Fallback: use NSM_WORD_PRIMES for words not in LexicalGrounding
