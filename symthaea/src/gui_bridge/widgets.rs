@@ -606,18 +606,13 @@ impl LiveConfigDiff {
                 }
                 (Some(o), Some(n)) => {
                     // Modified line
-                    if current_hunk.is_none() {
-                        current_hunk = Some(DiffHunk {
-                            old_start: old_idx as u32 + 1,
-                            old_count: 0,
-                            new_start: new_idx as u32 + 1,
-                            new_count: 0,
-                            lines: Vec::new(),
-                        });
-                    }
-
-                    // SAFETY: current_hunk guaranteed Some by is_none() guard above.
-                    let hunk = current_hunk.as_mut().unwrap();
+                    let hunk = current_hunk.get_or_insert_with(|| DiffHunk {
+                        old_start: old_idx as u32 + 1,
+                        old_count: 0,
+                        new_start: new_idx as u32 + 1,
+                        new_count: 0,
+                        lines: Vec::new(),
+                    });
                     hunk.lines.push(DiffLine {
                         diff_type: DiffType::Removed,
                         line_number_old: Some(old_idx as u32 + 1),
@@ -638,18 +633,13 @@ impl LiveConfigDiff {
                 }
                 (Some(o), None) => {
                     // Removed line
-                    if current_hunk.is_none() {
-                        current_hunk = Some(DiffHunk {
-                            old_start: old_idx as u32 + 1,
-                            old_count: 0,
-                            new_start: new_idx as u32 + 1,
-                            new_count: 0,
-                            lines: Vec::new(),
-                        });
-                    }
-
-                    // SAFETY: current_hunk guaranteed Some by is_none() guard above.
-                    let hunk = current_hunk.as_mut().unwrap();
+                    let hunk = current_hunk.get_or_insert_with(|| DiffHunk {
+                        old_start: old_idx as u32 + 1,
+                        old_count: 0,
+                        new_start: new_idx as u32 + 1,
+                        new_count: 0,
+                        lines: Vec::new(),
+                    });
                     hunk.lines.push(DiffLine {
                         diff_type: DiffType::Removed,
                         line_number_old: Some(old_idx as u32 + 1),
@@ -662,18 +652,13 @@ impl LiveConfigDiff {
                 }
                 (None, Some(n)) => {
                     // Added line
-                    if current_hunk.is_none() {
-                        current_hunk = Some(DiffHunk {
-                            old_start: old_idx as u32 + 1,
-                            old_count: 0,
-                            new_start: new_idx as u32 + 1,
-                            new_count: 0,
-                            lines: Vec::new(),
-                        });
-                    }
-
-                    // SAFETY: current_hunk guaranteed Some by is_none() guard above.
-                    let hunk = current_hunk.as_mut().unwrap();
+                    let hunk = current_hunk.get_or_insert_with(|| DiffHunk {
+                        old_start: old_idx as u32 + 1,
+                        old_count: 0,
+                        new_start: new_idx as u32 + 1,
+                        new_count: 0,
+                        lines: Vec::new(),
+                    });
                     hunk.lines.push(DiffLine {
                         diff_type: DiffType::Added,
                         line_number_old: None,
