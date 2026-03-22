@@ -93,7 +93,7 @@ The NRC's defense-in-depth framework for nuclear safety uses a four-tier classif
 
 The SentinelManager implements the \texttt{CognitiveSubsystem} trait at interval 67, chosen as the largest prime co-prime with all other manager intervals (7, 11, 13, 17, 19, 37, 41, 43, 47, 53, 61, 73). This ensures that sentinel checks never temporally align with other subsystem activations, preventing timing-based evasion.
 
-The manager receives \texttt{SentinelEvent} instances from the governance and network layers:
+The manager receives \texttt{SentinelEvent} instances from the governance and network layers (Table~\ref{tab:sentinel_events}):
 
 \begin{table}[h]
 \centering
@@ -177,7 +177,7 @@ Rapid tier oscillation ($> 3$ changes per 100 cycles) suggests gaming of the con
 
 \subsection{Threat Signal Classification}
 
-Each threat detector produces a \texttt{ThreatSignal} with a kind and base severity:
+Each threat detector produces a \texttt{ThreatSignal} with a kind and base severity (Table~\ref{tab:threat_severity}):
 
 \begin{table}[h]
 \centering
@@ -228,7 +228,7 @@ Nodes then request pattern updates from peers to fill coverage gaps.
 
 \subsection{Defense Cascade}
 
-Defensive actions are graduated across three safety levels:
+Defensive actions are graduated across three safety levels (Table~\ref{tab:defense}):
 
 \begin{table}[h]
 \centering
@@ -260,7 +260,7 @@ Every defensive action is evaluated by the moral algebra before execution. Actio
 
 \subsection{Guardian Posture}
 
-The physical embodiment system maps safety levels to robot behavior, further gated by consciousness:
+The physical embodiment system maps safety levels to robot behavior, further gated by consciousness (Table~\ref{tab:guardian}):
 
 \begin{table}[h]
 \centering
@@ -299,7 +299,7 @@ BLAKE3 attestation provides cryptographic integrity verification: each canary re
 
 \subsection{Test Coverage}
 
-The security system passes 120+ automated tests:
+The security system passes 120+ automated tests (Table~\ref{tab:security_tests}):
 
 \begin{table}[h]
 \centering
@@ -322,7 +322,7 @@ SafetyAgent (NRC 4-tier model, 1000-cycle soak) & 6 \\
 
 \subsection{Threat Detection Accuracy}
 
-Under simulated attack scenarios:
+Under simulated attack scenarios (Table~\ref{tab:detection}):
 
 \begin{table}[h]
 \centering
@@ -347,7 +347,7 @@ The lowest detection rate (gradient poisoning, 88\%) reflects the difficulty of 
 
 \subsection{Collective Immunity Amplification}
 
-The coherence-adjusted severity formula produces the expected amplification:
+The coherence-adjusted severity formula produces the expected amplification (Table~\ref{tab:amplification}):
 
 \begin{table}[h]
 \centering
@@ -447,7 +447,7 @@ Physical embodiment & No & No & No & Guardian \\
 \end{tabular}
 \end{table}
 
-The fundamental distinction is that our system treats security as a \emph{cognitive function} (part of the consciousness loop, mediated by neuromodulators) rather than as an external service. This enables security responses that are proportionate, context-sensitive, and subject to the same ethical constraints as all other system behaviors.
+Table~\ref{tab:security_comparison} summarizes these differences. The fundamental distinction is that our system treats security as a \emph{cognitive function} (part of the consciousness loop, mediated by neuromodulators) rather than as an external service. This enables security responses that are proportionate, context-sensitive, and subject to the same ethical constraints as all other system behaviors.
 
 \subsection{Limitations}
 
@@ -456,6 +456,41 @@ Several limitations should be acknowledged. First, the Mahalanobis distance appr
 \section{Conclusion}
 
 The SentinelManager establishes consciousness-aware security as a distinct discipline within distributed systems. By treating consciousness metrics as both functional signals and potential attack surfaces, the system provides comprehensive threat detection (7 specialized detectors), rapid pattern recognition (HDV-encoded threat memory), collective defense coordination (coherence-adjusted severity), and proportionate response (morally filtered defense cascade). The 120+ test validation suite, including a 1000-cycle soak test, demonstrates stable operation under sustained threat conditions. As distributed cognitive architectures become more prevalent, the security frameworks that protect them must evolve to address the novel attack surfaces that consciousness creates.
+
+\section{Reproducibility}
+
+All experiments were conducted using the Symthaea cognitive architecture (v1.9.0). The following commands reproduce the core results:
+
+\begin{verbatim}
+# Run SentinelManager tests (requires sentinel feature)
+cargo test -p symthaea --features sentinel --lib sentinel -- --nocapture
+
+# Run ThreatMemory tests
+cargo test -p symthaea --features sentinel --lib threat_memory \
+  -- --nocapture
+
+# Run defense cascade and moral filtering tests
+cargo test -p symthaea --features safety-agents --lib defense \
+  -- --nocapture
+
+# Run SafetyAgent NRC 4-tier tests (includes 1000-cycle soak)
+cargo test -p symthaea --features safety-agents --lib safety_agent \
+  -- --nocapture
+
+# Run behavioral canary and integrity tests
+cargo test -p symthaea --features integrity --lib integrity \
+  -- --nocapture
+
+# Run collective immunity tests
+cargo test -p symthaea --features sentinel --lib collective \
+  -- --nocapture
+\end{verbatim}
+
+The system requires Rust 1.75+ and the \texttt{nix develop} environment. The \texttt{sentinel} and \texttt{safety-agents} feature flags must be enabled for the full security system. The \texttt{integrity} feature enables behavioral canaries and BLAKE3 attestation.
+
+\subsection*{Code Availability}
+
+The SentinelManager (1,105 LOC) is in \texttt{symthaea/src/cognitive\_loop/managers/sentinel\_manager.rs}. The ThreatMemory system is in \texttt{symthaea/src/defense/threat\_memory.rs}. The GuardianPosture system is in \texttt{symthaea/src/defense/guardian.rs}. The collective immunity module is in \texttt{symthaea/src/defense/collective\_immunity.rs}. All source code is within the Luminous Dynamics Symthaea repository. Correspondence and access requests should be directed to the corresponding author.
 
 \bibliographystyle{plainnat}
 \begin{thebibliography}{20}

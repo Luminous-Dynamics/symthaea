@@ -111,15 +111,8 @@ impl WisconsinCardSortingBenchmark {
         // Encoding noise and time pressure degrade learning rates (impaired feedback)
         let noise = config.effective_noise();
         let lr_scale = 1.0 - noise * 0.6;
-        // Monsell (2003, "Task switching", Trends in Cognitive Sciences) showed
-        // that error-driven hypothesis updating is asymmetric: errors drive faster
-        // switching than correct trials drive perseveration. This models the
-        // negative feedback dominance in WCST set-shifting.
-        // Increased correct reinforcement (0.22) for faster hypothesis locking —
-        // explicit hypothesis testing converges faster than implicit rule learning
-        // (Ashby & Maddox, 2005 COVIS model).
-        let lr_correct = 0.22 * lr_scale;
-        let lr_error = 0.85 * lr_scale; // Stronger error penalty for faster set-shifting
+        let lr_correct = 0.2 * lr_scale; // Moderate reinforcement (lower cap = less needed)
+        let lr_error = 0.8 * lr_scale; // Stronger error penalty for faster set-shifting
 
         let all_colors = [Color::Red, Color::Blue, Color::Green, Color::Yellow];
         let all_shapes = [Shape::Triangle, Shape::Circle, Shape::Square, Shape::Star];
@@ -167,11 +160,13 @@ impl WisconsinCardSortingBenchmark {
             let candidates = [match_by_color, match_by_shape, match_by_number];
 
             // Softmax over rule confidences for stochastic selection.
-            // Time pressure: gain 1.5 produces ~15% perseverative errors (Heaton, 1993 WCST norms);
-            // -0.8/unit flattens selection toward chance, modeling impaired set-shifting under SAT (Heitz, 2014).
+            // Gain 1.8: explicit hypothesis testing (Ashby & Maddox, 2005 COVIS)
+            // exploits rule confidence more decisively than implicit learning,
+            // producing faster category completion with fewer total errors.
+            // Time pressure: -1.2/unit flattens toward chance (Heitz, 2014).
+            // Noise: -0.8/unit degrades rule discrimination.
             let diff_model = difficulty_model_for("Executive::WCST");
-            // Time pressure AND encoding noise both flatten softmax selection
-            let softmax_gain = (1.5 - config.time_pressure * 1.2 - noise * 0.8).max(0.1)
+            let softmax_gain = (1.8 - config.time_pressure * 1.2 - noise * 0.8).max(0.1)
                 * diff_model.temperature_multiplier(config.difficulty);
             let max_conf = rule_confidence
                 .iter()

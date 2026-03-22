@@ -267,7 +267,7 @@ with $w_{\text{stand}} = 0.4$, $w_{\text{move}} = 0.3$, $w_{\text{gait}} = 0.2$,
 
 \subsection{Perturbation Crucibles}
 
-We define four perturbation types, applied mid-episode without warning:
+We define four perturbation types (Table~\ref{tab:perturbations}), applied mid-episode without warning:
 
 \begin{table}[h]
 \centering
@@ -329,6 +329,8 @@ Transfer experiments trained on flight for 500 episodes, then fine-tuned on huma
 
 \subsection{Baseline Control Performance}
 
+The CDC controller achieves competitive performance with state-of-the-art methods on the DMC Humanoid benchmark (Table~\ref{tab:dmc}).
+
 \begin{table}[h]
 \centering
 \caption{DMC Humanoid benchmark performance (500 training episodes, mean $\pm$ SD over 20 seeds).}
@@ -352,6 +354,8 @@ The CDC controller achieves competitive performance with state-of-the-art model-
 The CfC closed-form temporal integration enables efficient training without the long rollouts required by model-free methods.
 
 \subsection{Perturbation Recovery}
+
+Table~\ref{tab:recovery} presents recovery times under each perturbation crucible.
 
 \begin{table}[h]
 \centering
@@ -379,6 +383,8 @@ The CDC controller adapts fastest (241 steps) because the $\Phi$ drop caused by 
 
 \subsection{$\Phi$ as Perturbation Predictor}
 
+Table~\ref{tab:phi_predict} presents the correlation between pre-perturbation $\Phi$ and recovery time.
+
 \begin{table}[h]
 \centering
 \caption{Correlation between pre-perturbation $\Phi$ and recovery time.}
@@ -401,6 +407,8 @@ Higher $\Phi$ before perturbation onset predicts faster recovery ($r = -0.71$), 
 This suggests that $\Phi$ measures something causally relevant to adaptive capacity: systems with greater information integration have more internal resources for rapid reorganization.
 
 \subsection{$\Phi$ Dynamics During Perturbation}
+
+Table~\ref{tab:phi_dynamics} traces the characteristic ``consciousness dip'' during perturbation and recovery.
 
 \begin{table}[h]
 \centering
@@ -427,6 +435,8 @@ This dip-and-recovery pattern mirrors biological startle and adaptation response
 
 \subsection{Flight Control Results}
 
+Table~\ref{tab:flight} summarizes quadrotor hover performance across perturbation conditions.
+
 \begin{table}[h]
 \centering
 \caption{Quadrotor hover performance (position RMSE in meters, 500 episodes).}
@@ -448,7 +458,7 @@ The CDC controller achieves the lowest position error across all conditions, wit
 \subsubsection{Adaptive Cognitive Frequency}
 
 A distinctive feature of the flight system is adaptive cognitive rate: the base 25\,Hz cognitive tick increases to up to 100\,Hz when danger is detected (free energy exceeds a threshold).
-This mirrors biological arousal responses where temporal resolution increases under threat.
+This mirrors biological arousal responses where temporal resolution increases under threat (Table~\ref{tab:cograte}).
 
 \begin{table}[h]
 \centering
@@ -467,6 +477,8 @@ Motor failure   & $71.2 \pm 12.3$ & $100.0$ \\
 \end{table}
 
 \subsection{Cross-Domain Transfer}
+
+Table~\ref{tab:transfer} compares training efficiency with and without flight-to-humanoid transfer.
 
 \begin{table}[h]
 \centering
@@ -490,6 +502,8 @@ Even with a frozen encoder (only output projection retrained), $3.1\times$ effic
 The 78\% reduction in required training episodes (from 412 to 91) is computed as $(412 - 91)/412 = 0.779$.
 
 \subsection{Computational Performance}
+
+Table~\ref{tab:timing} presents per-step computation times for both domains.
 
 \begin{table}[h]
 \centering
@@ -575,6 +589,37 @@ $\Phi$ measures the degree to which a control system functions as an integrated 
 The multi-rate architecture enables real-time operation (under 2\,ms total latency) while maintaining cognitive-level adaptation capabilities.
 
 Future work will deploy the CDC architecture on physical hardware (quadrotor and humanoid platforms), extend the transfer learning framework to additional embodiments (manipulators, legged robots, underwater vehicles), and investigate whether the $\Phi$-recovery correlation holds in multi-agent coordination scenarios where collective $\Phi$ may predict swarm resilience.
+
+\section{Reproducibility}
+\label{sec:reproducibility}
+
+All experiments were conducted using the Symthaea cognitive architecture (v1.9.0). The following commands reproduce the core results:
+
+\begin{verbatim}
+# Run flight control tests (requires mujoco feature)
+cargo test -p symthaea-flight --features mujoco -- --nocapture
+
+# Run humanoid control tests
+cargo test -p symthaea-humanoid -- --nocapture
+
+# Run HDC encoding tests
+cargo test -p symthaea-core --lib hdc -- --nocapture
+
+# Run CfC closed-form integration tests
+cargo test -p symthaea-core --lib cfc -- --nocapture
+
+# Run IIT/Phi spectral approximation tests
+cargo test -p symthaea --lib phi -- --nocapture
+
+# Run perturbation crucible tests
+cargo test -p symthaea-humanoid --lib perturbation -- --nocapture
+\end{verbatim}
+
+The system requires Rust 1.75+ and the \texttt{nix develop} environment. MuJoCo physics simulation requires the \texttt{mujoco} feature flag and MuJoCo 3.x installed. The HDC-CfC core requires only the default feature set. Training uses the Adam optimizer with lr $= 3 \times 10^{-4}$; hyperparameters are specified in the respective crate configuration files.
+
+\subsection*{Code Availability}
+
+The flight control system (9,637 LOC) and humanoid control system (8,208 LOC) are in \texttt{symthaea/crates/symthaea-flight/} and \texttt{symthaea/crates/symthaea-humanoid/} within the Luminous Dynamics Symthaea repository. The shared HDC-CfC core is in \texttt{symthaea-core/src/hdc/hdc\_ltc\_unified.rs}. Correspondence and access requests should be directed to the corresponding author.
 
 % ══════════════════════════════════════════════════════════════════════════════
 % BIBLIOGRAPHY

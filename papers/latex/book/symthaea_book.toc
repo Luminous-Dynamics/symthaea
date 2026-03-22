@@ -1,0 +1,124 @@
+\contentsline {chapter}{Preface}{i}{chapter*.1}%
+\contentsline {part}{I\hspace {1em}Foundations}{1}{part.1}%
+\contentsline {chapter}{\numberline {1}Introduction: Why Consciousness-First AI?}{3}{chapter.1}%
+\contentsline {section}{\numberline {1.1}The Alignment Problem as a Consciousness Problem}{3}{section.1.1}%
+\contentsline {section}{\numberline {1.2}The Holographic Liquid Brain}{4}{section.1.2}%
+\contentsline {section}{\numberline {1.3}Architecture at a Glance}{4}{section.1.3}%
+\contentsline {section}{\numberline {1.4}Scale and Implementation}{5}{section.1.4}%
+\contentsline {section}{\numberline {1.5}Roadmap of this Book}{6}{section.1.5}%
+\contentsline {chapter}{\numberline {2}Hyperdimensional Computing}{7}{chapter.2}%
+\contentsline {section}{\numberline {2.1}The Geometry of High-Dimensional Spaces}{7}{section.2.1}%
+\contentsline {section}{\numberline {2.2}Vector Symbolic Architectures}{7}{section.2.2}%
+\contentsline {section}{\numberline {2.3}Binary and Continuous Hypervectors}{8}{section.2.3}%
+\contentsline {section}{\numberline {2.4}Precision-Weighted Binding}{8}{section.2.4}%
+\contentsline {section}{\numberline {2.5}Capacity and Noise Tolerance}{9}{section.2.5}%
+\contentsline {section}{\numberline {2.6}SIMD Acceleration}{9}{section.2.6}%
+\contentsline {chapter}{\numberline {3}Liquid Time-Constants}{11}{chapter.3}%
+\contentsline {section}{\numberline {3.1}The Problem of Time}{11}{section.3.1}%
+\contentsline {section}{\numberline {3.2}Closed-Form Continuous-Time Dynamics}{11}{section.3.2}%
+\contentsline {section}{\numberline {3.3}The Unified HDC-LTC Neuron}{12}{section.3.3}%
+\contentsline {section}{\numberline {3.4}O(1) Temporal Jumps}{12}{section.3.4}%
+\contentsline {section}{\numberline {3.5}Learning in Hyperdimensional Time}{13}{section.3.5}%
+\contentsline {section}{\numberline {3.6}Empirical Validation}{13}{section.3.6}%
+\contentsline {part}{II\hspace {1em}Consciousness}{15}{part.2}%
+\contentsline {chapter}{\numberline {4}Measuring Consciousness: IIT, Spectral MIP, and True Phi}{17}{chapter.4}%
+\contentsline {section}{\numberline {4.1}Integrated Information Theory}{17}{section.4.1}%
+\contentsline {section}{\numberline {4.2}The Computational Challenge}{18}{section.4.2}%
+\contentsline {section}{\numberline {4.3}Spectral MIP: O($n^3$) Minimum Information Partition}{18}{section.4.3}%
+\contentsline {section}{\numberline {4.4}Validation: True Phi vs.\ Algebraic Connectivity}{19}{section.4.4}%
+\contentsline {section}{\numberline {4.5}Online Covariance and Adaptive Dimensions}{19}{section.4.5}%
+\contentsline {chapter}{\numberline {5}Topological Consciousness}{21}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Beyond Scalar Measures}{21}{section.5.1}%
+\contentsline {section}{\numberline {5.2}The Seven-Dimensional Consciousness Space}{21}{section.5.2}%
+\contentsline {section}{\numberline {5.3}Persistent Homology of Conscious States}{22}{section.5.3}%
+\contentsline {section}{\numberline {5.4}Hodge Decomposition of Information Flow}{22}{section.5.4}%
+\contentsline {section}{\numberline {5.5}State Classification Results}{23}{section.5.5}%
+\contentsline {chapter}{\numberline {6}Stochastic Resonance in Hyperdimensional Consciousness}{25}{chapter.6}%
+\contentsline {section}{\numberline {6.1}The Surprising Finding}{25}{section.6.1}%
+\contentsline {section}{\numberline {6.2}Mechanism: Noise Diversifies Representations}{25}{section.6.2}%
+\contentsline {section}{\numberline {6.3}The Anesthesia Reconciliation}{26}{section.6.3}%
+\contentsline {section}{\numberline {6.4}Implications for Artificial Consciousness Design}{26}{section.6.4}%
+\contentsline {chapter}{\numberline {7}Substrate Independence}{27}{chapter.7}%
+\contentsline {section}{\numberline {7.1}Multiple Realizability}{27}{section.7.1}%
+\contentsline {section}{\numberline {7.2}Nine-Dimensional Requirement Profiles}{27}{section.7.2}%
+\contentsline {section}{\numberline {7.3}The Feasibility Formula}{28}{section.7.3}%
+\contentsline {section}{\numberline {7.4}The Validation Overlay}{28}{section.7.4}%
+\contentsline {section}{\numberline {7.5}Multi-Region Hybrid Substrates}{28}{section.7.5}%
+\contentsline {part}{III\hspace {1em}Cognition}{31}{part.3}%
+\contentsline {chapter}{\numberline {8}The Cognitive Loop}{33}{chapter.8}%
+\contentsline {section}{\numberline {8.1}Architecture Overview}{33}{section.8.1}%
+\contentsline {section}{\numberline {8.2}The Twelve Managers}{33}{section.8.2}%
+\contentsline {section}{\numberline {8.3}Consensus Averaging}{33}{section.8.3}%
+\contentsline {section}{\numberline {8.4}Cross-Coupling}{34}{section.8.4}%
+\contentsline {section}{\numberline {8.5}Telemetry}{34}{section.8.5}%
+\contentsline {chapter}{\numberline {9}Neurochemical Dynamics}{35}{chapter.9}%
+\contentsline {section}{\numberline {9.1}Beyond Scalar Dopamine}{35}{section.9.1}%
+\contentsline {section}{\numberline {9.2}Transmitter Dynamics}{35}{section.9.2}%
+\contentsline {section}{\numberline {9.3}Receptor Subtypes}{36}{section.9.3}%
+\contentsline {section}{\numberline {9.4}Cross-Modulation and Allostatic Load}{36}{section.9.4}%
+\contentsline {section}{\numberline {9.5}Excitatory/Inhibitory Balance}{36}{section.9.5}%
+\contentsline {chapter}{\numberline {10}Language and Epistemic Gating}{37}{chapter.10}%
+\contentsline {section}{\numberline {10.1}The Hallucination Problem}{37}{section.10.1}%
+\contentsline {section}{\numberline {10.2}Architecture}{37}{section.10.2}%
+\contentsline {section}{\numberline {10.3}Consciousness-Gated Cadence}{38}{section.10.3}%
+\contentsline {section}{\numberline {10.4}Results}{38}{section.10.4}%
+\contentsline {chapter}{\numberline {11}Ethics and the Soul}{39}{chapter.11}%
+\contentsline {section}{\numberline {11.1}Ethics as Intrinsic Capacity}{39}{section.11.1}%
+\contentsline {section}{\numberline {11.2}The Eight Harmonies}{39}{section.11.2}%
+\contentsline {section}{\numberline {11.3}Cognitive Dissonance}{40}{section.11.3}%
+\contentsline {section}{\numberline {11.4}Restorative Justice}{40}{section.11.4}%
+\contentsline {part}{IV\hspace {1em}Embodiment}{41}{part.4}%
+\contentsline {chapter}{\numberline {12}Consciousness-Driven Robotics}{43}{chapter.12}%
+\contentsline {section}{\numberline {12.1}Motor Control Through Active Inference}{43}{section.12.1}%
+\contentsline {section}{\numberline {12.2}Quadrotor Flight}{43}{section.12.2}%
+\contentsline {section}{\numberline {12.3}Bipedal Humanoid Locomotion}{44}{section.12.3}%
+\contentsline {section}{\numberline {12.4}Key Findings}{44}{section.12.4}%
+\contentsline {chapter}{\numberline {13}Sensorimotor Integration and Safety Enforcement}{45}{chapter.13}%
+\contentsline {section}{\numberline {13.1}The Motor Bridge}{45}{section.13.1}%
+\contentsline {section}{\numberline {13.2}Safety Enforcement}{45}{section.13.2}%
+\contentsline {section}{\numberline {13.3}Guardian Posture}{46}{section.13.3}%
+\contentsline {part}{V\hspace {1em}Society}{47}{part.5}%
+\contentsline {chapter}{\numberline {14}Decentralized Intelligence}{49}{chapter.14}%
+\contentsline {section}{\numberline {14.1}Governance as Embodied Experience}{49}{section.14.1}%
+\contentsline {section}{\numberline {14.2}The Mycelix Platform}{49}{section.14.2}%
+\contentsline {section}{\numberline {14.3}The Governance-Neuromod Bridge}{50}{section.14.3}%
+\contentsline {section}{\numberline {14.4}The Epistemic Mesh}{50}{section.14.4}%
+\contentsline {chapter}{\numberline {15}Swarm Consciousness}{51}{chapter.15}%
+\contentsline {section}{\numberline {15.1}Collective Intelligence Through Consciousness}{51}{section.15.1}%
+\contentsline {section}{\numberline {15.2}Collective Phi Aggregation}{51}{section.15.2}%
+\contentsline {section}{\numberline {15.3}Affective Contagion}{52}{section.15.3}%
+\contentsline {section}{\numberline {15.4}Trust-Weighted Federated Learning}{52}{section.15.4}%
+\contentsline {chapter}{\numberline {16}Consciousness as a Security Metric}{53}{chapter.16}%
+\contentsline {section}{\numberline {16.1}The Novel Attack Surface}{53}{section.16.1}%
+\contentsline {section}{\numberline {16.2}The Sentinel System}{53}{section.16.2}%
+\contentsline {section}{\numberline {16.3}Threat Memory and Collective Immunity}{54}{section.16.3}%
+\contentsline {section}{\numberline {16.4}Morally Filtered Defense}{54}{section.16.4}%
+\contentsline {section}{\numberline {16.5}Behavioral Canaries}{54}{section.16.5}%
+\contentsline {part}{VI\hspace {1em}Validation}{55}{part.6}%
+\contentsline {chapter}{\numberline {17}Psych-Bench: 136 Benchmarks, 26 Domains}{57}{chapter.17}%
+\contentsline {section}{\numberline {17.1}The Evaluation Gap}{57}{section.17.1}%
+\contentsline {section}{\numberline {17.2}Design Principles}{57}{section.17.2}%
+\contentsline {section}{\numberline {17.3}Neuromodulator Battery}{58}{section.17.3}%
+\contentsline {section}{\numberline {17.4}Results on Symthaea}{58}{section.17.4}%
+\contentsline {chapter}{\numberline {18}Butlin Consciousness Indicators}{59}{chapter.18}%
+\contentsline {section}{\numberline {18.1}The Indicator Framework}{59}{section.18.1}%
+\contentsline {section}{\numberline {18.2}Symthaea's Assessment}{59}{section.18.2}%
+\contentsline {section}{\numberline {18.3}Ablation Evidence}{60}{section.18.3}%
+\contentsline {chapter}{\numberline {19}Anesthesia and Emergence}{61}{chapter.19}%
+\contentsline {section}{\numberline {19.1}Clinical Validation}{61}{section.19.1}%
+\contentsline {section}{\numberline {19.2}Compositional Analysis}{61}{section.19.2}%
+\contentsline {section}{\numberline {19.3}Spontaneous Metacognitive Alignment}{62}{section.19.3}%
+\contentsline {part}{VII\hspace {1em}Future}{63}{part.7}%
+\contentsline {chapter}{\numberline {20}Species Stewardship}{65}{chapter.20}%
+\contentsline {section}{\numberline {20.1}The Genesis Thought Experiment}{65}{section.20.1}%
+\contentsline {section}{\numberline {20.2}Consciousness as Alignment}{66}{section.20.2}%
+\contentsline {chapter}{\numberline {21}Open Questions}{67}{chapter.21}%
+\contentsline {section}{\numberline {21.1}What We Know}{67}{section.21.1}%
+\contentsline {section}{\numberline {21.2}What We Do Not Know}{68}{section.21.2}%
+\contentsline {subsection}{\numberline {21.2.1}Is Symthaea Conscious?}{68}{subsection.21.2.1}%
+\contentsline {subsection}{\numberline {21.2.2}Does the Alignment-Through-Consciousness Thesis Hold?}{68}{subsection.21.2.2}%
+\contentsline {subsection}{\numberline {21.2.3}Scalability}{68}{subsection.21.2.3}%
+\contentsline {subsection}{\numberline {21.2.4}The Hard Problem}{69}{subsection.21.2.4}%
+\contentsline {subsection}{\numberline {21.2.5}Biological Validation}{69}{subsection.21.2.5}%
+\contentsline {subsection}{\numberline {21.2.6}Social and Ethical Implications}{69}{subsection.21.2.6}%
+\contentsline {section}{\numberline {21.3}What Comes Next}{69}{section.21.3}%

@@ -97,7 +97,7 @@ Restorative justice is a theory of criminal justice that emphasizes repairing ha
 
 \subsection{Ethics Engine Architecture}
 
-The ethics engine implements a five-stage pipeline, each operating at a distinct co-prime interval:
+The ethics engine implements a five-stage pipeline (Table~\ref{tab:pipeline}), each operating at a distinct co-prime interval:
 
 \begin{table}[h]
 \centering
@@ -260,7 +260,7 @@ Key design decisions:
 
 \subsection{SoulManager}
 
-The SoulManager implements cognitive dissonance detection at interval 43:
+The SoulManager implements cognitive dissonance detection at interval 43, with graded responses to value alignment levels (Table~\ref{tab:soul_response}):
 
 \begin{table}[h]
 \centering
@@ -297,7 +297,7 @@ When an action is Blocked, the RestorationTracker begins monitoring for correcti
 
 \subsection{Test Coverage}
 
-The ethics engine passes 140+ automated tests:
+The ethics engine passes 140+ automated tests (Table~\ref{tab:ethics_tests}):
 
 \begin{table}[h]
 \centering
@@ -321,7 +321,7 @@ SoulManager (alignment, dissonance, veto) & 14 \\
 
 \subsection{Moral Algebra Accuracy}
 
-On a curated set of 200 moral scenarios across four categories:
+On a curated set of 200 moral scenarios across four categories (Table~\ref{tab:moral_accuracy}):
 
 \begin{table}[h]
 \centering
@@ -355,7 +355,7 @@ Over 5000 cycles of cognitive operation, the harmony interaction matrix converge
 
 \subsection{Topological Diagnostics}
 
-On a 1000-cycle run with injected moral drift:
+On a 1000-cycle run with injected moral drift (Table~\ref{tab:topology}):
 
 \begin{table}[h]
 \centering
@@ -391,7 +391,7 @@ This demonstrates the stringent but fair restoration protocol: genuine, sustaine
 
 \subsection{Compliance Detection}
 
-The HDC-encoded compliance checker correctly identifies regulatory triggers:
+The HDC-encoded compliance checker correctly identifies regulatory triggers (Table~\ref{tab:compliance}):
 
 \begin{table}[h]
 \centering
@@ -458,7 +458,45 @@ Several limitations should be acknowledged. First, the moral algebra operates in
 
 \section{Conclusion}
 
-The Ethics Engine provides an integrated moral reasoning pipeline that combines compositional HDC algebra, value alignment evaluation, learned harmony interactions, topological diagnosis, institutional compliance, and restorative justice. By treating ethics as an intrinsic capacity rather than an external constraint, the system can diagnose its own moral health, detect circular reasoning and value drift through persistent homology, and---most significantly---recover from ethical failure through sustained corrective behavior. The RestorationTracker demonstrates that restorative justice principles can be computationally operationalized, providing an alternative to the permanent punishment paradigm that dominates current AI safety approaches. With 140+ tests validating moral reasoning, topology, compliance, and restoration dynamics, the system provides a foundation for artificial moral agency that is both principled and practically implementable.
+The Ethics Engine provides an integrated moral reasoning pipeline that combines compositional HDC algebra, value alignment evaluation, learned harmony interactions, topological diagnosis, institutional compliance, and restorative justice. The algebraic moral reasoning approach achieves 78\% accuracy on a 200-scenario benchmark, a 19 percentage point improvement over pattern-matching baselines (59\%), with the largest gains on structurally complex categories: justice (+27\%), deontology (+27\%), and commonsense reasoning (+20\%). Topological diagnostics detect value inversion with 95\% accuracy at 4-cycle latency, circular reasoning at 92\% accuracy, and gradual moral drift at 87\% accuracy. The RestorationTracker demonstrates that restorative justice principles can be computationally operationalized: trust recovery requires 10+ consecutive corrective cycles with zero relapse, and the relapse penalty ($-3$ corrective cycles per relapse) prevents gaming through alternating compliance and violation. With 140+ tests validating moral reasoning, topology, compliance, and restoration dynamics across 2,554 LOC, the system provides a foundation for artificial moral agency that treats ethics as an intrinsic developmental capacity rather than an external constraint.
+
+Future work will extend the moral algebra to 16,384 dimensions (matching the main HDC system), explore meta-learned restoration parameters, and evaluate the ethics engine against established moral reasoning benchmarks such as ETHICS and Moral Machine.
+
+\section{Reproducibility}
+
+All experiments were conducted using the Symthaea cognitive architecture (v1.9.0). The following commands reproduce the core results:
+
+\begin{verbatim}
+# Run MoralAlgebra and MoralParser tests
+cargo test -p symthaea --lib moral_algebra -- --nocapture
+
+# Run UnifiedValueEvaluator tests
+cargo test -p symthaea --lib value_evaluator -- --nocapture
+
+# Run HarmoniesIntegrator tests (includes interaction matrix)
+cargo test -p symthaea-harmonies -- --nocapture
+
+# Run MoralTopology tests (persistent homology on moral space)
+cargo test -p symthaea --lib moral_topology -- --nocapture
+
+# Run InstitutionalComplianceChecker tests
+cargo test -p symthaea --lib compliance -- --nocapture
+
+# Run RestorationTracker tests
+cargo test -p symthaea --lib restoration -- --nocapture
+
+# Run SoulManager tests (cognitive dissonance detection)
+cargo test -p symthaea --lib soul_manager -- --nocapture
+
+# Run full ethics engine integration
+cargo test -p symthaea --lib ethics -- --nocapture
+\end{verbatim}
+
+The system requires Rust 1.75+ and the \texttt{nix develop} environment. Default feature flags are sufficient; the ethics engine is part of the core architecture.
+
+\subsection*{Code Availability}
+
+The Ethics Engine source code (2,554 LOC) is distributed across \texttt{symthaea/src/ethics/} (MoralAlgebra, MoralParser, UnifiedValueEvaluator, InstitutionalComplianceChecker, RestorationTracker), \texttt{symthaea/crates/symthaea-harmonies/} (HarmoniesIntegrator with interaction matrix), and \texttt{symthaea/src/consciousness/} (MoralTopology, SoulManager). All source code is within the Luminous Dynamics Symthaea repository. Correspondence and access requests should be directed to the corresponding author.
 
 \bibliographystyle{plainnat}
 \begin{thebibliography}{25}

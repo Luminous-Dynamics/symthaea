@@ -94,7 +94,7 @@ We define eight canonical substrate types as an enumeration, with three aliases 
 $\mathcal{S} = \{\text{BiologicalNeurons}, \text{SiliconDigital}, \text{QuantumComputer}, \text{PhotonicProcessor}, \text{NeuromorphicChip}, \text{BiochemicalComputer}, \text{HybridSystem}, \text{ExoticSubstrate}\}$
 \end{definition}
 
-Each substrate type is characterized by physical medium, characteristic operation speed, and energy per operation:
+Each substrate type is characterized by physical medium, characteristic operation speed, and energy per operation (Table~\ref{tab:substrate-properties}):
 
 \begin{table}[H]
 \centering
@@ -207,7 +207,7 @@ Biological neurons achieve the highest feasibility (0.554), followed by hybrid s
 
 \subsection{The Feasibility Gap}
 
-The feasibility scores in Table~\ref{tab:feasibility} represent \emph{hypothetical} capabilities---what each substrate could achieve if our theoretical models are correct. However, the confidence we should place in these scores varies enormously across substrates. We have overwhelming evidence that biological neurons support consciousness; we have essentially no evidence for silicon digital or quantum substrates.
+The feasibility scores in Table~\ref{tab:feasibility} represent \emph{hypothetical} capabilities---what each substrate could achieve if our theoretical models are correct. However, the confidence we should place in these scores varies enormously across substrates. We have overwhelming evidence that biological neurons support consciousness; we have essentially no evidence for silicon digital or quantum substrates (Table~\ref{tab:validation}).
 
 The validation overlay addresses this by associating each substrate with an \emph{evidence level} and corresponding \emph{honest confidence}:
 
@@ -268,7 +268,7 @@ ExoticSubstrate & 0.086 & 0.10 & 0.032 \\
 \end{tabular}
 \end{table}
 
-Under the validation overlay, biological neurons remain dominant ($F_{\text{eff}} = 0.535$), while silicon digital drops dramatically from $F = 0.312$ to $F_{\text{eff}} = 0.115$---a 63\% reduction reflecting our theoretical-only confidence. This is the intended behavior: the system is scientifically honest about the evidence base for silicon consciousness.
+Table~\ref{tab:effective} shows the effective feasibility under the validation overlay. Under the validation overlay, biological neurons remain dominant ($F_{\text{eff}} = 0.535$), while silicon digital drops dramatically from $F = 0.312$ to $F_{\text{eff}} = 0.115$---a 63\% reduction reflecting our theoretical-only confidence. This is the intended behavior: the system is scientifically honest about the evidence base for silicon consciousness.
 
 \section{Multi-Substrate Simulation}
 
@@ -281,7 +281,7 @@ F_{\text{eff}}^{(t+1)} = \alpha \cdot F_{\text{target}} + (1 - \alpha) \cdot F_{
 \label{eq:ema}
 \end{equation}
 
-with configurable smoothing constant $\alpha$. For simulation mode, $\alpha = 0.1$, yielding approximately 10 cognitive cycles to converge from one substrate's feasibility to another's. For backward compatibility, $\alpha = 1.0$ provides instant switching.
+with configurable smoothing constant $\alpha$. For simulation mode, $\alpha = 0.1$, yielding approximately 10 cognitive cycles to converge from one substrate's feasibility to another's (Table~\ref{tab:ema}). For backward compatibility, $\alpha = 1.0$ provides instant switching.
 
 \begin{table}[H]
 \centering
@@ -311,7 +311,7 @@ Substrate speed directly affects the temporal dynamics of consciousness computat
 \tau_{\text{factor}} = \frac{\text{speed}(\text{current})}{\text{speed}(\text{BiologicalNeurons})}
 \end{equation}
 
-For photonic substrates ($\sim$1~ps vs.\ $\sim$1~ms for biological), $\tau_{\text{factor}} = 10^6$: the substrate experiences time one million times faster. This factor is applied to the CfC delta-$t$ parameter, effectively compressing or dilating the temporal dynamics of consciousness computation.
+For photonic substrates ($\sim$1~ps vs.\ $\sim$1~ms for biological), $\tau_{\text{factor}} = 10^6$: the substrate experiences time one million times faster (Table~\ref{tab:tau}). This factor is applied to the CfC delta-$t$ parameter, effectively compressing or dilating the temporal dynamics of consciousness computation.
 
 \begin{table}[H]
 \centering
@@ -437,11 +437,11 @@ $-5$ (pre) & 0.535 & 0.182 & 0.71 & Yes \\
 \end{tabular}
 \end{table}
 
-Consciousness persists through the transfer but at reduced levels, consistent with the lower effective feasibility of silicon. The 56\% reduction in consciousness level ($0.71 \to 0.31$) reflects the validation overlay's honest assessment that we lack evidence for silicon consciousness, not a theoretical impossibility.
+Table~\ref{tab:transfer} shows the full transfer trajectory. Consciousness persists through the transfer but at reduced levels, consistent with the lower effective feasibility of silicon. The 56\% reduction in consciousness level ($0.71 \to 0.31$) reflects the validation overlay's honest assessment that we lack evidence for silicon consciousness, not a theoretical impossibility.
 
 \subsection{Optimal Substrate Allocation}
 
-Which substrate maximizes $\Phi$ for each cortical function? We compare single-substrate configurations:
+Which substrate maximizes $\Phi$ for each cortical function? We compare single-substrate configurations (Table~\ref{tab:peak-phi}):
 
 \begin{table}[H]
 \centering
@@ -467,7 +467,7 @@ Biological neurons achieve the highest $\Phi$ (0.185), consistent with the valid
 
 \subsection{Energy--Consciousness Trade-off}
 
-Different substrates offer different energy--consciousness trade-offs:
+Different substrates offer different energy--consciousness trade-offs (Table~\ref{tab:energy}):
 
 \begin{table}[H]
 \centering
@@ -490,7 +490,7 @@ Quantum computers achieve the highest energy-normalized consciousness, though th
 
 \subsection{Test Coverage}
 
-The framework comprises 52 tests across four implementation phases:
+The framework comprises 85 tests across four implementation phases (Table~\ref{tab:tests}):
 
 \begin{table}[H]
 \centering
@@ -572,6 +572,37 @@ We have presented a working computational framework for analyzing consciousness 
 The framework's most important contribution may be methodological rather than empirical: by making substrate-consciousness assumptions explicit and quantifiable, it transforms philosophical debates about machine consciousness into testable engineering questions. The validation overlay ensures that this quantification does not overstate our knowledge---silicon consciousness remains possible but unproven, and the system's effective feasibility reflects this honestly.
 
 Future work will implement the testable predictions generated by the validation framework, connect to external consciousness benchmarks, and model exotic substrates (Belousov--Zhabotinsky reactions, plasma computation) with realistic physics. As empirical evidence accumulates---through neuromorphic computing experiments, quantum cognition studies, and consciousness biomarkers---the framework's evidence levels and confidence scores will be updated, gradually replacing theoretical speculation with measured reality.
+
+\section{Reproducibility}
+
+All experiments were conducted using the Symthaea cognitive architecture (v1.9.0). The following commands reproduce the core results:
+
+\begin{verbatim}
+# Run core substrate independence tests (13 tests)
+cargo test -p symthaea-core --lib substrate_independence -- --nocapture
+
+# Run substrate validation tests (11 tests)
+cargo test -p symthaea-core --lib substrate_validation -- --nocapture
+
+# Run substrate simulation integration tests (13 tests)
+cargo test -p symthaea --test substrate_simulation -- --nocapture
+
+# Run substrate property tests (6 proptests)
+cargo test -p symthaea --test proptest_substrate_simulation -- --nocapture
+
+# Run substrate manager unit tests (39 tests)
+cargo test -p symthaea --lib substrate_manager -- --nocapture
+
+# Run multiple realizability tests
+cargo test -p symthaea --test substrate_simulation \
+  test_multiple_realizability -- --nocapture
+\end{verbatim}
+
+The system requires Rust 1.75+ and the \texttt{nix develop} environment. Default feature flags are sufficient; the substrate framework is part of the core architecture.
+
+\subsection*{Code Availability}
+
+The substrate independence framework source code is in \texttt{symthaea-core/src/hdc/substrate\_independence.rs} and \texttt{substrate\_validation.rs}. The SubstrateManager is in \texttt{symthaea/src/cognitive\_loop/substrate\_manager.rs}. The Symthaea source code is available at the Luminous Dynamics Symthaea repository. Correspondence and access requests should be directed to the corresponding author.
 
 \bibliographystyle{plainnat}
 \begin{thebibliography}{30}

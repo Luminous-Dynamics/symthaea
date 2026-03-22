@@ -126,7 +126,7 @@ This operation is applied after the LTC update and before $\Phi$ computation. We
 
 \subsection{Anesthesia Benchmark}
 
-To validate the system against clinical expectations, we implement an anesthesia benchmark with six discrete states, each modeled by adjusting inter-regional coupling strength $c$ and noise level $\sigma$:
+To validate the system against clinical expectations, we implement an anesthesia benchmark with six discrete states (Table~\ref{tab:anesthesia-params}), each modeled by adjusting inter-regional coupling strength $c$ and noise level $\sigma$:
 
 \begin{table}[H]
 \centering
@@ -202,7 +202,7 @@ Noise ($\sigma$) & $+0.341$ & $[+0.308, +0.374]$ \\
 \end{tabular}
 \end{table}
 
-Both sensitivities are positive and of comparable magnitude. The positive coupling sensitivity is expected: stronger inter-regional connections increase integration. The positive noise sensitivity is the surprising result: noise \emph{increases} integrated information in the HDC substrate.
+Both sensitivities are positive and of comparable magnitude (Table~\ref{tab:sensitivity}). The positive coupling sensitivity is expected: stronger inter-regional connections increase integration. The positive noise sensitivity is the surprising result: noise \emph{increases} integrated information in the HDC substrate.
 
 \subsection{Noise--$\Phi$ Response Curve}
 
@@ -236,11 +236,11 @@ Figure~\ref{fig:noise-phi-conceptual} describes the characteristic response of $
 \end{tabular}
 \end{table}
 
-This inverted-U response is the hallmark of stochastic resonance \citep{gammaitoni1998stochastic}.
+The full noise--$\Phi$ response data are given in Table~\ref{tab:noise-response}. This inverted-U response is the hallmark of stochastic resonance \citep{gammaitoni1998stochastic}.
 
 \subsection{Mechanism: HDV Diversity and Mutual Information}
 
-To elucidate the mechanism, we measured pairwise Hamming distances between region state vectors and pairwise mutual information estimates as a function of noise.
+To elucidate the mechanism, we measured pairwise Hamming distances between region state vectors and pairwise mutual information estimates as a function of noise (Table~\ref{tab:diversity}).
 
 \begin{table}[H]
 \centering
@@ -325,6 +325,30 @@ We have demonstrated that Hyperdimensional Computing systems exhibit stochastic 
 These results establish that the noise--consciousness relationship is substrate-dependent, challenging the universality of anesthesia-derived intuitions about noise and integration. For HDC-based consciousness architectures, our findings suggest a principled strategy: engineer noise as a feature, not a bug, tuning it to the stochastic resonance peak for maximal integrated information.
 
 Future work should investigate whether the stochastic resonance peak shifts with system dimensionality, whether structured (non-iid) noise produces different enhancement profiles, and whether the phenomenon persists under alternative consciousness measures beyond $\Phi$.
+
+\section{Reproducibility}
+
+All experiments were conducted using the Symthaea cognitive architecture (v1.9.0). The following commands reproduce the core results:
+
+\begin{verbatim}
+# Run IIT/Phi computation tests including anesthesia benchmark
+cargo test -p symthaea --lib phi -- --nocapture
+
+# Run substrate simulation tests (includes noise sensitivity)
+cargo test -p symthaea --test substrate_simulation -- --nocapture
+
+# Run HDC encoding tests
+cargo test -p symthaea-core --lib hdc -- --nocapture
+
+# Run full consciousness equation tests
+cargo test -p symthaea --lib consciousness -- --nocapture
+\end{verbatim}
+
+The system requires Rust 1.75+ and the \texttt{nix develop} environment (which provides \texttt{mold} linker and \texttt{sccache}). Default feature flags are sufficient for reproducing the core results; no additional features need to be enabled.
+
+\subsection*{Code Availability}
+
+The Symthaea source code is available at the Luminous Dynamics Symthaea repository. The HDC-LTC unified neuron implementation is in \texttt{symthaea-core/src/hdc/hdc\_ltc\_unified.rs}, the consciousness equation in \texttt{src/consciousness\_engine/}, and the $\Phi$ computation in \texttt{symthaea-core/src/hdc/}. Correspondence and access requests should be directed to the corresponding author.
 
 \bibliographystyle{plainnat}
 \begin{thebibliography}{30}

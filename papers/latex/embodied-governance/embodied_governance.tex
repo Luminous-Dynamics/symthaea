@@ -142,7 +142,7 @@ A participant's consciousness profile is a 4-tuple $(I, R, C, E) \in [0,1]^4$ wh
 \end{itemize}
 \end{definition}
 
-The composite score $S = w_I I + w_R R + w_C C + w_E E$ (with weights $w_I = 0.2$, $w_R = 0.3$, $w_C = 0.25$, $w_E = 0.25$) determines the participant's tier:
+The composite score $S = w_I I + w_R R + w_C C + w_E E$ (with weights $w_I = 0.2$, $w_R = 0.3$, $w_C = 0.25$, $w_E = 0.25$) determines the participant's tier (Table~\ref{tab:tiers}):
 
 \begin{table}[h]
 \centering
@@ -291,6 +291,8 @@ Metrics:
 
 \subsection{Learning Dynamics}
 
+Table~\ref{tab:learning} presents learning performance across conditions.
+
 \begin{table}[h]
 \centering
 \caption{Learning performance across conditions (mean $\pm$ SD, $n = 20$ runs).}
@@ -314,6 +316,8 @@ The learning rate boost mechanism (PE-driven LR modulation up to $2\times$) was 
 In the embodied condition, governance prediction errors spiked following unexpected tally outcomes, temporarily doubling the learning rate and enabling rapid policy updates.
 
 \subsection{Social Behavior}
+
+Table~\ref{tab:cooperation} presents cooperative behavior across conditions.
 
 \begin{table}[h]
 \centering
@@ -339,6 +343,8 @@ Disabling oxytocin injection while keeping all other pathways reduced the cooper
 
 \subsection{Attentional Allocation}
 
+Table~\ref{tab:attention} shows workspace access allocation following governance events.
+
 \begin{table}[h]
 \centering
 \caption{Workspace access allocation following governance events (first 50 cycles post-event).}
@@ -361,6 +367,8 @@ The NE baseline increase of $+0.15$ shifts the neuromodulatory bath toward heigh
 
 \subsection{Emotional Regulation}
 
+Table~\ref{tab:emotion} presents emotional valence statistics across conditions.
+
 \begin{table}[h]
 \centering
 \caption{Emotional valence statistics across conditions.}
@@ -380,6 +388,8 @@ Embodied governance & $0.57 \pm 0.04$ & $0.14$ & $31 \pm 9$ & $0.22$ \\
 Embodied governance increased emotional variability (SD from 0.08 to 0.14) but also improved recovery time (31 vs.\ 78 cycles for random neuromod), indicating that the governance-driven emotional perturbations are not only semantically appropriate but also \emph{regulated}---the system recovers to baseline faster because the neuromodulatory signals are congruent with the homeostatic mechanisms of the bath.
 
 \subsection{Consciousness Coherence}
+
+Table~\ref{tab:phi} shows integrated information during and after governance events.
 
 \begin{table}[h]
 \centering
@@ -401,6 +411,8 @@ Embodied governance temporarily elevates $\Phi$ during governance events ($+16.3
 Random neuromodulation \emph{decreases} $\Phi$ ($-7.7\%$), suggesting that incoherent neurochemical perturbations fragment consciousness.
 
 \subsection{Epistemic Mesh Grounding}
+
+Table~\ref{tab:grounding} shows the dynamic grounding factor across community knowledge states.
 
 \begin{table}[h]
 \centering
@@ -425,7 +437,7 @@ This directly affects the knowledge engine: on sparse topics, the agent appropri
 
 \subsection{Ablation Analysis}
 
-To assess the contribution of individual neuromodulatory pathways, we conducted ablation experiments, disabling each pathway individually:
+To assess the contribution of individual neuromodulatory pathways, we conducted ablation experiments (Table~\ref{tab:ablation}), disabling each pathway individually:
 
 \begin{table}[h]
 \centering
@@ -509,6 +521,37 @@ By respecting this embodied nature, artificial cognitive architectures can achie
 
 Future work will extend the framework to multi-community governance, implement adaptive neuromodulatory sensitivity based on individual temperament profiles, and evaluate the system with real human governance participation on the Mycelix mainnet.
 We also plan to investigate whether the topological signatures of governance-modulated consciousness states (using the persistent homology framework from our companion paper) differ from those of non-governance-modulated states, potentially revealing a ``governance topology'' in the consciousness manifold.
+
+\section{Reproducibility}
+\label{sec:reproducibility}
+
+All experiments were conducted using the Symthaea cognitive architecture (v1.9.0) with the Mycelix governance cluster. The following commands reproduce the core results:
+
+\begin{verbatim}
+# Run GovernanceManager unit tests (21 tests)
+cargo test -p symthaea --lib governance_manager -- --nocapture
+
+# Run governance integration tests (14 tests)
+cargo test -p symthaea --test cross_coupling_integration -- --nocapture
+
+# Run Mycelix bridge-common tests (349+ tests)
+cargo test -p mycelix-bridge-common -- --nocapture
+
+# Run consciousness gating property tests (6 proptests)
+cargo test -p mycelix-bridge-common --lib proptest -- --nocapture
+
+# Build Mycelix governance cluster
+just build-governance
+
+# Run full cognitive loop with governance feature
+cargo test -p symthaea --features mycelix --lib cognitive_loop -- --nocapture
+\end{verbatim}
+
+The system requires Rust 1.75+ and the \texttt{nix develop} environment. The \texttt{mycelix} feature flag must be enabled for governance integration. Holochain sweettest tests require a Holochain conductor; see the Mycelix repository for conductor setup instructions.
+
+\subsection*{Code Availability}
+
+The GovernanceManager source code is in \texttt{symthaea/src/cognitive\_loop/managers/governance\_manager.rs}. The Mycelix governance cluster is in \texttt{mycelix-governance/}. The consciousness gating profiles are in \texttt{crates/mycelix-bridge-common/src/consciousness\_profile.rs}. The Symthaea and Mycelix source code are available at the Luminous Dynamics repositories. Correspondence and access requests should be directed to the corresponding author.
 
 % ══════════════════════════════════════════════════════════════════════════════
 % BIBLIOGRAPHY

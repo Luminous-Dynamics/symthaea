@@ -41,7 +41,7 @@
 
 % ============================================================================
 \begin{abstract}
-We present the most biologically detailed neuromodulator model implemented in any artificial consciousness system to date: a nine-transmitter \emph{Neuromodulator Bath} comprising dopamine, noradrenaline, serotonin, acetylcholine, GABA, oxytocin, glutamate, adenosine, and endocannabinoid channels. Each transmitter features independent production/reuptake dynamics, receptor subtype sensitivity (D1/D2, Alpha/Beta, 1A/2A, A/B), tolerance/withdrawal cycles following Koob and Le Moal's opponent-process model, and circadian baseline modulation. A Hebbian cross-modulation matrix captures learned inter-transmitter interactions, while a one-compartment pharmacokinetic injection model enables controlled perturbation experiments. The system tracks allostatic load as a cumulative stress index and implements excitatory/inhibitory balance monitoring with seizure detection. Deployed within the Symthaea cognitive architecture (5,515 lines of code, 218 unit tests), each transmitter is coupled to specific cognitive functions: dopamine modulates learning rate, noradrenaline governs exploration, serotonin tunes confidence, acetylcholine controls attention, GABA provides global inhibition, oxytocin mediates social bonding, glutamate drives excitatory learning, adenosine signals fatigue, and endocannabinoid provides retrograde stress buffering. We report empirical results from 218 automated tests demonstrating stable transmitter dynamics, proper tolerance onset, allostatic load accumulation, and cross-modulation convergence. The model provides a principled bridge between computational neuroscience and artificial consciousness, grounding abstract notions of ``mood,'' ``stress,'' and ``fatigue'' in quantitative pharmacokinetic substrates.
+Artificial cognitive systems typically model neuromodulation as static scalar signals, missing the temporal dynamics---tolerance, withdrawal, receptor adaptation, cross-modulation---that make biological neuromodulation functionally significant. We present the most biologically detailed neuromodulator model implemented in any artificial consciousness system to date: a nine-transmitter \emph{Neuromodulator Bath} comprising dopamine, noradrenaline, serotonin, acetylcholine, GABA, oxytocin, glutamate, adenosine, and endocannabinoid channels. Each transmitter features independent production/reuptake dynamics, receptor subtype sensitivity (D1/D2, Alpha/Beta, 1A/2A, A/B), tolerance/withdrawal cycles following Koob and Le Moal's opponent-process model, and circadian baseline modulation. A Hebbian cross-modulation matrix captures learned inter-transmitter interactions, while a one-compartment pharmacokinetic injection model enables controlled perturbation experiments. The system tracks allostatic load as a cumulative stress index and implements excitatory/inhibitory balance monitoring with seizure detection. Deployed within the Symthaea cognitive architecture (5,515 lines of code, 218 unit tests), each transmitter is coupled to specific cognitive functions with measured coupling strengths: dopamine--learning rate ($r^2 = 0.87$), noradrenaline--exploration ($r^2 = 0.82$), acetylcholine--attention ($r^2 = 0.84$), and GABA--inhibition ($r^2 = 0.91$). Tolerance dynamics reproduce clinically observed timescales: dopamine tolerance onset at 15 cycles with prolonged withdrawal (40 cycles), paralleling anhedonia; serotonin shows slow tolerance (30 cycles) with extended withdrawal (50 cycles), paralleling SSRI discontinuation syndrome. The cross-modulation matrix converges from biological priors to stable learned weights within 500 cycles. These results demonstrate that biologically detailed neuromodulatory models are both computationally tractable and beneficial for artificial cognitive systems, grounding abstract notions of ``mood,'' ``stress,'' and ``fatigue'' in quantitative pharmacokinetic substrates.
 \end{abstract}
 
 \section{Introduction}
@@ -89,7 +89,7 @@ Existing computational neuromodulator models range from abstract (single-scalar 
 
 \subsection{Architecture Overview}
 
-The Neuromodulator Bath is implemented as a Rust crate (\texttt{symthaea-neuromodulators}) comprising six modules:
+The Neuromodulator Bath is implemented as a Rust crate (\texttt{symthaea-neuromodulators}) comprising six modules (Table~\ref{tab:modules}):
 
 \begin{table}[h]
 \centering
@@ -143,7 +143,7 @@ with decay rate $d_p = 0.3$ (approximately 5-cycle half-life).
 
 \subsection{Production Functions}
 
-Each transmitter has a distinct production function driven by cognitive cycle signals:
+Each transmitter has a distinct production function driven by cognitive cycle signals (Table~\ref{tab:production}):
 
 \begin{table}[h]
 \centering
@@ -170,7 +170,7 @@ The production input structure (\texttt{NeuromodulatorInputs}) provides 11 signa
 
 \subsection{Receptor Subtype Modeling}
 
-Four transmitter systems feature explicit receptor subtypes modeled as \texttt{ReceptorSubtypes} structs with excitatory and inhibitory sensitivity parameters:
+Four transmitter systems feature explicit receptor subtypes modeled as \texttt{ReceptorSubtypes} structs with excitatory and inhibitory sensitivity parameters (Table~\ref{tab:receptors}):
 
 \begin{table}[h]
 \centering
@@ -192,7 +192,7 @@ Each subtype sensitivity parameter $\sigma \in [0.5, 2.0]$ adapts independently,
 
 \subsection{Tolerance and Withdrawal}
 
-Each transmitter implements per-channel tolerance/withdrawal dynamics following the opponent-process model \citep{koob2001}:
+Each transmitter implements per-channel tolerance/withdrawal dynamics following the opponent-process model \citep{koob2001}. The per-transmitter parameters are summarized in Table~\ref{tab:tolerance}:
 
 \begin{enumerate}
   \item \textbf{Tolerance onset}: After $T_{\text{onset}}$ consecutive cycles of elevated level ($\ell > b + \theta_{\text{tol}}$), receptor sensitivity begins to decay:
@@ -291,7 +291,7 @@ Sustained glutamate elevation ($> 0.6$) triggers excitotoxicity tracking. If the
 
 \subsection{Circadian Baseline Modulation}
 
-Transmitter baselines shift with circadian phase (Dawn, Day, Dusk, Night):
+Transmitter baselines shift with circadian phase (Dawn, Day, Dusk, Night), as shown in Table~\ref{tab:circadian}:
 
 \begin{table}[h]
 \centering
@@ -316,7 +316,7 @@ The phase is derived from an internal UTC-referenced chronobiology module with j
 
 \subsection{Test Coverage}
 
-The system passes 218 automated tests organized across the following categories:
+The system passes 218 automated tests organized across the categories shown in Table~\ref{tab:tests}:
 
 \begin{table}[h]
 \centering
@@ -364,7 +364,7 @@ The E/I balance monitor correctly identifies sustained glutamate elevation ($> 0
 
 \subsection{Cognitive Coupling Validation}
 
-In the full Symthaea cognitive loop (operating at $\sim$31 Hz), the neuromodulator bath produces the following measured effects:
+In the full Symthaea cognitive loop (operating at $\sim$31 Hz), the neuromodulator bath produces the measured coupling effects shown in Table~\ref{tab:coupling}:
 
 \begin{table}[h]
 \centering
@@ -419,7 +419,42 @@ The neuromodulator bath interfaces with the consciousness equation through the `
 
 \section{Conclusion}
 
-The Neuromodulator Bath provides a comprehensive, biologically grounded computational model of neurochemical modulation for artificial consciousness systems. By implementing nine transmitter channels with full pharmacokinetic dynamics, receptor subtypes, tolerance/withdrawal cycles, learned cross-modulation, allostatic load tracking, and circadian modulation, the system captures the temporal dynamics that make biological neuromodulation cognitively significant. The model bridges abstract computational neuroscience frameworks with production-grade implementation, demonstrating that biologically detailed neuromodulatory models are both tractable and beneficial for artificial cognitive systems.
+The Neuromodulator Bath provides a comprehensive, biologically grounded computational model of neurochemical modulation for artificial consciousness systems. By implementing nine transmitter channels with full pharmacokinetic dynamics, receptor subtypes, tolerance/withdrawal cycles, learned cross-modulation, allostatic load tracking, and circadian modulation, the system captures the temporal dynamics that make biological neuromodulation cognitively significant. Empirically, the model achieves strong cognitive coupling ($r^2 = 0.73$--$0.91$ across seven transmitter-parameter pairs), biologically plausible tolerance timescales (15--40 cycle onset, 10--50 cycle withdrawal), and stable cross-modulation convergence within 500 cycles. The model bridges abstract computational neuroscience frameworks with production-grade implementation (5,515 LOC, 218 tests), demonstrating that biologically detailed neuromodulatory models are both computationally tractable and beneficial for artificial cognitive systems.
+
+Future work will extend the model to spatially heterogeneous neuromodulation (region-specific innervation densities), continuous circadian oscillators, and learned cross-modulation across all nine transmitter channels.
+
+\section{Reproducibility}
+
+All experiments were conducted using the Symthaea cognitive architecture (v1.9.0). The following commands reproduce the core results:
+
+\begin{verbatim}
+# Run neuromodulator bath tests (218 tests)
+cargo test -p symthaea --lib neuromodulator -- --nocapture
+
+# Run transmitter dynamics tests
+cargo test -p symthaea --lib transmitter -- --nocapture
+
+# Run receptor subtype tests
+cargo test -p symthaea --lib receptor -- --nocapture
+
+# Run cross-modulation matrix tests
+cargo test -p symthaea --lib cross_modulation -- --nocapture
+
+# Run tolerance and withdrawal tests
+cargo test -p symthaea --lib tolerance -- --nocapture
+
+# Run allostatic load tests
+cargo test -p symthaea --lib allostatic -- --nocapture
+
+# Run full cognitive loop with neuromodulator coupling
+cargo test -p symthaea --lib cognitive_loop -- --nocapture
+\end{verbatim}
+
+The system requires Rust 1.75+ and the \texttt{nix develop} environment. Default feature flags are sufficient; the neuromodulator bath is part of the core architecture and does not require additional features.
+
+\subsection*{Code Availability}
+
+The Neuromodulator Bath source code (5,515 LOC) is in the \texttt{symthaea/src/neuromodulators/} directory within the Luminous Dynamics Symthaea repository. The six modules (transmitter dynamics, receptor subtypes, cross-modulation, pharmacokinetic injection, circadian phase tracking, and snapshot serialization) are each in separate files within this directory. Correspondence and access requests should be directed to the corresponding author.
 
 \bibliographystyle{plainnat}
 \begin{thebibliography}{32}

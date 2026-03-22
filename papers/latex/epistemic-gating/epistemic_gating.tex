@@ -99,7 +99,7 @@ These components interact within a cognitive loop operating at approximately 31~
 
 \subsection{ThoughtEncoder: 20-Channel Cognitive Encoding}
 
-The ThoughtEncoder transforms the system's distributed cognitive state into a structured representation suitable for language generation. It comprises 20 specialized channels, each encoding a distinct aspect of the cognitive state:
+The ThoughtEncoder transforms the system's distributed cognitive state into a structured representation suitable for language generation. It comprises 20 specialized channels (Table~\ref{tab:channels}), each encoding a distinct aspect of the cognitive state:
 
 \begin{table}[H]
 \centering
@@ -225,7 +225,7 @@ We evaluate the Broca pipeline along four dimensions: factual accuracy, hallucin
 
 \subsection{Hallucination Prevention}
 
-We measure hallucination rate as the fraction of generated statements that are not supported by the system's grounded knowledge base. Evaluation is performed on a set of 500 generation episodes across diverse topics.
+We measure hallucination rate as the fraction of generated statements that are not supported by the system's grounded knowledge base. Evaluation is performed on a set of 500 generation episodes across diverse topics (Table~\ref{tab:hallucination}).
 
 \begin{table}[H]
 \centering
@@ -247,7 +247,7 @@ The EpistemicGate alone reduces hallucination from 23.4\% to 1.8\%---a 92.3\% re
 
 \subsection{Epistemic Support Distribution}
 
-We analyze the distribution of epistemic support scores across the vocabulary during generation.
+We analyze the distribution of epistemic support scores across the vocabulary during generation (Table~\ref{tab:epistemic-dist}).
 
 \begin{table}[H]
 \centering
@@ -268,7 +268,7 @@ At higher consciousness levels, the threshold increases and fewer tokens pass th
 
 \subsection{Semantic Veto Frequency}
 
-The CoherenceFeedback module's semantic veto is triggered when generation coherence drops below threshold. We characterize veto frequency and its relationship to generation quality.
+The CoherenceFeedback module's semantic veto is triggered when generation coherence drops below threshold. We characterize veto frequency and its relationship to generation quality (Table~\ref{tab:veto}).
 
 \begin{table}[H]
 \centering
@@ -290,7 +290,7 @@ Vetoes occur in approximately 28\% of episodes (mean 0.34 per episode), typicall
 
 \subsection{Adaptive Cadence Behavior}
 
-The cadence controller modulates generation frequency based on cognitive state.
+The cadence controller modulates generation frequency based on cognitive state (Table~\ref{tab:cadence}).
 
 \begin{table}[H]
 \centering
@@ -312,7 +312,7 @@ The cadence controller successfully allocates more generation bandwidth to high-
 
 \subsection{Comparison with Post-Hoc Methods}
 
-We compare the full Broca pipeline against representative post-hoc hallucination mitigation methods, applied to the same Liquid-Mamba backend without epistemic gating.
+We compare the full Broca pipeline against representative post-hoc hallucination mitigation methods, applied to the same Liquid-Mamba backend without epistemic gating (Table~\ref{tab:comparison}).
 
 \begin{table}[H]
 \centering
@@ -395,6 +395,33 @@ We have presented epistemic gating, a mechanism for preventing hallucination in 
 The key architectural innovations are: (1) encoding cognitive state as a 16,384-dimensional HDV via a 20-channel ThoughtEncoder; (2) computing per-token epistemic support via HDC similarity; (3) consciousness-modulated threshold adjustment; and (4) mid-sentence semantic veto for coherence maintenance. Together, these mechanisms implement a consciousness-aware language generation system that can only articulate what it knows.
 
 Future work will address compositional hallucination via phrase-level epistemic checking, external benchmark evaluation, and the integration of retrieval-augmented knowledge into the HDC grounding layer. We also plan to investigate the theoretical connections between epistemic gating and the free energy principle more formally, potentially deriving the gating threshold from variational inference principles.
+
+\section{Reproducibility}
+
+All experiments were conducted using the Broca language pipeline within the Symthaea cognitive architecture (v1.9.0). The following commands reproduce the core results:
+
+\begin{verbatim}
+# Run Broca pipeline tests (358 tests)
+cargo test -p symthaea-broca -- --nocapture
+
+# Run epistemic gating unit tests
+cargo test -p symthaea-broca --lib epistemic -- --nocapture
+
+# Run coherence feedback tests
+cargo test -p symthaea-broca --lib coherence -- --nocapture
+
+# Run end-to-end generation tests
+cargo test -p symthaea-broca --lib e2e -- --nocapture
+
+# Build with language feature enabled
+cargo build --features ssm_language
+\end{verbatim}
+
+The system requires Rust 1.75+ and the \texttt{nix develop} environment. The \texttt{ssm\_language} feature flag must be enabled for Broca pipeline functionality. The Liquid-Mamba backend requires the default feature set.
+
+\subsection*{Code Availability}
+
+The Broca language pipeline source code is located in \texttt{symthaea/crates/symthaea-broca/} within the Luminous Dynamics Symthaea repository. The EpistemicGate implementation, CoherenceFeedback module, and adaptive cadence controller are all contained within this crate. Correspondence and access requests should be directed to the corresponding author.
 
 \bibliographystyle{plainnat}
 \begin{thebibliography}{30}

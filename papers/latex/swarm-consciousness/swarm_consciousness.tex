@@ -96,7 +96,7 @@ The manager does not directly mutate any \texttt{CognitiveLoopService} fields. T
 
 \subsection{Swarm Event Taxonomy}
 
-The system defines nine event types:
+The system defines nine event types (Table~\ref{tab:events}):
 
 \begin{table}[h]
 \centering
@@ -222,7 +222,7 @@ Threat patterns receive a +30\% salience boost during dream consolidation, refle
 
 \subsection{Test Suite}
 
-The SwarmManager passes 43 automated tests across four categories:
+The SwarmManager passes 43 automated tests across four categories (Table~\ref{tab:swarm_tests}):
 
 \begin{table}[h]
 \centering
@@ -246,7 +246,7 @@ Under simulated network conditions (20 peers, random join/leave events, periodic
 
 \subsection{Neuromodulatory Coupling Validation}
 
-We validated the four neuromodulatory pathways by injecting controlled events and measuring downstream effects:
+We validated the four neuromodulatory pathways by injecting controlled events and measuring downstream effects (Table~\ref{tab:neuromod_coupling}):
 
 \begin{table}[h]
 \centering
@@ -274,7 +274,7 @@ In a 5-peer simulation with one ``emotionally expressive'' peer (high-intensity 
 
 \subsection{Collective $\Phi$ and Learning Rate}
 
-Under varying collective $\Phi$ conditions:
+Under varying collective $\Phi$ conditions (Table~\ref{tab:lr_mod}):
 
 \begin{table}[h]
 \centering
@@ -309,7 +309,7 @@ Six property tests verify invariants under randomized inputs:
 
 \subsection{Simulation: 50-Node Swarm Dynamics}
 
-To evaluate the SwarmManager's behavior at scale, we conducted a 50-node simulation over 2000 cycles with the following conditions: nodes join at Poisson-distributed intervals ($\lambda = 0.5$ per cycle), each node runs an independent cognitive loop at 20--31~Hz, and consciousness updates are broadcast every 10 cycles. Network partitions (affecting 5--15 nodes) are injected at cycles 500, 1000, and 1500.
+To evaluate the SwarmManager's behavior at scale, we conducted a 50-node simulation (results in Table~\ref{tab:sim}) over 2000 cycles with the following conditions: nodes join at Poisson-distributed intervals ($\lambda = 0.5$ per cycle), each node runs an independent cognitive loop at 20--31~Hz, and consciousness updates are broadcast every 10 cycles. Network partitions (affecting 5--15 nodes) are injected at cycles 500, 1000, and 1500.
 
 \begin{table}[h]
 \centering
@@ -340,7 +340,7 @@ We evaluated trust-weighted federated averaging using the SwarmManager's conscio
 \mathbf{g}_{\text{agg}} = \frac{\sum_{i \in \text{peers}} \tau_i \cdot \bar{\Phi}_i \cdot \mathbf{g}_i}{\sum_{i \in \text{peers}} \tau_i \cdot \bar{\Phi}_i + \epsilon}
 \end{equation}
 
-where $\mathbf{g}_i$ is peer $i$'s gradient update and the weighting combines trust ($\tau_i$) with consciousness level ($\bar{\Phi}_i$). Compared to standard FedAvg (uniform weighting) and trust-only weighting:
+where $\mathbf{g}_i$ is peer $i$'s gradient update and the weighting combines trust ($\tau_i$) with consciousness level ($\bar{\Phi}_i$). Compared to standard FedAvg (uniform weighting) and trust-only weighting (Table~\ref{tab:federated}):
 
 \begin{table}[h]
 \centering
@@ -385,7 +385,7 @@ High collective $\Phi$ indicates that the swarm is functioning as an integrated 
 
 \subsection{Comparison with Existing Distributed Learning Frameworks}
 
-Several distinctions separate the SwarmManager from existing distributed and federated learning systems:
+Several distinctions separate the SwarmManager from existing distributed and federated learning systems (Table~\ref{tab:comparison}):
 
 \begin{table}[h]
 \centering
@@ -414,7 +414,37 @@ The current implementation has several limitations. First, the affective contagi
 
 \section{Conclusion}
 
-The SwarmManager provides the first implementation of consciousness-level peer integration in a distributed cognitive architecture. By treating peer $\Phi$ as a social signal and translating swarm dynamics into neuromodulatory proposals, the system enables emergent collective intelligence grounded in biologically plausible neurochemical mechanisms. The trust-weighted aggregation, affective contagion, and consciousness-modulated learning rate create a distributed cognitive system that is more than the sum of its parts---a computational realization of the collective intelligence phenomena documented by Woolley et al. The 43-test validation suite confirms stable dynamics under varied network conditions, while property-based tests verify critical invariants under randomized inputs.
+The SwarmManager provides the first implementation of consciousness-level peer integration in a distributed cognitive architecture. By treating peer $\Phi$ as a social signal and translating swarm dynamics into neuromodulatory proposals, the system enables emergent collective intelligence grounded in biologically plausible neurochemical mechanisms. Key quantitative results include: collective $\Phi$ convergence within 30 cycles ($\pm 0.02$ error), trust-weighted federated learning achieving 14\% faster convergence than standard FedAvg with 60\% Byzantine robustness (vs.\ 0\% for FedAvg), network partition recovery scaling linearly with partition size (18--51 cycles), and affective contagion modulated by 67\% when trust is reduced from 0.9 to 0.3. The 43-test validation suite confirms stable dynamics under varied network conditions, while six property-based tests verify critical invariants (bounded outputs, monotonic tracking, convergence, trust gating, commutativity) under randomized inputs.
+
+Future work will extend the contagion model to full mimicry-feedback-contagion dynamics, investigate true swarm $\Phi$ computation beyond weighted averaging, and deploy the system on production Holochain networks to validate against real peer dynamics.
+
+\section{Reproducibility}
+
+All experiments were conducted using the Symthaea cognitive architecture (v1.9.0). The following commands reproduce the core results:
+
+\begin{verbatim}
+# Run SwarmManager unit tests (19 tests)
+cargo test -p symthaea --lib swarm_manager -- --nocapture
+
+# Run NetworkServiceBridge integration tests (8 tests)
+cargo test -p symthaea --lib network_bridge -- --nocapture
+
+# Run cognitive loop integration tests with swarm (10 tests)
+cargo test -p symthaea --test cross_coupling_integration \
+  swarm -- --nocapture
+
+# Run property-based tests (6 proptests)
+cargo test -p symthaea --test proptest_swarm -- --nocapture
+
+# Build with mesh feature (enables full P2P networking)
+cargo build --features mesh
+\end{verbatim}
+
+The system requires Rust 1.75+ and the \texttt{nix develop} environment. The \texttt{mesh} feature flag enables the full P2P networking stack (iroh/Holochain integration). Without this feature, the SwarmManager operates in local simulation mode. The 50-node simulation uses the local simulation mode with synthetic event generation.
+
+\subsection*{Code Availability}
+
+The SwarmManager source code (1,331 LOC) is in \texttt{symthaea/src/cognitive\_loop/managers/swarm\_manager.rs} within the Luminous Dynamics Symthaea repository. The NetworkServiceBridge is in the same file. Correspondence and access requests should be directed to the corresponding author.
 
 \bibliographystyle{plainnat}
 \begin{thebibliography}{20}
