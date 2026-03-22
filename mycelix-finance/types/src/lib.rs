@@ -236,8 +236,14 @@ pub fn compute_diversified_demurrage_rate(base_rate: f64, distinct_classes: usiz
     // Never reduce below 50% of base rate (constitutional floor)
     (base_rate - discount).max(base_rate * 0.5)
 }
-/// SAP exempt floor in micro-units (1,000 SAP = 1_000_000_000 micro-SAP).
-pub const DEMURRAGE_EXEMPT_FLOOR: u64 = 1_000_000_000;
+/// SAP exempt floor in micro-units (200 SAP = 200_000_000 micro-SAP).
+///
+/// Reduced from 1,000 SAP based on macro-economic simulation findings:
+/// at 1,000 SAP floor, demurrage rate (1-5%) has no effect on transaction
+/// velocity because most agents hold near or below the floor. At 200 SAP,
+/// demurrage becomes an effective circulation lever.
+/// See: mycelix-workspace/simulations/SIMULATION_REPORT.md (Finding 3)
+pub const DEMURRAGE_EXEMPT_FLOOR: u64 = 200_000_000;
 /// Compost distribution: 70% to local commons pool.
 pub const COMPOST_LOCAL_PCT: u64 = 70;
 /// Compost distribution: 20% to regional commons pool.

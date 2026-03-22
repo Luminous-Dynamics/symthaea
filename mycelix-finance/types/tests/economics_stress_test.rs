@@ -49,12 +49,12 @@ fn valid_minted_params() -> MintedCurrencyParams {
 
 #[test]
 fn test_demurrage_exempt_floor_never_touched() {
-    // For balances <= 1000 SAP (1_000_000_000 micro), demurrage deduction must
+    // For balances <= 200 SAP (200_000_000 micro), demurrage deduction must
     // always be 0, for time periods from 1 second to 100 years.
-    let exempt_floor = DEMURRAGE_EXEMPT_FLOOR; // 1_000_000_000
+    let exempt_floor = DEMURRAGE_EXEMPT_FLOOR; // 200_000_000
     let rate = DEMURRAGE_RATE; // 0.02
 
-    let balances: &[u64] = &[0, 1, 500_000_000, 999_999_999, 1_000_000_000];
+    let balances: &[u64] = &[0, 1, 100_000_000, 199_999_999, 200_000_000];
     let seconds_per_year: u64 = 31_536_000;
 
     for &balance in balances {
@@ -177,8 +177,8 @@ fn test_demurrage_at_scale() {
 fn test_demurrage_precision() {
     // Verify that demurrage of 10,000 SAP over exactly 1 year is approximately
     // 180 SAP (2% continuous = 1 - e^(-0.02) ~= 0.0198).
-    // Eligible = 10,000 - 1,000 = 9,000 SAP = 9_000_000_000 micro-SAP.
-    // Expected deduction = 9_000_000_000 * 0.019801 ~= 178_209_000 micro-SAP (~178 SAP).
+    // Eligible = 10,000 - 200 = 9,800 SAP = 9_800_000_000 micro-SAP.
+    // Expected deduction = 9_800_000_000 * 0.019801 ~= 194_050_000 micro-SAP (~194 SAP).
     let balance: u64 = 10_000_000_000; // 10,000 SAP
     let exempt_floor = DEMURRAGE_EXEMPT_FLOOR;
     let rate = DEMURRAGE_RATE;
@@ -186,8 +186,9 @@ fn test_demurrage_precision() {
 
     let deduction = compute_demurrage_deduction(balance, exempt_floor, rate, seconds_per_year);
 
-    // Expected ~178.2 SAP = 178_200_000 micro-SAP. 1% tolerance = +/- 1_782_000.
-    let expected: f64 = 9_000_000_000.0 * (1.0 - (-0.02_f64).exp());
+    // Expected ~194.1 SAP = 194_050_000 micro-SAP. 1% tolerance.
+    let eligible_micro = balance - exempt_floor;
+    let expected: f64 = eligible_micro as f64 * (1.0 - (-0.02_f64).exp());
     let expected_u64 = expected as u64;
     let tolerance = expected_u64 / 100; // 1%
 
