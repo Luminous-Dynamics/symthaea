@@ -108,6 +108,11 @@ pub struct SensorBridge {
     ambient_db: f32,
     /// Notification count from the platform. Set via `set_social_pressure()`.
     notification_count: u32,
+    /// Recent notification text snippets for HDC social context encoding.
+    /// Max 5 recent, truncated to 100 chars each.
+    notification_texts: Vec<String>,
+    /// Derived social context salience (0.0-1.0) from notification content.
+    social_salience: f32,
     /// Media playback state. Set via `set_media_state()`.
     media_state: MediaState,
     /// Step counter delta (steps since last tick).
@@ -124,6 +129,8 @@ impl SensorBridge {
             stationary_frames: 0,
             ambient_db: 40.0,
             notification_count: 0,
+            notification_texts: Vec::new(),
+            social_salience: 0.0,
             media_state: MediaState::None,
             step_delta: 0,
         }
@@ -162,6 +169,49 @@ impl SensorBridge {
     /// Set notification count from platform (social pressure signal).
     pub fn set_social_pressure(&mut self, notification_count: u32) {
         self.notification_count = notification_count;
+    }
+
+    /// Add notification text for social context analysis.
+    /// Text is truncated to 100 chars. Keeps max 5 recent notifications.
+    /// Computes social salience from keyword content.
+    pub fn add_notification_text(&mut self, text: &str) {
+        let truncated: String = text.chars().take(100).collect();
+
+        // Compute salience from content keywords
+        let lower = truncated.to_lowercase();
+        let urgent_keywords = [
+            "urgent",
+            "emergency",
+            "critical",
+            "asap",
+            "important",
+            "help",
+        ];
+        let social_keywords = ["message", "call", "reply", "friend", "family", "love"];
+        let urgent_count = urgent_keywords
+            .iter()
+            .filter(|k| lower.contains(*k))
+            .count();
+        let social_count = social_keywords
+            .iter()
+            .filter(|k| lower.contains(*k))
+            .count();
+
+        // Update salience: urgent boosts NE pathway, social boosts OT pathway
+        self.social_salience = ((urgent_count as f32 * 0.2 + social_count as f32 * 0.1)
+            .clamp(0.0, 1.0)
+            + self.social_salience)
+            * 0.5; // EMA
+
+        self.notification_texts.push(truncated);
+        if self.notification_texts.len() > 5 {
+            self.notification_texts.remove(0);
+        }
+    }
+
+    /// Current social context salience (0.0-1.0) derived from notification content.
+    pub fn social_salience(&self) -> f32 {
+        self.social_salience
     }
 
     /// Set media playback state (0=None, 1=Music, 2=Speech).
@@ -250,6 +300,11 @@ impl SensorBridge {
         if self.notification_count == 0 {
             // Extended isolation — oxytocin decay signal
             nudges.oxytocin_delta -= SOCIAL_OT_DECAY;
+        }
+        // Notification content salience → graded NE/OT boost
+        if self.social_salience > 0.1 {
+            nudges.norepinephrine_delta += self.social_salience * 0.02;
+            nudges.oxytocin_delta += self.social_salience * 0.01;
         }
 
         // Media state -> 5-HT/DA (emotional context)

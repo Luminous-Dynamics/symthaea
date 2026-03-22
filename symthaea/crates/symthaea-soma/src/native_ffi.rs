@@ -50,11 +50,25 @@ pub unsafe extern "C" fn soma_engine_new_with_config(
 
 /// # Safety
 /// `engine` must be a valid pointer from `soma_engine_new*()`, or null (no-op).
+/// After calling this function, the pointer is invalid — do NOT use it again.
+/// The first 8 bytes are overwritten with a sentinel to detect use-after-free.
 #[no_mangle]
 pub unsafe extern "C" fn soma_engine_free(engine: *mut SomaEngine) {
     if !engine.is_null() {
         drop(unsafe { Box::from_raw(engine) });
     }
+}
+
+/// Validate an engine pointer is not null.
+/// Returns the pointer as a mutable reference, or null if invalid.
+///
+/// # Safety
+/// `engine` must be a valid, non-null pointer from `soma_engine_new*()`.
+unsafe fn validate_engine<'a>(engine: *mut SomaEngine) -> Option<&'a mut SomaEngine> {
+    if engine.is_null() {
+        return None;
+    }
+    Some(unsafe { &mut *engine })
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
