@@ -76,22 +76,177 @@ where
 // Link Resolution
 // ============================================================================
 
-/// Resolve a list of links into their corresponding records.
+/// Follow the update chain to find the latest version of a record.
+///
+/// Given an initial `ActionHash`, fetches the record details and recursively
+/// follows any updates to return the most recent version. Returns `None` if
+/// the record has been deleted or not found.
+///
+/// This function is duplicated identically in 20+ coordinator zomes across
+/// commons, civic, hearth, and other clusters.
+pub fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update =
+                    &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
+/// Resolve a list of links into their corresponding records, following update chains.
 ///
 /// Iterates over `links`, converts each target to an `ActionHash`, and fetches
-/// the record via `get()`. Deleted or missing records are silently skipped.
+/// the latest version of the record via [`get_latest_record`]. Deleted or
+/// missing records are silently skipped.
 ///
-/// This function is duplicated identically in 15+ coordinator zomes.
+/// This function is duplicated identically in 20+ coordinator zomes.
 pub fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
     let mut records = Vec::new();
     for link in links {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
+        if let Some(record) = get_latest_record(action_hash)? {
             records.push(record);
         }
     }
     Ok(records)
+}
+
+/// Resolve a list of links into their corresponding records, requiring all to exist.
+///
+/// Like [`records_from_links`], but returns an error if any link target is missing
+/// or deleted. Use this when the caller expects all links to resolve (e.g., when
+/// the link set was just queried and entries should not have been deleted between).
+pub fn records_from_links_strict(links: Vec<Link>) -> ExternResult<Vec<Record>> {
+    let mut records = Vec::new();
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        let record = get_latest_record(action_hash.clone())?
+            .ok_or_else(|| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Record not found for link target: {:?}",
+                    action_hash
+                )))
+            })?;
+        records.push(record);
+    }
+    Ok(records)
+}
+
+// ============================================================================
+// Input Validation Helpers
+// ============================================================================
+
+/// Validate that a string field is not empty.
+///
+/// Returns a `WasmError::Guest` with the field name in the message.
+///
+/// # Example
+///
+/// ```ignore
+/// use mycelix_zome_helpers::validate_non_empty;
+/// validate_non_empty(&input.title, "title")?;
+/// ```
+pub fn validate_non_empty(value: &str, field_name: &str) -> ExternResult<()> {
+    if value.trim().is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "{} cannot be empty",
+            field_name
+        ))));
+    }
+    Ok(())
+}
+
+/// Validate that a string field does not exceed a maximum byte length.
+///
+/// # Example
+///
+/// ```ignore
+/// use mycelix_zome_helpers::validate_max_bytes;
+/// validate_max_bytes(&input.description, 4096, "description")?;
+/// ```
+pub fn validate_max_bytes(value: &str, max: usize, field_name: &str) -> ExternResult<()> {
+    if value.len() > max {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "{} too long ({} bytes, max {})",
+            field_name,
+            value.len(),
+            max
+        ))));
+    }
+    Ok(())
+}
+
+/// Validate that a collection's length is within a given range.
+///
+/// # Example
+///
+/// ```ignore
+/// use mycelix_zome_helpers::validate_length_range;
+/// validate_length_range(&input.outcomes, 2, 100, "outcomes")?;
+/// ```
+pub fn validate_length_range<T>(
+    data: &[T],
+    min: usize,
+    max: usize,
+    field_name: &str,
+) -> ExternResult<()> {
+    if data.len() < min {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "{} must have at least {} items, got {}",
+            field_name, min,
+            data.len()
+        ))));
+    }
+    if data.len() > max {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "{} must have at most {} items, got {}",
+            field_name, max,
+            data.len()
+        ))));
+    }
+    Ok(())
+}
+
+/// Shorthand macro for returning a `WasmError::Guest` error.
+///
+/// Reduces the boilerplate of `wasm_error!(WasmErrorInner::Guest(...))` which
+/// is repeated hundreds of times across coordinator zomes.
+///
+/// # Examples
+///
+/// ```ignore
+/// use mycelix_zome_helpers::bail_guest;
+///
+/// // Simple string
+/// bail_guest!("Not found");
+///
+/// // With format args
+/// bail_guest!("Market {} not found", market_id);
+/// ```
+#[macro_export]
+macro_rules! bail_guest {
+    ($msg:expr) => {
+        return Err(::hdk::prelude::wasm_error!(
+            ::hdk::prelude::WasmErrorInner::Guest($msg.into())
+        ))
+    };
+    ($fmt:expr, $($arg:tt)*) => {
+        return Err(::hdk::prelude::wasm_error!(
+            ::hdk::prelude::WasmErrorInner::Guest(format!($fmt, $($arg)*))
+        ))
+    };
 }
 
 // ============================================================================
@@ -179,5 +334,78 @@ mod tests {
         let result = records_from_links(vec![]);
         assert!(result.is_ok());
         assert!(result.unwrap().is_empty());
+    }
+
+    #[test]
+    fn records_from_links_strict_empty_vec() {
+        let result = records_from_links_strict(vec![]);
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_empty());
+    }
+
+    // ---- Validation helpers ----
+
+    #[test]
+    fn validate_non_empty_accepts_content() {
+        assert!(validate_non_empty("hello", "name").is_ok());
+    }
+
+    #[test]
+    fn validate_non_empty_rejects_empty() {
+        let err = validate_non_empty("", "title").unwrap_err();
+        assert!(format!("{:?}", err).contains("title"));
+    }
+
+    #[test]
+    fn validate_non_empty_rejects_whitespace() {
+        let err = validate_non_empty("   ", "reason").unwrap_err();
+        assert!(format!("{:?}", err).contains("reason"));
+    }
+
+    #[test]
+    fn validate_max_bytes_accepts_within_limit() {
+        assert!(validate_max_bytes("short", 100, "field").is_ok());
+    }
+
+    #[test]
+    fn validate_max_bytes_accepts_at_limit() {
+        let s = "x".repeat(256);
+        assert!(validate_max_bytes(&s, 256, "field").is_ok());
+    }
+
+    #[test]
+    fn validate_max_bytes_rejects_over_limit() {
+        let s = "x".repeat(257);
+        let err = validate_max_bytes(&s, 256, "description").unwrap_err();
+        assert!(format!("{:?}", err).contains("description"));
+        assert!(format!("{:?}", err).contains("257"));
+    }
+
+    #[test]
+    fn validate_length_range_accepts_within() {
+        let items = vec![1, 2, 3];
+        assert!(validate_length_range(&items, 2, 5, "outcomes").is_ok());
+    }
+
+    #[test]
+    fn validate_length_range_rejects_too_few() {
+        let items = vec![1];
+        let err = validate_length_range(&items, 2, 5, "outcomes").unwrap_err();
+        assert!(format!("{:?}", err).contains("at least 2"));
+    }
+
+    #[test]
+    fn validate_length_range_rejects_too_many() {
+        let items = vec![1, 2, 3, 4, 5, 6];
+        let err = validate_length_range(&items, 2, 5, "photos").unwrap_err();
+        assert!(format!("{:?}", err).contains("at most 5"));
+    }
+
+    #[test]
+    fn validate_length_range_at_boundaries() {
+        let min_items = vec![1, 2];
+        assert!(validate_length_range(&min_items, 2, 5, "f").is_ok());
+        let max_items = vec![1, 2, 3, 4, 5];
+        assert!(validate_length_range(&max_items, 2, 5, "f").is_ok());
     }
 }
