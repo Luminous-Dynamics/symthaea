@@ -1635,7 +1635,7 @@ impl ConsequenceTracker {
         current_cycle: u64,
     ) -> Option<f64> {
         let idx = self.pending.iter().position(|p| p.action_id == action_id)?;
-        let prediction = self.pending.remove(idx);
+        let prediction = self.pending.remove(idx)?;
 
         let phi_delta = observed_phi - prediction.baseline_community_phi;
         let valence_delta = observed_valence - prediction.baseline_affect_valence;
