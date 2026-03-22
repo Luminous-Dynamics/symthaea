@@ -17,6 +17,7 @@
 use rand::prelude::*;
 use rayon::prelude::*;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 // ============================================================================
 // CONSTANTS (matching production code exactly)
@@ -688,9 +689,15 @@ impl Simulation {
                 if controversial_count > 0 { controversial_agree as f64 / controversial_count as f64 * 100.0 } else { 0.0 });
         }
 
-        for i in 0..sampled.len() {
+        // Parallel pairwise comparison using rayon
+        let detected_atomic = AtomicUsize::new(0);
+        let tp_atomic = AtomicUsize::new(0);
+        let fp_atomic = AtomicUsize::new(0);
+        let approval_rates = &self.proposal_approval_rates;
+
+        (0..sampled.len()).into_par_iter().for_each(|i| {
+            let a = sampled[i];
             for j in (i + 1)..sampled.len() {
-                let a = sampled[i];
                 let b = sampled[j];
 
                 let b_votes: HashMap<u32, bool> = b.vote_history.iter().cloned().collect();
@@ -701,14 +708,11 @@ impl Simulation {
 
                 for (prop_id, vote_a) in &a.vote_history {
                     if let Some(vote_b) = b_votes.get(prop_id) {
-                        // Controversy weight: 1.0 when approval_rate = 0.5, 0.0 when unanimous
-                        // w = 1.0 - 2.0 * |approval_rate - 0.5|
-                        let controversy = self.proposal_approval_rates
+                        let controversy = approval_rates
                             .get(prop_id)
                             .map(|&ar| (1.0 - 2.0 * (ar - 0.5).abs()).max(0.0))
                             .unwrap_or(0.0);
 
-                        // Skip highly non-controversial proposals (>80% or <20% approval)
                         if controversy < 0.05 { continue; }
 
                         weighted_shared += controversy;
@@ -719,8 +723,6 @@ impl Simulation {
                     }
                 }
 
-                // Need enough controversial shared proposals (lower bar than raw Jaccard
-                // since controversial proposals are rarer)
                 if controversial_shared < 5 { continue; }
 
                 let similarity = if weighted_shared > 0.0 {
@@ -729,8 +731,6 @@ impl Simulation {
                     0.0
                 };
 
-                // Binomial test on controversial votes only
-                // Base agreement on controversial proposals is ~0.50 (coin flip)
                 let base_rate = 0.50;
                 let n = controversial_shared as f64;
                 let expected = n * base_rate;
@@ -741,11 +741,10 @@ impl Simulation {
                     0.0
                 };
 
-                // Require BOTH high similarity AND statistical significance
                 let significant = z_score >= 3.09 && similarity >= JACCARD_THRESHOLD;
 
                 if significant {
-                    detected_pairs += 1;
+                    detected_atomic.fetch_add(1, Ordering::Relaxed);
 
                     let both_cartel = match (a.strategy, b.strategy) {
                         (Strategy::Cartel(g1), Strategy::Cartel(g2)) => g1 == g2,
@@ -753,13 +752,17 @@ impl Simulation {
                     };
 
                     if both_cartel {
-                        true_positives += 1;
+                        tp_atomic.fetch_add(1, Ordering::Relaxed);
                     } else {
-                        false_positives += 1;
+                        fp_atomic.fetch_add(1, Ordering::Relaxed);
                     }
                 }
             }
-        }
+        });
+
+        detected_pairs = detected_atomic.load(Ordering::Relaxed);
+        true_positives = tp_atomic.load(Ordering::Relaxed);
+        false_positives = fp_atomic.load(Ordering::Relaxed);
 
         (detected_pairs, true_positives, false_positives)
     }
@@ -806,6 +809,19 @@ impl Simulation {
         let avg_reputation: f64 = self.agents.iter().map(|a| a.reputation).sum::<f64>() / n;
         let blacklisted_count = self.agents.iter().filter(|a| a.blacklisted).count();
 
+        // Percentiles (balances already sorted)
+        let pct = |sorted: &[f64], p: f64| -> f64 {
+            let idx = ((sorted.len() as f64 * p).floor() as usize).min(sorted.len() - 1);
+            sorted[idx]
+        };
+
+        let sap_p10 = pct(&balances, 0.10);
+        let sap_p50 = pct(&balances, 0.50);
+        let sap_p90 = pct(&balances, 0.90);
+        let sap_p99 = pct(&balances, 0.99);
+        let vw_p50 = pct(&vote_weights, 0.50);
+        let vw_p99 = pct(&vote_weights, 0.99);
+
         SimMetrics {
             day: self.day,
             gini_sap,
@@ -818,6 +834,8 @@ impl Simulation {
             proposals_approved: self.proposals_approved,
             circuit_breakers: self.circuit_breakers_triggered,
             cartel_proposals_passed: self.cartel_proposals_passed,
+            sap_p10, sap_p50, sap_p90, sap_p99,
+            vw_p50, vw_p99,
         }
     }
 }
@@ -834,18 +852,27 @@ struct SimMetrics {
     proposals_approved: u32,
     circuit_breakers: u32,
     cartel_proposals_passed: u32,
+    // Wealth percentiles
+    sap_p10: f64,
+    sap_p50: f64,
+    sap_p90: f64,
+    sap_p99: f64,
+    // Vote weight percentiles
+    vw_p50: f64,
+    vw_p99: f64,
 }
 
 impl SimMetrics {
     fn header() -> &'static str {
         "day,gini_sap,gini_votes,total_sap,avg_reputation,blacklisted,\
          observers,participants,citizens,stewards,guardians,\
-         proposals_total,proposals_approved,circuit_breakers,cartel_proposals_passed"
+         proposals_total,proposals_approved,circuit_breakers,cartel_proposals_passed,\
+         sap_p10,sap_p50,sap_p90,sap_p99,vw_p50,vw_p99"
     }
 
     fn to_csv(&self) -> String {
         format!(
-            "{},{:.4},{:.4},{:.0},{:.4},{},{},{},{},{},{},{},{},{},{}",
+            "{},{:.4},{:.4},{:.0},{:.4},{},{},{},{},{},{},{},{},{},{},{:.0},{:.0},{:.0},{:.0},{:.4},{:.4}",
             self.day,
             self.gini_sap,
             self.gini_votes,
@@ -861,6 +888,8 @@ impl SimMetrics {
             self.proposals_approved,
             self.circuit_breakers,
             self.cartel_proposals_passed,
+            self.sap_p10, self.sap_p50, self.sap_p90, self.sap_p99,
+            self.vw_p50, self.vw_p99,
         )
     }
 }
@@ -869,77 +898,188 @@ impl SimMetrics {
 // MAIN
 // ============================================================================
 
-fn main() {
-    let n_agents = 100_000;
-    let n_days = 365; // 1 year simulation
-    let seed = 42u64;
+/// Results from a single simulation run
+struct RunResult {
+    gini_sap: f64,
+    gini_votes: f64,
+    avg_reputation: f64,
+    blacklisted: usize,
+    tier_counts: [u32; 5],
+    proposals_total: u32,
+    proposals_approved: u32,
+    circuit_breakers: u32,
+    cartel_proposals_passed: u32,
+    sap_p10: f64,
+    sap_p50: f64,
+    sap_p90: f64,
+    sap_p99: f64,
+    elapsed_secs: f64,
+}
 
-    eprintln!("=== Mycelix Governance Mechanism Design Simulation ===");
-    eprintln!("Agents: {}", n_agents);
-    eprintln!("Duration: {} days", n_days);
-    eprintln!("Archetypes: 70% honest, 15% free-rider, 10% cartel (20 groups), 3% whale, 2% adversary");
-    eprintln!();
+fn run_single(n_agents: usize, n_days: u32, seed: u64, verbose: bool) -> RunResult {
+    let mut sim = Simulation::new(n_agents, 0.70, 0.15, 0.10, 0.03, 20, seed);
 
-    let mut sim = Simulation::new(
-        n_agents,
-        0.70,  // honest
-        0.15,  // free-rider
-        0.10,  // cartel
-        0.03,  // whale
-        20,    // cartel groups
-        seed,
-    );
-
-    // Print CSV header
-    println!("{}", SimMetrics::header());
-
-    // Initial state
-    let m = sim.compute_metrics();
-    println!("{}", m.to_csv());
+    if verbose {
+        println!("{}", SimMetrics::header());
+        let m = sim.compute_metrics();
+        println!("{}", m.to_csv());
+    }
 
     let start = std::time::Instant::now();
 
     for day in 1..=n_days {
         sim.run_daily_cycle();
 
-        // Print metrics every 30 days
-        if day % 30 == 0 {
+        if verbose && day % 30 == 0 {
             let m = sim.compute_metrics();
             println!("{}", m.to_csv());
             eprintln!(
-                "Day {}: Gini(SAP)={:.3} Gini(Vote)={:.3} Proposals={} CB={} CartelPassed={}",
-                day, m.gini_sap, m.gini_votes, m.proposals_total, m.circuit_breakers, m.cartel_proposals_passed
+                "Day {}: Gini(SAP)={:.3} Gini(Vote)={:.3} SAP_p50={:.0} Proposals={} CB={} CartelPassed={}",
+                day, m.gini_sap, m.gini_votes, m.sap_p50,
+                m.proposals_total, m.circuit_breakers, m.cartel_proposals_passed
             );
         }
     }
 
     let elapsed = start.elapsed();
-    eprintln!();
-    eprintln!("Simulation completed in {:.2}s", elapsed.as_secs_f64());
+    let m = sim.compute_metrics();
 
-    // Final cartel detection
-    eprintln!();
-    eprintln!("=== Cartel Detection Analysis ===");
-    let (detected, true_pos, false_pos) = sim.detect_cartels();
-    eprintln!("Correlated pairs detected: {}", detected);
-    eprintln!("True positives (same cartel): {}", true_pos);
-    eprintln!("False positives: {}", false_pos);
-    if detected > 0 {
-        eprintln!("Precision: {:.1}%", true_pos as f64 / detected as f64 * 100.0);
+    if verbose {
+        eprintln!();
+        eprintln!("Simulation completed in {:.2}s", elapsed.as_secs_f64());
+
+        // Cartel detection
+        eprintln!();
+        eprintln!("=== Cartel Detection Analysis ===");
+        let (detected, true_pos, false_pos) = sim.detect_cartels();
+        eprintln!("Correlated pairs detected: {}", detected);
+        eprintln!("True positives (same cartel): {}", true_pos);
+        eprintln!("False positives: {}", false_pos);
+        if detected > 0 {
+            eprintln!("Precision: {:.1}%", true_pos as f64 / detected as f64 * 100.0);
+        }
+
+        // Wealth distribution
+        eprintln!();
+        eprintln!("=== Wealth Distribution ===");
+        eprintln!("  p10:  {:.0} SAP", m.sap_p10);
+        eprintln!("  p50:  {:.0} SAP (median)", m.sap_p50);
+        eprintln!("  p90:  {:.0} SAP", m.sap_p90);
+        eprintln!("  p99:  {:.0} SAP (top 1%)", m.sap_p99);
+        eprintln!("  Ratio p99/p50: {:.1}x", m.sap_p99 / m.sap_p50.max(1.0));
+
+        // Voting power distribution
+        eprintln!();
+        eprintln!("=== Voting Power Distribution ===");
+        eprintln!("  p50:  {:.4} (median voter)", m.vw_p50);
+        eprintln!("  p99:  {:.4} (top 1%)", m.vw_p99);
+        eprintln!("  Ratio p99/p50: {:.1}x", m.vw_p99 / m.vw_p50.max(0.0001));
+
+        // Final summary
+        eprintln!();
+        eprintln!("=== Final State (Day {}) ===", n_days);
+        eprintln!("Gini (SAP wealth):    {:.4}", m.gini_sap);
+        eprintln!("Gini (voting power):  {:.4}", m.gini_votes);
+        eprintln!("Average reputation:   {:.4}", m.avg_reputation);
+        eprintln!("Blacklisted agents:   {}", m.blacklisted);
+        eprintln!("Tier distribution:    Obs={} Par={} Cit={} Stw={} Grd={}",
+            m.tier_counts[0], m.tier_counts[1], m.tier_counts[2], m.tier_counts[3], m.tier_counts[4]);
+        eprintln!("Proposals:            {} total, {} approved", m.proposals_total, m.proposals_approved);
+        eprintln!("Circuit breakers:     {} triggered", m.circuit_breakers);
+        eprintln!("Cartel proposals:     {} passed (should be near 0)", m.cartel_proposals_passed);
     }
 
-    // Final summary
-    let m = sim.compute_metrics();
+    RunResult {
+        gini_sap: m.gini_sap,
+        gini_votes: m.gini_votes,
+        avg_reputation: m.avg_reputation,
+        blacklisted: m.blacklisted,
+        tier_counts: m.tier_counts,
+        proposals_total: m.proposals_total,
+        proposals_approved: m.proposals_approved,
+        circuit_breakers: m.circuit_breakers,
+        cartel_proposals_passed: m.cartel_proposals_passed,
+        sap_p10: m.sap_p10,
+        sap_p50: m.sap_p50,
+        sap_p90: m.sap_p90,
+        sap_p99: m.sap_p99,
+        elapsed_secs: elapsed.as_secs_f64(),
+    }
+}
+
+fn mean_sd(values: &[f64]) -> (f64, f64) {
+    let n = values.len() as f64;
+    let mean = values.iter().sum::<f64>() / n;
+    let variance = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / (n - 1.0).max(1.0);
+    (mean, variance.sqrt())
+}
+
+fn main() {
+    let n_agents = 100_000;
+    let n_days = 365;
+    let seeds = [42u64, 123, 789, 456, 999];
+
+    eprintln!("=== Mycelix Governance Mechanism Design Simulation ===");
+    eprintln!("Agents:    {}", n_agents);
+    eprintln!("Duration:  {} days", n_days);
+    eprintln!("Seeds:     {:?} ({} runs)", seeds, seeds.len());
+    eprintln!("Archetypes: 70% honest, 15% free-rider, 10% cartel (20 groups), 3% whale, 2% adversary");
     eprintln!();
-    eprintln!("=== Final State (Day {}) ===", n_days);
-    eprintln!("Gini (SAP wealth):    {:.4}", m.gini_sap);
-    eprintln!("Gini (voting power):  {:.4}", m.gini_votes);
-    eprintln!("Total SAP in system:  {:.0}", m.total_sap);
-    eprintln!("Average reputation:   {:.4}", m.avg_reputation);
-    eprintln!("Blacklisted agents:   {}", m.blacklisted);
-    eprintln!("Tier distribution:    Obs={} Par={} Cit={} Stw={} Grd={}",
-        m.tier_counts[0], m.tier_counts[1], m.tier_counts[2], m.tier_counts[3], m.tier_counts[4]);
-    eprintln!("Proposals:            {} total, {} approved", m.proposals_total, m.proposals_approved);
-    eprintln!("Circuit breakers:     {} triggered", m.circuit_breakers);
-    eprintln!("Cartel proposals:     {} passed (should be near 0)", m.cartel_proposals_passed);
+
+    // Run first seed with full verbose output (CSV + diagnostics)
+    eprintln!("--- Seed {} (verbose) ---", seeds[0]);
+    let first = run_single(n_agents, n_days, seeds[0], true);
+
+    // Run remaining seeds quietly
+    let mut results = vec![first];
+    for &seed in &seeds[1..] {
+        eprintln!();
+        eprintln!("--- Seed {} ---", seed);
+        let r = run_single(n_agents, n_days, seed, false);
+        eprintln!("  Gini(SAP)={:.4} Gini(Vote)={:.4} CartelPassed={} in {:.1}s",
+            r.gini_sap, r.gini_votes, r.cartel_proposals_passed, r.elapsed_secs);
+        results.push(r);
+    }
+
+    // Aggregate cross-seed statistics
+    eprintln!();
+    eprintln!("====================================================");
+    eprintln!("=== CROSS-SEED SUMMARY ({} runs) ===", seeds.len());
+    eprintln!("====================================================");
+
+    let (m_gs, s_gs) = mean_sd(&results.iter().map(|r| r.gini_sap).collect::<Vec<_>>());
+    let (m_gv, s_gv) = mean_sd(&results.iter().map(|r| r.gini_votes).collect::<Vec<_>>());
+    let (m_rep, s_rep) = mean_sd(&results.iter().map(|r| r.avg_reputation).collect::<Vec<_>>());
+    let (m_bl, s_bl) = mean_sd(&results.iter().map(|r| r.blacklisted as f64).collect::<Vec<_>>());
+    let (m_cp, s_cp) = mean_sd(&results.iter().map(|r| r.cartel_proposals_passed as f64).collect::<Vec<_>>());
+    let (m_cb, s_cb) = mean_sd(&results.iter().map(|r| r.circuit_breakers as f64).collect::<Vec<_>>());
+    let (m_p50, s_p50) = mean_sd(&results.iter().map(|r| r.sap_p50).collect::<Vec<_>>());
+    let (m_p99, s_p99) = mean_sd(&results.iter().map(|r| r.sap_p99).collect::<Vec<_>>());
+
+    eprintln!("Gini (SAP wealth):     {:.4} +/- {:.4}", m_gs, s_gs);
+    eprintln!("Gini (voting power):   {:.4} +/- {:.4}", m_gv, s_gv);
+    eprintln!("Average reputation:    {:.4} +/- {:.4}", m_rep, s_rep);
+    eprintln!("Blacklisted agents:    {:.0} +/- {:.0}", m_bl, s_bl);
+    eprintln!("SAP median (p50):      {:.0} +/- {:.0}", m_p50, s_p50);
+    eprintln!("SAP top 1% (p99):      {:.0} +/- {:.0}", m_p99, s_p99);
+    eprintln!("Circuit breakers:      {:.1} +/- {:.1}", m_cb, s_cb);
+    eprintln!("Cartel proposals pass: {:.1} +/- {:.1} (should be ~0)", m_cp, s_cp);
+    eprintln!();
+
+    // Tier distribution (mean across seeds)
+    let mut tier_means = [0.0f64; 5];
+    for r in &results {
+        for i in 0..5 { tier_means[i] += r.tier_counts[i] as f64; }
+    }
+    for t in &mut tier_means { *t /= seeds.len() as f64; }
+    eprintln!("Tier distribution (mean):");
+    eprintln!("  Observer:    {:.0}", tier_means[0]);
+    eprintln!("  Participant: {:.0}", tier_means[1]);
+    eprintln!("  Citizen:     {:.0}", tier_means[2]);
+    eprintln!("  Steward:     {:.0}", tier_means[3]);
+    eprintln!("  Guardian:    {:.0}", tier_means[4]);
+
+    let total_time: f64 = results.iter().map(|r| r.elapsed_secs).sum();
+    eprintln!();
+    eprintln!("Total simulation time: {:.1}s ({:.1}s/run)", total_time, total_time / seeds.len() as f64);
 }
