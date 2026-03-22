@@ -63,7 +63,10 @@ pub fn continuous_vote_weight(
     temperature: f64,
     max_weight: f64,
 ) -> f64 {
-    if !temperature.is_finite() || temperature <= 0.0 || !score.is_finite() || !threshold.is_finite() || !max_weight.is_finite() {
+    if !temperature.is_finite() || temperature <= 0.0
+        || !score.is_finite() || !threshold.is_finite()
+        || !max_weight.is_finite() || max_weight < 0.0
+    {
         return 0.0;
     }
     let exponent = -((score - threshold) / temperature);
