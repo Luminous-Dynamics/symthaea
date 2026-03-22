@@ -507,7 +507,17 @@ impl ContinuousMind {
         // This enables collective consciousness emergence under partial information.
         if !peer_thoughts.is_empty() {
             let refs: Vec<&ContinuousHV> = peer_thoughts.iter().collect();
-            let social_bundle = ContinuousHV::bundle(&refs);
+            let mut social_bundle = ContinuousHV::bundle(&refs);
+
+            // Ensure dimension matches current_thought (cognitive loop may expand dims)
+            let target_dim = self.state.current_thought.dim();
+            if social_bundle.dim() != target_dim {
+                // Resize: pad with zeros if too small, truncate if too large
+                let mut resized = vec![0.0f32; target_dim];
+                let copy_len = social_bundle.dim().min(target_dim);
+                resized[..copy_len].copy_from_slice(&social_bundle.as_slice()[..copy_len]);
+                social_bundle = ContinuousHV::from_vec(resized);
+            }
 
             if self.working_memory.len() < self.config.working_memory_capacity {
                 self.working_memory.push(social_bundle);
