@@ -1358,7 +1358,7 @@ impl DuckClientWrapper {
                     max_phi: row.get::<_, f64>(1).unwrap_or(0.0),
                     min_phi: row.get::<_, f64>(2).unwrap_or(0.0),
                     std_phi: row.get::<_, f64>(3).unwrap_or(0.0),
-                    sample_count: row.get::<_, i64>(4).unwrap_or(0) as u64,
+                    sample_count: row.get::<_, i64>(4).unwrap_or(0).max(0) as u64,
                 })
             })
             .unwrap_or_default();

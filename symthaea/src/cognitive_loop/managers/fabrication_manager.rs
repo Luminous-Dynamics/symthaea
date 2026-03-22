@@ -29,6 +29,9 @@ use super::super::subsystem_trait::{
 };
 use super::super::thresholds;
 
+use symthaea_fabrication_kernel::cincinnati_live::{
+    CincinnatiMonitor, CincinnatiMonitorConfig, SensorReading,
+};
 use symthaea_fabrication_kernel::design_loop::{DesignLoopReading, DesignLoopTwin};
 use symthaea_fabrication_kernel::manufacturing::{
     ManufacturingReading, ManufacturingSafetyLevel, ManufacturingTwin,
@@ -69,6 +72,8 @@ pub enum FabricationEventKind {
     TwinReading { reading: ManufacturingReading },
     /// DesignLoopTwin reading (design-manufacture feedback).
     DesignLoopReading { reading: DesignLoopReading },
+    /// Run a mini simulation step (sensor reading → anomaly check → quality update).
+    SimulationStep { sensor_values: Vec<(String, f64)> },
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -150,6 +155,8 @@ pub struct FabricationManager {
     // Defect prediction snapshot.
     defect_prediction: f32,
     defect_confidence: f32,
+    // Optional Cincinnati monitor for simulation mode.
+    monitor: Option<CincinnatiMonitor>,
 }
 
 impl Default for FabricationManager {
@@ -180,6 +187,7 @@ impl Default for FabricationManager {
             mrp_work_order_count: 0,
             defect_prediction: 0.0,
             defect_confidence: 0.0,
+            monitor: None,
         }
     }
 }
@@ -242,6 +250,13 @@ impl FabricationManager {
     pub fn inject_defect_prediction(&mut self, quality: f32, confidence: f32) {
         self.defect_prediction = quality.clamp(0.0, 1.0);
         self.defect_confidence = confidence.clamp(0.0, 1.0);
+    }
+
+    /// Enable simulation mode with Cincinnati monitoring.
+    pub fn enable_simulation(&mut self) {
+        if self.monitor.is_none() {
+            self.monitor = Some(CincinnatiMonitor::new(CincinnatiMonitorConfig::default()));
+        }
     }
 
     pub fn nudge_confidence(&mut self, delta: f64) {
@@ -406,6 +421,60 @@ impl FabricationManager {
         }
     }
 
+    fn process_simulation_step(
+        &mut self,
+        sensor_values: &[(String, f64)],
+        output: &mut SubsystemOutput,
+    ) {
+        if self.monitor.is_none() {
+            return;
+        }
+
+        let timestamp_ms = self.current_cycle * 100; // 100ms proxy per cycle
+
+        // Phase 1: ingest readings and collect results (holds mutable monitor borrow).
+        let mut anomaly_severity: Option<f32> = None;
+        {
+            let Some(monitor) = self.monitor.as_mut() else {
+                return;
+            };
+            for (channel, value) in sensor_values {
+                let reading = SensorReading {
+                    channel: channel.clone(),
+                    value: *value,
+                    timestamp_ms,
+                };
+                if let Some(alert) = monitor.ingest_reading(reading) {
+                    let prev = anomaly_severity.unwrap_or(0.0);
+                    anomaly_severity = Some(prev.max(alert.severity));
+                }
+            }
+        } // monitor borrow released here
+
+        // Phase 2: act on anomaly (no monitor borrow held).
+        if let Some(severity) = anomaly_severity {
+            self.process_anomaly(severity, output);
+        }
+
+        // Phase 3: read baselines for the twin (re-borrow monitor immutably).
+        let Some(monitor) = self.monitor.as_ref() else {
+            return;
+        };
+        let mfg_reading = monitor.to_manufacturing_reading();
+
+        // Phase 4: step the manufacturing twin.
+        let twin_out = self.manufacturing_twin.step(&mfg_reading, 0.05);
+        self.last_manufacturing_fe = twin_out.free_energy;
+        self.last_recommended_action = format!("{:?}", twin_out.recommended_action);
+
+        // Simple quality estimate: high free energy = poor prediction = higher defect probability.
+        let quality_estimate =
+            (1.0 - (twin_out.free_energy as f32).clamp(0.0, 1.0)).clamp(0.0, 1.0);
+        let confidence_estimate = (1.0 - self.anomaly_ema).clamp(0.0, 1.0);
+        self.defect_prediction = 1.0 - quality_estimate;
+        self.defect_confidence = confidence_estimate;
+    }
+
     fn process_design_loop_reading(&mut self, reading: &DesignLoopReading) {
         let output = self.design_loop_twin.step(reading, 0.05);
         self.last_design_loop_fe = output.free_energy;
@@ -496,6 +565,9 @@ impl CognitiveSubsystem for FabricationManager {
                 }
                 FabricationEventKind::DesignLoopReading { reading } => {
                     self.process_design_loop_reading(reading);
+                }
+                FabricationEventKind::SimulationStep { sensor_values } => {
+                    self.process_simulation_step(sensor_values, &mut output);
                 }
             }
         }
@@ -772,5 +844,75 @@ mod tests {
         });
         let _output = mgr.process(&default_snapshot());
         assert!(mgr.last_manufacturing_fe.is_finite());
+    }
+
+    #[test]
+    fn inject_defect_prediction_shows_in_telemetry() {
+        let mut mgr = FabricationManager::default();
+        mgr.inject_defect_prediction(0.85, 0.72);
+        let t = mgr.telemetry();
+        assert!(
+            (t.defect_prediction - 0.85).abs() < 1e-6,
+            "defect_prediction should be 0.85, got {}",
+            t.defect_prediction
+        );
+        assert!(
+            (t.defect_confidence - 0.72).abs() < 1e-6,
+            "defect_confidence should be 0.72, got {}",
+            t.defect_confidence
+        );
+    }
+
+    #[test]
+    fn simulation_step_detects_anomaly() {
+        let mut mgr = FabricationManager::default();
+        mgr.enable_simulation();
+
+        // Build baseline with normal readings
+        for i in 0..15 {
+            mgr.inject_event(FabricationEvent {
+                kind: FabricationEventKind::SimulationStep {
+                    sensor_values: vec![
+                        ("temperature_nozzle".into(), 200.0 + i as f64 * 0.5),
+                        ("vibration_x".into(), 0.5),
+                    ],
+                },
+                timestamp_secs: i,
+            });
+            mgr.process(&default_snapshot());
+        }
+
+        // Inject anomalous reading
+        mgr.inject_event(FabricationEvent {
+            kind: FabricationEventKind::SimulationStep {
+                sensor_values: vec![
+                    ("temperature_nozzle".into(), 500.0), // way outside normal
+                    ("vibration_x".into(), 0.5),
+                ],
+            },
+            timestamp_secs: 100,
+        });
+        let _output = mgr.process(&default_snapshot());
+
+        // Should detect the anomaly
+        let telem = mgr.telemetry();
+        assert!(
+            telem.anomaly_count > 0 || telem.anomaly_ema > 0.0,
+            "Simulation step should detect anomaly"
+        );
+    }
+
+    #[test]
+    fn inject_mrp_status_shows_in_telemetry() {
+        let mut mgr = FabricationManager::default();
+        mgr.inject_mrp_status(5, false, 2, 10);
+        let t = mgr.telemetry();
+        assert_eq!(t.mrp_planned_orders, 5, "mrp_planned_orders should be 5");
+        assert!(!t.mrp_feasible, "mrp_feasible should be false");
+        assert_eq!(t.mrp_shortages_count, 2, "mrp_shortages_count should be 2");
+        assert_eq!(
+            t.mrp_work_order_count, 10,
+            "mrp_work_order_count should be 10"
+        );
     }
 }
