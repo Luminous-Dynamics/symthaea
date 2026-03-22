@@ -570,7 +570,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="touch the mandala to interact\nlong-press to dream\nswipe up for controls"
+            android:text="touch to wake\nlong-press to dream\npinch to explore the fractal\ntap the bottom edge to speak\nswipe up from bottom for controls"
             android:textColor="#4A5558"
             android:textSize="12sp"
             android:fontFamily="sans-serif-light"

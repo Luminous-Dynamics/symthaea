@@ -119,42 +119,65 @@ class MainActivity : AppCompatActivity() {
 
     private var conversationVisible = false
     private var swipeStartY = 0f
+    private var swipeStartTime = 0L
 
     private fun setupImmersiveGestures() {
-        // Gestures handled in dispatchTouchEvent (before views consume them)
+        // Bottom hint "• • •" toggles conversation on tap
+        binding.bottomHint.setOnClickListener {
+            toggleConversationBar()
+        }
     }
 
     /**
-     * Intercept touches at Activity level for bottom-edge gestures:
-     * - Tap bottom 15% of screen: toggle conversation bar
-     * - Swipe up from bottom 15%: expand bottom sheet controls
+     * Activity-level touch interception for immersive gestures:
+     * - Tap bottom 25% of screen: toggle conversation bar
+     * - Swipe up 150px+ starting from bottom 25%: expand controls
+     * - Three-finger tap anywhere: expand controls (discoverable shortcut)
      */
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         viewModel.touchBridge?.onTouchEvent(event)
 
-        // Use content area height (excludes system bars)
-        val contentH = binding.rootCoordinator.height.toFloat()
-        val bottomZone = contentH * 0.80f  // Bottom 20% of content area
+        val rootH = binding.rootCoordinator.height
+        if (rootH <= 0) return super.dispatchTouchEvent(event)
+        val bottomZone = rootH * 0.75f  // Bottom 25%
 
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 swipeStartY = event.y
+                swipeStartTime = System.currentTimeMillis()
+            }
+            MotionEvent.ACTION_POINTER_DOWN -> {
+                // Three-finger tap: show controls
+                if (event.pointerCount >= 3) {
+                    showControls()
+                }
             }
             MotionEvent.ACTION_UP -> {
-                val dy = swipeStartY - event.y  // Positive = swipe up
-                if (swipeStartY > bottomZone && event.y < contentH) {
-                    if (dy > 100) {
-                        // Swipe up from bottom: show bottom sheet
-                        val behavior = BottomSheetBehavior.from(binding.bottomSheet)
-                        behavior.state = BottomSheetBehavior.STATE_EXPANDED
-                    } else if (abs(dy) < 30) {
-                        // Tap in bottom zone: toggle conversation bar
+                val dy = swipeStartY - event.y
+                val dt = System.currentTimeMillis() - swipeStartTime
+                val isInBottomZone = swipeStartY > bottomZone
+
+                if (isInBottomZone) {
+                    if (dy > 120 && dt < 800) {
+                        // Quick swipe up from bottom: show controls
+                        showControls()
+                    } else if (abs(dy) < 40 && dt < 400) {
+                        // Quick tap in bottom zone: toggle conversation
                         toggleConversationBar()
                     }
                 }
             }
         }
         return super.dispatchTouchEvent(event)
+    }
+
+    private fun showControls() {
+        val behavior = BottomSheetBehavior.from(binding.bottomSheet)
+        if (behavior.state == BottomSheetBehavior.STATE_EXPANDED) {
+            behavior.state = BottomSheetBehavior.STATE_HIDDEN
+        } else {
+            behavior.state = BottomSheetBehavior.STATE_EXPANDED
+        }
     }
 
     private fun toggleConversationBar() {
