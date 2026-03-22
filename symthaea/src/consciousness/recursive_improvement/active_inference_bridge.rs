@@ -30,6 +30,7 @@
 //! | Attribution Quality | Coherence | Can we explain errors? |
 
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 
 use crate::consciousness::pac::PacTracker;
 use crate::experience::signals::PrincipledSignals;
@@ -88,10 +89,10 @@ pub struct ActiveInferenceBridge {
     pac_tracker: Option<PacTracker>,
 
     /// Recent prediction errors for smoothing
-    recent_prediction_errors: Vec<f64>,
+    recent_prediction_errors: VecDeque<f64>,
 
     /// Recent outcomes for PAC amplitude
-    recent_outcomes: Vec<f64>,
+    recent_outcomes: VecDeque<f64>,
 
     /// Phase counter for PAC (oscillates based on prediction rhythm)
     phase_counter: f64,
@@ -116,8 +117,8 @@ impl ActiveInferenceBridge {
         Self {
             config,
             pac_tracker,
-            recent_prediction_errors: Vec::with_capacity(100),
-            recent_outcomes: Vec::with_capacity(100),
+            recent_prediction_errors: VecDeque::with_capacity(100),
+            recent_outcomes: VecDeque::with_capacity(100),
             phase_counter: 0.0,
             total_observations: 0,
         }
@@ -227,16 +228,16 @@ impl ActiveInferenceBridge {
         // Track prediction error
         let error = if success { 0.0 } else { 1.0 };
         if self.recent_prediction_errors.len() >= 100 {
-            self.recent_prediction_errors.remove(0);
+            self.recent_prediction_errors.pop_front();
         }
-        self.recent_prediction_errors.push(error);
+        self.recent_prediction_errors.push_back(error);
 
         // Track outcome
         let outcome = if success { 1.0 } else { 0.0 };
         if self.recent_outcomes.len() >= 100 {
-            self.recent_outcomes.remove(0);
+            self.recent_outcomes.pop_front();
         }
-        self.recent_outcomes.push(outcome);
+        self.recent_outcomes.push_back(outcome);
 
         // Update PAC tracker if enabled
         if let Some(ref mut pac) = self.pac_tracker {

@@ -81,6 +81,11 @@ pub struct BrocaConfig {
     /// without overwhelming procedural dynamics.
     #[serde(default = "default_nsm_semantic_alpha")]
     pub nsm_semantic_alpha: f32,
+    /// Enable per-axis epistemic cube gating (E/N/M/H logit modulation).
+    /// Requires cube channels 28-42 to be populated. Complements the 1D gate.
+    /// Science: Goldman (1986) — reliabilist epistemology; knowledge source matters.
+    #[serde(default = "default_true")]
+    pub enable_epistemic_cube_gate: bool,
     /// Enable NSM semantic gate: boost logits for tokens expressing active primes.
     /// Science: Collins & Loftus (1975) — spreading activation in semantic networks.
     #[serde(default)]
@@ -93,6 +98,10 @@ pub struct BrocaConfig {
     /// Science: Grice (1975) — cooperative principle.
     #[serde(default = "default_nsm_coverage_veto_scale")]
     pub nsm_coverage_veto_scale: f32,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 fn default_repetition_penalty() -> f32 {
@@ -130,6 +139,7 @@ impl Default for BrocaConfig {
             repetition_penalty: default_repetition_penalty(),
             sampling_seed: None,
             enable_auto_spacing: true,
+            enable_epistemic_cube_gate: true,
             enable_nsm_semantic: false,
             nsm_semantic_alpha: default_nsm_semantic_alpha(),
             enable_nsm_gate: false,
@@ -210,6 +220,7 @@ pub struct BrocaGenerator {
     tokenizer: BpeTokenizer,
     encoder: ThoughtLanguageEncoder,
     epistemic_gate: EpistemicGate,
+    epistemic_cube_gate: crate::gating::EpistemicCubeGate,
     emotional_modulator: EmotionalModulator,
     coherence_feedback: CoherenceFeedback,
     config: BrocaConfig,
@@ -233,6 +244,7 @@ impl BrocaGenerator {
         let controller = LanguageController::new(genesis, &ctrl_config);
         let encoder = ThoughtLanguageEncoder::new(genesis);
         let epistemic_gate = EpistemicGate::new(&tokenizer, &config.gating);
+        let epistemic_cube_gate = crate::gating::EpistemicCubeGate::new(&tokenizer);
         let emotional_modulator = EmotionalModulator::new(&tokenizer, &config.gating);
         let mut coherence_feedback = CoherenceFeedback::with_veto_threshold(
             config.gating.coherence_drift_threshold,
@@ -256,6 +268,7 @@ impl BrocaGenerator {
             tokenizer,
             encoder,
             epistemic_gate,
+            epistemic_cube_gate,
             emotional_modulator,
             coherence_feedback,
             sampling_rng,
@@ -286,6 +299,7 @@ impl BrocaGenerator {
         let controller = LanguageController::new(genesis, &ctrl_config);
         let encoder = ThoughtLanguageEncoder::new(genesis);
         let epistemic_gate = EpistemicGate::new(&tokenizer, &config.gating);
+        let epistemic_cube_gate = crate::gating::EpistemicCubeGate::new(&tokenizer);
         let emotional_modulator = EmotionalModulator::new(&tokenizer, &config.gating);
         let mut coherence_feedback = CoherenceFeedback::with_veto_threshold(
             config.gating.coherence_drift_threshold,
@@ -309,6 +323,7 @@ impl BrocaGenerator {
             tokenizer,
             encoder,
             epistemic_gate,
+            epistemic_cube_gate,
             emotional_modulator,
             coherence_feedback,
             sampling_rng,
@@ -487,6 +502,14 @@ impl BrocaGenerator {
             } else {
                 0.0
             };
+
+            // Apply per-axis epistemic cube gating (E/N/M/H)
+            // Complements the 1D ordinal gate with fine-grained axis modulation:
+            // E-axis controls assertion vs hedging, N-axis social framing,
+            // M-axis temporal framing, H-axis coherence depth.
+            if self.config.enable_epistemic_cube_gate {
+                self.epistemic_cube_gate.apply(&mut logits, channels);
+            }
 
             let this_emotional_boost = if self.config.enable_emotional_modulation {
                 self.emotional_modulator.apply(&mut logits, channels, pos);
@@ -667,6 +690,10 @@ impl BrocaGenerator {
             // Check EOS
             if next_token == self.tokenizer.eos_id {
                 eos_terminated = true;
+                // Remove the trace entries recorded for this EOS iteration
+                // (they were pushed before we knew this was EOS)
+                gating_trace.pop();
+                coherence_dynamics.pop();
                 break;
             }
 
