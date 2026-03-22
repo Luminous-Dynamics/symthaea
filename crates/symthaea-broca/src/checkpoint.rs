@@ -233,27 +233,43 @@ impl BrocaCheckpoint {
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer)?;
 
-        // Try MessagePack named format (current, with logit_projection_weights)
-        let checkpoint: Self = if let Ok(ckpt) = rmp_serde::from_slice::<Self>(&buffer) {
-            // MessagePack checkpoint — verify integrity
-            if !ckpt.verify() {
-                tracing::warn!(
-                    "Checkpoint checksum mismatch (schema evolution) — proceeding with loaded data"
-                );
+        // Try MessagePack current format (with logit_projection_weights)
+        let checkpoint: Self = match rmp_serde::from_slice::<Self>(&buffer) {
+            Ok(ckpt) => {
+                if !ckpt.verify() {
+                    tracing::warn!(
+                        "Checkpoint checksum mismatch (schema evolution) — proceeding with loaded data"
+                    );
+                }
+                ckpt
             }
-            ckpt
-        } else if let Ok(legacy) = rmp_serde::from_slice::<BrocaCheckpointLegacy>(&buffer) {
-            // Legacy MessagePack (without logit_projection_weights)
-            tracing::info!("Loaded legacy Broca checkpoint (pre-projection) — upgrading");
-            legacy.into()
-        } else if let Ok(legacy) = bincode::deserialize::<BrocaCheckpointLegacy>(&buffer) {
-            // Fall back to bincode (oldest format) — skip verify since hash format changed
-            tracing::warn!(
-                "Loaded legacy bincode Broca checkpoint — will be re-saved as MessagePack"
-            );
-            legacy.into()
-        } else {
-            anyhow::bail!("Failed to deserialize BrocaCheckpoint (tried msgpack v2/v1 + bincode)");
+            Err(e1) => {
+                tracing::debug!("msgpack v2 failed: {e1}");
+                // Legacy MessagePack (without logit_projection_weights)
+                match rmp_serde::from_slice::<BrocaCheckpointLegacy>(&buffer) {
+                    Ok(legacy) => {
+                        tracing::info!(
+                            "Loaded legacy Broca checkpoint (pre-projection) — upgrading"
+                        );
+                        legacy.into()
+                    }
+                    Err(e2) => {
+                        tracing::debug!("msgpack legacy failed: {e2}");
+                        // Bincode fallback
+                        match bincode::deserialize::<BrocaCheckpointLegacy>(&buffer) {
+                            Ok(legacy) => {
+                                tracing::warn!("Loaded legacy bincode Broca checkpoint — will be re-saved as MessagePack");
+                                legacy.into()
+                            }
+                            Err(e3) => {
+                                anyhow::bail!(
+                                    "Failed to deserialize BrocaCheckpoint:\n  msgpack v2: {e1}\n  msgpack legacy: {e2}\n  bincode: {e3}"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
         };
 
         if checkpoint.version > CHECKPOINT_VERSION {

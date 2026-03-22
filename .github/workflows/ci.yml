@@ -203,9 +203,6 @@ jobs:
               parallel,service,shell,demo,api_module,
               integrity,semantic-encoder,webcam,
               nix-mind,identity,notifications
-          - group: core-net
-            features: >-
-              mesh,mesh-encryption,mesh-key-exchange,swarm,neural-bridge
           - group: core-media
             features: >-
               voice-tts,voice-stt,audio,vocal-tract,neural-vocoder,
