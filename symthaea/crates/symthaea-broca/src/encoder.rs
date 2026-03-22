@@ -1,11 +1,11 @@
-//! Thought-to-HDC encoder: 20 scalar channels → ContinuousHV (16,384D).
+//! Thought-to-HDC encoder: scalar channels → ContinuousHV (16,384D).
 //!
 //! Follows the `VocalTractHdcEncoder` pattern from `crates/symthaea-vocal-tract/src/encoder.rs`.
-//! Each of 20 thought channels gets a genesis-seeded base vector. Values are
+//! Each thought channel gets a genesis-seeded base vector. Values are
 //! level-encoded (thermometer coding) then bound with the base vector. The result is
 //! bundled into a single 16,384D ContinuousHV.
 //!
-//! # 20-Channel Thought State
+//! # Channel Layout
 //!
 //! | # | Channel               | Range      | Source                         |
 //! |---|-----------------------|------------|--------------------------------|
@@ -22,15 +22,34 @@
 //! | 17 | mood_temperature     | [0.5,2.0]  | Generation control             |
 //! | 18 | has_computed_answer   | [0,1]      | Boolean indicator              |
 //! | 19 | concept_count        | [0,10]     | Number of activated concepts   |
+//! | 20-23 | v3 context        | [0,1]      | Time/domain/social/confidence  |
+//! | 24-27 | v5 code           | [0,1]      | Syntax/types/algo/error        |
+//! | 28-32 | e_tier (one-hot)  | [0,1]      | Epistemic Cube: empirical E0-E4 |
+//! | 33-36 | n_tier (one-hot)  | [0,1]      | Epistemic Cube: normative N0-N3 |
+//! | 37-40 | m_tier (one-hot)  | [0,1]      | Epistemic Cube: materiality M0-M3 |
+//! | 41 | h_tier               | [0,1]      | Epistemic Cube: harmonic (scalar) |
+//! | 42 | epistemic_quality    | [0,1]      | Cube quality score E×0.4+N×0.35+M×0.25 |
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 
 /// Number of thought channels.
 #[cfg(not(feature = "therapeutic"))]
-pub const NUM_CHANNELS: usize = 28;
+pub const NUM_CHANNELS: usize = 43;
 #[cfg(feature = "therapeutic")]
-pub const NUM_CHANNELS: usize = 32;
+pub const NUM_CHANNELS: usize = 47;
+
+/// Number of channels before epistemic cube channels were added (v6).
+pub const PRE_EPISTEMIC_NUM_CHANNELS: usize = 28;
+
+/// Base index for epistemic cube channels.
+#[cfg(not(feature = "therapeutic"))]
+pub const EPISTEMIC_CUBE_BASE: usize = 28;
+#[cfg(feature = "therapeutic")]
+pub const EPISTEMIC_CUBE_BASE: usize = 32;
+
+/// Number of epistemic cube channels (E[5] + N[4] + M[4] + H[1] + quality[1]).
+pub const EPISTEMIC_CUBE_CHANNELS: usize = 15;
 
 /// Number of channels in legacy (v2) training data format.
 pub const LEGACY_NUM_CHANNELS: usize = 20;
@@ -61,16 +80,32 @@ const CHANNEL_NAMES: [&str; NUM_CHANNELS] = [
     "mood_temperature",    // 17
     "has_computed_answer", // 18
     "concept_count",       // 19
-    // New channels (v3)
-    "time_pressure",       // 20: urgency/deadline proximity (0=relaxed, 1=urgent)
-    "domain_familiarity",  // 21: how well-known the topic is (0=novel, 1=expert)
-    "social_context",      // 22: formality of interaction (0=intimate, 1=formal)
-    "response_confidence", // 23: confidence in the generated response (0=unsure, 1=confident)
+    // Context channels (v3)
+    "time_pressure",       // 20
+    "domain_familiarity",  // 21
+    "social_context",      // 22
+    "response_confidence", // 23
     // Code channels (v5)
-    "syntax_complexity", // 24: 0.0=simple expression, 1.0=deeply nested generics/lifetimes
-    "type_confidence",   // 25: 0.0=unknown types, 1.0=all types resolved
-    "algorithm_pattern", // 26: 0.0=no pattern detected, 1.0=strong algorithm match
-    "error_likelihood",  // 27: 0.0=likely correct, 1.0=likely to have errors
+    "syntax_complexity",   // 24
+    "type_confidence",     // 25
+    "algorithm_pattern",   // 26
+    "error_likelihood",    // 27
+    // Epistemic Cube channels (v6) — 4D cube from Mycelix Epistemic Charter
+    "e_tier_e0",           // 28: empirical one-hot E0 (opinion)
+    "e_tier_e1",           // 29: empirical one-hot E1 (testimonial)
+    "e_tier_e2",           // 30: empirical one-hot E2 (verifiable)
+    "e_tier_e3",           // 31: empirical one-hot E3 (proven)
+    "e_tier_e4",           // 32: empirical one-hot E4 (reproducible)
+    "n_tier_n0",           // 33: normative one-hot N0 (personal)
+    "n_tier_n1",           // 34: normative one-hot N1 (communal)
+    "n_tier_n2",           // 35: normative one-hot N2 (network)
+    "n_tier_n3",           // 36: normative one-hot N3 (axiomatic)
+    "m_tier_m0",           // 37: materiality one-hot M0 (ephemeral)
+    "m_tier_m1",           // 38: materiality one-hot M1 (temporal)
+    "m_tier_m2",           // 39: materiality one-hot M2 (persistent)
+    "m_tier_m3",           // 40: materiality one-hot M3 (foundational)
+    "h_tier",              // 41: harmonic coherence scalar (0.0-1.0)
+    "epistemic_quality",   // 42: cube quality score (0.0-1.0)
 ];
 
 /// Channel names for genesis seeding (therapeutic variant with 4 extra channels).
@@ -96,21 +131,37 @@ const CHANNEL_NAMES: [&str; NUM_CHANNELS] = [
     "mood_temperature",    // 17
     "has_computed_answer", // 18
     "concept_count",       // 19
-    // New channels (v3)
+    // Context channels (v3)
     "time_pressure",       // 20
     "domain_familiarity",  // 21
     "social_context",      // 22
     "response_confidence", // 23
     // Code channels (v5)
-    "syntax_complexity", // 24
-    "type_confidence",   // 25
-    "algorithm_pattern", // 26
-    "error_likelihood",  // 27
+    "syntax_complexity",   // 24
+    "type_confidence",     // 25
+    "algorithm_pattern",   // 26
+    "error_likelihood",    // 27
     // Therapeutic channels (v4)
     "therapeutic_intent",    // 28
     "alliance_quality",      // 29
     "client_distress_level", // 30
     "intervention_depth",    // 31
+    // Epistemic Cube channels (v6) — 4D cube from Mycelix Epistemic Charter
+    "e_tier_e0",           // 32: empirical one-hot E0 (opinion)
+    "e_tier_e1",           // 33: empirical one-hot E1 (testimonial)
+    "e_tier_e2",           // 34: empirical one-hot E2 (verifiable)
+    "e_tier_e3",           // 35: empirical one-hot E3 (proven)
+    "e_tier_e4",           // 36: empirical one-hot E4 (reproducible)
+    "n_tier_n0",           // 37: normative one-hot N0 (personal)
+    "n_tier_n1",           // 38: normative one-hot N1 (communal)
+    "n_tier_n2",           // 39: normative one-hot N2 (network)
+    "n_tier_n3",           // 40: normative one-hot N3 (axiomatic)
+    "m_tier_m0",           // 41: materiality one-hot M0 (ephemeral)
+    "m_tier_m1",           // 42: materiality one-hot M1 (temporal)
+    "m_tier_m2",           // 43: materiality one-hot M2 (persistent)
+    "m_tier_m3",           // 44: materiality one-hot M3 (foundational)
+    "h_tier",              // 45: harmonic coherence scalar (0.0-1.0)
+    "epistemic_quality",   // 46: cube quality score (0.0-1.0)
 ];
 
 /// Channel ranges [min, max] for normalization to [0, 1].
@@ -136,7 +187,7 @@ const CHANNEL_RANGES: [[f32; 2]; NUM_CHANNELS] = [
     [0.5, 2.0],  // mood_temperature
     [0.0, 1.0],  // has_computed_answer
     [0.0, 10.0], // concept_count
-    // New channels (v3)
+    // Context channels (v3)
     [0.0, 1.0], // time_pressure
     [0.0, 1.0], // domain_familiarity
     [0.0, 1.0], // social_context
@@ -146,6 +197,22 @@ const CHANNEL_RANGES: [[f32; 2]; NUM_CHANNELS] = [
     [0.0, 1.0], // type_confidence
     [0.0, 1.0], // algorithm_pattern
     [0.0, 1.0], // error_likelihood
+    // Epistemic Cube channels (v6)
+    [0.0, 1.0], // e_tier_e0
+    [0.0, 1.0], // e_tier_e1
+    [0.0, 1.0], // e_tier_e2
+    [0.0, 1.0], // e_tier_e3
+    [0.0, 1.0], // e_tier_e4
+    [0.0, 1.0], // n_tier_n0
+    [0.0, 1.0], // n_tier_n1
+    [0.0, 1.0], // n_tier_n2
+    [0.0, 1.0], // n_tier_n3
+    [0.0, 1.0], // m_tier_m0
+    [0.0, 1.0], // m_tier_m1
+    [0.0, 1.0], // m_tier_m2
+    [0.0, 1.0], // m_tier_m3
+    [0.0, 1.0], // h_tier
+    [0.0, 1.0], // epistemic_quality
 ];
 
 /// Channel ranges [min, max] for normalization to [0, 1] (therapeutic variant).
@@ -171,7 +238,7 @@ const CHANNEL_RANGES: [[f32; 2]; NUM_CHANNELS] = [
     [0.5, 2.0],  // mood_temperature
     [0.0, 1.0],  // has_computed_answer
     [0.0, 10.0], // concept_count
-    // New channels (v3)
+    // Context channels (v3)
     [0.0, 1.0], // time_pressure
     [0.0, 1.0], // domain_familiarity
     [0.0, 1.0], // social_context
@@ -186,6 +253,22 @@ const CHANNEL_RANGES: [[f32; 2]; NUM_CHANNELS] = [
     [0.0, 1.0], // alliance_quality
     [0.0, 1.0], // client_distress_level
     [0.0, 1.0], // intervention_depth
+    // Epistemic Cube channels (v6)
+    [0.0, 1.0], // e_tier_e0
+    [0.0, 1.0], // e_tier_e1
+    [0.0, 1.0], // e_tier_e2
+    [0.0, 1.0], // e_tier_e3
+    [0.0, 1.0], // e_tier_e4
+    [0.0, 1.0], // n_tier_n0
+    [0.0, 1.0], // n_tier_n1
+    [0.0, 1.0], // n_tier_n2
+    [0.0, 1.0], // n_tier_n3
+    [0.0, 1.0], // m_tier_m0
+    [0.0, 1.0], // m_tier_m1
+    [0.0, 1.0], // m_tier_m2
+    [0.0, 1.0], // m_tier_m3
+    [0.0, 1.0], // h_tier
+    [0.0, 1.0], // epistemic_quality
 ];
 
 /// Default values for the 4 new channels (used when loading legacy 20-channel data).
@@ -204,7 +287,16 @@ pub const CODE_CHANNEL_DEFAULTS: [f32; 4] = [
     0.0, // error_likelihood: likely correct
 ];
 
-/// Decoupled thought state: 20 scalar channels extracted from StructuredThought.
+/// Default values for the 15 epistemic cube channels.
+pub const EPISTEMIC_CUBE_DEFAULTS: [f32; EPISTEMIC_CUBE_CHANNELS] = [
+    0.0, 0.0, 0.0, 0.0, 0.0, // E-tier one-hot (none active)
+    0.0, 0.0, 0.0, 0.0,       // N-tier one-hot (none active)
+    0.0, 0.0, 0.0, 0.0,       // M-tier one-hot (none active)
+    0.25,                       // h_tier: H1 neutral
+    0.0,                        // epistemic_quality: unknown
+];
+
+/// Decoupled thought state: scalar channels extracted from StructuredThought.
 ///
 /// Conversion from `StructuredThought -> ThoughtChannels` happens at the
 /// integration layer (Phase 3), avoiding circular dependency.
@@ -231,7 +323,7 @@ impl Default for ThoughtChannels {
                 1.0, // mood_temperature: neutral
                 0.0, // has_computed_answer: false
                 0.0, // concept_count: none
-                // New channels (v3)
+                // Context channels (v3)
                 0.0, // time_pressure: relaxed
                 0.5, // domain_familiarity: mid
                 0.5, // social_context: mid
@@ -241,6 +333,12 @@ impl Default for ThoughtChannels {
                 0.0, // type_confidence: unknown
                 0.0, // algorithm_pattern: none
                 0.0, // error_likelihood: likely correct
+                // Epistemic Cube channels (v6) — default: no cube data
+                0.0, 0.0, 0.0, 0.0, 0.0, // E-tier one-hot (none active)
+                0.0, 0.0, 0.0, 0.0,       // N-tier one-hot (none active)
+                0.0, 0.0, 0.0, 0.0,       // M-tier one-hot (none active)
+                0.25,                       // h_tier: H1 neutral (0.25)
+                0.0,                        // epistemic_quality: unknown
             ],
         }
     }
@@ -279,6 +377,12 @@ impl Default for ThoughtChannels {
                 0.5, // alliance_quality
                 0.0, // client_distress_level
                 0.0, // intervention_depth
+                // Epistemic Cube channels (v6) — default: no cube data
+                0.0, 0.0, 0.0, 0.0, 0.0, // E-tier one-hot (none active)
+                0.0, 0.0, 0.0, 0.0,       // N-tier one-hot (none active)
+                0.0, 0.0, 0.0, 0.0,       // M-tier one-hot (none active)
+                0.25,                       // h_tier: H1 neutral (0.25)
+                0.0,                        // epistemic_quality: unknown
             ],
         }
     }
@@ -398,6 +502,10 @@ impl ThoughtChannels {
             tc.channels[30] = THERAPEUTIC_CHANNEL_DEFAULTS[2];
             tc.channels[31] = THERAPEUTIC_CHANNEL_DEFAULTS[3];
         }
+        // Epistemic cube defaults
+        for i in 0..EPISTEMIC_CUBE_CHANNELS {
+            tc.channels[EPISTEMIC_CUBE_BASE + i] = EPISTEMIC_CUBE_DEFAULTS[i];
+        }
         tc
     }
 
@@ -461,6 +569,81 @@ impl ThoughtChannels {
     #[cfg(feature = "therapeutic")]
     pub fn intervention_depth(&self) -> f32 {
         self.channels[31]
+    }
+
+    // ── Epistemic Cube channels (v6) ────────────────────────────────────
+
+    /// Set the full 4D epistemic cube as channel data.
+    ///
+    /// - `e_tier`: 0-4 (E0-E4 empirical verifiability)
+    /// - `n_tier`: 0-3 (N0-N3 normative authority)
+    /// - `m_tier`: 0-3 (M0-M3 materiality/permanence)
+    /// - `h_value`: 0.0-1.0 (harmonic coherence, continuous)
+    /// - `quality`: 0.0-1.0 (composite quality score)
+    pub fn set_epistemic_cube(
+        &mut self,
+        e_tier: u8,
+        n_tier: u8,
+        m_tier: u8,
+        h_value: f32,
+        quality: f32,
+    ) {
+        let base = EPISTEMIC_CUBE_BASE;
+
+        // E-tier one-hot (5 slots)
+        for i in 0..5 {
+            self.channels[base + i] = if i == e_tier as usize { 1.0 } else { 0.0 };
+        }
+
+        // N-tier one-hot (4 slots)
+        for i in 0..4 {
+            self.channels[base + 5 + i] = if i == n_tier as usize { 1.0 } else { 0.0 };
+        }
+
+        // M-tier one-hot (4 slots)
+        for i in 0..4 {
+            self.channels[base + 9 + i] = if i == m_tier as usize { 1.0 } else { 0.0 };
+        }
+
+        // H-tier scalar
+        self.channels[base + 13] = h_value.clamp(0.0, 1.0);
+
+        // Quality score
+        self.channels[base + 14] = quality.clamp(0.0, 1.0);
+    }
+
+    /// Get the E-tier index (0-4) from one-hot encoding, or None if no tier is active.
+    pub fn e_tier(&self) -> Option<u8> {
+        let base = EPISTEMIC_CUBE_BASE;
+        (0..5u8).find(|&i| self.channels[base + i as usize] > 0.5)
+    }
+
+    /// Get the N-tier index (0-3) from one-hot encoding, or None if no tier is active.
+    pub fn n_tier(&self) -> Option<u8> {
+        let base = EPISTEMIC_CUBE_BASE + 5;
+        (0..4u8).find(|&i| self.channels[base + i as usize] > 0.5)
+    }
+
+    /// Get the M-tier index (0-3) from one-hot encoding, or None if no tier is active.
+    pub fn m_tier(&self) -> Option<u8> {
+        let base = EPISTEMIC_CUBE_BASE + 9;
+        (0..4u8).find(|&i| self.channels[base + i as usize] > 0.5)
+    }
+
+    /// Get the H-tier scalar (0.0-1.0).
+    pub fn h_tier(&self) -> f32 {
+        self.channels[EPISTEMIC_CUBE_BASE + 13]
+    }
+
+    /// Get the epistemic quality score (0.0-1.0).
+    pub fn epistemic_quality(&self) -> f32 {
+        self.channels[EPISTEMIC_CUBE_BASE + 14]
+    }
+
+    /// Returns true if the epistemic cube channels have been populated
+    /// (at least one E/N/M one-hot is active).
+    pub fn has_epistemic_cube(&self) -> bool {
+        self.e_tier().is_some() || self.n_tier().is_some() || self.m_tier().is_some()
     }
 }
 

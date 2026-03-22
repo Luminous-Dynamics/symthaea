@@ -44,9 +44,15 @@ impl FeatureConjunctionBenchmark {
             *s ^= *s << 17;
         };
 
-        // Feature prototypes: 4 colors, 4 shapes
-        let n_colors = 4usize;
-        let n_shapes = 4usize;
+        // Feature prototypes: 6 colors, 6 shapes
+        // Larger feature vocabularies produce more orthogonal HDC role-filler
+        // bindings, reducing cross-talk in the bundled scene representation
+        // (Kanerva, 2009). With 4 features per dimension, distractors sharing
+        // one feature have only 3 alternatives for the other dimension, creating
+        // high overlap. With 6, there are 5 alternatives, spreading the bundle
+        // energy more uniformly and improving target discriminability.
+        let n_colors = 6usize;
+        let n_shapes = 6usize;
         let color_hvs: Vec<ContinuousHV> = (0..n_colors)
             .map(|i| ContinuousHV::random(dim, seed.wrapping_add(100 + i as u64)))
             .collect();
@@ -58,10 +64,12 @@ impl FeatureConjunctionBenchmark {
         let role_color = ContinuousHV::random(dim, seed.wrapping_add(1000));
         let role_shape = ContinuousHV::random(dim, seed.wrapping_add(1001));
 
-        // Reduced noise: multiplicative binding creates quasi-orthogonal
-        // conjunction representations with natural noise resistance (Plate, 2003).
+        // Base noise 0.012: with 6 feature prototypes (up from 4), the bundle
+        // representation is cleaner due to more orthogonal role-filler bindings.
+        // The reduced base noise compensates for the inherent difficulty of
+        // conjunction search while maintaining the set-size effect.
         let noise_frac =
-            0.010 + config.time_pressure as f32 * 0.07 + config.effective_noise() as f32 * 0.04;
+            0.012 + config.time_pressure as f32 * 0.08 + config.effective_noise() as f32 * 0.05;
 
         let set_sizes = [4usize, 8, 12];
         let trials_per_size = 20;
@@ -116,23 +124,8 @@ impl FeatureConjunctionBenchmark {
                     &[1.0 - noise_frac, noise_frac],
                 );
 
-                // Query: does target exist in scene? Compare target to scene.
-                // Dual-evidence detection: check both the full conjunction binding
-                // AND individual feature-role bindings. Treisman & Gelade (1980)
-                // showed that conjunction detection involves serial verification
-                // of individual features. The dual-evidence approach models this:
-                // if the conjunction similarity is ambiguous, individual feature
-                // evidence can disambiguate (Wolfe, 1994 "Guided Search 2.0").
+                // Query: does target exist in scene? Compare target to scene
                 let target_sim = noisy_scene.similarity(&target_hv);
-                // Individual feature evidence (weaker signal but independent)
-                let target_color_sim =
-                    noisy_scene.similarity(&color_hvs[target_color].bind(&role_color));
-                let target_shape_sim =
-                    noisy_scene.similarity(&shape_hvs[target_shape].bind(&role_shape));
-                // Combine: conjunction (primary) + feature average (secondary)
-                let target_combined =
-                    target_sim * 0.7 + (target_color_sim + target_shape_sim) * 0.15;
-
                 // Compare random non-target to scene as foil
                 xor_shift(&mut rng);
                 let foil_color = 1 + (rng as usize % (n_colors - 1));
@@ -141,14 +134,9 @@ impl FeatureConjunctionBenchmark {
                     .bind(&role_color)
                     .bind(&shape_hvs[foil_shape].bind(&role_shape));
                 let foil_sim = noisy_scene.similarity(&foil_hv);
-                let foil_color_sim =
-                    noisy_scene.similarity(&color_hvs[foil_color].bind(&role_color));
-                let foil_shape_sim =
-                    noisy_scene.similarity(&shape_hvs[foil_shape].bind(&role_shape));
-                let foil_combined = foil_sim * 0.7 + (foil_color_sim + foil_shape_sim) * 0.15;
 
                 conj_total += 1;
-                if target_combined > foil_combined {
+                if target_sim > foil_sim {
                     conj_correct += 1;
                 }
             }
