@@ -20,6 +20,7 @@
 
 use anyhow::Result;
 use ndarray::Array1;
+use std::collections::VecDeque;
 use std::time::Instant;
 
 use crate::dynamics::cfc::{CfCNetwork, CfCNetworkConfig};
@@ -102,7 +103,7 @@ pub struct LookaheadEngine {
     min_phi_gain: f32,
 
     /// History of predictions for confidence estimation
-    prediction_history: Vec<PredictionRecord>,
+    prediction_history: VecDeque<PredictionRecord>,
 
     /// Cumulative prediction error for adaptation
     cumulative_error: f32,
@@ -142,7 +143,7 @@ impl LookaheadEngine {
             phi_engine,
             horizon,
             min_phi_gain,
-            prediction_history: Vec::new(),
+            prediction_history: VecDeque::new(),
             cumulative_error: 0.0,
             prediction_count: 0,
         })
@@ -328,7 +329,7 @@ impl LookaheadEngine {
         let error = (predicted - actual).abs();
         let accurate = error < 0.2 * predicted.abs().max(0.001);
 
-        self.prediction_history.push(PredictionRecord {
+        self.prediction_history.push_back(PredictionRecord {
             predicted,
             actual: Some(actual),
             accurate: Some(accurate),
@@ -339,7 +340,7 @@ impl LookaheadEngine {
 
         // Keep history bounded
         if self.prediction_history.len() > 1000 {
-            self.prediction_history.remove(0);
+            self.prediction_history.pop_front();
         }
     }
 

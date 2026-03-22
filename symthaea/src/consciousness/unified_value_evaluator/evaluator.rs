@@ -17,7 +17,7 @@ use super::types::{
     EvaluatorConfig, EvaluatorStats, VetoReason,
 };
 use crate::perception::SemanticEncoder;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 /// The Unified Value Evaluator
 pub struct UnifiedValueEvaluator {
@@ -28,7 +28,7 @@ pub struct UnifiedValueEvaluator {
     /// Configuration
     config: EvaluatorConfig,
     /// Evaluation history for learning
-    history: Vec<EvaluationRecord>,
+    history: VecDeque<EvaluationRecord>,
     /// Maximum history size
     max_history: usize,
     /// Last evaluation result (for inspection/debugging)
@@ -61,7 +61,7 @@ impl UnifiedValueEvaluator {
             harmonies: EightHarmonies::new(),
             _encoder: SemanticEncoder::new(),
             config: EvaluatorConfig::default(),
-            history: Vec::new(),
+            history: VecDeque::new(),
             max_history: 1000,
             last_evaluation: None,
             feedback_loop: ValueFeedbackLoop::default(),
@@ -79,7 +79,7 @@ impl UnifiedValueEvaluator {
             harmonies: EightHarmonies::new(),
             _encoder: SemanticEncoder::new(),
             config,
-            history: Vec::new(),
+            history: VecDeque::new(),
             max_history: 1000,
             last_evaluation: None,
             feedback_loop: ValueFeedbackLoop::default(),
@@ -100,7 +100,7 @@ impl UnifiedValueEvaluator {
             harmonies: EightHarmonies::new(),
             _encoder: SemanticEncoder::new(),
             config,
-            history: Vec::new(),
+            history: VecDeque::new(),
             max_history: 1000,
             last_evaluation: None,
             feedback_loop: ValueFeedbackLoop::new(feedback_config),
@@ -550,7 +550,7 @@ impl UnifiedValueEvaluator {
 
     /// Record evaluation for learning
     fn record_evaluation(&mut self, action: &str, decision: &Decision) {
-        self.history.push(EvaluationRecord {
+        self.history.push_back(EvaluationRecord {
             _action: action.to_string(),
             result: decision.clone(),
             _timestamp: std::time::Instant::now(),
@@ -558,7 +558,7 @@ impl UnifiedValueEvaluator {
 
         // Trim history
         if self.history.len() > self.max_history {
-            self.history.remove(0);
+            self.history.pop_front();
         }
     }
 

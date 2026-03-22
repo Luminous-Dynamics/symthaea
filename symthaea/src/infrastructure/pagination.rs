@@ -3,7 +3,7 @@
 //! Provides pagination infrastructure for browsing large datasets
 //! like NixOS modules, packages, and options without loading everything.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::hash::Hash;
 use std::time::Instant;
 
@@ -149,7 +149,7 @@ pub struct Paginator<K, T> {
     /// Maximum cached pages
     max_cached_pages: usize,
     /// Cache access order for LRU eviction
-    access_order: Vec<K>,
+    access_order: VecDeque<K>,
 }
 
 #[derive(Clone)]
@@ -166,7 +166,7 @@ impl<K: Eq + Hash + Clone, T: Clone> Paginator<K, T> {
             page_cache: HashMap::new(),
             default_page_size,
             max_cached_pages: 10,
-            access_order: Vec::new(),
+            access_order: VecDeque::new(),
         }
     }
 
@@ -181,7 +181,7 @@ impl<K: Eq + Hash + Clone, T: Clone> Paginator<K, T> {
         if let Some(cached) = self.page_cache.get(key) {
             // Update access order
             self.access_order.retain(|k| k != key);
-            self.access_order.push(key.clone());
+            self.access_order.push_back(key.clone());
             Some(cached.page.clone())
         } else {
             None
@@ -192,16 +192,16 @@ impl<K: Eq + Hash + Clone, T: Clone> Paginator<K, T> {
     pub fn cache_page(&mut self, key: K, page: Page<T>) {
         // Evict if at capacity
         while self.page_cache.len() >= self.max_cached_pages {
-            if let Some(old_key) = self.access_order.first().cloned() {
+            if let Some(old_key) = self.access_order.front().cloned() {
                 self.page_cache.remove(&old_key);
-                self.access_order.remove(0);
+                self.access_order.pop_front();
             } else {
                 break;
             }
         }
 
         self.access_order.retain(|k| k != &key);
-        self.access_order.push(key.clone());
+        self.access_order.push_back(key.clone());
         self.page_cache.insert(
             key,
             CachedPage {
