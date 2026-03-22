@@ -505,11 +505,9 @@ impl CSPSolver {
     pub fn solve_n_queens(n: usize) -> Option<Vec<i64>> {
         let csp = Self::n_queens(n);
         let result = Self::solve(&csp);
-        result.solution.map(|sol| {
-            (0..n)
-                .map(|i| sol[&format!("Q{}", i)])
-                .collect()
-        })
+        result
+            .solution
+            .map(|sol| (0..n).map(|i| sol[&format!("Q{}", i)]).collect())
     }
 
     /// Create a Sudoku CSP from a 9x9 grid.

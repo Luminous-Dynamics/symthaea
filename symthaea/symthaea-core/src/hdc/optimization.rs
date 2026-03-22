@@ -130,7 +130,11 @@ type ConstraintFn = Box<dyn Fn(&[f64]) -> f64>;
 impl BoxConstraints {
     /// Create box constraints. Each dimension i is constrained to [lower[i], upper[i]].
     pub fn new(lower: Vec<f64>, upper: Vec<f64>) -> Self {
-        assert_eq!(lower.len(), upper.len(), "Lower and upper bounds must have same length");
+        assert_eq!(
+            lower.len(),
+            upper.len(),
+            "Lower and upper bounds must have same length"
+        );
         Self { lower, upper }
     }
 
@@ -189,28 +193,27 @@ where
 }
 
 /// Minimize an [`ObjectiveFunction`] impl starting from `x0`.
-pub fn minimize_objective(
-    obj: &dyn ObjectiveFunction,
-    x0: &[f64],
-    method: OptMethod,
-) -> OptResult {
+pub fn minimize_objective(obj: &dyn ObjectiveFunction, x0: &[f64], method: OptMethod) -> OptResult {
     let f = |x: &[f64]| obj.eval(x);
     let has_analytic_grad = obj.gradient(x0).is_some();
 
     match method {
         OptMethod::GradientDescent => {
-            let grad = |x: &[f64]| {
-                obj.gradient(x)
-                    .unwrap_or_else(|| numerical_gradient(&f, x))
-            };
-            OptimizationEngine::gradient_descent(&f, &grad, x0, DEFAULT_LEARNING_RATE, 0.0, DEFAULT_TOL)
+            let grad = |x: &[f64]| obj.gradient(x).unwrap_or_else(|| numerical_gradient(&f, x));
+            OptimizationEngine::gradient_descent(
+                &f,
+                &grad,
+                x0,
+                DEFAULT_LEARNING_RATE,
+                0.0,
+                DEFAULT_TOL,
+            )
         }
         OptMethod::NelderMead => OptimizationEngine::nelder_mead(&f, x0, 1.0, DEFAULT_TOL),
         OptMethod::LBFGS => {
             let grad = |x: &[f64]| {
                 if has_analytic_grad {
-                    obj.gradient(x)
-                        .unwrap_or_else(|| numerical_gradient(&f, x))
+                    obj.gradient(x).unwrap_or_else(|| numerical_gradient(&f, x))
                 } else {
                     numerical_gradient(&f, x)
                 }
@@ -1075,20 +1078,36 @@ mod tests {
 
     #[test]
     fn test_minimize_dispatcher_gd() {
-        let result = minimize(|x: &[f64]| x[0] * x[0] + x[1] * x[1], &[3.0, 4.0], OptMethod::GradientDescent);
-        assert!(result.fx < 1.0, "GD via minimize should make progress, got {}", result.fx);
+        let result = minimize(
+            |x: &[f64]| x[0] * x[0] + x[1] * x[1],
+            &[3.0, 4.0],
+            OptMethod::GradientDescent,
+        );
+        assert!(
+            result.fx < 1.0,
+            "GD via minimize should make progress, got {}",
+            result.fx
+        );
     }
 
     #[test]
     fn test_minimize_dispatcher_nm() {
-        let result = minimize(|x: &[f64]| x[0] * x[0] + x[1] * x[1], &[3.0, 4.0], OptMethod::NelderMead);
+        let result = minimize(
+            |x: &[f64]| x[0] * x[0] + x[1] * x[1],
+            &[3.0, 4.0],
+            OptMethod::NelderMead,
+        );
         assert!(result.converged, "NM via minimize should converge");
         assert!(result.fx < TOL);
     }
 
     #[test]
     fn test_minimize_dispatcher_lbfgs() {
-        let result = minimize(|x: &[f64]| x[0] * x[0] + x[1] * x[1], &[3.0, 4.0], OptMethod::LBFGS);
+        let result = minimize(
+            |x: &[f64]| x[0] * x[0] + x[1] * x[1],
+            &[3.0, 4.0],
+            OptMethod::LBFGS,
+        );
         assert!(result.converged, "LBFGS via minimize should converge");
         assert!(result.fx < TOL);
     }
@@ -1100,8 +1119,16 @@ mod tests {
         let f = |x: &[f64]| x[0] * x[0] + 3.0 * x[1] * x[1];
         let grad = numerical_gradient(&f, &[2.0, 3.0]);
         // Analytic: [2*x, 6*y] = [4.0, 18.0]
-        assert!((grad[0] - 4.0).abs() < 1e-5, "dfdx should be ~4.0, got {}", grad[0]);
-        assert!((grad[1] - 18.0).abs() < 1e-5, "dfdy should be ~18.0, got {}", grad[1]);
+        assert!(
+            (grad[0] - 4.0).abs() < 1e-5,
+            "dfdx should be ~4.0, got {}",
+            grad[0]
+        );
+        assert!(
+            (grad[1] - 18.0).abs() < 1e-5,
+            "dfdy should be ~18.0, got {}",
+            grad[1]
+        );
     }
 
     // ── Encoding ─────────────────────────────────────────────────────────

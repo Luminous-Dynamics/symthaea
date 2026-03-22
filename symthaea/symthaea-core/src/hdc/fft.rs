@@ -272,7 +272,12 @@ impl FftEngine {
         }
 
         let result = Self::ifft(&full);
-        result.spectrum.iter().take(original_len).map(|c| c.re).collect()
+        result
+            .spectrum
+            .iter()
+            .take(original_len)
+            .map(|c| c.re)
+            .collect()
     }
 
     // ─── Core FFT Implementation ─────────────────────────────────────────
@@ -517,10 +522,18 @@ mod tests {
         let signal = vec![1.0, 2.0, 3.0, 4.0];
         let half = FftEngine::rfft(&signal);
         // DC: 1+2+3+4 = 10
-        assert!((half[0].re - 10.0).abs() < TOL, "DC should be 10, got {}", half[0].re);
+        assert!(
+            (half[0].re - 10.0).abs() < TOL,
+            "DC should be 10, got {}",
+            half[0].re
+        );
         assert!(half[0].im.abs() < TOL);
         // Nyquist (N/2=2): 1-2+3-4 = -2
-        assert!((half[2].re - (-2.0)).abs() < TOL, "Nyquist should be -2, got {}", half[2].re);
+        assert!(
+            (half[2].re - (-2.0)).abs() < TOL,
+            "Nyquist should be -2, got {}",
+            half[2].re
+        );
     }
 
     #[test]
@@ -555,13 +568,7 @@ mod tests {
         // Manual convolution for verification
         let expected = vec![1.0, 3.0, 3.0, 1.0, 0.0, 0.0, 0.0];
         for (i, (&c, &e)) in conv.iter().zip(expected.iter()).enumerate() {
-            assert!(
-                (c - e).abs() < TOL,
-                "Convolution[{}]: {} != {}",
-                i,
-                c,
-                e
-            );
+            assert!((c - e).abs() < TOL, "Convolution[{}]: {} != {}", i, c, e);
         }
     }
 

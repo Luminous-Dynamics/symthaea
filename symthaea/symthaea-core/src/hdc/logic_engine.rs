@@ -701,11 +701,15 @@ impl LogicEngine {
     // ─── Resolution Prover (FOL) ─────────────────────────────────────────
 
     /// Apply a substitution to a resolution clause.
-    fn apply_subst_clause(clause: &[(String, Vec<FOLTerm>, bool)], subst: &HashMap<String, FOLTerm>) -> Vec<(String, Vec<FOLTerm>, bool)> {
+    fn apply_subst_clause(
+        clause: &[(String, Vec<FOLTerm>, bool)],
+        subst: &HashMap<String, FOLTerm>,
+    ) -> Vec<(String, Vec<FOLTerm>, bool)> {
         clause
             .iter()
             .map(|(name, args, pol)| {
-                let new_args: Vec<FOLTerm> = args.iter().map(|a| Self::apply_subst(a, subst)).collect();
+                let new_args: Vec<FOLTerm> =
+                    args.iter().map(|a| Self::apply_subst(a, subst)).collect();
                 (name.clone(), new_args, *pol)
             })
             .collect()
@@ -807,7 +811,9 @@ impl LogicEngine {
                 Box::new(Self::simplify_fol_not(q)),
             ),
             FOLFormula::Implies(p, q) => FOLFormula::Or(
-                Box::new(Self::simplify_fol_not(&FOLFormula::Not(Box::new(p.as_ref().clone())))),
+                Box::new(Self::simplify_fol_not(&FOLFormula::Not(Box::new(
+                    p.as_ref().clone(),
+                )))),
                 Box::new(Self::simplify_fol_not(q)),
             ),
             FOLFormula::ForAll(v, p) => {
@@ -871,9 +877,7 @@ impl LogicEngine {
                     .map(|a| Self::substitute_term(a, var, term))
                     .collect(),
             ),
-            FOLFormula::Not(p) => {
-                FOLFormula::Not(Box::new(Self::substitute_fol(p, var, term)))
-            }
+            FOLFormula::Not(p) => FOLFormula::Not(Box::new(Self::substitute_fol(p, var, term))),
             FOLFormula::And(p, q) => FOLFormula::And(
                 Box::new(Self::substitute_fol(p, var, term)),
                 Box::new(Self::substitute_fol(q, var, term)),
@@ -933,10 +937,7 @@ impl LogicEngine {
         }
     }
 
-    fn collect_fol_literals(
-        formula: &FOLFormula,
-        clause: &mut Vec<(String, Vec<FOLTerm>, bool)>,
-    ) {
+    fn collect_fol_literals(formula: &FOLFormula, clause: &mut Vec<(String, Vec<FOLTerm>, bool)>) {
         match formula {
             FOLFormula::Predicate(name, args) => {
                 clause.push((name.clone(), args.clone(), true));
@@ -1032,8 +1033,7 @@ impl LogicEngine {
                             };
                         }
                         // Avoid adding duplicate clauses
-                        if !clauses.contains(&resolvent) && !new_clauses.contains(&resolvent)
-                        {
+                        if !clauses.contains(&resolvent) && !new_clauses.contains(&resolvent) {
                             steps.push(ProofStepLogic {
                                 step_number: steps.len() + 1,
                                 rule: "Resolution".to_string(),
@@ -1067,10 +1067,7 @@ impl LogicEngine {
     }
 
     /// Clausify an FOL formula directly (without negation), for KB formulas.
-    fn clausify_direct(
-        formula: &FOLFormula,
-        clauses: &mut Vec<Vec<(String, Vec<FOLTerm>, bool)>>,
-    ) {
+    fn clausify_direct(formula: &FOLFormula, clauses: &mut Vec<Vec<(String, Vec<FOLTerm>, bool)>>) {
         let mut counter = 0;
         let skolemized = Self::skolemize(formula, &[], &mut counter);
         Self::clausify(&skolemized, clauses);
@@ -1084,13 +1081,9 @@ impl LogicEngine {
         let lits: Vec<String> = clause
             .iter()
             .map(|(name, args, pol)| {
-                let args_str: Vec<String> = args.iter().map(|a| Self::format_term(a)).collect();
+                let args_str: Vec<String> = args.iter().map(Self::format_term).collect();
                 let pred = format!("{}({})", name, args_str.join(", "));
-                if *pol {
-                    pred
-                } else {
-                    format!("¬{}", pred)
-                }
+                if *pol { pred } else { format!("¬{}", pred) }
             })
             .collect();
         format!("{{{}}}", lits.join(", "))
@@ -1101,7 +1094,7 @@ impl LogicEngine {
             FOLTerm::Var(v) => v.clone(),
             FOLTerm::Const(c) => c.clone(),
             FOLTerm::Func(name, args) => {
-                let args_str: Vec<String> = args.iter().map(|a| Self::format_term(a)).collect();
+                let args_str: Vec<String> = args.iter().map(Self::format_term).collect();
                 format!("{}({})", name, args_str.join(", "))
             }
         }
@@ -1579,10 +1572,7 @@ mod tests {
         let edges = vec![(0, 1), (1, 2), (0, 2)];
         let formula = LogicEngine::graph_coloring_sat(&edges, 3, 2);
         let (result, _) = LogicEngine::dpll_sat(&formula);
-        assert!(
-            result.is_none(),
-            "Triangle with 2 colors should be UNSAT"
-        );
+        assert!(result.is_none(), "Triangle with 2 colors should be UNSAT");
     }
 
     #[test]
@@ -1657,16 +1647,10 @@ mod tests {
                     vec![FOLTerm::Var("y".to_string())],
                 )),
             ),
-            FOLFormula::Predicate(
-                "A".to_string(),
-                vec![FOLTerm::Const("a".to_string())],
-            ),
+            FOLFormula::Predicate("A".to_string(), vec![FOLTerm::Const("a".to_string())]),
         ];
 
-        let goal = FOLFormula::Predicate(
-            "C".to_string(),
-            vec![FOLTerm::Const("a".to_string())],
-        );
+        let goal = FOLFormula::Predicate("C".to_string(), vec![FOLTerm::Const("a".to_string())]);
 
         let result = LogicEngine::resolution_prove(&kb, &goal, 200);
         assert!(result.valid, "Should prove C(a): {:?}", result.description);
@@ -1719,10 +1703,7 @@ mod tests {
 
     #[test]
     fn test_unify_arity_mismatch() {
-        let t1 = FOLTerm::Func(
-            "f".to_string(),
-            vec![FOLTerm::Const("a".to_string())],
-        );
+        let t1 = FOLTerm::Func("f".to_string(), vec![FOLTerm::Const("a".to_string())]);
         let t2 = FOLTerm::Func(
             "f".to_string(),
             vec![
