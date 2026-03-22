@@ -4,18 +4,17 @@
 **Build**: Release (`cargo build --release --target wasm32-unknown-unknown`)
 **Build Date**: 2026-02-21 (per-zome sizes from original audit; DNA bundles pre-date new zomes)
 
-> **Status**: Per-zome WASM sizes below are from the 2026-02-21 build. Five new zome pairs
-> have been added since then (mesh-time, resource-mesh in Commons-Care; resonance-feed in
-> Civic; name-registry, web-of-trust in Identity). At ~3.6 MB per pair average, estimated
-> growth is ~18 MB raw WASM / ~3.3 MB compressed DNA across all three clusters.
+> **Verified 2026-03-22**: Commons cluster rebuilt with 82 WASM files (was 78).
+> Two new zome pairs added: mesh-time (3.44 MB pair) and resource-mesh (3.52 MB pair).
+> Total raw WASM: 155.2 MB (was 144.9 MB, +7.1%). Bridge coordinator grew +0.18 MB
+> from metrics extern + fail-closed security hardening.
 >
-> **Updated headroom estimates** (conservative):
-> - Commons-Land: ~26.3 MB (unchanged — new zomes are in Commons-Care)
-> - Commons-Care: ~13.8 MB + ~7.2 MB (2 new pairs) ≈ 21 MB → 42% used
-> - Civic: ~11.2 MB + ~3.6 MB (1 new pair) ≈ 14.8 MB → 30% used
-> - Identity: ~6.4 MB + ~7.2 MB (2 new pairs) ≈ 13.6 MB → 27% used
+> **Measured headroom** (Commons only — Civic/Identity estimates below):
+> - Commons total: 155.2 MB raw → estimated ~28.2 MB DNA (5.5x compression) → **56% used**
+> - Civic: ~11.2 MB + ~3.6 MB (resonance-feed) ≈ 14.8 MB → **30% used**
+> - Identity: ~6.4 MB + ~7.2 MB (name-registry + web-of-trust) ≈ 13.6 MB → **27% used**
 >
-> All DNAs remain well within the 50 MB limit. No immediate action required.
+> All DNAs remain well within the 50 MB limit. Growth rate: +10.3 MB raw / ~5 months.
 
 ---
 
