@@ -99,6 +99,9 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("WCST") || name.contains("Wisconsin") => {
             Some(("wcst_categories_completed", &bl.executive))
         }
+        name if name.contains("FlankerInhibition") => {
+            Some(("interference_suppression", &bl.inhibition))
+        }
         name if name.contains("Flanker") => Some(("flanker_effect", &bl.executive)),
         name if name.contains("TowerOfLondon") => Some(("tol_overall_optimal_rate", &bl.executive)),
         name if name.contains("DualTask") => Some(("dual_task_cost", &bl.executive)),
@@ -113,9 +116,7 @@ fn baseline_for_benchmark<'a>(
         // Binding domain — route to binding baselines, not worm
         name if name.contains("TemporalOrder") => Some(("discrimination_slope", &bl.binding)),
         name if name.contains("CrossModal") => Some(("cross_modal_binding_accuracy", &bl.binding)),
-        name if name.contains("FeatureConjunction") => {
-            Some(("conjunction_accuracy", &bl.binding))
-        }
+        name if name.contains("FeatureConjunction") => Some(("conjunction_accuracy", &bl.binding)),
         name if name.contains("Binding") => Some(("binding_accuracy", &bl.worm)),
         name if name.contains("DigitSpan") => Some(("digit_span_forward", &bl.worm)),
 
@@ -245,9 +246,7 @@ fn baseline_for_benchmark<'a>(
 
         // Coding
         name if name.contains("HumanEvalMini") => Some(("humaneval_pass_at_1", &bl.coding)),
-        name if name.contains("BugDetection") => {
-            Some(("bug_category_accuracy", &bl.coding))
-        }
+        name if name.contains("BugDetection") => Some(("bug_category_accuracy", &bl.coding)),
         name if name.contains("AlgorithmRecognition") => {
             Some(("algorithm_recognition_accuracy", &bl.coding))
         }

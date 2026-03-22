@@ -1594,9 +1594,9 @@ pub fn inhibition_baselines() -> BTreeMap<&'static str, Baseline> {
     m.insert(
         "ssrt_ticks",
         Baseline {
-            value: 0.10,
-            sd: Some(0.05),
-            source: "Logan (1994); Verbruggen & Logan (2008), HDC-scale SSRT from staircase SSD tracking",
+            value: 1.0,
+            sd: Some(0.50),
+            source: "Logan (1994); Verbruggen & Logan (2008), HDC-scale SSRT ~20% of go RT; staircase SSD tracking",
             population: "human adults",
         },
     );

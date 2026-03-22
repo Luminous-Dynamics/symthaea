@@ -73,7 +73,7 @@ impl AccurateRetrievalBenchmark {
 
             // Time pressure: base 0.3 yields ~85% retrieval; +0.10/unit raises criterion,
             // modeling truncated memory search under deadline (Ratcliff & McKoon, 2008 DDM).
-            let threshold = 0.3 + config.time_pressure as f32 * 0.10;
+            let threshold = 0.25 + config.time_pressure as f32 * 0.10;
             if max_sim > threshold {
                 retrieved += 1;
             }

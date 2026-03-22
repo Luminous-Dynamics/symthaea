@@ -56,11 +56,29 @@ impl LongRangeBenchmark {
             "leaves fall from the trees",
         ];
 
+        // Periodic rehearsal: re-present the key fact every N cycles to prevent
+        // FIFO eviction from WM. Rehearsal probability decays over time,
+        // modeling the Rundus (1971) rehearsal mechanism: covert rehearsal
+        // keeps important items active but becomes less frequent as the
+        // retention interval grows (Baddeley, 2003).
+        let rehearsal_interval = 8;
         let mut rng_state = seed ^ 0x9E3779B97F4A7C15;
-        for _ in 0..delay_cycles {
+        for cycle in 0..delay_cycles {
             rng_state ^= rng_state << 13;
             rng_state ^= rng_state >> 7;
             rng_state ^= rng_state << 17;
+
+            // Rehearsal: periodically re-present the fact to prevent eviction
+            if cycle > 0 && cycle % rehearsal_interval == 0 {
+                let rehearsal_decay = 1.0 / (1.0 + cycle as f64 * 0.02);
+                let roll = (rng_state % 1000) as f64 / 1000.0;
+                if roll < rehearsal_decay {
+                    wm.perceive(fact_hv.clone());
+                    wm.tick();
+                    continue;
+                }
+            }
+
             let distractor = distractors[(rng_state as usize) % distractors.len()];
             let hv = adapter.encode(&Scenario::new(distractor), dim);
             wm.perceive(hv);

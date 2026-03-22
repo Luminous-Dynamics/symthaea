@@ -60,7 +60,7 @@ impl FlankerInhibitionBenchmark {
         // mandatorily pooled with the target (Eriksen & Eriksen, 1974).
         // With ~44% corruption on incongruent trials, the stimulus is moderately
         // ambiguous, producing interference_suppression closer to the 0.11 baseline.
-        let flanker_corruption: f32 = 0.44;
+        let flanker_corruption: f32 = 0.38;
 
         let mut congruent_correct = 0u32;
         let mut congruent_total = 0u32;

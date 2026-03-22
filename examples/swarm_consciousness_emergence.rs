@@ -109,11 +109,23 @@ fn compute_snapshot(tick: u64, states: &[MindState], n_byzantine: usize) -> Swar
     let mut pairwise = Vec::with_capacity(n * (n - 1) / 2);
     for i in 0..n {
         for j in (i + 1)..n {
-            pairwise.push(
-                states[i]
+            // Guard against dimension mismatch (cognitive loop may expand dims)
+            if states[i].current_thought.dim() == states[j].current_thought.dim() {
+                pairwise.push(
+                    states[i]
+                        .current_thought
+                        .similarity(&states[j].current_thought),
+                );
+            } else {
+                // Truncate to smaller dimension for comparison
+                let min_dim = states[i]
                     .current_thought
-                    .similarity(&states[j].current_thought),
-            );
+                    .dim()
+                    .min(states[j].current_thought.dim());
+                let a = ContinuousHV::from_slice(&states[i].current_thought.as_slice()[..min_dim]);
+                let b = ContinuousHV::from_slice(&states[j].current_thought.as_slice()[..min_dim]);
+                pairwise.push(a.similarity(&b));
+            }
         }
     }
 

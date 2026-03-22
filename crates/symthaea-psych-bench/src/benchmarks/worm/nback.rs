@@ -104,7 +104,22 @@ impl NBackBenchmark {
                     }
                 }
 
-                let responded_match = nback_retained && (match_sim > match_threshold || lure_match);
+                let mut responded_match =
+                    nback_retained && (match_sim > match_threshold || lure_match);
+
+                // Lapse rate: on a fraction of trials, randomly override the response
+                if config.lapse_rate > 0.0 {
+                    rng_state ^= rng_state << 13;
+                    rng_state ^= rng_state >> 7;
+                    rng_state ^= rng_state << 17;
+                    if (rng_state % 1000) < (config.lapse_rate * 1000.0) as u64 {
+                        // Random 50/50 match/no-match
+                        rng_state ^= rng_state << 13;
+                        rng_state ^= rng_state >> 7;
+                        rng_state ^= rng_state << 17;
+                        responded_match = (rng_state % 2) == 0;
+                    }
+                }
                 let margin = (match_sim - match_threshold).abs() as f64;
                 // Time pressure reduces deliberation ticks
                 let rt_scale = 1.0 - config.time_pressure * 0.4;

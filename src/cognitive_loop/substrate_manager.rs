@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Substrate independence manager.
 //!
 //! Consolidates the 6 substrate-related fields from CognitiveLoopService
@@ -443,6 +440,7 @@ impl SubstrateManager {
             SubstrateType::BiochemicalComputer => SubstrateRequirements::biochemical_computer(),
             SubstrateType::HybridSystem => SubstrateRequirements::hybrid_system(),
             SubstrateType::ExoticSubstrate => SubstrateRequirements::exotic_substrate(),
+            SubstrateType::SpacecraftComputer => SubstrateRequirements::spacecraft_computer(),
             _ => SubstrateRequirements::silicon_digital(),
         }
     }
@@ -491,6 +489,7 @@ impl SubstrateManager {
             SubstrateType::SiliconDigital => Some("silicon"),
             SubstrateType::QuantumComputer => Some("quantum"),
             SubstrateType::HybridSystem => Some("hybrid"),
+            SubstrateType::SpacecraftComputer => Some("spacecraft"),
             _ => None,
         }
     }

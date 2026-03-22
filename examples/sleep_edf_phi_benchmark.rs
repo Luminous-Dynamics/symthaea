@@ -147,24 +147,27 @@ struct EpochResult {
 }
 
 fn process_recording(psg_path: &Path, hyp_path: &Path) -> Result<Vec<EpochResult>, String> {
-    use symthaea::perception::physio::edf_loader::{EdfFile, SleepStage};
+    use symthaea::perception::physio::edf_loader::EdfFile;
     use symthaea::perception::physio::sleep_sentinel::{SleepSentinel, SleepSentinelConfig};
 
-    // Load PSG recording
-    let psg = EdfFile::load(psg_path).map_err(|e| format!("Failed to load PSG: {}", e))?;
-    let hyp = EdfFile::load(hyp_path).map_err(|e| format!("Failed to load Hypnogram: {}", e))?;
+    // Load PSG recording, then load hypnogram annotations into it
+    let mut psg = EdfFile::load(psg_path).map_err(|e| format!("Failed to load PSG: {}", e))?;
+    psg.load_hypnogram(hyp_path)
+        .map_err(|e| format!("Failed to load Hypnogram: {}", e))?;
 
-    // Find frontal (Fpz-Cz) and occipital (Pz-Oz) channels
+    // Find frontal (Fpz-Cz) and occipital (Pz-Oz) channels by exact label match.
+    // The generic is_frontal()/is_occipital() methods have false-positive overlap
+    // because "Fpz" contains both "F"+"CZ" and "PZ" substrings.
     let frontal_idx = psg
         .signals
         .iter()
-        .position(|s| s.is_frontal())
-        .ok_or("No frontal EEG channel found")?;
+        .position(|s| s.label.contains("Fpz"))
+        .ok_or("No frontal EEG channel (Fpz) found")?;
     let occipital_idx = psg
         .signals
         .iter()
-        .position(|s| s.is_occipital())
-        .ok_or("No occipital EEG channel found")?;
+        .position(|s| s.label.contains("Pz-Oz") || s.label.contains("Pz-OZ"))
+        .ok_or("No occipital EEG channel (Pz-Oz) found")?;
 
     let frontal = &psg.signals[frontal_idx];
     let occipital = &psg.signals[occipital_idx];
@@ -175,8 +178,8 @@ fn process_recording(psg_path: &Path, hyp_path: &Path) -> Result<Vec<EpochResult
         frontal.label, frontal.sample_rate, occipital.label, occipital.sample_rate
     );
 
-    // Parse hypnogram annotations into epoch stages
-    let epoch_stages = parse_hypnogram(&hyp);
+    // Use annotations loaded from hypnogram
+    let epoch_stages: Vec<_> = psg.annotations.iter().map(|ann| ann.stage).collect();
     println!("  Hypnogram: {} annotated epochs", epoch_stages.len());
 
     // Configure SleepSentinel
@@ -230,16 +233,6 @@ fn process_recording(psg_path: &Path, hyp_path: &Path) -> Result<Vec<EpochResult
     }
 
     Ok(results)
-}
-
-fn parse_hypnogram(
-    hyp: &symthaea::perception::physio::edf_loader::EdfFile,
-) -> Vec<symthaea::perception::physio::edf_loader::SleepStage> {
-    use symthaea::perception::physio::edf_loader::SleepStage;
-    hyp.annotations
-        .iter()
-        .map(|ann| SleepStage::from_annotation(&ann.annotation))
-        .collect()
 }
 
 fn print_stage_table(results: &BTreeMap<String, Vec<EpochResult>>) {

@@ -426,10 +426,7 @@ impl BugDetectionBenchmark {
             let delta = buggy_hv.bind(&fixed_hv);
             let kw_hv = encode_bug_keywords(snippet.keywords, &role_kw, xor_shift(&mut rng));
             // Combine delta (what changed) with keywords (what type of bug)
-            let combined = BinaryHV::bundle(&[
-                role_delta.bind(&delta),
-                kw_hv,
-            ]);
+            let combined = BinaryHV::bundle(&[role_delta.bind(&delta), kw_hv]);
             category_combined[snippet.bug_category.index()].push(combined);
         }
 
@@ -478,10 +475,7 @@ impl BugDetectionBenchmark {
 
             // Build combined encoding for the test snippet (delta + keywords)
             let kw_hv = encode_bug_keywords(snippet.keywords, &role_kw, xor_shift(&mut rng));
-            let test_combined = BinaryHV::bundle(&[
-                role_delta.bind(&delta),
-                kw_hv,
-            ]);
+            let test_combined = BinaryHV::bundle(&[role_delta.bind(&delta), kw_hv]);
 
             // Leave-one-out prototype
             let within_cat_idx = snippets[..snippet_idx]
@@ -740,8 +734,7 @@ mod tests {
         let r1 = BugDetectionBenchmark.run(&config);
         let r2 = BugDetectionBenchmark.run(&config);
         assert_eq!(
-            r1.metrics["category_accuracy"].mean,
-            r2.metrics["category_accuracy"].mean,
+            r1.metrics["category_accuracy"].mean, r2.metrics["category_accuracy"].mean,
             "Same seed should produce identical results"
         );
     }
@@ -785,5 +778,4 @@ mod tests {
             assert_eq!(count, 5, "Category {} should have 5 snippets", cat.name());
         }
     }
-
 }

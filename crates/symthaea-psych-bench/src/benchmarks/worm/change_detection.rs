@@ -154,7 +154,28 @@ impl ChangeDetectionBenchmark {
         let decision_margin = ((sim_to_original - sim_to_probe).abs() as f64).min(1.0);
         let rt_ticks = 4.0 + (1.0 - decision_margin) * 7.0;
 
-        let acc = if correct { 1.0 } else { 0.0 };
+        // Lapse rate: on a fraction of trials, randomly guess same/different
+        // (models attention lapses; Rouder et al. 2008 WM capacity individual differences)
+        let acc = if config.lapse_rate > 0.0 {
+            let lapse_seed = config.trial_seed("worm", "cd_lapse", trial_idx);
+            if (lapse_seed % 10000) as f64 / 10000.0 < config.lapse_rate {
+                // Random 50/50 guess
+                let guess_correct = (lapse_seed.wrapping_mul(0x517CC1B727220A95) % 2) == 0;
+                if guess_correct {
+                    1.0
+                } else {
+                    0.0
+                }
+            } else if correct {
+                1.0
+            } else {
+                0.0
+            }
+        } else if correct {
+            1.0
+        } else {
+            0.0
+        };
         (acc, rt_ticks)
     }
 }

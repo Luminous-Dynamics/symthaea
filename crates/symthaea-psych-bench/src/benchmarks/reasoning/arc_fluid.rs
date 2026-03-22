@@ -223,6 +223,23 @@ impl ArcFluidBenchmark {
                 // to the correct output than at least 2 of 3 distractors (other
                 // transforms applied to the same test input). More robust than
                 // single-distractor 2-AFC but not as strict as unanimous 4-AFC.
+                //
+                // Lapse rate: on lapse trials, noise is injected into similarity
+                // comparisons, modeling attentional lapses that degrade discriminability
+                // (Chollet 2019 — careless errors on easy items).
+                let lapse_noise = if config.lapse_rate > 0.0 {
+                    xor_shift(&mut rng);
+                    if (rng % 1000) < (config.lapse_rate * 1000.0) as u64 {
+                        // Lapse trial: add substantial noise to similarity comparisons
+                        xor_shift(&mut rng);
+                        let noise_val = (rng % 1000) as f64 / 1000.0 * 0.3 - 0.15;
+                        noise_val
+                    } else {
+                        0.0
+                    }
+                } else {
+                    0.0
+                };
                 let mut wins = 0u32;
                 for (other_idx, &other_type) in TASK_TYPES.iter().enumerate() {
                     if other_idx == type_idx {
@@ -231,7 +248,7 @@ impl ArcFluidBenchmark {
                     let dist_output = apply_transform(&test_input, other_type, task_param);
                     let dist_hv = encoder.encode_grid(&dist_output);
                     let dist_sim = predicted.similarity(&dist_hv) as f64;
-                    if pred_sim > dist_sim {
+                    if (pred_sim + lapse_noise) > dist_sim {
                         wins += 1;
                     }
                 }

@@ -71,7 +71,6 @@ if [ -d "${STANDALONE_REPO}/.git" ]; then
 else
     info "Cloning standalone repo..."
     GIT_LFS_SKIP_SMUDGE=1 git clone "${STANDALONE_REMOTE}" "${STANDALONE_REPO}"
-    git -C "${STANDALONE_REPO}" lfs pull 2>/dev/null || true
 fi
 echo
 
@@ -441,9 +440,10 @@ echo
 
 info "Changes in standalone repo:"
 echo
-# Use home directory for LFS temp to avoid /tmp space exhaustion
-git -C "${STANDALONE_REPO}" config lfs.storage "${HOME}/.lfs-cache/standalone"
-git -C "${STANDALONE_REPO}" add -A
+# Stage all changes EXCEPT LFS-tracked binaries (avoid clean filter failures on /tmp)
+git -C "${STANDALONE_REPO}" add -A -- ':!*.bin'
+# Re-add .gitattributes in case it changed (LFS tracking config)
+git -C "${STANDALONE_REPO}" add .gitattributes 2>/dev/null || true
 git -C "${STANDALONE_REPO}" diff --cached --stat
 echo
 

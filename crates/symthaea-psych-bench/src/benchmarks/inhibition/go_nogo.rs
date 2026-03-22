@@ -58,7 +58,7 @@ impl GoNoGoBenchmark {
         let shared = ContinuousHV::random(dim, seed.wrapping_add(50));
         let go_unique = ContinuousHV::random(dim, seed.wrapping_add(100));
         let nogo_unique = ContinuousHV::random(dim, seed.wrapping_add(200));
-        let overlap: f32 = 0.40;
+        let overlap: f32 = 0.35;
         let go_proto =
             ContinuousHV::weighted_bundle(&[&go_unique, &shared], &[1.0 - overlap, overlap]);
         let nogo_proto =
@@ -67,7 +67,7 @@ impl GoNoGoBenchmark {
         let pressure = config.time_pressure;
         let temp_mult = diff_model.temperature_multiplier(config.difficulty);
         let go_threshold: f64 = 0.12 - pressure * 0.06;
-        let nogo_threshold: f64 = 0.32 - pressure * 0.10;
+        let nogo_threshold: f64 = 0.28 - pressure * 0.10;
         let temperature: f64 = (0.25 + pressure * 0.15) * temp_mult;
 
         let total_trials = 100;

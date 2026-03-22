@@ -1872,6 +1872,18 @@ mod tests {
         assert!(SWARM_COLLECTIVE_PHI_LR_CAP > 0.0);
         assert!(SWARM_ISOLATION_THRESHOLD > 0.0 && SWARM_ISOLATION_THRESHOLD < 1.0);
 
+        // Space alerts
+        assert!(SPACE_CONJUNCTION_AROUSAL > 0.0 && SPACE_CONJUNCTION_AROUSAL < 0.5);
+        assert!(SPACE_DEBRIS_AROUSAL > 0.0 && SPACE_DEBRIS_AROUSAL < 0.5);
+        assert!(SPACE_DEBRIS_AROUSAL > SPACE_CONJUNCTION_AROUSAL); // debris more threatening
+        assert!(SPACE_DEBRIS_VALENCE < 0.0); // negative affect
+        assert!(SPACE_DEBRIS_CONFIDENCE < 0.0); // uncertainty reduces confidence
+        assert!(SPACE_COMM_CONFIDENCE > 0.0); // opportunity boosts confidence
+        assert!(SPACE_COMM_LR_BOOST > 0.0 && SPACE_COMM_LR_BOOST < 0.5);
+        assert!(SPACE_CONJUNCTION_EXPLORATION > 0.0);
+        assert!(SPACE_ANOMALY_AROUSAL > 0.0 && SPACE_ANOMALY_AROUSAL < 0.5);
+        assert!(SPACE_MANEUVER_CONFIDENCE > 0.0 && SPACE_MANEUVER_CONFIDENCE < 0.1);
+
         // Trust manager
         assert!(TRUST_VIOLATION_SLASH_FACTOR > 0.0 && TRUST_VIOLATION_SLASH_FACTOR < 1.0);
         assert!(TRUST_VIOLATION_AROUSAL_CAP > 0.0);

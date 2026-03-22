@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Property tests for substrate independence.
 //!
 //! Validates that substrate switching, feasibility computation, and
@@ -13,7 +10,7 @@ use symthaea_core::hdc::substrate_independence::SubstrateType;
 use crate::cognitive_loop::config::CognitiveLoopConfig;
 use crate::cognitive_loop::substrate_manager::SubstrateManager;
 
-/// Strategy: random SubstrateType from all 8 variants.
+/// Strategy: random SubstrateType from all 9 variants.
 fn substrate_strategy() -> impl Strategy<Value = SubstrateType> {
     prop_oneof![
         Just(SubstrateType::BiologicalNeurons),
@@ -24,6 +21,7 @@ fn substrate_strategy() -> impl Strategy<Value = SubstrateType> {
         Just(SubstrateType::BiochemicalComputer),
         Just(SubstrateType::HybridSystem),
         Just(SubstrateType::ExoticSubstrate),
+        Just(SubstrateType::SpacecraftComputer),
     ]
 }
 

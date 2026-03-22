@@ -1,9 +1,5 @@
 [
     {
-        "merged": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-mergeDebugResources-34:/layout/activity_main.xml",
-        "source": "/home/tstoltz/.gradle/daemon/8.5/io.symthaea.soma.demo-main-37:/layout/activity_main.xml"
-    },
-    {
         "merged": "io.symthaea.soma.demo-mergeDebugResources-34:/layout/activity_main.xml",
         "source": "io.symthaea.soma.demo-main-37:/layout/activity_main.xml"
     }

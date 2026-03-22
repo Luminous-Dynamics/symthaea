@@ -557,19 +557,30 @@ impl CognitiveLoopService {
                 {
                     let processed = self.holon_receiver.process_inbound(cycle_num as u64);
                     if processed > 0 {
-                        // Register Soma peers as swarm peers (oxytocin social buffering)
-                        for peer in self.holon_receiver.peers() {
+                        // Collect peer data into local vec (avoid borrow conflict with swarm_manager)
+                        let peer_updates: Vec<_> = self
+                            .holon_receiver
+                            .peers()
+                            .map(|p| {
+                                (
+                                    p.device_id.clone(),
+                                    p.phi as f64,
+                                    p.valence as f64,
+                                    p.arousal as f64,
+                                )
+                            })
+                            .collect();
+                        for (peer_id, phi, valence, arousal) in peer_updates {
                             use super::managers::swarm_manager::SwarmEvent;
                             self.swarm_manager
                                 .inject_event(SwarmEvent::ConsciousnessUpdate {
-                                    peer_id: peer.device_id.clone(),
-                                    phi: peer.phi as f64,
-                                    valence: peer.valence as f64,
-                                    arousal: peer.arousal as f64,
+                                    peer_id,
+                                    phi,
+                                    valence,
+                                    arousal,
                                 });
                         }
                     }
-                    // Evict peers not seen for 500 cycles (~25s at 20Hz)
                     self.holon_receiver.evict_stale(cycle_num as u64, 500);
                 }
 

@@ -43,8 +43,10 @@ id bottomSheet
 id brocaText
 id btnCheckpoint
 id btnDream
+id btnEvening
 id btnHolon
 id btnMic
+id btnMorning
 id btnOllama
 id btnSend
 id btnSleep

@@ -1,11 +1,11 @@
 1<?xml version="1.0" encoding="utf-8"?>
 2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-3    package="io.symthaea.soma.demo"
+3    package="io.symthaea.soma.demo.debug"
 4    android:versionCode="1"
 5    android:versionName="0.1.0" >
 6
 7    <uses-sdk
-8        android:minSdkVersion="24"
+8        android:minSdkVersion="26"
 9        android:targetSdkVersion="34" />
 10
 11    <!-- Sensors: high-rate accel/gyro for motion detection -->
@@ -43,12 +43,12 @@
 25
 26    <permission
 26-->[androidx.core:core:1.12.0] /home/tstoltz/.gradle/caches/transforms-3/f23e95a0fb0ac81f840512f02915cc80/transformed/core-1.12.0/AndroidManifest.xml:22:5-24:47
-27        android:name="io.symthaea.soma.demo.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+27        android:name="io.symthaea.soma.demo.debug.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
 27-->[androidx.core:core:1.12.0] /home/tstoltz/.gradle/caches/transforms-3/f23e95a0fb0ac81f840512f02915cc80/transformed/core-1.12.0/AndroidManifest.xml:23:9-81
 28        android:protectionLevel="signature" />
 28-->[androidx.core:core:1.12.0] /home/tstoltz/.gradle/caches/transforms-3/f23e95a0fb0ac81f840512f02915cc80/transformed/core-1.12.0/AndroidManifest.xml:24:9-44
 29
-30    <uses-permission android:name="io.symthaea.soma.demo.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+30    <uses-permission android:name="io.symthaea.soma.demo.debug.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
 30-->[androidx.core:core:1.12.0] /home/tstoltz/.gradle/caches/transforms-3/f23e95a0fb0ac81f840512f02915cc80/transformed/core-1.12.0/AndroidManifest.xml:26:5-97
 30-->[androidx.core:core:1.12.0] /home/tstoltz/.gradle/caches/transforms-3/f23e95a0fb0ac81f840512f02915cc80/transformed/core-1.12.0/AndroidManifest.xml:26:22-94
 31
@@ -97,13 +97,13 @@
 56             Dream consolidation runs overnight, sensors stay active.
 57        -->
 58        <service
-58-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:40:9-43:74
+58-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:40:9-43:58
 59            android:name="io.symthaea.soma.SomaEngineService"
 59-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:41:13-62
 60            android:exported="false"
 60-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:42:13-37
-61            android:foregroundServiceType="specialUse|mediaProjection" />
-61-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:43:13-71
+61            android:foregroundServiceType="specialUse" />
+61-->/srv/luminous-dynamics/symthaea/crates/symthaea-soma/android/demo/src/main/AndroidManifest.xml:43:13-55
 62
 63        <!--
 64             Notification listener for social pressure + media state bridges.
@@ -130,7 +130,7 @@
 77-->[androidx.emoji2:emoji2:1.2.0] /home/tstoltz/.gradle/caches/transforms-3/560b3320b5e61dc7c87e3e76308c9efd/transformed/emoji2-1.2.0/AndroidManifest.xml:24:9-32:20
 78            android:name="androidx.startup.InitializationProvider"
 78-->[androidx.emoji2:emoji2:1.2.0] /home/tstoltz/.gradle/caches/transforms-3/560b3320b5e61dc7c87e3e76308c9efd/transformed/emoji2-1.2.0/AndroidManifest.xml:25:13-67
-79            android:authorities="io.symthaea.soma.demo.androidx-startup"
+79            android:authorities="io.symthaea.soma.demo.debug.androidx-startup"
 79-->[androidx.emoji2:emoji2:1.2.0] /home/tstoltz/.gradle/caches/transforms-3/560b3320b5e61dc7c87e3e76308c9efd/transformed/emoji2-1.2.0/AndroidManifest.xml:26:13-68
 80            android:exported="false" >
 80-->[androidx.emoji2:emoji2:1.2.0] /home/tstoltz/.gradle/caches/transforms-3/560b3320b5e61dc7c87e3e76308c9efd/transformed/emoji2-1.2.0/AndroidManifest.xml:27:13-37

@@ -470,6 +470,43 @@ pub const SWARM_ISOLATION_THRESHOLD: f64 = 0.2;
 /// Exploration boost when isolated (no connected peers).
 pub const SWARM_ISOLATION_EXPLORATION_BOOST: f64 = 0.05;
 
+// ── Space alerts (feature: space-alerts) ─────────────────────────────────
+
+/// Arousal delta from conjunction warning.
+/// Basis: Kahneman (2011) — threat salience drives attentional capture.
+pub const SPACE_CONJUNCTION_AROUSAL: f32 = 0.10;
+
+/// Arousal delta from debris proximity (fight-or-flight analogue).
+/// Basis: Cannon (1929) — acute threat triggers sympathetic arousal.
+pub const SPACE_DEBRIS_AROUSAL: f32 = 0.15;
+
+/// Valence delta from debris threat (negative affect).
+/// Basis: LeDoux (2003) — amygdala-mediated aversive valence.
+pub const SPACE_DEBRIS_VALENCE: f32 = -0.08;
+
+/// Confidence reduction from debris uncertainty.
+/// Basis: Kahneman & Tversky (1979) — uncertainty reduces decision confidence.
+pub const SPACE_DEBRIS_CONFIDENCE: f32 = -0.10;
+
+/// Confidence boost from communication window opportunity.
+/// Basis: Heinrichs (2003) — social/resource access buffers stress.
+pub const SPACE_COMM_CONFIDENCE: f32 = 0.05;
+
+/// Learning rate boost during communication windows.
+/// Basis: Schultz (1997) — reward prediction boosts dopaminergic learning.
+pub const SPACE_COMM_LR_BOOST: f32 = 0.10;
+
+/// Exploration boost from conjunction (search for alternatives).
+/// Basis: Aston-Jones & Cohen (2005) — threat uncertainty promotes exploration.
+pub const SPACE_CONJUNCTION_EXPLORATION: f32 = 0.05;
+
+/// Arousal delta from orbital anomaly detection.
+/// Basis: Sokolov (1963) — orienting response to unexpected stimuli.
+pub const SPACE_ANOMALY_AROUSAL: f32 = 0.08;
+
+/// Confidence boost from maneuver announcement (neutral information).
+pub const SPACE_MANEUVER_CONFIDENCE: f32 = 0.03;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // TRUST MANAGER — Violation response, anomaly detection
 // Basis: Zak (2012) — trust/oxytocin; Dunbar (1998) — social brain

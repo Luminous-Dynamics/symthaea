@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-circular"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+description = "Waste classification and decomposition prediction via HDC"
+
+[workspace]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }

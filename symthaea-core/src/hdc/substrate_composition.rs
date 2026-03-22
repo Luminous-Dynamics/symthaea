@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 // Substrate Composition: Weighted Mixtures of Substrates
 //
 // Models heterogeneous systems where consciousness runs on a weighted
@@ -232,6 +229,7 @@ fn requirements_for(substrate: SubstrateType) -> SubstrateRequirements {
         SubstrateType::BiochemicalComputer => SubstrateRequirements::biochemical_computer(),
         SubstrateType::HybridSystem => SubstrateRequirements::hybrid_system(),
         SubstrateType::ExoticSubstrate => SubstrateRequirements::exotic_substrate(),
+        SubstrateType::SpacecraftComputer => SubstrateRequirements::spacecraft_computer(),
         _ => SubstrateRequirements::silicon_digital(),
     }
 }

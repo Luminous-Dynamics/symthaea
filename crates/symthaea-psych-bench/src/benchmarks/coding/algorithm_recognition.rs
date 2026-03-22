@@ -227,10 +227,8 @@ fn encode_code(code: &str, seed_offset: u64) -> BinaryHV {
         .windows(3)
         .map(|w| {
             let seed = (w[0] as u64) | ((w[1] as u64) << 8) | ((w[2] as u64) << 16);
-            let mixed = seed
-                .wrapping_mul(0x100000001b3)
-                .wrapping_add(seed_offset)
-                ^ 0xcbf29ce484222325;
+            let mixed =
+                seed.wrapping_mul(0x100000001b3).wrapping_add(seed_offset) ^ 0xcbf29ce484222325;
             BinaryHV::random(mixed)
         })
         .collect();
@@ -294,17 +292,12 @@ impl AlgorithmRecognitionBenchmark {
             let code_hv = encode_code(snippet.code, xor_shift(&mut rng));
             let kw_hv = encode_keywords(snippet.keywords, &role_keyword, xor_shift(&mut rng));
             // Combine code surface features with structural keywords
-            let combined = BinaryHV::bundle(&[
-                role_code.bind(&code_hv),
-                kw_hv,
-            ]);
+            let combined = BinaryHV::bundle(&[role_code.bind(&code_hv), kw_hv]);
             family_hvs[snippet.family.index()].push(combined);
         }
 
-        let family_prototypes: Vec<BinaryHV> = family_hvs
-            .iter()
-            .map(|hvs| BinaryHV::bundle(hvs))
-            .collect();
+        let family_prototypes: Vec<BinaryHV> =
+            family_hvs.iter().map(|hvs| BinaryHV::bundle(hvs)).collect();
 
         // Leave-one-out classification
         let mut hits = 0u32;
@@ -328,10 +321,7 @@ impl AlgorithmRecognitionBenchmark {
                 code_hv = code_hv.add_noise(lapse_flip_prob.min(0.49), xor_shift(&mut rng));
             }
 
-            let test_hv = BinaryHV::bundle(&[
-                role_code.bind(&code_hv),
-                kw_hv,
-            ]);
+            let test_hv = BinaryHV::bundle(&[role_code.bind(&code_hv), kw_hv]);
 
             // Leave-one-out: rebuild family prototype without this snippet
             let within_family_idx = snippets[..snippet_idx]
@@ -452,13 +442,8 @@ impl PsychBenchmark for AlgorithmRecognitionBenchmark {
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
         let mut accuracies = Vec::new();
         let mut confidences = Vec::new();
-        let mut per_fam: [Vec<f64>; 5] = [
-            Vec::new(),
-            Vec::new(),
-            Vec::new(),
-            Vec::new(),
-            Vec::new(),
-        ];
+        let mut per_fam: [Vec<f64>; 5] =
+            [Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()];
         let mut trace = Vec::new();
 
         for trial in 0..config.trials_per_condition {
@@ -473,10 +458,7 @@ impl PsychBenchmark for AlgorithmRecognitionBenchmark {
             }
         }
 
-        result.insert(
-            "algorithm_accuracy",
-            MetricValue::from_samples(&accuracies),
-        );
+        result.insert("algorithm_accuracy", MetricValue::from_samples(&accuracies));
         result.insert(
             "confidence_discrimination",
             MetricValue::from_samples(&confidences),
@@ -597,5 +579,4 @@ mod tests {
             assert_eq!(count, 5, "Family {} should have 5 snippets", fam.name());
         }
     }
-
 }

@@ -54,9 +54,11 @@ impl RewardLearningBenchmark {
         // Asymmetric learning rates (Frank et al., 2007): phasic DA dips
         // (negative RPE) drive faster unlearning than DA bursts drive acquisition.
         // This is a core feature of the basal ganglia Go/NoGo pathway asymmetry.
-        let lr_pos = 0.15; // DA burst → Go pathway
-        let lr_neg = 0.25; // DA dip → NoGo pathway (faster unlearning)
-        let base_temperature = 0.3;
+        let lr_pos = 0.15 * (1.0 - config.lapse_rate * 0.5); // DA burst → Go pathway
+                                                             // Lapse_rate also degrades learning rate — models reduced
+                                                             // encoding under attentional lapses (Daw et al. 2006).
+        let lr_neg = 0.25 * (1.0 - config.lapse_rate * 0.5);
+        let base_temperature = 0.3 + config.lapse_rate * 0.15; // noisier choices
 
         // Lapse rate: random responding on a fraction of trials (models
         // attention lapses / individual differences for ICC reliability)
@@ -66,7 +68,9 @@ impl RewardLearningBenchmark {
         let criterion = 0.8;
 
         for _trial in 0..40 {
-            let choice = if lapse_rate > 0.0 && (next_seed(&mut rng) % 10000) as f64 / 10000.0 < lapse_rate {
+            let choice = if lapse_rate > 0.0
+                && (next_seed(&mut rng) % 10000) as f64 / 10000.0 < lapse_rate
+            {
                 (next_seed(&mut rng) % 2) as usize // random lapse
             } else {
                 softmax_choice(&q_values, base_temperature, &mut rng)
@@ -102,7 +106,9 @@ impl RewardLearningBenchmark {
             // RPE is high (unexpected non-reward increases uncertainty → exploration)
             let temperature = base_temperature + recent_rpe_magnitude * 0.15;
 
-            let choice = if lapse_rate > 0.0 && (next_seed(&mut rng) % 10000) as f64 / 10000.0 < lapse_rate {
+            let choice = if lapse_rate > 0.0
+                && (next_seed(&mut rng) % 10000) as f64 / 10000.0 < lapse_rate
+            {
                 (next_seed(&mut rng) % 2) as usize
             } else {
                 softmax_choice(&q_values, temperature, &mut rng)

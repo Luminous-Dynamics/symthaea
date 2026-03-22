@@ -101,7 +101,26 @@ impl ReversalLearningBenchmark {
             rng ^= rng >> 7;
             rng ^= rng << 17;
             let roll = (rng % 10000) as f64 / 10000.0;
-            let chose_a = roll < (exp_a / total);
+            let chose_a_veridical = roll < (exp_a / total);
+
+            // Lapse: on a lapse trial, randomly choose A or B instead of using
+            // the learned reward associations (Cools et al., 2002 — attentional lapses
+            // degrade contingency tracking).
+            let chose_a = if config.lapse_rate > 0.0 {
+                rng ^= rng << 13;
+                rng ^= rng >> 7;
+                rng ^= rng << 17;
+                if (rng % 1000) < (config.lapse_rate * 1000.0) as u64 {
+                    rng ^= rng << 13;
+                    rng ^= rng >> 7;
+                    rng ^= rng << 17;
+                    rng % 2 == 0
+                } else {
+                    chose_a_veridical
+                }
+            } else {
+                chose_a_veridical
+            };
 
             // Track win-stay / lose-shift
             if let (Some(prev), Some(was_rewarded)) = (prev_choice, prev_rewarded) {

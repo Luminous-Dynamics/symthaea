@@ -47,7 +47,18 @@ impl YerkesDodsonBenchmark {
                 .map(|_| ContinuousHV::random(dim, next_seed(&mut rng)))
                 .collect();
 
-            for _ in 0..simple_trials {
+            for t in 0..simple_trials {
+                // Lapse: random responding on a fraction of trials
+                if config.lapse_rate > 0.0
+                    && (next_seed(&mut rng) % 1000) < (config.lapse_rate * 1000.0) as u64
+                {
+                    // Random 4-AFC guess: 25% chance correct
+                    if next_seed(&mut rng) % 4 == 0 {
+                        simple_correct += 1;
+                    }
+                    let _ = t;
+                    continue;
+                }
                 // NE modulates signal-to-noise: inverted-U
                 // Moderate NE: best focus. Low NE: sluggish. High NE: jittery.
                 let noise_scale = 1.0 - (1.0 - (ne - 0.6).powi(2) * 4.0).max(0.0);
@@ -78,8 +89,18 @@ impl YerkesDodsonBenchmark {
                 .map(|_| ContinuousHV::random(dim, next_seed(&mut rng)))
                 .collect();
 
-            for _ in 0..complex_trials {
+            for _t in 0..complex_trials {
                 let correct_idx = (next_seed(&mut rng) % 8) as usize;
+
+                // Lapse: random responding
+                if config.lapse_rate > 0.0
+                    && (next_seed(&mut rng) % 1000) < (config.lapse_rate * 1000.0) as u64
+                {
+                    if next_seed(&mut rng) % 8 == correct_idx as u64 {
+                        complex_correct += 1;
+                    }
+                    continue;
+                }
 
                 // Higher noise at extreme NE levels; complex tasks more sensitive
                 let noise_scale = 1.0 - (1.0 - (ne - 0.45).powi(2) * 5.0).max(0.0);

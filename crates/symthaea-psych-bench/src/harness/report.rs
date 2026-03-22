@@ -252,6 +252,9 @@ pub struct BenchmarkResult {
     /// Per-trial trace data (populated when `config.trial_trace` is true).
     #[serde(default)]
     pub trial_trace: Vec<super::trial_analysis::TrialOutcome>,
+    /// Optional notes (e.g. honesty disclaimers, comparison context).
+    #[serde(default)]
+    pub notes: Vec<String>,
 }
 
 impl BenchmarkResult {
@@ -265,6 +268,7 @@ impl BenchmarkResult {
             conditions: 0,
             trials_per_condition: 0,
             trial_trace: Vec::new(),
+            notes: Vec::new(),
         }
     }
 
@@ -932,11 +936,7 @@ impl BenchmarkReport {
             ("accuracy_at_scale", "accuracy_at_scale", &bl.security),
             // Coding domain
             ("pass_at_1", "humaneval_pass_at_1", &bl.coding),
-            (
-                "category_accuracy",
-                "bug_category_accuracy",
-                &bl.coding,
-            ),
+            ("category_accuracy", "bug_category_accuracy", &bl.coding),
             (
                 "algorithm_accuracy",
                 "algorithm_recognition_accuracy",
@@ -2142,7 +2142,7 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("EmotionalStroop") => "negative_accuracy",
         b if b.contains("Stroop") && !b.contains("Strange") => "incongruent_accuracy",
         b if b.contains("FlankerInhibition") => "interference_suppression",
-        b if b.contains("Flanker") => "flanker_effect",
+        b if b.contains("Flanker") => "incongruent_accuracy",
         b if b.contains("Wisconsin") || b.contains("WCST") => "categories_completed",
         b if b.contains("Iowa") || b.contains("IGT") => "overall_net_score",
         b if b.contains("Ravens") => "overall_accuracy",
@@ -2175,18 +2175,18 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("AttentionalBlink") => "lag3_t2_accuracy",
         b if b.contains("ProspectiveMemory") => "pm_hit_rate",
         b if b.contains("StopSignal") => "ssrt_ticks",
-        b if b.contains("VisualSearch") => "search_asymmetry",
+        b if b.contains("VisualSearch") => "conjunction_search_accuracy",
         b if b.contains("FeelingOfKnowing") => "fok_gamma",
         b if b.contains("DualTask") => "dual_task_cost",
         b if b.contains("SART") => "commission_errors",
         b if b.contains("PVT") => "vigilance_decrement",
         b if b.contains("CPT") => "d_prime",
-        b if b.contains("SRTT") => "learning_effect",
+        b if b.contains("SRTT") => "sequence_accuracy",
         b if b.contains("FittsLaw") => "fitts_r_squared",
         b if b.contains("Bimanual") => "coordination_cost",
         b if b.contains("GardenPath") => "disambiguation_cost",
         b if b.contains("SemanticCoherence") => "coherence_mean",
-        b if b.contains("LexicalDecision") => "lexicality_effect",
+        b if b.contains("LexicalDecision") => "word_accuracy",
         b if b.contains("SemanticPriming") => "priming_effect",
         b if b.contains("UltimatumGame") => "fairness_sensitivity",
         b if b.contains("PrisonersDilemma") => "cooperation_rate",
@@ -2625,6 +2625,22 @@ impl BenchmarkReport {
                             &bl.butlin,
                             &bl.inhibition,
                             &bl.attention,
+                            &bl.reasoning,
+                            &bl.sustained_attention,
+                            &bl.motor,
+                            &bl.language,
+                            &bl.social,
+                            &bl.binding,
+                            &bl.spatial,
+                            &bl.causal_reasoning,
+                            &bl.speech,
+                            &bl.consciousness,
+                            &bl.substrate,
+                            &bl.clinical,
+                            &bl.institutional_reasoning,
+                            &bl.mathematics,
+                            &bl.security,
+                            &bl.coding,
                         ];
                         baseline_maps.iter().find_map(|bm| {
                             bm.values()

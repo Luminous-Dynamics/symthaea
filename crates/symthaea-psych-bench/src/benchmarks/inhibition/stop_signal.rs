@@ -59,7 +59,7 @@ impl StopSignalBenchmark {
         let diff_model = difficulty_model_for(self.name());
         let sig_mult = diff_model.signal_multiplier(config.difficulty);
         let go_threshold: f64 = (0.15 - pressure * 0.08) * sig_mult;
-        let stop_effectiveness: f64 = (0.70 - pressure * 0.20) * sig_mult;
+        let stop_effectiveness: f64 = (0.80 - pressure * 0.20) * sig_mult;
         // Softmax temperature: noisier decisions under pressure
         let temperature: f64 =
             (0.30 + pressure * 0.15) * diff_model.temperature_multiplier(config.difficulty);

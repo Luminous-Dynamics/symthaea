@@ -1,6 +1,8 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root/*!
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+
+/*!
 Property-Based Tests for Voice Pipeline
 
 Fuzzes the vocal tract pipeline with random cognitive states, phoneme sequences,

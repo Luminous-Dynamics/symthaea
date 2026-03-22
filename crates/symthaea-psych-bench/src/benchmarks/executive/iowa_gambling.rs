@@ -148,6 +148,18 @@ impl IowaGamblingBenchmark {
                 }
             }
 
+            // Attention lapse: on a fraction of trials proportional to lapse_rate,
+            // randomly pick a deck instead of using the learned expected value.
+            // Models attentional failures that disrupt somatic marker guidance
+            // (Bechara et al., 1994; Denburg et al., 2005).
+            if config.lapse_rate > 0.0 {
+                let lapse_seed = config.trial_seed("igt", "lapse", trial);
+                if (lapse_seed % 10000) as f64 / 10000.0 < config.lapse_rate {
+                    let choice_seed = config.trial_seed("igt", "lapse_choice", trial);
+                    chosen = choice_seed as usize % 4;
+                }
+            }
+
             // RT proxy: decision difficulty from max probability spread
             let max_prob = probs.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
             let ticks = 4.0 + (1.0 - max_prob) * 8.0;

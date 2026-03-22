@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! SporeEngine: the core consciousness loop for WASM targets.
 
 use crate::broca::BrocaLite;
@@ -357,12 +354,8 @@ pub struct SporeEngine {
     // Conversation-level context for topic continuity
     conversation_context: ConversationContext,
 
-    // QOL trend history for personal trend tracking
     trend_history: crate::persistence::TrendHistory,
-
-    // Wellbeing profile — neuromodulator biases and temporal adjustments
     wellbeing: crate::wellbeing_profiles::WellbeingConfig,
-
     /// Optional persistence storage.
     storage: Option<Box<dyn crate::persistence::SporeStorage>>,
     /// Auto-checkpoint interval in cycles (0 = disabled).
@@ -589,11 +582,9 @@ impl SporeEngine {
         self.bath.serotonin.reuptake();
         self.bath.oxytocin.reuptake();
 
-        // Wellbeing profile bias — gentle additive nudge toward profile targets.
-        // Applied after reuptake, before PE-driven production. The bias is small
-        // enough (~0.03-0.10) to modulate tone without overriding dynamics.
+        // Wellbeing profile bias
         {
-            let bias = self.wellbeing.effective_bias(0.0); // allostatic_load is 0 in Spore (full CLS has it)
+            let bias = self.wellbeing.effective_bias(0.0);
             self.bath.dopamine.level =
                 (self.bath.dopamine.level + bias.dopamine * 0.1).clamp(0.0, 1.0);
             self.bath.noradrenaline.level =
@@ -858,7 +849,7 @@ impl SporeEngine {
             let _consolidation = self.consolidator.consolidate();
         }
 
-        // QOL trend recording (gated by sample interval inside TrendHistory)
+        // QOL trend recording
         self.trend_history
             .maybe_record(crate::persistence::QolSnapshot {
                 cycle: self.cycle_count,
@@ -868,10 +859,10 @@ impl SporeEngine {
                     .unwrap_or(0),
                 consciousness_level,
                 harmony_alignment,
-                metacog_accuracy: 0.0, // Full metacog only in CognitiveLoopService
-                allostatic_load: 0.0,  // Full allostatic only in CognitiveLoopService
+                metacog_accuracy: 0.0,
+                allostatic_load: 0.0,
                 dream_wisdom_count: self.dream_journal.count(),
-                coherence_score: consciousness_level, // Best proxy in Spore (full CLS has temporal coherence)
+                coherence_score: consciousness_level,
                 safety_level: self.immune.safety_level() as u8,
             });
 
@@ -1061,7 +1052,7 @@ impl SporeEngine {
         // Sync coordinator step
         self.memory.step = checkpoint.cycle;
 
-        // Restore QOL trend history (v2+)
+        // Restore QOL trend history
         if !checkpoint.trend_snapshots.is_empty() {
             self.trend_history = crate::persistence::TrendHistory::new();
             for snap in &checkpoint.trend_snapshots {
@@ -1631,83 +1622,45 @@ impl SporeEngine {
         self.dream_journal.count()
     }
 
-    // ======================================================================
-    // QOL Trend History
-    // ======================================================================
-
-    /// Get QOL trend snapshots as JSON.
     pub fn trend_snapshots_json(&self) -> String {
         self.trend_history.to_json()
     }
-
-    /// Get a trend summary as JSON.
     pub fn trend_summary_json(&self) -> String {
         serde_json::to_string(&self.trend_history.trend_summary())
             .unwrap_or_else(|_| "{}".to_string())
     }
-
-    /// Number of QOL trend snapshots stored.
     pub fn trend_snapshot_count(&self) -> usize {
         self.trend_history.count()
     }
-
-    /// Get the consciousness stability from the trend summary [0, 1].
     pub fn trend_summary_stability(&self) -> f32 {
         self.trend_history.trend_summary().consciousness_stability
     }
 
-    // ======================================================================
-    // Wellbeing Profiles
-    // ======================================================================
-
-    /// Set the active wellbeing profile.
     pub fn set_wellbeing_profile(&mut self, profile: crate::wellbeing_profiles::WellbeingProfile) {
         self.wellbeing = crate::wellbeing_profiles::WellbeingConfig::for_profile(profile);
     }
-
-    /// Set the wellbeing profile by name string.
-    /// Returns true if the profile was recognized and set.
     pub fn set_wellbeing_profile_by_name(&mut self, name: &str) -> bool {
-        if let Some(profile) = crate::wellbeing_profiles::WellbeingProfile::from_name(name) {
-            self.set_wellbeing_profile(profile);
+        if let Some(p) = crate::wellbeing_profiles::WellbeingProfile::from_name(name) {
+            self.set_wellbeing_profile(p);
             true
         } else {
             false
         }
     }
-
-    /// Get the current wellbeing profile name.
     pub fn wellbeing_profile_name(&self) -> &'static str {
         self.wellbeing.profile.name()
     }
-
-    /// Get the wellbeing configuration as JSON.
     pub fn wellbeing_config_json(&self) -> String {
         serde_json::to_string(&self.wellbeing).unwrap_or_else(|_| "{}".to_string())
     }
-
-    /// List all available wellbeing profiles as JSON array of {name, description}.
     pub fn wellbeing_profiles_json() -> String {
-        let profiles: Vec<serde_json::Value> = crate::wellbeing_profiles::WellbeingProfile::all()
+        let p: Vec<serde_json::Value> = crate::wellbeing_profiles::WellbeingProfile::all()
             .iter()
-            .map(|p| {
-                serde_json::json!({
-                    "name": p.name(),
-                    "description": p.description(),
-                })
-            })
+            .map(|p| serde_json::json!({"name": p.name(), "description": p.description()}))
             .collect();
-        serde_json::to_string(&profiles).unwrap_or_else(|_| "[]".to_string())
+        serde_json::to_string(&p).unwrap_or_else(|_| "[]".to_string())
     }
 
-    // ======================================================================
-    // Daily Rituals — Morning Alignment & Evening Reflection
-    // ======================================================================
-
-    /// Generate a Morning Alignment ritual sequence.
-    ///
-    /// Reads current consciousness state, dream journal, and harmony alignment
-    /// to produce a 3-phase ritual: Awakening → Dream Wisdom → Intention.
     pub fn generate_morning_ritual(&self) -> crate::daily_ritual::RitualSequence {
         let recent: Vec<crate::dream_journal::DreamFragment> = self
             .dream_journal
@@ -1717,42 +1670,27 @@ impl SporeEngine {
             .take(5)
             .cloned()
             .collect();
-
-        let ctx = crate::daily_ritual::MorningContext {
+        crate::daily_ritual::generate_morning(&crate::daily_ritual::MorningContext {
             consciousness_level: self.last_consciousness,
             dominant_harmony: self.dominant_harmony(),
             harmony_alignment: self.harmony_alignment(),
             recent_dreams: &recent,
-        };
-        crate::daily_ritual::generate_morning(&ctx)
+        })
     }
-
-    /// Generate an Evening Reflection ritual sequence.
-    ///
-    /// Produces a 3-phase ritual: Gratitude → Consolidation → Sleep Preparation.
-    /// Does NOT trigger dream consolidation — call `dream_consolidate()` separately
-    /// after the ritual playback completes so the user experiences the ritual first.
     pub fn generate_evening_ritual(&self) -> crate::daily_ritual::RitualSequence {
-        let ctx = crate::daily_ritual::EveningContext {
+        crate::daily_ritual::generate_evening(&crate::daily_ritual::EveningContext {
             consciousness_level: self.last_consciousness,
             dominant_harmony: self.dominant_harmony(),
             harmony_alignment: self.harmony_alignment(),
             cycle_count: self.cycle_count,
             dream_wisdom_count: self.dream_journal.count(),
-        };
-        crate::daily_ritual::generate_evening(&ctx)
+        })
     }
-
-    /// Generate a morning ritual as JSON string.
     pub fn morning_ritual_json(&self) -> String {
-        let seq = self.generate_morning_ritual();
-        serde_json::to_string(&seq).unwrap_or_else(|_| "{}".to_string())
+        serde_json::to_string(&self.generate_morning_ritual()).unwrap_or_else(|_| "{}".to_string())
     }
-
-    /// Generate an evening ritual as JSON string.
     pub fn evening_ritual_json(&self) -> String {
-        let seq = self.generate_evening_ritual();
-        serde_json::to_string(&seq).unwrap_or_else(|_| "{}".to_string())
+        serde_json::to_string(&self.generate_evening_ritual()).unwrap_or_else(|_| "{}".to_string())
     }
 
     // ======================================================================
@@ -2265,17 +2203,6 @@ impl SporeEngine {
         }
     }
 
-    /// JSON array of per-harmony scores [RC, PSF, IW, IP, UI, SR, EP, SS].
-    pub fn harmony_scores_json(&self) -> String {
-        let c = self.last_consciousness;
-        let scores: Vec<f32> = Harmony::all()
-            .iter()
-            .map(|h| self.harmony_score(h, c))
-            .collect();
-        serde_json::to_string(&scores)
-            .unwrap_or_else(|_| "[0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5]".into())
-    }
-
     /// Build the epistemic status that accompanies every cycle result.
     fn build_epistemic_status(&self) -> EpistemicStatus {
         // Gap between hypothetical feasibility and evidence confidence.
@@ -2612,6 +2539,7 @@ fn parse_substrate(name: &str) -> SubstrateType {
         "BiochemicalComputer" | "Biochemical" => SubstrateType::BiochemicalComputer,
         "HybridSystem" | "Hybrid" => SubstrateType::HybridSystem,
         "ExoticSubstrate" | "Exotic" => SubstrateType::ExoticSubstrate,
+        "SpacecraftComputer" | "Spacecraft" => SubstrateType::SpacecraftComputer,
         _ => SubstrateType::SiliconDigital,
     }
 }
@@ -2627,6 +2555,7 @@ fn substrate_requirements(substrate: &SubstrateType) -> SubstrateRequirements {
         SubstrateType::BiochemicalComputer => SubstrateRequirements::biochemical_computer(),
         SubstrateType::HybridSystem => SubstrateRequirements::hybrid_system(),
         SubstrateType::ExoticSubstrate => SubstrateRequirements::exotic_substrate(),
+        SubstrateType::SpacecraftComputer => SubstrateRequirements::spacecraft_computer(),
         _ => SubstrateRequirements::silicon_digital(),
     }
 }
@@ -2642,6 +2571,7 @@ fn honest_confidence_for(substrate: &SubstrateType) -> (EvidenceLevel, f64) {
         SubstrateType::BiochemicalComputer => (EvidenceLevel::Indirect, 0.20),
         SubstrateType::HybridSystem => (EvidenceLevel::None, 0.0),
         SubstrateType::ExoticSubstrate => (EvidenceLevel::None, 0.0),
+        SubstrateType::SpacecraftComputer => (EvidenceLevel::Theoretical, 0.08),
         _ => (EvidenceLevel::None, 0.0),
     }
 }
@@ -2792,17 +2722,19 @@ mod tests {
 
     #[test]
     fn test_instance_counter() {
+        let before = SporeEngine::active_instance_count();
         let engine = SporeEngine::new(SporeConfig::default());
         let id = engine.instance_id();
         assert!(id > 0);
-        // At least our engine is active (other parallel tests may also
-        // create/drop engines, so we only check count > 0).
-        assert!(SporeEngine::active_instance_count() >= 1);
+        // After creation, count must have increased by at least 1 (other
+        // parallel tests may also create engines, so use >=).
+        assert!(SporeEngine::active_instance_count() >= before + 1);
         drop(engine);
-        // After drop, we only verify the engine was successfully created
-        // and dropped without panic. We cannot assert count relationships
-        // because concurrent tests create/drop engines in parallel,
-        // making any count comparison inherently racy.
+        // After drop, count must be back to at most what it was before we
+        // created our engine (parallel tests may have added more, but our
+        // contribution is gone). We cannot assert an exact value because
+        // concurrent tests create/drop engines in parallel.
+        assert!(SporeEngine::active_instance_count() >= before);
     }
 
     #[test]

@@ -649,6 +649,25 @@ jobs:
             fi
           }
 
+  sbom:
+    name: SBOM Generation
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-cyclonedx
+        run: cargo install cargo-cyclonedx
+      - name: Generate SBOM
+        run: cargo cyclonedx --format json --output-file symthaea-sbom.json
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: symthaea-sbom.json
+          retention-days: 90
+
   test-subcrates:
     name: Test Sub-Crates
     runs-on: ubuntu-latest
@@ -949,3 +968,14 @@ jobs:
           echo "Checking compliance documentation..."
           test -f COMPLIANCE.md || test -f docs/COMPLIANCE.md || echo "::warning::No COMPLIANCE.md found"
           echo "Documentation check complete"
+
+  secrets-scan:
+    name: Secrets Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

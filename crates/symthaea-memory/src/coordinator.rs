@@ -101,6 +101,8 @@ pub enum MemorySource {
     ActionFeedback,
     /// Evicted from semantic ring buffer (survived full rotation)
     SemanticEviction,
+    /// Received via social relay from a peer agent
+    Social,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

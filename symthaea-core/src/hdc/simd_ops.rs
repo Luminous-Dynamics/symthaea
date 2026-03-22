@@ -929,6 +929,8 @@ unsafe fn matching_bits_neon(a: &[u8; 2048], b: &[u8; 2048]) -> u32 {
 pub fn bind_simd(a: &[u8; 2048], b: &[u8; 2048]) -> [u8; 2048] {
     let mut result = [0u8; 2048];
     #[cfg(target_arch = "aarch64")]
+    // SAFETY: NEON is guaranteed available on AArch64.
+    // Input arrays are fixed-size [u8; 2048] so length and alignment are compile-time verified.
     unsafe {
         bind_neon(a, b, &mut result);
     }
@@ -944,6 +946,8 @@ pub fn bind_simd(a: &[u8; 2048], b: &[u8; 2048]) -> [u8; 2048] {
 pub fn intersection_simd(a: &[u8; 2048], b: &[u8; 2048]) -> [u8; 2048] {
     let mut result = [0u8; 2048];
     #[cfg(target_arch = "aarch64")]
+    // SAFETY: NEON is guaranteed available on AArch64.
+    // Input arrays are fixed-size [u8; 2048] so length and alignment are compile-time verified.
     unsafe {
         intersection_neon(a, b, &mut result);
     }
@@ -959,6 +963,8 @@ pub fn intersection_simd(a: &[u8; 2048], b: &[u8; 2048]) -> [u8; 2048] {
 pub fn union_simd(a: &[u8; 2048], b: &[u8; 2048]) -> [u8; 2048] {
     let mut result = [0u8; 2048];
     #[cfg(target_arch = "aarch64")]
+    // SAFETY: NEON is guaranteed available on AArch64.
+    // Input arrays are fixed-size [u8; 2048] so length and alignment are compile-time verified.
     unsafe {
         union_neon(a, b, &mut result);
     }
@@ -973,6 +979,8 @@ pub fn union_simd(a: &[u8; 2048], b: &[u8; 2048]) -> [u8; 2048] {
 #[inline]
 pub fn matching_bits_simd(a: &[u8; 2048], b: &[u8; 2048]) -> u32 {
     #[cfg(target_arch = "aarch64")]
+    // SAFETY: NEON is guaranteed available on AArch64.
+    // Input arrays are fixed-size [u8; 2048] so length and alignment are compile-time verified.
     unsafe {
         return matching_bits_neon(a, b);
     }
@@ -987,6 +995,8 @@ pub fn matching_bits_simd(a: &[u8; 2048], b: &[u8; 2048]) -> u32 {
 pub fn invert_simd(a: &[u8; 2048]) -> [u8; 2048] {
     let mut result = [0u8; 2048];
     #[cfg(target_arch = "aarch64")]
+    // SAFETY: NEON is guaranteed available on AArch64.
+    // Input arrays are fixed-size [u8; 2048] so length and alignment are compile-time verified.
     unsafe {
         invert_neon(a, &mut result);
     }

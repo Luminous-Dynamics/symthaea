@@ -130,7 +130,23 @@ impl TwoStepBenchmark {
             let ticks = 5.0 + (1.0 - mb_diff.min(1.0)) * 8.0;
             rt_ticks.push(ticks);
 
-            let stage1_action = sample_action(&final_probs, &mut rng_state);
+            // Lapse: on a lapse trial, randomly choose an action instead of using
+            // the blended model-based/FEP signal (Daw et al., 2011 — inattentive trials).
+            let stage1_action = if config.lapse_rate > 0.0 {
+                rng_state ^= rng_state << 13;
+                rng_state ^= rng_state >> 7;
+                rng_state ^= rng_state << 17;
+                if (rng_state % 1000) < (config.lapse_rate * 1000.0) as u64 {
+                    rng_state ^= rng_state << 13;
+                    rng_state ^= rng_state >> 7;
+                    rng_state ^= rng_state << 17;
+                    (rng_state % 2) as usize
+                } else {
+                    sample_action(&final_probs, &mut rng_state)
+                }
+            } else {
+                sample_action(&final_probs, &mut rng_state)
+            };
 
             // Transition: 70% common, 30% rare
             rng_state ^= rng_state << 13;

@@ -635,8 +635,29 @@ struct ServiceState {
 }
 
 /// Sender half for Holon HTTP bridge → consciousness loop.
+#[allow(dead_code)]
 type HolonSender =
     std::sync::mpsc::Sender<(String, symthaea::consciousness::holon_receiver::SomaMessage)>;
+
+/// Drain the Holon inbound channel into Symthaea's HolonReceiver.
+///
+/// Separated into a function to avoid borrow conflicts between
+/// `holon_inbound_rx` (immutable borrow via Mutex) and `symthaea` (mutable borrow).
+fn drain_holon_channel(state: &mut ServiceState) {
+    let mut pending = Vec::new();
+    if let Ok(rx) = state.holon_inbound_rx.lock() {
+        for _ in 0..256 {
+            match rx.try_recv() {
+                Ok(msg) => pending.push(msg),
+                Err(_) => break,
+            }
+        }
+    }
+    for (device_id, msg) in pending {
+        state.symthaea.holon_enqueue_soma_message(device_id, msg);
+    }
+    state.symthaea.holon_process_pending();
+}
 
 impl ServiceState {
     async fn new(
@@ -1594,17 +1615,7 @@ async fn consciousness_loop_with_holon(
         // Drain Holon channel + update HTTP state
         {
             let mut s = state.write().await;
-            if let Ok(rx) = s.holon_inbound_rx.lock() {
-                for _ in 0..256 {
-                    match rx.try_recv() {
-                        Ok((device_id, msg)) => {
-                            s.symthaea.holon_enqueue_soma_message(device_id, msg);
-                        }
-                        Err(_) => break,
-                    }
-                }
-            }
-            s.symthaea.holon_process_pending();
+            drain_holon_channel(&mut s);
 
             // Sync state to HTTP handlers
             let intro = s.symthaea.introspect();
@@ -1652,24 +1663,7 @@ async fn consciousness_loop(
         // Drain Holon inbound channel → Symthaea.holon_receiver
         {
             let mut s = state.write().await;
-            // Drain channel into local buffer first (to release Mutex before mutable borrow)
-            let pending: Vec<_> = {
-                let rx = s.holon_inbound_rx.lock().ok();
-                let mut buf = Vec::new();
-                if let Some(rx) = rx {
-                    for _ in 0..256 {
-                        match rx.try_recv() {
-                            Ok(msg) => buf.push(msg),
-                            Err(_) => break,
-                        }
-                    }
-                }
-                buf
-            };
-            for (device_id, msg) in pending {
-                s.symthaea.holon_enqueue_soma_message(device_id, msg);
-            }
-            s.symthaea.holon_process_pending();
+            drain_holon_channel(&mut s);
         }
 
         // Simple consciousness maintenance

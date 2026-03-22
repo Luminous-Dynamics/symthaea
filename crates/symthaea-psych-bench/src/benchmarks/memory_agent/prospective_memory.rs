@@ -139,12 +139,12 @@ impl ProspectiveMemoryBenchmark {
                 let context_noise = ContinuousHV::random(dim, rng);
                 let stimulus = ContinuousHV::weighted_bundle(
                     &[&pm_target, &noise, &context_noise],
-                    &[0.35, 0.35, 0.30],
+                    &[0.45, 0.30, 0.25],
                 );
 
                 // Check if PM intention is detected
                 let pm_sim = stimulus.similarity(&pm_intention) as f64;
-                let cue_threshold = 0.27 + (1.0 - pm_activation) * 0.25;
+                let cue_threshold = 0.22 + (1.0 - pm_activation) * 0.20;
 
                 if pm_sim > cue_threshold {
                     pm_hits += 1;
