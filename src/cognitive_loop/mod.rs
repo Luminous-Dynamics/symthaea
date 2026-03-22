@@ -709,6 +709,11 @@ pub struct CognitiveLoopService {
     /// collective Φ modulation. Implements CognitiveSubsystem at interval 41.
     swarm_manager: managers::SwarmManager,
 
+    /// Holon Receiver: Desktop-side bridge accepting Soma WebSocket connections.
+    /// Processes inbound SomaMessages (heartbeats, CVs, tasks, knowledge) and
+    /// routes them to SwarmManager (peers), ReasoningManager (tasks), KnowledgeManager (offers).
+    holon_receiver: crate::consciousness::holon_receiver::HolonReceiver,
+
     /// Receiver for swarm events from external async P2P layer.
     /// Drained non-blocking in Phase B before `swarm_manager.process()`.
     /// Created eagerly at construction; clone `swarm_event_tx` to inject events.

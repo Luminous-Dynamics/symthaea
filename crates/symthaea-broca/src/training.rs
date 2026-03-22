@@ -1212,8 +1212,9 @@ pub fn train_with_adam(
                                 }
                             }
 
-                            // Refresh projected embeddings after weight update
-                            generator.controller_mut().refresh_projected_embeddings();
+                            // Note: projected embeddings are refreshed once per sequence
+                            // (after the inner token loop), not per token — projecting all
+                            // 4096 embeddings through 256×16384 is too expensive per token.
                         }
                     }
                 }
@@ -1265,6 +1266,13 @@ pub fn train_with_adam(
                     prev_token = target_id;
                 }
                 global_step += 1;
+            }
+
+            // Refresh projected embeddings once per sequence (not per token).
+            // Each refresh re-projects all 4096 embeddings through the 256×16384 projection
+            // matrix — doing this per-token is ~17× slower for typical sequences.
+            if generator.controller().projection_dim().is_some() {
+                generator.controller_mut().refresh_projected_embeddings();
             }
 
             // Contrastive intent loss: after processing the full token sequence,

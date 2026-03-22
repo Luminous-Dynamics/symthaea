@@ -1118,6 +1118,25 @@ impl ActiveInferenceFlightAgent {
             self.high_fe_ticks = 0;
         }
 
+        // ── Consciousness modulation ──────────────────────────────────────
+        // Scale exploration by consciousness context (phi, safety, harmony).
+        if let Some(ref mut noise) = result.exploration_noise {
+            let gain = self.consciousness_ctx.exploration_gain();
+            noise.thrust *= gain;
+            noise.roll_moment *= gain;
+            noise.pitch_moment *= gain;
+            noise.yaw_moment *= gain;
+            if gain == 0.0 {
+                result.exploration_noise = None;
+            }
+        }
+        // Emergency: override setpoint to descend to 0.3m altitude
+        if self.consciousness_ctx.is_emergency() {
+            result.setpoint_override = Some([state.position[0], state.position[1], 0.3]);
+            result.exploration_noise = None;
+            result.tau_factor = 0.7; // Fast response
+        }
+
         // Update tracking state
         self.prev_prediction_error = setpoint.position_error_magnitude(state);
         self.tau_ema = 0.8 * self.tau_ema + 0.2 * result.tau_factor as f64;

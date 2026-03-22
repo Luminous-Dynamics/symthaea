@@ -415,6 +415,21 @@ pub enum GovernanceDispatchCommand {
     },
     /// Query active proposals (response arrives via governance event channel).
     QueryActiveProposals,
+    /// Evaluate an asset and record the consciousness assessment on-chain.
+    EvaluateAsset {
+        correlation_id: u64,
+        project_id: String,
+        description: String,
+        project_type: String,
+        capacity_mw: f64,
+        community_did: Option<String>,
+        impact_claims: Vec<String>,
+        phi_score: f64,
+        harmony_alignment: f64,
+        per_harmony_scores: String,
+        care_activation: f64,
+        meta_awareness: f64,
+    },
 }
 
 /// Outcome received from the conductor confirming or rejecting a dispatched command.
@@ -878,6 +893,7 @@ impl MycelixBridge {
     /// This is the bridge method that connects Symthaea consciousness scoring
     /// to the Mycelix energy cluster. It wraps `AssetEvaluator::evaluate()`
     /// for convenience when you already have a `MycelixBridge` instance.
+    /// Evaluate a regenerative asset against the Eight Harmonies.
     pub fn evaluate_asset(
         &self,
         metadata: &super::asset_evaluator::AssetMetadata,
@@ -885,6 +901,69 @@ impl MycelixBridge {
     ) -> super::asset_evaluator::AssetConsciousnessScore {
         let mut evaluator = super::asset_evaluator::AssetEvaluator::new();
         evaluator.evaluate(metadata, consciousness)
+    }
+
+    /// Evaluate an asset AND dispatch the result to the Holochain conductor.
+    ///
+    /// This is the full pipeline: evaluate → serialize → dispatch.
+    /// The conductor bridge will call `record_consciousness_assessment()`
+    /// on the energy bridge zome to store the result on-chain.
+    #[cfg(feature = "mycelix")]
+    pub fn evaluate_and_dispatch_asset(
+        &mut self,
+        project_id: &str,
+        metadata: &super::asset_evaluator::AssetMetadata,
+        consciousness: &ConsciousnessSnapshot,
+    ) -> Result<super::asset_evaluator::AssetConsciousnessScore, BridgeError> {
+        let score = self.evaluate_asset(metadata, consciousness);
+
+        // Serialize per-harmony scores for on-chain storage
+        let per_harmony_json =
+            serde_json::to_string(&score.per_harmony).unwrap_or_else(|_| "{}".to_string());
+
+        // Dispatch to conductor
+        let mut disconnected = false;
+        if let Some(ref tx) = self.governance_dispatch_tx {
+            let cid = self.next_correlation_id;
+            self.next_correlation_id += 1;
+
+            match tx.try_send(GovernanceDispatchCommand::EvaluateAsset {
+                correlation_id: cid,
+                project_id: project_id.to_string(),
+                description: metadata.description.clone(),
+                project_type: metadata.project_type.clone(),
+                capacity_mw: metadata.capacity_mw,
+                community_did: metadata.community_did.clone(),
+                impact_claims: metadata.impact_claims.clone(),
+                phi_score: score.phi_score,
+                harmony_alignment: score.harmony_alignment,
+                per_harmony_scores: per_harmony_json,
+                care_activation: score.care_activation,
+                meta_awareness: score.meta_awareness,
+            }) {
+                Ok(()) => {
+                    self.pending_confirmations.insert(cid, Instant::now());
+                    tracing::info!(
+                        project_id,
+                        phi = score.phi_score,
+                        harmony = score.harmony_alignment,
+                        "Asset evaluation dispatched to conductor"
+                    );
+                }
+                Err(std::sync::mpsc::TrySendError::Full(_)) => {
+                    tracing::warn!("Governance dispatch channel full — evaluation not dispatched");
+                }
+                Err(std::sync::mpsc::TrySendError::Disconnected(_)) => {
+                    tracing::warn!("Governance dispatch channel disconnected");
+                    disconnected = true;
+                }
+            }
+        }
+        if disconnected {
+            self.governance_dispatch_tx = None;
+        }
+
+        Ok(score)
     }
 
     // ========================================================================

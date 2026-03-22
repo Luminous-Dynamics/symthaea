@@ -414,6 +414,28 @@ impl ActiveInferenceVehicleAgent {
             self.high_fe_ticks = 0;
         }
 
+        // ── Consciousness modulation ──────────────────────────────────────
+        // Scale exploration by consciousness context.
+        if let Some(ref mut noise) = result.exploration_noise {
+            let gain = self.consciousness_ctx.exploration_gain();
+            for n in noise.iter_mut() {
+                *n *= gain;
+            }
+            if gain == 0.0 {
+                result.exploration_noise = None;
+            }
+        }
+        // Emergency: force deceleration
+        if self.consciousness_ctx.is_emergency() {
+            result.exploration_noise = None;
+            result.tau_factor = 0.5; // Fast brake response
+            result.learning_rate_factor = 0.1; // Freeze learning
+        }
+        // Elevated safety: reduce effective target speed
+        if self.consciousness_ctx.safety_level >= 2 {
+            result.prior_precision *= 2.0; // Stronger deceleration prior
+        }
+
         // Update tracking state
         let speed_error = if self.target_speed > 0.1 {
             (state.speed - self.target_speed).abs()

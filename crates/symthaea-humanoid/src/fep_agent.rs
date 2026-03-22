@@ -356,6 +356,28 @@ impl ActiveInferenceHumanoidAgent {
             self.high_fe_ticks = (self.high_fe_ticks - self.config.exploration_decay_rate).max(0.0);
         }
 
+        // ── Consciousness modulation ──────────────────────────────────────
+        // Scale exploration by consciousness context.
+        if let Some(ref mut noise) = result.exploration_noise {
+            let gain = self.consciousness_ctx.exploration_gain();
+            for n in noise.iter_mut() {
+                *n *= gain;
+            }
+            if gain == 0.0 {
+                result.exploration_noise = None;
+            }
+        }
+        // Emergency: force conservative stance (raise tau for stability)
+        if self.consciousness_ctx.is_emergency() {
+            result.exploration_noise = None;
+            result.tau_factor = 1.5; // Slow, stable response
+            result.learning_rate_factor = 0.3; // Freeze learning
+        }
+        // High harmony → smoother control (slightly raise tau)
+        if self.consciousness_ctx.harmony_alignment > 0.7 {
+            result.tau_factor = result.tau_factor.max(1.05);
+        }
+
         // Update tracking state
         self.prev_head_height_error = (1.4 - state.head_height).abs();
         self.tau_ema = 0.8 * self.tau_ema + 0.2 * result.tau_factor as f64;

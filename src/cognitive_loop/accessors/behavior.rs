@@ -893,6 +893,49 @@ impl CognitiveLoopService {
     }
 
     // ========================================================================
+    // HOLON RECEIVER (Soma↔Desktop bridge)
+    // ========================================================================
+
+    /// Enqueue a message from a connected Soma device.
+    ///
+    /// Called by the WebSocket handler when a Soma sends JSON over `/v1/ws/soma`.
+    /// Messages are processed during the next cycle's Phase B.
+    pub fn holon_enqueue_soma_message(
+        &mut self,
+        device_id: String,
+        msg: crate::consciousness::holon_receiver::SomaMessage,
+    ) {
+        self.holon_receiver.enqueue_message(device_id, msg);
+    }
+
+    /// Number of connected Soma devices.
+    pub fn holon_soma_peer_count(&self) -> usize {
+        self.holon_receiver.peer_count()
+    }
+
+    /// Send a response to a specific Soma device.
+    pub fn holon_send_to_soma(
+        &mut self,
+        device_id: &str,
+        response: crate::consciousness::holon_receiver::HolonResponse,
+    ) {
+        self.holon_receiver.send_to_device(device_id, response);
+    }
+
+    /// Drain outbound responses for a specific Soma device (for WebSocket delivery).
+    pub fn holon_drain_soma_outbound(
+        &mut self,
+        device_id: &str,
+    ) -> Vec<crate::consciousness::holon_receiver::HolonResponse> {
+        self.holon_receiver.drain_outbound(device_id)
+    }
+
+    /// Total messages processed by the HolonReceiver.
+    pub fn holon_total_processed(&self) -> u64 {
+        self.holon_receiver.total_processed()
+    }
+
+    // ========================================================================
     // SWARM NEUROMODULATORY COUPLING
     // ========================================================================
 

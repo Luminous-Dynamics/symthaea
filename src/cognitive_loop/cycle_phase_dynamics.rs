@@ -548,6 +548,28 @@ impl CognitiveLoopService {
                         .record("swarm_manager", swarm_output);
                 }
 
+                // ── Holon Receiver (every cycle — low cost) ────────────
+                // Process inbound messages from connected Soma devices.
+                // Routes tasks, knowledge, and peer state into the existing managers.
+                {
+                    let processed = self.holon_receiver.process_inbound(cycle_num as u64);
+                    if processed > 0 {
+                        // Register Soma peers as swarm peers (oxytocin social buffering)
+                        for peer in self.holon_receiver.peers() {
+                            use super::managers::swarm_manager::SwarmEvent;
+                            self.swarm_manager
+                                .inject_event(SwarmEvent::ConsciousnessUpdate {
+                                    peer_id: peer.device_id.clone(),
+                                    phi: peer.phi as f64,
+                                    valence: peer.valence as f64,
+                                    arousal: peer.arousal as f64,
+                                });
+                        }
+                    }
+                    // Evict peers not seen for 500 cycles (~25s at 20Hz)
+                    self.holon_receiver.evict_stale(cycle_num as u64, 500);
+                }
+
                 // ── Soul Manager (interval 43, co-prime) ──────────────
                 if let Some(ref mut soul_mgr) = self.soul_manager {
                     if soul_mgr.should_run(cycle_num, urgency_u8) {

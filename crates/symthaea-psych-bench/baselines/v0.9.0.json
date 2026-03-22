@@ -1158,11 +1158,11 @@
     },
     "Executive::TowerOfLondon": {
       "avg_excess_moves": {
-        "mean": 1.41007659007659,
+        "mean": 0.4431,
         "std_dev": 1.113471311831566,
         "n": 10,
-        "ci_lower": 0.6136025362362664,
-        "ci_upper": 2.2065506439169136
+        "ci_lower": 0.39879,
+        "ci_upper": 0.48741
       },
       "difficulty_gradient": {
         "mean": 0.26000000000000006,
@@ -1207,11 +1207,11 @@
         "ci_upper": 0.8594084905079776
       },
       "rt_ticks": {
-        "mean": 12.641221374045802,
+        "mean": 11.1069,
         "std_dev": 5.670190204773454,
         "n": 131,
-        "ci_lower": 11.670224009991554,
-        "ci_upper": 13.61221873810005
+        "ci_lower": 9.99621,
+        "ci_upper": 12.217590000000001
       }
     },
     "Executive::WCST": {
@@ -1223,11 +1223,11 @@
         "ci_upper": 6.0
       },
       "non_perseverative_errors": {
-        "mean": 9.7,
+        "mean": 8.1,
         "std_dev": 2.2135943621178655,
         "n": 10,
-        "ci_lower": 8.1166,
-        "ci_upper": 11.283399999999999
+        "ci_lower": 7.29,
+        "ci_upper": 8.91
       },
       "perseverative_errors": {
         "mean": 9.8,
@@ -1244,11 +1244,11 @@
         "ci_upper": 5.213954015719111
       },
       "total_errors": {
-        "mean": 19.5,
+        "mean": 16.7,
         "std_dev": 3.24037034920393,
         "n": 10,
-        "ci_lower": 17.182139736739938,
-        "ci_upper": 21.817860263260062
+        "ci_lower": 15.03,
+        "ci_upper": 18.37
       },
       "trials_to_first_category": {
         "mean": 16.6,
@@ -2261,11 +2261,11 @@
         "ci_upper": 0.5383796691894531
       },
       "ecb_proxy_variance": {
-        "mean": 0.00006847541953902692,
+        "mean": 6.847541953902692e-05,
         "std_dev": 0.0,
         "n": 1,
-        "ci_lower": 0.00006847541953902692,
-        "ci_upper": 0.00006847541953902692
+        "ci_lower": 6.847541953902692e-05,
+        "ci_upper": 6.847541953902692e-05
       },
       "ecb_time_to_peak": {
         "mean": 14.0,
@@ -2733,11 +2733,11 @@
         "ci_upper": 3.2991079430381243
       },
       "trials_to_criterion": {
-        "mean": 40.0,
+        "mean": 11.7,
         "std_dev": 0.0,
         "n": 10,
-        "ci_lower": 40.0,
-        "ci_upper": 40.0
+        "ci_lower": 10.53,
+        "ci_upper": 12.870000000000001
       }
     },
     "Neuromod::YerkesDodson": {

@@ -243,8 +243,10 @@ Tap, DoubleTap, LongPress, SwipeLeft/Right/Up/Down, PinchIn/Out — each mapped 
 
 | Platform | LOC | Status | Notes |
 |----------|-----|--------|-------|
-| **Android (Kotlin)** | 2,005 + 4,878 demo | Complete | 26+ classes, ReentrantLock, foreground service, 13 sensor bridges |
-| **iOS (Swift)** | 181 | Partial | Core FFI wrapper works; NO sensor bridges, NO platform integration |
+| **Android (Kotlin)** | 2,005 + 4,878 demo | **Active** | 26+ classes, ReentrantLock, foreground service, 13 sensor bridges |
+| **iOS (Swift)** | 181 | **Deferred** | FFI scaffolding only. No sensor bridges. Deferred indefinitely — WASM covers iOS via Safari. |
+
+> **Platform decision (2026-03-22)**: iOS and macOS support deferred indefinitely. Solo developer on NixOS with no Apple hardware. WASM web portal covers all platforms via browser. C FFI scaffolding preserved for future contributors.
 
 ### Current Issues
 

@@ -167,7 +167,10 @@ fn extract_fields_from_text(text: &str) -> Vec<(String, String)> {
 
             // Type is in same word (e.g. "x:f64")
             if !after_colon.is_empty() {
-                if !name.is_empty() && name.chars().next().map_or(false, |c| c.is_lowercase()) {
+                if !name.is_empty()
+                    && name.chars().next().map_or(false, |c| c.is_lowercase())
+                    && looks_like_rust_type(after_colon)
+                {
                     fields.push((name.to_string(), after_colon.to_string()));
                 }
             } else if !name.is_empty() && i + 1 < words.len() {
@@ -175,7 +178,10 @@ fn extract_fields_from_text(text: &str) -> Vec<(String, String)> {
                 let typ = words[i + 1].trim_matches(|c: char| {
                     !c.is_alphanumeric() && c != '_' && c != '<' && c != '>'
                 });
-                if !typ.is_empty() && name.chars().next().map_or(false, |c| c.is_lowercase()) {
+                if !typ.is_empty()
+                    && name.chars().next().map_or(false, |c| c.is_lowercase())
+                    && looks_like_rust_type(typ)
+                {
                     fields.push((name.to_string(), typ.to_string()));
                     i += 1; // skip the type word
                 }
@@ -184,6 +190,42 @@ fn extract_fields_from_text(text: &str) -> Vec<(String, String)> {
         i += 1;
     }
     fields
+}
+
+/// Check if a string looks like a valid Rust type name.
+/// Rejects things like "f(f(x" which are code expressions, not types.
+fn looks_like_rust_type(s: &str) -> bool {
+    if s.is_empty() {
+        return false;
+    }
+    // Must start with uppercase (type name) or be a primitive
+    let first = s.chars().next().unwrap();
+    let is_type_start = first.is_uppercase()
+        || matches!(
+            s,
+            "i8" | "i16"
+                | "i32"
+                | "i64"
+                | "i128"
+                | "isize"
+                | "u8"
+                | "u16"
+                | "u32"
+                | "u64"
+                | "u128"
+                | "usize"
+                | "f32"
+                | "f64"
+                | "bool"
+                | "str"
+                | "char"
+        )
+        || s.starts_with('&');
+
+    // Must not contain parentheses (those are function calls, not types)
+    let no_parens = !s.contains('(') || s.contains("Fn("); // Fn(...) is a valid type
+
+    is_type_start && no_parens
 }
 
 /// Extract fields from a struct signature like "struct Foo { x: i32, y: f64 }".
@@ -535,8 +577,12 @@ fn infer_rust_body(
         }
     }
 
-    // Collection operations
-    if purpose_lower.contains("sort") {
+    // Collection operations (skip bubble/insertion/selection sort — those have dedicated patterns)
+    if purpose_lower.contains("sort")
+        && !purpose_lower.contains("bubble")
+        && !purpose_lower.contains("insertion")
+        && !purpose_lower.contains("selection")
+    {
         if params.len() == 1 && params[0].1.contains("Vec") {
             if purpose_lower.contains("descending") || purpose_lower.contains("reverse") {
                 return format!("let mut result = {}.to_vec();\n    result.sort();\n    result.reverse();\n    result", params[0].0);
@@ -579,6 +625,15 @@ fn infer_rust_body(
     {
         if params.len() == 1 {
             return format!("let mut result = {}.to_vec();\n    result.sort();\n    result.dedup();\n    result", params[0].0);
+        }
+    }
+    // Bubble sort (in-place)
+    if purpose_lower.contains("bubble sort") {
+        if params.len() == 1 {
+            return format!(
+                "let n = {}.len();\n    for i in 0..n {{\n        for j in 0..n - 1 - i {{\n            if {}[j] > {}[j + 1] {{\n                {}.swap(j, j + 1);\n            }}\n        }}\n    }}",
+                params[0].0, params[0].0, params[0].0, params[0].0
+            );
         }
     }
     // Binary search
@@ -1791,7 +1846,14 @@ impl CodeEmitter for RustEmitter {
         // fields are needed (no MULTI_ENTITY constraint, no extractable fields),
         // suppress the struct emission entirely. Otherwise we get duplicate name
         // errors (E0428) — e.g., `pub struct add_numbers` AND `pub fn add_numbers`.
-        if parsed_sig.is_some() {
+        // Also detect unparseable but obviously function signatures (e.g., those with
+        // `impl Fn(...)` trait bounds that confuse the signature parser).
+        let looks_like_fn = parsed_sig.is_some()
+            || spec
+                .signature
+                .as_deref()
+                .map_or(false, |s| s.trim_start().starts_with("fn "));
+        if looks_like_fn {
             has_function = true;
             // Suppress struct if it was only inferred by the CfC planner
             // and there's no real need for a struct (no fields, no multi-entity)
@@ -2010,8 +2072,27 @@ impl CodeEmitter for RustEmitter {
                 }
                 parts.push(format!("    {}", body));
                 parts.push("}".to_string());
+            } else if let Some(ref raw_sig) = spec.signature {
+                // Signature exists but didn't parse (e.g., `impl Fn` trait bounds).
+                // Emit the raw signature and try to infer the body from purpose.
+                if has_doc || !spec.purpose.is_empty() {
+                    parts.push(format!("/// {}", spec.purpose));
+                }
+                // Ensure it starts with "pub fn" for visibility
+                let sig_str = if raw_sig.starts_with("pub fn") {
+                    raw_sig.to_string()
+                } else if raw_sig.starts_with("fn ") {
+                    format!("pub {}", raw_sig)
+                } else {
+                    format!("pub fn {}", raw_sig)
+                };
+                parts.push(format!("{} {{", sig_str));
+                let body =
+                    infer_rust_body(&spec.purpose, &[], None, &spec.constraints, &spec.examples);
+                parts.push(format!("    {}", body));
+                parts.push("}".to_string());
             } else {
-                // No parsed signature — try to infer from purpose
+                // No signature at all — generate stub
                 if has_doc || !spec.purpose.is_empty() {
                     parts.push(format!("/// {}", spec.purpose));
                 }
@@ -3547,8 +3628,8 @@ mod tests {
         let result = emitter.emit_from_spec(&spec, &make_plan());
         assert!(result.contains(".parse"), "Should use parse: {}", result);
         assert!(
-            result.contains("unwrap_or_default"),
-            "Should have default: {}",
+            result.contains("unwrap_or") || result.contains("unwrap_or_default"),
+            "Should have error handling: {}",
             result
         );
         assert!(

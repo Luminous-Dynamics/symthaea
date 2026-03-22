@@ -99,6 +99,7 @@ fn test_full_code_pipeline() {
     let all_objectives: Vec<&str> = TIER1_OBJECTIVES
         .iter()
         .chain(symthaea::school::code_learning::TIER2_OBJECTIVES.iter())
+        .chain(symthaea::school::code_learning::TIER3_OBJECTIVES.iter())
         .copied()
         .collect();
     let summary = engine.run_session(&all_objectives);

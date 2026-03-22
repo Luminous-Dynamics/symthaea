@@ -108,6 +108,7 @@ fn main() -> Result<()> {
         adam_state: None,
         projection_weights: None,
         liquid_mamba_config: None,
+        logit_projection_weights: None,
         checksum: [0u8; 32],
     };
 

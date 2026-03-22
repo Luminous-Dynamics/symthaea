@@ -1,359 +1,204 @@
 # Symthaea Variant Improvement Plan
 
-**Version**: 1.1.0
+**Version**: 2.0.0
 **Date**: 2026-03-22
-**Status**: In Progress (Phase 1-3 complete, Phase 4-5 pending)
+**Status**: Phases 1-4 complete. Phase 5-6 active.
 **Companion**: See `VARIANT_ARCHITECTURE.md` for current state reference
 
 ---
 
 ## Executive Summary
 
-The Symthaea variant ecosystem is **mature but fragmented**. Spore is production-ready, Soma is functionally complete but has security gaps, embodiments are isolated from consciousness feedback, and the critical Soma↔Holon sync path is protocol-defined but not implemented. This plan addresses these gaps in priority order across 5 phases.
+The Symthaea variant ecosystem is **mature but fragmented**. This plan addresses gaps in priority order. Phases 1-4 (safety, structural bridges, cross-variant integration, tests) are complete. Phase 5 wires the structural work into functional integration. Phase 6 covers polish.
 
-**Estimated scope**: ~4,500 LOC new code, ~800 LOC fixes, ~200 LOC tests
+### Platform Decision (2026-03-22)
 
----
+**iOS and macOS are deferred indefinitely.** Rationale:
+- Solo developer on NixOS — no Apple hardware for testing
+- iOS Swift wrapper is 181 LOC scaffolding with zero sensor bridges (vs 2,800+ LOC Kotlin on Android)
+- Maintaining dual-platform mobile code without test capability is a liability
+- WASM web portal (live at symthaea.luminousdynamics.io) already covers iOS Safari and macOS browsers
+- The C FFI layer (`staticlib` + `SomaBridge.h`) remains as scaffolding for future contributors
 
-## Phase 1: Security & Safety (Priority: Critical)
-
-### 1.1 HolonBridge Encryption
-
-**Problem**: Soma transmits consciousness vectors and task data over plaintext WebSocket. The `session_key` field exists in HolonBridge but is never applied to outbound messages.
-
-**Files**:
-- `crates/symthaea-soma/src/holon_bridge.rs`
-- `crates/symthaea-soma/android/src/main/kotlin/io/symthaea/soma/SomaNetworkBridge.kt`
-
-**Implementation**:
-1. Add ChaCha20-Poly1305 encryption to `HolonOutbound` serialization using `session_key`
-2. Add corresponding decryption to `HolonInbound` deserialization
-3. Derive session key from SensorBridge HDC context (already implemented, just needs wiring)
-4. Android: upgrade `HolonWebSocket.kt` from `ws://` to `wss://`
-5. Add key rotation on motion state change (context key already re-derives)
-
-**Effort**: ~200 LOC | **Risk**: Low (encryption primitives already in deps)
-
-### 1.2 FFI Double-Free Protection
-
-**Problem**: If Kotlin/Swift calls `soma_engine_free()` twice, the second call dereferences freed memory.
-
-**File**: `crates/symthaea-soma/src/native_ffi.rs`
-
-**Implementation**:
-1. Add sentinel pattern: after `Box::from_raw()`, write a null marker to the pointer location
-2. Check for null/sentinel before every dereference in all 90 FFI functions
-3. Alternative: use `AtomicPtr` with compare-and-swap for thread-safe nullification
-
-**Effort**: ~50 LOC | **Risk**: Low
-
-### 1.3 Touch Body Panic Fix
-
-**Problem**: `touch_body.rs:670` calls `unwrap()` on `attention_focus` which may be `None`.
-
-**File**: `crates/symthaea-soma/src/touch_body.rs`
-
-**Implementation**: Replace `unwrap()` with `unwrap_or_default()` or early return.
-
-**Effort**: 2 LOC | **Risk**: None
-
-### 1.4 Pairing Challenge Cleanup
-
-**Problem**: Pending pairing challenges accumulate without garbage collection if peers send invalid challenges.
-
-**File**: `crates/symthaea-soma/src/pairing.rs`
-
-**Implementation**: Add `tick()` method that evicts challenges older than `CHALLENGE_TIMEOUT_CYCLES`. Call from `SomaEngine::cycle()` post-processing.
-
-**Effort**: ~30 LOC | **Risk**: None
+**Active targets**: Android (Kotlin/JNI), Browser (WASM), NixOS desktop (native), Edge (mesh_daemon).
 
 ---
 
-## Phase 2: Soma↔Holon Bridge (Priority: High)
+## Completed Work (Phases 1-4)
 
-### 2.1 Desktop HolonBridge Receiver
+### Phase 1: Security & Safety — DONE
 
-**Problem**: Soma can transmit consciousness vectors and task requests via HolonBridge, but the desktop Holon has no receiver. This is the single biggest integration gap.
+| Item | Status | What Was Done |
+|------|--------|---------------|
+| 1.1 HolonBridge encryption | **Done** | ChaCha20-Poly1305 AEAD behind `encrypted-bridge` feature. `EncryptedEnvelope` type, encrypt/decrypt methods, nonce from sequence + key hash. |
+| 1.2 FFI double-free protection | **Done** | `FREED_SENTINEL` written after free, checked in `validate_engine()`/`validate_engine_ref()`. Null checks on all core accessors. 2 new tests. |
+| 1.3 Touch body panic | **N/A** | False alarm — unwrap was in test code only, production uses `Option` correctly. |
+| 1.4 Pairing challenge cleanup | **N/A** | Already implemented — `tick()` retains only unexpired challenges. |
 
-**Files to create**:
-- `src/consciousness/holon_receiver.rs` — WebSocket server accepting Soma connections
-- Wire into `CognitiveLoopService` as a new manager (interval ~50 cycles)
+### Phase 2: Soma↔Holon Bridge — DONE (structural)
 
-**Implementation**:
-1. Axum WebSocket endpoint (extend existing `src/api/` infrastructure)
-2. Accept `HolonInbound` messages (Heartbeat, ConsciousnessVector, TaskRequest, KnowledgeOffer)
-3. Route ConsciousnessVector to SwarmManager as a local peer
-4. Route TaskRequest to ReasoningManager for delegation
-5. Route KnowledgeOffer to KnowledgeManager for integration
-6. Send `HolonOutbound` responses (LanguageOutput, KnowledgeShare, Resuscitation)
-7. Authentication via Ed25519 pubkey from pairing handshake
+| Item | Status | What Was Done |
+|------|--------|---------------|
+| 2.1 Desktop HolonBridge receiver | **Done** | `src/consciousness/holon_receiver.rs` — `HolonReceiver` struct, `SomaMessage`/`HolonResponse` wire types, peer tracking (max 8, stale eviction), task/knowledge routing. 8 unit tests. |
+| 2.2 iOS sensor bridges | **Dropped** | See platform decision above. iOS scaffolding preserved for future contributors. |
 
-**Effort**: ~600 LOC | **Risk**: Medium (WebSocket lifecycle management)
+### Phase 3: Cross-Variant Integration — DONE (structural)
 
-### 2.2 iOS Sensor Bridge Parity
+| Item | Status | What Was Done |
+|------|--------|---------------|
+| 3.1 Consciousness into embodiment | **Done** | `ConsciousnessContext` in `symthaea-core/src/lib.rs` with `is_emergency()`, `should_suppress_exploration()`, `exploration_gain()`. Field + setter in Flight, Humanoid, Vehicle FEP agents. |
+| 3.3 Checkpoint versioning | **Done** | Forward-compatible version check (older accepted, future rejected). Linter extended to v2 with QOL trend snapshots. 2 new tests. |
 
-**Problem**: iOS Swift wrapper has only raw FFI calls. No battery, thermal, light, proximity, or motion bridges — the phone can't sense its own state.
+### Phase 4: Test Coverage — DONE
 
-**Files to create**:
-- `ios/Sources/Soma/SomaBatteryBridge.swift`
-- `ios/Sources/Soma/SomaSensorBridge.swift`
-- `ios/Sources/Soma/SomaMotionBridge.swift`
-- `ios/Sources/Soma/SomaScreenBridge.swift`
-
-**Implementation**: Port the 13 Android Kotlin bridges to Swift equivalents using CoreMotion, UIDevice, CoreLocation, AVAudioSession. The Rust FFI layer is already complete — this is pure Swift work.
-
-**Effort**: ~800 LOC Swift | **Risk**: Low (mirroring existing Kotlin patterns)
+| Item | Status | What Was Done |
+|------|--------|---------------|
+| 4.1 E2E variant integration tests | **Done** | `tests/variant_integration.rs` — 9 tests covering Spore→Soma state, sensor→neuromod flow, HolonBridge heartbeat/language/task/knowledge/resuscitation, full pipeline, checkpoint. |
+| 4.3 Soma proptests | **Done** | `tests/proptest_soma.rs` — 5 property tests: sensor nudge bounds, privacy suppresses BLE, consciousness bounded, BLE peer cap, ConsciousnessContext exploration gain. |
 
 ---
 
-## Phase 3: Cross-Variant Integration (Priority: Medium)
+## Phase 5: Functional Integration (Priority: HIGH — current focus)
 
-### 3.1 Embodiment ← Consciousness Feedback
+Phase 5 turns the structural code from Phases 2-3 into working end-to-end integration.
 
-**Problem**: Flight, Humanoid, and Vehicle crates run isolated from the consciousness pipeline. Their FEP agents use hardcoded priors rather than Spore/Holon consciousness state.
+### 5.1 Wire HolonReceiver into CognitiveLoopService
 
-**Implementation**:
-1. Add `ConsciousnessContext` parameter to each FEP agent's `act()` method:
-   ```rust
-   pub struct ConsciousnessContext {
-       pub phi: f32,
-       pub safety_level: SafetyLevel,
-       pub harmony_alignment: f32,
-       pub prediction_error: f32,
-   }
-   ```
-2. Wire into existing agents:
-   - **Flight**: Phi modulates exploration vs exploitation; SafetyLevel::Red triggers emergency descent
-   - **Humanoid**: Harmony alignment modulates gait smoothness; low Phi → conservative stance
-   - **Vehicle**: Safety level gates speed limits; consciousness modulates attention allocation
-3. Add integration test per embodiment: `SporeEngine::cycle()` output feeds controller
-
-**Files**:
-- `crates/symthaea-flight/src/fep_agent.rs`
-- `crates/symthaea-humanoid/src/fep_agent.rs`
-- `crates/symthaea-vehicle/src/fep_agent.rs`
-
-**Effort**: ~300 LOC across 3 crates | **Risk**: Low
-
-### 3.2 Physics → Embodiment Teaching Signals
-
-**Problem**: Physics crate (plasma, grid, fission) generates rich simulation data but doesn't feed into Flight/Vehicle/Humanoid. The plasma digital twin could provide environmental perturbation profiles.
+**Problem**: `HolonReceiver` exists as a standalone struct with tests, but is not instantiated in the CLS or called during the cognitive cycle. Soma cannot actually talk to the Holon yet.
 
 **Implementation**:
-1. Define `PhysicsTeachingSignal` trait in `symthaea-core`:
-   ```rust
-   pub trait PhysicsTeachingSignal {
-       fn perturbation_profile(&self) -> Vec<f32>;
-       fn stability_metric(&self) -> f32;
-   }
-   ```
-2. Implement for `PlasmaState`, `GridState`, `FissionState`
-3. Feed perturbation profiles into Flight/Vehicle perturbation engines
+1. Add `holon_receiver: HolonReceiver` field to CLS (or create `HolonReceiverManager` following existing manager pattern)
+2. Add `/v1/ws/soma` WebSocket endpoint to existing Axum API that deserializes `SomaMessage` JSON and calls `holon_receiver.enqueue_message()`
+3. In CLS cycle (Phase B or post-processing), call `holon_receiver.process_inbound(cycle)`
+4. Route `drain_task_requests()` results into ReasoningManager
+5. Route `drain_knowledge_offers()` into KnowledgeManager
+6. Register Soma peers from `holon_receiver.peers()` into SwarmManager as local peers (oxytocin nudge)
+7. Feed Broca language output back via `holon_receiver.send_to_device()` → WebSocket outbound
 
-**Effort**: ~200 LOC | **Risk**: Low (additive, no existing code changes)
+**Files to modify**:
+- `src/cognitive_loop/constructor.rs` — add HolonReceiver field
+- `src/cognitive_loop/cycle.rs` — process inbound in Phase B
+- `src/api/mod.rs` — add `/v1/ws/soma` route
+- `src/api/ws.rs` or new `src/api/soma_ws.rs` — WebSocket handler
 
-### 3.3 Checkpoint Schema Versioning
+**Effort**: ~400 LOC | **Risk**: Medium (async WebSocket ↔ sync CLS boundary)
 
-**Problem**: Spore's `SporeCheckpoint` uses custom binary serialization without schema versioning. Adding fields breaks old checkpoints silently.
+### 5.2 Make ConsciousnessContext Modulate FEP Behavior
 
-**File**: `crates/symthaea-spore/src/persistence.rs`
+**Problem**: `ConsciousnessContext` field exists on all 3 embodiment agents but `step()` doesn't read it. Consciousness doesn't actually control the body yet.
 
-**Implementation**:
-1. Add 4-byte magic header (`SPOR`) + 2-byte schema version to checkpoint format
-2. Implement forward-compatible reading: unknown fields ignored, missing fields get defaults
-3. Migrate existing checkpoints on load (version 0 → version 1)
+**Implementation per agent**:
 
-**Effort**: ~150 LOC | **Risk**: Low (backward-compatible migration)
+**Flight** (`fep_agent.rs::step()`):
+1. Scale exploration noise by `consciousness_ctx.exploration_gain()` (was hardcoded)
+2. On `is_emergency()` → override setpoint to emergency descent (z = 0, zero velocity)
+3. On `should_suppress_exploration()` → skip exploration entirely
+
+**Humanoid** (`fep_agent.rs::step()`):
+1. Scale exploration noise by `consciousness_ctx.exploration_gain()`
+2. On `is_emergency()` → override to crouch posture (lower COM target, widen stance)
+3. Modulate tau_ema toward conservative (higher tau) when `harmony_alignment > 0.7`
+
+**Vehicle** (`fep_agent.rs::step()`):
+1. Scale exploration noise by `consciousness_ctx.exploration_gain()`
+2. On `is_emergency()` → emergency brake (deceleration override)
+3. On `safety_level >= 2` → reduce target speed by 50%
+
+**Effort**: ~150 LOC across 3 files | **Risk**: Low (additive to existing step logic)
+
+### 5.3 End-to-End Soma↔Holon Demo
+
+**Problem**: No proof that the fractal architecture works across layers.
+
+**Implementation**: Single integration test or example binary:
+1. Create `HolonReceiver` + start Soma engine in same process
+2. Soma runs 60 cycles producing HolonBridge outbound messages
+3. Deserialize outbound as `SomaMessage`, feed into `HolonReceiver`
+4. Verify Soma peer appears in receiver, task requests route correctly
+5. Send `HolonResponse::LanguageOutput` back, verify Soma receives it
+
+**File**: `crates/symthaea-soma/tests/soma_holon_e2e.rs` or `examples/soma_holon_demo.rs`
+
+**Effort**: ~200 LOC | **Risk**: Low (in-process, no networking)
 
 ---
 
-## Phase 4: Test Coverage (Priority: Medium)
+## Phase 6: Polish & Ecosystem (Priority: Low)
 
-### 4.1 End-to-End Variant Integration Tests
+### 6.1 Broca Tier Unification
 
-**Problem**: No test exercises the path from one variant layer to another.
+Define `BrocaBackend` trait for BrocaLite/BrocaFull/BrocaPipeline with consistent API. SporeEngine selects tier at startup based on features/resources.
 
-**Files to create**:
-- `crates/symthaea-soma/tests/spore_soma_integration.rs` — Spore cycle output affects Soma sensors
-- `crates/symthaea-soma/tests/holon_bridge_roundtrip.rs` — Soma→Holon→Soma message flow
-- `crates/symthaea-flight/tests/consciousness_flight.rs` — SporeEngine output controls quadrotor
-- `tests/variant_integration.rs` — Full Spore→Soma→Holon pipeline (unit-testable without real hardware)
+**Effort**: ~300 LOC | **Risk**: Low
 
-**Effort**: ~400 LOC tests | **Risk**: None
+### 6.2 Version Reconciliation
 
-### 4.2 Web Portal Tests
+Update CHANGELOG.md (frozen at v0.5.0, Feb 3) with all changes through March 22. Reconcile Cargo.toml v2.0.0 with actual release state. Bump sub-crate versions.
 
-**Problem**: symthaea-web has 0 tests.
+**Effort**: Documentation only
 
-**File to create**: `crates/symthaea-web/tests/` or inline `#[cfg(test)]` modules
+### 6.3 Web Offline Fallback
 
-**Implementation**:
-1. Component render tests (Leptos provides `leptos::testing` utilities)
-2. SporeEngine WASM instantiation test
-3. Broca checkpoint loading test (mock data)
+Show UI indicator when BrocaPipeline fails to load. Fall back to BrocaLite with notification. Add retry with exponential backoff.
 
-**Effort**: ~200 LOC | **Risk**: Low
+**Effort**: ~100 LOC
 
-### 4.3 Soma Proptest Suite
+### 6.4 Swarm Communication Realism
 
-**Problem**: Soma has 0 property tests. Sensor→neuromod mappings, metabolism state machine, and BLE peer management are ideal proptest candidates.
+Add `CommsConfig { latency_ms, packet_loss_rate, bandwidth_limit }` to vehicle swarm. Test formation stability under degraded comms.
 
-**File to create**: `crates/symthaea-soma/tests/proptest_soma.rs`
-
-**Properties**:
-1. All sensor nudges bounded to [-1.0, 1.0]
-2. Metabolism state transitions are deterministic given same inputs
-3. BLE peer count never exceeds 16
-4. Pairing challenge queue bounded
-5. Privacy mode suppresses all nudges for any sensor input
-
-**Effort**: ~200 LOC | **Risk**: None
+**Effort**: ~150 LOC
 
 ---
 
-## Phase 5: Polish & Ecosystem (Priority: Low)
+## Priority Matrix (Current)
 
-### 5.1 Broca Tier Unification
-
-**Problem**: Three Broca implementations (lite/full/pipeline) with different APIs and capabilities. Unclear which to use when.
-
-**Implementation**:
-1. Define `BrocaBackend` trait in `symthaea-spore`:
-   ```rust
-   pub trait BrocaBackend {
-       fn generate(&mut self, channels: &ThoughtChannels, max_tokens: usize) -> GenerationResult;
-       fn tier(&self) -> BrocaTier;  // Lite, Full, Pipeline
-       fn vocab_size(&self) -> usize;
-       fn supports_epistemic_gating(&self) -> bool;
-   }
-   ```
-2. Implement for all 3 tiers
-3. SporeEngine selects tier at startup based on available resources/features
-4. Add feature-parity test ensuring all tiers produce valid output for same input
-
-**Effort**: ~300 LOC | **Risk**: Low (trait abstraction over existing code)
-
-### 5.2 Version Reconciliation
-
-**Problem**: Cargo.toml says v2.0.0 but CHANGELOG stops at v0.5.0. Sub-crates all at v0.1.0.
-
-**Implementation**:
-1. Update CHANGELOG.md with all changes since v0.5.0 (Feb 3 → Mar 22)
-2. Decide canonical version: either tag v1.0.0 (reflecting maturity) or v0.6.0 (reflecting pre-release)
-3. Bump sub-crate versions to reflect actual stability (Spore, Soma → v0.2.0 at minimum)
-
-**Effort**: Documentation only | **Risk**: None
-
-### 5.3 Web Offline Fallback
-
-**Problem**: If LFS fetch fails for Broca checkpoint, language generation is silently disabled.
-
-**File**: `crates/symthaea-web/src/` (worker module)
-
-**Implementation**:
-1. Show explicit UI indicator when BrocaPipeline is unavailable
-2. Fall back to BrocaLite (always available) with user notification
-3. Add retry logic with exponential backoff for LFS fetch
-
-**Effort**: ~100 LOC | **Risk**: Low
-
-### 5.4 Swarm Communication Realism
-
-**Problem**: Vehicle swarm assumes perfect V2V comms. No latency or packet loss modeling.
-
-**File**: `crates/symthaea-vehicle/src/swarm.rs`
-
-**Implementation**:
-1. Add `CommsConfig { latency_ms: f32, packet_loss_rate: f32, bandwidth_limit: usize }`
-2. Inject latency jitter and random drops into `send_to_peer()`
-3. Test formation stability under degraded comms
-
-**Effort**: ~150 LOC | **Risk**: Low
+| Phase | Item | Effort | Impact | Status |
+|-------|------|--------|--------|--------|
+| **5.1** | Wire HolonReceiver into CLS | 400 LOC | **Critical** (makes bridge real) | Pending |
+| **5.2** | ConsciousnessContext modulates FEP | 150 LOC | **High** (consciousness controls body) | Pending |
+| **5.3** | Soma↔Holon E2E demo | 200 LOC | **High** (proof of architecture) | Pending |
+| **6.1** | Broca tier unification | 300 LOC | **Medium** (clarity) | Pending |
+| **6.2** | Version reconciliation | Docs | **Medium** (hygiene) | Pending |
+| **6.3** | Web offline fallback | 100 LOC | **Low** (UX) | Pending |
+| **6.4** | Swarm comms realism | 150 LOC | **Low** (fidelity) | Pending |
 
 ---
 
-## Implementation Priority Matrix
+## Recommended Next Sprint
 
-| Phase | Item | Effort | Impact | Dependencies |
-|-------|------|--------|--------|-------------|
-| **1.1** | HolonBridge encryption | 200 LOC | **Critical** (security) | None |
-| **1.2** | FFI double-free protection | 50 LOC | **Critical** (safety) | None |
-| **1.3** | Touch body panic fix | 2 LOC | **High** (crash) | None |
-| **1.4** | Pairing challenge cleanup | 30 LOC | **Medium** (DoS risk) | None |
-| **2.1** | Desktop HolonBridge receiver | 600 LOC | **High** (core feature) | Phase 1.1 |
-| **2.2** | iOS sensor bridges | 800 LOC | **High** (platform parity) | None |
-| **3.1** | Embodiment ← consciousness | 300 LOC | **Medium** (architecture) | None |
-| **3.2** | Physics → embodiment signals | 200 LOC | **Low** (research) | None |
-| **3.3** | Checkpoint versioning | 150 LOC | **Medium** (reliability) | None |
-| **4.1** | E2E integration tests | 400 LOC | **High** (confidence) | Phases 2-3 |
-| **4.2** | Web portal tests | 200 LOC | **Low** (0 coverage) | None |
-| **4.3** | Soma proptests | 200 LOC | **Medium** (robustness) | None |
-| **5.1** | Broca tier unification | 300 LOC | **Medium** (clarity) | None |
-| **5.2** | Version reconciliation | Docs only | **Medium** (hygiene) | None |
-| **5.3** | Web offline fallback | 100 LOC | **Low** (UX) | None |
-| **5.4** | Swarm comms realism | 150 LOC | **Low** (fidelity) | None |
+### Sprint 5: Functional Integration (2-3 sessions)
+1. [5.2] ConsciousnessContext modulates FEP (150 LOC — quick win)
+2. [5.1] Wire HolonReceiver into CLS (400 LOC — biggest impact)
+3. [5.3] Soma↔Holon E2E demo (200 LOC — proves it works)
 
----
-
-## Recommended Execution Order
-
-### Sprint 1: Safety & Security (1-2 sessions)
-- [1.3] Touch body panic fix (2 LOC, immediate)
-- [1.2] FFI double-free protection (50 LOC)
-- [1.4] Pairing challenge cleanup (30 LOC)
-- [1.1] HolonBridge encryption (200 LOC)
-
-### Sprint 2: Soma↔Holon Connection (2-3 sessions)
-- [2.1] Desktop HolonBridge receiver (600 LOC)
-- [3.3] Checkpoint versioning (150 LOC)
-- [4.3] Soma proptests (200 LOC)
-
-### Sprint 3: Cross-Variant Integration (2-3 sessions)
-- [3.1] Embodiment ← consciousness feedback (300 LOC)
-- [4.1] E2E integration tests (400 LOC)
-- [3.2] Physics → embodiment signals (200 LOC)
-
-### Sprint 4: iOS & Polish (2-3 sessions)
-- [2.2] iOS sensor bridges (800 LOC Swift)
-- [5.1] Broca tier unification (300 LOC)
-- [5.2] Version reconciliation (docs)
-
-### Sprint 5: Web & Ecosystem (1-2 sessions)
-- [4.2] Web portal tests (200 LOC)
-- [5.3] Web offline fallback (100 LOC)
-- [5.4] Swarm comms realism (150 LOC)
+### Sprint 6: Polish (1-2 sessions)
+1. [6.1] Broca tier unification (300 LOC)
+2. [6.2] Version reconciliation (docs)
+3. [6.3] Web offline fallback (100 LOC)
 
 ---
 
 ## Success Criteria
 
-### After Phase 1 (Safety)
-- [ ] No panics possible in Soma production code paths
-- [ ] HolonBridge messages encrypted in transit
-- [ ] FFI double-free returns safely (no UB)
-- [ ] Pairing challenge queue bounded under adversarial conditions
-
-### After Phase 2 (Bridge)
+### After Phase 5 (Functional Integration)
 - [ ] Soma consciousness vector appears in Holon's SwarmManager peer list
-- [ ] Task delegation flows: Soma → Holon → Soma
-- [ ] iOS SomaEngine receives battery, thermal, light, motion signals
-- [ ] Checkpoint load/save survives schema addition
+- [ ] Task delegation flows: Soma → HolonReceiver → ReasoningManager → response → Soma
+- [ ] Flight FEP emergency descent triggered by SafetyLevel::Red
+- [ ] Humanoid FEP emergency crouch triggered by SafetyLevel::Red
+- [ ] Vehicle FEP emergency brake triggered by SafetyLevel::Red
+- [ ] E2E demo passes: Soma→HolonReceiver→response→Soma in single process
 
-### After Phase 3 (Integration)
-- [ ] Flight FEP agent modulates behavior based on Phi
-- [ ] SafetyLevel::Red triggers emergency maneuvers in all embodiments
-- [ ] At least 1 E2E test per variant pair (Spore→Soma, Soma→Holon, Holon→Flight)
-
-### After Phase 5 (Polish)
+### After Phase 6 (Polish)
 - [ ] All 3 Broca tiers implement `BrocaBackend` trait
 - [ ] CHANGELOG covers all changes since v0.5.0
-- [ ] Web portal has non-zero test coverage
-- [ ] Vehicle swarm stable under 10% packet loss
+- [ ] Web portal gracefully handles BrocaPipeline load failure
 
 ---
 
 ## What This Plan Does NOT Cover
 
+- iOS/macOS support (deferred indefinitely — WASM covers these platforms via browser)
 - New variant creation (no new crates)
 - Real hardware deployment (drones, robots, tokamaks)
 - LUCID dashboard (SvelteKit + Tauri — separate project)
