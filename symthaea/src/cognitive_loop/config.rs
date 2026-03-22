@@ -371,6 +371,21 @@ pub struct CognitiveLoopConfig {
     /// Science: Friston (2008) — hierarchical predictive processing
     pub enable_hierarchical_free_energy: bool,
 
+    /// Enable ODE-based trajectory planning for active inference.
+    /// When true, the FEP module simulates forward trajectories using Dormand-Prince
+    /// adaptive ODE integration to compute expected free energy over future horizons.
+    /// Science: Friston (2010) — Active Inference requires trajectory simulation.
+    #[serde(default)]
+    pub enable_trajectory_planning: bool,
+
+    /// Trajectory planning horizon in seconds. Default: 0.5 (~10 cycles at 20Hz).
+    #[serde(default = "default_trajectory_horizon")]
+    pub trajectory_horizon_seconds: f64,
+
+    /// Cycle interval for trajectory planning. Default: 10 (every 10th cycle).
+    #[serde(default = "default_trajectory_interval")]
+    pub trajectory_planning_interval: u64,
+
     /// Enable hierarchical region-based bundling for structured aggregation.
     /// When enabled, the cognitive loop accumulates BinaryHV vectors per cortical
     /// region and produces structured aggregates for enhanced Phi measurement.
@@ -784,6 +799,9 @@ impl Default for CognitiveLoopConfig {
             enable_consciousness_thermodynamics: false,
             enable_phenomenal_binding: false,
             enable_hierarchical_free_energy: false,
+            enable_trajectory_planning: false,
+            trajectory_horizon_seconds: default_trajectory_horizon(),
+            trajectory_planning_interval: default_trajectory_interval(),
             enable_hierarchical_bundling: false,
             enable_contextual_weights: false,
             enable_phi_attention: false,
@@ -901,6 +919,14 @@ fn default_name_cache_size() -> usize {
     256
 }
 
+fn default_trajectory_horizon() -> f64 {
+    0.5
+}
+
+fn default_trajectory_interval() -> u64 {
+    10
+}
+
 impl CognitiveLoopConfig {
     /// Create configuration with CfC backend (default)
     pub fn with_cfc() -> Self {
@@ -1016,6 +1042,7 @@ impl ConsciousnessProfile {
         config.enable_consciousness_thermodynamics = false;
         config.enable_phenomenal_binding = false;
         config.enable_hierarchical_free_energy = false;
+        config.enable_trajectory_planning = false;
         config.enable_hierarchical_bundling = false;
         config.enable_contextual_weights = false;
         config.enable_phi_attention = false;
@@ -1080,6 +1107,7 @@ impl ConsciousnessProfile {
                 config.enable_consciousness_thermodynamics = true;
                 config.enable_phenomenal_binding = true;
                 config.enable_hierarchical_free_energy = true;
+                config.enable_trajectory_planning = true;
                 config.enable_hierarchical_bundling = true;
                 config.enable_contextual_weights = true;
                 config.enable_phi_attention = true;

@@ -2823,6 +2823,10 @@ impl CognitiveLoopService {
                 fep_complexity,
                 fep_surprise,
                 fep_td_error,
+                trajectory_efe: self.fep.trajectory_telemetry.best_efe,
+                trajectory_best_action: self.fep.trajectory_telemetry.best_action,
+                trajectory_surprise: self.fep.trajectory_telemetry.best_trajectory_surprise,
+                trajectory_ode_steps: self.fep.trajectory_telemetry.total_ode_steps,
             },
             reasoning: DynReasoning {
                 reasoning_confidence,
@@ -3362,6 +3366,21 @@ impl CognitiveLoopService {
             1.0 - surprise_norm * FEP_SURPRISE_TAU_SCALE // high surprise → 0.8 (faster), low → 1.0
         } else {
             1.0
+        };
+
+        // ODE trajectory planning: simulate forward trajectories via Dormand-Prince
+        // to compute expected free energy over future horizons.
+        // Friston (2010): genuine active inference requires planning through simulation.
+        // The trajectory surprise augments the FEP tau factor for more informed dynamics.
+        let fep_tau_factor = if let Some(_best_action) =
+            self.fep.plan_trajectories(self.stats.total_cycles as u64)
+        {
+            let traj_surprise = self.fep.trajectory_telemetry.best_trajectory_surprise as f32;
+            let traj_surprise_norm = traj_surprise.clamp(0.0, 2.0) / 2.0;
+            // Blend trajectory surprise into tau: augments single-step FEP surprise
+            fep_tau_factor * (1.0 - traj_surprise_norm * 0.1) // ±10% modulation
+        } else {
+            fep_tau_factor
         };
 
         // Session 10 Item 3: Coherence velocity tau factor.
@@ -4374,81 +4393,60 @@ impl CognitiveLoopService {
                 semantic_hv: nsm_semantic_hv.clone(),
                 semantic_confidence: nsm_semantic_confidence,
 
-                // Epistemic Cube: extract from current structured thought's domain context
-                cube_e_tier: self
-                    .language_comm
-                    .last_structured_thought
-                    .as_ref()
-                    .and_then(|t| t.domain_context.as_ref())
-                    .and_then(|dc| dc.cube.as_ref())
-                    .map(|cube| match cube.e {
-                        crate::mind::structured_thought::ETier::E0 => 0u8,
-                        crate::mind::structured_thought::ETier::E1 => 1,
-                        crate::mind::structured_thought::ETier::E2 => 2,
-                        crate::mind::structured_thought::ETier::E3 => 3,
-                        crate::mind::structured_thought::ETier::E4 => 4,
-                    }),
-                cube_n_tier: self
-                    .language_comm
-                    .last_structured_thought
-                    .as_ref()
-                    .and_then(|t| t.domain_context.as_ref())
-                    .and_then(|dc| dc.cube.as_ref())
-                    .map(|cube| match cube.n {
-                        crate::mind::structured_thought::NTier::N0 => 0u8,
-                        crate::mind::structured_thought::NTier::N1 => 1,
-                        crate::mind::structured_thought::NTier::N2 => 2,
-                        crate::mind::structured_thought::NTier::N3 => 3,
-                    }),
-                cube_m_tier: self
-                    .language_comm
-                    .last_structured_thought
-                    .as_ref()
-                    .and_then(|t| t.domain_context.as_ref())
-                    .and_then(|dc| dc.cube.as_ref())
-                    .map(|cube| match cube.m {
-                        crate::mind::structured_thought::MTier::M0 => 0u8,
-                        crate::mind::structured_thought::MTier::M1 => 1,
-                        crate::mind::structured_thought::MTier::M2 => 2,
-                        crate::mind::structured_thought::MTier::M3 => 3,
-                    }),
-                cube_h_value: self
-                    .language_comm
-                    .last_structured_thought
-                    .as_ref()
-                    .and_then(|t| t.domain_context.as_ref())
-                    .and_then(|dc| dc.cube.as_ref())
-                    .map(|cube| cube.harmonic().to_f64() as f32)
-                    .unwrap_or(0.25),
-                cube_quality: self
-                    .language_comm
-                    .last_structured_thought
-                    .as_ref()
-                    .and_then(|t| t.domain_context.as_ref())
-                    .and_then(|dc| dc.cube.as_ref())
-                    .map(|cube| {
-                        let e = match cube.e {
-                            crate::mind::structured_thought::ETier::E0 => 0.0f32,
-                            crate::mind::structured_thought::ETier::E1 => 1.0,
-                            crate::mind::structured_thought::ETier::E2 => 2.0,
-                            crate::mind::structured_thought::ETier::E3 => 3.0,
-                            crate::mind::structured_thought::ETier::E4 => 4.0,
+                // Epistemic Cube: populated every cycle in cycle_subsystems.rs
+                // from epistemic confidence, social context, knowledge grounding, and phi.
+                cube_e_tier: self.carryover.quality.last_cube_e_tier,
+                cube_n_tier: self.carryover.quality.last_cube_n_tier,
+                cube_m_tier: self.carryover.quality.last_cube_m_tier,
+                cube_h_value: self.carryover.quality.last_cube_h_value,
+                cube_quality: self.carryover.quality.last_cube_quality,
+
+                // Compute HDC encoding of the epistemic cube via NSM grounding.
+                // This semantically encodes the cube position so the thought HV
+                // carries *what kind of knowledge this is*, not just scalar metadata.
+                epistemic_cube_hv: {
+                    if let (Some(e), Some(n), Some(m)) = (
+                        self.carryover.quality.last_cube_e_tier,
+                        self.carryover.quality.last_cube_n_tier,
+                        self.carryover.quality.last_cube_m_tier,
+                    ) {
+                        use crate::consciousness::epistemic_tiers::{
+                            EmpiricalTier, EpistemicCoordinate, EpistemicNSMGrounding,
+                            MaterialityTier, NormativeTier,
                         };
-                        let n = match cube.n {
-                            crate::mind::structured_thought::NTier::N0 => 0.0f32,
-                            crate::mind::structured_thought::NTier::N1 => 1.0,
-                            crate::mind::structured_thought::NTier::N2 => 2.0,
-                            crate::mind::structured_thought::NTier::N3 => 3.0,
+                        let empirical = match e {
+                            0 => EmpiricalTier::E0Null,
+                            1 => EmpiricalTier::E1Testimonial,
+                            2 => EmpiricalTier::E2PrivatelyVerifiable,
+                            3 => EmpiricalTier::E3CryptographicallyProven,
+                            _ => EmpiricalTier::E4PubliclyReproducible,
                         };
-                        let m = match cube.m {
-                            crate::mind::structured_thought::MTier::M0 => 0.0f32,
-                            crate::mind::structured_thought::MTier::M1 => 1.0,
-                            crate::mind::structured_thought::MTier::M2 => 2.0,
-                            crate::mind::structured_thought::MTier::M3 => 3.0,
+                        let normative = match n {
+                            0 => NormativeTier::N0Personal,
+                            1 => NormativeTier::N1Communal,
+                            2 => NormativeTier::N2Network,
+                            _ => NormativeTier::N3Axiomatic,
                         };
-                        (e / 4.0) * 0.40 + (n / 3.0) * 0.35 + (m / 3.0) * 0.25
-                    })
-                    .unwrap_or(0.0),
+                        let materiality = match m {
+                            0 => MaterialityTier::M0Ephemeral,
+                            1 => MaterialityTier::M1Temporal,
+                            2 => MaterialityTier::M2Persistent,
+                            _ => MaterialityTier::M3Foundational,
+                        };
+                        let coord = EpistemicCoordinate {
+                            empirical,
+                            normative,
+                            materiality,
+                        };
+                        let system =
+                            symthaea_core::hdc::primitive_system::PrimitiveSystem::global();
+                        let grounding = EpistemicNSMGrounding::new(&system);
+                        let binary_hv = grounding.encode_coordinate(&coord);
+                        Some(binary_hv.to_continuous())
+                    } else {
+                        None
+                    }
+                },
             };
             if let Some(mut result) = broca.generate(signals) {
                 if !result.text.is_empty() {

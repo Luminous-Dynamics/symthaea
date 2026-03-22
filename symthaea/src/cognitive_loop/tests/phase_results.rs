@@ -286,7 +286,7 @@ fn dyn_core_field_count_11() {
 }
 
 #[test]
-fn dyn_fep_field_count_6() {
+fn dyn_fep_field_count_10() {
     let d = DynFep::default();
     let DynFep {
         fep_action_idx: _,
@@ -295,6 +295,10 @@ fn dyn_fep_field_count_6() {
         fep_complexity: _,
         fep_surprise: _,
         fep_td_error: _,
+        trajectory_efe: _,
+        trajectory_best_action: _,
+        trajectory_surprise: _,
+        trajectory_ode_steps: _,
     } = d;
 }
 

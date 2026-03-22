@@ -32,6 +32,8 @@ pub fn sync_terra_atlas_project(input: SyncProjectInput) -> ExternResult<Record>
         status: input.status,
         regenerative_progress: 0.0,
         synced_at: now,
+        phi_score: None,
+        harmony_alignment: None,
     };
 
     let hash = create_entry(&EntryTypes::TerraAtlasProject(project))?;

@@ -22,6 +22,19 @@ pub struct EnergyProject {
     pub financials: ProjectFinancials,
     pub created: Timestamp,
     pub updated: Timestamp,
+
+    // ── Consciousness Scoring (Symthaea integration) ────────────────
+    /// Phi score from Symthaea consciousness evaluation (0.0–1.0).
+    /// Higher Phi indicates more integrated, coherent project design.
+    /// Computed by Symthaea's ConsciousnessEquationV2 via Holon bridge.
+    pub phi_score: Option<f64>,
+    /// Eight Harmonies alignment score (0.0–1.0).
+    /// Measures ecological reciprocity, community coherence, sacred stillness.
+    pub harmony_alignment: Option<f64>,
+    /// When the consciousness assessment was last computed.
+    pub consciousness_assessed_at: Option<Timestamp>,
+    /// DID of the Symthaea instance that computed the score.
+    pub consciousness_scorer_did: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]

@@ -135,6 +135,10 @@ pub(super) struct DynFep {
     pub(super) fep_complexity: f64,
     pub(super) fep_surprise: f64,
     pub(super) fep_td_error: f64,
+    pub(super) trajectory_efe: f64,
+    pub(super) trajectory_best_action: usize,
+    pub(super) trajectory_surprise: f64,
+    pub(super) trajectory_ode_steps: usize,
 }
 
 /// Reasoning engine and planning metrics.

@@ -44,6 +44,10 @@ pub struct TerraAtlasProject {
     pub status: ProjectStatus,
     pub regenerative_progress: f64, // 0.0 - 1.0
     pub synced_at: Timestamp,
+    /// Symthaea Phi consciousness score (0.0–1.0). None if not yet assessed.
+    pub phi_score: Option<f64>,
+    /// Eight Harmonies alignment (0.0–1.0). None if not yet assessed.
+    pub harmony_alignment: Option<f64>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -517,6 +521,8 @@ mod tests {
             status: ProjectStatus::Funding,
             regenerative_progress: 0.0,
             synced_at: create_test_timestamp(),
+            phi_score: None,
+            harmony_alignment: None,
         }
     }
 

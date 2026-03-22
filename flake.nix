@@ -34,6 +34,69 @@
         };
       in
       {
+        # ── Docker Images ──────────────────────────────────────────────
+        # Build: nix build .#symthaea-docker
+        # Load: docker load < result
+        packages = let
+          commonBuildInputs = with pkgs; [ openssl ];
+          commonNativeBuildInputs = with pkgs; [ pkg-config ];
+        in {
+          symthaea-docker = let
+            symthaea-api = pkgs.rustPlatform.buildRustPackage {
+              pname = "symthaea-api";
+              version = "2.0.0";
+              src = ./symthaea;
+
+              cargoLock = {
+                lockFile = ./symthaea/Cargo.lock;
+              };
+
+              buildInputs = commonBuildInputs;
+              nativeBuildInputs = commonNativeBuildInputs;
+
+              cargoBuildFlags = [ "--bin" "symthaea-api" ];
+              buildFeatures = [ "api_module" ];
+
+              # Skip tests during Docker image build (run separately)
+              doCheck = false;
+
+              meta = with pkgs.lib; {
+                description = "Symthaea Holographic Liquid Brain — REST API server";
+                homepage = "https://luminousdynamics.org";
+                license = licenses.mit;
+                mainProgram = "symthaea-api";
+              };
+            };
+          in pkgs.dockerTools.buildLayeredImage {
+            name = "symthaea-api";
+            tag = "latest";
+
+            contents = with pkgs; [
+              symthaea-api
+              cacert        # SSL certificates for HTTPS
+              coreutils
+              bash
+            ];
+
+            config = {
+              Cmd = [ "${symthaea-api}/bin/symthaea-api" ];
+              ExposedPorts = {
+                "8080/tcp" = {};
+              };
+              Env = [
+                "SYMTHAEA_HOST=0.0.0.0"
+                "SYMTHAEA_PORT=8080"
+                "RUST_LOG=symthaea=info"
+              ];
+              WorkingDir = "/app";
+              User = "nobody";
+            };
+
+            created = "now";
+            maxLayers = 100;
+          };
+        };
+
         devShells = {
         default = pkgs.mkShell {
           name = "luminous-dynamics-dev";

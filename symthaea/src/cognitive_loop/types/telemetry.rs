@@ -2346,6 +2346,14 @@ pub struct FepTelemetry {
     pub predictive_free_energy: f64,
     /// Predictive processing phi modulation (1.0 when off — neutral).
     pub predictive_phi_modulation: f64,
+    /// ODE trajectory expected free energy (best action, 0.0 when planning disabled).
+    pub trajectory_efe: f64,
+    /// Action selected by trajectory planning (0 when disabled).
+    pub trajectory_best_action: usize,
+    /// Integrated surprise along best trajectory (0.0 when disabled).
+    pub trajectory_surprise: f64,
+    /// Total ODE steps across all action rollouts (0 when disabled).
+    pub trajectory_ode_steps: usize,
 }
 
 /// Mesh network telemetry.
