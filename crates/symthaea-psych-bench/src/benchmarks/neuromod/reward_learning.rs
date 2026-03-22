@@ -47,31 +47,56 @@ impl RewardLearningBenchmark {
 
         // Association strengths (learned via Hebbian-like update)
         let mut q_values = [0.5_f64, 0.5]; // [A, B]
-        let lr = 0.15; // DA-like learning rate
-        let temperature = 0.3;
+
+        // Asymmetric learning rates (Frank et al., 2007): phasic DA dips
+        // (negative RPE) drive faster unlearning than DA bursts drive acquisition.
+        // This is a core feature of the basal ganglia Go/NoGo pathway asymmetry.
+        let lr_pos = 0.15; // DA burst → Go pathway
+        let lr_neg = 0.25; // DA dip → NoGo pathway (faster unlearning)
+        let base_temperature = 0.3;
+
+        // Lapse rate: random responding on a fraction of trials (models
+        // attention lapses / individual differences for ICC reliability)
+        let lapse_rate = config.lapse_rate;
 
         // Phase 1: Acquisition (A→reward, B→nothing), 40 trials
         let criterion = 0.8;
 
         for _trial in 0..40 {
-            let choice = softmax_choice(&q_values, temperature, &mut rng);
+            let choice = if lapse_rate > 0.0 && (next_seed(&mut rng) % 10000) as f64 / 10000.0 < lapse_rate {
+                (next_seed(&mut rng) % 2) as usize // random lapse
+            } else {
+                softmax_choice(&q_values, base_temperature, &mut rng)
+            };
             let reward = if choice == 0 { 1.0 } else { 0.0 };
 
-            // DA RPE update
+            // DA RPE update with asymmetric learning rates
             let rpe = reward - q_values[choice];
+            let lr = if rpe >= 0.0 { lr_pos } else { lr_neg };
             q_values[choice] += lr * rpe;
             q_values[choice] = q_values[choice].clamp(0.0, 1.0);
         }
 
         // Phase 2: Reversal (B→reward, A→nothing), 40 trials
+        // Surprise-driven exploration: high negative RPE increases temperature
+        // (Daw et al., 2006 — uncertainty-driven exploration)
         let mut lose_shifts = 0usize;
         let mut losses = 0usize;
         let mut reversal_criterion_trials = 40usize;
         let mut reversal_criterion_met = false;
         let mut phase2_b_choices = 0usize;
+        let mut recent_rpe_magnitude = 0.0_f64; // EMA of |negative RPE|
 
         for trial in 0..40 {
-            let choice = softmax_choice(&q_values, temperature, &mut rng);
+            // Surprise-driven exploration: boost temperature when recent negative
+            // RPE is high (unexpected non-reward increases uncertainty → exploration)
+            let temperature = base_temperature + recent_rpe_magnitude * 0.15;
+
+            let choice = if lapse_rate > 0.0 && (next_seed(&mut rng) % 10000) as f64 / 10000.0 < lapse_rate {
+                (next_seed(&mut rng) % 2) as usize
+            } else {
+                softmax_choice(&q_values, temperature, &mut rng)
+            };
             let reward = if choice == 1 { 1.0 } else { 0.0 };
 
             // Track lose-shift: chose A (now unrewarded) → switched to B next
@@ -79,10 +104,18 @@ impl RewardLearningBenchmark {
                 losses += 1;
             }
 
-            // DA RPE update (negative RPE for previous rewarded stimulus)
+            // DA RPE update with asymmetric rates
             let rpe = reward - q_values[choice];
+            let lr = if rpe >= 0.0 { lr_pos } else { lr_neg };
             q_values[choice] += lr * rpe;
             q_values[choice] = q_values[choice].clamp(0.0, 1.0);
+
+            // Track surprise for exploration modulation (EMA, alpha=0.3)
+            if rpe < 0.0 {
+                recent_rpe_magnitude = recent_rpe_magnitude * 0.7 + (-rpe) * 0.3;
+            } else {
+                recent_rpe_magnitude *= 0.7; // decay when rewards are received
+            }
 
             if choice == 1 {
                 phase2_b_choices += 1;

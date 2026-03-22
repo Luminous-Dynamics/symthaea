@@ -96,7 +96,10 @@ impl BleMesh {
         }
     }
 
-    /// Receive peer CV from raw BLE data (peer_id + 12 bytes: 3 x f32).
+    /// Receive peer CV from raw BLE data (peer_id + 12 bytes: 3 x f32 little-endian).
+    ///
+    /// Wire format: `[phi:f32le, valence:f32le, arousal:f32le]` = 12 bytes.
+    /// Little-endian is the standard for BLE (Bluetooth Core Spec Vol 1, Part A, §6.2).
     pub fn receive_peer_raw(&mut self, peer_id: u64, data: &[u8]) -> bool {
         if data.len() < 12 {
             return false;
@@ -105,7 +108,11 @@ impl BleMesh {
         let valence = f32::from_le_bytes([data[4], data[5], data[6], data[7]]);
         let arousal = f32::from_le_bytes([data[8], data[9], data[10], data[11]]);
 
-        if phi.is_nan() || valence.is_nan() || arousal.is_nan() {
+        // Reject NaN, Inf, and out-of-range values
+        if !phi.is_finite() || !valence.is_finite() || !arousal.is_finite() {
+            return false;
+        }
+        if phi < 0.0 || phi > 1.0 {
             return false;
         }
 

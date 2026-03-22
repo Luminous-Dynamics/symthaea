@@ -93,6 +93,27 @@ struct ActiveTouch {
     last_timestamp_ms: u64,
 }
 
+/// Recognized gesture type from touch sequence analysis.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Gesture {
+    /// No gesture detected.
+    None,
+    /// Single tap (quick down+up).
+    Tap,
+    /// Double tap (two taps within 300ms).
+    DoubleTap,
+    /// Long press (sustained > 500ms).
+    LongPress,
+    /// Swipe in a cardinal direction.
+    SwipeLeft,
+    SwipeRight,
+    SwipeUp,
+    SwipeDown,
+    /// Pinch (two fingers moving apart or together).
+    PinchIn,
+    PinchOut,
+}
+
 /// Consciousness-relevant output from touch processing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TouchBodyState {
@@ -108,6 +129,8 @@ pub struct TouchBodyState {
     pub multi_touch_count: u8,
     /// Whether any finger is currently touching the screen.
     pub touch_active: bool,
+    /// Recognized gesture from touch sequence.
+    pub gesture: Gesture,
 }
 
 impl Default for TouchBodyState {
@@ -119,6 +142,7 @@ impl Default for TouchBodyState {
             is_long_press: false,
             multi_touch_count: 0,
             touch_active: false,
+            gesture: Gesture::None,
         }
     }
 }
@@ -173,6 +197,10 @@ pub struct TouchBody {
     last_down_ms: u64,
     /// Count of rapid taps (resets when inter-tap > threshold).
     rapid_tap_count: u32,
+    /// Position of the initial Down event (for swipe detection).
+    down_position: Option<(f32, f32)>,
+    /// Previous two-finger distance (for pinch detection).
+    prev_pinch_distance: Option<f32>,
 }
 
 impl TouchBody {
@@ -188,6 +216,8 @@ impl TouchBody {
             current_state: TouchBodyState::default(),
             last_down_ms: 0,
             rapid_tap_count: 0,
+            down_position: None,
+            prev_pinch_distance: None,
         }
     }
 
@@ -227,6 +257,9 @@ impl TouchBody {
         let multi_touch_count = self.active_touches.len().min(255) as u8;
         let touch_active = !self.active_touches.is_empty();
 
+        // Gesture detection
+        let gesture = self.detect_gesture(&event, is_long_press, multi_touch_count);
+
         self.current_state = TouchBodyState {
             surprise,
             attention_focus,
@@ -234,6 +267,7 @@ impl TouchBody {
             is_long_press,
             multi_touch_count,
             touch_active,
+            gesture,
         };
 
         self.current_state.clone()
@@ -270,6 +304,93 @@ impl TouchBody {
         }
 
         nudges
+    }
+
+    /// Detect gesture from current touch state and event sequence.
+    fn detect_gesture(
+        &mut self,
+        event: &TouchEvent,
+        is_long_press: bool,
+        multi_touch_count: u8,
+    ) -> Gesture {
+        match event.action {
+            TouchAction::Down => {
+                self.down_position = Some((event.x, event.y));
+                // Track pinch distance for two-finger gestures
+                if self.active_touches.len() == 2 {
+                    let t0 = &self.active_touches[0];
+                    let t1 = &self.active_touches[1];
+                    let dx = t0.x - t1.x;
+                    let dy = t0.y - t1.y;
+                    self.prev_pinch_distance = Some((dx * dx + dy * dy).sqrt());
+                }
+                Gesture::None
+            }
+            TouchAction::Move => {
+                // Pinch detection (two fingers)
+                if multi_touch_count == 2 && self.active_touches.len() == 2 {
+                    let t0 = &self.active_touches[0];
+                    let t1 = &self.active_touches[1];
+                    let dx = t0.x - t1.x;
+                    let dy = t0.y - t1.y;
+                    let dist = (dx * dx + dy * dy).sqrt();
+                    if let Some(prev) = self.prev_pinch_distance {
+                        let delta = dist - prev;
+                        self.prev_pinch_distance = Some(dist);
+                        if delta > 0.05 {
+                            return Gesture::PinchOut;
+                        } else if delta < -0.05 {
+                            return Gesture::PinchIn;
+                        }
+                    }
+                }
+                Gesture::None
+            }
+            TouchAction::Up => {
+                self.prev_pinch_distance = None;
+                if let Some((dx, dy)) = self.down_position.take() {
+                    let delta_x = event.x - dx;
+                    let delta_y = event.y - dy;
+                    let dist = (delta_x * delta_x + delta_y * delta_y).sqrt();
+                    let duration = event.timestamp_ms.saturating_sub(self.last_down_ms);
+
+                    if is_long_press {
+                        return Gesture::LongPress;
+                    }
+
+                    // Swipe: moved > 0.15 normalized distance within 500ms
+                    if dist > 0.15 && duration < 500 {
+                        if delta_x.abs() > delta_y.abs() {
+                            return if delta_x > 0.0 {
+                                Gesture::SwipeRight
+                            } else {
+                                Gesture::SwipeLeft
+                            };
+                        } else {
+                            return if delta_y > 0.0 {
+                                Gesture::SwipeDown
+                            } else {
+                                Gesture::SwipeUp
+                            };
+                        }
+                    }
+
+                    // Tap: small movement, short duration
+                    if dist < 0.05 && duration < 300 {
+                        if self.rapid_tap_count >= 2 {
+                            return Gesture::DoubleTap;
+                        }
+                        return Gesture::Tap;
+                    }
+                }
+                Gesture::None
+            }
+            TouchAction::Cancel => {
+                self.down_position = None;
+                self.prev_pinch_distance = None;
+                Gesture::None
+            }
+        }
     }
 
     /// Update the internal velocity-based prediction for the next touch location.

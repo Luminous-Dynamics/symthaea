@@ -1308,3 +1308,15 @@ pub const MATH_DEFAULT_TELEMETRY_PHI: f64 = 0.4;
 
 /// Default telemetry confidence value.
 pub const MATH_DEFAULT_TELEMETRY_CONFIDENCE: f64 = 0.9;
+
+/// Phi boost for symbolic-exact solutions (vs 1.2 for multipath numeric).
+///
+/// Science: Rota (1997) — mathematical elegance correlates with information
+/// compression; closed-form solutions maximally compress computational traces.
+pub const MATH_SYMBOLIC_EXACT_PHI_BOOST: f64 = 1.5;
+
+/// Confidence for symbolic-exact solutions (rational arithmetic, zero error).
+pub const MATH_SYMBOLIC_EXACT_CONFIDENCE: f64 = 1.0;
+
+/// Tolerance for symbolic-numeric cross-validation agreement.
+pub const MATH_SYMBOLIC_NUMERIC_AGREEMENT_TOL: f64 = 1e-8;

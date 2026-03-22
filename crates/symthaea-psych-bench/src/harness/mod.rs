@@ -354,6 +354,7 @@ mod tests {
             Box::new(ScalingAnalysisBenchmark),
             // Coding
             Box::new(HumanEvalMiniBenchmark),
+            Box::new(BugDetectionBenchmark),
         ];
 
         let mut missing = Vec::new();

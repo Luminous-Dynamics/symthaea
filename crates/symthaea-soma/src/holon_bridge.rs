@@ -76,6 +76,10 @@ pub struct HolonBridge {
     resuscitation: Option<([f32; 4], Vec<f32>)>,
     sequence: u64,
     cycles_since_heartbeat: u64,
+    /// HDC-derived session encryption key (32 bytes from sensor context).
+    /// Set via `set_session_key()` from SensorBridge::derive_context_key().
+    /// When set, outbound messages should be encrypted (requires chacha20poly1305).
+    session_key: Option<[u8; 32]>,
 }
 
 impl HolonBridge {
@@ -89,6 +93,7 @@ impl HolonBridge {
             resuscitation: None,
             sequence: 0,
             cycles_since_heartbeat: 0,
+            session_key: None,
         }
     }
 
@@ -105,6 +110,17 @@ impl HolonBridge {
 
     pub fn set_connected(&mut self, connected: bool) {
         self.connected = connected;
+    }
+
+    /// Set the HDC-derived session encryption key.
+    /// When set, outbound messages will be encrypted (once chacha20poly1305 is wired).
+    pub fn set_session_key(&mut self, key: [u8; 32]) {
+        self.session_key = Some(key);
+    }
+
+    /// Whether a session encryption key has been set.
+    pub fn has_session_key(&self) -> bool {
+        self.session_key.is_some()
     }
 
     pub fn is_connected(&self) -> bool {

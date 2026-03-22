@@ -1,19 +1,7 @@
 // Symthaea Service Worker — caches large WASM assets for instant reload.
-const CACHE_NAME = 'symthaea-v1';
-const CACHED_ASSETS = [
-  './assets/broca-spore-v1.bin',
-  './assets/broca-pipeline.bin',
-];
+const CACHE_NAME = 'symthaea-v2';
 
 self.addEventListener('install', event => {
-  // Pre-cache known large assets (ignore failures for optional files)
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache =>
-      Promise.allSettled(
-        CACHED_ASSETS.map(url => cache.add(url).catch(() => {}))
-      )
-    )
-  );
   self.skipWaiting();
 });
 
@@ -33,7 +21,7 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   const url = event.request.url;
-  // Cache-first for large binary assets
+  // Cache-first for large binary assets and WASM
   if (url.includes('broca-spore') || url.includes('broca-pipeline') ||
       url.includes('.wasm') || url.includes('symthaea_spore')) {
     event.respondWith(

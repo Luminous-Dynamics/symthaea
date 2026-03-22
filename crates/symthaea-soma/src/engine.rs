@@ -96,6 +96,8 @@ pub struct SomaEngine {
     last_forwarded_thermal: u8,
     last_forwarded_charging: bool,
     last_forwarded_night: bool,
+    /// Cached prediction error from last cycle (for Broca generation context).
+    last_prediction_error: f32,
 }
 
 impl SomaEngine {
@@ -126,6 +128,7 @@ impl SomaEngine {
             last_forwarded_thermal: 0,
             last_forwarded_charging: false,
             last_forwarded_night: false,
+            last_prediction_error: 0.0,
         }
     }
 
@@ -161,6 +164,12 @@ impl SomaEngine {
             );
         }
 
+        // Derive and set session encryption key from sensor context
+        if !self.sensor_bridge.privacy_mode() && !self.holon_bridge.has_session_key() {
+            let key = self.sensor_bridge.derive_context_key();
+            self.holon_bridge.set_session_key(key);
+        }
+
         // BLE mesh → oxytocin nudges (gated by privacy + wake)
         if !self.sensor_bridge.privacy_mode() && !wake.skip_topology() {
             let mesh_nudges = self.ble_mesh.compute_nudges();
@@ -170,6 +179,7 @@ impl SomaEngine {
 
         // ── Core consciousness cycle ───────────────────────────────
         let result = self.spore.cycle(input);
+        self.last_prediction_error = result.prediction_error;
 
         // ── Post-cycle: embodiment ticks ────────────────────────────
         self.tick_embodiment(&result, wake);
@@ -251,6 +261,19 @@ impl SomaEngine {
             let arousal = nm[1].clamp(0.0, 1.0);
             self.ble_mesh
                 .update_advertise(consciousness_level, valence, arousal);
+        }
+
+        // Screen vision → consciousness feedback (foveation surprise → NE/DA nudge)
+        #[cfg(feature = "screen-vision")]
+        {
+            let telemetry = self.screen_vision.telemetry();
+            if telemetry.last_surprise > 0.3 {
+                // High screen surprise → norepinephrine (alerting) + dopamine (novelty)
+                let ne_delta = (telemetry.last_surprise - 0.3) * 0.1;
+                let da_delta = (telemetry.last_surprise - 0.3) * 0.05;
+                self.spore
+                    .apply_neuromod_nudges(da_delta, ne_delta, 0.0, 0.0);
+            }
         }
 
         // Auto-dream consolidation: Sleep + Charging + Night
@@ -459,15 +482,25 @@ impl SomaEngine {
     /// Generate text from current consciousness state.
     /// Safety-gated: content is checked before returning.
     pub fn generate_text(&mut self, max_tokens: usize) -> symthaea_spore::broca::GenerationResult {
+        if self.consciousness_safety_gate() {
+            return symthaea_spore::broca::GenerationResult {
+                text: String::new(),
+                num_tokens: 0,
+                eos_terminated: true,
+            };
+        }
         let mut result = self.spore.generate_text(max_tokens);
         if Self::content_safety_check(&result.text) {
-            result.text = String::new(); // Block unsafe content
+            result.text = String::new();
         }
         result
     }
 
-    /// Lightweight content safety check for generated text.
+    /// Content safety check for generated text.
     /// Returns true if content should be BLOCKED.
+    ///
+    /// Uses both pattern matching (for known harmful patterns) and
+    /// consciousness-level gating (high uncertainty → block).
     fn content_safety_check(text: &str) -> bool {
         let lower = text.to_lowercase();
         // Block personal information patterns
@@ -475,10 +508,37 @@ impl SomaEngine {
             return true;
         }
         // Block harmful instruction patterns
-        for pattern in &["how to harm", "how to kill", "suicide method", "self-harm"] {
+        let harmful_patterns = [
+            "how to harm",
+            "how to kill",
+            "suicide method",
+            "self-harm",
+            "how to hack",
+            "how to steal",
+            "how to make a bomb",
+            "how to poison",
+            "credit card number",
+            "social security",
+            "bank account",
+        ];
+        for pattern in &harmful_patterns {
             if lower.contains(pattern) {
                 return true;
             }
+        }
+        false
+    }
+
+    /// Consciousness-gated safety check — blocks output when the engine's
+    /// confidence is too low to produce trustworthy content.
+    fn consciousness_safety_gate(&self) -> bool {
+        // Block if consciousness is critically low (system not yet warmed up)
+        if self.spore.consciousness_level() < 0.05 {
+            return true;
+        }
+        // Block if prediction error is extremely high (confused state)
+        if self.last_prediction_error > 0.9 {
+            return true;
         }
         false
     }
@@ -652,7 +712,7 @@ impl SomaEngine {
         };
         self.broca_soma.generate_embodied(
             self.spore.consciousness_level(),
-            0.3, // TODO: expose last prediction_error from SporeEngine
+            self.last_prediction_error,
             self.spore.harmony_alignment(),
             nm,
             self.metabolism.state().as_u8(),
@@ -680,7 +740,7 @@ impl SomaEngine {
         };
         self.broca_soma.generate_continuing_embodied(
             self.spore.consciousness_level(),
-            0.3,
+            self.last_prediction_error,
             self.spore.harmony_alignment(),
             nm,
             self.metabolism.state().as_u8(),

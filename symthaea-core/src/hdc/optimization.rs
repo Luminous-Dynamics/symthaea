@@ -124,6 +124,9 @@ pub struct BoxConstraints {
     pub upper: Vec<f64>,
 }
 
+/// Type alias for boxed constraint functions.
+type ConstraintFn = Box<dyn Fn(&[f64]) -> f64>;
+
 impl BoxConstraints {
     /// Create box constraints. Each dimension i is constrained to [lower[i], upper[i]].
     pub fn new(lower: Vec<f64>, upper: Vec<f64>) -> Self {
@@ -145,9 +148,9 @@ impl BoxConstraints {
 
     /// Convert to penalty-style inequality constraints: g_i(x) <= 0.
     /// For each dimension, two constraints: x[i] - upper[i] <= 0 and lower[i] - x[i] <= 0.
-    pub fn to_penalty_constraints(&self) -> Vec<Box<dyn Fn(&[f64]) -> f64>> {
+    pub fn to_penalty_constraints(&self) -> Vec<ConstraintFn> {
         let n = self.lower.len();
-        let mut constraints: Vec<Box<dyn Fn(&[f64]) -> f64>> = Vec::with_capacity(2 * n);
+        let mut constraints: Vec<ConstraintFn> = Vec::with_capacity(2 * n);
         for i in 0..n {
             let lo = self.lower[i];
             let hi = self.upper[i];
@@ -279,15 +282,14 @@ impl OptimizationEngine {
                 };
             }
 
-            // Backtracking Armijo line search for step size
+            // Backtracking Armijo line search for step size (gradient direction only)
             let descent: f64 = g.iter().map(|gi| gi * gi).sum();
             let mut step = lr;
             for _ in 0..ARMIJO_MAX_BACKTRACKS {
                 let x_trial: Vec<f64> = x
                     .iter()
                     .zip(g.iter())
-                    .zip(velocity.iter())
-                    .map(|((&xi, &gi), &vi)| xi + momentum * vi - step * gi)
+                    .map(|(&xi, &gi)| xi - step * gi)
                     .collect();
                 let f_trial = f(&x_trial);
                 if f_trial <= fx - ARMIJO_C1 * step * descent {
@@ -946,6 +948,186 @@ mod tests {
             result.fx < 1.0,
             "Should find near-global minimum, got f={}",
             result.fx
+        );
+    }
+
+    // ── GD vs Nelder-Mead comparison ────────────────────────────────────
+
+    #[test]
+    fn test_gd_vs_nm_comparison() {
+        // Both should find the minimum of a quadratic bowl
+        let f = |x: &[f64]| x[0] * x[0] + 2.0 * x[1] * x[1];
+        let g = |x: &[f64]| vec![2.0 * x[0], 4.0 * x[1]];
+
+        let gd = OptimizationEngine::gradient_descent(&f, &g, &[3.0, 4.0], 0.1, 0.0, 1e-10);
+        let nm = OptimizationEngine::nelder_mead(&f, &[3.0, 4.0], 1.0, 1e-10);
+
+        assert!(gd.converged, "GD should converge");
+        assert!(nm.converged, "NM should converge");
+        assert!(gd.fx < TOL, "GD minimum should be near 0, got {}", gd.fx);
+        assert!(nm.fx < TOL, "NM minimum should be near 0, got {}", nm.fx);
+    }
+
+    // ── L-BFGS convergence on non-trivial function ──────────────────────
+
+    #[test]
+    fn test_lbfgs_convergence_rate() {
+        // L-BFGS should converge faster than GD on Rosenbrock
+        let f = |x: &[f64]| (1.0 - x[0]).powi(2) + 100.0 * (x[1] - x[0] * x[0]).powi(2);
+        let g = |x: &[f64]| {
+            vec![
+                -2.0 * (1.0 - x[0]) - 400.0 * x[0] * (x[1] - x[0] * x[0]),
+                200.0 * (x[1] - x[0] * x[0]),
+            ]
+        };
+
+        let lbfgs_result = OptimizationEngine::lbfgs(&f, &g, &[0.0, 0.0], 1e-10);
+        assert!(
+            lbfgs_result.converged,
+            "L-BFGS should converge on Rosenbrock"
+        );
+        assert!(
+            lbfgs_result.iterations < 200,
+            "L-BFGS should converge quickly, took {} iterations",
+            lbfgs_result.iterations
+        );
+    }
+
+    // ── Box constraints ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_box_constraints_projection() {
+        let bounds = BoxConstraints::new(vec![-1.0, -1.0], vec![1.0, 1.0]);
+        let projected = bounds.project(&[5.0, -3.0]);
+        assert!((projected[0] - 1.0).abs() < 1e-15);
+        assert!((projected[1] - (-1.0)).abs() < 1e-15);
+
+        let interior = bounds.project(&[0.5, -0.5]);
+        assert!((interior[0] - 0.5).abs() < 1e-15);
+        assert!((interior[1] - (-0.5)).abs() < 1e-15);
+    }
+
+    #[test]
+    fn test_box_constrained_optimization() {
+        // Minimize (x-3)² + (y-3)² subject to 0 <= x,y <= 2
+        // Unconstrained min at (3,3), constrained min at (2,2)
+        // Box constraints as penalty: x[i] - 2 <= 0 and 0 - x[i] <= 0
+        let constraints: Vec<Box<dyn Fn(&[f64]) -> f64>> = vec![
+            Box::new(|x: &[f64]| x[0] - 2.0),
+            Box::new(|x: &[f64]| -x[0]),
+            Box::new(|x: &[f64]| x[1] - 2.0),
+            Box::new(|x: &[f64]| -x[1]),
+        ];
+
+        let result = OptimizationEngine::penalty_method(
+            &|x: &[f64]| (x[0] - 3.0).powi(2) + (x[1] - 3.0).powi(2),
+            &|x: &[f64]| vec![2.0 * (x[0] - 3.0), 2.0 * (x[1] - 3.0)],
+            &constraints,
+            &[1.0, 1.0],
+            1e-4,
+        );
+        assert!(
+            (result.x[0] - 2.0).abs() < 0.1,
+            "x[0] should be ~2.0, got {}",
+            result.x[0]
+        );
+        assert!(
+            (result.x[1] - 2.0).abs() < 0.1,
+            "x[1] should be ~2.0, got {}",
+            result.x[1]
+        );
+    }
+
+    // ── ObjectiveFunction trait ──────────────────────────────────────────
+
+    #[test]
+    fn test_objective_function_trait() {
+        struct Sphere;
+        impl ObjectiveFunction for Sphere {
+            fn eval(&self, x: &[f64]) -> f64 {
+                x.iter().map(|xi| xi * xi).sum()
+            }
+            fn gradient(&self, x: &[f64]) -> Option<Vec<f64>> {
+                Some(x.iter().map(|xi| 2.0 * xi).collect())
+            }
+        }
+
+        let sphere = Sphere;
+        let result = minimize_objective(&sphere, &[3.0, 4.0], OptMethod::LBFGS);
+        assert!(result.converged, "Trait-based LBFGS should converge");
+        assert!(result.fx < TOL, "Should find minimum, got {}", result.fx);
+    }
+
+    #[test]
+    fn test_objective_function_without_gradient() {
+        struct Quadratic;
+        impl ObjectiveFunction for Quadratic {
+            fn eval(&self, x: &[f64]) -> f64 {
+                x[0] * x[0] + x[1] * x[1]
+            }
+            // No gradient — uses finite differences
+        }
+
+        let q = Quadratic;
+        let result = minimize_objective(&q, &[3.0, 4.0], OptMethod::LBFGS);
+        assert!(result.converged, "Should converge with numerical gradient");
+        assert!(result.fx < 0.01, "Should find minimum, got {}", result.fx);
+    }
+
+    // ── Minimize dispatcher ─────────────────────────────────────────────
+
+    #[test]
+    fn test_minimize_dispatcher_gd() {
+        let result = minimize(
+            |x: &[f64]| x[0] * x[0] + x[1] * x[1],
+            &[3.0, 4.0],
+            OptMethod::GradientDescent,
+        );
+        assert!(
+            result.fx < 1.0,
+            "GD via minimize should make progress, got {}",
+            result.fx
+        );
+    }
+
+    #[test]
+    fn test_minimize_dispatcher_nm() {
+        let result = minimize(
+            |x: &[f64]| x[0] * x[0] + x[1] * x[1],
+            &[3.0, 4.0],
+            OptMethod::NelderMead,
+        );
+        assert!(result.converged, "NM via minimize should converge");
+        assert!(result.fx < TOL);
+    }
+
+    #[test]
+    fn test_minimize_dispatcher_lbfgs() {
+        let result = minimize(
+            |x: &[f64]| x[0] * x[0] + x[1] * x[1],
+            &[3.0, 4.0],
+            OptMethod::LBFGS,
+        );
+        assert!(result.converged, "LBFGS via minimize should converge");
+        assert!(result.fx < TOL);
+    }
+
+    // ── Numerical gradient ──────────────────────────────────────────────
+
+    #[test]
+    fn test_numerical_gradient_accuracy() {
+        let f = |x: &[f64]| x[0] * x[0] + 3.0 * x[1] * x[1];
+        let grad = numerical_gradient(&f, &[2.0, 3.0]);
+        // Analytic: [2*x, 6*y] = [4.0, 18.0]
+        assert!(
+            (grad[0] - 4.0).abs() < 1e-5,
+            "dfdx should be ~4.0, got {}",
+            grad[0]
+        );
+        assert!(
+            (grad[1] - 18.0).abs() < 1e-5,
+            "dfdy should be ~18.0, got {}",
+            grad[1]
         );
     }
 

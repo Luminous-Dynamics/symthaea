@@ -660,7 +660,7 @@ impl BrocaGenerator {
             let next_token = self.sample(&logits);
 
             // Observe token for NSM prime coverage tracking
-            if let (Some(ref mut tracker), Some(ref gate)) = (&mut nsm_tracker, &nsm_gate) {
+            if let (Some(ref mut tracker), Some(ref gate)) = (&mut nsm_tracker, &self.nsm_gate) {
                 tracker.observe_token(next_token, gate);
             }
 

@@ -1334,6 +1334,7 @@ h2, h3 { letter-spacing: 0.02em; }
    =================================================================== */
 @media (max-width: 768px) {
   .hero-title { font-size: 1.8rem; }
+  .hero-title-row { flex-wrap: wrap; justify-content: center; }
   .soma-layout { grid-template-columns: 1fr; }
   .experiment-grid { grid-template-columns: 1fr; }
   .topo-bottom { grid-template-columns: 1fr; }
@@ -1343,11 +1344,21 @@ h2, h3 { letter-spacing: 0.02em; }
   .probe-grid { grid-template-columns: 1fr; }
   .tab { font-size: 0.72rem; padding: 0 0.7rem; }
   .narration-stream { max-height: 20vh; padding: 2rem 1rem 1rem; }
+  .tier-row { flex-wrap: wrap; gap: 0.3rem; }
+  .tier-name { width: auto; }
+  .tier-threshold { width: auto; }
+  .tier-weight { width: auto; text-align: left; }
+  .fractal-variant { padding: 0.8rem; }
+  .fv-header { flex-wrap: wrap; }
+  .dream-controls { flex-direction: column; align-items: stretch; }
+  .ws-contents .neuro-bar-row .nb-label { width: 3.5rem; }
 }
 
 @media (max-width: 480px) {
   .hero-title { font-size: 1.5rem; letter-spacing: 0.08em; }
   .tab-content { padding: 1rem; }
+  .tab { font-size: 0.65rem; padding: 0 0.5rem; }
+  .dream-stats-grid { grid-template-columns: 1fr 1fr; }
 }
 
 /* ===================================================================

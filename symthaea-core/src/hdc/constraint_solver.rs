@@ -496,6 +496,94 @@ impl CSPSolver {
         }
     }
 
+    // ─── Convenience Solvers ────────────────────────────────────────────
+
+    /// Solve N-Queens and return the solution as a vector of column positions.
+    ///
+    /// `result[row]` = column of the queen in that row.
+    /// Returns `None` if no solution exists (only for n=2 or n=3).
+    pub fn solve_n_queens(n: usize) -> Option<Vec<i64>> {
+        let csp = Self::n_queens(n);
+        let result = Self::solve(&csp);
+        result
+            .solution
+            .map(|sol| (0..n).map(|i| sol[&format!("Q{}", i)]).collect())
+    }
+
+    /// Create a Sudoku CSP from a 9x9 grid.
+    ///
+    /// `grid[row][col]` = 0 for empty, 1-9 for given digits.
+    pub fn sudoku(grid: &[[i32; 9]; 9]) -> CSP {
+        let mut variables = Vec::new();
+        let mut domains = HashMap::new();
+
+        for row in 0..9 {
+            for col in 0..9 {
+                let var = format!("R{}C{}", row, col);
+                variables.push(var.clone());
+                if grid[row][col] != 0 {
+                    // Fixed cell — domain is just the given value
+                    domains.insert(var, vec![grid[row][col] as i64]);
+                } else {
+                    domains.insert(var, (1..=9).map(|v| v as i64).collect());
+                }
+            }
+        }
+
+        let mut constraints = Vec::new();
+
+        // Row constraints: all different in each row
+        for row in 0..9 {
+            let row_vars: Vec<String> = (0..9).map(|col| format!("R{}C{}", row, col)).collect();
+            constraints.push(Constraint::AllDifferent(row_vars));
+        }
+
+        // Column constraints: all different in each column
+        for col in 0..9 {
+            let col_vars: Vec<String> = (0..9).map(|row| format!("R{}C{}", row, col)).collect();
+            constraints.push(Constraint::AllDifferent(col_vars));
+        }
+
+        // Box constraints: all different in each 3x3 box
+        for box_row in 0..3 {
+            for box_col in 0..3 {
+                let mut box_vars = Vec::new();
+                for dr in 0..3 {
+                    for dc in 0..3 {
+                        let r = box_row * 3 + dr;
+                        let c = box_col * 3 + dc;
+                        box_vars.push(format!("R{}C{}", r, c));
+                    }
+                }
+                constraints.push(Constraint::AllDifferent(box_vars));
+            }
+        }
+
+        CSP {
+            domains,
+            constraints,
+            variables,
+        }
+    }
+
+    /// Solve a Sudoku puzzle.
+    ///
+    /// `grid[row][col]` = 0 for empty, 1-9 for given digits.
+    /// Returns the completed 9x9 grid, or `None` if unsolvable.
+    pub fn solve_sudoku(grid: &[[i32; 9]; 9]) -> Option<[[i32; 9]; 9]> {
+        let csp = Self::sudoku(grid);
+        let result = Self::solve(&csp);
+        result.solution.map(|sol| {
+            let mut out = [[0i32; 9]; 9];
+            for row in 0..9 {
+                for col in 0..9 {
+                    out[row][col] = sol[&format!("R{}C{}", row, col)] as i32;
+                }
+            }
+            out
+        })
+    }
+
     // ─── Helpers ─────────────────────────────────────────────────────────
 
     fn encode_solution(assignment: &HashMap<String, i64>) -> BinaryHV {
@@ -681,6 +769,114 @@ mod tests {
         let result = CSPSolver::solve(&csp);
         assert!(result.solved);
         assert_eq!(result.solution.unwrap()["X"], 2);
+    }
+
+    // ── Convenience solvers ────────────────────────────────────────────
+
+    #[test]
+    fn test_solve_n_queens_4() {
+        let sol = CSPSolver::solve_n_queens(4);
+        assert!(sol.is_some(), "4-Queens should have a solution");
+        let queens = sol.unwrap();
+        assert_eq!(queens.len(), 4);
+        // Verify all columns different
+        let unique: HashSet<i64> = queens.iter().copied().collect();
+        assert_eq!(unique.len(), 4);
+        // Verify no diagonal conflicts
+        for i in 0..4 {
+            for j in (i + 1)..4 {
+                let row_diff = (j - i) as i64;
+                let col_diff = (queens[i] - queens[j]).abs();
+                assert_ne!(row_diff, col_diff);
+            }
+        }
+    }
+
+    #[test]
+    fn test_solve_n_queens_8() {
+        let sol = CSPSolver::solve_n_queens(8);
+        assert!(sol.is_some(), "8-Queens should have a solution");
+        assert_eq!(sol.unwrap().len(), 8);
+    }
+
+    // ── Sudoku ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_sudoku_simple() {
+        // A puzzle with many givens (easy)
+        #[rustfmt::skip]
+        let grid: [[i32; 9]; 9] = [
+            [5, 3, 0, 0, 7, 0, 0, 0, 0],
+            [6, 0, 0, 1, 9, 5, 0, 0, 0],
+            [0, 9, 8, 0, 0, 0, 0, 6, 0],
+            [8, 0, 0, 0, 6, 0, 0, 0, 3],
+            [4, 0, 0, 8, 0, 3, 0, 0, 1],
+            [7, 0, 0, 0, 2, 0, 0, 0, 6],
+            [0, 6, 0, 0, 0, 0, 2, 8, 0],
+            [0, 0, 0, 4, 1, 9, 0, 0, 5],
+            [0, 0, 0, 0, 8, 0, 0, 7, 9],
+        ];
+
+        let result = CSPSolver::solve_sudoku(&grid);
+        assert!(result.is_some(), "Simple Sudoku should be solvable");
+
+        let sol = result.unwrap();
+
+        // Verify all givens preserved
+        for row in 0..9 {
+            for col in 0..9 {
+                if grid[row][col] != 0 {
+                    assert_eq!(
+                        sol[row][col], grid[row][col],
+                        "Given at ({},{}) changed",
+                        row, col
+                    );
+                }
+                assert!(
+                    sol[row][col] >= 1 && sol[row][col] <= 9,
+                    "Value out of range at ({},{}): {}",
+                    row,
+                    col,
+                    sol[row][col]
+                );
+            }
+        }
+
+        // Verify row uniqueness
+        for row in 0..9 {
+            let vals: HashSet<i32> = sol[row].iter().copied().collect();
+            assert_eq!(vals.len(), 9, "Row {} has duplicates", row);
+        }
+
+        // Verify column uniqueness
+        for col in 0..9 {
+            let vals: HashSet<i32> = (0..9).map(|row| sol[row][col]).collect();
+            assert_eq!(vals.len(), 9, "Column {} has duplicates", col);
+        }
+
+        // Verify box uniqueness
+        for br in 0..3 {
+            for bc in 0..3 {
+                let mut vals = HashSet::new();
+                for dr in 0..3 {
+                    for dc in 0..3 {
+                        vals.insert(sol[br * 3 + dr][bc * 3 + dc]);
+                    }
+                }
+                assert_eq!(vals.len(), 9, "Box ({},{}) has duplicates", br, bc);
+            }
+        }
+    }
+
+    #[test]
+    fn test_sudoku_csp_creation() {
+        let grid = [[0i32; 9]; 9];
+        let csp = CSPSolver::sudoku(&grid);
+        // 81 variables, each with domain 1..9
+        assert_eq!(csp.variables.len(), 81);
+        assert_eq!(csp.domains["R0C0"].len(), 9);
+        // 9 row + 9 col + 9 box = 27 AllDifferent constraints
+        assert_eq!(csp.constraints.len(), 27);
     }
 
     // ── Encoding ─────────────────────────────────────────────────────────

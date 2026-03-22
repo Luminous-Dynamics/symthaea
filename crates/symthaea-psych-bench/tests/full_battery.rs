@@ -15,6 +15,7 @@ use symthaea_psych_bench::benchmarks::{
         AllianceMaintenanceBenchmark, CognitiveDistortionBenchmark, CrisisDetectionBenchmark,
         EmpathicAccuracyBenchmark, MotivationalInterviewingBenchmark, TherapeuticResponseBenchmark,
     },
+    coding::{BugDetectionBenchmark, HumanEvalMiniBenchmark},
     cogbench::{
         BartBenchmark, HorizonBenchmark, InstrumentalLearningBenchmark,
         ProbabilisticReasoningBenchmark, RestlessBanditBenchmark, ReversalLearningBenchmark,
@@ -299,6 +300,10 @@ fn full_battery_report() {
     report.add(EncryptedBindingBenchmark.run(&config));
     report.add(ScalingAnalysisBenchmark.run(&config));
 
+    // ── Coding ──
+    report.add(HumanEvalMiniBenchmark.run(&config));
+    report.add(BugDetectionBenchmark.run(&config));
+
     // ── Neuromod ──
     report.add(PharmacologicalChallengeBenchmark.run(&config));
     report.add(InjectionChallengeBenchmark.run(&config));
@@ -314,8 +319,8 @@ fn full_battery_report() {
     // Verify all benchmarks produced results
     assert_eq!(
         report.results.len(),
-        136,
-        "Expected 136 benchmark results, got {}",
+        138,
+        "Expected 138 benchmark results, got {}",
         report.results.len()
     );
 

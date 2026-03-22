@@ -209,13 +209,11 @@ fn baseline_for_benchmark<'a>(
         }
 
         // Creativity
-        name if name.contains("AlternateUses") => Some(("aut_originality", &bl.creativity)),
-        name if name.contains("RemoteAssociates") => {
-            Some(("rat_mean_solution_rank", &bl.creativity))
-        }
+        name if name.contains("AlternateUses") => Some(("aut_fluency", &bl.creativity)),
+        name if name.contains("RemoteAssociates") => Some(("rat_overall_accuracy", &bl.creativity)),
 
         // Butlin
-        name if name.contains("Butlin") => Some(("present_count", &bl.butlin)),
+        name if name.contains("Butlin") => Some(("mean_quality_score", &bl.butlin)),
 
         // Neuromod
         name if name.contains("RewardLearning") => Some(("trials_to_criterion", &bl.neuromod)),
@@ -241,9 +239,6 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("ConsciousnessPharmacology") => {
             Some(("psychedelic_proxy_peak", &bl.neuromod))
         }
-
-        // Coding domain
-        name if name.contains("HumanEvalMini") => Some(("humaneval_pass_at_1", &bl.coding)),
 
         _ => {
             // Try generic metric name lookup against all baseline maps

@@ -15,10 +15,10 @@ on:
     - cron: '0 4 * * 0'
 
 concurrency:
-  # Use commit SHA so each push gets its own non-cancellable run.
-  # Prevents concurrent sessions from cancelling each other's CI.
-  group: ${{ github.workflow }}-${{ github.sha }}
-  cancel-in-progress: false
+  # Group by workflow + branch so that only the latest push per branch runs.
+  # Older pushes to the same branch are cancelled, avoiding runner queue backlog.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always

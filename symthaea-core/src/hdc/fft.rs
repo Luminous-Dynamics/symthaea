@@ -238,6 +238,48 @@ impl FftEngine {
         Self::fft(signal).power_spectrum()
     }
 
+    /// Real FFT wrapper — returns only the first N/2+1 unique bins (half-spectrum).
+    ///
+    /// For a real-valued signal of length N, the full FFT has conjugate symmetry:
+    /// X[k] = conj(X[N-k]). This method returns only bins 0..=N/2, saving half the storage.
+    pub fn rfft(signal: &[f64]) -> Vec<Complex> {
+        let result = Self::fft(signal);
+        let n = result.n;
+        let half = n / 2 + 1;
+        result.spectrum.into_iter().take(half).collect()
+    }
+
+    /// Inverse real FFT — reconstructs a real signal from the half-spectrum produced by [`rfft`].
+    ///
+    /// `half_spectrum` should have N/2+1 bins. The full spectrum is reconstructed via
+    /// conjugate symmetry, then inverse FFT is applied.
+    pub fn irfft(half_spectrum: &[Complex], original_len: usize) -> Vec<f64> {
+        let n = original_len.next_power_of_two();
+        let mut full: Vec<Complex> = Vec::with_capacity(n);
+
+        // Copy the half-spectrum
+        for &c in half_spectrum.iter().take(n / 2 + 1) {
+            full.push(c);
+        }
+        // Reconstruct conjugate-symmetric bins
+        for k in (1..n / 2).rev() {
+            full.push(half_spectrum[k].conjugate());
+        }
+
+        // Pad if needed
+        while full.len() < n {
+            full.push(Complex::zero());
+        }
+
+        let result = Self::ifft(&full);
+        result
+            .spectrum
+            .iter()
+            .take(original_len)
+            .map(|c| c.re)
+            .collect()
+    }
+
     // ─── Core FFT Implementation ─────────────────────────────────────────
 
     fn fft_recursive(x: &[Complex], inverse: bool) -> Vec<Complex> {
@@ -462,5 +504,153 @@ mod tests {
         assert_eq!(result.phase_spectrum().len(), 4);
         assert_eq!(result.real_parts().len(), 4);
         assert!(result.is_forward);
+    }
+
+    // ── Real FFT (half-spectrum) ─────────────────────────────────────────
+
+    #[test]
+    fn test_rfft_half_spectrum_length() {
+        let signal = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+        let half = FftEngine::rfft(&signal);
+        // N=8 → N/2+1 = 5 unique bins
+        assert_eq!(half.len(), 5, "rfft should return N/2+1 bins");
+    }
+
+    #[test]
+    fn test_rfft_dc_and_nyquist() {
+        // DC = sum of signal, Nyquist = alternating sum
+        let signal = vec![1.0, 2.0, 3.0, 4.0];
+        let half = FftEngine::rfft(&signal);
+        // DC: 1+2+3+4 = 10
+        assert!(
+            (half[0].re - 10.0).abs() < TOL,
+            "DC should be 10, got {}",
+            half[0].re
+        );
+        assert!(half[0].im.abs() < TOL);
+        // Nyquist (N/2=2): 1-2+3-4 = -2
+        assert!(
+            (half[2].re - (-2.0)).abs() < TOL,
+            "Nyquist should be -2, got {}",
+            half[2].re
+        );
+    }
+
+    #[test]
+    fn test_irfft_roundtrip() {
+        let signal = vec![1.0, 3.0, -2.0, 4.0, 0.5, 1.5, -1.0, 2.0];
+        let n = signal.len();
+        let half = FftEngine::rfft(&signal);
+        let recovered = FftEngine::irfft(&half, n);
+        assert_eq!(recovered.len(), n);
+        for (i, (&orig, &rec)) in signal.iter().zip(recovered.iter()).enumerate() {
+            assert!(
+                (orig - rec).abs() < 1e-6,
+                "Sample {}: {} != {}",
+                i,
+                orig,
+                rec
+            );
+        }
+    }
+
+    // ── Convolution theorem ─────────────────────────────────────────────
+
+    #[test]
+    fn test_convolution_theorem() {
+        // Convolution in time = multiplication in frequency
+        // Verify: FFT(a*b) ≈ FFT(a) · FFT(b) (with proper zero-padding)
+        let a = vec![1.0, 2.0, 1.0, 0.0];
+        let b = vec![1.0, 1.0, 0.0, 0.0];
+
+        let conv = FftEngine::convolve(&a, &b);
+
+        // Manual convolution for verification
+        let expected = vec![1.0, 3.0, 3.0, 1.0, 0.0, 0.0, 0.0];
+        for (i, (&c, &e)) in conv.iter().zip(expected.iter()).enumerate() {
+            assert!((c - e).abs() < TOL, "Convolution[{}]: {} != {}", i, c, e);
+        }
+    }
+
+    // ── Power spectrum of sine wave ─────────────────────────────────────
+
+    #[test]
+    fn test_power_spectrum_sine_wave() {
+        // A pure sine wave should have energy concentrated at one frequency
+        let n = 128;
+        let freq = 8.0; // 8 cycles in 128 samples
+        let signal: Vec<f64> = (0..n)
+            .map(|i| (2.0 * std::f64::consts::PI * freq * i as f64 / n as f64).sin())
+            .collect();
+
+        let ps = FftEngine::power_spectrum(&signal);
+
+        // Energy at bin 8 and bin N-8 should dominate
+        let total_energy: f64 = ps.iter().sum();
+        let peak_energy = ps[freq as usize] + ps[n - freq as usize];
+        let ratio = peak_energy / total_energy;
+        assert!(
+            ratio > 0.99,
+            "Sine wave energy should be >99% at frequency bin, got {:.4}",
+            ratio
+        );
+    }
+
+    // ── Complex FFT ─────────────────────────────────────────────────────
+
+    #[test]
+    fn test_fft_complex_input() {
+        // Complex exponential e^{j2πk/N} should have a single peak at bin 1
+        let n = 8;
+        let signal: Vec<Complex> = (0..n)
+            .map(|i| {
+                let angle = 2.0 * std::f64::consts::PI * i as f64 / n as f64;
+                Complex::new(angle.cos(), angle.sin())
+            })
+            .collect();
+
+        let result = FftEngine::fft_complex(&signal);
+        let magnitudes = result.magnitude_spectrum();
+
+        // Peak should be at bin 1
+        assert!(
+            magnitudes[1] > magnitudes[0] * 10.0,
+            "Bin 1 should dominate: bin0={}, bin1={}",
+            magnitudes[0],
+            magnitudes[1]
+        );
+    }
+
+    // ── Edge cases ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_fft_single_sample() {
+        let result = FftEngine::fft(&[42.0]);
+        assert_eq!(result.spectrum.len(), 1);
+        assert!((result.spectrum[0].re - 42.0).abs() < TOL);
+    }
+
+    #[test]
+    fn test_convolution_commutativity() {
+        let a = vec![1.0, 2.0, 3.0];
+        let b = vec![4.0, 5.0];
+        let ab = FftEngine::convolve(&a, &b);
+        let ba = FftEngine::convolve(&b, &a);
+        assert_eq!(ab.len(), ba.len());
+        for (x, y) in ab.iter().zip(ba.iter()) {
+            assert!((x - y).abs() < TOL, "Convolution should be commutative");
+        }
+    }
+
+    #[test]
+    fn test_complex_conjugate() {
+        let c = Complex::new(3.0, 4.0);
+        let conj = c.conjugate();
+        assert!((conj.re - 3.0).abs() < TOL);
+        assert!((conj.im - (-4.0)).abs() < TOL);
+        // c * conj(c) = |c|²
+        let product = c * conj;
+        assert!((product.re - 25.0).abs() < TOL);
+        assert!(product.im.abs() < TOL);
     }
 }

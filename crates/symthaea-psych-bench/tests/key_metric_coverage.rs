@@ -6,6 +6,7 @@
 use symthaea_psych_bench::benchmarks::affect::*;
 use symthaea_psych_bench::benchmarks::attention::*;
 use symthaea_psych_bench::benchmarks::butlin::*;
+use symthaea_psych_bench::benchmarks::coding::*;
 use symthaea_psych_bench::benchmarks::cogbench::*;
 use symthaea_psych_bench::benchmarks::creativity::*;
 use symthaea_psych_bench::benchmarks::executive::*;
@@ -117,6 +118,9 @@ fn test_key_metric_exists_in_output() {
         Box::new(RmeBenchmark),
         Box::new(UltimatumGameBenchmark),
         Box::new(SocialNormBenchmark),
+        // Coding
+        Box::new(HumanEvalMiniBenchmark),
+        Box::new(BugDetectionBenchmark),
     ];
 
     let mut failures = Vec::new();

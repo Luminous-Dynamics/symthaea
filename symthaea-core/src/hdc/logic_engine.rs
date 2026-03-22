@@ -700,10 +700,6 @@ impl LogicEngine {
 
     // ─── Resolution Prover (FOL) ─────────────────────────────────────────
 
-    /// A clause in resolution is a set of literals (predicate, polarity).
-    /// We represent it as a Vec of (predicate_name, args, positive?).
-    type ResClause = Vec<(String, Vec<FOLTerm>, bool)>;
-
     /// Apply a substitution to a resolution clause.
     fn apply_subst_clause(
         clause: &[(String, Vec<FOLTerm>, bool)],
@@ -1499,6 +1495,270 @@ mod tests {
             sim < 0.6,
             "AND vs OR should have different encodings: {}",
             sim
+        );
+    }
+
+    // ── Disjunctive Syllogism ───────────────────────────────────────────
+
+    #[test]
+    fn test_disjunctive_syllogism() {
+        let p = Proposition::atom("P");
+        let q = Proposition::atom("Q");
+        let disj = p.clone().or(q.clone());
+        let neg_p = p.not();
+        let result = LogicEngine::disjunctive_syllogism(&disj, &neg_p);
+        assert!(result.is_some());
+        let proof = result.unwrap();
+        assert!(proof.valid);
+        assert_eq!(proof.proof_steps.len(), 3);
+    }
+
+    #[test]
+    fn test_disjunctive_syllogism_symmetric() {
+        let p = Proposition::atom("P");
+        let q = Proposition::atom("Q");
+        let disj = p.clone().or(q.clone());
+        let neg_q = q.not();
+        let result = LogicEngine::disjunctive_syllogism(&disj, &neg_q);
+        assert!(result.is_some());
+        assert!(result.unwrap().valid);
+    }
+
+    #[test]
+    fn test_disjunctive_syllogism_fail() {
+        let p = Proposition::atom("P");
+        let q = Proposition::atom("Q");
+        let r = Proposition::atom("R");
+        let disj = p.or(q);
+        let neg_r = r.not();
+        let result = LogicEngine::disjunctive_syllogism(&disj, &neg_r);
+        assert!(result.is_none());
+    }
+
+    // ── Pigeonhole SAT ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_pigeonhole_2_in_1_unsat() {
+        // 2 pigeons, 1 hole — UNSAT
+        let formula = LogicEngine::pigeonhole(2, 1);
+        let (result, _) = LogicEngine::dpll_sat(&formula);
+        assert!(result.is_none(), "2 pigeons in 1 hole should be UNSAT");
+    }
+
+    #[test]
+    fn test_pigeonhole_3_in_2_unsat() {
+        // 3 pigeons, 2 holes — UNSAT
+        let formula = LogicEngine::pigeonhole(3, 2);
+        let (result, _) = LogicEngine::dpll_sat(&formula);
+        assert!(result.is_none(), "3 pigeons in 2 holes should be UNSAT");
+    }
+
+    #[test]
+    fn test_pigeonhole_2_in_2_sat() {
+        // 2 pigeons, 2 holes — SAT (each gets its own hole)
+        let formula = LogicEngine::pigeonhole(2, 2);
+        let (result, _) = LogicEngine::dpll_sat(&formula);
+        assert!(result.is_some(), "2 pigeons in 2 holes should be SAT");
+    }
+
+    // ── Graph Coloring SAT ──────────────────────────────────────────────
+
+    #[test]
+    fn test_graph_coloring_sat_triangle_3_colors() {
+        let edges = vec![(0, 1), (1, 2), (0, 2)];
+        let formula = LogicEngine::graph_coloring_sat(&edges, 3, 3);
+        let (result, _) = LogicEngine::dpll_sat(&formula);
+        assert!(result.is_some(), "Triangle with 3 colors should be SAT");
+    }
+
+    #[test]
+    fn test_graph_coloring_sat_triangle_2_colors() {
+        let edges = vec![(0, 1), (1, 2), (0, 2)];
+        let formula = LogicEngine::graph_coloring_sat(&edges, 3, 2);
+        let (result, _) = LogicEngine::dpll_sat(&formula);
+        assert!(result.is_none(), "Triangle with 2 colors should be UNSAT");
+    }
+
+    #[test]
+    fn test_graph_coloring_sat_path() {
+        // Path graph: 0-1-2 needs only 2 colors
+        let edges = vec![(0, 1), (1, 2)];
+        let formula = LogicEngine::graph_coloring_sat(&edges, 3, 2);
+        let (result, _) = LogicEngine::dpll_sat(&formula);
+        assert!(result.is_some(), "Path with 2 colors should be SAT");
+    }
+
+    // ── Resolution prover ───────────────────────────────────────────────
+
+    #[test]
+    fn test_resolution_simple_syllogism() {
+        // KB: ∀x. Human(x) → Mortal(x), Human(socrates)
+        // Goal: Mortal(socrates)
+        let kb = vec![
+            // Human(x) → Mortal(x) encoded as: ¬Human(x) ∨ Mortal(x)
+            FOLFormula::Or(
+                Box::new(FOLFormula::Not(Box::new(FOLFormula::Predicate(
+                    "Human".to_string(),
+                    vec![FOLTerm::Var("x".to_string())],
+                )))),
+                Box::new(FOLFormula::Predicate(
+                    "Mortal".to_string(),
+                    vec![FOLTerm::Var("x".to_string())],
+                )),
+            ),
+            // Human(socrates)
+            FOLFormula::Predicate(
+                "Human".to_string(),
+                vec![FOLTerm::Const("socrates".to_string())],
+            ),
+        ];
+
+        let goal = FOLFormula::Predicate(
+            "Mortal".to_string(),
+            vec![FOLTerm::Const("socrates".to_string())],
+        );
+
+        let result = LogicEngine::resolution_prove(&kb, &goal, 100);
+        assert!(
+            result.valid,
+            "Should prove Mortal(socrates): {:?}",
+            result.description
+        );
+    }
+
+    #[test]
+    fn test_resolution_chain() {
+        // KB: A(x) → B(x), B(x) → C(x), A(a)
+        // Goal: C(a)
+        let kb = vec![
+            FOLFormula::Or(
+                Box::new(FOLFormula::Not(Box::new(FOLFormula::Predicate(
+                    "A".to_string(),
+                    vec![FOLTerm::Var("x".to_string())],
+                )))),
+                Box::new(FOLFormula::Predicate(
+                    "B".to_string(),
+                    vec![FOLTerm::Var("x".to_string())],
+                )),
+            ),
+            FOLFormula::Or(
+                Box::new(FOLFormula::Not(Box::new(FOLFormula::Predicate(
+                    "B".to_string(),
+                    vec![FOLTerm::Var("y".to_string())],
+                )))),
+                Box::new(FOLFormula::Predicate(
+                    "C".to_string(),
+                    vec![FOLTerm::Var("y".to_string())],
+                )),
+            ),
+            FOLFormula::Predicate("A".to_string(), vec![FOLTerm::Const("a".to_string())]),
+        ];
+
+        let goal = FOLFormula::Predicate("C".to_string(), vec![FOLTerm::Const("a".to_string())]);
+
+        let result = LogicEngine::resolution_prove(&kb, &goal, 200);
+        assert!(result.valid, "Should prove C(a): {:?}", result.description);
+    }
+
+    #[test]
+    fn test_resolution_invalid() {
+        // KB: Human(socrates)
+        // Goal: Mortal(socrates) — can't prove without the rule
+        let kb = vec![FOLFormula::Predicate(
+            "Human".to_string(),
+            vec![FOLTerm::Const("socrates".to_string())],
+        )];
+
+        let goal = FOLFormula::Predicate(
+            "Mortal".to_string(),
+            vec![FOLTerm::Const("socrates".to_string())],
+        );
+
+        let result = LogicEngine::resolution_prove(&kb, &goal, 50);
+        assert!(
+            !result.valid,
+            "Should NOT prove Mortal(socrates) without the rule"
+        );
+    }
+
+    // ── Unification additional ──────────────────────────────────────────
+
+    #[test]
+    fn test_unify_nested_functions() {
+        // f(g(X), a) and f(g(b), Y) → {X=b, Y=a}
+        let t1 = FOLTerm::Func(
+            "f".to_string(),
+            vec![
+                FOLTerm::Func("g".to_string(), vec![FOLTerm::Var("X".to_string())]),
+                FOLTerm::Const("a".to_string()),
+            ],
+        );
+        let t2 = FOLTerm::Func(
+            "f".to_string(),
+            vec![
+                FOLTerm::Func("g".to_string(), vec![FOLTerm::Const("b".to_string())]),
+                FOLTerm::Var("Y".to_string()),
+            ],
+        );
+        let subst = LogicEngine::unify(&t1, &t2).unwrap();
+        assert_eq!(subst.get("X"), Some(&FOLTerm::Const("b".to_string())));
+        assert_eq!(subst.get("Y"), Some(&FOLTerm::Const("a".to_string())));
+    }
+
+    #[test]
+    fn test_unify_arity_mismatch() {
+        let t1 = FOLTerm::Func("f".to_string(), vec![FOLTerm::Const("a".to_string())]);
+        let t2 = FOLTerm::Func(
+            "f".to_string(),
+            vec![
+                FOLTerm::Const("a".to_string()),
+                FOLTerm::Const("b".to_string()),
+            ],
+        );
+        assert!(LogicEngine::unify(&t1, &t2).is_none());
+    }
+
+    // ── CNF conversion advanced ─────────────────────────────────────────
+
+    #[test]
+    fn test_cnf_implication() {
+        // P → Q should become one clause: [¬P, Q]
+        let p = Proposition::atom("P");
+        let q = Proposition::atom("Q");
+        let formula = p.implies(q);
+        let cnf = LogicEngine::to_cnf(&formula);
+        assert_eq!(cnf.len(), 1);
+        assert_eq!(cnf[0].len(), 2);
+    }
+
+    #[test]
+    fn test_cnf_biconditional() {
+        // P ↔ Q becomes (¬P ∨ Q) ∧ (¬Q ∨ P) — 2 clauses
+        let p = Proposition::atom("P");
+        let q = Proposition::atom("Q");
+        let formula = p.iff(q);
+        let cnf = LogicEngine::to_cnf(&formula);
+        assert_eq!(cnf.len(), 2);
+    }
+
+    #[test]
+    fn test_sat_three_variable() {
+        // (P ∨ Q) ∧ (¬P ∨ R) ∧ (¬Q ∨ ¬R)
+        let p = Proposition::atom("P");
+        let q = Proposition::atom("Q");
+        let r = Proposition::atom("R");
+        let formula = p
+            .clone()
+            .or(q.clone())
+            .and(p.not().or(r.clone()))
+            .and(q.not().or(r.not()));
+        let (result, _) = LogicEngine::dpll_sat(&formula);
+        assert!(result.is_some());
+        let a = result.unwrap();
+        // Verify the assignment satisfies all clauses
+        assert!(
+            *a.get("P").unwrap_or(&false) || *a.get("Q").unwrap_or(&false),
+            "First clause violated"
         );
     }
 }

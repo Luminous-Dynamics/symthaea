@@ -456,8 +456,17 @@ impl PredictiveHierarchy {
     /// Generate prediction for expected future state
     pub fn predict_future(&self) -> Prediction {
         // Use highest level to generate prediction
-        let top_level = self.layers.last().expect("layers must not be empty");
-        top_level.generate_prediction()
+        match self.layers.last() {
+            Some(top_level) => top_level.generate_prediction(),
+            None => Prediction {
+                content: BinaryHV::random(0),
+                precision: 0.0,
+                timestamp: std::time::Instant::now(),
+                horizon: 0,
+                level: 0,
+                context: BinaryHV::random(0),
+            },
+        }
     }
 
     /// Learn from action outcome

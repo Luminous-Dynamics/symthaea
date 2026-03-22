@@ -167,11 +167,14 @@ impl Drop for PooledBinaryHV {
     fn drop(&mut self) {
         if let Some(data) = self.data.take() {
             HV16_POOL.with(|pool| {
-                let mut pool = pool.borrow_mut();
-                if pool.len() < HV16_POOL_CAPACITY {
-                    pool.push(data);
+                // Use try_borrow_mut to avoid panicking if the pool is already
+                // borrowed (e.g., during concurrent Drop in test cleanup).
+                if let Ok(mut pool) = pool.try_borrow_mut() {
+                    if pool.len() < HV16_POOL_CAPACITY {
+                        pool.push(data);
+                    }
                 }
-                // If pool is full, let the Box drop normally
+                // If borrow fails or pool is full, let the Box drop normally
             });
         }
     }
@@ -351,10 +354,14 @@ impl Drop for PooledContinuousHV {
     fn drop(&mut self) {
         if let Some(data) = self.data.take() {
             CONTINUOUS_HV_POOL.with(|pool| {
-                let mut pool = pool.borrow_mut();
-                if pool.len() < CONTINUOUS_HV_POOL_CAPACITY {
-                    pool.push(data);
+                // Use try_borrow_mut to avoid panicking if the pool is already
+                // borrowed (e.g., during concurrent Drop in test cleanup).
+                if let Ok(mut pool) = pool.try_borrow_mut() {
+                    if pool.len() < CONTINUOUS_HV_POOL_CAPACITY {
+                        pool.push(data);
+                    }
                 }
+                // If borrow fails or pool is full, let the Box drop normally
             });
         }
     }

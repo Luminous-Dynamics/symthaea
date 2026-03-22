@@ -352,8 +352,8 @@ impl AttractorAnalyzer {
 
         // Estimate D₂ from scaling: C(r) ~ r^D₂
         // Use linear fit to log(C) vs log(r)
-        let r_min = distances[distances.len() / 100];
-        let r_max = distances[distances.len() / 10];
+        let r_min = distances[(distances.len() / 100).min(distances.len() - 1)];
+        let r_max = distances[(distances.len() / 10).min(distances.len() - 1)];
 
         let num_r = 20;
         let mut log_r = Vec::new();

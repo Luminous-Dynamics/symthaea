@@ -177,7 +177,7 @@ impl QuantumGravityEncoder {
         let area = self.area_quantum(spin_j);
         let vector = self
             .spin_network
-            .permute((spin_j * 1000.0) as usize)
+            .permute((spin_j * 1000.0).max(0.0) as usize)
             .scale(spin_j as f32)
             .bind(&self.area_quantization);
 
