@@ -519,7 +519,7 @@ impl Hyperfeel {
         let dominant_mood = centroid.dominant_emotion();
 
         // Compute stability (how much coherence has changed)
-        let stability = if let Some(prev) = self.coherence_history.last() {
+        let stability = if let Some(prev) = self.coherence_history.back() {
             1.0 - (prev.alignment - alignment).abs()
         } else {
             0.5
