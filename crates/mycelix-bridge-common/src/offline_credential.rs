@@ -1,4 +1,6 @@
-//! Offline-resilient credential extensions for Mycelix identity.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Offline-resilient credential extensions for Mycelix identity.
 //!
 //! Extends ConsciousnessCredential with graceful degradation during
 //! network outages. In South Africa, loadshedding and cable cuts mean
@@ -147,15 +149,16 @@ impl OfflineCredential {
         // Future-dated reference times: tolerate up to 1 hour of clock skew
         // (common during South African loadshedding recovery when NTP hasn't synced).
         // Beyond the tolerance window, treat as suspicious and degrade.
-        if reference_time > now_us.saturating_add(CLOCK_SKEW_TOLERANCE_US) {
-            return self.credential.tier.degrade(2);
-        }
-        // Within tolerance: clamp to zero elapsed (treat as just-verified)
         if reference_time > now_us {
-            return self.credential.tier; // Full tier — within clock skew tolerance
+            let gap = reference_time - now_us;
+            if gap > CLOCK_SKEW_TOLERANCE_US {
+                return self.credential.tier.degrade(2);
+            }
+            // Within tolerance: treat as zero elapsed (just-verified)
+            return self.credential.tier;
         }
 
-        let elapsed = now_us.saturating_sub(reference_time);
+        let elapsed = now_us - reference_time;
         let grace = self.custom_grace_period.unwrap_or(HOURS_24);
 
         if elapsed <= grace {

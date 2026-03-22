@@ -187,19 +187,33 @@ fuzz_target!(|input: FuzzOfflineInput| {
 
     // 6. Monotonicity: for a fixed credential, longer offline = same or lower tier
     //    (only when no attestation and degradation enabled, using default grace)
+    //    NOTE: Monotonicity only holds when all query_times are >= reference_time.
+    //    When reference_time is far in the future, queries before it trigger
+    //    future-timestamp degradation, but queries after it see small elapsed time.
+    //    This is by design (clock skew recovery). We restrict the assertion to
+    //    query times that are all past the reference_time.
     if input.degradation_enabled && offline.attestation.is_none() && input.custom_grace_hours.is_none()
     {
         let base_offline = OfflineCredential::new(make_credential(&input));
-        let mut sorted_times = input.query_times.clone();
+        let ref_time = base_offline.last_online_verification;
+        let mut sorted_times: Vec<u64> = input
+            .query_times
+            .iter()
+            .copied()
+            .filter(|&t| t >= ref_time)
+            .collect();
         sorted_times.sort();
         let mut prev_tier = base_offline.credential.tier;
         for &t in &sorted_times {
             let tier = base_offline.effective_tier(t);
             assert!(
                 tier <= prev_tier,
-                "tier increased from {:?} to {:?} as time advanced",
+                "tier increased from {:?} to {:?} at time {} (issued_at={}, last_online={})",
                 prev_tier,
-                tier
+                tier,
+                t,
+                base_offline.credential.issued_at,
+                base_offline.last_online_verification,
             );
             prev_tier = tier;
         }
