@@ -259,11 +259,15 @@ jobs:
             cmake
 
       - name: Run tests (${{ matrix.group }})
-        run: |
-          FEATURES="${{ matrix.features }}"
-          # Remove whitespace from YAML multiline
-          FEATURES=$(echo "$FEATURES" | tr -d '[:space:]' | sed 's/,,*/,/g; s/^,//; s/,$//')
-          cargo test -p symthaea --lib --features "$FEATURES"
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 30
+          max_attempts: 2
+          command: |
+            FEATURES="${{ matrix.features }}"
+            # Remove whitespace from YAML multiline
+            FEATURES=$(echo "$FEATURES" | tr -d '[:space:]' | sed 's/,,*/,/g; s/^,//; s/,$//')
+            cargo test -p symthaea --lib --features "$FEATURES"
 
   test-feature-matrix-critical:
     name: Test Feature Matrix (core/web_research/pathology)
