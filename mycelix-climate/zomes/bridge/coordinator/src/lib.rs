@@ -490,6 +490,203 @@ pub fn project_due_diligence(input: ProjectDueDiligenceInput) -> ExternResult<Re
 }
 
 // ============================================================================
+// Gap 5: Climate Provenance via Supplychain
+// ============================================================================
+
+/// Input for verifying supply chain sustainability claims.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SustainabilityVerificationInput {
+    /// Item identifier to verify (e.g., product ID or batch ID).
+    pub item_id: String,
+    /// Type of sustainability claim to look for (e.g., "carbon_neutral", "recycled").
+    pub claim_type: String,
+}
+
+/// Summary of verification results across all claims for an item.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SustainabilityVerificationResult {
+    /// Item ID that was checked.
+    pub item_id: String,
+    /// Claim type that was checked.
+    pub claim_type: String,
+    /// Number of claims found with this type.
+    pub claims_found: u32,
+    /// Number of those claims with a verified status.
+    pub verified_count: u32,
+    /// Number of those claims with a pending status.
+    pub pending_count: u32,
+    /// Number of those claims with a rejected status.
+    pub rejected_count: u32,
+    /// Whether the supplychain cluster was reachable.
+    pub supplychain_available: bool,
+    /// Non-fatal error message.
+    pub error: Option<String>,
+}
+
+/// Verify supply chain sustainability for an item by querying the supplychain cluster.
+///
+/// 1. Calls `get_claims_by_item` on the supplychain claims zome to find all
+///    claims for the given item.
+/// 2. For each claim matching `claim_type`, calls `get_verifications_for_claim`
+///    on the supplychain verification zome to get verification status.
+/// 3. Returns a summary of verified / pending / rejected counts.
+///
+/// All cross-cluster failures are non-fatal.
+#[hdk_extern]
+pub fn verify_supply_chain_sustainability(
+    input: SustainabilityVerificationInput,
+) -> ExternResult<SustainabilityVerificationResult> {
+    if input.item_id.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "item_id is required".to_string()
+        )));
+    }
+    if input.claim_type.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "claim_type is required".to_string()
+        )));
+    }
+
+    // Step 1: Get all claims for the item from supplychain
+    let claims_payload = ExternIO::encode(input.item_id.clone())
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+
+    let claims_value: serde_json::Value = match call(
+        CallTargetCell::OtherRole("supplychain".into()),
+        ZomeName::from("claims_coordinator"),
+        FunctionName::from("get_claims_by_item"),
+        None,
+        claims_payload,
+    ) {
+        Ok(ZomeCallResponse::Ok(data)) => {
+            data.decode().unwrap_or(serde_json::Value::Array(vec![]))
+        }
+        Ok(other) => {
+            return Ok(SustainabilityVerificationResult {
+                item_id: input.item_id,
+                claim_type: input.claim_type,
+                claims_found: 0,
+                verified_count: 0,
+                pending_count: 0,
+                rejected_count: 0,
+                supplychain_available: true,
+                error: Some(format!("get_claims_by_item rejected: {:?}", other)),
+            });
+        }
+        Err(_) => {
+            return Ok(SustainabilityVerificationResult {
+                item_id: input.item_id,
+                claim_type: input.claim_type,
+                claims_found: 0,
+                verified_count: 0,
+                pending_count: 0,
+                rejected_count: 0,
+                supplychain_available: false,
+                error: Some("Supplychain cluster not available".to_string()),
+            });
+        }
+    };
+
+    // Step 2: Filter claims by type and get verification status for each
+    let empty_arr = vec![];
+    let claims_arr = claims_value.as_array().unwrap_or(&empty_arr);
+
+    let mut claims_found: u32 = 0;
+    let mut verified_count: u32 = 0;
+    let mut pending_count: u32 = 0;
+    let mut rejected_count: u32 = 0;
+
+    for claim in claims_arr {
+        // Each claim record's entry has a `claim_type` field.
+        // The record is serialized as { signed_action: ..., entry: ... }.
+        // Navigate into the entry to get claim_type.
+        let ct = claim
+            .get("entry")
+            .and_then(|e| e.get("claim_type"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        if ct != input.claim_type {
+            continue;
+        }
+
+        claims_found += 1;
+
+        // Get the action_hash for this claim record to query verifications
+        let claim_hash_value = claim
+            .get("signed_action")
+            .and_then(|sa| sa.get("hashed"))
+            .and_then(|h| h.get("hash"))
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
+
+        if claim_hash_value.is_null() {
+            // Can't query verifications without the hash; count as pending
+            pending_count += 1;
+            continue;
+        }
+
+        let verif_payload = ExternIO::encode(claim_hash_value)
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+
+        let verifications: serde_json::Value = match call(
+            CallTargetCell::OtherRole("supplychain".into()),
+            ZomeName::from("verification_coordinator"),
+            FunctionName::from("get_verifications_for_claim"),
+            None,
+            verif_payload,
+        ) {
+            Ok(ZomeCallResponse::Ok(data)) => {
+                data.decode().unwrap_or(serde_json::Value::Array(vec![]))
+            }
+            _ => {
+                // Verification zome unavailable for this claim — treat as pending
+                pending_count += 1;
+                continue;
+            }
+        };
+
+        let verif_arr = match verifications.as_array() {
+            Some(a) => a,
+            None => {
+                pending_count += 1;
+                continue;
+            }
+        };
+
+        if verif_arr.is_empty() {
+            // Claim exists but has no verifications yet
+            pending_count += 1;
+        } else {
+            // Use the most recent verification status
+            let last = verif_arr.last().unwrap();
+            let status = last
+                .get("entry")
+                .and_then(|e| e.get("status"))
+                .and_then(|s| s.as_str())
+                .unwrap_or("Pending");
+
+            match status {
+                "Verified" => verified_count += 1,
+                "Rejected" => rejected_count += 1,
+                _ => pending_count += 1,
+            }
+        }
+    }
+
+    Ok(SustainabilityVerificationResult {
+        item_id: input.item_id,
+        claim_type: input.claim_type,
+        claims_found,
+        verified_count,
+        pending_count,
+        rejected_count,
+        supplychain_available: true,
+        error: None,
+    })
+}
+
+// ============================================================================
 // Statistics
 // ============================================================================
 
@@ -597,4 +794,83 @@ pub fn get_bridge_summary(_: ()) -> ExternResult<BridgeSummary> {
         active_listings,
         total_listed_tonnes,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // =========================================================================
+    // Gap 5: Sustainability Verification Tests
+    // =========================================================================
+
+    #[test]
+    fn test_sustainability_verification_result_serde() {
+        // Fully verified item
+        let result = SustainabilityVerificationResult {
+            item_id: "BATCH-SOLAR-2026-001".to_string(),
+            claim_type: "carbon_neutral".to_string(),
+            claims_found: 3,
+            verified_count: 2,
+            pending_count: 1,
+            rejected_count: 0,
+            supplychain_available: true,
+            error: None,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let back: SustainabilityVerificationResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.item_id, "BATCH-SOLAR-2026-001");
+        assert_eq!(back.claim_type, "carbon_neutral");
+        assert_eq!(back.claims_found, 3);
+        assert_eq!(back.verified_count, 2);
+        assert_eq!(back.pending_count, 1);
+        assert_eq!(back.rejected_count, 0);
+        assert!(back.supplychain_available);
+        assert!(back.error.is_none());
+
+        // Supplychain unavailable
+        let result2 = SustainabilityVerificationResult {
+            item_id: "BATCH-WIND-2026-007".to_string(),
+            claim_type: "recycled_materials".to_string(),
+            claims_found: 0,
+            verified_count: 0,
+            pending_count: 0,
+            rejected_count: 0,
+            supplychain_available: false,
+            error: Some("Supplychain cluster not available".to_string()),
+        };
+        let json2 = serde_json::to_string(&result2).unwrap();
+        let back2: SustainabilityVerificationResult = serde_json::from_str(&json2).unwrap();
+        assert!(!back2.supplychain_available);
+        assert_eq!(back2.claims_found, 0);
+        assert!(back2.error.is_some());
+
+        // Rejected claims
+        let result3 = SustainabilityVerificationResult {
+            item_id: "ITEM-XYZ".to_string(),
+            claim_type: "fair_trade".to_string(),
+            claims_found: 2,
+            verified_count: 0,
+            pending_count: 0,
+            rejected_count: 2,
+            supplychain_available: true,
+            error: None,
+        };
+        let json3 = serde_json::to_string(&result3).unwrap();
+        let back3: SustainabilityVerificationResult = serde_json::from_str(&json3).unwrap();
+        assert_eq!(back3.rejected_count, 2);
+        assert_eq!(back3.verified_count, 0);
+    }
+
+    #[test]
+    fn test_sustainability_verification_input_serde() {
+        let input = SustainabilityVerificationInput {
+            item_id: "SOLAR-PANEL-BATCH-2026".to_string(),
+            claim_type: "carbon_neutral".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: SustainabilityVerificationInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.item_id, "SOLAR-PANEL-BATCH-2026");
+        assert_eq!(back.claim_type, "carbon_neutral");
+    }
 }
