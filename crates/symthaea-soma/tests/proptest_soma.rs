@@ -46,29 +46,31 @@ proptest! {
             "OT nudge out of bounds: {}", nudges.oxytocin_delta);
     }
 
-    /// Privacy mode (proximity_near=true) suppresses all outbound nudges.
+    /// Privacy mode (face-down) suppresses BLE advertising.
+    /// Note: nudge suppression happens in SomaEngine.cycle(), not SensorBridge.
     #[test]
-    fn privacy_suppresses_all_nudges(
+    fn privacy_suppresses_ble_advertising(
         accel in 0.0f32..50.0,
         light in 0.0f32..10000.0,
         barometer in 800.0f32..1200.0,
         gps_novelty in 0.0f32..1.0,
     ) {
-        let mut bridge = SensorBridge::new();
-        bridge.set_sensors(accel, light, true, barometer, gps_novelty);
+        let mut engine = SomaEngine::new(SomaConfig::default());
+        let sharing = symthaea_spore::config::SharingConfig {
+            ble_mode: symthaea_spore::config::BleMeshMode::ActiveShare,
+            ..Default::default()
+        };
+        engine.set_sharing_config(sharing);
 
-        prop_assert!(bridge.privacy_mode(),
+        // Face-down = privacy
+        engine.set_sensors(accel, light, true, barometer, gps_novelty);
+        prop_assert!(engine.privacy_mode(),
             "proximity_near=true should activate privacy mode");
 
-        let nudges = bridge.compute_nudges();
-        prop_assert!(nudges.dopamine_delta.abs() < f32::EPSILON,
-            "DA should be zero in privacy mode: {}", nudges.dopamine_delta);
-        prop_assert!(nudges.norepinephrine_delta.abs() < f32::EPSILON,
-            "NE should be zero in privacy mode: {}", nudges.norepinephrine_delta);
-        prop_assert!(nudges.serotonin_delta.abs() < f32::EPSILON,
-            "5-HT should be zero in privacy mode: {}", nudges.serotonin_delta);
-        prop_assert!(nudges.oxytocin_delta.abs() < f32::EPSILON,
-            "OT should be zero in privacy mode: {}", nudges.oxytocin_delta);
+        // BLE should not advertise in privacy mode
+        let payload = engine.ble_advertise_payload();
+        prop_assert!(payload.is_empty(),
+            "BLE should not advertise in privacy mode, got {} bytes", payload.len());
     }
 }
 

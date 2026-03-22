@@ -133,6 +133,42 @@ pub struct BrocaCheckpoint {
     pub checksum: [u8; 32],
 }
 
+/// Legacy checkpoint layout (without logit_projection_weights).
+/// Used for backward-compatible deserialization of older checkpoints.
+#[derive(Deserialize)]
+struct BrocaCheckpointLegacy {
+    version: u32,
+    token_embeddings: Vec<ContinuousHV>,
+    network_state: HdcLtcUnifiedNetwork,
+    vocab: VocabFile,
+    config: BrocaConfig,
+    training_epoch: usize,
+    training_loss: f32,
+    adam_state: Option<AdamState>,
+    projection_weights: Option<Vec<f32>>,
+    liquid_mamba_config: Option<String>,
+    checksum: [u8; 32],
+}
+
+impl From<BrocaCheckpointLegacy> for BrocaCheckpoint {
+    fn from(legacy: BrocaCheckpointLegacy) -> Self {
+        Self {
+            version: legacy.version,
+            token_embeddings: legacy.token_embeddings,
+            network_state: legacy.network_state,
+            vocab: legacy.vocab,
+            config: legacy.config,
+            training_epoch: legacy.training_epoch,
+            training_loss: legacy.training_loss,
+            adam_state: legacy.adam_state,
+            projection_weights: legacy.projection_weights,
+            liquid_mamba_config: legacy.liquid_mamba_config,
+            logit_projection_weights: None,
+            checksum: legacy.checksum,
+        }
+    }
+}
+
 impl BrocaCheckpoint {
     /// Compute the blake3 checksum of the checkpoint (with checksum field zeroed).
     fn compute_checksum(&self) -> [u8; 32] {
@@ -197,7 +233,7 @@ impl BrocaCheckpoint {
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer)?;
 
-        // Try MessagePack (current format) first
+        // Try MessagePack named format (current, with logit_projection_weights)
         let checkpoint: Self = if let Ok(ckpt) = rmp_serde::from_slice::<Self>(&buffer) {
             // MessagePack checkpoint — verify integrity
             if !ckpt.verify() {
@@ -206,14 +242,18 @@ impl BrocaCheckpoint {
                 );
             }
             ckpt
-        } else {
-            // Fall back to bincode (legacy format) — skip verify since hash format changed
-            let ckpt = bincode::deserialize::<Self>(&buffer)
-                .context("Failed to deserialize BrocaCheckpoint (tried msgpack + bincode)")?;
+        } else if let Ok(legacy) = rmp_serde::from_slice::<BrocaCheckpointLegacy>(&buffer) {
+            // Legacy MessagePack (without logit_projection_weights)
+            tracing::info!("Loaded legacy Broca checkpoint (pre-projection) — upgrading");
+            legacy.into()
+        } else if let Ok(legacy) = bincode::deserialize::<BrocaCheckpointLegacy>(&buffer) {
+            // Fall back to bincode (oldest format) — skip verify since hash format changed
             tracing::warn!(
                 "Loaded legacy bincode Broca checkpoint — will be re-saved as MessagePack"
             );
-            ckpt
+            legacy.into()
+        } else {
+            anyhow::bail!("Failed to deserialize BrocaCheckpoint (tried msgpack v2/v1 + bincode)");
         };
 
         if checkpoint.version > CHECKPOINT_VERSION {

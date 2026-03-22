@@ -883,7 +883,7 @@ impl MycelixBridge {
         metadata: &super::asset_evaluator::AssetMetadata,
         consciousness: &ConsciousnessSnapshot,
     ) -> super::asset_evaluator::AssetConsciousnessScore {
-        let evaluator = super::asset_evaluator::AssetEvaluator::new();
+        let mut evaluator = super::asset_evaluator::AssetEvaluator::new();
         evaluator.evaluate(metadata, consciousness)
     }
 

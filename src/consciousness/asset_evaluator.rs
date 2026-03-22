@@ -215,7 +215,7 @@ mod tests {
 
     #[test]
     fn test_evaluate_returns_valid_scores() {
-        let evaluator = AssetEvaluator::new();
+        let mut evaluator = AssetEvaluator::new();
         let score = evaluator.evaluate(&test_metadata(), &test_snapshot());
 
         assert!(score.phi_score >= 0.0 && score.phi_score <= 1.0);
@@ -227,7 +227,7 @@ mod tests {
 
     #[test]
     fn test_phi_score_matches_snapshot() {
-        let evaluator = AssetEvaluator::new();
+        let mut evaluator = AssetEvaluator::new();
         let snapshot = test_snapshot();
         let score = evaluator.evaluate(&test_metadata(), &snapshot);
 
@@ -236,7 +236,7 @@ mod tests {
 
     #[test]
     fn test_per_harmony_scores_populated() {
-        let evaluator = AssetEvaluator::new();
+        let mut evaluator = AssetEvaluator::new();
         let score = evaluator.evaluate(&test_metadata(), &test_snapshot());
 
         // Should have entries for at least some harmonies
@@ -245,7 +245,7 @@ mod tests {
 
     #[test]
     fn test_recommendation_is_not_cannot_evaluate() {
-        let evaluator = AssetEvaluator::new();
+        let mut evaluator = AssetEvaluator::new();
         let score = evaluator.evaluate(&test_metadata(), &test_snapshot());
 
         // With a valid consciousness snapshot, should produce a real recommendation
@@ -257,7 +257,7 @@ mod tests {
 
     #[test]
     fn test_build_evaluation_text() {
-        let evaluator = AssetEvaluator::new();
+        let mut evaluator = AssetEvaluator::new();
         let text = evaluator.build_evaluation_text(&test_metadata());
 
         assert!(text.contains("Community solar farm"));
@@ -269,7 +269,7 @@ mod tests {
 
     #[test]
     fn test_minimal_metadata() {
-        let evaluator = AssetEvaluator::new();
+        let mut evaluator = AssetEvaluator::new();
         let minimal = AssetMetadata {
             description: "A small community garden project".to_string(),
             project_type: "Agriculture".to_string(),
@@ -285,7 +285,7 @@ mod tests {
 
     #[test]
     fn test_low_consciousness_snapshot() {
-        let evaluator = AssetEvaluator::new();
+        let mut evaluator = AssetEvaluator::new();
         let low = ConsciousnessSnapshot::new(0.1, 0.1, 0.1, 0.1, 0.0, 0.1);
         let score = evaluator.evaluate(&test_metadata(), &low);
 
@@ -295,35 +295,35 @@ mod tests {
 
     #[test]
     fn test_score_to_recommendation_strong_support() {
-        let evaluator = AssetEvaluator::new();
+        let mut evaluator = AssetEvaluator::new();
         let rec = evaluator.score_to_recommendation(0.9, 0.9, false);
         assert_eq!(rec, GovernanceRecommendation::StrongSupport);
     }
 
     #[test]
     fn test_score_to_recommendation_oppose_on_violations() {
-        let evaluator = AssetEvaluator::new();
+        let mut evaluator = AssetEvaluator::new();
         let rec = evaluator.score_to_recommendation(0.9, 0.9, true);
         assert_eq!(rec, GovernanceRecommendation::StrongOppose);
     }
 
     #[test]
     fn test_score_to_recommendation_neutral() {
-        let evaluator = AssetEvaluator::new();
+        let mut evaluator = AssetEvaluator::new();
         let rec = evaluator.score_to_recommendation(0.1, 0.1, false);
         assert_eq!(rec, GovernanceRecommendation::Neutral);
     }
 
     #[test]
     fn test_score_to_recommendation_oppose() {
-        let evaluator = AssetEvaluator::new();
+        let mut evaluator = AssetEvaluator::new();
         let rec = evaluator.score_to_recommendation(-0.3, 0.1, false);
         assert_eq!(rec, GovernanceRecommendation::Oppose);
     }
 
     #[test]
     fn test_harmony_alignment_mapping() {
-        let evaluator = AssetEvaluator::new();
+        let mut evaluator = AssetEvaluator::new();
         let score = evaluator.evaluate(&test_metadata(), &test_snapshot());
 
         // harmony_alignment should be in [0,1] (mapped from [-1,+1])
@@ -333,7 +333,7 @@ mod tests {
 
     #[test]
     fn test_serialization_roundtrip() {
-        let evaluator = AssetEvaluator::new();
+        let mut evaluator = AssetEvaluator::new();
         let score = evaluator.evaluate(&test_metadata(), &test_snapshot());
         let json = serde_json::to_string(&score).unwrap();
         let back: AssetConsciousnessScore = serde_json::from_str(&json).unwrap();

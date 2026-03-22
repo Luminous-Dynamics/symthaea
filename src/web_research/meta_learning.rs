@@ -198,7 +198,7 @@ impl EpistemicLearner {
             config: LearnerConfig::default(),
             source_credibility: HashMap::new(),
             strategies: Vec::new(),
-            outcomes: Vec::new(),
+            outcomes: VecDeque::new(),
             meta_phi: MetaPhi::default(),
             domain_expertise: HashMap::new(),
         }
@@ -210,7 +210,7 @@ impl EpistemicLearner {
             config,
             source_credibility: HashMap::new(),
             strategies: Vec::new(),
-            outcomes: Vec::new(),
+            outcomes: VecDeque::new(),
             meta_phi: MetaPhi::default(),
             domain_expertise: HashMap::new(),
         }
@@ -225,11 +225,11 @@ impl EpistemicLearner {
         self.update_domain_expertise(&outcome);
 
         // Store outcome
-        self.outcomes.push(outcome);
+        self.outcomes.push_back(outcome);
 
         // Trim old outcomes
         if self.outcomes.len() > 1000 {
-            self.outcomes.remove(0);
+            self.outcomes.pop_front();
         }
 
         // Periodically update meta-phi

@@ -15,6 +15,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -252,7 +253,7 @@ pub struct PersistentState {
     /// Consciousness metrics
     pub consciousness: ConsciousnessState,
     /// Command history (last N commands)
-    pub command_history: Vec<HistoricalCommand>,
+    pub command_history: VecDeque<HistoricalCommand>,
     /// Session statistics
     pub session_stats: SessionStats,
     /// Custom user preferences
@@ -267,7 +268,7 @@ pub struct ConsciousnessState {
     pub consciousness_level: f64,
     pub is_conscious: bool,
     /// Accumulated Phi over time (for trends)
-    pub phi_history: Vec<f64>,
+    pub phi_history: VecDeque<f64>,
 }
 
 /// Historical command entry
@@ -328,9 +329,9 @@ impl Default for PersistentState {
                 coherence: 0.5,
                 consciousness_level: 0.5,
                 is_conscious: true,
-                phi_history: Vec::new(),
+                phi_history: VecDeque::new(),
             },
-            command_history: Vec::new(),
+            command_history: VecDeque::new(),
             session_stats: SessionStats::default(),
             preferences: UserPreferences::default(),
         }
@@ -423,15 +424,15 @@ impl StateManager {
         self.state.consciousness.consciousness_level = (phi + coherence) / 2.0;
 
         // Keep history bounded
-        self.state.consciousness.phi_history.push(phi);
+        self.state.consciousness.phi_history.push_back(phi);
         if self.state.consciousness.phi_history.len() > 100 {
-            self.state.consciousness.phi_history.remove(0);
+            self.state.consciousness.phi_history.pop_front();
         }
     }
 
     /// Add command to history
     pub fn add_to_history(&mut self, command: String, phi: f64, success: bool) {
-        self.state.command_history.push(HistoricalCommand {
+        self.state.command_history.push_back(HistoricalCommand {
             command,
             timestamp: Utc::now(),
             phi_at_execution: phi,
@@ -440,7 +441,7 @@ impl StateManager {
 
         // Keep history bounded
         while self.state.command_history.len() > self.max_history_entries {
-            self.state.command_history.remove(0);
+            self.state.command_history.pop_front();
         }
 
         self.state.session_stats.commands_executed += 1;
