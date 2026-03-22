@@ -12,4 +12,5 @@ name = "knowledge_bridge"
 hdk = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+mycelix-bridge-common = { workspace = true }
 knowledge_bridge_integrity = { path = "../integrity" }

@@ -1606,6 +1606,24 @@ pub struct IdentityBridgeHealth {
     pub api_version: u16,
 }
 
+// ============================================================================
+// Observability — Bridge Metrics Export
+// ============================================================================
+
+/// Return a JSON-encoded snapshot of this bridge's dispatch metrics.
+///
+/// See `mycelix_bridge_common::metrics::BridgeMetricsSnapshot` for the schema.
+#[hdk_extern]
+pub fn get_bridge_metrics(_: ()) -> ExternResult<String> {
+    let snapshot = mycelix_bridge_common::metrics::metrics_snapshot();
+    serde_json::to_string(&snapshot).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Failed to serialize metrics snapshot: {}",
+            e
+        )))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

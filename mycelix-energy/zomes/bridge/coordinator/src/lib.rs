@@ -1111,6 +1111,929 @@ pub fn procure_equipment(input: EquipmentProcurementInput) -> ExternResult<Equip
     }
 }
 
+// =============================================================================
+// Consciousness Assessment (Symthaea → Energy Bridge)
+// =============================================================================
+
+/// Record a consciousness assessment from Symthaea for a project.
+///
+/// Stores the Phi score, Eight Harmonies alignment, and supporting metrics
+/// on the DHT, linked to the project for discovery. Also queues a sync
+/// record to push scores to Terra Atlas.
+#[hdk_extern]
+pub fn record_consciousness_assessment(input: RecordAssessmentInput) -> ExternResult<Record> {
+    let now = sys_time()?;
+
+    let assessment = ConsciousnessAssessment {
+        id: format!("assess:{}:{}:{}", input.project_id, input.scorer_did, now.as_micros()),
+        project_id: input.project_id.clone(),
+        scorer_did: input.scorer_did.clone(),
+        phi_score: input.phi_score,
+        harmony_alignment: input.harmony_alignment,
+        per_harmony_scores: input.per_harmony_scores.clone(),
+        care_activation: input.care_activation,
+        meta_awareness: input.meta_awareness,
+        assessment_cycle: input.assessment_cycle,
+        assessed_at: now,
+    };
+
+    let hash = create_entry(&EntryTypes::ConsciousnessAssessment(assessment))?;
+
+    // Link to project for discovery
+    create_link(
+        anchor_hash(&input.project_id)?,
+        hash.clone(),
+        LinkTypes::ProjectToAssessments,
+        (),
+    )?;
+
+    // Queue for sync to Terra Atlas
+    queue_sync_to_terra_atlas(QueueSyncInput {
+        sync_type: SyncType::ConsciousnessScore,
+        project_id: input.project_id.clone(),
+        payload: serde_json::json!({
+            "project_id": input.project_id,
+            "phi_score": input.phi_score,
+            "harmony_alignment": input.harmony_alignment,
+            "per_harmony_scores": input.per_harmony_scores,
+            "care_activation": input.care_activation,
+            "meta_awareness": input.meta_awareness,
+            "scorer_did": input.scorer_did,
+            "assessment_cycle": input.assessment_cycle,
+        }).to_string(),
+    })?;
+
+    // Broadcast event
+    broadcast_energy_event(BroadcastEnergyEventInput {
+        event_type: EnergyEventType::ConsciousnessAssessed,
+        project_id: input.project_id,
+        payload: serde_json::json!({
+            "phi_score": input.phi_score,
+            "harmony_alignment": input.harmony_alignment,
+            "scorer": input.scorer_did,
+        }).to_string(),
+    })?;
+
+    get(hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Assessment not found".into())))
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RecordAssessmentInput {
+    pub project_id: String,
+    pub scorer_did: String,
+    pub phi_score: f64,
+    pub harmony_alignment: f64,
+    pub per_harmony_scores: String,
+    pub care_activation: f64,
+    pub meta_awareness: f64,
+    pub assessment_cycle: u64,
+}
+
+/// Get consciousness assessments for a project
+#[hdk_extern]
+pub fn get_project_consciousness(project_id: String) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&project_id)?, LinkTypes::ProjectToAssessments)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut assessments = Vec::new();
+    for link in links {
+        let hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link".into())))?;
+        if let Some(record) = get(hash, GetOptions::default())? {
+            assessments.push(record);
+        }
+    }
+
+    Ok(assessments)
+}
+
+/// Get the latest consciousness assessment for a project
+#[hdk_extern]
+pub fn get_latest_project_consciousness(project_id: String) -> ExternResult<Option<Record>> {
+    let assessments = get_project_consciousness(project_id)?;
+    // Return the last one (most recently linked)
+    Ok(assessments.into_iter().last())
+}
+
+// =============================================================================
+// Allocation Pledges (Trust-Weighted Resource Commitment)
+// =============================================================================
+
+/// Minimum consciousness score required to submit a pledge (Participant tier).
+/// Matches `consciousness_gate_pledge` in mycelix-bridge-common.
+const PLEDGE_MIN_TRUST: f64 = 0.2;
+
+/// Default pledge TTL: 24 hours in microseconds.
+/// Matches consciousness credential TTL.
+const PLEDGE_TTL_US: i64 = 86_400_000_000;
+
+/// Submit a trust-weighted pledge toward a project.
+///
+/// The pledger must have a consciousness score >= 0.2 (Participant tier).
+/// The pledge expires after 24h (matching consciousness credential TTL).
+/// Pledges are denominated in TEND, SAP, or a community currency.
+#[hdk_extern]
+pub fn submit_pledge(input: SubmitPledgeInput) -> ExternResult<Record> {
+    // Consciousness gate: require Participant tier
+    if input.trust_score < PLEDGE_MIN_TRUST {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            format!(
+                "Trust score {:.2} below pledge threshold {:.2} (Participant tier required)",
+                input.trust_score, PLEDGE_MIN_TRUST
+            )
+        )));
+    }
+
+    let now = sys_time()?;
+    let expires_at = Timestamp::from_micros(now.as_micros() + PLEDGE_TTL_US);
+
+    let pledge = AllocationPledge {
+        id: format!("pledge:{}:{}:{}", input.project_id, input.pledger_did, now.as_micros()),
+        pledger_did: input.pledger_did.clone(),
+        project_id: input.project_id.clone(),
+        amount: input.amount,
+        currency: input.currency.clone(),
+        trust_score: input.trust_score,
+        trust_tier: input.trust_tier.clone(),
+        harmony_intent: input.harmony_intent.clone(),
+        status: PledgeStatus::Pending,
+        pledged_at: now,
+        expires_at,
+        matched_at: None,
+    };
+
+    let hash = create_entry(&EntryTypes::AllocationPledge(pledge))?;
+
+    // Link to project for discovery
+    create_link(
+        anchor_hash(&input.project_id)?,
+        hash.clone(),
+        LinkTypes::AssetToPledges,
+        (),
+    )?;
+
+    // Link to pledger for portfolio view
+    create_link(
+        anchor_hash(&input.pledger_did)?,
+        hash.clone(),
+        LinkTypes::PledgerToPledges,
+        (),
+    )?;
+
+    // Broadcast event
+    broadcast_energy_event(BroadcastEnergyEventInput {
+        event_type: EnergyEventType::PledgeSubmitted,
+        project_id: input.project_id,
+        payload: serde_json::json!({
+            "pledger": input.pledger_did,
+            "amount": input.amount,
+            "currency": input.currency,
+            "trust_score": input.trust_score,
+            "trust_tier": input.trust_tier,
+            "harmony_intent": input.harmony_intent,
+        }).to_string(),
+    })?;
+
+    get(hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Pledge not found".into())))
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SubmitPledgeInput {
+    pub pledger_did: String,
+    pub project_id: String,
+    pub amount: u64,
+    pub currency: String,
+    pub trust_score: f64,
+    pub trust_tier: String,
+    pub harmony_intent: String,
+}
+
+/// Withdraw a pending pledge (only the pledger can withdraw).
+#[hdk_extern]
+pub fn withdraw_pledge(input: WithdrawPledgeInput) -> ExternResult<Record> {
+    let record = get(input.pledge_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Pledge not found".into())))?;
+
+    let pledge = record.entry().to_app_option::<AllocationPledge>()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Parse error: {:?}", e))))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid pledge entry".into())))?;
+
+    // Only the pledger can withdraw
+    if pledge.pledger_did != input.pledger_did {
+        return Err(wasm_error!(WasmErrorInner::Guest("Only the pledger can withdraw".into())));
+    }
+
+    // Can only withdraw pending pledges
+    if pledge.status != PledgeStatus::Pending {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Cannot withdraw pledge in {:?} status", pledge.status)
+        )));
+    }
+
+    // Create updated pledge with Withdrawn status
+    let withdrawn = AllocationPledge {
+        status: PledgeStatus::Withdrawn,
+        ..pledge.clone()
+    };
+
+    let new_hash = update_entry(input.pledge_hash, &withdrawn)?;
+
+    // Broadcast withdrawal
+    broadcast_energy_event(BroadcastEnergyEventInput {
+        event_type: EnergyEventType::PledgeWithdrawn,
+        project_id: pledge.project_id,
+        payload: serde_json::json!({
+            "pledger": pledge.pledger_did,
+            "amount": pledge.amount,
+        }).to_string(),
+    })?;
+
+    get(new_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Updated pledge not found".into())))
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WithdrawPledgeInput {
+    pub pledge_hash: ActionHash,
+    pub pledger_did: String,
+}
+
+/// Get all pledges for a project
+#[hdk_extern]
+pub fn get_project_pledges(project_id: String) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&project_id)?, LinkTypes::AssetToPledges)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut pledges = Vec::new();
+    for link in links {
+        let hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link".into())))?;
+        if let Some(record) = get(hash, GetOptions::default())? {
+            pledges.push(record);
+        }
+    }
+
+    Ok(pledges)
+}
+
+/// Get all pledges by a specific pledger
+#[hdk_extern]
+pub fn get_pledger_pledges(pledger_did: String) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&pledger_did)?, LinkTypes::PledgerToPledges)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut pledges = Vec::new();
+    for link in links {
+        let hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link".into())))?;
+        if let Some(record) = get(hash, GetOptions::default())? {
+            pledges.push(record);
+        }
+    }
+
+    Ok(pledges)
+}
+
+// =============================================================================
+// Matching Engine (Bilateral Consciousness-Weighted)
+// =============================================================================
+
+/// Minimum consciousness score to run matching (Citizen tier).
+const MATCHING_MIN_TRUST: f64 = 0.3;
+
+/// Scoring weights for the matching algorithm.
+const W_TRUST: f64 = 0.40;
+const W_AMOUNT_FIT: f64 = 0.30;
+const W_HARMONY: f64 = 0.20;
+const W_PROXIMITY: f64 = 0.10;
+
+/// Sigmoid function for continuous consciousness weight.
+/// Maps consciousness score to [0,1] with smooth transition around threshold.
+fn sigmoid_weight(score: f64, threshold: f64, temperature: f64) -> f64 {
+    1.0 / (1.0 + (-(score - threshold) / temperature).exp())
+}
+
+/// Run consciousness-weighted matching for a project.
+///
+/// The asset holder (or any Citizen-tier participant) collects all pending
+/// pledges, scores them using the 4-factor consciousness-weighted algorithm,
+/// and creates AllocationMatch entries for the best matches.
+///
+/// Matching is bilateral: the holder proposes, the pledger must confirm.
+/// No partial fills — a pledge is either fully matched or stays pending.
+#[hdk_extern]
+pub fn run_matching(input: RunMatchingInput) -> ExternResult<Vec<Record>> {
+    // Consciousness gate: require Citizen tier to run matching
+    if input.holder_trust_score < MATCHING_MIN_TRUST {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            format!(
+                "Trust score {:.2} below matching threshold {:.2} (Citizen tier required)",
+                input.holder_trust_score, MATCHING_MIN_TRUST
+            )
+        )));
+    }
+
+    let now = sys_time()?;
+
+    // Collect pending pledges for this project
+    let pledge_records = get_project_pledges(input.project_id.clone())?;
+
+    // Parse and filter to pending, non-expired pledges
+    let mut scored_pledges: Vec<(AllocationPledge, ActionHash, f64)> = Vec::new();
+
+    for record in &pledge_records {
+        let action_hash = record.action_address().clone();
+        if let Some(pledge) = record.entry().to_app_option::<AllocationPledge>()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Parse error: {:?}", e))))?
+        {
+            // Only match pending pledges that haven't expired
+            if pledge.status != PledgeStatus::Pending {
+                continue;
+            }
+            if pledge.expires_at < now {
+                continue;
+            }
+
+            // Compute match score
+            let trust_weight = sigmoid_weight(pledge.trust_score, 0.3, 0.05);
+
+            let amount_fit = if input.funding_gap > 0 {
+                let fit = 1.0 - ((pledge.amount as f64 - input.funding_gap as f64).abs()
+                    / input.total_cost.max(1) as f64);
+                fit.clamp(0.0, 1.0)
+            } else {
+                0.0 // No gap to fill
+            };
+
+            let harmony_alignment = input.project_harmony_alignment.clamp(0.0, 1.0);
+
+            let community_proximity = if input.community_did.is_some()
+                && pledge.harmony_intent.contains(input.community_did.as_deref().unwrap_or(""))
+            {
+                1.0
+            } else {
+                0.0
+            };
+
+            let match_score = W_TRUST * trust_weight
+                + W_AMOUNT_FIT * amount_fit
+                + W_HARMONY * harmony_alignment
+                + W_PROXIMITY * community_proximity;
+
+            scored_pledges.push((pledge, action_hash, match_score));
+        }
+    }
+
+    // Sort by match score descending
+    scored_pledges.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
+
+    // Greedy fill: accept pledges in score order until funding gap is met
+    // Supports partial fills: if a pledge exceeds the remaining gap,
+    // only the needed portion is matched (rest stays as a reduced pledge).
+    let mut remaining_gap = input.funding_gap;
+    let mut matches = Vec::new();
+
+    for (pledge, _action_hash, score) in &scored_pledges {
+        if remaining_gap == 0 {
+            break;
+        }
+
+        // Determine match amount (partial fill support)
+        let match_amount = pledge.amount.min(remaining_gap);
+
+        let trust_weight = sigmoid_weight(pledge.trust_score, 0.3, 0.05);
+        let amount_fit = if input.funding_gap > 0 {
+            (1.0 - ((pledge.amount as f64 - remaining_gap as f64).abs()
+                / input.total_cost.max(1) as f64)).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+
+        let allocation_match = AllocationMatch {
+            id: format!("match:{}:{}:{}", input.project_id, pledge.id, now.as_micros()),
+            pledge_id: pledge.id.clone(),
+            project_id: input.project_id.clone(),
+            pledger_did: pledge.pledger_did.clone(),
+            holder_did: input.holder_did.clone(),
+            amount: match_amount,
+            match_score: *score,
+            trust_weight,
+            amount_fit,
+            harmony_alignment: input.project_harmony_alignment.clamp(0.0, 1.0),
+            community_proximity: 0.0,
+            status: MatchStatus::Proposed,
+            proposed_at: now,
+            resolved_at: None,
+        };
+
+        let hash = create_entry(&EntryTypes::AllocationMatch(allocation_match))?;
+
+        // Link to project
+        create_link(
+            anchor_hash(&input.project_id)?,
+            hash.clone(),
+            LinkTypes::AssetToMatches,
+            (),
+        )?;
+
+        // Link pledge to match
+        create_link(
+            anchor_hash(&pledge.id)?,
+            hash.clone(),
+            LinkTypes::PledgeToMatch,
+            (),
+        )?;
+
+        // Broadcast
+        broadcast_energy_event(BroadcastEnergyEventInput {
+            event_type: EnergyEventType::MatchProposed,
+            project_id: input.project_id.clone(),
+            payload: serde_json::json!({
+                "pledger": pledge.pledger_did,
+                "amount": match_amount,
+                "partial_fill": match_amount < pledge.amount,
+                "match_score": score,
+                "trust_weight": trust_weight,
+            }).to_string(),
+        })?;
+
+        if let Some(record) = get(hash, GetOptions::default())? {
+            matches.push(record);
+        }
+
+        remaining_gap = remaining_gap.saturating_sub(match_amount);
+    }
+
+    Ok(matches)
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RunMatchingInput {
+    pub project_id: String,
+    pub holder_did: String,
+    pub holder_trust_score: f64,
+    pub funding_gap: u64,
+    pub total_cost: u64,
+    pub project_harmony_alignment: f64,
+    pub community_did: Option<String>,
+}
+
+/// Pledger confirms a proposed match.
+#[hdk_extern]
+pub fn confirm_match(input: ConfirmMatchInput) -> ExternResult<Record> {
+    let record = get(input.match_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Match not found".into())))?;
+
+    let allocation_match = record.entry().to_app_option::<AllocationMatch>()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Parse error: {:?}", e))))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid match entry".into())))?;
+
+    // Only the pledger can confirm
+    if allocation_match.pledger_did != input.pledger_did {
+        return Err(wasm_error!(WasmErrorInner::Guest("Only the pledger can confirm".into())));
+    }
+
+    if allocation_match.status != MatchStatus::Proposed {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Cannot confirm match in {:?} status", allocation_match.status)
+        )));
+    }
+
+    // Re-check consciousness: pledger must still meet threshold
+    if input.current_trust_score < PLEDGE_MIN_TRUST {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Trust score has dropped below pledge threshold — cannot confirm".into()
+        )));
+    }
+
+    let now = sys_time()?;
+    let accepted = AllocationMatch {
+        status: MatchStatus::Accepted,
+        resolved_at: Some(now),
+        ..allocation_match.clone()
+    };
+
+    let new_hash = update_entry(input.match_hash, &accepted)?;
+
+    broadcast_energy_event(BroadcastEnergyEventInput {
+        event_type: EnergyEventType::MatchAccepted,
+        project_id: allocation_match.project_id,
+        payload: serde_json::json!({
+            "pledger": allocation_match.pledger_did,
+            "amount": allocation_match.amount,
+            "match_score": allocation_match.match_score,
+        }).to_string(),
+    })?;
+
+    get(new_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Updated match not found".into())))
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ConfirmMatchInput {
+    pub match_hash: ActionHash,
+    pub pledger_did: String,
+    pub current_trust_score: f64,
+}
+
+/// Pledger rejects a proposed match.
+#[hdk_extern]
+pub fn reject_match(input: RejectMatchInput) -> ExternResult<Record> {
+    let record = get(input.match_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Match not found".into())))?;
+
+    let allocation_match = record.entry().to_app_option::<AllocationMatch>()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Parse error: {:?}", e))))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid match entry".into())))?;
+
+    if allocation_match.pledger_did != input.pledger_did {
+        return Err(wasm_error!(WasmErrorInner::Guest("Only the pledger can reject".into())));
+    }
+
+    if allocation_match.status != MatchStatus::Proposed {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Cannot reject match in {:?} status", allocation_match.status)
+        )));
+    }
+
+    let now = sys_time()?;
+    let rejected = AllocationMatch {
+        status: MatchStatus::Rejected,
+        resolved_at: Some(now),
+        ..allocation_match.clone()
+    };
+
+    let new_hash = update_entry(input.match_hash, &rejected)?;
+
+    broadcast_energy_event(BroadcastEnergyEventInput {
+        event_type: EnergyEventType::MatchRejected,
+        project_id: allocation_match.project_id,
+        payload: serde_json::json!({
+            "pledger": allocation_match.pledger_did,
+            "amount": allocation_match.amount,
+        }).to_string(),
+    })?;
+
+    get(new_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Updated match not found".into())))
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RejectMatchInput {
+    pub match_hash: ActionHash,
+    pub pledger_did: String,
+}
+
+/// Get all matches for a project
+#[hdk_extern]
+pub fn get_project_matches(project_id: String) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&project_id)?, LinkTypes::AssetToMatches)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut matches = Vec::new();
+    for link in links {
+        let hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link".into())))?;
+        if let Some(record) = get(hash, GetOptions::default())? {
+            matches.push(record);
+        }
+    }
+
+    Ok(matches)
+}
+
+// =============================================================================
+// Reputation Feedback (post-match rating)
+// =============================================================================
+
+/// Rate a completed match — both pledger and holder can provide feedback.
+///
+/// Feedback scores feed into MYCEL reputation scores and influence future
+/// matching priority. Both `outcome_score` and `harmony_fulfilled` affect
+/// the rated party's consciousness profile engagement dimension.
+#[hdk_extern]
+pub fn rate_match(input: RateMatchInput) -> ExternResult<Record> {
+    let now = sys_time()?;
+
+    // Verify the match exists and is completed
+    let match_record = get(input.match_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Match not found".into())))?;
+
+    let allocation_match = match_record.entry().to_app_option::<AllocationMatch>()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Parse error: {:?}", e))))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid match entry".into())))?;
+
+    if allocation_match.status != MatchStatus::Accepted && allocation_match.status != MatchStatus::Completed {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Can only rate accepted or completed matches".into()
+        )));
+    }
+
+    // Verify rater is a participant in this match
+    let (role, rated_did) = if input.rater_did == allocation_match.pledger_did {
+        (FeedbackRole::Pledger, allocation_match.holder_did.clone())
+    } else if input.rater_did == allocation_match.holder_did {
+        (FeedbackRole::Holder, allocation_match.pledger_did.clone())
+    } else {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only match participants can rate".into()
+        )));
+    };
+
+    let feedback = MatchFeedback {
+        id: format!("feedback:{}:{:?}:{}", allocation_match.id, role, now.as_micros()),
+        match_id: allocation_match.id.clone(),
+        project_id: allocation_match.project_id.clone(),
+        rater_did: input.rater_did.clone(),
+        rated_did,
+        role,
+        outcome_score: input.outcome_score,
+        harmony_fulfilled: input.harmony_fulfilled,
+        would_match_again: input.would_match_again,
+        comment: input.comment,
+        rated_at: now,
+    };
+
+    let hash = create_entry(&EntryTypes::MatchFeedback(feedback))?;
+
+    // Link from match to feedback
+    create_link(
+        anchor_hash(&allocation_match.id)?,
+        hash.clone(),
+        LinkTypes::MatchToFeedback,
+        (),
+    )?;
+
+    get(hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Feedback not found".into())))
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RateMatchInput {
+    pub match_hash: ActionHash,
+    pub rater_did: String,
+    pub outcome_score: f64,
+    pub harmony_fulfilled: f64,
+    pub would_match_again: bool,
+    pub comment: Option<String>,
+}
+
+/// Get feedback for a match
+#[hdk_extern]
+pub fn get_match_feedback(match_id: String) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&match_id)?, LinkTypes::MatchToFeedback)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut feedback = Vec::new();
+    for link in links {
+        let hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link".into())))?;
+        if let Some(record) = get(hash, GetOptions::default())? {
+            feedback.push(record);
+        }
+    }
+
+    Ok(feedback)
+}
+
+// =============================================================================
+// QOL Impact Metrics
+// =============================================================================
+
+/// Minimum consciousness score to report impact (Participant tier).
+const IMPACT_MIN_TRUST: f64 = 0.2;
+
+/// Record QOL impact metrics for a project.
+///
+/// Reports real-world impact (CO2 avoided, jobs created, community trust, etc.)
+/// that feeds back into the project's consciousness score and Terra Atlas dashboard.
+#[hdk_extern]
+pub fn record_impact(input: RecordImpactInput) -> ExternResult<Record> {
+    // Consciousness gate
+    if input.reporter_trust_score < IMPACT_MIN_TRUST {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            format!(
+                "Trust score {:.2} below impact reporting threshold {:.2}",
+                input.reporter_trust_score, IMPACT_MIN_TRUST
+            )
+        )));
+    }
+
+    let now = sys_time()?;
+
+    let impact = ImpactRecord {
+        id: format!("impact:{}:{}:{}", input.project_id, input.reporter_did, now.as_micros()),
+        project_id: input.project_id.clone(),
+        reporter_did: input.reporter_did.clone(),
+        period_start: input.period_start,
+        period_end: input.period_end,
+        co2_avoided_tonnes: input.co2_avoided_tonnes,
+        jobs_created: input.jobs_created,
+        community_trust_delta: input.community_trust_delta,
+        energy_access_households: input.energy_access_households,
+        biodiversity_index_delta: input.biodiversity_index_delta,
+        verification_evidence: input.verification_evidence.clone(),
+        verified_by: input.verified_by.clone(),
+        recorded_at: now,
+    };
+
+    let hash = create_entry(&EntryTypes::ImpactRecord(impact))?;
+
+    // Link to project
+    create_link(
+        anchor_hash(&input.project_id)?,
+        hash.clone(),
+        LinkTypes::AssetToImpacts,
+        (),
+    )?;
+
+    // Queue for sync to Terra Atlas
+    queue_sync_to_terra_atlas(QueueSyncInput {
+        sync_type: SyncType::ImpactMetrics,
+        project_id: input.project_id.clone(),
+        payload: serde_json::json!({
+            "project_id": input.project_id,
+            "co2_avoided_tonnes": input.co2_avoided_tonnes,
+            "jobs_created": input.jobs_created,
+            "community_trust_delta": input.community_trust_delta,
+            "energy_access_households": input.energy_access_households,
+            "biodiversity_index_delta": input.biodiversity_index_delta,
+            "reporter_did": input.reporter_did,
+        }).to_string(),
+    })?;
+
+    // Broadcast
+    broadcast_energy_event(BroadcastEnergyEventInput {
+        event_type: EnergyEventType::ImpactReported,
+        project_id: input.project_id,
+        payload: serde_json::json!({
+            "co2_avoided_tonnes": input.co2_avoided_tonnes,
+            "jobs_created": input.jobs_created,
+            "community_trust_delta": input.community_trust_delta,
+            "reporter": input.reporter_did,
+        }).to_string(),
+    })?;
+
+    get(hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Impact record not found".into())))
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RecordImpactInput {
+    pub project_id: String,
+    pub reporter_did: String,
+    pub reporter_trust_score: f64,
+    pub period_start: Timestamp,
+    pub period_end: Timestamp,
+    pub co2_avoided_tonnes: f64,
+    pub jobs_created: u32,
+    pub community_trust_delta: f64,
+    pub energy_access_households: u32,
+    pub biodiversity_index_delta: f64,
+    pub verification_evidence: Option<String>,
+    pub verified_by: Option<String>,
+}
+
+/// Get impact history for a project
+#[hdk_extern]
+pub fn get_project_impact(project_id: String) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&project_id)?, LinkTypes::AssetToImpacts)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut impacts = Vec::new();
+    for link in links {
+        let hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link".into())))?;
+        if let Some(record) = get(hash, GetOptions::default())? {
+            impacts.push(record);
+        }
+    }
+
+    Ok(impacts)
+}
+
+/// Get full allocation summary for a project (consciousness + pledges + matches + impact)
+#[hdk_extern]
+pub fn get_allocation_summary(project_id: String) -> ExternResult<AllocationSummary> {
+    // Get latest consciousness score
+    let latest_consciousness = get_latest_project_consciousness(project_id.clone())?;
+    let (phi_score, harmony_alignment) = if let Some(ref record) = latest_consciousness {
+        if let Some(assessment) = record.entry().to_app_option::<ConsciousnessAssessment>()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Parse: {:?}", e))))?
+        {
+            (assessment.phi_score, assessment.harmony_alignment)
+        } else {
+            (0.0, 0.0)
+        }
+    } else {
+        (0.0, 0.0)
+    };
+
+    // Count pledges by status
+    let pledge_records = get_project_pledges(project_id.clone())?;
+    let mut total_pledged: u64 = 0;
+    let mut pending_pledges: u32 = 0;
+    let mut matched_pledges: u32 = 0;
+    for record in &pledge_records {
+        if let Some(pledge) = record.entry().to_app_option::<AllocationPledge>()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Parse: {:?}", e))))?
+        {
+            total_pledged += pledge.amount;
+            match pledge.status {
+                PledgeStatus::Pending => pending_pledges += 1,
+                PledgeStatus::Matched => matched_pledges += 1,
+                _ => {}
+            }
+        }
+    }
+
+    // Aggregate impact
+    let impact_records = get_project_impact(project_id.clone())?;
+    let mut total_co2_avoided: f64 = 0.0;
+    let mut total_jobs_created: u32 = 0;
+    let mut total_trust_delta: f64 = 0.0;
+    let mut total_households: u32 = 0;
+    for record in &impact_records {
+        if let Some(impact) = record.entry().to_app_option::<ImpactRecord>()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Parse: {:?}", e))))?
+        {
+            total_co2_avoided += impact.co2_avoided_tonnes;
+            total_jobs_created += impact.jobs_created;
+            total_trust_delta += impact.community_trust_delta;
+            total_households += impact.energy_access_households;
+        }
+    }
+
+    // Net Humanity Benefit composite
+    let net_humanity_benefit = (total_co2_avoided / 1000.0) * 0.3
+        + (total_jobs_created as f64 / 100.0) * 0.25
+        + total_trust_delta.clamp(-1.0, 1.0) * 0.25
+        + (total_households as f64 / 1000.0) * 0.2;
+
+    Ok(AllocationSummary {
+        project_id,
+        phi_score,
+        harmony_alignment,
+        total_pledged,
+        pending_pledges,
+        matched_pledges,
+        total_co2_avoided,
+        total_jobs_created,
+        total_trust_delta,
+        total_households,
+        net_humanity_benefit,
+        impact_report_count: impact_records.len() as u32,
+    })
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AllocationSummary {
+    pub project_id: String,
+    pub phi_score: f64,
+    pub harmony_alignment: f64,
+    pub total_pledged: u64,
+    pub pending_pledges: u32,
+    pub matched_pledges: u32,
+    pub total_co2_avoided: f64,
+    pub total_jobs_created: u32,
+    pub total_trust_delta: f64,
+    pub total_households: u32,
+    pub net_humanity_benefit: f64,
+    pub impact_report_count: u32,
+}
+
+// ============================================================================
+// Observability — Bridge Metrics Export
+// ============================================================================
+
+/// Return a JSON-encoded snapshot of this bridge's dispatch metrics.
+///
+/// See `mycelix_bridge_common::metrics::BridgeMetricsSnapshot` for the schema.
+#[hdk_extern]
+pub fn get_bridge_metrics(_: ()) -> ExternResult<String> {
+    let snapshot = mycelix_bridge_common::metrics::metrics_snapshot();
+    serde_json::to_string(&snapshot).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Failed to serialize metrics snapshot: {}",
+            e
+        )))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

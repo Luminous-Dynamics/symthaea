@@ -13,4 +13,5 @@ holochain_serialized_bytes = { workspace = true }
 hdk = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+mycelix-bridge-common = { workspace = true }
 energy_bridge_integrity = { path = "../integrity" }
