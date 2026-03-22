@@ -50,10 +50,7 @@ fn run_benchmark() {
     let mut task_results = Vec::new();
 
     for task in &tasks {
-        println!(
-            "━━━ Training {:?} ({} episodes) ━━━",
-            task, num_train_episodes
-        );
+        println!("━━━ Training {:?} ({} episodes) ━━━", task, num_train_episodes);
 
         let config = HumanoidConfig {
             num_episodes: num_train_episodes,
@@ -77,8 +74,11 @@ fn run_benchmark() {
             .into_iter()
             .rev()
             .collect();
-        let mean_train_reward: f64 =
-            last_10.iter().map(|m| m.avg_episode_reward).sum::<f64>() / last_10.len() as f64;
+        let mean_train_reward: f64 = last_10
+            .iter()
+            .map(|m| m.avg_episode_reward)
+            .sum::<f64>()
+            / last_10.len() as f64;
         println!("  Last-10 training mean return: {:.4}", mean_train_reward);
 
         // Evaluate last N episodes
@@ -103,10 +103,16 @@ fn run_benchmark() {
             .map(|m| m.avg_standing_reward)
             .sum::<f64>()
             / eval_metrics.len() as f64;
-        let mean_uprightness: f64 =
-            eval_metrics.iter().map(|m| m.avg_uprightness).sum::<f64>() / eval_metrics.len() as f64;
-        let mean_head_height: f64 =
-            eval_metrics.iter().map(|m| m.avg_head_height).sum::<f64>() / eval_metrics.len() as f64;
+        let mean_uprightness: f64 = eval_metrics
+            .iter()
+            .map(|m| m.avg_uprightness)
+            .sum::<f64>()
+            / eval_metrics.len() as f64;
+        let mean_head_height: f64 = eval_metrics
+            .iter()
+            .map(|m| m.avg_head_height)
+            .sum::<f64>()
+            / eval_metrics.len() as f64;
         let mean_speed: f64 = eval_metrics
             .iter()
             .map(|m| m.avg_horizontal_speed)
@@ -124,28 +130,13 @@ fn run_benchmark() {
             fell: any_fell,
             steps_to_fall: 1000,
             total_steps: 1000,
-            avg_foot_clearance: eval_metrics
-                .last()
-                .map(|m| m.avg_foot_clearance)
-                .unwrap_or(0.0),
-            min_foot_clearance: eval_metrics
-                .last()
-                .map(|m| m.min_foot_clearance)
-                .unwrap_or(0.0),
-            avg_stride_length: eval_metrics
-                .last()
-                .map(|m| m.avg_stride_length)
-                .unwrap_or(0.0),
+            avg_foot_clearance: eval_metrics.last().map(|m| m.avg_foot_clearance).unwrap_or(0.0),
+            min_foot_clearance: eval_metrics.last().map(|m| m.min_foot_clearance).unwrap_or(0.0),
+            avg_stride_length: eval_metrics.last().map(|m| m.avg_stride_length).unwrap_or(0.0),
             avg_cadence: eval_metrics.last().map(|m| m.avg_cadence).unwrap_or(0.0),
             gait_asymmetry: eval_metrics.last().map(|m| m.gait_asymmetry).unwrap_or(0.0),
-            step_regularity: eval_metrics
-                .last()
-                .map(|m| m.step_regularity)
-                .unwrap_or(0.0),
-            cost_of_transport: eval_metrics
-                .last()
-                .map(|m| m.cost_of_transport)
-                .unwrap_or(0.0),
+            step_regularity: eval_metrics.last().map(|m| m.step_regularity).unwrap_or(0.0),
+            cost_of_transport: eval_metrics.last().map(|m| m.cost_of_transport).unwrap_or(0.0),
         };
 
         println!("\n{}\n", format_comparison(&result, task));
@@ -179,18 +170,17 @@ fn run_benchmark() {
 
         // Use last episode as perturbation baseline
         if let Some(last) = metrics.last() {
-            let perturbation_result =
-                symthaea_humanoid::perturbations::PerturbationBenchmarkResult {
-                    pre_perturbation_reward: last.avg_episode_reward,
-                    min_reward: last.avg_episode_reward * 0.3, // estimated
-                    recovery_steps: 150,
-                    final_reward: last.avg_episode_reward * 0.8,
-                    min_tau: 0.5,
-                    fell: false,
-                    reward_trace: Vec::new(),
-                    free_energy_trace: Vec::new(),
-                    tau_trace: Vec::new(),
-                };
+            let perturbation_result = symthaea_humanoid::perturbations::PerturbationBenchmarkResult {
+                pre_perturbation_reward: last.avg_episode_reward,
+                min_reward: last.avg_episode_reward * 0.3, // estimated
+                recovery_steps: 150,
+                final_reward: last.avg_episode_reward * 0.8,
+                min_tau: 0.5,
+                fell: false,
+                reward_trace: Vec::new(),
+                free_energy_trace: Vec::new(),
+                tau_trace: Vec::new(),
+            };
 
             println!(
                 "  {:<15} | Pre: {:.3} | Min: {:.3} | Final: {:.3} | Recovery: {} steps | Fell: {}",

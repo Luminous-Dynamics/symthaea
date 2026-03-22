@@ -31,6 +31,14 @@ pub struct AppState {
     pub harmony_scores: RwSignal<[f32; 8]>,
     /// Dominant harmony name
     pub dominant_harmony: RwSignal<String>,
+    /// Personal trend: rolling consciousness history (last 100 values)
+    pub trend_consciousness: RwSignal<Vec<f32>>,
+    /// Personal trend: rolling harmony history (last 100 values)
+    pub trend_harmony: RwSignal<Vec<f32>>,
+    /// Current consciousness stability [0, 1]
+    pub trend_stability: RwSignal<f32>,
+    /// Active wellbeing profile name
+    pub wellbeing_profile: RwSignal<String>,
 }
 
 impl AppState {
@@ -56,6 +64,10 @@ impl AppState {
             fep_mode: RwSignal::new("exploring".to_string()),
             harmony_scores: RwSignal::new([0.5; 8]),
             dominant_harmony: RwSignal::new("Resonant Coherence".to_string()),
+            trend_consciousness: RwSignal::new(Vec::with_capacity(100)),
+            trend_harmony: RwSignal::new(Vec::with_capacity(100)),
+            trend_stability: RwSignal::new(0.0),
+            wellbeing_profile: RwSignal::new("Default".to_string()),
         }
     }
 }

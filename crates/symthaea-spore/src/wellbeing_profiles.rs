@@ -60,12 +60,18 @@ impl WellbeingProfile {
     pub fn description(&self) -> &'static str {
         match self {
             Self::Default => "Baseline consciousness dynamics with no modifications.",
-            Self::AdhdSupport => "Elevated novelty response and faster dynamics for focus support.",
+            Self::AdhdSupport => {
+                "Elevated novelty response and faster dynamics for focus support."
+            }
             Self::AnxietyBuffer => {
                 "Calming bias activated during high stress — warmth and serenity."
             }
-            Self::GriefMode => "Slower, gentler dynamics with emphasis on rest and memory.",
-            Self::SensoryGentle => "Dampened surprise and reduced alertness for sensory comfort.",
+            Self::GriefMode => {
+                "Slower, gentler dynamics with emphasis on rest and memory."
+            }
+            Self::SensoryGentle => {
+                "Dampened surprise and reduced alertness for sensory comfort."
+            }
             Self::FocusFlow => "Sustained attention support with moderate engagement boost.",
         }
     }
@@ -185,13 +191,13 @@ impl WellbeingConfig {
             WellbeingProfile::AdhdSupport => Self {
                 profile,
                 neuromod_bias: NeuromodBias {
-                    dopamine: 0.10,       // Elevated novelty/reward baseline
-                    norepinephrine: 0.03, // Slight alertness boost
+                    dopamine: 0.10,        // Elevated novelty/reward baseline
+                    norepinephrine: 0.03,  // Slight alertness boost
                     serotonin: 0.0,
                     oxytocin: 0.0,
                 },
                 temporal: TemporalAdjustment {
-                    tau_multiplier: 0.85, // Faster temporal dynamics (shorter attention window)
+                    tau_multiplier: 0.85,  // Faster temporal dynamics (shorter attention window)
                     surprise_dampening: 0.0,
                     stillness_weight_boost: 0.0,
                     dream_replay_multiplier: 1.0,
@@ -209,13 +215,13 @@ impl WellbeingConfig {
                     oxytocin: 0.05,        // Warmth/safety
                 },
                 temporal: TemporalAdjustment {
-                    tau_multiplier: 1.15,    // Slightly slower (more deliberate)
+                    tau_multiplier: 1.15,  // Slightly slower (more deliberate)
                     surprise_dampening: 0.3, // Reduce surprise spikes
                     stillness_weight_boost: 0.05,
                     dream_replay_multiplier: 1.0,
                 },
-                conditional_activation: true, // Only activates when stressed
-                activation_threshold: 0.7,    // Allostatic load > 0.7 triggers
+                conditional_activation: true,  // Only activates when stressed
+                activation_threshold: 0.7,     // Allostatic load > 0.7 triggers
             },
 
             WellbeingProfile::GriefMode => Self {
@@ -227,7 +233,7 @@ impl WellbeingConfig {
                     oxytocin: 0.08,        // Warmth and comfort
                 },
                 temporal: TemporalAdjustment {
-                    tau_multiplier: 1.5, // Slower temporal flow (spacious time)
+                    tau_multiplier: 1.5,   // Slower temporal flow (spacious time)
                     surprise_dampening: 0.2,
                     stillness_weight_boost: 0.10, // Sacred Stillness emphasis
                     dream_replay_multiplier: 1.5, // More dream consolidation (memory processing)
@@ -257,13 +263,13 @@ impl WellbeingConfig {
             WellbeingProfile::FocusFlow => Self {
                 profile,
                 neuromod_bias: NeuromodBias {
-                    dopamine: 0.05,       // Moderate engagement boost
-                    norepinephrine: 0.02, // Mild alertness
-                    serotonin: 0.02,      // Mood stability
+                    dopamine: 0.05,        // Moderate engagement boost
+                    norepinephrine: 0.02,  // Mild alertness
+                    serotonin: 0.02,       // Mood stability
                     oxytocin: 0.0,
                 },
                 temporal: TemporalAdjustment {
-                    tau_multiplier: 0.95,    // Slightly faster
+                    tau_multiplier: 0.95,  // Slightly faster
                     surprise_dampening: 0.1, // Mild dampening (reduce distractions)
                     stillness_weight_boost: 0.0,
                     dream_replay_multiplier: 1.0,

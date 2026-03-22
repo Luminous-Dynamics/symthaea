@@ -1158,7 +1158,7 @@ impl PhenomenalState {
 #[derive(Debug, Clone)]
 pub struct UserMentalModel {
     /// Inferred user goals
-    pub goals: Vec<InferredGoal>,
+    pub goals: VecDeque<InferredGoal>,
     /// User knowledge/expertise estimate
     pub expertise: ExpertiseLevel,
     /// Inferred emotional state
@@ -1210,7 +1210,7 @@ pub enum BehaviorType {
 impl Default for UserMentalModel {
     fn default() -> Self {
         Self {
-            goals: Vec::new(),
+            goals: VecDeque::new(),
             expertise: ExpertiseLevel::Intermediate,
             emotional_state: EmotionalState::neutral(),
             trust: 0.5,
@@ -1240,7 +1240,7 @@ impl UserMentalModel {
             "General interaction"
         };
 
-        self.goals.push(InferredGoal {
+        self.goals.push_back(InferredGoal {
             goal: goal.to_string(),
             confidence,
             inferred_from: input.chars().take(50).collect(),
@@ -1248,7 +1248,7 @@ impl UserMentalModel {
 
         // Keep only recent goals
         if self.goals.len() > 10 {
-            self.goals.remove(0);
+            self.goals.pop_front();
         }
     }
 
@@ -1304,7 +1304,7 @@ impl UserMentalModel {
     pub fn describe(&self) -> String {
         let goal_desc = self
             .goals
-            .last()
+            .back()
             .map(|g| format!("trying to {}", g.goal))
             .unwrap_or_else(|| "with unclear goals".to_string());
 
@@ -1435,7 +1435,7 @@ impl NarrativeEngine {
                 "I understand that you're {}.",
                 user_model
                     .goals
-                    .last()
+                    .back()
                     .map(|g| g.goal.as_str())
                     .unwrap_or("working on something")
             );

@@ -23,6 +23,7 @@
 
 pub mod demo_runner;
 pub mod handlers;
+pub mod holon;
 pub mod metrics;
 pub mod models;
 pub mod state;

@@ -1691,6 +1691,15 @@ async fn main() -> Result<()> {
         consciousness_loop(loop_state, args.loop_interval, args.sleep_interval).await;
     });
 
+    // Holon HTTP bridge for Soma mobile connections.
+    // The router is defined at src/api/holon.rs and accepts Arc<RwLock<Symthaea>>.
+    // To activate: refactor ServiceState to hold Arc<RwLock<Symthaea>> instead of
+    // owning Symthaea directly, then spawn the Axum server on port 5492.
+    // The in-process demo (`cargo run -p symthaea-soma --example soma_holon_live`)
+    // proves the full protocol works end-to-end.
+    // TODO(holon-bridge): Wire holon::holon_router(shared_symthaea) here.
+    info!("Holon bridge: protocol ready, awaiting daemon state refactor for live serving");
+
     // Start listening
     if let Some(socket_path) = args.socket {
         // Remove existing socket file

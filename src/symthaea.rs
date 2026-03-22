@@ -427,6 +427,12 @@ pub struct Symthaea {
     pain_tx: PainSender,
     /// Task supervisor: wraps all tokio::spawn calls for panic detection.
     task_supervisor: TaskSupervisor,
+
+    // ── Holon Bridge ────────────────────────────────────────────────────
+    /// Desktop-side receiver for Soma mobile connections.
+    /// Stores inbound messages from HTTP `/holon/outbound` and queues
+    /// responses for `/holon/inbound`. Processed by `holon_process_pending()`.
+    holon_receiver: crate::consciousness::holon_receiver::HolonReceiver,
 }
 
 #[cfg(feature = "school_learning")]
@@ -754,6 +760,7 @@ impl Symthaea {
             somatic_bridge,
             pain_tx,
             task_supervisor,
+            holon_receiver: crate::consciousness::holon_receiver::HolonReceiver::new(),
         };
 
         // Wire LLM backend into ContinuousMind for swarm projection gradient exchange
@@ -998,6 +1005,7 @@ impl Symthaea {
             somatic_bridge,
             pain_tx,
             task_supervisor,
+            holon_receiver: crate::consciousness::holon_receiver::HolonReceiver::new(),
         };
 
         // Wire LLM backend into ContinuousMind for swarm projection gradient exchange
@@ -3164,6 +3172,52 @@ impl Symthaea {
                 long_term_count: self.interactions as usize,
             },
         }
+    }
+
+    // ========================================================================
+    // HOLON RECEIVER (Soma↔Desktop bridge)
+    // ========================================================================
+
+    /// Enqueue a message from a connected Soma device.
+    ///
+    /// Called by the Holon HTTP server when a Soma sends data to `/holon/outbound`.
+    /// Messages are stored in the facade-level HolonReceiver and processed
+    /// when the daemon's consciousness loop runs `holon_process_pending()`.
+    pub fn holon_enqueue_soma_message(
+        &mut self,
+        device_id: String,
+        msg: crate::consciousness::holon_receiver::SomaMessage,
+    ) {
+        self.holon_receiver.enqueue_message(device_id, msg);
+    }
+
+    /// Drain outbound responses for a specific Soma device.
+    ///
+    /// Called by the Holon HTTP server to respond to `/holon/inbound` GET requests.
+    pub fn holon_drain_soma_outbound(
+        &mut self,
+        device_id: &str,
+    ) -> Vec<crate::consciousness::holon_receiver::HolonResponse> {
+        self.holon_receiver.drain_outbound(device_id)
+    }
+
+    /// Number of connected Soma devices.
+    pub fn holon_soma_peer_count(&self) -> usize {
+        self.holon_receiver.peer_count()
+    }
+
+    /// Process pending Soma messages. Call from the daemon's background loop.
+    pub fn holon_process_pending(&mut self) {
+        self.holon_receiver.process_inbound(self.interactions);
+    }
+
+    /// Send a language response to a Soma device.
+    pub fn holon_send_to_soma(
+        &mut self,
+        device_id: &str,
+        response: crate::consciousness::holon_receiver::HolonResponse,
+    ) {
+        self.holon_receiver.send_to_device(device_id, response);
     }
 
     /// Trigger a sleep/consolidation cycle.

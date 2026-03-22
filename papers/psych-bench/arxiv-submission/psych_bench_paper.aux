@@ -42,16 +42,17 @@
 \@writefile{toc}{\contentsline {section}{\numberline {3}Architecture}{5}{section.3}\protected@file@percent }
 \newlabel{sec:architecture}{{3}{5}{Architecture}{section.3}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Benchmark Trait and Configuration}{5}{subsection.3.1}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Three-layer architecture of \textsc  {Psych-Bench}{}. Benchmarks define experimental paradigms with HDC-encoded stimuli. The harness provides psychometric infrastructure (reliability, SAT curves, normative comparison, neuromodulator profiles). The reporting layer generates self-contained analysis outputs. Arrows indicate data flow from the agent under test upward through encoding, evaluation, and reporting.}}{6}{figure.caption.11}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Three-layer architecture of \textsc  {Psych-Bench}{}. Benchmarks define experimental paradigms with HDC-encoded stimuli. The harness provides psychometric infrastructure (reliability, SAT curves, normative comparison, neuromodulator profiles). The reporting layer generates self-contained analysis outputs.}}{6}{figure.caption.11}\protected@file@percent }
 \providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
-\newlabel{fig:architecture}{{1}{6}{Three-layer architecture of \psychbench {}. Benchmarks define experimental paradigms with HDC-encoded stimuli. The harness provides psychometric infrastructure (reliability, SAT curves, normative comparison, neuromodulator profiles). The reporting layer generates self-contained analysis outputs. Arrows indicate data flow from the agent under test upward through encoding, evaluation, and reporting}{figure.caption.11}{}}
+\newlabel{fig:architecture}{{1}{6}{Three-layer architecture of \psychbench {}. Benchmarks define experimental paradigms with HDC-encoded stimuli. The harness provides psychometric infrastructure (reliability, SAT curves, normative comparison, neuromodulator profiles). The reporting layer generates self-contained analysis outputs}{figure.caption.11}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Holographic Stimulus Encoding}{6}{subsection.3.2}\protected@file@percent }
 \citation{levitt1971transformed}
 \citation{shrout1979intraclass}
 \citation{cicchetti1994guidelines}
 \citation{wickelgren1977speed}
-\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces HDC stimulus encoding pipeline. Raw stimuli are converted to continuous hypervectors via five adapter types using binding ($\otimes $), bundling ($\oplus $), and permutation ($P$) operations. All modalities share a common $\mathbb  {R}^D$ space where cosine similarity enables cross-modal comparison. Decisions use prototype matching via $\arg \max $ similarity.}}{7}{figure.caption.12}\protected@file@percent }
-\newlabel{fig:encoding}{{2}{7}{HDC stimulus encoding pipeline. Raw stimuli are converted to continuous hypervectors via five adapter types using binding ($\bind $), bundling ($\bundle $), and permutation ($P$) operations. All modalities share a common $\mathbb {R}^D$ space where cosine similarity enables cross-modal comparison. Decisions use prototype matching via $\arg \max $ similarity}{figure.caption.12}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Holographic Stimulus Encoding}{7}{subsection.3.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces HDC stimulus encoding pipeline. Raw stimuli are converted to continuous hypervectors via five adapter types using binding ($\otimes $), bundling ($\oplus $), and permutation ($P$). All modalities share a common $\mathbb  {R}^D$ space where cosine similarity enables cross-modal comparison. Decisions use prototype matching via $\arg \max $ similarity.}}{7}{figure.caption.12}\protected@file@percent }
+\newlabel{fig:encoding}{{2}{7}{HDC stimulus encoding pipeline. Raw stimuli are converted to continuous hypervectors via five adapter types using binding ($\bind $), bundling ($\bundle $), and permutation ($P$). All modalities share a common $\mathbb {R}^D$ space where cosine similarity enables cross-modal comparison. Decisions use prototype matching via $\arg \max $ similarity}{figure.caption.12}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Harness Infrastructure}{7}{subsection.3.3}\protected@file@percent }
 \citation{stroop1935interference,macleod1991half}
 \citation{eriksen1974effects}
 \citation{berg1948simple}
@@ -59,27 +60,27 @@
 \citation{raven1938progressive}
 \citation{shallice1982specific}
 \citation{pashler1994dual}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Harness Infrastructure}{8}{subsection.3.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Normative Comparison}{8}{subsection.3.4}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {4}Benchmark Inventory}{8}{section.4}\protected@file@percent }
 \newlabel{sec:inventory}{{4}{8}{Benchmark Inventory}{section.4}{}}
+\@writefile{toc}{\contentsline {paragraph}{Executive Function (7 benchmarks).}{8}{section*.14}\protected@file@percent }
 \citation{jaeggi2010relationship,owen2005nback}
 \citation{luck1997capacity,cowan2001magical}
 \citation{murdock1962serial}
 \citation{oberauer2003selective}
 \citation{wechsler2008wais}
 \citation{robertson1997sustained}
-\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Benchmark count by domain across all 28 domain categories (27 domains plus Neuromod sub-battery). The neuromodulator evaluation framework (17 benchmarks) is the largest single domain, reflecting its novel contribution. Reasoning (11), Mathematics (10), CogBench (8), InstitutionalReasoning (7), and Social (7) provide additional depth. Eight domains map to the cognitive profile radar chart; the remainder are specialized sub-batteries including Clinical, Security (FHE), Speech, Binding, Substrate, Spatial, CausalReasoning, Consciousness, and WorM domains.}}{9}{figure.caption.13}\protected@file@percent }
-\newlabel{fig:domain_matrix}{{3}{9}{Benchmark count by domain across all 28 domain categories (27 domains plus Neuromod sub-battery). The neuromodulator evaluation framework (17 benchmarks) is the largest single domain, reflecting its novel contribution. Reasoning (11), Mathematics (10), CogBench (8), InstitutionalReasoning (7), and Social (7) provide additional depth. Eight domains map to the cognitive profile radar chart; the remainder are specialized sub-batteries including Clinical, Security (FHE), Speech, Binding, Substrate, Spatial, CausalReasoning, Consciousness, and WorM domains}{figure.caption.13}{}}
-\@writefile{toc}{\contentsline {paragraph}{Executive Function (7 benchmarks).}{9}{section*.14}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Working Memory (6 benchmarks).}{9}{section*.15}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Memory Agent (5 benchmarks).}{9}{section*.16}\protected@file@percent }
 \citation{baroncohen2001eyes}
 \citation{guth1982experimental}
 \citation{baroncohen1985mindblindness}
 \citation{stone1998faux}
 \citation{happe1994advanced}
 \citation{corcoran1995schizophrenia}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Benchmark count by domain across all 28 domain categories (27 domains plus Neuromod sub-battery). The neuromodulator evaluation framework (17 benchmarks) is the largest single domain, reflecting its novel contribution. Reasoning (11), Mathematics (10), CogBench (8), InstitutionalReasoning (7), and Social (7) provide additional depth. Eight domains map to the cognitive profile radar chart; the remainder are specialized sub-batteries including Clinical, Security (FHE), Speech, Binding, Substrate, Spatial, CausalReasoning, Consciousness, and WorM domains.}}{9}{figure.caption.13}\protected@file@percent }
+\newlabel{fig:domain_matrix}{{3}{9}{Benchmark count by domain across all 28 domain categories (27 domains plus Neuromod sub-battery). The neuromodulator evaluation framework (17 benchmarks) is the largest single domain, reflecting its novel contribution. Reasoning (11), Mathematics (10), CogBench (8), InstitutionalReasoning (7), and Social (7) provide additional depth. Eight domains map to the cognitive profile radar chart; the remainder are specialized sub-batteries including Clinical, Security (FHE), Speech, Binding, Substrate, Spatial, CausalReasoning, Consciousness, and WorM domains}{figure.caption.13}{}}
+\@writefile{toc}{\contentsline {paragraph}{Working Memory (6 benchmarks).}{9}{section*.15}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Memory Agent (5 benchmarks).}{9}{section*.16}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Attention (3 benchmarks) and Sustained Attention (3 benchmarks).}{9}{section*.17}\protected@file@percent }
 \citation{nissen1987attentional}
 \citation{fitts1954information}
 \citation{ferreira2002good}
@@ -90,21 +91,20 @@
 \citation{kirby1999heroin}
 \citation{lejuez2002evaluation}
 \citation{cools2002reversal}
-\@writefile{toc}{\contentsline {paragraph}{Attention (3 benchmarks) and Sustained Attention (3 benchmarks).}{10}{section*.17}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Social Cognition (7 benchmarks) and Theory of Mind (5 benchmarks).}{10}{section*.18}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Motor Learning (4 benchmarks).}{10}{section*.19}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Language (4 benchmarks).}{10}{section*.20}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Metacognition (3 benchmarks).}{10}{section*.21}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Reasoning (11 benchmarks).}{10}{section*.22}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{CogBench (8 benchmarks).}{10}{section*.23}\protected@file@percent }
 \citation{bower1981mood}
 \citation{williams1996emotional}
 \citation{mednick1962associative}
 \citation{guilford1967nature}
 \citation{fauconnier2002way}
 \citation{logan1984ability}
+\@writefile{toc}{\contentsline {paragraph}{Social Cognition (7 benchmarks) and Theory of Mind (5 benchmarks).}{10}{section*.18}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Motor Learning (4 benchmarks).}{10}{section*.19}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Language (4 benchmarks).}{10}{section*.20}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Metacognition (3 benchmarks).}{10}{section*.21}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Reasoning (11 benchmarks).}{10}{section*.22}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{CogBench (8 benchmarks).}{10}{section*.23}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Affect (3), Creativity (4), Inhibition (3).}{10}{section*.24}\protected@file@percent }
 \citation{butlin2023consciousness}
-\@writefile{toc}{\contentsline {paragraph}{Affect (3), Creativity (4), Inhibition (3).}{11}{section*.24}\protected@file@percent }
 \@writefile{toc}{\contentsline {paragraph}{Consciousness (3 benchmarks) and Consciousness Indicators (1 benchmark).}{11}{section*.25}\protected@file@percent }
 \@writefile{toc}{\contentsline {paragraph}{Spatial Cognition (4 benchmarks).}{11}{section*.26}\protected@file@percent }
 \@writefile{toc}{\contentsline {paragraph}{Causal Reasoning (3 benchmarks).}{11}{section*.27}\protected@file@percent }
@@ -112,6 +112,7 @@
 \@writefile{toc}{\contentsline {paragraph}{Substrate Independence (3 benchmarks).}{11}{section*.29}\protected@file@percent }
 \@writefile{toc}{\contentsline {paragraph}{Clinical Psychology (6 benchmarks).}{11}{section*.30}\protected@file@percent }
 \@writefile{toc}{\contentsline {paragraph}{Institutional Reasoning (7 benchmarks).}{11}{section*.31}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Mathematics (10 benchmarks).}{11}{section*.32}\protected@file@percent }
 \citation{doya2002metalearning}
 \citation{schultz1997dopamine}
 \citation{yerkes1908relation}
@@ -132,7 +133,6 @@
 \citation{schultz1997dopamine}
 \citation{yerkes1908relation}
 \citation{posner1990attention}
-\@writefile{toc}{\contentsline {paragraph}{Mathematics (10 benchmarks).}{12}{section*.32}\protected@file@percent }
 \@writefile{toc}{\contentsline {paragraph}{Security (6 benchmarks).}{12}{section*.33}\protected@file@percent }
 \@writefile{toc}{\contentsline {paragraph}{Neuromodulator Evaluation (17 benchmarks).}{12}{section*.34}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {5}Neuromodulator Evaluation Framework}{12}{section.5}\protected@file@percent }
@@ -141,22 +141,22 @@
 \@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Complete benchmark inventory (representative selection). Each entry lists the domain, benchmark name, source paradigm, primary metric, and human baseline where available. Full inventory with all 141 benchmarks available in the software documentation.}}{13}{table.caption.35}\protected@file@percent }
 \newlabel{tab:inventory}{{1}{13}{Complete benchmark inventory (representative selection). Each entry lists the domain, benchmark name, source paradigm, primary metric, and human baseline where available. Full inventory with all 141 benchmarks available in the software documentation}{table.caption.35}{}}
 \citation{dayan2009serotonin}
+\citation{clark1937log}
 \@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Neuromodulator benchmark summary. Each benchmark targets specific transmitter systems and implements established neuroscience paradigms. DA = dopamine, NE = noradrenaline, 5-HT = serotonin, ACh = acetylcholine, GABA = $\gamma $-aminobutyric acid, OT = oxytocin.}}{14}{table.caption.36}\protected@file@percent }
 \newlabel{tab:neuromod}{{2}{14}{Neuromodulator benchmark summary. Each benchmark targets specific transmitter systems and implements established neuroscience paradigms. DA = dopamine, NE = noradrenaline, 5-HT = serotonin, ACh = acetylcholine, GABA = $\gamma $-aminobutyric acid, OT = oxytocin}{table.caption.36}{}}
-\citation{clark1937log}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Pharmacological Manipulation}{14}{subsection.5.2}\protected@file@percent }
 \citation{arnsten2011catecholamine}
 \citation{koob2001drug}
 \citation{stahl2013essential}
 \citation{doya2002metalearning}
 \citation{schultz1997dopamine}
 \citation{arnsten2011catecholamine}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Pharmacological Manipulation}{15}{subsection.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Neuromodulator Profile System}{15}{subsection.5.3}\protected@file@percent }
+\citation{feldman2012oxytocin}
 \@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Neuromodulator evaluation patterns from \texttt  {neuromod\_curves.csv}. (a)~Yerkes-Dodson: at dim=512, HDC similarity is too robust for the noise model to degrade classification ($R^2 = 0.00$); dashed curve shows predicted inverted-U. (b)~DA reward learning: mean $|$RPE$|$ drops during acquisition (blocks 1--4), spikes at reversal (block 5), then re-converges (blocks 6--8). (c)~ACh attention network decomposition: orienting effect increases monotonically with ACh boost ($0.00 \to -2.63$); conflict effect ($\sim 5.8$) dominates. (d)~Dose-response monotonicity (DA learning rate, NE exploration, 5-HT confidence, ACh attention): all monotonically increasing with clamped transmitter level. Data generated from \texttt  {psych\_bench\_paper\_data} example.}}{16}{figure.caption.37}\protected@file@percent }
 \newlabel{fig:neuromod}{{4}{16}{Neuromodulator evaluation patterns from \texttt {neuromod\_curves.csv}. (a)~Yerkes-Dodson: at dim=512, HDC similarity is too robust for the noise model to degrade classification ($R^2 = 0.00$); dashed curve shows predicted inverted-U. (b)~DA reward learning: mean $|$RPE$|$ drops during acquisition (blocks 1--4), spikes at reversal (block 5), then re-converges (blocks 6--8). (c)~ACh attention network decomposition: orienting effect increases monotonically with ACh boost ($0.00 \to -2.63$); conflict effect ($\sim 5.8$) dominates. (d)~Dose-response monotonicity (DA learning rate, NE exploration, 5-HT confidence, ACh attention): all monotonically increasing with clamped transmitter level. Data generated from \texttt {psych\_bench\_paper\_data} example}{figure.caption.37}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Neuromodulator Profile System}{16}{subsection.5.3}\protected@file@percent }
-\citation{feldman2012oxytocin}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}Consciousness and Moral Modulation}{16}{subsection.5.4}\protected@file@percent }
 \citation{shrout1979intraclass}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}Consciousness and Moral Modulation}{17}{subsection.5.4}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {6}Psychometric Validation}{17}{section.6}\protected@file@percent }
 \newlabel{sec:psychometrics}{{6}{17}{Psychometric Validation}{section.6}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {6.1}Test-Retest Reliability}{17}{subsection.6.1}\protected@file@percent }
@@ -171,27 +171,27 @@
 \newlabel{tab:correlations}{{4}{19}{Cross-domain correlation matrix for 10 theoretically motivated benchmark pairs ($n = 10$ seeds per pair). Positive correlations indicate shared cognitive mechanisms; near-zero correlations indicate domain independence. Generated from \texttt {correlations.csv}}{table.caption.39}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Construct Validity}{19}{subsection.6.2}\protected@file@percent }
 \citation{wickelgren1977speed}
-\citation{levitt1971transformed}
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Speed-accuracy tradeoff curves for four representative benchmarks spanning executive function, attention, and reasoning. All four show accuracy decreasing monotonically with increasing time pressure (criterion 1): Stroop (0.85$\to $0.64, $\Delta = 0.21$), Visual Search (0.85$\to $0.74, $\Delta = 0.11$), Flanker (0.96$\to $0.88, $\Delta = 0.08$), and ARC~Fluid (0.54$\to $0.49, $\Delta = 0.05$). Of these, only ARC~Fluid also shows RT decrease with time pressure and good exponential fit ($R^2 = 0.79$), meeting all three human-likeness criteria. N-back and WCST produce flat accuracy curves (ceiling/floor effects) but their RTs do decrease with time pressure. Data loaded from per-benchmark SAT CSVs.}}{20}{figure.caption.40}\protected@file@percent }
+\newlabel{fig:sat}{{5}{20}{Speed-accuracy tradeoff curves for four representative benchmarks spanning executive function, attention, and reasoning. All four show accuracy decreasing monotonically with increasing time pressure (criterion 1): Stroop (0.85$\to $0.64, $\Delta = 0.21$), Visual Search (0.85$\to $0.74, $\Delta = 0.11$), Flanker (0.96$\to $0.88, $\Delta = 0.08$), and ARC~Fluid (0.54$\to $0.49, $\Delta = 0.05$). Of these, only ARC~Fluid also shows RT decrease with time pressure and good exponential fit ($R^2 = 0.79$), meeting all three human-likeness criteria. N-back and WCST produce flat accuracy curves (ceiling/floor effects) but their RTs do decrease with time pressure. Data loaded from per-benchmark SAT CSVs}{figure.caption.40}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {6.3}Speed-Accuracy Tradeoff Curves}{20}{subsection.6.3}\protected@file@percent }
 \newlabel{eq:sat}{{2}{20}{Speed-Accuracy Tradeoff Curves}{equation.2}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.4}Adaptive Staircase Procedures}{20}{subsection.6.4}\protected@file@percent }
+\citation{levitt1971transformed}
 \citation{butlin2023consciousness}
 \citation{baars1988cognitive}
 \citation{tononi2004information,oizumi2014phenomenology}
-\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Speed-accuracy tradeoff curves for four representative benchmarks spanning executive function, attention, and reasoning. All four show accuracy decreasing monotonically with increasing time pressure (criterion 1): Stroop (0.85$\to $0.64, $\Delta = 0.21$), Visual Search (0.85$\to $0.74, $\Delta = 0.11$), Flanker (0.96$\to $0.88, $\Delta = 0.08$), and ARC~Fluid (0.54$\to $0.49, $\Delta = 0.05$). Of these, only ARC~Fluid also shows RT decrease with time pressure and good exponential fit ($R^2 = 0.79$), meeting all three human-likeness criteria. N-back and WCST produce flat accuracy curves (ceiling/floor effects) but their RTs do decrease with time pressure. Data loaded from per-benchmark SAT CSVs.}}{21}{figure.caption.40}\protected@file@percent }
-\newlabel{fig:sat}{{5}{21}{Speed-accuracy tradeoff curves for four representative benchmarks spanning executive function, attention, and reasoning. All four show accuracy decreasing monotonically with increasing time pressure (criterion 1): Stroop (0.85$\to $0.64, $\Delta = 0.21$), Visual Search (0.85$\to $0.74, $\Delta = 0.11$), Flanker (0.96$\to $0.88, $\Delta = 0.08$), and ARC~Fluid (0.54$\to $0.49, $\Delta = 0.05$). Of these, only ARC~Fluid also shows RT decrease with time pressure and good exponential fit ($R^2 = 0.79$), meeting all three human-likeness criteria. N-back and WCST produce flat accuracy curves (ceiling/floor effects) but their RTs do decrease with time pressure. Data loaded from per-benchmark SAT CSVs}{figure.caption.40}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.4}Adaptive Staircase Procedures}{21}{subsection.6.4}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {7}Consciousness Indicators}{21}{section.7}\protected@file@percent }
 \newlabel{sec:consciousness}{{7}{21}{Consciousness Indicators}{section.7}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Complete 27-domain cognitive signature of the \textsc  {Symthaea}{} \textsc  {HLB}{}. Background shading indicates Average (green, $|z| \leq 1$), Above Average (yellow, $1 < z \leq 2$), and Exceptional (red, $z > 2$) bands. All 27 domains exceed the human mean ($z = 0$). The profile reveals architectural strengths in sustained attention, motor, and speech, with average executive function and affect.}}{22}{figure.caption.41}\protected@file@percent }
+\newlabel{fig:signature}{{6}{22}{Complete 27-domain cognitive signature of the \symthaea {} \hlb {}. Background shading indicates Average (green, $|z| \leq 1$), Above Average (yellow, $1 < z \leq 2$), and Exceptional (red, $z > 2$) bands. All 27 domains exceed the human mean ($z = 0$). The profile reveals architectural strengths in sustained attention, motor, and speech, with average executive function and affect}{figure.caption.41}{}}
 \@writefile{toc}{\contentsline {section}{\numberline {8}Demonstration}{22}{section.8}\protected@file@percent }
 \newlabel{sec:demonstration}{{8}{22}{Demonstration}{section.8}{}}
-\@writefile{toc}{\contentsline {paragraph}{Cognitive Profile.}{22}{section*.43}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Eight-domain cognitive profile of the \textsc  {Symthaea}{} Holographic Liquid Brain, generated from benchmark data. The green band represents the human average range (normalized 0.4--0.6). Domain scores loaded from \texttt  {cognitive\_profile.csv}.}}{23}{figure.caption.42}\protected@file@percent }
+\newlabel{fig:radar}{{7}{23}{Eight-domain cognitive profile of the \symthaea {} Holographic Liquid Brain, generated from benchmark data. The green band represents the human average range (normalized 0.4--0.6). Domain scores loaded from \texttt {cognitive\_profile.csv}}{figure.caption.42}{}}
+\@writefile{toc}{\contentsline {paragraph}{Cognitive Profile.}{23}{section*.43}\protected@file@percent }
 \citation{cicchetti1994guidelines}
 \citation{cicchetti1994guidelines}
-\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Complete 27-domain cognitive signature of the \textsc  {Symthaea}{} \textsc  {HLB}{}. Background shading indicates Average (green, $|z| \leq 1$), Above Average (yellow, $1 < z \leq 2$), and Exceptional (red, $z > 2$) bands. All 27 domains exceed the human mean ($z = 0$). The profile reveals architectural strengths in sustained attention, motor, and speech, with average executive function and affect.}}{23}{figure.caption.41}\protected@file@percent }
-\newlabel{fig:signature}{{6}{23}{Complete 27-domain cognitive signature of the \symthaea {} \hlb {}. Background shading indicates Average (green, $|z| \leq 1$), Above Average (yellow, $1 < z \leq 2$), and Exceptional (red, $z > 2$) bands. All 27 domains exceed the human mean ($z = 0$). The profile reveals architectural strengths in sustained attention, motor, and speech, with average executive function and affect}{figure.caption.41}{}}
-\@writefile{toc}{\contentsline {paragraph}{Normative Standing.}{23}{section*.44}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Eight-domain cognitive profile of the \textsc  {Symthaea}{} Holographic Liquid Brain, generated from benchmark data. The green band represents the human average range (normalized 0.4--0.6). Domain scores loaded from \texttt  {cognitive\_profile.csv}.}}{24}{figure.caption.42}\protected@file@percent }
-\newlabel{fig:radar}{{7}{24}{Eight-domain cognitive profile of the \symthaea {} Holographic Liquid Brain, generated from benchmark data. The green band represents the human average range (normalized 0.4--0.6). Domain scores loaded from \texttt {cognitive\_profile.csv}}{figure.caption.42}{}}
+\@writefile{toc}{\contentsline {paragraph}{Normative Standing.}{24}{section*.44}\protected@file@percent }
 \@writefile{toc}{\contentsline {paragraph}{Ablation Analysis.}{24}{section*.46}\protected@file@percent }
 \@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Forest plot of normative z-scores for 84 benchmarks with matched human baselines (z-scores clamped to $\pm 3$ for readability). Background shading indicates clinical interpretation bands \citep  {cicchetti1994guidelines}. Band counts: 46 Average ($|z| \leq 1$), 16 Above Average, 4 Below Average, 18 Superior ($z > 2$), 0 Impaired ($z < -2$). Data loaded from \texttt  {normative\_zscores.csv}.}}{25}{figure.caption.45}\protected@file@percent }
 \newlabel{fig:forest}{{8}{25}{Forest plot of normative z-scores for 84 benchmarks with matched human baselines (z-scores clamped to $\pm 3$ for readability). Background shading indicates clinical interpretation bands \citep {cicchetti1994guidelines}. Band counts: 46 Average ($|z| \leq 1$), 16 Above Average, 4 Below Average, 18 Superior ($z > 2$), 0 Impaired ($z < -2$). Data loaded from \texttt {normative\_zscores.csv}}{figure.caption.45}{}}
@@ -202,6 +202,7 @@
 \newlabel{sec:usage}{{9}{27}{Usage and API}{section.9}{}}
 \@writefile{toc}{\contentsline {paragraph}{Single benchmark evaluation.}{27}{section*.49}\protected@file@percent }
 \@writefile{toc}{\contentsline {paragraph}{Full battery with cognitive profile.}{27}{section*.50}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{HTML report generation.}{27}{section*.51}\protected@file@percent }
 \citation{codaforno2024cogbench}
 \citation{chollet2019measure}
 \citation{liang2023holistic}
@@ -212,24 +213,23 @@
 \citation{liang2023holistic}
 \citation{srivastava2023beyond}
 \citation{chollet2019measure}
-\@writefile{toc}{\contentsline {paragraph}{HTML report generation.}{28}{section*.51}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Comparison of \textsc  {Psych-Bench}{} with existing AI benchmark suites. Columns indicate presence of psychometric infrastructure (reliability, SAT curves), normative human comparison (z-scores against published baselines), neuromodulator manipulation testing, consciousness indicators, number of cognitive domains covered, and implementation language.}}{28}{table.caption.53}\protected@file@percent }
+\newlabel{tab:comparison}{{5}{28}{Comparison of \psychbench {} with existing AI benchmark suites. Columns indicate presence of psychometric infrastructure (reliability, SAT curves), normative human comparison (z-scores against published baselines), neuromodulator manipulation testing, consciousness indicators, number of cognitive domains covered, and implementation language}{table.caption.53}{}}
 \@writefile{toc}{\contentsline {paragraph}{Neuromodulator sweep.}{28}{section*.52}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {10}Discussion}{28}{section.10}\protected@file@percent }
 \newlabel{sec:discussion}{{10}{28}{Discussion}{section.10}{}}
-\@writefile{toc}{\contentsline {paragraph}{Relationship to existing work.}{28}{section*.54}\protected@file@percent }
 \citation{wichmann2001psychometric}
 \citation{cronbach1970essentials}
-\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Comparison of \textsc  {Psych-Bench}{} with existing AI benchmark suites. Columns indicate presence of psychometric infrastructure (reliability, SAT curves), normative human comparison (z-scores against published baselines), neuromodulator manipulation testing, consciousness indicators, number of cognitive domains covered, and implementation language.}}{29}{table.caption.53}\protected@file@percent }
-\newlabel{tab:comparison}{{5}{29}{Comparison of \psychbench {} with existing AI benchmark suites. Columns indicate presence of psychometric infrastructure (reliability, SAT curves), normative human comparison (z-scores against published baselines), neuromodulator manipulation testing, consciousness indicators, number of cognitive domains covered, and implementation language}{table.caption.53}{}}
-\@writefile{toc}{\contentsline {paragraph}{Unique contributions.}{29}{section*.55}\protected@file@percent }
 \citation{codaforno2024cogbench}
 \citation{kosinski2023theory}
 \citation{chollet2019measure}
+\@writefile{toc}{\contentsline {paragraph}{Relationship to existing work.}{29}{section*.54}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Unique contributions.}{29}{section*.55}\protected@file@percent }
 \@writefile{toc}{\contentsline {paragraph}{External validation anchors.}{30}{section*.56}\protected@file@percent }
 \@writefile{toc}{\contentsline {paragraph}{Limitations.}{30}{section*.57}\protected@file@percent }
 \@writefile{toc}{\contentsline {paragraph}{Future directions.}{32}{section*.58}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {11}Conclusion}{33}{section.11}\protected@file@percent }
-\newlabel{sec:conclusion}{{11}{33}{Conclusion}{section.11}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {11}Conclusion}{32}{section.11}\protected@file@percent }
+\newlabel{sec:conclusion}{{11}{32}{Conclusion}{section.11}{}}
 \bibstyle{apalike}
 \bibdata{psych_bench_references}
 \bibcite{arnsten2011catecholamine}{{1}{2011}{{Arnsten}}{{}}}

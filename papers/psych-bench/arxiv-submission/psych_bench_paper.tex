@@ -219,7 +219,7 @@ Our contributions are:
 \node[draw, thick, rounded corners=4pt, minimum width=13cm, minimum height=0.7cm, fill=hlbgray!15, align=center, font=\scriptsize\bfseries] (agent) at (0,-1.9) {Agent Under Test (e.g., \symthaea{} Holographic Liquid Brain: HDC $\bind$ CfC $\bind$ IIT $\bind$ Active Inference)};
 \draw[arrow] (0,-1.45) -- (0,-1.2);
 \end{tikzpicture}
-\caption{Three-layer architecture of \psychbench{}. Benchmarks define experimental paradigms with HDC-encoded stimuli. The harness provides psychometric infrastructure (reliability, SAT curves, normative comparison, neuromodulator profiles). The reporting layer generates self-contained analysis outputs. Arrows indicate data flow from the agent under test upward through encoding, evaluation, and reporting.}
+\caption{Three-layer architecture of \psychbench{}. Benchmarks define experimental paradigms with HDC-encoded stimuli. The harness provides psychometric infrastructure (reliability, SAT curves, normative comparison, neuromodulator profiles). The reporting layer generates self-contained analysis outputs.}
 \label{fig:architecture}
 \end{figure}
 
@@ -269,7 +269,7 @@ The encoding pipeline (Figure~\ref{fig:encoding}) converts raw stimuli into cont
 \draw[arrow] (sce) -- (hv);
 \draw[arrow] (hv) -- (dec);
 \end{tikzpicture}
-\caption{HDC stimulus encoding pipeline. Raw stimuli are converted to continuous hypervectors via five adapter types using binding ($\bind$), bundling ($\bundle$), and permutation ($P$) operations. All modalities share a common $\mathbb{R}^D$ space where cosine similarity enables cross-modal comparison. Decisions use prototype matching via $\arg\max$ similarity.}
+\caption{HDC stimulus encoding pipeline. Raw stimuli are converted to continuous hypervectors via five adapter types using binding ($\bind$), bundling ($\bundle$), and permutation ($P$). All modalities share a common $\mathbb{R}^D$ space where cosine similarity enables cross-modal comparison. Decisions use prototype matching via $\arg\max$ similarity.}
 \label{fig:encoding}
 \end{figure}
 
@@ -285,7 +285,7 @@ The \textbf{ScenarioAdapter} encodes text-based scenarios (social dilemmas, mora
 
 \subsection{Harness Infrastructure}
 
-The harness layer provides five psychometric tools. The \textbf{AdaptiveRunner} implements Levitt's~\citep{levitt1971transformed} transformed up-down staircase method, dynamically adjusting difficulty to estimate threshold performance with configurable convergence criteria. The \textbf{ReliabilityBattery} computes ICC(3,1)~\citep{shrout1979intraclass} test-retest reliability across $n$ sessions, along with Pearson $r$, standard error of measurement (SEM $= \text{SD} \cdot \sqrt{1 - \text{ICC}}$), and practice effects classified as improvement ($> +2\%$), stable ($\pm 2\%$), or decline ($< -2\%$). Reliability is classified following Cicchetti's~\citep{cicchetti1994guidelines} guidelines: Excellent (ICC $> 0.90$), Good ($> 0.75$), Moderate ($> 0.50$), Poor ($\leq 0.50$). The \textbf{SatBattery} fits Wickelgren's~\citep{wickelgren1977speed} exponential speed-accuracy tradeoff function $d'(t) = \lambda(1 - e^{-\beta(t - \delta)})$ via grid search, evaluating human-likeness by three criteria: accuracy decreases with time pressure, RT decreases with time pressure, and $R^2 > 0.70$. The \textbf{DifficultyModel} provides parametric difficulty scaling for adaptive testing. The \textbf{NeuromodCorrelationMatrix} computes trial-level Pearson correlations between four transmitter levels (DA, NE, 5-HT, ACh) and three behavioral measures (RT, accuracy, prediction error), with significance testing via $t$-distribution and Cohen's effect size classification.
+The harness layer provides five psychometric tools. The \textbf{AdaptiveRunner} implements Levitt's~\citep{levitt1971transformed} transformed up-down staircase method, dynamically adjusting difficulty to estimate threshold performance. The \textbf{ReliabilityBattery} computes ICC(3,1)~\citep{shrout1979intraclass} test-retest reliability across $n$ sessions, along with Pearson~$r$, standard error of measurement ($\mathrm{SEM} = \mathrm{SD} \cdot \sqrt{1 - \mathrm{ICC}}$), and practice effects. Reliability is classified following Cicchetti's~\citep{cicchetti1994guidelines} guidelines: Excellent ($\mathrm{ICC} > 0.90$), Good ($> 0.75$), Moderate ($> 0.50$), Poor ($\leq 0.50$). The \textbf{SatBattery} fits Wickelgren's~\citep{wickelgren1977speed} exponential speed-accuracy tradeoff function $d'(t) = \lambda(1 - e^{-\beta(t - \delta)})$ via grid search, evaluating human-likeness by three criteria: accuracy decreases with time pressure, RT decreases with time pressure, and $R^2 > 0.70$. The \textbf{DifficultyModel} provides parametric difficulty scaling. The \textbf{NeuromodCorrelationMatrix} computes trial-level Pearson correlations between four transmitter levels (DA, NE, 5-HT, ACh) and three behavioral measures (RT, accuracy, prediction error), with significance testing via $t$-distribution.
 
 \subsection{Normative Comparison}
 
@@ -438,7 +438,7 @@ The neuromodulator evaluation framework is \psychbench{}'s most novel contributi
 \caption{Neuromodulator benchmark summary. Each benchmark targets specific transmitter systems and implements established neuroscience paradigms. DA = dopamine, NE = noradrenaline, 5-HT = serotonin, ACh = acetylcholine, GABA = $\gamma$-aminobutyric acid, OT = oxytocin.}
 \label{tab:neuromod}
 \scriptsize
-\begin{tabular}{@{}p{2.5cm}p{2.1cm}p{2.3cm}p{2.1cm}p{2.6cm}@{}}
+\begin{tabular}{@{}p{2.4cm}p{2.0cm}p{2.2cm}p{2.2cm}p{2.8cm}@{}}
 \toprule
 \textbf{Benchmark} & \textbf{Transmitter} & \textbf{Paradigm} & \textbf{Key Metric} & \textbf{Citation} \\
 \midrule
@@ -456,7 +456,7 @@ AllostaticStress & Cortisol/NE & Chronic load & Allostatic index & \citet{mcewen
 DoseResponse & All & Graded dose sweep & Monotonicity score & \citet{clark1937log} \\
 ToleranceWithdrawal & All & Sustained exposure & Tolerance ratio & \citet{koob2001drug} \\
 AntagonistProfiles & All & Named antagonists & Selectivity index & \citet{stahl2013essential} \\
-MultiTransmitterSynergy & DA$\times$NE, etc. & Paired interactions & Synergy coefficient & \citet{doya2002metalearning} \\
+MultiTransmitter\-Synergy & DA$\times$NE, etc. & Paired interactions & Synergy coeff. & \citet{doya2002metalearning} \\
 \midrule
 \multicolumn{5}{l}{\emph{Consciousness \& Moral Modulation}} \\
 ConsciousnessPharm & 5-HT/GABA/DA & Drug $\to$ $\Phi$ proxy & Proxy peak/mean & \citet{tononi2004information} \\

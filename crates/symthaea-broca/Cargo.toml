@@ -3,7 +3,7 @@ name = "symthaea-broca"
 version = "0.1.0"
 edition = "2021"
 description = "SSM Language Center: CfC-HDC autoregressive thought-to-text generation"
-license = "MIT"
+license = "AGPL-3.0-or-later"
 
 [dependencies]
 symthaea-core = { path = "../../symthaea-core" }

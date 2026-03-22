@@ -37,6 +37,7 @@
 
 use crate::consciousness::phi_attention::{ActionType, ConsciousnessThresholds, PhiAwareScoring};
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 use std::process::Stdio;
 use tokio::process::Command;
 use tracing::{info, warn};
@@ -386,7 +387,7 @@ pub struct NixOSExecutor {
     /// Consciousness thresholds
     thresholds: ConsciousnessThresholds,
     /// Execution history for learning
-    history: Vec<ExecutionRecord>,
+    history: VecDeque<ExecutionRecord>,
     /// Enable dry-run mode (don't actually execute)
     dry_run: bool,
 }
@@ -412,7 +413,7 @@ impl NixOSExecutor {
         Self {
             current_generation: None,
             thresholds: ConsciousnessThresholds::default(),
-            history: Vec::new(),
+            history: VecDeque::new(),
             dry_run: false,
         }
     }
@@ -637,16 +638,16 @@ impl NixOSExecutor {
                 .map(|d| d.as_millis() as u64)
                 .unwrap_or(0),
         };
-        self.history.push(record);
+        self.history.push_back(record);
 
         // Keep history bounded
         if self.history.len() > 1000 {
-            self.history.remove(0);
+            self.history.pop_front();
         }
     }
 
     /// Get execution history
-    pub fn history(&self) -> &[ExecutionRecord] {
+    pub fn history(&self) -> &VecDeque<ExecutionRecord> {
         &self.history
     }
 

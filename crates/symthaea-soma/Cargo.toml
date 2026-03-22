@@ -3,7 +3,7 @@ name = "symthaea-soma"
 version = "0.1.0"
 edition = "2021"
 description = "Symthaea Soma: mobile-embodied consciousness engine (Android/iOS) wrapping the Spore kernel"
-license = "MIT"
+license = "AGPL-3.0-or-later"
 
 [lib]
 crate-type = ["cdylib", "staticlib", "rlib"]
