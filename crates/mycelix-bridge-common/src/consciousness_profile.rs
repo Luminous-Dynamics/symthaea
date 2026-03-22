@@ -1,4 +1,6 @@
-//! Multi-dimensional consciousness profile for governance gating.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Multi-dimensional consciousness profile for governance gating.
 //!
 //! Replaces the single MATL score (40% MFA + 60% reputation) with a
 //! 4-dimensional `ConsciousnessProfile` that gates governance actions
@@ -61,7 +63,7 @@ pub fn continuous_vote_weight(
     temperature: f64,
     max_weight: f64,
 ) -> f64 {
-    if temperature <= 0.0 || !score.is_finite() {
+    if !temperature.is_finite() || temperature <= 0.0 || !score.is_finite() || !threshold.is_finite() || !max_weight.is_finite() {
         return 0.0;
     }
     let exponent = -((score - threshold) / temperature);
@@ -106,10 +108,17 @@ impl ConsciousnessProfile {
     /// - community:  30%
     /// - engagement: 20%
     pub fn combined_score(&self) -> f64 {
-        self.identity * 0.25
+        let raw = self.identity * 0.25
             + self.reputation * 0.25
             + self.community * 0.30
-            + self.engagement * 0.20
+            + self.engagement * 0.20;
+        // Guard: NaN/Infinity in any dimension propagates through arithmetic.
+        // Clamp to [0, 1] — non-finite inputs collapse to 0 (safest default).
+        if raw.is_finite() {
+            raw.clamp(0.0, 1.0)
+        } else {
+            0.0
+        }
     }
 
     /// Derive the consciousness tier from this profile's combined score.
