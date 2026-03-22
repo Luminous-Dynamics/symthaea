@@ -17,6 +17,7 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 feldman-dkg = { workspace = true }
 k256 = { workspace = true }
+mycelix-zome-helpers = { workspace = true }
 getrandom_03 = { workspace = true }
 
 [dev-dependencies]

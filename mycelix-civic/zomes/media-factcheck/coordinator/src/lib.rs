@@ -2,14 +2,15 @@
 use hdk::prelude::*;
 use media_factcheck_integrity::*;
 use mycelix_bridge_common::{
-    gate_consciousness, requirement_for_proposal, GovernanceEligibility, GovernanceRequirement,
+    requirement_for_proposal, GovernanceEligibility, GovernanceRequirement,
 };
+use mycelix_zome_helpers::{get_latest_record};
 
 fn require_consciousness(
     requirement: &GovernanceRequirement,
     action_name: &str,
 ) -> ExternResult<GovernanceEligibility> {
-    gate_consciousness("civic_bridge", requirement, action_name)
+    mycelix_zome_helpers::require_consciousness("civic_bridge", requirement, action_name)
 }
 
 /// Helper function to create an anchor entry and return its hash
@@ -17,24 +18,6 @@ fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_string.to_string());
     let _ = create_entry(&EntryTypes::Anchor(anchor.clone()));
     hash_entry(&anchor)
-}
-
-fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
-    let Some(details) = get_details(action_hash, GetOptions::default())? else {
-        return Ok(None);
-    };
-    match details {
-        Details::Record(record_details) => {
-            if record_details.updates.is_empty() {
-                Ok(Some(record_details.record))
-            } else {
-                let latest_update = &record_details.updates[record_details.updates.len() - 1];
-                let latest_hash = latest_update.action_address().clone();
-                get_latest_record(latest_hash)
-            }
-        }
-        Details::Entry(_) => Ok(None),
-    }
 }
 
 #[hdk_extern]

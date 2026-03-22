@@ -7,3 +7,4 @@ edition = "2021"
 hdk = { workspace = true }
 hearth-types = { path = "../hearth-types" }
 serde = { workspace = true }
+mycelix-zome-helpers = { workspace = true }

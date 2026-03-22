@@ -66,6 +66,7 @@ derive_more = "0.99"
 # NOTE: Do NOT use features = ["js"] or ["wasm_js"] - they pull in wasm-bindgen
 # which is incompatible with Holochain's WASM runtime.
 getrandom_03 = { package = "getrandom", version = "0.3" }
+mycelix-zome-helpers = { path = "../mycelix-workspace/crates/mycelix-zome-helpers" }
 
 [profile.dev]
 opt-level = "z"

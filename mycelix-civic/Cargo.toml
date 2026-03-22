@@ -76,6 +76,7 @@ getrandom_03 = { package = "getrandom", version = "0.3" }
 civic-types = { path = "crates/civic-types" }
 mycelix-bridge-common = { path = "../crates/mycelix-bridge-common" }
 mycelix-bridge-entry-types = { path = "../crates/mycelix-bridge-entry-types" }
+mycelix-zome-helpers = { path = "../mycelix-workspace/crates/mycelix-zome-helpers" }
 
 [profile.dev]
 opt-level = "z"

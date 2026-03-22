@@ -51,6 +51,7 @@ k256 = { version = "0.13", default-features = false, features = ["arithmetic", "
 
 # Shared governance utilities
 governance-utils = { path = "crates/governance-utils" }
+mycelix-zome-helpers = { path = "../mycelix-workspace/crates/mycelix-zome-helpers" }
 
 [profile.dev]
 opt-level = "z"

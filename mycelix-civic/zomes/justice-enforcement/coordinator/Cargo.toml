@@ -15,4 +15,5 @@ holochain_serialized_bytes = { workspace = true }
 justice_enforcement_integrity = { path = "../integrity" }
 civic-types = { workspace = true }
 mycelix-bridge-common = { workspace = true }
+mycelix-zome-helpers = { workspace = true }
 

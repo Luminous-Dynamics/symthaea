@@ -20,6 +20,7 @@ mycelix-crypto = { workspace = true }
 
 # Link to integrity zome
 mfa_integrity = { path = "../integrity" }
+mycelix-zome-helpers = { workspace = true }
 
 [features]
 default = []

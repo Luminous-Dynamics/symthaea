@@ -4,9 +4,10 @@
 use emergency_coordination_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
     GovernanceRequirement,
 };
+use mycelix_zome_helpers::{get_latest_record};
 
 /// Summary of a single active disaster
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
@@ -36,28 +37,10 @@ fn require_consciousness(
     requirement: &GovernanceRequirement,
     action_name: &str,
 ) -> ExternResult<GovernanceEligibility> {
-    gate_consciousness("civic_bridge", requirement, action_name)
+    mycelix_zome_helpers::require_consciousness("civic_bridge", requirement, action_name)
 }
 
 /// Form a new response team
-
-fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
-    let Some(details) = get_details(action_hash, GetOptions::default())? else {
-        return Ok(None);
-    };
-    match details {
-        Details::Record(record_details) => {
-            if record_details.updates.is_empty() {
-                Ok(Some(record_details.record))
-            } else {
-                let latest_update = &record_details.updates[record_details.updates.len() - 1];
-                let latest_hash = latest_update.action_address().clone();
-                get_latest_record(latest_hash)
-            }
-        }
-        Details::Entry(_) => Ok(None),
-    }
-}
 
 #[hdk_extern]
 pub fn form_team(input: FormTeamInput) -> ExternResult<Record> {

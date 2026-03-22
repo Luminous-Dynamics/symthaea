@@ -1,6 +1,6 @@
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    gate_consciousness, requirement_for_basic, requirement_for_voting, GovernanceEligibility,
+    requirement_for_basic, requirement_for_voting, GovernanceEligibility,
     GovernanceRequirement,
 };
 use web_of_trust_integrity::*;
@@ -9,7 +9,7 @@ fn require_consciousness(
     requirement: &GovernanceRequirement,
     action_name: &str,
 ) -> ExternResult<GovernanceEligibility> {
-    gate_consciousness("identity_bridge", requirement, action_name)
+    mycelix_zome_helpers::require_consciousness("identity_bridge", requirement, action_name)
 }
 
 /// Helper to get an anchor entry hash

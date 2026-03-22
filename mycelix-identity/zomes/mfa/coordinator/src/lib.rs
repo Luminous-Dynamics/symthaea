@@ -24,24 +24,7 @@ use subtle::ConstantTimeEq;
 // HELPERS
 // =============================================================================
 
-/// Follow update chains to get the latest version of a record.
-fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
-    let Some(details) = get_details(action_hash, GetOptions::default())? else {
-        return Ok(None);
-    };
-    match details {
-        Details::Record(record_details) => {
-            if record_details.updates.is_empty() {
-                Ok(Some(record_details.record))
-            } else {
-                let latest_update = &record_details.updates[record_details.updates.len() - 1];
-                let latest_hash = latest_update.action_address().clone();
-                get_latest_record(latest_hash)
-            }
-        }
-        Details::Entry(_) => Ok(None),
-    }
-}
+use mycelix_zome_helpers::get_latest_record;
 
 // =============================================================================
 // RATE LIMITING CONFIGURATION

@@ -9,7 +9,7 @@ use hearth_coordinator_common::{
 };
 use hearth_types::*;
 use mycelix_bridge_common::{
-    gate_consciousness, requirement_for_basic, GovernanceEligibility, GovernanceRequirement,
+    requirement_for_basic, GovernanceEligibility, GovernanceRequirement,
 };
 
 // ============================================================================
@@ -20,7 +20,7 @@ fn require_consciousness(
     requirement: &GovernanceRequirement,
     action_name: &str,
 ) -> ExternResult<GovernanceEligibility> {
-    gate_consciousness("hearth_bridge", requirement, action_name)
+    mycelix_zome_helpers::require_consciousness("hearth_bridge", requirement, action_name)
 }
 
 // ============================================================================
