@@ -435,7 +435,9 @@ impl FabricationManager {
         // Phase 1: ingest readings and collect results (holds mutable monitor borrow).
         let mut anomaly_severity: Option<f32> = None;
         {
-            let monitor = self.monitor.as_mut().unwrap();
+            let Some(monitor) = self.monitor.as_mut() else {
+                return;
+            };
             for (channel, value) in sensor_values {
                 let reading = SensorReading {
                     channel: channel.clone(),
@@ -455,7 +457,10 @@ impl FabricationManager {
         }
 
         // Phase 3: read baselines for the twin (re-borrow monitor immutably).
-        let mfg_reading = self.monitor.as_ref().unwrap().to_manufacturing_reading();
+        let Some(monitor) = self.monitor.as_ref() else {
+            return;
+        };
+        let mfg_reading = monitor.to_manufacturing_reading();
 
         // Phase 4: step the manufacturing twin.
         let twin_out = self.manufacturing_twin.step(&mfg_reading, 0.05);
