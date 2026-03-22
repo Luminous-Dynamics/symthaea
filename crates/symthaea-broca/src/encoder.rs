@@ -86,26 +86,26 @@ const CHANNEL_NAMES: [&str; NUM_CHANNELS] = [
     "social_context",      // 22
     "response_confidence", // 23
     // Code channels (v5)
-    "syntax_complexity", // 24
-    "type_confidence",   // 25
-    "algorithm_pattern", // 26
-    "error_likelihood",  // 27
+    "syntax_complexity",   // 24
+    "type_confidence",     // 25
+    "algorithm_pattern",   // 26
+    "error_likelihood",    // 27
     // Epistemic Cube channels (v6) — 4D cube from Mycelix Epistemic Charter
-    "e_tier_e0",         // 28: empirical one-hot E0 (opinion)
-    "e_tier_e1",         // 29: empirical one-hot E1 (testimonial)
-    "e_tier_e2",         // 30: empirical one-hot E2 (verifiable)
-    "e_tier_e3",         // 31: empirical one-hot E3 (proven)
-    "e_tier_e4",         // 32: empirical one-hot E4 (reproducible)
-    "n_tier_n0",         // 33: normative one-hot N0 (personal)
-    "n_tier_n1",         // 34: normative one-hot N1 (communal)
-    "n_tier_n2",         // 35: normative one-hot N2 (network)
-    "n_tier_n3",         // 36: normative one-hot N3 (axiomatic)
-    "m_tier_m0",         // 37: materiality one-hot M0 (ephemeral)
-    "m_tier_m1",         // 38: materiality one-hot M1 (temporal)
-    "m_tier_m2",         // 39: materiality one-hot M2 (persistent)
-    "m_tier_m3",         // 40: materiality one-hot M3 (foundational)
-    "h_tier",            // 41: harmonic coherence scalar (0.0-1.0)
-    "epistemic_quality", // 42: cube quality score (0.0-1.0)
+    "e_tier_e0",           // 28: empirical one-hot E0 (opinion)
+    "e_tier_e1",           // 29: empirical one-hot E1 (testimonial)
+    "e_tier_e2",           // 30: empirical one-hot E2 (verifiable)
+    "e_tier_e3",           // 31: empirical one-hot E3 (proven)
+    "e_tier_e4",           // 32: empirical one-hot E4 (reproducible)
+    "n_tier_n0",           // 33: normative one-hot N0 (personal)
+    "n_tier_n1",           // 34: normative one-hot N1 (communal)
+    "n_tier_n2",           // 35: normative one-hot N2 (network)
+    "n_tier_n3",           // 36: normative one-hot N3 (axiomatic)
+    "m_tier_m0",           // 37: materiality one-hot M0 (ephemeral)
+    "m_tier_m1",           // 38: materiality one-hot M1 (temporal)
+    "m_tier_m2",           // 39: materiality one-hot M2 (persistent)
+    "m_tier_m3",           // 40: materiality one-hot M3 (foundational)
+    "h_tier",              // 41: harmonic coherence scalar (0.0-1.0)
+    "epistemic_quality",   // 42: cube quality score (0.0-1.0)
 ];
 
 /// Channel names for genesis seeding (therapeutic variant with 4 extra channels).
@@ -137,31 +137,31 @@ const CHANNEL_NAMES: [&str; NUM_CHANNELS] = [
     "social_context",      // 22
     "response_confidence", // 23
     // Code channels (v5)
-    "syntax_complexity", // 24
-    "type_confidence",   // 25
-    "algorithm_pattern", // 26
-    "error_likelihood",  // 27
+    "syntax_complexity",   // 24
+    "type_confidence",     // 25
+    "algorithm_pattern",   // 26
+    "error_likelihood",    // 27
     // Therapeutic channels (v4)
     "therapeutic_intent",    // 28
     "alliance_quality",      // 29
     "client_distress_level", // 30
     "intervention_depth",    // 31
     // Epistemic Cube channels (v6) — 4D cube from Mycelix Epistemic Charter
-    "e_tier_e0",         // 32: empirical one-hot E0 (opinion)
-    "e_tier_e1",         // 33: empirical one-hot E1 (testimonial)
-    "e_tier_e2",         // 34: empirical one-hot E2 (verifiable)
-    "e_tier_e3",         // 35: empirical one-hot E3 (proven)
-    "e_tier_e4",         // 36: empirical one-hot E4 (reproducible)
-    "n_tier_n0",         // 37: normative one-hot N0 (personal)
-    "n_tier_n1",         // 38: normative one-hot N1 (communal)
-    "n_tier_n2",         // 39: normative one-hot N2 (network)
-    "n_tier_n3",         // 40: normative one-hot N3 (axiomatic)
-    "m_tier_m0",         // 41: materiality one-hot M0 (ephemeral)
-    "m_tier_m1",         // 42: materiality one-hot M1 (temporal)
-    "m_tier_m2",         // 43: materiality one-hot M2 (persistent)
-    "m_tier_m3",         // 44: materiality one-hot M3 (foundational)
-    "h_tier",            // 45: harmonic coherence scalar (0.0-1.0)
-    "epistemic_quality", // 46: cube quality score (0.0-1.0)
+    "e_tier_e0",           // 32: empirical one-hot E0 (opinion)
+    "e_tier_e1",           // 33: empirical one-hot E1 (testimonial)
+    "e_tier_e2",           // 34: empirical one-hot E2 (verifiable)
+    "e_tier_e3",           // 35: empirical one-hot E3 (proven)
+    "e_tier_e4",           // 36: empirical one-hot E4 (reproducible)
+    "n_tier_n0",           // 37: normative one-hot N0 (personal)
+    "n_tier_n1",           // 38: normative one-hot N1 (communal)
+    "n_tier_n2",           // 39: normative one-hot N2 (network)
+    "n_tier_n3",           // 40: normative one-hot N3 (axiomatic)
+    "m_tier_m0",           // 41: materiality one-hot M0 (ephemeral)
+    "m_tier_m1",           // 42: materiality one-hot M1 (temporal)
+    "m_tier_m2",           // 43: materiality one-hot M2 (persistent)
+    "m_tier_m3",           // 44: materiality one-hot M3 (foundational)
+    "h_tier",              // 45: harmonic coherence scalar (0.0-1.0)
+    "epistemic_quality",   // 46: cube quality score (0.0-1.0)
 ];
 
 /// Channel ranges [min, max] for normalization to [0, 1].
@@ -290,10 +290,10 @@ pub const CODE_CHANNEL_DEFAULTS: [f32; 4] = [
 /// Default values for the 15 epistemic cube channels.
 pub const EPISTEMIC_CUBE_DEFAULTS: [f32; EPISTEMIC_CUBE_CHANNELS] = [
     0.0, 0.0, 0.0, 0.0, 0.0, // E-tier one-hot (none active)
-    0.0, 0.0, 0.0, 0.0, // N-tier one-hot (none active)
-    0.0, 0.0, 0.0, 0.0,  // M-tier one-hot (none active)
-    0.25, // h_tier: H1 neutral
-    0.0,  // epistemic_quality: unknown
+    0.0, 0.0, 0.0, 0.0,       // N-tier one-hot (none active)
+    0.0, 0.0, 0.0, 0.0,       // M-tier one-hot (none active)
+    0.25,                       // h_tier: H1 neutral
+    0.0,                        // epistemic_quality: unknown
 ];
 
 /// Decoupled thought state: scalar channels extracted from StructuredThought.
@@ -302,7 +302,41 @@ pub const EPISTEMIC_CUBE_DEFAULTS: [f32; EPISTEMIC_CUBE_CHANNELS] = [
 /// integration layer (Phase 3), avoiding circular dependency.
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct ThoughtChannels {
+    #[serde(
+        serialize_with = "channel_serde::serialize",
+        deserialize_with = "channel_serde::deserialize",
+        default = "ThoughtChannels::default_array",
+        bound(serialize = "", deserialize = "")
+    )]
     pub channels: [f32; NUM_CHANNELS],
+}
+
+/// Custom serde for arrays > 32 elements (serde doesn't derive for large arrays).
+mod channel_serde {
+    use super::NUM_CHANNELS;
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(arr: &[f32; NUM_CHANNELS], s: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeSeq;
+        let mut seq = s.serialize_seq(Some(NUM_CHANNELS))?;
+        for val in arr {
+            seq.serialize_element(val)?;
+        }
+        seq.end()
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<[f32; NUM_CHANNELS], D::Error> {
+        let v: Vec<f32> = Vec::deserialize(d)?;
+        if v.len() != NUM_CHANNELS {
+            // Accept shorter arrays (legacy data) by padding with defaults
+            let mut arr = super::ThoughtChannels::default_array();
+            let copy_len = v.len().min(NUM_CHANNELS);
+            arr[..copy_len].copy_from_slice(&v[..copy_len]);
+            return Ok(arr);
+        }
+        v.try_into()
+            .map_err(|_| serde::de::Error::custom("wrong channel count"))
+    }
 }
 
 #[cfg(not(feature = "therapeutic"))]
@@ -335,10 +369,10 @@ impl Default for ThoughtChannels {
                 0.0, // error_likelihood: likely correct
                 // Epistemic Cube channels (v6) — default: no cube data
                 0.0, 0.0, 0.0, 0.0, 0.0, // E-tier one-hot (none active)
-                0.0, 0.0, 0.0, 0.0, // N-tier one-hot (none active)
-                0.0, 0.0, 0.0, 0.0,  // M-tier one-hot (none active)
-                0.25, // h_tier: H1 neutral (0.25)
-                0.0,  // epistemic_quality: unknown
+                0.0, 0.0, 0.0, 0.0,       // N-tier one-hot (none active)
+                0.0, 0.0, 0.0, 0.0,       // M-tier one-hot (none active)
+                0.25,                       // h_tier: H1 neutral (0.25)
+                0.0,                        // epistemic_quality: unknown
             ],
         }
     }
@@ -379,16 +413,22 @@ impl Default for ThoughtChannels {
                 0.0, // intervention_depth
                 // Epistemic Cube channels (v6) — default: no cube data
                 0.0, 0.0, 0.0, 0.0, 0.0, // E-tier one-hot (none active)
-                0.0, 0.0, 0.0, 0.0, // N-tier one-hot (none active)
-                0.0, 0.0, 0.0, 0.0,  // M-tier one-hot (none active)
-                0.25, // h_tier: H1 neutral (0.25)
-                0.0,  // epistemic_quality: unknown
+                0.0, 0.0, 0.0, 0.0,       // N-tier one-hot (none active)
+                0.0, 0.0, 0.0, 0.0,       // M-tier one-hot (none active)
+                0.25,                       // h_tier: H1 neutral (0.25)
+                0.0,                        // epistemic_quality: unknown
             ],
         }
     }
 }
 
 impl ThoughtChannels {
+    /// Returns the default channel array values (used by serde deserialization
+    /// when loading legacy data with fewer channels).
+    fn default_array() -> [f32; NUM_CHANNELS] {
+        Self::default().channels
+    }
+
     /// Create channels with a specific semantic intent one-hot.
     pub fn with_intent(intent_index: usize) -> Self {
         let mut channels = Self::default();
