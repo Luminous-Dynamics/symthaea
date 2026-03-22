@@ -167,7 +167,10 @@ fn extract_fields_from_text(text: &str) -> Vec<(String, String)> {
 
             // Type is in same word (e.g. "x:f64")
             if !after_colon.is_empty() {
-                if !name.is_empty() && name.chars().next().map_or(false, |c| c.is_lowercase()) {
+                if !name.is_empty()
+                    && name.chars().next().map_or(false, |c| c.is_lowercase())
+                    && looks_like_rust_type(after_colon)
+                {
                     fields.push((name.to_string(), after_colon.to_string()));
                 }
             } else if !name.is_empty() && i + 1 < words.len() {
@@ -175,7 +178,10 @@ fn extract_fields_from_text(text: &str) -> Vec<(String, String)> {
                 let typ = words[i + 1].trim_matches(|c: char| {
                     !c.is_alphanumeric() && c != '_' && c != '<' && c != '>'
                 });
-                if !typ.is_empty() && name.chars().next().map_or(false, |c| c.is_lowercase()) {
+                if !typ.is_empty()
+                    && name.chars().next().map_or(false, |c| c.is_lowercase())
+                    && looks_like_rust_type(typ)
+                {
                     fields.push((name.to_string(), typ.to_string()));
                     i += 1; // skip the type word
                 }
@@ -184,6 +190,99 @@ fn extract_fields_from_text(text: &str) -> Vec<(String, String)> {
         i += 1;
     }
     fields
+}
+
+/// Check if a string looks like a valid Rust type name.
+/// Rejects things like "f(f(x" which are code expressions, not types.
+fn looks_like_rust_type(s: &str) -> bool {
+    if s.is_empty() {
+        return false;
+    }
+    // Must start with uppercase (type name) or be a primitive
+    let first = s.chars().next().unwrap();
+    let is_type_start = first.is_uppercase()
+        || matches!(
+            s,
+            "i8" | "i16" | "i32" | "i64" | "i128" | "isize" | "u8" | "u16" | "u32" | "u64"
+                | "u128" | "usize" | "f32" | "f64" | "bool" | "str" | "char"
+        )
+        || s.starts_with('&');
+
+    // Must not contain parentheses (those are function calls, not types)
+    let no_parens = !s.contains('(') || s.contains("Fn("); // Fn(...) is a valid type
+
+    is_type_start && no_parens
+}
+
+/// Extract fields from a struct signature like "struct Foo { x: i32, y: f64 }".
+fn extract_fields_from_struct_sig(sig: &str) -> Vec<(String, String)> {
+    let mut fields = Vec::new();
+    // Find content between { and }
+    if let Some(brace_start) = sig.find('{') {
+        if let Some(brace_end) = sig.rfind('}') {
+            let body = &sig[brace_start + 1..brace_end];
+            for field_str in body.split(',') {
+                let field_str = field_str.trim();
+                if let Some(colon) = field_str.find(':') {
+                    let name = field_str[..colon].trim().trim_start_matches("pub ");
+                    let typ = field_str[colon + 1..].trim();
+                    if !name.is_empty() && !typ.is_empty() {
+                        fields.push((name.to_string(), typ.to_string()));
+                    }
+                }
+            }
+        }
+    }
+    fields
+}
+
+/// Generate impl methods for a struct based on purpose keywords.
+///
+/// Recognizes patterns like "increment/decrement/get" for counter-like types,
+/// "push/pop/peek" for stack-like types, etc.
+fn generate_purpose_methods(
+    struct_name: &str,
+    fields: &[(String, String)],
+    purpose: &str,
+) -> Vec<String> {
+    let mut methods = Vec::new();
+    let purpose_lower = purpose.to_lowercase();
+
+    // Counter pattern: increment/decrement/get on a numeric field
+    if purpose_lower.contains("increment") || purpose_lower.contains("counter") {
+        if let Some((field_name, field_type)) = fields.first() {
+            if field_type.contains("i32")
+                || field_type.contains("i64")
+                || field_type.contains("u32")
+                || field_type.contains("usize")
+            {
+                methods.push(format!(
+                    "    pub fn increment(&mut self) {{\n        self.{} += 1;\n    }}",
+                    field_name
+                ));
+                if purpose_lower.contains("decrement") {
+                    methods.push(format!(
+                        "    pub fn decrement(&mut self) {{\n        self.{} -= 1;\n    }}",
+                        field_name
+                    ));
+                }
+                if purpose_lower.contains("get") || purpose_lower.contains("value") {
+                    methods.push(format!(
+                        "    pub fn get(&self) -> {} {{\n        self.{}\n    }}",
+                        field_type, field_name
+                    ));
+                }
+                if purpose_lower.contains("reset") {
+                    methods.push(format!(
+                        "    pub fn reset(&mut self) {{\n        self.{} = 0;\n    }}",
+                        field_name
+                    ));
+                }
+            }
+        }
+    }
+
+    methods
 }
 
 /// Infer a reasonable function body from the purpose, params, and return type.
@@ -257,6 +356,49 @@ fn infer_rust_body(
     {
         if params.len() == 1 && (params[0].1.contains("str") || params[0].1.contains("String")) {
             return format!("{}.chars().collect()", params[0].0);
+        }
+    }
+
+    // sum of squares (before generic "sum")
+    if purpose_lower.contains("sum") && purpose_lower.contains("square") {
+        if params.len() == 1 {
+            return format!(
+                "{}.iter().map(|x| x * x).sum()",
+                params[0].0
+            );
+        }
+    }
+    // parse string to integer/number → Result
+    if purpose_lower.contains("parse")
+        && (purpose_lower.contains("integer")
+            || purpose_lower.contains("number")
+            || purpose_lower.contains("int"))
+    {
+        if params.len() == 1 {
+            let ret = return_type.unwrap_or("");
+            if ret.contains("Result") {
+                return format!(
+                    "{}.parse::<i32>().map_err(|e| e.to_string())",
+                    params[0].0
+                );
+            } else {
+                return format!("{}.parse::<i32>().unwrap_or(0)", params[0].0);
+            }
+        }
+    }
+    // apply function twice: f(f(x))
+    if purpose_lower.contains("apply") && purpose_lower.contains("twice") {
+        if params.len() == 2 {
+            return format!("{}({}({}))", params[0].0, params[0].0, params[1].0);
+        }
+    }
+    // apply function N times
+    if purpose_lower.contains("apply") && purpose_lower.contains("times") {
+        if params.len() == 3 {
+            return format!(
+                "(0..{}).fold({}, |acc, _| {}(acc))",
+                params[2].0, params[1].0, params[0].0
+            );
         }
     }
 
@@ -336,7 +478,11 @@ fn infer_rust_body(
     }
     if purpose_lower.contains("length")
         || purpose_lower.contains("len")
-        || purpose_lower.contains("count")
+        || (purpose_lower.contains("count")
+            && !purpose_lower.contains("vowel")
+            && !purpose_lower.contains("digit")
+            && !purpose_lower.contains("char")
+            && !purpose_lower.contains("word"))
     {
         if params.len() == 1 {
             return format!("{}.len()", params[0].0);
@@ -423,8 +569,12 @@ fn infer_rust_body(
         }
     }
 
-    // Collection operations
-    if purpose_lower.contains("sort") {
+    // Collection operations (skip bubble/insertion/selection sort — those have dedicated patterns)
+    if purpose_lower.contains("sort")
+        && !purpose_lower.contains("bubble")
+        && !purpose_lower.contains("insertion")
+        && !purpose_lower.contains("selection")
+    {
         if params.len() == 1 && params[0].1.contains("Vec") {
             if purpose_lower.contains("descending") || purpose_lower.contains("reverse") {
                 return format!("let mut result = {}.to_vec();\n    result.sort();\n    result.reverse();\n    result", params[0].0);
@@ -469,32 +619,41 @@ fn infer_rust_body(
             return format!("let mut result = {}.to_vec();\n    result.sort();\n    result.dedup();\n    result", params[0].0);
         }
     }
+    // Bubble sort (in-place)
+    if purpose_lower.contains("bubble sort") {
+        if params.len() == 1 {
+            return format!(
+                "let n = {}.len();\n    for i in 0..n {{\n        for j in 0..n - 1 - i {{\n            if {}[j] > {}[j + 1] {{\n                {}.swap(j, j + 1);\n            }}\n        }}\n    }}",
+                params[0].0, params[0].0, params[0].0, params[0].0
+            );
+        }
+    }
     // Binary search
     if purpose_lower.contains("binary search") || purpose_lower.contains("bsearch") {
         if params.len() == 2 {
             return format!("{}.binary_search(&{}).ok()", params[0].0, params[1].0);
         }
     }
-    // Sum of collection
+    // Sum of collection (Vec or slice)
     if (purpose_lower.contains("sum") || purpose_lower.contains("total"))
         && params.len() == 1
-        && params[0].1.contains("Vec")
+        && (params[0].1.contains("Vec") || params[0].1.contains("&["))
     {
         return format!("{}.iter().sum()", params[0].0);
     }
-    // Max of collection
+    // Max of collection (Vec or slice)
     if (purpose_lower.contains("max")
         || purpose_lower.contains("largest")
         || purpose_lower.contains("biggest"))
         && params.len() == 1
-        && params[0].1.contains("Vec")
+        && (params[0].1.contains("Vec") || params[0].1.contains("&["))
     {
         return format!("{}.iter().max().copied()", params[0].0);
     }
-    // Min of collection
+    // Min of collection (Vec or slice)
     if (purpose_lower.contains("min") || purpose_lower.contains("smallest"))
         && params.len() == 1
-        && params[0].1.contains("Vec")
+        && (params[0].1.contains("Vec") || params[0].1.contains("&["))
     {
         return format!("{}.iter().min().copied()", params[0].0);
     }
@@ -1679,7 +1838,14 @@ impl CodeEmitter for RustEmitter {
         // fields are needed (no MULTI_ENTITY constraint, no extractable fields),
         // suppress the struct emission entirely. Otherwise we get duplicate name
         // errors (E0428) — e.g., `pub struct add_numbers` AND `pub fn add_numbers`.
-        if parsed_sig.is_some() {
+        // Also detect unparseable but obviously function signatures (e.g., those with
+        // `impl Fn(...)` trait bounds that confuse the signature parser).
+        let looks_like_fn = parsed_sig.is_some()
+            || spec
+                .signature
+                .as_deref()
+                .map_or(false, |s| s.trim_start().starts_with("fn "));
+        if looks_like_fn {
             has_function = true;
             // Suppress struct if it was only inferred by the CfC planner
             // and there's no real need for a struct (no fields, no multi-entity)
@@ -1699,7 +1865,18 @@ impl CodeEmitter for RustEmitter {
                 parts.push(format!("/// {}", spec.purpose));
             }
 
-            let fields = extract_fields_from_text(&spec.purpose);
+            // Try to extract fields from the signature first (e.g., "struct Foo { x: i32, y: f64 }")
+            // then fall back to purpose-based extraction.
+            let fields = if let Some(ref sig) = spec.signature {
+                let sig_fields = extract_fields_from_struct_sig(sig);
+                if sig_fields.is_empty() {
+                    extract_fields_from_text(&spec.purpose)
+                } else {
+                    sig_fields
+                }
+            } else {
+                extract_fields_from_text(&spec.purpose)
+            };
             if fields.is_empty() && field_steps > 0 {
                 // Generate placeholder fields from field_steps count
                 parts.push(format!("#[derive(Debug, Clone)]"));
@@ -1727,9 +1904,23 @@ impl CodeEmitter for RustEmitter {
                 .constraints
                 .iter()
                 .any(|c| c.starts_with("MULTI_ENTITY"));
-            if has_impl || method_steps > 0 || is_multi_entity {
+            // Also generate impl block when purpose mentions method-like words
+            let has_method_keywords = {
+                let p = spec.purpose.to_lowercase();
+                p.contains("increment") || p.contains("decrement") || p.contains("push")
+                    || p.contains("pop") || p.contains("enqueue") || p.contains("dequeue")
+                    || p.contains("method")
+            };
+            if has_impl || method_steps > 0 || is_multi_entity || has_method_keywords {
                 parts.push(format!("impl {} {{", spec.name));
-                let fields = extract_fields_from_text(&spec.purpose);
+                // Use signature-extracted fields if available, otherwise purpose-based
+                let impl_fields = if let Some(ref sig) = spec.signature {
+                    let sf = extract_fields_from_struct_sig(sig);
+                    if sf.is_empty() { extract_fields_from_text(&spec.purpose) } else { sf }
+                } else {
+                    extract_fields_from_text(&spec.purpose)
+                };
+                let fields = impl_fields;
                 if !fields.is_empty() {
                     let params: Vec<String> = fields
                         .iter()
@@ -1750,6 +1941,13 @@ impl CodeEmitter for RustEmitter {
                     parts.push("    pub fn new() -> Self {".to_string());
                     parts.push("        Self {}".to_string());
                     parts.push("    }".to_string());
+                }
+
+                // Auto-generate methods from purpose keywords (counter, stack, etc.)
+                let purpose_methods = generate_purpose_methods(&spec.name, &fields, &spec.purpose);
+                for method in &purpose_methods {
+                    parts.push(String::new());
+                    parts.push(method.clone());
                 }
 
                 // Auto-generate methods from purpose when MULTI_ENTITY
@@ -1858,8 +2056,27 @@ impl CodeEmitter for RustEmitter {
                 }
                 parts.push(format!("    {}", body));
                 parts.push("}".to_string());
+            } else if let Some(ref raw_sig) = spec.signature {
+                // Signature exists but didn't parse (e.g., `impl Fn` trait bounds).
+                // Emit the raw signature and try to infer the body from purpose.
+                if has_doc || !spec.purpose.is_empty() {
+                    parts.push(format!("/// {}", spec.purpose));
+                }
+                // Ensure it starts with "pub fn" for visibility
+                let sig_str = if raw_sig.starts_with("pub fn") {
+                    raw_sig.to_string()
+                } else if raw_sig.starts_with("fn ") {
+                    format!("pub {}", raw_sig)
+                } else {
+                    format!("pub fn {}", raw_sig)
+                };
+                parts.push(format!("{} {{", sig_str));
+                let body =
+                    infer_rust_body(&spec.purpose, &[], None, &spec.constraints, &spec.examples);
+                parts.push(format!("    {}", body));
+                parts.push("}".to_string());
             } else {
-                // No parsed signature — try to infer from purpose
+                // No signature at all — generate stub
                 if has_doc || !spec.purpose.is_empty() {
                     parts.push(format!("/// {}", spec.purpose));
                 }
@@ -3395,8 +3612,8 @@ mod tests {
         let result = emitter.emit_from_spec(&spec, &make_plan());
         assert!(result.contains(".parse"), "Should use parse: {}", result);
         assert!(
-            result.contains("unwrap_or_default"),
-            "Should have default: {}",
+            result.contains("unwrap_or") || result.contains("unwrap_or_default"),
+            "Should have error handling: {}",
             result
         );
         assert!(

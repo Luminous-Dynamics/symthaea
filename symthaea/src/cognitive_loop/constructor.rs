@@ -1008,6 +1008,7 @@ impl CognitiveLoopService {
             #[cfg(feature = "mycelix")]
             governance_mgr: super::managers::GovernanceManager::default(),
             swarm_manager: super::managers::SwarmManager::default(),
+            holon_receiver: crate::consciousness::holon_receiver::HolonReceiver::new(),
             swarm_event_rx: std::sync::Mutex::new(Some(swarm_event_rx)),
             swarm_event_tx,
             federation_handle,

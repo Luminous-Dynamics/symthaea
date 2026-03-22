@@ -147,7 +147,10 @@ impl CodeExecutor {
         // Write source file
         let source_path = self.work_dir.join("generated.rs");
         let full_source = if let Some(tests) = test_source {
-            format!("{source}\n\n#[cfg(test)]\nmod tests {{\n    use super::*;\n{tests}\n}}")
+            // Strip any emitter-generated test module from the source to avoid
+            // duplicate `mod tests` (E0428). The external test_source takes precedence.
+            let clean_source = strip_test_module(source);
+            format!("{clean_source}\n\n#[cfg(test)]\nmod tests {{\n    use super::*;\n{tests}\n}}")
         } else {
             source.to_string()
         };
@@ -855,6 +858,62 @@ pub fn parse_json_diagnostics(json_output: &str) -> Vec<CompileError> {
 
 /// Attempt to auto-fix common Rust compilation errors in source code.
 ///
+/// Strip the `#[cfg(test)] mod tests { ... }` block from generated source.
+///
+/// Used when external test source is provided — avoids duplicate `mod tests` (E0428).
+/// Handles both `#[cfg(test)]\nmod tests {` and `mod tests {` patterns.
+fn strip_test_module(source: &str) -> String {
+    let lines: Vec<&str> = source.lines().collect();
+    let mut result = Vec::new();
+    let mut in_test_module = false;
+    let mut brace_depth = 0i32;
+    let mut skip_cfg_test = false;
+
+    for (i, line) in lines.iter().enumerate() {
+        let trimmed = line.trim();
+
+        // Detect #[cfg(test)] preceding mod tests
+        if trimmed == "#[cfg(test)]" {
+            // Check if next line is `mod tests {`
+            if i + 1 < lines.len() && lines[i + 1].trim().starts_with("mod tests") {
+                skip_cfg_test = true;
+                continue;
+            }
+        }
+
+        if skip_cfg_test {
+            skip_cfg_test = false;
+            if trimmed.starts_with("mod tests") {
+                in_test_module = true;
+                brace_depth = trimmed.chars().filter(|&c| c == '{').count() as i32
+                    - trimmed.chars().filter(|&c| c == '}').count() as i32;
+                if brace_depth <= 0 {
+                    in_test_module = false;
+                }
+                continue;
+            }
+        }
+
+        if in_test_module {
+            brace_depth += trimmed.chars().filter(|&c| c == '{').count() as i32;
+            brace_depth -= trimmed.chars().filter(|&c| c == '}').count() as i32;
+            if brace_depth <= 0 {
+                in_test_module = false;
+            }
+            continue;
+        }
+
+        result.push(*line);
+    }
+
+    // Remove trailing empty lines
+    while result.last().map_or(false, |l| l.trim().is_empty()) {
+        result.pop();
+    }
+
+    result.join("\n")
+}
+
 /// Applies mechanical fixes for well-known rustc error patterns. When
 /// structured errors with line numbers are available (via `try_auto_fix_structured`),
 /// fixes are targeted to specific lines for higher accuracy.
