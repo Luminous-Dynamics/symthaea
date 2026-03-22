@@ -25,6 +25,7 @@ admin_interfaces:
   - driver:
       type: websocket
       port: 4444
+      bind_to: "0.0.0.0"
       allowed_origins: "*"
 
 # Network configuration — how this conductor discovers and communicates with peers.

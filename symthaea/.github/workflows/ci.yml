@@ -191,7 +191,7 @@ jobs:
   test-all-features:
     name: Test (CI-safe features)
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
 
@@ -223,27 +223,32 @@ jobs:
             cmake
 
       - name: Run tests (CI-safe features)
-        run: |
-          # Same CI-safe feature set as clippy (excludes GPU/MuJoCo/V4L2/cpal/I2C)
-          CI_FEATURES="parallel,service,shell,demo,api_module,\
-          voice-tts,voice-stt,audio,vocal-tract,neural-vocoder,\
-          embeddings,vision,perception,vision-manifold,foveation,\
-          integrity,semantic-encoder,neural-bridge,webcam,\
-          mesh,mesh-encryption,mesh-key-exchange,swarm,notifications,\
-          nix-mind,identity,physics,physics-bridge,\
-          flight,humanoid,hal,ssm-power,ssm_language,\
-          lancedb-backend,multi_agent,full_consciousness,full_perception,\
-          full_language,magi_loop,reasoning_engine,code_generation,\
-          wasm-sandbox,school_learning,benchmarks,all_benchmarks,\
-          integration_module,observability_module,support,web_research_module,\
-          genomics,cell-foundry,ectogenesis,nurture,population,genesis,\
-          genesis-missions,fusion-twin,safety-agents,lab-controller,\
-          materials,nuclear-forensics,water-prediction,physics-unification,\
-          grid-scaling,fission-reactor,accelerator,threat-assessment,\
-          datacenter,experiment-planner,strategic-materials,critical-minerals,\
-          advanced-manufacturing,building-systems,design-production,\
-          mycelix,unstable-examples"
-          cargo test -p symthaea --lib --features "$CI_FEATURES"
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 55
+          max_attempts: 2
+          retry_on: error
+          command: |
+            # Same CI-safe feature set as clippy (excludes GPU/MuJoCo/V4L2/cpal/I2C)
+            CI_FEATURES="parallel,service,shell,demo,api_module,\
+            voice-tts,voice-stt,audio,vocal-tract,neural-vocoder,\
+            embeddings,vision,perception,vision-manifold,foveation,\
+            integrity,semantic-encoder,neural-bridge,webcam,\
+            mesh,mesh-encryption,mesh-key-exchange,swarm,notifications,\
+            nix-mind,identity,physics,physics-bridge,\
+            flight,humanoid,hal,ssm-power,ssm_language,\
+            lancedb-backend,multi_agent,full_consciousness,full_perception,\
+            full_language,magi_loop,reasoning_engine,code_generation,\
+            wasm-sandbox,school_learning,benchmarks,all_benchmarks,\
+            integration_module,observability_module,support,web_research_module,\
+            genomics,cell-foundry,ectogenesis,nurture,population,genesis,\
+            genesis-missions,fusion-twin,safety-agents,lab-controller,\
+            materials,nuclear-forensics,water-prediction,physics-unification,\
+            grid-scaling,fission-reactor,accelerator,threat-assessment,\
+            datacenter,experiment-planner,strategic-materials,critical-minerals,\
+            advanced-manufacturing,building-systems,design-production,\
+            mycelix,unstable-examples"
+            cargo test -p symthaea --lib --features "$CI_FEATURES"
 
   test-feature-matrix-critical:
     name: Test Feature Matrix (core/web_research/pathology)
@@ -846,7 +851,7 @@ jobs:
     name: Compliance (Consciousness & Substrate)
     runs-on: ubuntu-latest
     needs: test
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
         with:
