@@ -242,6 +242,23 @@ pub struct LanceMemory {
     db: lancedb::Connection,
     table: tokio::sync::RwLock<Option<lancedb::Table>>,
     path: String,
+    /// Whether this instance owns a temp directory that should be cleaned up on drop.
+    is_temp: bool,
+}
+
+impl Drop for LanceMemory {
+    fn drop(&mut self) {
+        // Release the table reference before the connection drops,
+        // preventing panics from lancedb's async cleanup racing with
+        // file handle closure.
+        if let Ok(mut guard) = self.table.try_write() {
+            *guard = None;
+        }
+        // Clean up temp directories after releasing lancedb handles.
+        if self.is_temp {
+            let _ = std::fs::remove_dir_all(&self.path);
+        }
+    }
 }
 
 impl LanceMemory {
@@ -256,6 +273,7 @@ impl LanceMemory {
             db,
             table: tokio::sync::RwLock::new(None),
             path: path.to_string(),
+            is_temp: false,
         };
 
         mem.ensure_table().await?;
@@ -277,7 +295,9 @@ impl LanceMemory {
             DatabaseError::ConnectionFailed(format!("Temp dir creation failed: {e}"))
         })?;
 
-        Self::new(&dir.to_string_lossy()).await
+        let mut mem = Self::new(&dir.to_string_lossy()).await?;
+        mem.is_temp = true;
+        Ok(mem)
     }
 
     /// Ensure the "memories" table exists, creating it if necessary.

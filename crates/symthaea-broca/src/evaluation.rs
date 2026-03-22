@@ -59,6 +59,11 @@ pub struct EvalResult {
     /// Hallucination rate: fraction of generations where coherence dropped below
     /// threshold for 3+ consecutive tokens (from gating trace).
     pub hallucination_rate: Option<f32>,
+    /// Distinct-1: fraction of unique unigrams across all generated tokens.
+    /// Higher = more diverse vocabulary usage (Li et al., 2016).
+    pub distinct_1: Option<f32>,
+    /// Distinct-2: fraction of unique bigrams across all generated tokens.
+    pub distinct_2: Option<f32>,
 }
 
 /// Per-intent quality metrics.
@@ -143,6 +148,7 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
     let mut total_english_ratio = 0.0f32;
     let mut total_coherence = 0.0f32;
     let mut gen_count = 0usize;
+    let mut all_gen_token_ids: Vec<u32> = Vec::new(); // for distinct-n computation
     let mut intent_accum: HashMap<String, (f32, f32, f32, f32, usize, usize)> = HashMap::new();
     // (sum_ce, sum_ce_tokens_f, sum_english_ratio, sum_coherence, gen_count, count)
 
@@ -199,6 +205,7 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
             pair_coherence = result.final_coherence;
             total_english_ratio += pair_english_ratio;
             total_coherence += pair_coherence;
+            all_gen_token_ids.extend_from_slice(&result.token_ids);
             gen_count += 1;
         }
 
@@ -280,6 +287,25 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
         Some(contrastive_intent_score(&intent_texts))
     };
 
+    // Compute distinct-1/2: vocabulary diversity metrics (Li et al., 2016)
+    let (distinct_1, distinct_2) = if !all_gen_token_ids.is_empty() {
+        let total = all_gen_token_ids.len();
+        let unique_unigrams: std::collections::HashSet<u32> =
+            all_gen_token_ids.iter().copied().collect();
+        let d1 = unique_unigrams.len() as f32 / total as f32;
+
+        let unique_bigrams: std::collections::HashSet<(u32, u32)> =
+            all_gen_token_ids.windows(2).map(|w| (w[0], w[1])).collect();
+        let d2 = if total > 1 {
+            unique_bigrams.len() as f32 / (total - 1) as f32
+        } else {
+            0.0
+        };
+        (Some(d1), Some(d2))
+    } else {
+        (None, None)
+    };
+
     // Compute hallucination rate from gating traces
     let hallucination_rate = if gen_count > 0 {
         let mut hallucination_count = 0usize;
@@ -303,6 +329,8 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
         num_samples: config.dataset.len(),
         contrastive_intent_score: contrastive_score,
         hallucination_rate,
+        distinct_1,
+        distinct_2,
     }
 }
 
@@ -323,6 +351,12 @@ pub fn format_eval_report(result: &EvalResult) -> String {
     }
     if let Some(halluc) = result.hallucination_rate {
         s.push_str(&format!("Hallucination:     {:.4}\n", halluc));
+    }
+    if let Some(d1) = result.distinct_1 {
+        s.push_str(&format!("Distinct-1:        {:.4}\n", d1));
+    }
+    if let Some(d2) = result.distinct_2 {
+        s.push_str(&format!("Distinct-2:        {:.4}\n", d2));
     }
 
     if !result.intent_scores.is_empty() {
@@ -783,6 +817,8 @@ pub fn evaluate_liquid_mamba(
         num_samples: config.dataset.len(),
         contrastive_intent_score: None,
         hallucination_rate: None,
+        distinct_1: None,
+        distinct_2: None,
     };
 
     // --- Consciousness gating test ---
@@ -1288,6 +1324,8 @@ mod tests {
             num_samples: 10,
             contrastive_intent_score: None,
             hallucination_rate: None,
+            distinct_1: None,
+            distinct_2: None,
         };
 
         let report = format_eval_report(&result);
@@ -1406,6 +1444,8 @@ mod tests {
                     num_samples: 5,
                     contrastive_intent_score: None,
                     hallucination_rate: None,
+                    distinct_1: None,
+                    distinct_2: None,
                 },
                 avg_semantic_pe: 0.72,
                 avg_effective_rank: 18.5,
@@ -1511,6 +1551,8 @@ mod tests {
                     num_samples: 1,
                     contrastive_intent_score: None,
                     hallucination_rate: None,
+                    distinct_1: None,
+                    distinct_2: None,
                 },
                 avg_semantic_pe: 0.9,
                 avg_effective_rank: 2.0,

@@ -600,6 +600,41 @@ impl LanguageController {
         };
     }
 
+    /// Apply dropout to CfC hidden states (training-time regularization).
+    /// Randomly zeros a fraction of hidden state dimensions, scaled by `1/(1-rate)`
+    /// to maintain expected magnitude (inverted dropout).
+    /// Uses deterministic masking based on `step` for reproducibility.
+    pub fn apply_hidden_dropout(&mut self, rate: f32, step: usize) {
+        if rate <= 0.0 || rate >= 1.0 {
+            return;
+        }
+        let scale = 1.0 / (1.0 - rate);
+        for layer_idx in 0..self.network.n_layers() {
+            if let Some(layer) = self.network.layer_mut(layer_idx) {
+                for (neuron_idx, neuron) in layer.iter_mut().enumerate() {
+                    let state = neuron.state();
+                    let src = state.as_slice();
+                    let mut values: Vec<f32> = src.to_vec();
+                    // Deterministic mask based on step + layer + neuron
+                    let seed = step
+                        .wrapping_mul(1000003)
+                        .wrapping_add(layer_idx * 10007)
+                        .wrapping_add(neuron_idx * 997);
+                    for (j, v) in values.iter_mut().enumerate() {
+                        // LCG-based deterministic coin flip
+                        let hash = seed.wrapping_mul(j.wrapping_add(1)).wrapping_add(7) % 1000;
+                        if (hash as f32) < rate * 1000.0 {
+                            *v = 0.0;
+                        } else {
+                            *v *= scale;
+                        }
+                    }
+                    neuron.set_state(ContinuousHV::from_values(values));
+                }
+            }
+        }
+    }
+
     /// Save a snapshot of the current CfC network state (Phase 4: soft veto).
     /// The snapshot captures per-neuron states for partial restoration.
     pub fn save_state(&self) -> NetworkSnapshot {
