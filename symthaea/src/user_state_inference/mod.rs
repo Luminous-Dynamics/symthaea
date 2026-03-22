@@ -32,6 +32,7 @@
 //! ```
 
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 use std::time::Instant;
 
 /// Kind of context the user is operating in
@@ -343,7 +344,7 @@ pub struct UserStateInference {
     current_state: UserState,
 
     /// History of interactions for pattern analysis
-    interaction_history: Vec<InteractionRecord>,
+    interaction_history: VecDeque<InteractionRecord>,
 
     /// Last interaction time
     last_interaction: Option<Instant>,
@@ -399,7 +400,7 @@ impl UserStateInference {
     pub fn new() -> Self {
         Self {
             current_state: UserState::default(),
-            interaction_history: Vec::new(),
+            interaction_history: VecDeque::new(),
             last_interaction: None,
             config: InferenceConfig::default(),
         }
@@ -454,11 +455,11 @@ impl UserStateInference {
             had_error,
             timestamp: now,
         };
-        self.interaction_history.push(record);
+        self.interaction_history.push_back(record);
 
         // Trim history if needed
         if self.interaction_history.len() > self.config.max_history {
-            self.interaction_history.remove(0);
+            self.interaction_history.pop_front();
         }
 
         // Update timestamp

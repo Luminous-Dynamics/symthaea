@@ -6,7 +6,7 @@
 //! domain, and develops domain-specific expertise.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use super::types::{ResearchSource, VerificationOutcome};
 
@@ -178,7 +178,7 @@ pub struct EpistemicLearner {
     /// Verification strategies
     strategies: Vec<VerificationStrategy>,
     /// Outcome history
-    outcomes: Vec<VerificationOutcome>,
+    outcomes: VecDeque<VerificationOutcome>,
     /// Meta-Phi tracking
     meta_phi: MetaPhi,
     /// Domain expertise scores
@@ -198,7 +198,7 @@ impl EpistemicLearner {
             config: LearnerConfig::default(),
             source_credibility: HashMap::new(),
             strategies: Vec::new(),
-            outcomes: Vec::new(),
+            outcomes: VecDeque::new(),
             meta_phi: MetaPhi::default(),
             domain_expertise: HashMap::new(),
         }
@@ -210,7 +210,7 @@ impl EpistemicLearner {
             config,
             source_credibility: HashMap::new(),
             strategies: Vec::new(),
-            outcomes: Vec::new(),
+            outcomes: VecDeque::new(),
             meta_phi: MetaPhi::default(),
             domain_expertise: HashMap::new(),
         }
@@ -225,11 +225,11 @@ impl EpistemicLearner {
         self.update_domain_expertise(&outcome);
 
         // Store outcome
-        self.outcomes.push(outcome);
+        self.outcomes.push_back(outcome);
 
         // Trim old outcomes
         if self.outcomes.len() > 1000 {
-            self.outcomes.remove(0);
+            self.outcomes.pop_front();
         }
 
         // Periodically update meta-phi

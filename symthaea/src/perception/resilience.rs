@@ -18,7 +18,7 @@
 //! This ensures Sophia remains conscious and responsive even when
 //! some perceptual capabilities are degraded.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
     Arc, RwLock,
@@ -385,7 +385,7 @@ pub struct CoherenceGate {
     /// Minimum coherence threshold
     pub threshold: f32,
     /// History of coherence scores for adaptation
-    history: Vec<f32>,
+    history: VecDeque<f32>,
     /// Maximum history size
     max_history: usize,
 }
@@ -394,7 +394,7 @@ impl Default for CoherenceGate {
     fn default() -> Self {
         Self {
             threshold: 0.3,
-            history: Vec::new(),
+            history: VecDeque::new(),
             max_history: 100,
         }
     }
@@ -404,7 +404,7 @@ impl CoherenceGate {
     pub fn new(threshold: f32) -> Self {
         Self {
             threshold,
-            history: Vec::new(),
+            history: VecDeque::new(),
             max_history: 100,
         }
     }
@@ -417,9 +417,9 @@ impl CoherenceGate {
 
     /// Record a coherence score
     pub fn record(&mut self, coherence: f32) {
-        self.history.push(coherence);
+        self.history.push_back(coherence);
         if self.history.len() > self.max_history {
-            self.history.remove(0);
+            self.history.pop_front();
         }
     }
 
@@ -437,7 +437,7 @@ impl CoherenceGate {
         if self.history.len() >= 10 {
             let avg = self.average_coherence();
             // Don't let threshold go above 90th percentile of history
-            let mut sorted = self.history.clone();
+            let mut sorted: Vec<f32> = self.history.iter().copied().collect();
             sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
             let p10 = sorted[sorted.len() / 10];
 

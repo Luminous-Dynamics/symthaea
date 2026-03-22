@@ -9,6 +9,8 @@
 //! This module does not modify core cognition; it only shapes how
 //! consciousness state is exposed to the translation layer.
 
+use std::collections::VecDeque;
+
 use crate::language::llm_organ::{
     ConversationMessage, LLMGenerationResult, LLMOrgan, LLMQuery, LLMQueryParams, QueryType,
 };
@@ -35,7 +37,7 @@ pub struct MetaConsciousLlmBridge {
     /// Current Φ value (updated externally from cognitive loop)
     phi: f64,
     /// History of Φ values for meta-Φ computation
-    phi_history: Vec<f64>,
+    phi_history: VecDeque<f64>,
 }
 
 impl MetaConsciousLlmBridge {
@@ -43,17 +45,17 @@ impl MetaConsciousLlmBridge {
     pub fn new() -> Self {
         Self {
             phi: 0.0,
-            phi_history: Vec::new(),
+            phi_history: VecDeque::new(),
         }
     }
 
     /// Update the current Φ from the cognitive loop.
     pub fn update_phi(&mut self, phi: f64) {
         self.phi = phi;
-        self.phi_history.push(phi);
+        self.phi_history.push_back(phi);
         // Keep last 100 values for meta-Φ computation
         if self.phi_history.len() > 100 {
-            self.phi_history.remove(0);
+            self.phi_history.pop_front();
         }
     }
 

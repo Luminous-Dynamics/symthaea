@@ -8,7 +8,7 @@
 
 use crate::action::DestructivenessLevel;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -33,7 +33,7 @@ pub struct ShellContext {
     /// Current Nix profile
     pub nix_profile: Option<String>,
     /// Shell history (most recent last)
-    pub history: Vec<String>,
+    pub history: VecDeque<String>,
     /// Maximum history size
     pub max_history: usize,
     /// Session ID
@@ -66,7 +66,7 @@ impl ShellContext {
             hostname,
             is_root: user == "root",
             nix_profile: std::env::var("NIX_PROFILES").ok(),
-            history: Vec::new(),
+            history: VecDeque::new(),
             max_history: 1000,
             session_id: uuid::Uuid::new_v4().to_string(),
             current_phi: 0.5,
@@ -95,11 +95,11 @@ impl ShellContext {
     pub fn add_history(&mut self, command: String) {
         // Don't add duplicates (check if already exists anywhere in history)
         if !self.history.contains(&command) {
-            self.history.push(command);
+            self.history.push_back(command);
         }
         // Trim history
         while self.history.len() > self.max_history {
-            self.history.remove(0);
+            self.history.pop_front();
         }
     }
 

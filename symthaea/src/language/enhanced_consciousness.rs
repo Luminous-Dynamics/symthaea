@@ -647,7 +647,7 @@ pub struct TemporalConsciousness {
     /// Flow state detection
     pub flow_state: FlowState,
     /// Learning curves per theory
-    pub learning_curves: HashMap<String, Vec<f64>>,
+    pub learning_curves: HashMap<String, VecDeque<f64>>,
     /// Max history size
     max_history: usize,
 }
@@ -748,9 +748,9 @@ impl TemporalConsciousness {
     fn update_learning_curve(&mut self, theory: &str, value: f64) {
         let curve = self.learning_curves.entry(theory.to_string()).or_default();
         if curve.len() >= 100 {
-            curve.remove(0);
+            curve.pop_front();
         }
-        curve.push(value);
+        curve.push_back(value);
     }
 
     fn assess_flow(&mut self, metrics: &MultiTheoryMetrics) {
