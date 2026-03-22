@@ -330,8 +330,11 @@ impl SemanticErrorExplainer {
 
         for pattern in &self.patterns {
             if lower.contains(&pattern.pattern.to_lowercase()) {
-                let score =
-                    pattern.confidence * (pattern.pattern.len() as f32 / lower.len() as f32);
+                let score = if lower.is_empty() {
+                    0.0
+                } else {
+                    pattern.confidence * (pattern.pattern.len() as f32 / lower.len() as f32)
+                };
                 if score > best_score {
                     best_score = score;
                     best_match = Some(pattern);

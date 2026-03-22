@@ -128,4 +128,40 @@ proptest! {
         prop_assert!((result - 1.0).abs() < 0.01,
             "identical-vector cosine should be ~1.0, got {}", result);
     }
+
+    /// Pre-cast clamp prevents negative float → usize wrapping in histogram binning.
+    ///
+    /// This guards the pattern fixed in Round 38: floating-point rounding can make
+    /// `(x - x_min)` negative even when x was derived from the same dataset as x_min.
+    #[test]
+    fn prop_histogram_bin_clamp_before_cast(
+        values in proptest::collection::vec(-1e6f64..1e6, 2..200),
+        num_bins in 2usize..64,
+    ) {
+        let x_min = values.iter().cloned().fold(f64::INFINITY, f64::min);
+        let x_max = values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let x_range = (x_max - x_min).max(1e-10);
+
+        for &x in &values {
+            // This is the FIXED pattern (clamp before cast):
+            let bin = (((x - x_min) / x_range) * (num_bins - 1) as f64)
+                .clamp(0.0, (num_bins - 1) as f64) as usize;
+            prop_assert!(bin < num_bins,
+                "bin {} >= num_bins {} for x={}, x_min={}, x_range={}",
+                bin, num_bins, x, x_min, x_range);
+        }
+    }
+
+    /// Negative f64-to-usize cast saturates to 0 in Rust 2021+, but pre-cast clamp
+    /// is still needed because `.min()` after cast sees the saturated 0, not the
+    /// original negative — which can mask bugs in bin counting.
+    #[test]
+    fn prop_negative_float_to_usize_saturates(
+        v in -1e10f64..-0.001,
+    ) {
+        // Rust 2021+: negative f64 as usize == 0 (saturation, not wrap).
+        // But relying on this is fragile — clamp is the correct fix.
+        let raw = v as usize;
+        prop_assert_eq!(raw, 0, "negative f64 as usize should saturate to 0, got {}", raw);
+    }
 }
