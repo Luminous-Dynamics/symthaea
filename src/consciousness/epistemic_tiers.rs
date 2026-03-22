@@ -338,9 +338,8 @@ impl MaterialityTier {
 // ==============================================================================
 
 /// NSM grounding for empirical verification tiers
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub(crate) struct EmpiricalTierPrimitiveGrounding {
+pub struct EmpiricalTierPrimitiveGrounding {
     /// The tier being grounded
     pub tier: EmpiricalTier,
     /// NSM primitive composition
@@ -351,9 +350,8 @@ pub(crate) struct EmpiricalTierPrimitiveGrounding {
     pub verification_strength: f64,
 }
 
-#[allow(dead_code)]
 impl EmpiricalTierPrimitiveGrounding {
-    pub(crate) fn new(tier: EmpiricalTier, system: &PrimitiveSystem) -> Self {
+    pub fn new(tier: EmpiricalTier, system: &PrimitiveSystem) -> Self {
         let (primitives, strength) = Self::nsm_mapping(tier);
         let encoding = encode_primitives(&primitives, system);
 
@@ -409,9 +407,8 @@ impl EmpiricalTierPrimitiveGrounding {
 }
 
 /// NSM grounding for normative authority tiers
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub(crate) struct NormativeTierPrimitiveGrounding {
+pub struct NormativeTierPrimitiveGrounding {
     /// The tier being grounded
     pub tier: NormativeTier,
     /// NSM primitive composition
@@ -422,9 +419,8 @@ pub(crate) struct NormativeTierPrimitiveGrounding {
     pub consensus_breadth: f64,
 }
 
-#[allow(dead_code)]
 impl NormativeTierPrimitiveGrounding {
-    pub(crate) fn new(tier: NormativeTier, system: &PrimitiveSystem) -> Self {
+    pub fn new(tier: NormativeTier, system: &PrimitiveSystem) -> Self {
         let (primitives, breadth) = Self::nsm_mapping(tier);
         let encoding = encode_primitives(&primitives, system);
 
@@ -475,9 +471,8 @@ impl NormativeTierPrimitiveGrounding {
 }
 
 /// NSM grounding for materiality/permanence tiers
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub(crate) struct MaterialityTierPrimitiveGrounding {
+pub struct MaterialityTierPrimitiveGrounding {
     /// The tier being grounded
     pub tier: MaterialityTier,
     /// NSM primitive composition
@@ -488,9 +483,8 @@ pub(crate) struct MaterialityTierPrimitiveGrounding {
     pub temporal_persistence: f64,
 }
 
-#[allow(dead_code)]
 impl MaterialityTierPrimitiveGrounding {
-    pub(crate) fn new(tier: MaterialityTier, system: &PrimitiveSystem) -> Self {
+    pub fn new(tier: MaterialityTier, system: &PrimitiveSystem) -> Self {
         let (primitives, persistence) = Self::nsm_mapping(tier);
         let encoding = encode_primitives(&primitives, system);
 
@@ -536,10 +530,15 @@ impl MaterialityTierPrimitiveGrounding {
     }
 }
 
-/// Unified NSM grounding system for epistemic tiers
-#[allow(dead_code)]
+/// Unified NSM grounding system for epistemic tiers.
+///
+/// Maps each tier of the 3D Epistemic Cube (E/N/M) to NSM semantic primitives
+/// (Wierzbicka, 1996) encoded as HDC binary hypervectors. This enables:
+/// - Semantic similarity queries between tiers
+/// - HDC-encoded epistemic coordinates for Broca language generation
+/// - Grounded understanding of what each epistemic level *means*
 #[derive(Debug)]
-pub(crate) struct EpistemicNSMGrounding {
+pub struct EpistemicNSMGrounding {
     /// Empirical tier groundings
     pub empirical_tiers: HashMap<EmpiricalTier, EmpiricalTierPrimitiveGrounding>,
     /// Normative tier groundings
@@ -548,10 +547,9 @@ pub(crate) struct EpistemicNSMGrounding {
     pub materiality_tiers: HashMap<MaterialityTier, MaterialityTierPrimitiveGrounding>,
 }
 
-#[allow(dead_code)]
 impl EpistemicNSMGrounding {
-    /// Create complete grounding system from primitive system
-    pub(crate) fn new(system: &PrimitiveSystem) -> Self {
+    /// Create complete grounding system from primitive system.
+    pub fn new(system: &PrimitiveSystem) -> Self {
         let mut empirical_tiers = HashMap::new();
         let mut normative_tiers = HashMap::new();
         let mut materiality_tiers = HashMap::new();
@@ -594,8 +592,11 @@ impl EpistemicNSMGrounding {
         }
     }
 
-    /// Get combined encoding for an epistemic coordinate
-    pub(crate) fn encode_coordinate(&self, coord: &EpistemicCoordinate) -> BinaryHV {
+    /// Get combined encoding for an epistemic coordinate.
+    ///
+    /// Binds the HDC encodings of the E, N, and M tiers into a single
+    /// hypervector that represents the full 3D epistemic position.
+    pub fn encode_coordinate(&self, coord: &EpistemicCoordinate) -> BinaryHV {
         let e_enc = self
             .empirical_tiers
             .get(&coord.empirical)
@@ -616,12 +617,8 @@ impl EpistemicNSMGrounding {
         e_enc.bind(&n_enc).bind(&m_enc)
     }
 
-    /// Query empirical tiers by semantic similarity
-    pub(crate) fn query_empirical(
-        &self,
-        query: &BinaryHV,
-        threshold: f32,
-    ) -> Vec<(&EmpiricalTier, f32)> {
+    /// Query empirical tiers by semantic similarity.
+    pub fn query_empirical(&self, query: &BinaryHV, threshold: f32) -> Vec<(&EmpiricalTier, f32)> {
         let mut results: Vec<_> = self
             .empirical_tiers
             .iter()
@@ -632,12 +629,8 @@ impl EpistemicNSMGrounding {
         results
     }
 
-    /// Query normative tiers by semantic similarity
-    pub(crate) fn query_normative(
-        &self,
-        query: &BinaryHV,
-        threshold: f32,
-    ) -> Vec<(&NormativeTier, f32)> {
+    /// Query normative tiers by semantic similarity.
+    pub fn query_normative(&self, query: &BinaryHV, threshold: f32) -> Vec<(&NormativeTier, f32)> {
         let mut results: Vec<_> = self
             .normative_tiers
             .iter()
@@ -648,8 +641,8 @@ impl EpistemicNSMGrounding {
         results
     }
 
-    /// Query materiality tiers by semantic similarity
-    pub(crate) fn query_materiality(
+    /// Query materiality tiers by semantic similarity.
+    pub fn query_materiality(
         &self,
         query: &BinaryHV,
         threshold: f32,
@@ -664,8 +657,8 @@ impl EpistemicNSMGrounding {
         results
     }
 
-    /// Get tiers with high verification strength
-    pub(crate) fn high_verification_tiers(&self) -> Vec<&EmpiricalTier> {
+    /// Get tiers with high verification strength.
+    pub fn high_verification_tiers(&self) -> Vec<&EmpiricalTier> {
         self.empirical_tiers
             .iter()
             .filter(|(_, g)| g.verification_strength >= 0.5)
@@ -673,8 +666,8 @@ impl EpistemicNSMGrounding {
             .collect()
     }
 
-    /// Get tiers with high consensus breadth
-    pub(crate) fn high_consensus_tiers(&self) -> Vec<&NormativeTier> {
+    /// Get tiers with high consensus breadth.
+    pub fn high_consensus_tiers(&self) -> Vec<&NormativeTier> {
         self.normative_tiers
             .iter()
             .filter(|(_, g)| g.consensus_breadth >= 0.5)
@@ -682,8 +675,8 @@ impl EpistemicNSMGrounding {
             .collect()
     }
 
-    /// Get tiers with high temporal persistence
-    pub(crate) fn high_persistence_tiers(&self) -> Vec<&MaterialityTier> {
+    /// Get tiers with high temporal persistence.
+    pub fn high_persistence_tiers(&self) -> Vec<&MaterialityTier> {
         self.materiality_tiers
             .iter()
             .filter(|(_, g)| g.temporal_persistence >= 0.5)
@@ -692,8 +685,10 @@ impl EpistemicNSMGrounding {
     }
 }
 
-/// Encode NSM primitives into HDC vector via sequential binding
-#[allow(dead_code)]
+/// Encode NSM primitives into HDC vector via sequential binding.
+///
+/// Each primitive is looked up in the PrimitiveSystem, then bound with a
+/// position-encoding hypervector to preserve word order.
 fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> BinaryHV {
     let vectors: Vec<BinaryHV> = primitives
         .iter()

@@ -388,6 +388,26 @@ impl CognitiveLoopService {
         self.social_mgr.social.social_mean_trust = mean_trust.clamp(0.0, 1.0);
     }
 
+    /// Inject epistemic cube data from the facade's StructuredThought.
+    ///
+    /// Called by the Symthaea facade when it computes an EpistemicCube via
+    /// domain context. The CLS uses this to enrich Broca generation with
+    /// full 4D epistemic coordinates instead of deriving from confidence alone.
+    pub fn inject_epistemic_cube(
+        &mut self,
+        e_tier: u8,
+        n_tier: u8,
+        m_tier: u8,
+        h_value: f32,
+        quality: f32,
+    ) {
+        self.carryover.quality.last_cube_e_tier = Some(e_tier.min(4));
+        self.carryover.quality.last_cube_n_tier = Some(n_tier.min(3));
+        self.carryover.quality.last_cube_m_tier = Some(m_tier.min(3));
+        self.carryover.quality.last_cube_h_value = h_value.clamp(0.0, 1.0);
+        self.carryover.quality.last_cube_quality = quality.clamp(0.0, 1.0);
+    }
+
     /// Set the relational Psi from an external dyad computation.
     /// This is called by the Symthaea facade after computing Phi_dyad.
     pub fn set_relational_psi(&mut self, psi: f64) {

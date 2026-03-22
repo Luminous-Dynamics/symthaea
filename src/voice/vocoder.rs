@@ -752,8 +752,11 @@ impl FormantVocoder {
         self.reset();
 
         // Calculate total samples
-        let total_duration = frames.last().expect("frames checked non-empty above").time
-            - frames.first().expect("frames checked non-empty above").time;
+        // SAFETY: frames.is_empty() returned early above
+        let Some(last_frame) = frames.last() else {
+            return Vec::new();
+        };
+        let total_duration = last_frame.time - frames[0].time;
         let frame_duration = if frames.len() > 1 {
             total_duration / (frames.len() - 1) as f32
         } else {

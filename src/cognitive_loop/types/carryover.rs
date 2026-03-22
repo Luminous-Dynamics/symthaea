@@ -187,6 +187,16 @@ pub struct QualityMetrics {
     pub(crate) last_consciousness_state: String,
     /// Last epistemic confidence (cached from gate evaluation).
     pub(crate) last_epistemic_confidence: f32,
+    /// Epistemic Cube E-tier from last StructuredThought domain context (0-4, None = no cube).
+    pub(crate) last_cube_e_tier: Option<u8>,
+    /// Epistemic Cube N-tier (0-3, None = no cube).
+    pub(crate) last_cube_n_tier: Option<u8>,
+    /// Epistemic Cube M-tier (0-3, None = no cube).
+    pub(crate) last_cube_m_tier: Option<u8>,
+    /// Epistemic Cube H-value (harmonic coherence, 0.0-1.0).
+    pub(crate) last_cube_h_value: f32,
+    /// Epistemic Cube quality score (0.0-1.0).
+    pub(crate) last_cube_quality: f32,
     /// Last unified pipeline consciousness score (cached).
     pub(crate) last_pipeline_consciousness: f64,
     /// Whether narrative-GWT vetoed the previous cycle (suppresses learning)
@@ -318,6 +328,11 @@ impl Default for QualityMetrics {
             last_affective_valence: 0.0,
             last_consciousness_state: String::new(),
             last_epistemic_confidence: 0.5,
+            last_cube_e_tier: None,
+            last_cube_n_tier: None,
+            last_cube_m_tier: None,
+            last_cube_h_value: 0.25,
+            last_cube_quality: 0.0,
             last_pipeline_consciousness: 0.0,
             narrative_veto_active: false,
             cached_prefrontal_veto: false,

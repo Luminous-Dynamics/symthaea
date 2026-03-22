@@ -16,6 +16,7 @@
 use crate::consciousness::fep_active_inference::{ActiveInferenceAgent, EnhancedFEPBridge};
 use crate::dynamics::ode_solvers::{OdeConfig, OdeResult, OdeSolver, OdeSolverEngine, OdeSystem};
 use crate::exploration::SurpriseExplorationBridge;
+use std::collections::VecDeque;
 
 use super::goal_world::{GoalSystemBridge, WorldModelBridge};
 use super::learning::ClosedLearningLoop;
@@ -218,7 +219,7 @@ pub struct FepModule {
     pub trajectory_telemetry: TrajectoryTelemetry,
 
     /// Ring buffer of recent trajectory planning decisions.
-    pub trajectory_history: Vec<TrajectoryRecord>,
+    pub trajectory_history: VecDeque<TrajectoryRecord>,
 }
 
 impl FepModule {
@@ -321,9 +322,9 @@ impl FepModule {
 
         // Record in history ring buffer
         if self.trajectory_history.len() >= TRAJECTORY_HISTORY_CAP {
-            self.trajectory_history.remove(0);
+            self.trajectory_history.pop_front();
         }
-        self.trajectory_history.push(TrajectoryRecord {
+        self.trajectory_history.push_back(TrajectoryRecord {
             cycle,
             action: best_rollout.action,
             efe: best_rollout.expected_free_energy,
@@ -427,7 +428,7 @@ impl FepModule {
     }
 
     /// Get the trajectory planning history.
-    pub fn trajectory_history(&self) -> &[TrajectoryRecord] {
+    pub fn trajectory_history(&self) -> &VecDeque<TrajectoryRecord> {
         &self.trajectory_history
     }
 }

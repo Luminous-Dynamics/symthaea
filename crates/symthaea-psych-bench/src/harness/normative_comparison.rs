@@ -113,6 +113,7 @@ fn baseline_for_benchmark<'a>(
         // Binding domain — route to binding baselines, not worm
         name if name.contains("TemporalOrder") => Some(("discrimination_slope", &bl.binding)),
         name if name.contains("CrossModal") => Some(("cross_modal_binding_accuracy", &bl.binding)),
+        name if name.contains("FeatureConjunction") => Some(("conjunction_accuracy", &bl.binding)),
         name if name.contains("Binding") => Some(("binding_accuracy", &bl.worm)),
         name if name.contains("DigitSpan") => Some(("digit_span_forward", &bl.worm)),
 
@@ -208,11 +209,18 @@ fn baseline_for_benchmark<'a>(
             Some(("probabilistic_likelihood_weight", &bl.cogbench))
         }
 
-        // Creativity
-        name if name.contains("AlternateUses") => Some(("aut_fluency", &bl.creativity)),
-        name if name.contains("RemoteAssociates") => Some(("rat_overall_accuracy", &bl.creativity)),
+        // Creativity — IMPORTANT: baseline keys must match the key_metric scale.
+        // AlternateUses key_metric is "originality" (0-1 scale) → aut_originality (0.60±0.15).
+        // NOT aut_fluency (8.0±3.0, count scale) which causes z=-2.36 unit mismatch.
+        // RemoteAssociates key_metric is "mean_solution_rank" (1-10) → rat_mean_solution_rank.
+        // NOT rat_overall_accuracy (0-1) which causes z=-12.45 unit mismatch.
+        name if name.contains("AlternateUses") => Some(("aut_originality", &bl.creativity)),
+        name if name.contains("RemoteAssociates") => {
+            Some(("rat_mean_solution_rank", &bl.creativity))
+        }
 
-        // Butlin
+        // Butlin — key_metric is "mean_quality_score" (0-1) → mean_quality_score (0.80±0.10).
+        // NOT present_count (14.0±2.0, indicator count) which causes z=-6.57 unit mismatch.
         name if name.contains("Butlin") => Some(("mean_quality_score", &bl.butlin)),
 
         // Neuromod

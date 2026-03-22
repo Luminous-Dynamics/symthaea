@@ -4373,6 +4373,38 @@ impl CognitiveLoopService {
                 // Use GroundedUnderstanding to build a BinaryHV → ContinuousHV.
                 semantic_hv: nsm_semantic_hv.clone(),
                 semantic_confidence: nsm_semantic_confidence,
+
+                // Epistemic Cube: derive from CLS state when facade hasn't set explicit values.
+                // E-tier from epistemic confidence, H from phi/coherence, N/M default.
+                cube_e_tier: self.carryover.quality.last_cube_e_tier.or_else(|| {
+                    let conf = self.carryover.quality.last_epistemic_confidence;
+                    Some(if conf > 0.9 {
+                        4
+                    } else if conf > 0.7 {
+                        3
+                    } else if conf > 0.4 {
+                        2
+                    } else if conf > 0.2 {
+                        1
+                    } else {
+                        0
+                    })
+                }),
+                cube_n_tier: self.carryover.quality.last_cube_n_tier.or(Some(0)), // N0 personal
+                cube_m_tier: self.carryover.quality.last_cube_m_tier.or(Some(1)), // M1 temporal
+                cube_h_value: if self.carryover.quality.last_cube_h_value > 0.01 {
+                    self.carryover.quality.last_cube_h_value
+                } else {
+                    // Derive from phi + coherence
+                    (broca_psi + coherence).clamp(0.0, 2.0) / 2.0
+                },
+                cube_quality: if self.carryover.quality.last_cube_quality > 0.01 {
+                    self.carryover.quality.last_cube_quality
+                } else {
+                    // Derive: E×0.4 + N×0.35 + M×0.25 with defaults
+                    let e = self.carryover.quality.last_epistemic_confidence;
+                    (e * 0.40) + (0.0 / 3.0) * 0.35 + (1.0 / 3.0) * 0.25
+                },
             };
             if let Some(mut result) = broca.generate(signals) {
                 if !result.text.is_empty() {

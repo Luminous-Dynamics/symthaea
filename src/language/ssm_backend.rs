@@ -19,7 +19,9 @@ use symthaea_broca::{
 use symthaea_core::genesis::GenesisSeed;
 
 use super::llm_backend::{GenerationParams, LLMBackend};
-use crate::mind::structured_thought::{EpistemicStatus, SemanticIntent, StructuredThought};
+use crate::mind::structured_thought::{
+    ETier, EpistemicStatus, HTier, MTier, NTier, SemanticIntent, StructuredThought,
+};
 
 /// Trait for direct thought-to-text generation (bypasses text prompt serialization).
 pub trait DirectThoughtBackend: LLMBackend {
@@ -268,6 +270,39 @@ pub fn thought_to_channels(thought: &StructuredThought, mood_temperature: f32) -
 
     // Channel 19: concept count (capped at 10)
     ch.channels[19] = (thought.activated_concepts.len() as f32).min(10.0);
+
+    // Channels 28-42 (or 32-46 with therapeutic): Epistemic Cube from domain context
+    if let Some(ref dc) = thought.domain_context {
+        if let Some(ref cube) = dc.cube {
+            let e_tier = match cube.e {
+                ETier::E0 => 0,
+                ETier::E1 => 1,
+                ETier::E2 => 2,
+                ETier::E3 => 3,
+                ETier::E4 => 4,
+            };
+            let n_tier = match cube.n {
+                NTier::N0 => 0,
+                NTier::N1 => 1,
+                NTier::N2 => 2,
+                NTier::N3 => 3,
+            };
+            let m_tier = match cube.m {
+                MTier::M0 => 0,
+                MTier::M1 => 1,
+                MTier::M2 => 2,
+                MTier::M3 => 3,
+            };
+            let h_value = cube.harmonic().to_f64() as f32;
+
+            // Quality score: E×0.40 + N×0.35 + M×0.25 (normalized to 0-1)
+            let quality = (e_tier as f32 / 4.0) * 0.40
+                + (n_tier as f32 / 3.0) * 0.35
+                + (m_tier as f32 / 3.0) * 0.25;
+
+            ch.set_epistemic_cube(e_tier, n_tier, m_tier, h_value, quality);
+        }
+    }
 
     ch
 }

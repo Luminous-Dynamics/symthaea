@@ -468,7 +468,11 @@ pub use dream::{
     DreamEngine, DreamEngineConfig, DreamEngineStats, DreamEvent, DreamResult, Wisdom,
 };
 pub use eight_harmonies::{AlignmentResult, EightHarmonies, Harmony, HarmonyAlignment};
-pub use epistemic_tiers::{EmpiricalTier, EpistemicCoordinate, MaterialityTier, NormativeTier};
+pub use epistemic_tiers::{
+    EmpiricalTier, EmpiricalTierPrimitiveGrounding, EpistemicCoordinate, EpistemicNSMGrounding,
+    MaterialityTier, MaterialityTierPrimitiveGrounding, NormativeTier,
+    NormativeTierPrimitiveGrounding,
+};
 pub use fep_active_inference::{
     ActionSelectionResult, ActiveInferenceAgent, ActiveInferenceAgentConfig,
     ActiveInferenceAgentStats, ActiveInferenceSummary, CognitiveLoopFEPBridge,

@@ -711,7 +711,12 @@ impl PredictiveProcessor {
         if self.accuracy_window.is_empty() {
             return 0.5; // Neutral
         }
-        self.accuracy_window.iter().sum::<f64>() / self.accuracy_window.len() as f64
+        let result = self.accuracy_window.iter().sum::<f64>() / self.accuracy_window.len() as f64;
+        if result.is_finite() {
+            result
+        } else {
+            0.5
+        }
     }
 
     /// Get average surprise (higher = more unpredictable)
@@ -719,7 +724,13 @@ impl PredictiveProcessor {
         if self.error_history.is_empty() {
             return 0.0;
         }
-        self.error_history.iter().map(|e| e.surprise).sum::<f64>() / self.error_history.len() as f64
+        let result = self.error_history.iter().map(|e| e.surprise).sum::<f64>()
+            / self.error_history.len() as f64;
+        if result.is_finite() {
+            result
+        } else {
+            0.0
+        }
     }
 
     /// Calculate PP metric (prediction success)

@@ -1603,6 +1603,7 @@ impl BenchmarkReport {
             || benchmark.contains("Spatial")
             || benchmark.contains("CausalReasoning")
             || benchmark.contains("Security")
+            || benchmark.contains("Coding")
         {
             comps
         } else {

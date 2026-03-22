@@ -227,8 +227,8 @@ impl IntegrityManager {
         self.substrate_tau_factor = tau;
         // Scale temporal monitor thresholds: faster substrate → shorter acceptable cycles
         let inv_tau = 1.0 / tau.max(0.01);
-        self.temporal.min_cycle_duration =
-            std::time::Duration::from_micros((100.0 * inv_tau as f64) as u64);
+        let micros = (100.0 * inv_tau as f64).clamp(1.0, 10_000_000.0) as u64;
+        self.temporal.min_cycle_duration = std::time::Duration::from_micros(micros);
     }
 
     /// Compute a deterministic jittered attestation interval for the given cycle.

@@ -34,7 +34,7 @@
 //! 3. **Preserves co-prime intervals**: Each subsystem fires at its original rate
 //! 4. **Backward compatible**: All existing carryover fields populated
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -1547,11 +1547,11 @@ impl EthicsEngine {
 /// Science: Friston (2010) active inference; Cushman (2013) dual-process moral cognition.
 pub(crate) struct ConsequenceTracker {
     /// Pending predictions awaiting outcome observation.
-    pending: Vec<ConsequencePrediction>,
+    pending: VecDeque<ConsequencePrediction>,
     /// Maximum pending predictions (prevents unbounded growth).
     max_pending: usize,
     /// Completed predictions with observed outcomes.
-    completed: Vec<ConsequenceOutcome>,
+    completed: VecDeque<ConsequenceOutcome>,
     /// Maximum completed outcomes to retain (ring buffer).
     max_completed: usize,
     /// Running prediction accuracy (EMA, alpha=0.05).
@@ -1586,9 +1586,9 @@ pub(crate) struct ConsequenceOutcome {
 impl ConsequenceTracker {
     pub(crate) fn new() -> Self {
         Self {
-            pending: Vec::new(),
+            pending: VecDeque::new(),
             max_pending: 100,
-            completed: Vec::new(),
+            completed: VecDeque::new(),
             max_completed: 500,
             accuracy_ema: 0.5,
             total_predictions: 0,
@@ -1614,9 +1614,9 @@ impl ConsequenceTracker {
         affect_valence: f64,
     ) {
         if self.pending.len() >= self.max_pending {
-            self.pending.remove(0);
+            self.pending.pop_front();
         }
-        self.pending.push(ConsequencePrediction {
+        self.pending.push_back(ConsequencePrediction {
             action_id,
             predicted_verdict: verdict,
             consciousness_at_prediction: consciousness,
@@ -1635,7 +1635,7 @@ impl ConsequenceTracker {
         current_cycle: u64,
     ) -> Option<f64> {
         let idx = self.pending.iter().position(|p| p.action_id == action_id)?;
-        let prediction = self.pending.remove(idx);
+        let prediction = self.pending.remove(idx)?;
 
         let phi_delta = observed_phi - prediction.baseline_community_phi;
         let valence_delta = observed_valence - prediction.baseline_affect_valence;
@@ -1665,9 +1665,9 @@ impl ConsequenceTracker {
             observation_delay_cycles: delay,
         };
         if self.completed.len() >= self.max_completed {
-            self.completed.remove(0);
+            self.completed.pop_front();
         }
-        self.completed.push(outcome);
+        self.completed.push_back(outcome);
 
         Some(pe)
     }

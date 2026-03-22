@@ -746,7 +746,12 @@ impl CognitiveLoopService {
         }
 
         if denominator.abs() > 0.0001 {
-            numerator / denominator
+            let slope = numerator / denominator;
+            if slope.is_finite() {
+                slope
+            } else {
+                0.0
+            }
         } else {
             0.0
         }

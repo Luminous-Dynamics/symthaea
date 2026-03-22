@@ -603,7 +603,7 @@ impl CognitiveLoopService {
                 surprise_bridge,
                 trajectory_config: super::fep_module::TrajectoryPlanningConfig::default(),
                 trajectory_telemetry: super::fep_module::TrajectoryTelemetry::default(),
-                trajectory_history: Vec::new(),
+                trajectory_history: VecDeque::new(),
             },
             feedback_state: super::feedback_state::FeedbackState::new(),
             coherence_tracker: ConversationCoherenceTracker::new(0.3),

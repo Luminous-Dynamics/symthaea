@@ -5,7 +5,7 @@
 //! all experiences and transformations.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::hash::{Hash, Hasher};
 use symthaea_core::hdc::ContinuousHV;
 
@@ -137,7 +137,7 @@ pub struct Soul {
     /// Soul embedding (integrated essence)
     essence: ContinuousHV,
     /// Experience history (for learning)
-    experience_history: Vec<Experience>,
+    experience_history: VecDeque<Experience>,
     /// Statistics
     stats: SoulStats,
 }
@@ -247,7 +247,7 @@ impl Soul {
             core_values,
             self_model,
             essence,
-            experience_history: Vec::new(),
+            experience_history: VecDeque::new(),
             stats: SoulStats::default(),
         }
     }
@@ -315,9 +315,9 @@ impl Soul {
             (self.stats.avg_value_alignment * (n - 1.0) + experience.value_alignment) / n;
 
         // Store experience
-        self.experience_history.push(experience);
+        self.experience_history.push_back(experience);
         if self.experience_history.len() > 1000 {
-            self.experience_history.remove(0);
+            self.experience_history.pop_front();
         }
 
         // Update self-assessment

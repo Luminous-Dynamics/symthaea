@@ -240,7 +240,9 @@ impl CrossTheoryIntegrator {
     ) {
         if passes.len() >= 2 {
             // Multiple passes indicate refined understanding
-            let last_pass = passes.last().expect("passes.len() >= 2 checked above");
+            let Some(last_pass) = passes.last() else {
+                return;
+            };
             let improvement = last_pass.confidence;
 
             // Learn from recurrent processing

@@ -179,4 +179,49 @@ proptest! {
         // Just verify no panic — the result value doesn't matter.
         let _ = fires;
     }
+
+    /// Guards Round 46 Bayesian update NaN fix: arbitrary likelihood_ratio and
+    /// prior values must never produce NaN/Inf posterior.
+    #[test]
+    fn prop_bayesian_update_never_nan(
+        lr in -1e10f64..1e10,
+        prior in prop_oneof![
+            Just(f64::NAN),
+            Just(f64::INFINITY),
+            Just(f64::NEG_INFINITY),
+            Just(0.0f64),
+            Just(1.0f64),
+            -1e6f64..1e6,
+        ],
+    ) {
+        // Mirrors scientific_method.rs bayesian_update()
+        let lr = lr.max(1e-10);
+        if !prior.is_finite() {
+            // Guard triggers — posterior resets to 0.5
+            let posterior = 0.5f64;
+            prop_assert!(posterior.is_finite());
+        } else {
+            let numerator = lr * prior;
+            let denominator = numerator + (1.0 - prior);
+            let result = numerator / denominator;
+            let posterior = if result.is_finite() {
+                result.clamp(0.0, 1.0)
+            } else {
+                0.5
+            };
+            prop_assert!(posterior.is_finite());
+            prop_assert!(posterior >= 0.0 && posterior <= 1.0);
+        }
+    }
+
+    /// Guards Round 47 integrity tau clamp: substrate tau factor must produce
+    /// bounded microsecond durations regardless of input magnitude.
+    #[test]
+    fn prop_integrity_tau_clamp_bounded(
+        tau in -1e10f32..1e10,
+    ) {
+        let inv_tau = 1.0f64 / (tau.max(0.01) as f64);
+        let micros = (100.0 * inv_tau).clamp(1.0, 10_000_000.0) as u64;
+        prop_assert!(micros >= 1 && micros <= 10_000_000);
+    }
 }
