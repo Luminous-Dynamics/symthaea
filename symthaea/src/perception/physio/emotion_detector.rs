@@ -43,7 +43,7 @@
 //! - Koelstra et al. (2012). DEAP: A database for emotion analysis
 //! - Zheng & Lu (2015). SEED: Investigating EEG-based emotion recognition
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::f64::consts::PI;
 
 /// Emotional state in the Valence-Arousal circumplex
@@ -636,7 +636,7 @@ pub struct EmotionSentinel {
     /// Arousal detector
     arousal_detector: ArousalDetector,
     /// History of emotional states
-    history: Vec<EmotionalState>,
+    history: VecDeque<EmotionalState>,
     /// Maximum history length
     max_history: usize,
 }
@@ -647,7 +647,7 @@ impl EmotionSentinel {
         Self {
             frontal_asymmetry: FrontalAsymmetry::new(),
             arousal_detector: ArousalDetector::new(),
-            history: Vec::new(),
+            history: VecDeque::new(),
             max_history: 100,
         }
     }
@@ -687,9 +687,9 @@ impl EmotionSentinel {
         let state = EmotionalState::new(valence, arousal, dominance, confidence);
 
         // Store in history
-        self.history.push(state);
+        self.history.push_back(state);
         if self.history.len() > self.max_history {
-            self.history.remove(0);
+            self.history.pop_front();
         }
 
         state
@@ -702,12 +702,12 @@ impl EmotionSentinel {
         }
 
         let window = window.min(self.history.len());
-        let recent = &self.history[self.history.len() - window..];
+        let skip = self.history.len() - window;
 
-        let avg_valence = recent.iter().map(|s| s.valence).sum::<f64>() / window as f64;
-        let avg_arousal = recent.iter().map(|s| s.arousal).sum::<f64>() / window as f64;
-        let avg_dominance = recent.iter().map(|s| s.dominance).sum::<f64>() / window as f64;
-        let avg_confidence = recent.iter().map(|s| s.confidence).sum::<f64>() / window as f64;
+        let avg_valence = self.history.iter().skip(skip).map(|s| s.valence).sum::<f64>() / window as f64;
+        let avg_arousal = self.history.iter().skip(skip).map(|s| s.arousal).sum::<f64>() / window as f64;
+        let avg_dominance = self.history.iter().skip(skip).map(|s| s.dominance).sum::<f64>() / window as f64;
+        let avg_confidence = self.history.iter().skip(skip).map(|s| s.confidence).sum::<f64>() / window as f64;
 
         EmotionalState::new(avg_valence, avg_arousal, avg_dominance, avg_confidence)
     }
@@ -715,7 +715,7 @@ impl EmotionSentinel {
     /// Get the current detected emotion category
     pub fn current_emotion(&self) -> EmotionCategory {
         self.history
-            .last()
+            .back()
             .map(|s| s.classify())
             .unwrap_or(EmotionCategory::Neutral)
     }

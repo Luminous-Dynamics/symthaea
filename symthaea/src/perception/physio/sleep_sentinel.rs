@@ -907,6 +907,38 @@ impl ConsciousnessState {
     }
 }
 
+/// Result of computing the Phi proxy for a signal window.
+///
+/// Contains the core integration measures plus spectral features
+/// needed for sleep stage analysis and consciousness benchmarking.
+#[derive(Debug, Clone)]
+pub struct PhiProxyResult {
+    /// Integration measure: synchrony × bidirectional causality (0..1).
+    pub phi_proxy: f32,
+    /// Pearson correlation between frontal and occipital channels, normalized to 0..1.
+    pub synchrony: f32,
+    /// Combined signal variance scaled to 0..1.
+    pub complexity: f32,
+    /// Permutation entropy (order 3) of the frontal channel (0..~2.58).
+    pub permutation_entropy: f32,
+    /// Dominant frequency estimated from zero crossings (Hz).
+    pub dominant_freq_hz: f32,
+    /// Lagged causal influence: frontal → occipital (0..1).
+    pub frontal_to_occipital: f32,
+    /// Lagged causal influence: occipital → frontal (0..1).
+    pub occipital_to_frontal: f32,
+    /// Delta band power (0.5-4 Hz).
+    pub delta_power: f32,
+    /// Theta band power (4-8 Hz).
+    pub theta_power: f32,
+    /// Alpha band power (8-12 Hz).
+    pub alpha_power: f32,
+    /// Beta band power (12-30 Hz).
+    pub beta_power: f32,
+    /// Gamma band power (30-100 Hz).
+    pub gamma_power: f32,
+}
+
 /// Integration metrics (Φ proxy)
 #[derive(Debug, Clone)]
 pub struct IntegrationMetrics {
@@ -1373,6 +1405,46 @@ impl SleepSentinel {
         } else {
             10.0
         };
+    }
+
+    /// Compute the Phi proxy (integration measure) from raw signal buffers.
+    ///
+    /// Returns `(phi_proxy, synchrony, complexity, permutation_entropy)` for the
+    /// current integration window. Returns `None` if insufficient data (<50 samples).
+    ///
+    /// - **phi_proxy**: synchrony × bidirectional causality (0..1)
+    /// - **synchrony**: Pearson correlation between frontal and occipital (normalized to 0..1)
+    /// - **complexity**: combined signal variance scaled to 0..1
+    /// - **permutation_entropy**: order-3 permutation entropy of frontal channel (0..1)
+    pub fn compute_phi_proxy(&mut self) -> Option<PhiProxyResult> {
+        if self.frontal_history.len() < 50 {
+            return None;
+        }
+        self.update_metrics();
+        let m = &self.current_metrics;
+
+        // Compute permutation entropy from raw frontal signal
+        let raw_frontal: Vec<f64> = self
+            .raw_input_history
+            .iter()
+            .map(|(f, _)| *f as f64)
+            .collect();
+        let perm_entropy = super::permutation_entropy_order3(&raw_frontal, 1);
+
+        Some(PhiProxyResult {
+            phi_proxy: m.phi_proxy,
+            synchrony: m.synchrony,
+            complexity: m.complexity,
+            permutation_entropy: perm_entropy as f32,
+            dominant_freq_hz: m.dominant_freq_hz,
+            frontal_to_occipital: m.frontal_to_occipital,
+            occipital_to_frontal: m.occipital_to_frontal,
+            delta_power: m.delta_power,
+            theta_power: m.theta_power,
+            alpha_power: m.alpha_power,
+            beta_power: m.beta_power,
+            gamma_power: m.gamma_power,
+        })
     }
 
     /// Classify consciousness state based on metrics

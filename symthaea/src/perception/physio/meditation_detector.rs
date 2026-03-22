@@ -49,7 +49,7 @@
 //! - Cahn & Polich (2006): Meditation and EEG review
 //! - Csikszentmihalyi (1990): Flow - The Psychology of Optimal Experience
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::f64::consts::PI;
 
 /// Meditation/Flow state in the Focus-Attention space
@@ -574,7 +574,7 @@ pub struct MeditationSentinel {
     /// Gamma synchrony detector
     gamma_sync: GammaSynchrony,
     /// History of states
-    history: Vec<MeditationState>,
+    history: VecDeque<MeditationState>,
     /// Maximum history
     max_history: usize,
 }
@@ -586,7 +586,7 @@ impl MeditationSentinel {
             fmt: FrontalMidlineTheta::new(),
             alpha_coherence: AlphaCoherence::new(),
             gamma_sync: GammaSynchrony::new(),
-            history: Vec::new(),
+            history: VecDeque::new(),
             max_history: 100,
         }
     }
@@ -618,9 +618,9 @@ impl MeditationSentinel {
         let state = MeditationState::new(focus, calm, flow, presence, confidence);
 
         // Store history
-        self.history.push(state);
+        self.history.push_back(state);
         if self.history.len() > self.max_history {
-            self.history.remove(0);
+            self.history.pop_front();
         }
 
         state
@@ -633,13 +633,13 @@ impl MeditationSentinel {
         }
 
         let window = window.min(self.history.len());
-        let recent = &self.history[self.history.len() - window..];
+        let skip = self.history.len() - window;
 
-        let avg_focus = recent.iter().map(|s| s.focus).sum::<f64>() / window as f64;
-        let avg_calm = recent.iter().map(|s| s.calm).sum::<f64>() / window as f64;
-        let avg_flow = recent.iter().map(|s| s.flow).sum::<f64>() / window as f64;
-        let avg_presence = recent.iter().map(|s| s.presence).sum::<f64>() / window as f64;
-        let avg_confidence = recent.iter().map(|s| s.confidence).sum::<f64>() / window as f64;
+        let avg_focus = self.history.iter().skip(skip).map(|s| s.focus).sum::<f64>() / window as f64;
+        let avg_calm = self.history.iter().skip(skip).map(|s| s.calm).sum::<f64>() / window as f64;
+        let avg_flow = self.history.iter().skip(skip).map(|s| s.flow).sum::<f64>() / window as f64;
+        let avg_presence = self.history.iter().skip(skip).map(|s| s.presence).sum::<f64>() / window as f64;
+        let avg_confidence = self.history.iter().skip(skip).map(|s| s.confidence).sum::<f64>() / window as f64;
 
         MeditationState::new(avg_focus, avg_calm, avg_flow, avg_presence, avg_confidence)
     }
@@ -647,7 +647,7 @@ impl MeditationSentinel {
     /// Current category
     pub fn current_category(&self) -> MeditationCategory {
         self.history
-            .last()
+            .back()
             .map(|s| s.classify())
             .unwrap_or(MeditationCategory::Wandering)
     }

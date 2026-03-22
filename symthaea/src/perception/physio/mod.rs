@@ -43,5 +43,5 @@ pub use meditation_detector::{
 };
 pub use sleep_sentinel::{
     AdaptiveThresholdConfig, CalibrationData, CalibrationState, ConsciousnessState,
-    IntegrationMetrics, SleepSentinel, SleepSentinelConfig, SleepSentinelStats,
+    IntegrationMetrics, PhiProxyResult, SleepSentinel, SleepSentinelConfig, SleepSentinelStats,
 };

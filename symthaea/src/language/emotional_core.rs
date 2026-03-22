@@ -5,7 +5,7 @@
 //! response generation.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::primitive_system::PrimitiveSystem;
 use symthaea_core::hdc::ContinuousHV;
@@ -232,7 +232,7 @@ pub struct EmotionalCore {
     /// Primitive-grounded emotions (NSM semantic primes)
     primitive_groundings: HashMap<String, EmotionPrimitiveGrounding>,
     /// Emotional memory (recent states)
-    memory: Vec<EmotionalAnalysis>,
+    memory: VecDeque<EmotionalAnalysis>,
     /// Current emotional state
     current_state: EmotionalAnalysis,
     /// Statistics
@@ -282,7 +282,7 @@ impl EmotionalCore {
             config,
             emotion_embeddings,
             primitive_groundings,
-            memory: Vec::new(),
+            memory: VecDeque::new(),
             stats: EmotionalCoreStats::default(),
         }
     }
@@ -405,9 +405,9 @@ impl EmotionalCore {
 
         // Store in memory
         if self.config.memory_enabled {
-            self.memory.push(analysis.clone());
+            self.memory.push_back(analysis.clone());
             if self.memory.len() > 100 {
-                self.memory.remove(0);
+                self.memory.pop_front();
             }
         }
 
@@ -477,7 +477,7 @@ impl EmotionalCore {
     }
 
     /// Get emotional memory
-    pub fn memory(&self) -> &[EmotionalAnalysis] {
+    pub fn memory(&self) -> &VecDeque<EmotionalAnalysis> {
         &self.memory
     }
 
