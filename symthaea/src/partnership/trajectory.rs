@@ -44,7 +44,9 @@ impl RelationshipTrajectory {
         }
 
         let first = &self.points[0];
-        let last = self.points.last().expect("len >= 2 checked above");
+        let Some(last) = self.points.last() else {
+            return None;
+        };
 
         let phi_delta = last.phi_dyad - first.phi_dyad;
         let stages_visited = self.points.iter().map(|p| p.stage).collect();

@@ -851,10 +851,21 @@ impl ConfigurableScientificMethodEngine {
         if let Some(h) = self.hypotheses.iter_mut().find(|h| h.id == hypothesis_id) {
             let lr = likelihood_ratio.max(1e-10); // prevent division by zero
             let prior = h.posterior;
+            if !prior.is_finite() {
+                // Corrupted prior — reset to uninformative
+                h.posterior = 0.5;
+                self.telemetry.bayesian_updates += 1;
+                return true;
+            }
             // Bayes: posterior = lr * prior / (lr * prior + 1 * (1 - prior))
             let numerator = lr * prior;
             let denominator = numerator + (1.0 - prior);
-            h.posterior = (numerator / denominator).clamp(0.0, 1.0);
+            let result = numerator / denominator;
+            h.posterior = if result.is_finite() {
+                result.clamp(0.0, 1.0)
+            } else {
+                0.5 // NaN/Inf from arithmetic — reset
+            };
             self.telemetry.bayesian_updates += 1;
             true
         } else {

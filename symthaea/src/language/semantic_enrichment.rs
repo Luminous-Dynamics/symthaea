@@ -29,7 +29,7 @@
 //!     └──► Coherence Calculator ──► Φ Signal
 //! ```
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use symthaea_core::hdc::universal_semantics::SemanticPrime;
 
 // ============================================================================
@@ -1601,7 +1601,7 @@ pub struct SelfLearningVocabulary {
     /// Learned associations: word -> (primes, confidence, observation_count)
     learned: HashMap<String, (Vec<SemanticPrime>, f64, usize)>,
     /// Interaction history (recent)
-    history: Vec<LearnableInteraction>,
+    history: VecDeque<LearnableInteraction>,
     /// Max history size
     max_history: usize,
     /// Learning rate
@@ -1613,7 +1613,7 @@ impl Default for SelfLearningVocabulary {
         Self {
             inference: CompositionalInference::new(),
             learned: HashMap::new(),
-            history: Vec::new(),
+            history: VecDeque::new(),
             max_history: 1000,
             learning_rate: 0.1,
         }
@@ -1660,9 +1660,9 @@ impl SelfLearningVocabulary {
         }
 
         // Add to history
-        self.history.push(interaction);
+        self.history.push_back(interaction);
         if self.history.len() > self.max_history {
-            self.history.remove(0);
+            self.history.pop_front();
         }
     }
 
@@ -1681,9 +1681,9 @@ impl SelfLearningVocabulary {
         };
 
         // Add to history but don't reinforce
-        self.history.push(interaction);
+        self.history.push_back(interaction);
         if self.history.len() > self.max_history {
-            self.history.remove(0);
+            self.history.pop_front();
         }
     }
 
