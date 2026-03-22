@@ -123,6 +123,7 @@ fn run_eval(genesis: &GenesisSeed, bench: &BenchRun, dataset: &TrainingDataset) 
         compute_english_ratio: true,
         per_intent_breakdown: false,
         max_gen_tokens: 20,
+        eval_limit: 0,
     };
     evaluation::evaluate(&mut gen, &eval_cfg)
 }
@@ -267,6 +268,7 @@ fn main() {
             compute_english_ratio: true,
             per_intent_breakdown: false,
             max_gen_tokens: 20,
+            eval_limit: 0,
         };
         let r = evaluation::evaluate(&mut gen, &eval_cfg);
         eprintln!(

@@ -7,6 +7,244 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Code-specific tokens for programming language generation.
+///
+/// These tokens cover Rust keywords, Python keywords, operators, common types,
+/// and common patterns. Each token is assigned an ID in the 4000-4200 range
+/// when added to the vocabulary builder.
+pub const CODE_TOKENS: &[&str] = &[
+    // ── Rust keywords ──
+    "fn",
+    "let",
+    "mut",
+    "pub",
+    "struct",
+    "enum",
+    "impl",
+    "trait",
+    "match",
+    "where",
+    "mod",
+    "use",
+    "crate",
+    "self",
+    "super",
+    "async",
+    "await",
+    "unsafe",
+    "dyn",
+    "ref",
+    "move",
+    "return",
+    "break",
+    "continue",
+    "loop",
+    "while",
+    "for",
+    "in",
+    "if",
+    "else",
+    "type",
+    "const",
+    "static",
+    "extern",
+    "as",
+    "true",
+    "false",
+    // ── Python keywords ──
+    "def",
+    "class",
+    "import",
+    "from",
+    "yield",
+    "lambda",
+    "pass",
+    "raise",
+    "try",
+    "except",
+    "finally",
+    "with",
+    "assert",
+    "global",
+    "nonlocal",
+    "del",
+    "elif",
+    "None",
+    "True",
+    "False",
+    // Note: "self", "return", "for", "in", "if", "else", "while", "break",
+    // "continue", "as", "from" overlap with Rust and are already above.
+    // ── Operators & syntax ──
+    "->",
+    "=>",
+    "::",
+    "..",
+    "..=",
+    "&mut",
+    "&str",
+    "&self",
+    "#[",
+    "]",
+    "()",
+    "{}",
+    "[]",
+    ";",
+    "@@",
+    "|>",
+    "<|",
+    // ── Common types ──
+    "Vec",
+    "HashMap",
+    "HashSet",
+    "Option",
+    "Result",
+    "String",
+    "Box",
+    "Arc",
+    "Mutex",
+    "Rc",
+    "RefCell",
+    "i32",
+    "i64",
+    "u32",
+    "u64",
+    "f32",
+    "f64",
+    "usize",
+    "bool",
+    "str",
+    // ── Common patterns ──
+    "fn main",
+    "pub fn",
+    "impl Display",
+    "#[derive",
+    "#[test]",
+    "#[cfg",
+    "assert_eq!",
+    "assert!",
+    "println!",
+    "eprintln!",
+    "format!",
+    "vec!",
+    "todo!",
+    "unimplemented!",
+    "Ok(",
+    "Err(",
+    "Some(",
+    "unwrap()",
+    // ── Nix keywords ──
+    "pkgs",
+    "mkDerivation",
+    "buildInputs",
+    "nativeBuildInputs",
+    "fetchFromGitHub",
+    "stdenv",
+    "lib",
+    "callPackage",
+    "override",
+    "overrideAttrs",
+    // ── Common code fragments ──
+    "pub struct",
+    "pub enum",
+    "pub trait",
+    "pub mod",
+    "pub use",
+    "impl Iterator",
+    "impl From",
+    "impl Into",
+    "impl Default",
+    "fn new",
+    "fn default",
+    "fn from",
+    "::<",
+    ">::",
+    "Result<",
+    "Option<",
+    "Vec<",
+    "Box<",
+    "Arc<",
+    "-> Self",
+    "-> Result",
+    "-> Option",
+    "-> bool",
+    "-> usize",
+    "&self,",
+    "&mut self",
+    "self,",
+    "mut self",
+    "pub fn new",
+    "pub fn default",
+    // ── Indentation / structure ──
+    "    ",
+    "        ",
+    "            ",
+    "{\n",
+    "}\n",
+    "(\n",
+    ")\n",
+    // ── Common string patterns ──
+    "\"\"",
+    "''",
+    "r#\"",
+    "\"#",
+    // ── Python patterns ──
+    "def __init__",
+    "self.",
+    "import ",
+    "from ",
+    "class ",
+    "__name__",
+    "__main__",
+    "if __name__",
+    // ── Comment patterns ──
+    "//",
+    "///",
+    "//!",
+    "/*",
+    "*/",
+    "#",
+    "# ",
+    // ── Lifetime / generics ──
+    "'a",
+    "'static",
+    "<T>",
+    "<T, E>",
+    "<'a>",
+    // Padding to reach ~200 tokens
+    "where T:",
+    "where Self:",
+    "impl<T>",
+    "fn<T>",
+    "match self",
+    "match &self",
+    ".unwrap()",
+    ".expect(",
+    ".map(",
+    ".filter(",
+    ".collect()",
+    ".iter()",
+    ".into_iter()",
+    ".enumerate()",
+    ".zip(",
+    ".ok_or(",
+    ".unwrap_or(",
+    ".unwrap_or_default()",
+    "use std::",
+    "use crate::",
+    "use super::",
+    "#[allow(",
+    "#[deny(",
+    "#[warn(",
+    "#[inline]",
+    "#[must_use]",
+    "#[repr(",
+    "Default::default()",
+    "String::new()",
+    "Vec::new()",
+    "HashMap::new()",
+    "HashSet::new()",
+];
+
 /// Special token IDs.
 pub const BOS_TOKEN: &str = "<bos>";
 pub const EOS_TOKEN: &str = "<eos>";
@@ -262,6 +500,13 @@ impl BpeTokenizer {
         for word in common_words {
             if !tokens.contains(&word.to_string()) {
                 tokens.push(word.to_string());
+            }
+        }
+
+        // Code-specific tokens (IDs starting after common words)
+        for token in CODE_TOKENS {
+            if !tokens.contains(&token.to_string()) {
+                tokens.push(token.to_string());
             }
         }
 
@@ -539,6 +784,30 @@ impl BpeTokenizer {
             || id == self.thought_id
     }
 
+    /// Add all code-specific tokens from `CODE_TOKENS` to the vocabulary.
+    ///
+    /// Tokens that already exist in the vocabulary are skipped (idempotent).
+    /// Returns the number of new tokens added.
+    pub fn add_code_tokens(&mut self) -> usize {
+        let mut added = 0;
+        for &token in CODE_TOKENS {
+            if !self.token_to_id.contains_key(token) {
+                self.add_token(token);
+                added += 1;
+            }
+        }
+        added
+    }
+
+    /// Check if a token is a code-specific token.
+    pub fn is_code_token(&self, id: u32) -> bool {
+        if let Some(token_str) = self.id_to_token.get(id as usize) {
+            CODE_TOKENS.contains(&token_str.as_str())
+        } else {
+            false
+        }
+    }
+
     /// Add a new token to the vocabulary (for swarm vocabulary extension).
     /// Returns the new token's ID.
     pub fn add_token(&mut self, token: &str) -> u32 {
@@ -613,7 +882,7 @@ mod tests {
     fn test_default_minimal_creates_vocab() {
         let tok = BpeTokenizer::default_minimal();
         assert!(tok.vocab_size() > 100, "should have >100 tokens");
-        assert!(tok.vocab_size() < 500, "should be a minimal vocab");
+        assert!(tok.vocab_size() < 700, "should be a minimal vocab");
     }
 
     #[test]
@@ -797,6 +1066,54 @@ mod tests {
         let json = serde_json::to_string(&vocab).unwrap();
         let parsed: VocabFile = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.tokens.len(), tok.vocab_size());
+    }
+
+    #[test]
+    fn test_code_tokens_in_minimal_vocab() {
+        let tok = BpeTokenizer::default_minimal();
+        // Code tokens should be present in the minimal vocab
+        for &token in &["fn", "struct", "impl", "->", "Vec", "pub fn"] {
+            let id = tok.token_id(token);
+            assert_ne!(
+                id, tok.unk_id,
+                "Code token '{token}' should be in minimal vocab"
+            );
+        }
+    }
+
+    #[test]
+    fn test_add_code_tokens_idempotent() {
+        let mut tok = BpeTokenizer::default_minimal();
+        let size_before = tok.vocab_size();
+        // Code tokens are already in minimal vocab, so adding again should add 0
+        let added = tok.add_code_tokens();
+        assert_eq!(
+            added, 0,
+            "Code tokens already in vocab should not be re-added"
+        );
+        assert_eq!(tok.vocab_size(), size_before);
+    }
+
+    #[test]
+    fn test_is_code_token() {
+        let tok = BpeTokenizer::default_minimal();
+        let fn_id = tok.token_id("fn");
+        assert!(tok.is_code_token(fn_id), "'fn' should be a code token");
+        let the_id = tok.token_id("the");
+        assert!(
+            !tok.is_code_token(the_id),
+            "'the' should not be a code token"
+        );
+    }
+
+    #[test]
+    fn test_code_token_encode_decode() {
+        let tok = BpeTokenizer::default_minimal();
+        let text = "fn main";
+        let ids = tok.encode(text);
+        assert!(!ids.is_empty());
+        let decoded = tok.decode(&ids);
+        assert_eq!(decoded, text, "Code token roundtrip should be lossless");
     }
 
     #[test]

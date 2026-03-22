@@ -83,7 +83,9 @@ fn main() {
             }
         }
     } else {
-        let config = BrocaConfig::default();
+        let mut config = BrocaConfig::default();
+        config.controller.network_layers = opts.network_layers;
+        config.controller.neurons_per_layer = opts.neurons_per_layer;
         (BrocaGenerator::new_4k(&genesis, config), None)
     };
 
@@ -114,6 +116,17 @@ fn main() {
         adam_state = None;
     }
 
+    // Auto-generate best checkpoint path: output.bin → output.best.bin
+    let best_path = if opts.best_checkpoint_path.is_empty() && opts.patience > 0 {
+        if let Some(stem) = opts.output_path.strip_suffix(".bin") {
+            format!("{stem}.best.bin")
+        } else {
+            format!("{}.best", opts.output_path)
+        }
+    } else {
+        opts.best_checkpoint_path.clone()
+    };
+
     let train_config = TrainingConfig {
         epochs: opts.epochs,
         learning_rate: opts.learning_rate,
@@ -138,6 +151,12 @@ fn main() {
         merge_token_loss_weight: opts.merge_token_loss_weight,
         enable_fusion_during_training: opts.enable_fusion,
         fusion_warmup_epochs: opts.fusion_warmup_epochs,
+        contrastive_weight: opts.contrastive_weight,
+        contrastive_margin: opts.contrastive_margin,
+        scheduled_sampling_max: opts.scheduled_sampling,
+        label_smoothing: opts.label_smoothing,
+        best_checkpoint_path: best_path,
+        hidden_dropout: opts.hidden_dropout,
         ..Default::default()
     };
 
@@ -261,6 +280,7 @@ fn main() {
             compute_english_ratio: true,
             per_intent_breakdown: true,
             max_gen_tokens: 64,
+            eval_limit: 0,
         };
 
         let result = evaluation::evaluate(&mut generator, &eval_config);
@@ -348,6 +368,23 @@ struct TrainOpts {
     fusion_warmup_epochs: usize,
     /// Disable thought-seeded CfC initial state.
     no_thought_seed: bool,
+    /// Contrastive intent loss weight (default: 0.0 = off).
+    contrastive_weight: f32,
+    /// Contrastive margin (default: 0.0).
+    contrastive_margin: f32,
+    /// Scheduled sampling max probability (default: 0.0 = pure teacher forcing).
+    /// Linearly anneals from 0 to this value over training epochs.
+    scheduled_sampling: f32,
+    /// Label smoothing epsilon (default: 0.0 = disabled).
+    label_smoothing: f32,
+    /// Save best checkpoint path (auto-generated from output if not specified).
+    best_checkpoint_path: String,
+    /// Hidden state dropout rate (default: 0.0 = disabled).
+    hidden_dropout: f32,
+    /// CfC network layers (default: 3). Only used for fresh training (not --resume).
+    network_layers: usize,
+    /// CfC neurons per layer (default: 8). Only used for fresh training (not --resume).
+    neurons_per_layer: usize,
 }
 
 fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
@@ -381,6 +418,14 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
         enable_fusion: false,
         fusion_warmup_epochs: 0,
         no_thought_seed: false,
+        contrastive_weight: 0.0,
+        contrastive_margin: 0.0,
+        scheduled_sampling: 0.0,
+        label_smoothing: 0.0,
+        best_checkpoint_path: String::new(),
+        hidden_dropout: 0.0,
+        network_layers: 3,
+        neurons_per_layer: 8,
     };
 
     let mut i = 1;
@@ -554,6 +599,62 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
             "--no-thought-seed" => {
                 opts.no_thought_seed = true;
             }
+            "--contrastive" => {
+                i += 1;
+                opts.contrastive_weight = args
+                    .get(i)
+                    .ok_or("--contrastive requires a number")?
+                    .parse()
+                    .map_err(|_| "--contrastive must be a float")?;
+            }
+            "--contrastive-margin" => {
+                i += 1;
+                opts.contrastive_margin = args
+                    .get(i)
+                    .ok_or("--contrastive-margin requires a number")?
+                    .parse()
+                    .map_err(|_| "--contrastive-margin must be a float")?;
+            }
+            "--scheduled-sampling" => {
+                i += 1;
+                opts.scheduled_sampling = args
+                    .get(i)
+                    .ok_or("--scheduled-sampling requires a number")?
+                    .parse()
+                    .map_err(|_| "--scheduled-sampling must be a float")?;
+            }
+            "--label-smoothing" => {
+                i += 1;
+                opts.label_smoothing = args
+                    .get(i)
+                    .ok_or("--label-smoothing requires a number")?
+                    .parse()
+                    .map_err(|_| "--label-smoothing must be a float")?;
+            }
+            "--hidden-dropout" => {
+                i += 1;
+                opts.hidden_dropout = args
+                    .get(i)
+                    .ok_or("--hidden-dropout requires a number")?
+                    .parse()
+                    .map_err(|_| "--hidden-dropout must be a float")?;
+            }
+            "--network-layers" => {
+                i += 1;
+                opts.network_layers = args
+                    .get(i)
+                    .ok_or("--network-layers requires a number")?
+                    .parse()
+                    .map_err(|_| "--network-layers must be a positive integer")?;
+            }
+            "--neurons-per-layer" => {
+                i += 1;
+                opts.neurons_per_layer = args
+                    .get(i)
+                    .ok_or("--neurons-per-layer requires a number")?
+                    .parse()
+                    .map_err(|_| "--neurons-per-layer must be a positive integer")?;
+            }
             "--fusion" => {
                 opts.enable_fusion = true;
             }
@@ -616,5 +717,12 @@ fn print_usage() {
     );
     eprintln!("  --merge-bias F       Merge-token loss weight (default: 1.5, 1.0 = off)");
     eprintln!("  --no-thought-seed    Disable thought-seeded CfC initial state");
+    eprintln!("  --contrastive F      Contrastive intent loss weight (default: 0.0 = off)");
+    eprintln!("  --contrastive-margin F  Margin for contrastive hinge (default: 0.0)");
+    eprintln!("  --label-smoothing F  Label smoothing epsilon (default: 0.0 = off)");
+    eprintln!("  --scheduled-sampling F  Max scheduled sampling probability (default: 0.0 = off)");
+    eprintln!("  --hidden-dropout F   CfC hidden state dropout rate (default: 0.0 = off)");
+    eprintln!("  --network-layers N   CfC network layers (default: 3, fresh train only)");
+    eprintln!("  --neurons-per-layer N  CfC neurons per layer (default: 8, fresh train only)");
     eprintln!("  --help, -h           Show this help message");
 }

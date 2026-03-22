@@ -20,6 +20,38 @@ use symthaea_core::hdc::{
     ContinuousHV, HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig, HDC_DIMENSION,
 };
 
+/// GPU-resident pre-normalized embedding matrix for accelerated logit computation.
+/// Converts 4,096 × 16,384 individual cosine similarities into a single matrix-vector
+/// multiply on GPU (or optimized CPU tensor ops via candle).
+#[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+pub struct GpuEmbeddingCache {
+    /// Pre-normalized embedding matrix [vocab_size, HDC_DIMENSION] on device.
+    embeddings: candle_core::Tensor,
+    /// Pre-computed L2 norms for each embedding row (for cosine sim).
+    /// Not needed if rows are pre-normalized, but kept for numerical stability.
+    device: candle_core::Device,
+}
+
+#[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+impl std::fmt::Debug for GpuEmbeddingCache {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GpuEmbeddingCache")
+            .field("shape", &self.embeddings.shape())
+            .field("device", &self.device)
+            .finish()
+    }
+}
+
+#[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+impl Clone for GpuEmbeddingCache {
+    fn clone(&self) -> Self {
+        Self {
+            embeddings: self.embeddings.clone(),
+            device: self.device.clone(),
+        }
+    }
+}
+
 /// Configuration for the language controller.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LanguageControllerConfig {
@@ -217,6 +249,10 @@ pub struct LanguageController {
     last_effective_dt: f32,
     /// Cached refined output HV from last forward_step (for coherence measurement).
     last_logit_hv: Option<ContinuousHV>,
+    /// GPU-resident embedding matrix for accelerated logit computation.
+    /// Shape: [vocab_size, HDC_DIMENSION]. Pre-normalized rows.
+    #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+    gpu_embeddings: Option<GpuEmbeddingCache>,
 }
 
 impl LanguageController {
@@ -262,6 +298,9 @@ impl LanguageController {
             None
         };
 
+        #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+        let gpu_embeddings = Self::build_gpu_cache(&token_embeddings);
+
         Self {
             network,
             token_embeddings,
@@ -273,6 +312,45 @@ impl LanguageController {
             coherence_for_dt: 1.0,
             last_effective_dt: config.dt_per_token,
             last_logit_hv: None,
+            #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+            gpu_embeddings,
+        }
+    }
+
+    /// Build GPU/candle embedding cache from token embeddings.
+    /// Falls back to None if device initialization fails.
+    #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+    fn build_gpu_cache(token_embeddings: &[ContinuousHV]) -> Option<GpuEmbeddingCache> {
+        use candle_core::{Device, Tensor};
+
+        // Try CUDA first, fall back to CPU tensor ops
+        let device = Device::cuda_if_available(0).unwrap_or(Device::Cpu);
+
+        let vocab_size = token_embeddings.len();
+        let dim = if vocab_size > 0 {
+            token_embeddings[0].as_slice().len()
+        } else {
+            return None;
+        };
+
+        // Flatten all embeddings into a contiguous [vocab_size * dim] buffer
+        let mut flat = Vec::with_capacity(vocab_size * dim);
+        for emb in token_embeddings {
+            let s = emb.as_slice();
+            // Pre-normalize each row for cosine similarity
+            let norm = s.iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-10);
+            flat.extend(s.iter().map(|x| x / norm));
+        }
+
+        match Tensor::from_vec(flat, (vocab_size, dim), &device) {
+            Ok(embeddings) => {
+                tracing::info!("GPU embedding cache built: [{vocab_size}, {dim}] on {device:?}");
+                Some(GpuEmbeddingCache { embeddings, device })
+            }
+            Err(e) => {
+                tracing::warn!("Failed to build GPU embedding cache: {e}");
+                None
+            }
         }
     }
 
@@ -281,12 +359,25 @@ impl LanguageController {
     /// `logits[i] = logit_scale * cosine_similarity(output_hv, token_embeddings[i])`
     /// The scale factor (default 20.0, CLIP-style) spreads cosine similarities from
     /// [-1, 1] to a range where softmax can discriminate between tokens.
-    /// Parallelized with rayon for large vocabularies.
+    ///
+    /// When the `mamba-cpu` feature is enabled, uses candle tensor ops (GPU if CUDA
+    /// available, otherwise optimized CPU BLAS) for the matrix-vector multiply.
+    /// This replaces 4,096 individual 16,384D cosine similarities with a single
+    /// batched operation.
     pub fn compute_logits(&self, output_hv: &ContinuousHV) -> Vec<f32> {
         let scale = self.config.logit_scale;
+
+        // Try GPU/candle accelerated path
+        #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+        if let Some(ref cache) = self.gpu_embeddings {
+            if let Ok(logits) = self.compute_logits_candle(output_hv, cache, scale) {
+                return logits;
+            }
+            // Fall through to CPU path on error
+        }
+
         #[cfg(feature = "parallel")]
         if self.token_embeddings.len() > self.config.parallel_threshold {
-            // Parallel for large vocabularies
             return self
                 .token_embeddings
                 .par_iter()
@@ -297,6 +388,35 @@ impl LanguageController {
             .iter()
             .map(|emb| scale * output_hv.similarity(emb))
             .collect()
+    }
+
+    /// Candle-accelerated logit computation via batched matrix-vector multiply.
+    /// Embeddings are pre-normalized, so: cosine_sim = dot(emb_normalized, query_normalized).
+    /// Result: logits = scale * (E_norm @ q_norm), single BLAS gemv.
+    #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+    fn compute_logits_candle(
+        &self,
+        output_hv: &ContinuousHV,
+        cache: &GpuEmbeddingCache,
+        scale: f32,
+    ) -> Result<Vec<f32>, candle_core::Error> {
+        use candle_core::Tensor;
+
+        let s = output_hv.as_slice();
+        let norm = s.iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-10);
+
+        // Normalize query vector and move to device
+        let q_norm: Vec<f32> = s.iter().map(|x| x / norm).collect();
+        let q_tensor = Tensor::from_vec(q_norm, (1, s.len()), &cache.device)?;
+
+        // matmul: [1, dim] × [dim, vocab] = [1, vocab]
+        // Since embeddings are [vocab, dim], we do q @ E^T
+        let similarities = q_tensor.matmul(&cache.embeddings.t()?)?;
+
+        // Scale and extract
+        let scaled = (similarities * scale as f64)?;
+        let logits: Vec<f32> = scaled.squeeze(0)?.to_vec1()?;
+        Ok(logits)
     }
 
     /// Forward step: evolve network with composed input, return logits.
@@ -480,6 +600,41 @@ impl LanguageController {
         };
     }
 
+    /// Apply dropout to CfC hidden states (training-time regularization).
+    /// Randomly zeros a fraction of hidden state dimensions, scaled by `1/(1-rate)`
+    /// to maintain expected magnitude (inverted dropout).
+    /// Uses deterministic masking based on `step` for reproducibility.
+    pub fn apply_hidden_dropout(&mut self, rate: f32, step: usize) {
+        if rate <= 0.0 || rate >= 1.0 {
+            return;
+        }
+        let scale = 1.0 / (1.0 - rate);
+        for layer_idx in 0..self.network.n_layers() {
+            if let Some(layer) = self.network.layer_mut(layer_idx) {
+                for (neuron_idx, neuron) in layer.iter_mut().enumerate() {
+                    let state = neuron.state();
+                    let src = state.as_slice();
+                    let mut values: Vec<f32> = src.to_vec();
+                    // Deterministic mask based on step + layer + neuron
+                    let seed = step
+                        .wrapping_mul(1000003)
+                        .wrapping_add(layer_idx * 10007)
+                        .wrapping_add(neuron_idx * 997);
+                    for (j, v) in values.iter_mut().enumerate() {
+                        // LCG-based deterministic coin flip
+                        let hash = seed.wrapping_mul(j.wrapping_add(1)).wrapping_add(7) % 1000;
+                        if (hash as f32) < rate * 1000.0 {
+                            *v = 0.0;
+                        } else {
+                            *v *= scale;
+                        }
+                    }
+                    neuron.set_state(ContinuousHV::from_values(values));
+                }
+            }
+        }
+    }
+
     /// Save a snapshot of the current CfC network state (Phase 4: soft veto).
     /// The snapshot captures per-neuron states for partial restoration.
     pub fn save_state(&self) -> NetworkSnapshot {
@@ -548,6 +703,11 @@ impl LanguageController {
             ContinuousHV::from_genesis(genesis, &format!("broca::token_emb::{name}"), HDC_DIMENSION)
         };
         self.token_embeddings.push(emb);
+        // Invalidate GPU cache — will be rebuilt on next compute_logits if needed
+        #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+        {
+            self.gpu_embeddings = Self::build_gpu_cache(&self.token_embeddings);
+        }
     }
 
     /// Current vocabulary size (may grow via append_token).
@@ -675,6 +835,13 @@ impl LanguageController {
         &mut self.token_embeddings
     }
 
+    /// Rebuild the GPU embedding cache after training updates.
+    /// Call after modifying embeddings (e.g., after gradient updates or normalization).
+    #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+    pub fn rebuild_gpu_cache(&mut self) {
+        self.gpu_embeddings = Self::build_gpu_cache(&self.token_embeddings);
+    }
+
     /// Normalize all token embeddings to a target L2 norm.
     ///
     /// Prevents embedding norm explosion during training (observed norms >3000
@@ -690,6 +857,9 @@ impl LanguageController {
                 }
             }
         }
+        // Rebuild GPU cache with updated norms
+        #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+        self.rebuild_gpu_cache();
     }
 
     /// Backpropagate a loss gradient through the CfC network.

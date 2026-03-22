@@ -2484,80 +2484,6 @@ mod tests {
 
 use std::collections::{HashMap, HashSet};
 
-/// Convert a SemanticPrime enum to the uppercase gate name used by NsmSemanticGate.
-fn semantic_prime_to_gate_name(
-    prime: symthaea_core::hdc::universal_semantics::SemanticPrime,
-) -> &'static str {
-    use symthaea_core::hdc::universal_semantics::SemanticPrime;
-    match prime {
-        SemanticPrime::I => "I",
-        SemanticPrime::You => "YOU",
-        SemanticPrime::Someone => "SOMEONE",
-        SemanticPrime::Something => "SOMETHING",
-        SemanticPrime::People => "PEOPLE",
-        SemanticPrime::Body => "BODY",
-        SemanticPrime::KindOf => "KIND_OF",
-        SemanticPrime::PartOf => "PART_OF",
-        SemanticPrime::This => "THIS",
-        SemanticPrime::Same => "SAME",
-        SemanticPrime::Other => "OTHER",
-        SemanticPrime::One => "ONE",
-        SemanticPrime::Two => "TWO",
-        SemanticPrime::Some => "SOME",
-        SemanticPrime::All => "ALL",
-        SemanticPrime::Much => "MUCH",
-        SemanticPrime::Little => "LITTLE",
-        SemanticPrime::Good => "GOOD",
-        SemanticPrime::Bad => "BAD",
-        SemanticPrime::Big => "BIG",
-        SemanticPrime::Small => "SMALL",
-        SemanticPrime::Think => "THINK",
-        SemanticPrime::Know => "KNOW",
-        SemanticPrime::Want => "WANT",
-        SemanticPrime::Feel => "FEEL",
-        SemanticPrime::See => "SEE",
-        SemanticPrime::Hear => "HEAR",
-        SemanticPrime::Say => "SAY",
-        SemanticPrime::Words => "WORDS",
-        SemanticPrime::True => "TRUE",
-        SemanticPrime::Do => "DO",
-        SemanticPrime::Happen => "HAPPEN",
-        SemanticPrime::Move => "MOVE",
-        SemanticPrime::Touch => "TOUCH",
-        SemanticPrime::Be => "BE",
-        SemanticPrime::ThereIs => "THERE_IS",
-        SemanticPrime::Have => "HAVE",
-        SemanticPrime::Live => "LIVE",
-        SemanticPrime::Die => "DIE",
-        SemanticPrime::Not => "NOT",
-        SemanticPrime::Maybe => "MAYBE",
-        SemanticPrime::Can => "CAN",
-        SemanticPrime::Because => "BECAUSE",
-        SemanticPrime::If => "IF",
-        SemanticPrime::When => "WHEN",
-        SemanticPrime::Now => "NOW",
-        SemanticPrime::Before => "BEFORE",
-        SemanticPrime::After => "AFTER",
-        SemanticPrime::LongTime => "LONG_TIME",
-        SemanticPrime::ShortTime => "SHORT_TIME",
-        SemanticPrime::ForSomeTime => "FOR_SOME_TIME",
-        SemanticPrime::InOneMoment => "IN_ONE_MOMENT",
-        SemanticPrime::Where => "WHERE",
-        SemanticPrime::Here => "HERE",
-        SemanticPrime::Above => "ABOVE",
-        SemanticPrime::Below => "BELOW",
-        SemanticPrime::Far => "FAR",
-        SemanticPrime::Near => "NEAR",
-        SemanticPrime::Side => "SIDE",
-        SemanticPrime::Inside => "INSIDE",
-        SemanticPrime::On => "ON",
-        SemanticPrime::Very => "VERY",
-        SemanticPrime::More => "MORE",
-        SemanticPrime::Like => "LIKE",
-        SemanticPrime::With => "WITH",
-    }
-}
-
 /// Maps NSM semantic primes to BPE token IDs that express them.
 ///
 /// Built once from the tokenizer vocabulary, then reused per-generation.
@@ -2757,7 +2683,7 @@ impl NsmSemanticGate {
             if let Some(primes) = lexicon.decompose(word) {
                 let prime_strs: Vec<&str> = primes
                     .iter()
-                    .map(|p| semantic_prime_to_gate_name(*p))
+                    .map(|p| p.as_gate_name())
                     .collect();
                 gate.register_word(tokenizer, word, &prime_strs);
             } else {

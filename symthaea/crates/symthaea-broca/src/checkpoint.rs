@@ -69,6 +69,10 @@ impl AdamState {
         self.t += 1;
         let t = self.t as f32;
 
+        // Precompute bias correction factors ONCE (not per-dimension)
+        let bc1 = 1.0 / (1.0 - self.beta1.powf(t));
+        let bc2 = 1.0 / (1.0 - self.beta2.powf(t));
+
         let m = &mut self.m[idx];
         let v = &mut self.v[idx];
         let mut update = vec![0.0f32; grad.len()];
@@ -81,9 +85,9 @@ impl AdamState {
             m[j] = self.beta1 * m[j] + (1.0 - self.beta1) * g;
             v[j] = self.beta2 * v[j] + (1.0 - self.beta2) * g * g;
 
-            // Bias correction
-            let m_hat = m[j] / (1.0 - self.beta1.powf(t));
-            let v_hat = v[j] / (1.0 - self.beta2.powf(t));
+            // Bias-corrected estimates
+            let m_hat = m[j] * bc1;
+            let v_hat = v[j] * bc2;
 
             update[j] = lr * m_hat / (v_hat.sqrt() + self.epsilon);
         }
