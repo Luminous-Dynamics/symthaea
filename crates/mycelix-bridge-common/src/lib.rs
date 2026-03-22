@@ -45,6 +45,8 @@ pub use routing::{
     CrossClusterRole, CIVIC_DOMAINS, COMMONS_DOMAINS,
 };
 
+pub mod metrics;
+
 use hdk::prelude::*;
 use serde::{Deserialize, Serialize};
 

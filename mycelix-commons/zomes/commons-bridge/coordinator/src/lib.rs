@@ -1698,6 +1698,30 @@ pub struct CollateralHealthResult {
 }
 
 // ============================================================================
+// Observability — Bridge Metrics Export
+// ============================================================================
+
+/// Return a JSON-encoded snapshot of this bridge's dispatch metrics.
+///
+/// Includes per-function success/error counts, latency percentiles (p50/p95/p99),
+/// rate limit hits, and cross-cluster call counts. Metrics accumulate for the
+/// lifetime of the cell and reset on conductor restart.
+///
+/// Returns JSON string for maximum compatibility — callers can deserialize with
+/// `serde_json::from_str::<BridgeMetricsSnapshot>()`. Suitable for Prometheus
+/// scraping, admin tools, or Observatory dashboard consumption.
+#[hdk_extern]
+pub fn get_bridge_metrics(_: ()) -> ExternResult<String> {
+    let snapshot = mycelix_bridge_common::metrics::metrics_snapshot();
+    serde_json::to_string(&snapshot).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Failed to serialize metrics snapshot: {}",
+            e
+        )))
+    })
+}
+
+// ============================================================================
 // Tests
 // ============================================================================
 

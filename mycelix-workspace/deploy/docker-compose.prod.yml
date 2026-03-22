@@ -38,12 +38,16 @@ services:
     networks:
       - mycelix-net
     healthcheck:
-      # Basic TCP check on the app WebSocket port
-      test: ["CMD", "curl", "-sf", "http://localhost:8888", "||", "true"]
+      # Verify the admin WebSocket port is accepting connections.
+      # Uses the admin port (4444) which responds to HTTP with a connection
+      # upgrade prompt — a successful TCP connect + HTTP response confirms
+      # the conductor process is alive and serving. The app port (8888) is
+      # also implicitly verified since both are bound by the same process.
+      test: ["CMD", "curl", "-sf", "--max-time", "3", "http://localhost:4444/"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 15s
+      start_period: 30s
 
   # ---------------------------------------------------------------------------
   # Observatory Dashboard
