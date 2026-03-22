@@ -516,10 +516,9 @@ impl PhiValidationFramework {
     /// Creates a formatted report suitable for inclusion in scientific papers,
     /// including statistical analysis, interpretation, and recommendations.
     pub fn generate_report(&self) -> String {
-        let results = self
-            .results
-            .as_ref()
-            .expect("No results available - run validation study first");
+        let Some(results) = self.results.as_ref() else {
+            return "# Φ Validation Study Results\n\nNo results available — run validation study first.\n".to_string();
+        };
 
         let mut report = String::new();
 
