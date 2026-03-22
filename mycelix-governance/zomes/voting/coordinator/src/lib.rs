@@ -1,4 +1,6 @@
-//! Voting Coordinator Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Voting Coordinator Zome
 //! Business logic for governance voting
 //!
 //! Enhanced with Φ-weighted voting, quadratic voting, and delegation decay
@@ -1945,13 +1947,17 @@ pub fn tally_phi_votes(input: TallyPhiVotesInput) -> ExternResult<Record> {
         (),
     )?;
 
-    // Index tally in global list for cross-proposal analysis (bloc detection)
-    let _ = create_link(
+    // Index tally in global list for cross-proposal analysis (bloc detection).
+    // Best-effort: failure here means bloc detection may miss this tally, but
+    // the tally itself is already committed and linked to its proposal.
+    if let Err(e) = create_link(
         anchor_hash("all_phi_tallies")?,
         action_hash.clone(),
         LinkTypes::BlocDetectionAnchor,
         (),
-    );
+    ) {
+        debug!("Non-critical: failed to index tally for bloc detection: {:?}", e);
+    }
 
     // Emit real-time signal for tally completion
     let _ = emit_governance_signal(GovernanceSignal::TallyCompleted {

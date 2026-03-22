@@ -1,4 +1,6 @@
-//! Commons Bridge Coordinator Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Commons Bridge Coordinator Zome
 //!
 //! Unified cross-domain dispatch for the Commons cluster.
 //! Provides three integration patterns:
@@ -321,6 +323,13 @@ pub fn dispatch_call(input: DispatchInput) -> ExternResult<DispatchResult> {
 /// If auto-dispatch succeeds, the query is automatically resolved with the result.
 #[hdk_extern]
 pub fn query_commons(query: CommonsQuery) -> ExternResult<Record> {
+    // Require at least Participant tier to submit queries (prevents DHT spam from Observers)
+    mycelix_bridge_common::gate_consciousness(
+        "commons_bridge",
+        &mycelix_bridge_common::requirement_for_basic(),
+        "query_commons",
+    )?;
+
     let action_hash = create_entry(&EntryTypes::Query(query.clone()))?;
 
     // Link to all queries
@@ -364,12 +373,15 @@ pub fn query_commons(query: CommonsQuery) -> ExternResult<Record> {
                     .response
                     .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
                     .unwrap_or_else(|| "null".to_string());
-                // Auto-resolve the query
-                let _ = resolve_query(ResolveQueryInput {
+                // Auto-resolve the query. Failure here leaves the query in "pending"
+                // state — the data is still on the DHT, just not marked resolved.
+                if let Err(e) = resolve_query(ResolveQueryInput {
                     query_hash: action_hash.clone(),
                     result: result_str,
                     success: true,
-                });
+                }) {
+                    debug!("Auto-resolve failed for query {:?}: {:?}", action_hash, e);
+                }
             }
         }
     }
@@ -391,6 +403,13 @@ fn resolve_domain_zome(domain: &str, query_type: &str) -> Option<String> {
 /// Resolve a pending query with a result
 #[hdk_extern]
 pub fn resolve_query(input: ResolveQueryInput) -> ExternResult<Record> {
+    // Require Citizen tier to resolve queries (modifies existing data)
+    mycelix_bridge_common::gate_consciousness(
+        "commons_bridge",
+        &mycelix_bridge_common::requirement_for_voting(),
+        "resolve_query",
+    )?;
+
     let record = get(input.query_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Query not found".into())))?;
 
@@ -432,6 +451,13 @@ pub struct BridgeEventSignal {
 /// Broadcast a cross-domain event within the Commons cluster and emit a signal
 #[hdk_extern]
 pub fn broadcast_event(event: CommonsEvent) -> ExternResult<Record> {
+    // Require at least Participant tier to broadcast events
+    mycelix_bridge_common::gate_consciousness(
+        "commons_bridge",
+        &mycelix_bridge_common::requirement_for_basic(),
+        "broadcast_event",
+    )?;
+
     let action_hash = create_entry(&EntryTypes::Event(event.clone()))?;
 
     // Link to all events
@@ -1157,8 +1183,10 @@ fn get_cached_credential(did: &str) -> ExternResult<Option<ConsciousnessCredenti
         }
     }
 
-    // Get the most recent link
-    let link = links.into_iter().max_by_key(|l| l.timestamp).unwrap();
+    // Get the most recent link (safe: early return above guarantees non-empty)
+    let Some(link) = links.into_iter().max_by_key(|l| l.timestamp) else {
+        return Ok(None);
+    };
     let target = link.target.into_action_hash().ok_or_else(|| {
         wasm_error!(WasmErrorInner::Guest(
             "Invalid credential cache link target".into()

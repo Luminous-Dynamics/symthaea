@@ -1,4 +1,6 @@
-//! Civic Bridge Coordinator Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Civic Bridge Coordinator Zome
 //!
 //! Unified cross-domain dispatch for the Civic cluster.
 //! Provides three integration patterns:
@@ -150,6 +152,13 @@ pub fn dispatch_call(input: DispatchInput) -> ExternResult<DispatchResult> {
 /// to the target domain zome if the query_type matches a known function name.
 #[hdk_extern]
 pub fn query_civic(query: CivicQueryEntry) -> ExternResult<Record> {
+    // Require at least Participant tier to submit queries
+    mycelix_bridge_common::gate_consciousness(
+        "civic_bridge",
+        &mycelix_bridge_common::requirement_for_basic(),
+        "query_civic",
+    )?;
+
     // Reject empty or whitespace-only domain
     if query.domain.trim().is_empty() {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -233,6 +242,13 @@ fn resolve_domain_zome(domain: &str, query_type: &str) -> Option<String> {
 /// Resolve a pending query with a result
 #[hdk_extern]
 pub fn resolve_query(input: ResolveQueryInput) -> ExternResult<Record> {
+    // Require Citizen tier to resolve queries (modifies existing data)
+    mycelix_bridge_common::gate_consciousness(
+        "civic_bridge",
+        &mycelix_bridge_common::requirement_for_voting(),
+        "resolve_query",
+    )?;
+
     let record = get(input.query_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Query not found".into())))?;
 
@@ -277,6 +293,13 @@ pub struct BridgeEventSignal {
 /// Broadcast a cross-domain event and emit a signal to connected clients
 #[hdk_extern]
 pub fn broadcast_event(event: CivicEventEntry) -> ExternResult<Record> {
+    // Require at least Participant tier to broadcast events
+    mycelix_bridge_common::gate_consciousness(
+        "civic_bridge",
+        &mycelix_bridge_common::requirement_for_basic(),
+        "broadcast_event",
+    )?;
+
     // Reject empty or whitespace-only payloads
     if event.payload.trim().is_empty() {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -1273,7 +1296,9 @@ fn get_cached_credential(did: &str) -> ExternResult<Option<ConsciousnessCredenti
         }
     }
 
-    let link = links.into_iter().max_by_key(|l| l.timestamp).unwrap();
+    let Some(link) = links.into_iter().max_by_key(|l| l.timestamp) else {
+        return Ok(None);
+    };
     let target = link.target.into_action_hash().ok_or_else(|| {
         wasm_error!(WasmErrorInner::Guest(
             "Invalid credential cache link target".into()
