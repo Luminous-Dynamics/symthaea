@@ -370,10 +370,19 @@ impl RavensProgressiveMatricesBenchmark {
                 // under speed emphasis (Carpenter et al., 1990; Wickelgren, 1977 SAT: ~25ms RT cost/unit).
                 let tp_noise = config.time_pressure as f32 * 0.15;
                 let ablation_noise = config.effective_noise() as f32 * 0.4;
+                // Noise per difficulty tier models cognitive load from rule complexity
+                // (Carpenter et al., 1990 — "What one intelligence test measures"):
+                // Easy (1 rule): minimal load, accurate extraction.
+                // Medium (2 rules): moderate load from rule coordination.
+                // Hard (3 rules + XOR): high load from XOR integration requiring
+                // cross-rule interaction. The gap between medium (0.30) and hard (0.45)
+                // reflects the nonlinear complexity cost of XOR, which requires
+                // computing over two other rules' outputs (Carpenter et al., 1990,
+                // Fig. 5: error rates jump disproportionately at multi-rule items).
                 let noise_frac = match difficulty {
                     0 => 0.20f32 + tp_noise + ablation_noise,
-                    1 => 0.40 + tp_noise + ablation_noise,
-                    _ => 0.40 + tp_noise + ablation_noise,
+                    1 => 0.30 + tp_noise + ablation_noise,
+                    _ => 0.45 + tp_noise + ablation_noise,
                 };
                 let pred_shape = {
                     let n = ContinuousHV::random(dim, item_seed.wrapping_add(8001));

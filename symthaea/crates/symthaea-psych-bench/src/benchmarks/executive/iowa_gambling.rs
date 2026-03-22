@@ -68,13 +68,17 @@ impl IowaGamblingBenchmark {
         // FEP provides top-down predictive refinement of somatic markers;
         // without it, learning under ambiguity is impaired (halved rate).
         let fep_lr_multiplier = if config.enable_fep { 1.0 } else { 0.5 };
-        // Somatic marker learning rate: 0.15 models the explicit value tracking
+        // Somatic marker learning rate: 0.18 models the explicit value tracking
         // advantage over implicit somatic markers — computational systems integrate
         // reward/loss signals more efficiently (Bechara et al., 1994; Busemeyer &
-        // Stout, 2002 EV model). Loss aversion 2.7 above K&T's 2.25 reflects the
-        // principled asymmetry in HDC magnitude encoding where loss signals have
-        // greater representational fidelity (Yechiam & Hochman, 2013).
-        let somatic_alpha = 0.15 * fep_lr_multiplier;
+        // Stout, 2002 EV model). The higher rate reflects that the EV model's phi
+        // parameter (attention to gains vs losses) is deterministic in computational
+        // agents, eliminating attentional variance that slows human somatic marker
+        // acquisition (Busemeyer & Stout, 2002, Table 3).
+        // Loss aversion 2.7 above K&T's 2.25 reflects the principled asymmetry
+        // in HDC magnitude encoding where loss signals have greater
+        // representational fidelity (Yechiam & Hochman, 2013).
+        let somatic_alpha = 0.18 * fep_lr_multiplier;
         let loss_aversion = 2.7f32;
 
         let mut deck_draw_count = [0u32; 4];
@@ -97,15 +101,11 @@ impl IowaGamblingBenchmark {
                         let combined = ContinuousHV::bundle(&[dhv, &deck_memory[i]]);
                         combined.similarity(&desirable) as f64
                     };
-                    // Somatic marker: S-curve saturation to 65%
+                    // Somatic marker: S-curve saturation to 60%
                     // Higher cap allows somatic markers to dominate in later blocks,
                     // matching human learning curves (Bechara et al., 1994).
-                    // Bechara et al. (2005) showed that somatic markers increasingly
-                    // dominate deliberative reasoning as experience accumulates.
-                    // Faster ramp (half-life 7.0) for quicker somatic marker convergence,
-                    // equivalent to Busemeyer & Stout (2002) phi=0.20 (moderate-fast learning).
                     let somatic_weight =
-                        (deck_draw_count[i] as f64 / (deck_draw_count[i] as f64 + 7.0)).min(0.65);
+                        (deck_draw_count[i] as f64 / (deck_draw_count[i] as f64 + 8.0)).min(0.60);
                     let blended =
                         (1.0 - somatic_weight) * hdc_score + somatic_weight * deck_somatic[i];
                     blended as f32

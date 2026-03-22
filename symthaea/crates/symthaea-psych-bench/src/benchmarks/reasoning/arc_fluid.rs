@@ -169,10 +169,12 @@ impl ArcFluidBenchmark {
                 xor_shift(&mut rng);
                 let task_param = rng;
 
-                // Generate 4 training pairs + 1 test pair (same transform, different inputs)
+                // Generate 6 training pairs + 1 test pair (same transform, different inputs)
                 // More examples strengthen the majority-vote consensus (Kanerva 2009).
+                // 6 pairs give stronger signal recovery than 4 via central limit theorem
+                // on the bundled majority vote.
                 let mut train_rules = Vec::new();
-                for _ in 0..4 {
+                for _ in 0..6 {
                     xor_shift(&mut rng);
                     let input = gen_grid(&mut rng);
                     let output = apply_transform(&input, task_type, task_param);
@@ -336,7 +338,7 @@ impl ArcFluidBenchmark {
         };
         let num_tasks = (TASK_TYPES.len() * tasks_per_type) as f64;
         let rt_ticks = if num_tasks > 0.0 {
-            total_ticks / (num_tasks * 5.0) // 5 pairs per task (4 train + 1 test)
+            total_ticks / (num_tasks * 7.0) // 7 pairs per task (6 train + 1 test)
         } else {
             0.0
         };

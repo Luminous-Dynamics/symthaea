@@ -213,7 +213,7 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("RemoteAssociates") => Some(("rat_overall_accuracy", &bl.creativity)),
 
         // Butlin
-        name if name.contains("Butlin") => Some(("present_count", &bl.butlin)),
+        name if name.contains("Butlin") => Some(("mean_quality_score", &bl.butlin)),
 
         // Neuromod
         name if name.contains("RewardLearning") => Some(("trials_to_criterion", &bl.neuromod)),

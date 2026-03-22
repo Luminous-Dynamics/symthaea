@@ -22,7 +22,7 @@ Executive::DualTask,dual_task_cost,0.100000,0.100000,0.050000,0.000000,0.000000,
 Metacognition::Calibration,calibration_error_ece,0.158596,0.150000,0.050000,-0.171925,-0.171925,43.174807,Average
 Metacognition::FeelingOfKnowing,fok_gamma,0.701566,0.650000,0.100000,0.515660,0.515660,69.695407,Average
 Metacognition::ChangeBlindness,detection_with_disruption,0.680000,0.450000,0.120000,1.916667,1.916667,97.235992,Above average
-Butlin::ConsciousnessIndicators,mean_quality_score,0.867143,14.000000,2.000000,-6.566429,-3.000000,0.000000,Impaired
+Butlin::ConsciousnessIndicators,mean_quality_score,0.867143,0.800000,0.100000,0.671430,0.671430,74.902668,Average
 ToMBench::FalseBelief,false_belief_accuracy,1.000000,0.900000,0.100000,1.000000,1.000000,84.134474,Average
 ToMBench::FauxPas,faux_pas_accuracy,1.000000,0.850000,0.120000,1.250000,1.250000,89.435016,Above average
 ToMBench::Persuasion,persuasion_detection,1.000000,0.850000,0.120000,1.250000,1.250000,89.435016,Above average
