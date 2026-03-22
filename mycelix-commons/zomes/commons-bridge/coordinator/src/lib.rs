@@ -287,14 +287,10 @@ pub fn dispatch_call(input: DispatchInput) -> ExternResult<DispatchResult> {
 
     // Validate against the full allowlist (both sub-clusters)
     if !ALLOWED_ZOMES.contains(&input.zome.as_str()) {
-        return Ok(DispatchResult {
-            success: false,
-            response: None,
-            error: Some(format!(
-                "Zome '{}' is not in the commons allowlist",
-                input.zome
-            )),
-        });
+        return Ok(DispatchResult::err(
+            mycelix_bridge_common::BridgeErrorCode::AllowlistRejected,
+            format!("Zome '{}' is not in the commons allowlist", input.zome),
+        ));
     }
 
     let cluster = detect_sub_cluster();

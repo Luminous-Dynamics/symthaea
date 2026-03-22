@@ -1399,6 +1399,7 @@ mod tests {
             success: true,
             response: Some(encoded.0),
             error: None,
+            error_code: None,
         };
         let decoded: Vec<u32> = decode_dispatch_response(&result, "test").unwrap();
         assert_eq!(decoded, payload);
@@ -1410,6 +1411,7 @@ mod tests {
             success: false,
             response: None,
             error: Some("something broke".to_string()),
+            error_code: None,
         };
         let err = decode_dispatch_response::<Vec<u32>>(&result, "test_ctx").unwrap_err();
         let msg = format!("{}", err);
@@ -1426,6 +1428,7 @@ mod tests {
             success: false,
             response: None,
             error: None,
+            error_code: None,
         };
         let err = decode_dispatch_response::<Vec<u32>>(&result, "ctx").unwrap_err();
         let msg = format!("{}", err);
@@ -1438,6 +1441,7 @@ mod tests {
             success: true,
             response: None,
             error: None,
+            error_code: None,
         };
         let err = decode_dispatch_response::<Vec<u32>>(&result, "ctx").unwrap_err();
         let msg = format!("{}", err);
@@ -1450,6 +1454,8 @@ mod tests {
             success: true,
             response: Some(vec![0xFF, 0xFE, 0xFD]),
             error: None,
+            error_code: None,
+            error_code: None,
         };
         let err = decode_dispatch_response::<Vec<u32>>(&result, "ctx").unwrap_err();
         let msg = format!("{}", err);

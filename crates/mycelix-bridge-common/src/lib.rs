@@ -75,6 +75,33 @@ pub struct DispatchResult {
     pub response: Option<Vec<u8>>,
     /// Error message (on failure).
     pub error: Option<String>,
+    /// Structured error code (on failure). Enables programmatic error handling
+    /// without parsing error message strings. Populated by dispatch functions;
+    /// defaults to `None` for backward compatibility with existing callers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<BridgeErrorCode>,
+}
+
+impl DispatchResult {
+    /// Create a success result.
+    pub fn ok(response: Vec<u8>) -> Self {
+        Self {
+            success: true,
+            response: Some(response),
+            error: None,
+            error_code: None,
+        }
+    }
+
+    /// Create an error result with structured code.
+    pub fn err(code: BridgeErrorCode, message: String) -> Self {
+        Self {
+            success: false,
+            response: None,
+            error: Some(message),
+            error_code: Some(code),
+        }
+    }
 }
 
 /// Input for resolving a query with a result.
@@ -100,6 +127,66 @@ pub struct BridgeHealth {
     pub total_events: u32,
     pub total_queries: u32,
     pub domains: Vec<String>,
+}
+
+// ============================================================================
+// Bridge Error Codes — structured error classification for dispatch failures
+// ============================================================================
+
+/// Structured error codes for bridge dispatch failures.
+///
+/// Each code maps to a specific failure mode, making it easy to:
+/// - Track error rates by type in metrics (via `BridgeMetricsSnapshot.error_counts`)
+/// - Diagnose issues from logs without parsing error message strings
+/// - Build alerting rules (e.g., alert on BRG-006 spike = cross-cluster partition)
+///
+/// Codes are stable — do not renumber or reuse after removal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BridgeErrorCode {
+    /// BRG-001: Target zome not in allowlist (unauthorized dispatch attempt)
+    AllowlistRejected,
+    /// BRG-002: Network error during local dispatch
+    LocalNetworkError,
+    /// BRG-003: Local zome call rejected (non-Ok response)
+    LocalCallRejected,
+    /// BRG-004: No response from local zome call
+    LocalNoResponse,
+    /// BRG-005: Local HDK call failed (runtime error)
+    LocalCallFailed,
+    /// BRG-006: Network error during cross-cluster dispatch
+    CrossClusterNetworkError,
+    /// BRG-007: Cross-cluster call rejected (non-Ok response)
+    CrossClusterCallRejected,
+    /// BRG-008: No response from cross-cluster call
+    CrossClusterNoResponse,
+    /// BRG-009: Cross-cluster HDK call failed (runtime error)
+    CrossClusterCallFailed,
+    /// BRG-010: Dispatch input validation failed (oversized payload/identifier)
+    ValidationFailed,
+}
+
+impl BridgeErrorCode {
+    /// String code for metrics recording (e.g., "BRG-001").
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::AllowlistRejected => "BRG-001",
+            Self::LocalNetworkError => "BRG-002",
+            Self::LocalCallRejected => "BRG-003",
+            Self::LocalNoResponse => "BRG-004",
+            Self::LocalCallFailed => "BRG-005",
+            Self::CrossClusterNetworkError => "BRG-006",
+            Self::CrossClusterCallRejected => "BRG-007",
+            Self::CrossClusterNoResponse => "BRG-008",
+            Self::CrossClusterCallFailed => "BRG-009",
+            Self::ValidationFailed => "BRG-010",
+        }
+    }
+}
+
+impl core::fmt::Display for BridgeErrorCode {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
 }
 
 // ============================================================================
@@ -161,24 +248,19 @@ pub fn dispatch_call_checked(
     allowed_zomes: &[&str],
 ) -> ExternResult<DispatchResult> {
     if let Err(msg) = validate_dispatch_sizes(&input.zome, &input.fn_name, &input.payload) {
-        return Ok(DispatchResult {
-            success: false,
-            response: None,
-            error: Some(msg),
-        });
+        metrics::record_error(&input.zome, &input.fn_name, BridgeErrorCode::ValidationFailed.as_str());
+        return Ok(DispatchResult::err(BridgeErrorCode::ValidationFailed, msg));
     }
     if !allowed_zomes.contains(&input.zome.as_str()) {
-        return Ok(DispatchResult {
-            success: false,
-            response: None,
-            error: Some(format!(
-                "Zome '{}' is not in the allowed dispatch list. Valid zomes: {:?}",
-                input.zome, allowed_zomes
-            )),
-        });
+        metrics::record_error(&input.zome, &input.fn_name, BridgeErrorCode::AllowlistRejected.as_str());
+        return Ok(DispatchResult::err(
+            BridgeErrorCode::AllowlistRejected,
+            format!("Zome '{}' is not in the allowed dispatch list. Valid zomes: {:?}", input.zome, allowed_zomes),
+        ));
     }
 
     let payload = ExternIO(input.payload.clone());
+    let start_us = sys_time().ok().map(|t| t.as_micros() as u64);
 
     let result = HDK.with(|h| {
         h.borrow().call(vec![Call::new(
@@ -190,34 +272,39 @@ pub fn dispatch_call_checked(
         )])
     });
 
+    let elapsed_us = start_us.and_then(|start| {
+        sys_time().ok().map(|end| (end.as_micros() as u64).saturating_sub(start))
+    });
+
     match result {
         Ok(responses) => match responses.into_iter().next() {
-            Some(ZomeCallResponse::Ok(extern_io)) => Ok(DispatchResult {
-                success: true,
-                response: Some(extern_io.0),
-                error: None,
-            }),
-            Some(ZomeCallResponse::NetworkError(err)) => Ok(DispatchResult {
-                success: false,
-                response: None,
-                error: Some(format!("Network error: {}", err)),
-            }),
-            Some(other) => Ok(DispatchResult {
-                success: false,
-                response: None,
-                error: Some(format!("Zome call rejected: {:?}", other)),
-            }),
-            None => Ok(DispatchResult {
-                success: false,
-                response: None,
-                error: Some("No response from zome call".into()),
-            }),
+            Some(ZomeCallResponse::Ok(extern_io)) => {
+                if let Some(latency) = elapsed_us {
+                    metrics::record_success(&input.zome, &input.fn_name, latency);
+                }
+                Ok(DispatchResult::ok(extern_io.0))
+            }
+            Some(ZomeCallResponse::NetworkError(err)) => {
+                let code = BridgeErrorCode::LocalNetworkError;
+                metrics::record_error(&input.zome, &input.fn_name, code.as_str());
+                Ok(DispatchResult::err(code, format!("Network error: {}", err)))
+            }
+            Some(other) => {
+                let code = BridgeErrorCode::LocalCallRejected;
+                metrics::record_error(&input.zome, &input.fn_name, code.as_str());
+                Ok(DispatchResult::err(code, format!("Zome call rejected: {:?}", other)))
+            }
+            None => {
+                let code = BridgeErrorCode::LocalNoResponse;
+                metrics::record_error(&input.zome, &input.fn_name, code.as_str());
+                Ok(DispatchResult::err(code, "No response from zome call".into()))
+            }
         },
-        Err(e) => Ok(DispatchResult {
-            success: false,
-            response: None,
-            error: Some(format!("Call failed: {:?}", e)),
-        }),
+        Err(e) => {
+            let code = BridgeErrorCode::LocalCallFailed;
+            metrics::record_error(&input.zome, &input.fn_name, code.as_str());
+            Ok(DispatchResult::err(code, format!("Call failed: {:?}", e)))
+        }
     }
 }
 
@@ -272,35 +359,28 @@ pub fn dispatch_call_cross_cluster(
     allowed_zomes: &[&str],
 ) -> ExternResult<DispatchResult> {
     if let Err(msg) = validate_dispatch_sizes(&input.zome, &input.fn_name, &input.payload) {
-        return Ok(DispatchResult {
-            success: false,
-            response: None,
-            error: Some(msg),
-        });
+        metrics::record_error(&input.zome, &input.fn_name, BridgeErrorCode::ValidationFailed.as_str());
+        return Ok(DispatchResult::err(BridgeErrorCode::ValidationFailed, msg));
     }
     if input.role.len() > MAX_DISPATCH_IDENTIFIER_BYTES {
-        return Ok(DispatchResult {
-            success: false,
-            response: None,
-            error: Some(format!(
-                "Role name too long ({} bytes, max {})",
-                input.role.len(),
-                MAX_DISPATCH_IDENTIFIER_BYTES
-            )),
-        });
+        metrics::record_error(&input.zome, &input.fn_name, BridgeErrorCode::ValidationFailed.as_str());
+        return Ok(DispatchResult::err(
+            BridgeErrorCode::ValidationFailed,
+            format!("Role name too long ({} bytes, max {})", input.role.len(), MAX_DISPATCH_IDENTIFIER_BYTES),
+        ));
     }
     if !allowed_zomes.contains(&input.zome.as_str()) {
-        return Ok(DispatchResult {
-            success: false,
-            response: None,
-            error: Some(format!(
-                "Zome '{}' is not in the allowed cross-cluster dispatch list. Valid zomes: {:?}",
-                input.zome, allowed_zomes
-            )),
-        });
+        metrics::record_error(&input.zome, &input.fn_name, BridgeErrorCode::AllowlistRejected.as_str());
+        return Ok(DispatchResult::err(
+            BridgeErrorCode::AllowlistRejected,
+            format!("Zome '{}' is not in the allowed cross-cluster dispatch list. Valid zomes: {:?}", input.zome, allowed_zomes),
+        ));
     }
 
     let payload = ExternIO(input.payload.clone());
+    let call_key = format!("{}::{}", input.role, input.zome);
+    let start_us = sys_time().ok().map(|t| t.as_micros() as u64);
+    metrics::record_cross_cluster();
 
     let result = HDK.with(|h| {
         h.borrow().call(vec![Call::new(
@@ -312,34 +392,39 @@ pub fn dispatch_call_cross_cluster(
         )])
     });
 
+    let elapsed_us = start_us.and_then(|start| {
+        sys_time().ok().map(|end| (end.as_micros() as u64).saturating_sub(start))
+    });
+
     match result {
         Ok(responses) => match responses.into_iter().next() {
-            Some(ZomeCallResponse::Ok(extern_io)) => Ok(DispatchResult {
-                success: true,
-                response: Some(extern_io.0),
-                error: None,
-            }),
-            Some(ZomeCallResponse::NetworkError(err)) => Ok(DispatchResult {
-                success: false,
-                response: None,
-                error: Some(format!("Cross-cluster network error: {}", err)),
-            }),
-            Some(other) => Ok(DispatchResult {
-                success: false,
-                response: None,
-                error: Some(format!("Cross-cluster call rejected: {:?}", other)),
-            }),
-            None => Ok(DispatchResult {
-                success: false,
-                response: None,
-                error: Some("No response from cross-cluster call".into()),
-            }),
+            Some(ZomeCallResponse::Ok(extern_io)) => {
+                if let Some(latency) = elapsed_us {
+                    metrics::record_success(&call_key, &input.fn_name, latency);
+                }
+                Ok(DispatchResult::ok(extern_io.0))
+            }
+            Some(ZomeCallResponse::NetworkError(err)) => {
+                let code = BridgeErrorCode::CrossClusterNetworkError;
+                metrics::record_error(&call_key, &input.fn_name, code.as_str());
+                Ok(DispatchResult::err(code, format!("Cross-cluster network error: {}", err)))
+            }
+            Some(other) => {
+                let code = BridgeErrorCode::CrossClusterCallRejected;
+                metrics::record_error(&call_key, &input.fn_name, code.as_str());
+                Ok(DispatchResult::err(code, format!("Cross-cluster call rejected: {:?}", other)))
+            }
+            None => {
+                let code = BridgeErrorCode::CrossClusterNoResponse;
+                metrics::record_error(&call_key, &input.fn_name, code.as_str());
+                Ok(DispatchResult::err(code, "No response from cross-cluster call".into()))
+            }
         },
-        Err(e) => Ok(DispatchResult {
-            success: false,
-            response: None,
-            error: Some(format!("Cross-cluster call failed: {:?}", e)),
-        }),
+        Err(e) => {
+            let code = BridgeErrorCode::CrossClusterCallFailed;
+            metrics::record_error(&call_key, &input.fn_name, code.as_str());
+            Ok(DispatchResult::err(code, format!("Cross-cluster call failed: {:?}", e)))
+        }
     }
 }
 
@@ -761,30 +846,38 @@ mod tests {
 
     #[test]
     fn dispatch_result_success_serde_roundtrip() {
-        let result = DispatchResult {
-            success: true,
-            response: Some(vec![10, 20, 30]),
-            error: None,
-        };
+        let result = DispatchResult::ok(vec![10, 20, 30]);
         let json = serde_json::to_string(&result).unwrap();
         let r2: DispatchResult = serde_json::from_str(&json).unwrap();
         assert!(r2.success);
         assert_eq!(r2.response, Some(vec![10, 20, 30]));
         assert!(r2.error.is_none());
+        assert!(r2.error_code.is_none());
     }
 
     #[test]
     fn dispatch_result_error_serde_roundtrip() {
-        let result = DispatchResult {
-            success: false,
-            response: None,
-            error: Some("something failed".into()),
-        };
+        let result = DispatchResult::err(
+            BridgeErrorCode::LocalCallFailed,
+            "something failed".into(),
+        );
         let json = serde_json::to_string(&result).unwrap();
+        assert!(json.contains("error_code")); // error code field present
         let r2: DispatchResult = serde_json::from_str(&json).unwrap();
         assert!(!r2.success);
         assert!(r2.response.is_none());
         assert_eq!(r2.error.as_deref(), Some("something failed"));
+        assert_eq!(r2.error_code, Some(BridgeErrorCode::LocalCallFailed));
+    }
+
+    #[test]
+    fn dispatch_result_backward_compat_without_error_code() {
+        // Old serialized results without error_code should deserialize fine
+        let json = r#"{"success":false,"response":null,"error":"old error"}"#;
+        let r: DispatchResult = serde_json::from_str(json).unwrap();
+        assert!(!r.success);
+        assert_eq!(r.error.as_deref(), Some("old error"));
+        assert_eq!(r.error_code, None); // backward compatible default
     }
 
     #[test]
