@@ -388,9 +388,13 @@ impl EdfFile {
                 .iter()
                 .map(|s| s.samples_per_record as i64 * 2)
                 .sum();
-            (data_bytes / bytes_per_record) as usize
+            if data_bytes <= 0 || bytes_per_record <= 0 {
+                0
+            } else {
+                (data_bytes / bytes_per_record) as usize
+            }
         } else {
-            num_records as usize
+            num_records.max(0) as usize
         };
 
         // Pre-allocate signal data
@@ -520,7 +524,7 @@ impl EdfFile {
         let occipital = self.occipital_eeg()?;
         let annotation = self.annotations.get(epoch_idx)?;
 
-        let start_sample = (annotation.onset_sec * frontal.sample_rate) as usize;
+        let start_sample = (annotation.onset_sec * frontal.sample_rate).max(0.0) as usize;
         let frontal_data = frontal.get_epoch(start_sample)?;
         let occipital_data = occipital.get_epoch(start_sample)?;
 

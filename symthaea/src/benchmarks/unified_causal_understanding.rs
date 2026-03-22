@@ -247,8 +247,8 @@ impl CompressionCodebook {
         let mut bins: Vec<Vec<f64>> = vec![Vec::new(); num_bins];
 
         for i in 0..x.len() {
-            let bin = (((x[i] - x_min) / x_range) * (num_bins - 1) as f64) as usize;
-            let bin = bin.min(num_bins - 1);
+            let bin = (((x[i] - x_min) / x_range) * (num_bins - 1) as f64)
+                .clamp(0.0, (num_bins - 1) as f64) as usize;
             bins[bin].push(y[i]);
         }
 

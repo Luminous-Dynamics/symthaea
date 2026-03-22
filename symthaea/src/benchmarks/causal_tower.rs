@@ -71,7 +71,7 @@ impl ImprovedHdcCompression {
             .iter()
             .map(|&v| {
                 let norm = (v - min_val) / range;
-                ((norm * (codebook_size - 1) as f64) as usize).min(codebook_size - 1)
+                (norm * (codebook_size - 1) as f64).clamp(0.0, (codebook_size - 1) as f64) as usize
             })
             .collect();
 
