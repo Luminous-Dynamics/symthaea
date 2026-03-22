@@ -1,4 +1,10 @@
-//! ARC Rule Algebra Probes benchmark.
+//! ARC Rule Algebra Probes benchmark (SYNTHETIC — tests HDC algebra, not reasoning).
+//!
+//! **Honesty note:** This benchmark explicitly tests algebraic properties of the
+//! HDC encoding, not cognitive reasoning. The z-scores reflect how well BinaryHV
+//! XOR binding preserves mathematical structure (commutativity, associativity,
+//! inverse existence, identity, distributivity). These are encoding quality
+//! metrics, not abstract reasoning metrics.
 //!
 //! Tests whether HDC rule encodings satisfy algebraic properties:
 //!
@@ -284,6 +290,12 @@ impl PsychBenchmark for ArcAlgebraBenchmark {
         if config.trial_trace {
             result.trial_trace = trace;
         }
+        result.notes.push(
+            "SYNTHETIC: Tests algebraic properties of HDC encoding \
+             (commutativity, associativity, inverse, identity, distributivity). \
+             Z-scores reflect encoding algebra quality, not reasoning ability."
+                .to_string(),
+        );
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

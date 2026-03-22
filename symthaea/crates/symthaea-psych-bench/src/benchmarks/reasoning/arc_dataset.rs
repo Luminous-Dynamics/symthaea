@@ -1,8 +1,18 @@
-//! Real ARC-AGI dataset loader and evaluator.
+//! ARC-AGI dataset loader and evaluator.
 //!
-//! Loads tasks from the ARC-AGI JSON format and evaluates Symthaea's HDC
-//! grid encoder on them. This provides ground-truth evaluation against
-//! Chollet's original benchmark.
+//! **IMPORTANT: Honesty note on what this measures.**
+//!
+//! When used with real ARC JSON files (from Chollet's dataset), this evaluates
+//! HDC grid encoding/retrieval fidelity on genuine ARC tasks. However, the HDC
+//! approach here tests **encoding algebra** (XOR bind/unbind rule recovery), not
+//! novel rule discovery. The XOR self-inverse property means "rule application"
+//! is exact algebraic recovery, not generalization to unseen transform types.
+//!
+//! The 2-AFC scoring (predicted vs random distractor) is a lenient baseline that
+//! primarily tests whether the encoding preserves any signal at all, not whether
+//! the system can solve ARC tasks in the way humans or LLMs do. Do not interpret
+//! high 2-AFC accuracy as comparable to ARC solve rates reported for LLMs or
+//! humans, which require generating exact pixel-perfect outputs.
 //!
 //! ARC JSON format:
 //! ```json
@@ -41,7 +51,13 @@ pub struct AccuracyBreakdown {
     pub bins: BTreeMap<String, (usize, usize, f64)>,
 }
 
-/// Results from evaluating on real ARC tasks.
+/// Results from evaluating on ARC tasks.
+///
+/// Note: When used with Chollet's real ARC data, scores reflect HDC encoding
+/// fidelity under 2-AFC (not rule discovery ability). When used with synthetic
+/// tasks (the common case in psych-bench), scores reflect encoding algebra
+/// only — the system knows the transform family and tests retrieval, not
+/// discovery of novel rules.
 #[derive(Debug, Clone)]
 pub struct ArcDatasetResult {
     /// Number of tasks loaded.
@@ -60,6 +76,8 @@ pub struct ArcDatasetResult {
     pub by_train_count: AccuracyBreakdown,
     /// Histogram of similarity scores (10 bins from 0.0 to 1.0).
     pub similarity_histogram: [usize; 10],
+    /// Whether tasks were procedurally generated (true) or from Chollet's dataset (false).
+    pub synthetic: bool,
 }
 
 /// Load all ARC tasks from a directory of JSON files.
@@ -274,13 +292,16 @@ pub fn evaluate_arc_tasks(
         by_grid_size,
         by_train_count,
         similarity_histogram,
+        synthetic: false, // loaded from real ARC JSON files
     }
 }
 
 /// Format ARC dataset evaluation results.
 pub fn format_arc_dataset_result(result: &ArcDatasetResult) -> String {
     let mut lines = Vec::new();
-    lines.push("## Real ARC-AGI Dataset Evaluation".to_string());
+    lines.push(
+        "## ARC-AGI Dataset Evaluation (HDC encoding fidelity, not rule discovery)".to_string(),
+    );
     lines.push(format!("Tasks loaded: {}", result.tasks_loaded));
     lines.push(format!(
         "Tasks correct (2-AFC): {}/{} ({:.1}%)",
@@ -345,19 +366,25 @@ pub fn format_arc_dataset_result(result: &ArcDatasetResult) -> String {
         lines.push(format!("  [{:.1},{:.1}): {:>4} {}", lo, hi, count, bar));
     }
 
-    // LLM comparison
+    // LLM comparison — NOT directly comparable
     let our_accuracy = if result.tasks_loaded > 0 {
         result.tasks_correct as f64 / result.tasks_loaded as f64
     } else {
         0.0
     };
     lines.push(String::new());
-    lines.push("LLM Comparison (ARC-AGI accuracy):".to_string());
-    lines.push(format!("  Symthaea HDC:    {:.1}%", our_accuracy * 100.0));
-    lines.push("  GPT-4:           5.0%".to_string());
-    lines.push("  Claude 3.5:     21.0%".to_string());
-    lines.push("  o3-high:        87.5%".to_string());
-    lines.push("  Human:          84.0%".to_string());
+    lines.push("Reference: Real ARC-AGI solve rates (NOT directly comparable):".to_string());
+    lines.push("  NOTE: Symthaea uses 2-AFC (predicted vs random distractor),".to_string());
+    lines.push("  while the scores below require exact pixel-perfect generation.".to_string());
+    lines.push("  Our metric tests encoding fidelity, not rule discovery.".to_string());
+    lines.push(format!(
+        "  Symthaea HDC (2-AFC): {:.1}%",
+        our_accuracy * 100.0
+    ));
+    lines.push("  GPT-4 (exact):        5.0%".to_string());
+    lines.push("  Claude 3.5 (exact):   21.0%".to_string());
+    lines.push("  o3-high (exact):      87.5%".to_string());
+    lines.push("  Human (exact):        84.0%".to_string());
 
     // Show top-5 best and worst tasks
     let mut sorted = result.per_task.clone();
@@ -465,11 +492,12 @@ mod tests {
             by_grid_size: AccuracyBreakdown::default(),
             by_train_count: AccuracyBreakdown::default(),
             similarity_histogram: [0; 10],
+            synthetic: false,
         };
         let formatted = format_arc_dataset_result(&result);
         assert!(formatted.contains("10"));
         assert!(formatted.contains("7/10"));
         assert!(formatted.contains("70.0%"));
-        assert!(formatted.contains("LLM Comparison"));
+        assert!(formatted.contains("NOT directly comparable"));
     }
 }

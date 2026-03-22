@@ -1,4 +1,10 @@
-//! ARC Compositional Reasoning benchmark.
+//! ARC Compositional Reasoning benchmark (SYNTHETIC, not real ARC).
+//!
+//! **Honesty note:** This benchmark uses procedurally generated grid tasks.
+//! It tests HDC encoding/retrieval under composition (chained transforms),
+//! size variation, and symmetry detection via prototype matching. Because
+//! XOR bind is self-inverse, rule "application" is algebraic recovery.
+//! The z-scores reflect encoding robustness, not compositional reasoning.
 //!
 //! Extends ArcFluidBenchmark with three harder task categories:
 //!   1. **Chained transforms**: Two sequential transforms (e.g., translate then reflect).
@@ -504,7 +510,7 @@ impl PsychBenchmark for ArcCompositionalBenchmark {
 
     fn provenance(&self) -> Option<BenchmarkProvenance> {
         Some(BenchmarkProvenance {
-            paradigm: "Abstraction and Reasoning Corpus — Compositional Extension",
+            paradigm: "Synthetic ARC-inspired compositional grid transforms (HDC encoding test)",
             citation: "Chollet (2019); Johnson et al. (2021)",
             year: 2021,
             doi: Some("10.48550/arXiv.1911.01547"),
@@ -572,6 +578,13 @@ impl PsychBenchmark for ArcCompositionalBenchmark {
         if config.trial_trace {
             result.trial_trace = trace;
         }
+        result.notes.push(
+            "SYNTHETIC: Uses procedural grid transforms, not Chollet's real ARC. \
+             Tests HDC encoding robustness under composition, size variation, and \
+             prototype-based symmetry classification. Z-scores reflect encoding \
+             quality, not compositional reasoning."
+                .to_string(),
+        );
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }
@@ -688,7 +701,8 @@ mod tests {
     #[test]
     fn test_provenance_correct() {
         let prov = ArcCompositionalBenchmark.provenance().unwrap();
-        assert!(prov.paradigm.contains("Compositional"));
+        assert!(prov.paradigm.contains("Synthetic"));
+        assert!(prov.paradigm.contains("compositional"));
         assert!(prov.citation.contains("Johnson"));
     }
 

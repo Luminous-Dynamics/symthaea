@@ -184,16 +184,30 @@ pub fn run_staircase(
             consecutive_correct += 1;
             if consecutive_correct >= needed {
                 // Step up (harder)
-                direction = 1;
-                difficulty = (difficulty + step_size).min(1.0);
+                let new_diff = (difficulty + step_size).min(1.0);
+                if new_diff >= 1.0 && difficulty >= 1.0 {
+                    // At ceiling — force step down to avoid saturation
+                    direction = -1;
+                    difficulty = (difficulty - step_size).max(0.0);
+                } else {
+                    direction = 1;
+                    difficulty = new_diff;
+                }
                 consecutive_correct = 0;
             } else {
                 direction = 0; // hold
             }
         } else {
             // Step down (easier)
-            direction = -1;
-            difficulty = (difficulty - step_size).max(0.0);
+            let new_diff = (difficulty - step_size).max(0.0);
+            if new_diff <= 0.0 && difficulty <= 0.0 {
+                // At floor — force step up to avoid saturation
+                direction = 1;
+                difficulty = (difficulty + step_size).min(1.0);
+            } else {
+                direction = -1;
+                difficulty = new_diff;
+            }
             consecutive_correct = 0;
         }
 

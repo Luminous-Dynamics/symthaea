@@ -1,4 +1,10 @@
-//! ARC Abductive Reasoning benchmark.
+//! ARC Abductive Reasoning benchmark (SYNTHETIC, not real ARC).
+//!
+//! **Honesty note:** This benchmark uses procedurally generated grid tasks.
+//! It tests HDC XOR-based unbinding (backward algebraic recovery), not genuine
+//! abductive reasoning. With BinaryHV, unbind is XOR — the exact inverse of
+//! bind — so "backward inference" is algebraically identical to forward
+//! application. The z-scores reflect encoding fidelity, not reasoning ability.
 //!
 //! Tests backward causal inference: given the output of a transformation and
 //! the learned rule, infer what the input must have been. This is the inverse
@@ -248,7 +254,7 @@ impl PsychBenchmark for ArcAbductiveBenchmark {
 
     fn provenance(&self) -> Option<BenchmarkProvenance> {
         Some(BenchmarkProvenance {
-            paradigm: "Abductive Reasoning via Grid Transforms",
+            paradigm: "Synthetic abductive inference via HDC grid unbinding",
             citation: "Chollet (2019); Harman (1965)",
             year: 2019,
             doi: Some("10.48550/arXiv.1911.01547"),
@@ -308,6 +314,12 @@ impl PsychBenchmark for ArcAbductiveBenchmark {
         if config.trial_trace {
             result.trial_trace = trace;
         }
+        result.notes.push(
+            "SYNTHETIC: Uses procedural grid transforms, not Chollet's real ARC. \
+             Tests HDC XOR unbinding (algebraically identical to forward bind). \
+             Z-scores reflect encoding fidelity, not abductive reasoning."
+                .to_string(),
+        );
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }
@@ -382,7 +394,7 @@ mod tests {
     #[test]
     fn test_provenance_correct() {
         let prov = ArcAbductiveBenchmark.provenance().unwrap();
-        assert!(prov.paradigm.contains("Abductive"));
+        assert!(prov.paradigm.contains("abductive"));
         assert!(prov.citation.contains("Harman"));
         assert_eq!(prov.year, 2019);
     }

@@ -15,6 +15,7 @@ use symthaea_psych_bench::benchmarks::{
         AllianceMaintenanceBenchmark, CognitiveDistortionBenchmark, CrisisDetectionBenchmark,
         EmpathicAccuracyBenchmark, MotivationalInterviewingBenchmark, TherapeuticResponseBenchmark,
     },
+    coding::{BugDetectionBenchmark, HumanEvalMiniBenchmark},
     cogbench::{
         BartBenchmark, HorizonBenchmark, InstrumentalLearningBenchmark,
         ProbabilisticReasoningBenchmark, RestlessBanditBenchmark, ReversalLearningBenchmark,
@@ -23,7 +24,7 @@ use symthaea_psych_bench::benchmarks::{
     consciousness::{BinocularRivalryBenchmark, BlindSightBenchmark, PerceptualCrowdingBenchmark},
     creativity::{
         AlternateUsesBenchmark, ConceptualBlendingBenchmark, DivergentThinkingBenchmark,
-        RemoteAssociatesBenchmark,
+        InsightProblemBenchmark, RemoteAssociatesBenchmark,
     },
     executive::{
         DualTaskBenchmark, FlankerBenchmark, IowaGamblingBenchmark,
@@ -170,6 +171,7 @@ fn full_battery_report() {
     report.add(AlternateUsesBenchmark.run(&config));
     report.add(DivergentThinkingBenchmark.run(&config));
     report.add(ConceptualBlendingBenchmark.run(&config));
+    report.add(InsightProblemBenchmark.run(&config));
 
     // ── Butlin Consciousness Indicators ──
     report.add(ButlinIndicatorSuite.run(&config));
@@ -298,6 +300,10 @@ fn full_battery_report() {
     report.add(EncryptedBindingBenchmark.run(&config));
     report.add(ScalingAnalysisBenchmark.run(&config));
 
+    // ── Coding ──
+    report.add(HumanEvalMiniBenchmark.run(&config));
+    report.add(BugDetectionBenchmark.run(&config));
+
     // ── Neuromod ──
     report.add(PharmacologicalChallengeBenchmark.run(&config));
     report.add(InjectionChallengeBenchmark.run(&config));
@@ -313,8 +319,8 @@ fn full_battery_report() {
     // Verify all benchmarks produced results
     assert_eq!(
         report.results.len(),
-        135,
-        "Expected 135 benchmark results, got {}",
+        138,
+        "Expected 138 benchmark results, got {}",
         report.results.len()
     );
 
@@ -415,6 +421,7 @@ fn regression_against_baseline() {
     report.add(AlternateUsesBenchmark.run(&config));
     report.add(DivergentThinkingBenchmark.run(&config));
     report.add(ConceptualBlendingBenchmark.run(&config));
+    report.add(InsightProblemBenchmark.run(&config));
     report.add(ButlinIndicatorSuite.run(&config));
     report.add(GoNoGoBenchmark.run(&config));
     report.add(StopSignalBenchmark.run(&config));

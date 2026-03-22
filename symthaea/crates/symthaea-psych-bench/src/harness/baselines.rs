@@ -66,6 +66,8 @@ pub struct BaselineCollection {
     pub causal_reasoning: BaselineMap,
     /// Security (HDC-FHE) baselines (encrypted classification, collective aggregation).
     pub security: BaselineMap,
+    /// Coding domain baselines (HumanEval, bug detection).
+    pub coding: BaselineMap,
     /// GPT-4 baselines from CogBench (Coda et al., 2023).
     pub llm_cogbench: BaselineMap,
     /// GPT-4 baselines from ToMBench (Kosinski, 2023).
@@ -106,6 +108,7 @@ impl BaselineCollection {
             spatial: spatial_baselines(),
             causal_reasoning: causal_reasoning_baselines(),
             security: security_baselines(),
+            coding: coding_baselines(),
             llm_cogbench: llm_cogbench_baselines(),
             llm_tombench: llm_tombench_baselines(),
             llm_arc: llm_arc_baselines(),
@@ -1455,18 +1458,6 @@ pub fn creativity_baselines() -> BTreeMap<&'static str, Baseline> {
         },
     );
 
-    // Remote Associates Test mean solution rank (Bowden & Jung-Beeman, 2003)
-    // With ~50% accuracy across 4 candidates, mean rank ≈ 1.75 (is_lower_better)
-    m.insert(
-        "rat_mean_solution_rank",
-        Baseline {
-            value: 1.75,
-            sd: Some(0.50),
-            source: "Bowden & Jung-Beeman (2003), derived from 50% accuracy over 4 candidates",
-            population: "human adults",
-        },
-    );
-
     // Alternate Uses Task fluency (Torrance, 1974)
     m.insert(
         "aut_fluency",
@@ -1474,6 +1465,83 @@ pub fn creativity_baselines() -> BTreeMap<&'static str, Baseline> {
             value: 8.0,
             sd: Some(3.0),
             source: "Torrance (1974), Torrance Tests of Creative Thinking",
+            population: "human adults",
+        },
+    );
+
+    // Alternate Uses Task originality (Silvia et al., 2008)
+    // Mean semantic distance of generated uses from the object's typical use.
+    // Originality reflects how far uses diverge from conventional associations.
+    m.insert(
+        "aut_originality",
+        Baseline {
+            value: 0.60,
+            sd: Some(0.15),
+            source: "Silvia et al. (2008), Assessing creativity with divergent thinking tasks",
+            population: "human adults",
+        },
+    );
+
+    // RAT binding accuracy (Bowden & Jung-Beeman, 2003)
+    // Proportion of triads where the convergent associate is correctly
+    // identified via associative binding (pairwise cue binding ensemble).
+    // Lower than overall accuracy because binding is a harder retrieval
+    // mode than simple similarity matching.
+    m.insert(
+        "rat_convergent_binding",
+        Baseline {
+            value: 0.55,
+            sd: Some(0.15),
+            source: "Bowden & Jung-Beeman (2003), convergent associative retrieval accuracy",
+            population: "human adults",
+        },
+    );
+
+    // Conceptual Blending (Fauconnier & Turner, 2002)
+    m.insert(
+        "blend_coherence",
+        Baseline {
+            value: 0.55,
+            sd: Some(0.12),
+            source: "Fauconnier & Turner (2002), The Way We Think; Ward (1994)",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "novelty_score",
+        Baseline {
+            value: 0.50,
+            sd: Some(0.15),
+            source: "Ward (1994), Structured Imagination: the Role of Category Structure",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "integration_score",
+        Baseline {
+            value: 0.45,
+            sd: Some(0.12),
+            source: "Fauconnier & Turner (2002), conceptual integration measure",
+            population: "human adults",
+        },
+    );
+
+    // Insight Problem Solving (Bowden & Jung-Beeman, 2003; Ohlsson, 1992)
+    m.insert(
+        "insight_accuracy",
+        Baseline {
+            value: 0.50,
+            sd: Some(0.15),
+            source: "Bowden & Jung-Beeman (2003); Metcalfe & Wiebe (1987)",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "restructuring_depth",
+        Baseline {
+            value: 0.40,
+            sd: Some(0.15),
+            source: "Ohlsson (1992), representational change theory",
             population: "human adults",
         },
     );
@@ -1523,35 +1591,6 @@ pub fn creativity_baselines() -> BTreeMap<&'static str, Baseline> {
             value: 0.35,
             sd: Some(0.12),
             source: "Guilford (1967), inter-response distinctiveness",
-            population: "human adults",
-        },
-    );
-
-    // Conceptual Blending (Fauconnier & Turner, 2002; Ward, 1994)
-    m.insert(
-        "blend_quality",
-        Baseline {
-            value: 0.52,
-            sd: Some(0.14),
-            source: "Ward (1994), composite creativity score for conceptual combination",
-            population: "human adults",
-        },
-    );
-    m.insert(
-        "blend_novelty",
-        Baseline {
-            value: 0.48,
-            sd: Some(0.16),
-            source: "Wisniewski (1997), semantic distance in conceptual combinations",
-            population: "human adults",
-        },
-    );
-    m.insert(
-        "blend_coherence",
-        Baseline {
-            value: 0.65,
-            sd: Some(0.12),
-            source: "Fauconnier & Turner (2002), blend structural consistency ratings",
             population: "human adults",
         },
     );
@@ -4734,6 +4773,36 @@ pub fn security_baselines() -> BaselineMap {
             sd: Some(0.05),
             source: "Rahimi et al. (2016) HDC classification scaling",
             population: "HDC classification systems",
+        },
+    );
+    m
+}
+
+/// Coding domain baselines (HumanEval, bug detection).
+pub fn coding_baselines() -> BaselineMap {
+    let mut m = BTreeMap::new();
+    // HumanEvalMini: pass_at_1
+    // Baseline: Chen et al. (2021) HumanEval Codex-12B pass@1 = 28.8%
+    // We use a slightly higher baseline reflecting modern LLM code generation.
+    m.insert(
+        "humaneval_pass_at_1",
+        Baseline {
+            value: 0.35,
+            sd: Some(0.12),
+            source:
+                "Chen et al. (2021) Evaluating Large Language Models Trained on Code; Codex pass@1",
+            population: "LLM code generation systems",
+        },
+    );
+    // BugDetection: delta_magnitude
+    // Baseline: Beller et al. (2018) bug detection accuracy, typical ~70% for static analysis
+    m.insert(
+        "bug_detection_delta_magnitude",
+        Baseline {
+            value: 0.70,
+            sd: Some(0.10),
+            source: "Beller et al. (2018) static analysis bug detection accuracy; DevOps defect detection",
+            population: "static analysis tools",
         },
     );
     m

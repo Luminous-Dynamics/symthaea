@@ -324,6 +324,7 @@ fn reliability_benchmarks() -> Vec<Box<dyn PsychBenchmark + Send + Sync>> {
         Box::new(ReversalLearningBenchmark),
         Box::new(StopSignalBenchmark),
         Box::new(MetacognitiveCalibrationBenchmark),
+        Box::new(FeelingOfKnowingBenchmark),
         Box::new(YerkesDodsonBenchmark),
         Box::new(DoseResponseBenchmark),
         Box::new(RewardLearningBenchmark),

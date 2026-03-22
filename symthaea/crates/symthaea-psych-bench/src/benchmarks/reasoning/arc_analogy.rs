@@ -1,4 +1,11 @@
-//! ARC Analogy benchmark.
+//! ARC Analogy benchmark (SYNTHETIC, not real ARC).
+//!
+//! **Honesty note:** This benchmark uses procedurally generated grid tasks.
+//! It tests HDC XOR-based rule transfer — whether a rule HV extracted from
+//! one input/output pair can be applied to a different input. Because XOR
+//! bind is self-inverse, "analogical transfer" is exact algebraic recovery,
+//! not genuine analogical reasoning. The z-scores reflect encoding fidelity
+//! across different inputs, not abstract analogical ability.
 //!
 //! Tests analogical reasoning: given A→B via transform T, infer C→D.
 //! This is the classic A:B :: C:? paradigm (Cattell/Horn fluid intelligence).
@@ -333,7 +340,7 @@ impl PsychBenchmark for ArcAnalogyBenchmark {
 
     fn provenance(&self) -> Option<BenchmarkProvenance> {
         Some(BenchmarkProvenance {
-            paradigm: "Analogical Reasoning via Grid Transforms",
+            paradigm: "Synthetic analogical transfer via HDC rule binding",
             citation: "Chollet (2019); Lovett & Forbus (2017)",
             year: 2019,
             doi: Some("10.48550/arXiv.1911.01547"),
@@ -386,6 +393,12 @@ impl PsychBenchmark for ArcAnalogyBenchmark {
         if config.trial_trace {
             result.trial_trace = trace;
         }
+        result.notes.push(
+            "SYNTHETIC: Uses procedural grid transforms, not Chollet's real ARC. \
+             Tests HDC rule transfer (XOR bind/unbind), not genuine analogical \
+             reasoning. Z-scores reflect encoding fidelity across inputs."
+                .to_string(),
+        );
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }
@@ -456,7 +469,7 @@ mod tests {
     #[test]
     fn test_provenance_correct() {
         let prov = ArcAnalogyBenchmark.provenance().unwrap();
-        assert!(prov.paradigm.contains("Analogical"));
+        assert!(prov.paradigm.contains("analogical"));
         assert!(prov.citation.contains("Lovett"));
     }
 

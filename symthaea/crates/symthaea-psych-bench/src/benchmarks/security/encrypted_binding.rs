@@ -167,6 +167,7 @@ impl PsychBenchmark for EncryptedBindingBenchmark {
             conditions: 2,
             trials_per_condition: trials,
             trial_trace: Vec::new(),
+            notes: Vec::new(),
         }
     }
 }

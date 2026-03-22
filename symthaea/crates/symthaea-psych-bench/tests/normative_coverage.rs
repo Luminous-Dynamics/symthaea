@@ -7,6 +7,7 @@
 use symthaea_psych_bench::benchmarks::affect::*;
 use symthaea_psych_bench::benchmarks::attention::*;
 use symthaea_psych_bench::benchmarks::butlin::*;
+use symthaea_psych_bench::benchmarks::coding::*;
 use symthaea_psych_bench::benchmarks::cogbench::*;
 use symthaea_psych_bench::benchmarks::creativity::*;
 use symthaea_psych_bench::benchmarks::executive::*;
@@ -83,6 +84,7 @@ fn test_normative_coverage() {
         Box::new(RemoteAssociatesBenchmark),
         Box::new(DivergentThinkingBenchmark),
         Box::new(ConceptualBlendingBenchmark),
+        Box::new(InsightProblemBenchmark),
         // Butlin
         Box::new(ButlinIndicatorSuite),
         // Inhibition
@@ -131,6 +133,9 @@ fn test_normative_coverage() {
         Box::new(PharmacologicalAblationBenchmark),
         Box::new(BehavioralKnockoutBenchmark),
         Box::new(ConsciousnessPharmacologyBenchmark),
+        // Coding
+        Box::new(HumanEvalMiniBenchmark),
+        Box::new(BugDetectionBenchmark),
     ];
 
     // Build a full report from all benchmarks
