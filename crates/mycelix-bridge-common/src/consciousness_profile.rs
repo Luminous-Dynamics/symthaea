@@ -555,6 +555,16 @@ pub struct GateAuditInput {
     /// Format: "<agent_hex_prefix>:<timestamp_us>" — generated at action entry points.
     #[serde(default)]
     pub correlation_id: Option<String>,
+    /// Source of the consciousness credential used for this gate check.
+    ///
+    /// Enables post-incident forensics by distinguishing real credentials from
+    /// cached or bootstrap credentials. Values:
+    /// - `"identity_bridge_fresh"` — newly issued by identity cluster
+    /// - `"identity_bridge_refresh"` — refreshed within expiry window
+    /// - `"cache_hit"` — retrieved from local credential cache
+    /// - `"bootstrap"` — bootstrap credential for small communities
+    #[serde(default)]
+    pub credential_source: Option<String>,
 }
 
 // ============================================================================
@@ -940,6 +950,7 @@ pub fn gate_consciousness(
             required_tier: format!("{:?}", requirement.min_tier),
             weight_bp: eligibility.weight_bp,
             correlation_id: None,
+            credential_source: None,
         };
         match call(
             CallTargetCell::Local,
@@ -2515,6 +2526,7 @@ mod tests {
             required_tier: "Participant".into(),
             weight_bp: 7500,
             correlation_id: Some("abcdef01:1700000000000000".into()),
+            credential_source: None,
         };
         let json = serde_json::to_string(&audit).unwrap();
         let a2: GateAuditInput = serde_json::from_str(&json).unwrap();
@@ -2523,10 +2535,30 @@ mod tests {
 
     #[test]
     fn gate_audit_input_serde_without_correlation_id() {
-        // Backward compat: old audit inputs without correlation_id
+        // Backward compat: old audit inputs without correlation_id or credential_source
         let json = r#"{"action_name":"test","zome_name":"z","eligible":true,"actual_tier":"Citizen","required_tier":"Participant","weight_bp":7500}"#;
         let audit: GateAuditInput = serde_json::from_str(json).unwrap();
         assert_eq!(audit.correlation_id, None);
+        assert_eq!(audit.credential_source, None);
+    }
+
+    #[test]
+    fn gate_audit_input_serde_with_credential_source() {
+        let audit = GateAuditInput {
+            action_name: "create_shelter".into(),
+            zome_name: "civic_bridge".into(),
+            eligible: true,
+            actual_tier: "Citizen".into(),
+            required_tier: "Participant".into(),
+            weight_bp: 7500,
+            correlation_id: None,
+            credential_source: Some("identity_bridge_fresh".into()),
+        };
+        let json = serde_json::to_string(&audit).unwrap();
+        assert!(json.contains("credential_source"));
+        assert!(json.contains("identity_bridge_fresh"));
+        let a2: GateAuditInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(a2.credential_source, Some("identity_bridge_fresh".into()));
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -2624,6 +2656,7 @@ mod tests {
             required_tier: format!("{:?}", ConsciousnessTier::Participant),
             weight_bp: result.weight_bp,
             correlation_id: Some(format!("mvb:{}", NOW)),
+            credential_source: Some("identity_bridge_fresh".into()),
         };
         // Verify it serializes (real bridge would store on source chain)
         let json = serde_json::to_string(&_audit).unwrap();

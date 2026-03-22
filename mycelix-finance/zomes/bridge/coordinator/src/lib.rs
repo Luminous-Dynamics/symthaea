@@ -27,7 +27,12 @@ const FINANCE_HAPP_ID: &str = "mycelix-finance";
 ///
 /// Set to `true` for high-security deployments where governance availability
 /// is guaranteed and any gap in oversight is unacceptable.
-const STRICT_GOVERNANCE_MODE: bool = false;
+///
+/// SECURITY: Changed from `false` to `true` — financial operations must not
+/// proceed without governance verification. The permissive default allowed
+/// currency creation and proposal verification to bypass governance during
+/// network partitions, which is unacceptable for production deployments.
+const STRICT_GOVERNANCE_MODE: bool = true;
 
 /// 24 hours in microseconds
 const DAY_MICROS: i64 = 24 * 60 * 60 * 1_000_000;

@@ -1398,23 +1398,15 @@ pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCr
             })?
         }
         _ => {
-            // Identity role unavailable (single-DNA mode or network partition).
-            // Return a permissive fallback credential so single-cluster operations
-            // can proceed. In production, the identity role will provide real scores.
-            debug!(
-                "Identity role unavailable, using fallback consciousness credential for {}",
+            // Identity role unavailable (network partition or crash).
+            // FAIL CLOSED: Do not issue unverified credentials. Civic operations
+            // (justice, emergency, media) requiring consciousness gating must wait
+            // until identity verification is restored.
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Identity cluster unreachable — cannot verify consciousness credentials \
+                 for {}. Civic operations suspended until identity verification is restored.",
                 did
-            );
-            let now_us = sys_time()?.as_micros() as u64;
-            ConsciousnessCredential::from_unified_consciousness(
-                did.clone(),
-                0.5, // unified_consciousness — mid-range default
-                0.5, // identity — above Participant threshold (0.25)
-                0.5, // reputation
-                0.5, // community
-                "did:mycelix:civic-bridge-fallback".to_string(),
-                now_us,
-            )
+            ))));
         }
     };
 
@@ -1501,17 +1493,12 @@ pub fn refresh_consciousness_credential(did: String) -> ExternResult<Consciousne
             if let Some(cached) = get_cached_credential(&did)? {
                 return Ok(cached);
             }
-            // No cache either — return Citizen-tier fallback
-            let now_us = sys_time()?.as_micros() as u64;
-            ConsciousnessCredential::from_unified_consciousness(
-                did.clone(),
-                0.5,
-                0.5,
-                0.5,
-                0.5,
-                "did:mycelix:civic-bridge-fallback".to_string(),
-                now_us,
-            )
+            // No cache either — fail closed. Do not issue unverified credentials.
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Identity cluster unreachable during refresh and no cached credential \
+                 for {}. Cannot proceed without verified consciousness credentials.",
+                did
+            ))));
         }
     };
 

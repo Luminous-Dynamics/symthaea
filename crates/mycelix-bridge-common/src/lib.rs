@@ -101,6 +101,47 @@ pub struct BridgeHealth {
 }
 
 // ============================================================================
+// Dispatch size limits — prevent memory exhaustion via oversized payloads
+// ============================================================================
+
+/// Maximum dispatch payload size (1 MB). Prevents memory exhaustion from
+/// oversized payloads being cloned into ExternIO.
+pub const MAX_DISPATCH_PAYLOAD_BYTES: usize = 1_048_576;
+
+/// Maximum dispatch zome/fn_name identifier length (256 bytes).
+pub const MAX_DISPATCH_IDENTIFIER_BYTES: usize = 256;
+
+/// Validate dispatch input field sizes.
+fn validate_dispatch_sizes(
+    zome: &str,
+    fn_name: &str,
+    payload: &[u8],
+) -> Result<(), String> {
+    if zome.len() > MAX_DISPATCH_IDENTIFIER_BYTES {
+        return Err(format!(
+            "Zome name too long ({} bytes, max {})",
+            zome.len(),
+            MAX_DISPATCH_IDENTIFIER_BYTES
+        ));
+    }
+    if fn_name.len() > MAX_DISPATCH_IDENTIFIER_BYTES {
+        return Err(format!(
+            "Function name too long ({} bytes, max {})",
+            fn_name.len(),
+            MAX_DISPATCH_IDENTIFIER_BYTES
+        ));
+    }
+    if payload.len() > MAX_DISPATCH_PAYLOAD_BYTES {
+        return Err(format!(
+            "Payload too large ({} bytes, max {})",
+            payload.len(),
+            MAX_DISPATCH_PAYLOAD_BYTES
+        ));
+    }
+    Ok(())
+}
+
+// ============================================================================
 // Dispatch logic
 // ============================================================================
 
@@ -117,6 +158,13 @@ pub fn dispatch_call_checked(
     input: &DispatchInput,
     allowed_zomes: &[&str],
 ) -> ExternResult<DispatchResult> {
+    if let Err(msg) = validate_dispatch_sizes(&input.zome, &input.fn_name, &input.payload) {
+        return Ok(DispatchResult {
+            success: false,
+            response: None,
+            error: Some(msg),
+        });
+    }
     if !allowed_zomes.contains(&input.zome.as_str()) {
         return Ok(DispatchResult {
             success: false,
@@ -221,6 +269,24 @@ pub fn dispatch_call_cross_cluster(
     input: &CrossClusterDispatchInput,
     allowed_zomes: &[&str],
 ) -> ExternResult<DispatchResult> {
+    if let Err(msg) = validate_dispatch_sizes(&input.zome, &input.fn_name, &input.payload) {
+        return Ok(DispatchResult {
+            success: false,
+            response: None,
+            error: Some(msg),
+        });
+    }
+    if input.role.len() > MAX_DISPATCH_IDENTIFIER_BYTES {
+        return Ok(DispatchResult {
+            success: false,
+            response: None,
+            error: Some(format!(
+                "Role name too long ({} bytes, max {})",
+                input.role.len(),
+                MAX_DISPATCH_IDENTIFIER_BYTES
+            )),
+        });
+    }
     if !allowed_zomes.contains(&input.zome.as_str()) {
         return Ok(DispatchResult {
             success: false,

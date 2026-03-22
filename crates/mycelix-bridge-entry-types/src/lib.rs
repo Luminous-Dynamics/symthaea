@@ -23,6 +23,25 @@ fn default_schema_v1() -> u8 {
 }
 
 // ============================================================================
+// Size limit constants — prevent DHT storage exhaustion attacks
+// ============================================================================
+
+/// Maximum length for domain identifiers (e.g., "property", "justice")
+pub const MAX_DOMAIN_BYTES: usize = 256;
+
+/// Maximum length for query_type / event_type identifiers
+pub const MAX_TYPE_BYTES: usize = 256;
+
+/// Maximum length for query result payloads (64 KB)
+pub const MAX_RESULT_BYTES: usize = 65_536;
+
+/// Maximum length for each individual hash in related_hashes
+pub const MAX_HASH_BYTES: usize = 128;
+
+/// Maximum length for DID strings
+pub const MAX_DID_BYTES: usize = 256;
+
+// ============================================================================
 // Entry types
 // ============================================================================
 
@@ -159,6 +178,13 @@ impl TryFrom<&Entry> for CachedCredentialEntry {
 pub fn validate_cached_credential(entry: &CachedCredentialEntry) -> Result<(), String> {
     if entry.did.is_empty() {
         return Err("Cached credential DID cannot be empty".into());
+    }
+    if entry.did.len() > MAX_DID_BYTES {
+        return Err(format!(
+            "Cached credential DID too long ({} bytes, max {})",
+            entry.did.len(),
+            MAX_DID_BYTES
+        ));
     }
     if entry.credential_json.is_empty() {
         return Err("Cached credential JSON cannot be empty".into());
@@ -515,10 +541,24 @@ pub fn validate_query_fields(
     query: &BridgeQueryEntry,
     valid_domains: &[&str],
 ) -> Result<(), String> {
+    if query.domain.len() > MAX_DOMAIN_BYTES {
+        return Err(format!(
+            "Domain too long ({} bytes, max {})",
+            query.domain.len(),
+            MAX_DOMAIN_BYTES
+        ));
+    }
     if !valid_domains.contains(&query.domain.as_str()) {
         return Err(format!(
             "Invalid domain '{}'. Must be one of: {:?}",
             query.domain, valid_domains
+        ));
+    }
+    if query.query_type.len() > MAX_TYPE_BYTES {
+        return Err(format!(
+            "Query type too long ({} bytes, max {})",
+            query.query_type.len(),
+            MAX_TYPE_BYTES
         ));
     }
     if query.params.len() > 8192 {
@@ -527,6 +567,15 @@ pub fn validate_query_fields(
     if !query.params.is_empty() {
         if serde_json::from_str::<serde_json::Value>(&query.params).is_err() {
             return Err("Parameters must be valid JSON".into());
+        }
+    }
+    if let Some(ref result) = query.result {
+        if result.len() > MAX_RESULT_BYTES {
+            return Err(format!(
+                "Result too large ({} bytes, max {})",
+                result.len(),
+                MAX_RESULT_BYTES
+            ));
         }
     }
     Ok(())
@@ -539,10 +588,24 @@ pub fn validate_event_fields(
     event: &BridgeEventEntry,
     valid_domains: &[&str],
 ) -> Result<(), String> {
+    if event.domain.len() > MAX_DOMAIN_BYTES {
+        return Err(format!(
+            "Domain too long ({} bytes, max {})",
+            event.domain.len(),
+            MAX_DOMAIN_BYTES
+        ));
+    }
     if !valid_domains.contains(&event.domain.as_str()) {
         return Err(format!(
             "Invalid domain '{}'. Must be one of: {:?}",
             event.domain, valid_domains
+        ));
+    }
+    if event.event_type.len() > MAX_TYPE_BYTES {
+        return Err(format!(
+            "Event type too long ({} bytes, max {})",
+            event.event_type.len(),
+            MAX_TYPE_BYTES
         ));
     }
     if event.payload.len() > 8192 {
@@ -550,6 +613,16 @@ pub fn validate_event_fields(
     }
     if event.related_hashes.len() > 20 {
         return Err("Cannot have more than 20 related hashes".into());
+    }
+    for (i, hash) in event.related_hashes.iter().enumerate() {
+        if hash.len() > MAX_HASH_BYTES {
+            return Err(format!(
+                "Related hash [{}] too long ({} bytes, max {})",
+                i,
+                hash.len(),
+                MAX_HASH_BYTES
+            ));
+        }
     }
     Ok(())
 }
@@ -1034,22 +1107,100 @@ mod tests {
     }
 
     #[test]
-    fn query_very_long_domain_string() {
+    fn query_very_long_domain_string_rejected_by_size() {
         let long_domain = "x".repeat(1024);
         let q = make_query(&long_domain, "{}");
-        // A 1024-char domain is not in the allowlist, so validation must reject it
+        // Rejected by MAX_DOMAIN_BYTES (256) before allowlist check
         let err = validate_query_fields(&q, DOMAINS).unwrap_err();
-        assert!(err.contains("Invalid domain"));
+        assert!(err.contains("Domain too long"));
 
-        // But if we add it to the allowlist, it passes
+        // Even if we add it to the allowlist, it's still rejected by size limit
         let custom_domains: Vec<&str> = vec![&long_domain];
-        assert!(validate_query_fields(&q, &custom_domains).is_ok());
+        let err = validate_query_fields(&q, &custom_domains).unwrap_err();
+        assert!(err.contains("Domain too long"));
+    }
 
-        // And serde roundtrip preserves the long domain
-        let bytes = serde_json::to_vec(&q).unwrap();
-        let q2: BridgeQueryEntry = serde_json::from_slice(&bytes).unwrap();
-        assert_eq!(q2.domain.len(), 1024);
-        assert_eq!(q, q2);
+    #[test]
+    fn query_domain_at_max_bytes_accepted() {
+        let domain = "x".repeat(MAX_DOMAIN_BYTES);
+        let q = make_query(&domain, "{}");
+        let domains: Vec<&str> = vec![&domain];
+        assert!(validate_query_fields(&q, &domains).is_ok());
+    }
+
+    #[test]
+    fn query_domain_over_max_bytes_rejected() {
+        let domain = "x".repeat(MAX_DOMAIN_BYTES + 1);
+        let q = make_query(&domain, "{}");
+        let domains: Vec<&str> = vec![&domain];
+        let err = validate_query_fields(&q, &domains).unwrap_err();
+        assert!(err.contains("Domain too long"));
+    }
+
+    #[test]
+    fn query_type_over_max_bytes_rejected() {
+        let mut q = make_query("property", "{}");
+        q.query_type = "x".repeat(MAX_TYPE_BYTES + 1);
+        let err = validate_query_fields(&q, DOMAINS).unwrap_err();
+        assert!(err.contains("Query type too long"));
+    }
+
+    #[test]
+    fn query_type_at_max_bytes_accepted() {
+        let mut q = make_query("property", "{}");
+        q.query_type = "x".repeat(MAX_TYPE_BYTES);
+        assert!(validate_query_fields(&q, DOMAINS).is_ok());
+    }
+
+    #[test]
+    fn query_result_over_max_bytes_rejected() {
+        let mut q = make_query("property", "{}");
+        q.result = Some("x".repeat(MAX_RESULT_BYTES + 1));
+        let err = validate_query_fields(&q, DOMAINS).unwrap_err();
+        assert!(err.contains("Result too large"));
+    }
+
+    #[test]
+    fn query_result_at_max_bytes_accepted() {
+        let mut q = make_query("property", "{}");
+        q.result = Some("x".repeat(MAX_RESULT_BYTES));
+        assert!(validate_query_fields(&q, DOMAINS).is_ok());
+    }
+
+    #[test]
+    fn event_type_over_max_bytes_rejected() {
+        let mut e = make_event("property", "{}");
+        e.event_type = "x".repeat(MAX_TYPE_BYTES + 1);
+        let err = validate_event_fields(&e, DOMAINS).unwrap_err();
+        assert!(err.contains("Event type too long"));
+    }
+
+    #[test]
+    fn event_individual_hash_over_max_bytes_rejected() {
+        let mut e = make_event("property", "{}");
+        e.related_hashes = vec!["x".repeat(MAX_HASH_BYTES + 1)];
+        let err = validate_event_fields(&e, DOMAINS).unwrap_err();
+        assert!(err.contains("Related hash [0] too long"));
+    }
+
+    #[test]
+    fn event_individual_hash_at_max_bytes_accepted() {
+        let mut e = make_event("property", "{}");
+        e.related_hashes = vec!["x".repeat(MAX_HASH_BYTES)];
+        assert!(validate_event_fields(&e, DOMAINS).is_ok());
+    }
+
+    #[test]
+    fn cached_credential_did_over_max_bytes_rejected() {
+        let c = make_cached_credential(&"x".repeat(MAX_DID_BYTES + 1), r#"{"p":{}}"#);
+        let err = validate_cached_credential(&c).unwrap_err();
+        assert!(err.contains("DID too long"));
+    }
+
+    #[test]
+    fn cached_credential_did_at_max_bytes_accepted() {
+        let c = make_cached_credential(&"x".repeat(MAX_DID_BYTES), r#"{"p":{}}"#);
+        assert!(validate_cached_credential(&c).is_ok());
     }
 
     // ---- JurisdictionConstraintEntry validation ----
