@@ -68,7 +68,8 @@ impl HolonHttpState {
             buf.extend(responses);
             // Cap at 256 to prevent unbounded growth
             if buf.len() > 256 {
-                *buf = buf.split_off(buf.len() - 256);
+                let keep_from = buf.len() - 256;
+                *buf = buf.split_off(keep_from);
             }
         }
     }
