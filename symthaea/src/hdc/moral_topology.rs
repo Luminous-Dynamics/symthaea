@@ -2774,8 +2774,9 @@ impl MoralTopology {
         }
 
         // Features still alive at the last scale get death = last scale
-        // SAFETY: scales.len() >= 2 checked at entry
-        let last_scale = *scales.last().expect("scales.len() >= 2 verified at entry");
+        let Some(&last_scale) = scales.last() else {
+            return;
+        };
         for birth in births.drain(..) {
             let pf = PersistentFeature::new(feature_type, birth, last_scale);
             if pf.persistence >= min_persistence {

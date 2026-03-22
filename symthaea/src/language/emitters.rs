@@ -547,6 +547,23 @@ fn infer_rust_body(
             return format!("{}.is_empty()", params[0].0);
         }
     }
+    // Count characters matching a predicate
+    if purpose_lower.contains("count") && purpose_lower.contains("vowel") {
+        if params.len() == 1 {
+            return format!(
+                "{}.chars().filter(|c| \"aeiouAEIOU\".contains(*c)).count()",
+                params[0].0
+            );
+        }
+    }
+    if purpose_lower.contains("count") && purpose_lower.contains("digit") {
+        if params.len() == 1 {
+            return format!(
+                "{}.chars().filter(|c| c.is_ascii_digit()).count()",
+                params[0].0
+            );
+        }
+    }
     if purpose_lower.contains("is even") {
         if params.len() == 1 {
             return format!("{} % 2 == 0", params[0].0);

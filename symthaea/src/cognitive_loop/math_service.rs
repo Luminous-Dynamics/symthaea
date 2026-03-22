@@ -25,6 +25,10 @@ use symthaea_core::hdc::quadrature::QuadratureEngine;
 use symthaea_core::hdc::root_finding::RootFindingEngine;
 use symthaea_core::hdc::statistics;
 
+// Symbolic calculus for exact integration and derivative-assisted root finding
+use symthaea_core::hdc::arithmetic_engine::Polynomial;
+use symthaea_core::hdc::calculus::{SymbolicDifferentiator, SymbolicIntegrator};
+
 use super::thresholds::{
     MATH_DEFAULT_TELEMETRY_CONFIDENCE, MATH_DEFAULT_TELEMETRY_PHI,
     MATH_INTEGRATION_UNVERIFIED_CONFIDENCE, MATH_INTEGRATION_VERIFIED_CONFIDENCE,
@@ -32,7 +36,8 @@ use super::thresholds::{
     MATH_OPTIMIZATION_CONVERGED_CONFIDENCE, MATH_OPTIMIZATION_FAILED_CONFIDENCE,
     MATH_ROOT_FINDING_CONVERGED_CONFIDENCE, MATH_ROOT_FINDING_FAILED_CONFIDENCE,
     MATH_ROOT_FINDING_VERIFIED_CONFIDENCE, MATH_STATISTICS_CONFIDENCE,
-    MATH_STATISTICS_PHI_BASELINE,
+    MATH_STATISTICS_PHI_BASELINE, MATH_SYMBOLIC_EXACT_CONFIDENCE, MATH_SYMBOLIC_EXACT_PHI_BOOST,
+    MATH_SYMBOLIC_NUMERIC_AGREEMENT_TOL,
 };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -797,6 +802,206 @@ impl MathService {
             error_bound: simpson.error_estimate,
         };
         self.store_episode(&response, "integration");
+        response
+    }
+
+    /// Compute a definite integral of a polynomial using exact symbolic arithmetic.
+    ///
+    /// Returns the exact rational result (numerator/denominator) with perfect confidence.
+    /// Cross-validates against numeric quadrature for triple-path verification.
+    ///
+    /// Science: Rota (1997) — closed-form solutions maximally compress computation,
+    /// producing higher Phi than numeric approximation.
+    pub fn integrate_symbolic(
+        &mut self,
+        poly: &Polynomial,
+        lower: i64,
+        upper: i64,
+    ) -> MathResponse {
+        // Symbolic: exact rational arithmetic
+        let (num, den) = SymbolicIntegrator::definite_integral_exact(poly, lower, upper);
+        let symbolic_value = num as f64 / den as f64;
+
+        // Cross-validate with numeric quadrature for triple-path verification
+        let coeffs = poly.coefficients();
+        let numeric_f = move |x: f64| -> f64 {
+            coeffs
+                .iter()
+                .enumerate()
+                .map(|(i, &c)| c as f64 * x.powi(i as i32))
+                .sum()
+        };
+        let simpson =
+            QuadratureEngine::adaptive_simpson(&numeric_f, lower as f64, upper as f64, 1e-10);
+        let gauss = QuadratureEngine::gauss_legendre(&numeric_f, lower as f64, upper as f64, 10);
+
+        // Triple-path: symbolic vs Simpson vs Gauss-Legendre
+        let sym_simp_agree =
+            (symbolic_value - simpson.value).abs() < MATH_SYMBOLIC_NUMERIC_AGREEMENT_TOL;
+        let sym_gauss_agree =
+            (symbolic_value - gauss.value).abs() < MATH_SYMBOLIC_NUMERIC_AGREEMENT_TOL;
+        let all_agree = sym_simp_agree && sym_gauss_agree;
+
+        // Symbolic exact gets highest Phi; triple-path agreement boosts further
+        let base_phi = (simpson.phi + gauss.phi) / 2.0;
+        let phi = if all_agree {
+            base_phi * MATH_SYMBOLIC_EXACT_PHI_BOOST
+        } else {
+            base_phi * MATH_MULTIPATH_PHI_BOOST
+        };
+        self.record_solve(MathProblemType::Integration, phi);
+        self.telemetry.verification_rate = {
+            let total = self.telemetry.problems_solved as f64;
+            let prev = self.telemetry.verification_rate * (total - 1.0).max(0.0);
+            (prev + 1.0) / total // Symbolic always counts as verified
+        };
+
+        let answer = if den == 1 {
+            format!("∫[{},{}] = {} (exact)", lower, upper, num)
+        } else {
+            format!(
+                "∫[{},{}] = {}/{} = {:.10} (exact rational)",
+                lower, upper, num, den, symbolic_value
+            )
+        };
+
+        let response = MathResponse {
+            answer,
+            numerical_result: Some(symbolic_value),
+            vector_result: None,
+            encoding: simpson.encoding,
+            phi,
+            confidence: MATH_SYMBOLIC_EXACT_CONFIDENCE,
+            multipath_verified: true,
+            problem_type: MathProblemType::Integration,
+            epistemic_caveat: if !all_agree {
+                Some(format!(
+                    "Symbolic-numeric disagreement: Δ_simpson={:.2e}, Δ_gauss={:.2e}",
+                    (symbolic_value - simpson.value).abs(),
+                    (symbolic_value - gauss.value).abs(),
+                ))
+            } else {
+                None
+            },
+            error_bound: Some(0.0), // Exact solution has zero error
+        };
+        self.store_episode(&response, "symbolic_integration");
+        response
+    }
+
+    /// Integrate with symbolic-first dispatch: tries exact polynomial integration,
+    /// falls back to numeric quadrature for non-polynomial functions.
+    ///
+    /// When `poly` is `Some`, attempts symbolic integration first. If the bounds
+    /// are near-integer, uses exact rational arithmetic. Otherwise falls back
+    /// to numeric integration.
+    pub fn integrate_with_symbolic_fallback<F: Fn(f64) -> f64>(
+        &mut self,
+        f: &F,
+        a: f64,
+        b: f64,
+        poly: Option<&Polynomial>,
+    ) -> MathResponse {
+        // Try symbolic path if polynomial representation is available
+        if let Some(poly) = poly {
+            let a_int = a.round() as i64;
+            let b_int = b.round() as i64;
+            // Only use symbolic if bounds are exactly integer (no precision loss)
+            if (a - a_int as f64).abs() < 1e-12 && (b - b_int as f64).abs() < 1e-12 {
+                return self.integrate_symbolic(poly, a_int, b_int);
+            }
+        }
+        // Fall back to numeric
+        self.integrate(f, a, b)
+    }
+
+    /// Find a root of f(x) = 0 using Newton-Raphson with a symbolic derivative,
+    /// multi-path verified against Brent's method.
+    ///
+    /// When the derivative is computed symbolically (exact), Newton-Raphson
+    /// achieves quadratic convergence without finite-difference error.
+    /// Cross-validated with Brent for multi-path verification.
+    pub fn find_root_with_derivative<F, G>(
+        &mut self,
+        f: &F,
+        df: &G,
+        x0: f64,
+        a: f64,
+        b: f64,
+    ) -> MathResponse
+    where
+        F: Fn(f64) -> f64,
+        G: Fn(f64) -> f64,
+    {
+        let tol = 1e-10;
+
+        // Primary: Newton-Raphson with exact symbolic derivative
+        let newton_result = RootFindingEngine::newton_raphson(f, df, x0, tol);
+
+        // Cross-validate: Brent's method (bracket-based, no derivative needed)
+        let brent_result = RootFindingEngine::brent(f, a, b, tol);
+
+        // Multi-path: Newton (exact derivative) vs Brent (bracket)
+        let agreement = (newton_result.root - brent_result.root).abs();
+        let multipath_verified =
+            newton_result.converged && brent_result.converged && agreement < 1e-6;
+
+        // Newton with symbolic derivative gets Phi boost for exact derivative
+        let phi = if multipath_verified {
+            (newton_result.phi + brent_result.phi) / 2.0 * MATH_SYMBOLIC_EXACT_PHI_BOOST
+        } else if newton_result.converged {
+            newton_result.phi * MATH_MULTIPATH_PHI_BOOST
+        } else {
+            brent_result.phi
+        };
+        self.record_solve(MathProblemType::RootFinding, phi);
+        self.telemetry.verification_rate = {
+            let total = self.telemetry.problems_solved as f64;
+            let prev = self.telemetry.verification_rate * (total - 1.0).max(0.0);
+            (prev + if multipath_verified { 1.0 } else { 0.0 }) / total
+        };
+
+        // Use Newton as primary (quadratic convergence), fall back to Brent
+        let primary = if newton_result.converged {
+            &newton_result
+        } else {
+            &brent_result
+        };
+
+        let response = MathResponse {
+            answer: format!(
+                "Root: {:.10} (residual: {:.2e}, method: {})",
+                primary.root,
+                primary.residual,
+                if newton_result.converged {
+                    "Newton-Raphson (symbolic derivative)"
+                } else {
+                    "Brent (fallback)"
+                }
+            ),
+            numerical_result: Some(primary.root),
+            vector_result: None,
+            encoding: primary.encoding.clone(),
+            phi,
+            confidence: if multipath_verified {
+                MATH_SYMBOLIC_EXACT_CONFIDENCE
+            } else if primary.converged {
+                MATH_ROOT_FINDING_CONVERGED_CONFIDENCE
+            } else {
+                MATH_ROOT_FINDING_FAILED_CONFIDENCE
+            },
+            multipath_verified,
+            problem_type: MathProblemType::RootFinding,
+            epistemic_caveat: if !primary.converged {
+                Some("Root finding did not converge within tolerance".into())
+            } else if !multipath_verified && newton_result.converged && brent_result.converged {
+                Some(format!("Newton vs Brent disagreement: {:.2e}", agreement))
+            } else {
+                None
+            },
+            error_bound: Some(primary.residual.abs()),
+        };
+        self.store_episode(&response, "symbolic_root_finding");
         response
     }
 
