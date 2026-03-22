@@ -1,4 +1,6 @@
-//! Standard AI Benchmarks for Symthaea
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Standard AI Benchmarks for Symthaea
 //!
 //! This benchmark suite evaluates Symthaea's consciousness-aware AI capabilities
 //! against standard benchmarks:

@@ -1,4 +1,6 @@
-//! # Periodic Signal Learning Benchmark
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Periodic Signal Learning Benchmark
 //!
 //! Tests CfC networks on periodic sequence prediction — the paper's #1 stated
 //! limitation (Section 6.6): "On 4-element repeating sequences, prediction error

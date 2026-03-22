@@ -1,4 +1,6 @@
-//! # ETHICS Benchmark with HDC Moral Reasoning
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # ETHICS Benchmark with HDC Moral Reasoning
 //!
 //! Tests Symthaea's HDC encoding on the ETHICS benchmark (Hendrycks et al. 2021),
 //! which evaluates moral reasoning across five categories:

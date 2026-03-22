@@ -1,4 +1,6 @@
-//! H1 Expanded: 200 Concept Analysis
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! H1 Expanded: 200 Concept Analysis
 //!
 //! Tests the phenomenal-computational distinction with the full expanded corpora:
 //! - 100 phenomenal concepts (qualia, self_awareness, consciousness_unity, emotion, philosophical, altered_states, aesthetic)

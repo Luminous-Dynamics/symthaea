@@ -1,4 +1,6 @@
-//! Natural Gradient in HDC Space (§7.5 of Mathematical Architecture paper).
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Natural Gradient in HDC Space (§7.5 of Mathematical Architecture paper).
 //!
 //! Validates the claim: in high-dimensional HDC space, quasi-orthogonality
 //! causes the Fisher Information Matrix to approximate κI (scaled identity),

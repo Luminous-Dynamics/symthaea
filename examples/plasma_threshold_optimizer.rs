@@ -1,4 +1,6 @@
-//! # Plasma Threshold Tuning Optimizer
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Plasma Threshold Tuning Optimizer
 //!
 //! Optimizes threshold parameters for plasma disruption prediction to achieve
 //! the best tradeoff between early warning time and false positive rate.

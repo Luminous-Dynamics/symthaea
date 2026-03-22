@@ -1,4 +1,6 @@
-//! Profiling test: identifies cognitive cycle hot-path modules.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Profiling test: identifies cognitive cycle hot-path modules.
 //!
 //! Runs 100 warm cycles and reports the top-20 slowest modules
 //! using the existing ModuleTimings telemetry (zero overhead instrumentation).

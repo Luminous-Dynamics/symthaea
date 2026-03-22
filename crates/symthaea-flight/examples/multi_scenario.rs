@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Multi-Scenario EFE Evaluation: Test 7 geometry variants.
 //!
 //! Evaluates EFE-based decision making across different threat geometries:

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Binary HDC grid encoder for 2D spatial reasoning.
 //!
 //! Uses BinaryHV (XOR binding) instead of ContinuousHV for rule extraction.
@@ -534,6 +537,95 @@ mod tests {
             sim > 0.9,
             "Abductive inference should recover input: sim={}",
             sim
+        );
+    }
+
+    #[test]
+    fn test_decode_grid_roundtrip_small() {
+        let enc = BinaryGridEncoder::new(3, 3, 4, 42);
+        let grid = vec![vec![0, 1, 2], vec![3, 0, 1], vec![2, 3, 0]];
+        let hv = enc.encode_grid(&grid);
+        let decoded = enc.decode_grid(&hv, 3, 3);
+        let accuracy = BinaryGridEncoder::grid_accuracy(&decoded, &grid);
+        assert!(
+            accuracy > 0.5,
+            "Small 3x3 grid roundtrip accuracy should be > 0.5, got {}",
+            accuracy
+        );
+    }
+
+    #[test]
+    fn test_decode_grid_roundtrip_large() {
+        let enc = make_encoder();
+        let grid = sample_grid();
+        let hv = enc.encode_grid(&grid);
+        let decoded = enc.decode_grid(&hv, 5, 5);
+        let accuracy = BinaryGridEncoder::grid_accuracy(&decoded, &grid);
+        // Chance for 6 colors is ~1/6 ≈ 0.17; should beat that
+        assert!(
+            accuracy > 0.17,
+            "5x5 grid roundtrip accuracy should beat chance (1/6), got {}",
+            accuracy
+        );
+    }
+
+    #[test]
+    fn test_grid_accuracy_exact() {
+        let g = vec![vec![0, 1, 2], vec![3, 4, 5], vec![0, 1, 2]];
+        let accuracy = BinaryGridEncoder::grid_accuracy(&g, &g);
+        assert!(
+            (accuracy - 1.0).abs() < f32::EPSILON,
+            "Identical grids should have accuracy 1.0, got {}",
+            accuracy
+        );
+    }
+
+    #[test]
+    fn test_grid_accuracy_partial() {
+        let g1 = vec![vec![0, 1, 2], vec![3, 4, 5], vec![0, 1, 2]];
+        // Differ in exactly 2 cells: (0,0) and (2,2)
+        let g2 = vec![vec![5, 1, 2], vec![3, 4, 5], vec![0, 1, 5]];
+        let accuracy = BinaryGridEncoder::grid_accuracy(&g1, &g2);
+        let expected = 7.0 / 9.0;
+        assert!(
+            (accuracy - expected).abs() < f32::EPSILON,
+            "2 mismatches in 9 cells should give accuracy {}, got {}",
+            expected,
+            accuracy
+        );
+    }
+
+    #[test]
+    fn test_grid_exact_match() {
+        let g1 = vec![vec![0, 1, 2], vec![3, 4, 5], vec![0, 1, 2]];
+        let g2 = vec![vec![0, 1, 2], vec![3, 4, 5], vec![0, 1, 2]];
+        let g3 = vec![vec![0, 1, 2], vec![3, 4, 5], vec![0, 1, 0]];
+        assert!(
+            BinaryGridEncoder::grid_exact_match(&g1, &g2),
+            "Identical grids should return true"
+        );
+        assert!(
+            !BinaryGridEncoder::grid_exact_match(&g1, &g3),
+            "Different grids should return false"
+        );
+    }
+
+    #[test]
+    fn test_decode_preserves_dominant_color() {
+        let enc = BinaryGridEncoder::new(3, 3, 4, 42);
+        // 8 out of 9 cells are color 0, one cell is color 2
+        let grid = vec![vec![0, 0, 0], vec![0, 2, 0], vec![0, 0, 0]];
+        let hv = enc.encode_grid(&grid);
+        let decoded = enc.decode_grid(&hv, 3, 3);
+        let dominant_count = decoded
+            .iter()
+            .flat_map(|row| row.iter())
+            .filter(|&&c| c == 0)
+            .count();
+        assert!(
+            dominant_count > 4,
+            "Dominant color (0) should appear in majority of decoded cells, got {}/9",
+            dominant_count
         );
     }
 }

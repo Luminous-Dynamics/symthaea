@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Spectral MIP Finder — O(n³) via Fiedler Ordering + Bordered Cholesky
 //!
 //! Scales MIP search from O(2^n) exhaustive to **O(n³)** by exploiting the spectral

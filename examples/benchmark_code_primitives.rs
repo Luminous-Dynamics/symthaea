@@ -1,4 +1,6 @@
-//! Benchmark: Code Tier Primitives Performance
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Benchmark: Code Tier Primitives Performance
 //!
 //! Tests the consciousness-aware code understanding system by:
 //! 1. Primitive selection speed

@@ -1,4 +1,6 @@
-//! ARC-AGI Benchmark Runner — Strict + 2-AFC scoring on Chollet's dataset.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! ARC-AGI Benchmark Runner — Strict + 2-AFC scoring on Chollet's dataset.
 //!
 //! Runs both the strict (pixel-perfect) and lenient (2-AFC) ARC evaluations,
 //! comparing against published baselines.

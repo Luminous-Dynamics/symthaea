@@ -1,4 +1,6 @@
-//! # Bound Phenomenal Concept Probe
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Bound Phenomenal Concept Probe
 //!
 //! Tests the combined H1+H2 hypothesis:
 //! Do BOUND phenomenal concepts show stronger topological signatures than unbound?

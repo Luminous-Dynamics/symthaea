@@ -1,5 +1,7 @@
 #![cfg(any(feature = "magi_loop", feature = "full_consciousness"))]
-//! # MAGI Loop Live Fire Integration Test
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # MAGI Loop Live Fire Integration Test
 //!
 //! This test suite proves that the MAGI Loop can **touch the world**.
 //!

@@ -1,4 +1,6 @@
-//! Cross-Scale Cascade Demonstration Test
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Cross-Scale Cascade Demonstration Test
 //!
 //! Validates §7.3 of the Mathematical Architecture paper: perturbations at one
 //! scale (embodied/interoceptive) propagate through the hierarchy:

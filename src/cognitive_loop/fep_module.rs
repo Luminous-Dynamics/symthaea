@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # FEP Module — Consolidated Free Energy Principle / Active Inference State
 //!
 //! Consolidates 10 previously scattered FEP fields from CognitiveLoopService

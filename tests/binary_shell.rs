@@ -1,4 +1,6 @@
-//! Shell Binary Integration Tests
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Shell Binary Integration Tests
 //!
 //! Tests for the `symthaea-shell` TUI binary.
 //! Since TUI applications require a terminal, these tests focus on:

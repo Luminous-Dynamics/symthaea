@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Advanced ODE Solvers for Symthaea Neural Dynamics
 //!
 //! This module provides a suite of ordinary differential equation (ODE) solvers

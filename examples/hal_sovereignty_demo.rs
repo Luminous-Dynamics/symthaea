@@ -1,4 +1,6 @@
-//! HAL Sovereignty Demo
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! HAL Sovereignty Demo
 //!
 //! Demonstrates Symthaea sensing her own power via INA219
 //! and adjusting her cognitive 'throttle' to maintain the 6-Watt limit.

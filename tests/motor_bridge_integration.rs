@@ -1,4 +1,6 @@
-//! Motor Output Bridge Integration Tests
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Motor Output Bridge Integration Tests
 //!
 //! Verifies the motor bridge → cognitive loop pipeline:
 //! 1. Phi gating uses actual consciousness_level (not coherence proxy)

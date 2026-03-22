@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Threshold Registry — Centralized Cognitive Tuning Constants
 //!
 //! All magic numbers used in the cognitive loop are collected here with:

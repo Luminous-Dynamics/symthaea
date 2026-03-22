@@ -1,4 +1,6 @@
-//! Layer-Specific Probe Training
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Layer-Specific Probe Training
 //!
 //! Trains separate classifiers for each layer to identify which layer
 //! best discriminates phenomenal from functional concepts.

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Learned moral prototype classifier (Good / Neutral / Bad).
 //!
 //! Trains 3-class HDC prototypes from labeled text using the same

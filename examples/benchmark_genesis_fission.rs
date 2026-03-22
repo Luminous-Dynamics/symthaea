@@ -1,4 +1,6 @@
-//! Genesis Mission Challenge 2: Fission Reactor Safety
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Genesis Mission Challenge 2: Fission Reactor Safety
 //!
 //! Demonstrates HDC + CfC + FEP fission reactor monitoring with
 //! O(1) prediction cost from 0.1s to 1 day.

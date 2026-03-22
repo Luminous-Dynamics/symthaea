@@ -217,12 +217,31 @@ INDIVIDUAL_FILES=(
     "SAFETY.md"
 )
 
+# Legal files from monorepo root (AGPL dual-license framework)
+MONOREPO_LEGAL_FILES=(
+    "COMMERCIAL_LICENSE.md"
+    "CLA.md"
+    "LICENSING_FAQ.md"
+)
+
 for f in "${INDIVIDUAL_FILES[@]}"; do
     if [ -f "${SYMTHAEA_DIR}/${f}" ]; then
         info "Copying ${f}"
         if ! $DRY_RUN; then
             cp "${SYMTHAEA_DIR}/${f}" "${STANDALONE_REPO}/${f}"
         fi
+    fi
+done
+
+# Copy legal files from monorepo root (these don't live in symthaea/)
+for f in "${MONOREPO_LEGAL_FILES[@]}"; do
+    if [ -f "${MONOREPO_ROOT}/${f}" ]; then
+        info "Copying ${f} (from monorepo root)"
+        if ! $DRY_RUN; then
+            cp "${MONOREPO_ROOT}/${f}" "${STANDALONE_REPO}/${f}"
+        fi
+    else
+        warn "Missing ${f} in monorepo root"
     fi
 done
 
@@ -402,13 +421,8 @@ elif $SKIP_CHECK; then
 fi
 
 # --- Post-sync license fixups -------------------------------------------------
-# The monorepo uses AGPL-3.0-or-later for some crates that should be Apache-2.0
-# in the standalone repo (e.g. symthaea-mycelix-conductor).
-CONDUCTOR_TOML="${STANDALONE_REPO}/crates/symthaea-mycelix-conductor/Cargo.toml"
-if [ -f "$CONDUCTOR_TOML" ] && grep -q 'license = "AGPL-3.0-or-later"' "$CONDUCTOR_TOML"; then
-    sed -i 's/^license = "AGPL-3.0-or-later"/license = "Apache-2.0"/' "$CONDUCTOR_TOML"
-    info "Fixed symthaea-mycelix-conductor license → Apache-2.0"
-fi
+# All crates are now AGPL-3.0-or-later (unified March 2026).
+# No per-crate license overrides needed.
 
 # --- Format with CI toolchain -------------------------------------------------
 # CI uses dtolnay/rust-toolchain@1.93.0, so format with the same version

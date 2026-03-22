@@ -1,4 +1,6 @@
-//! # Symthaea End-to-End Demo
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Symthaea End-to-End Demo
 //!
 //! A comprehensive demonstration of the Symthaea Holographic Liquid Brain,
 //! showcasing all major subsystems working together:

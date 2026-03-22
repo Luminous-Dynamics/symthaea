@@ -1,4 +1,6 @@
-//! ARC reasoning through the cognitive loop.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! ARC reasoning through the cognitive loop.
 //!
 //! Tests that ARC-style rule representations can be processed by the cognitive
 //! loop, producing meaningful prediction errors and adaptation over cycles.

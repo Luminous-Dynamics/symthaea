@@ -1,4 +1,6 @@
-//! # MNIST CfC Sequential Classification Benchmark
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # MNIST CfC Sequential Classification Benchmark
 //!
 //! Tests whether CfC temporal dynamics improve MNIST classification by processing
 //! images as 28-step sequences (one row per timestep) instead of flat vectors.

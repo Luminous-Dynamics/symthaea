@@ -1,4 +1,6 @@
-//! Enhanced Cincinnati-LTC Comparison
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Enhanced Cincinnati-LTC Comparison
 //!
 //! Compares the enhanced Cincinnati-LTC (multi-scale, amplitude encoding, attention)
 //! against the baseline implementation across various biosignal types.

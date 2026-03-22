@@ -1,4 +1,6 @@
-//! # Drosophila Connectome Scale Validation
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Drosophila Connectome Scale Validation
 //!
 //! Tests Symthaea's Φ computation scalability on the Drosophila melanogaster
 //! (fruit fly) brain connectome. At ~25,000 neurons and ~20M synapses, this is

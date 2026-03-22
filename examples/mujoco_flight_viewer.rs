@@ -1,4 +1,6 @@
-//! Interactive 3D viewer for MuJoCo Crazyflie 2 flight simulation.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Interactive 3D viewer for MuJoCo Crazyflie 2 flight simulation.
 //!
 //! Launches a passive viewer window showing the quadrotor in real-time
 //! while running the HDC-LTC-FEP control loop.

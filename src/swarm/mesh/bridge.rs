@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Mesh Bridge — Async/Sync Actor Pattern for the Mycelial Mesh.
 //!
 //! Connects the synchronous `ContinuousMind` tick loop to the async

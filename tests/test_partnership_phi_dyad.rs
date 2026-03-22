@@ -1,4 +1,6 @@
-//! Basic tests for the partnership module and Φ_dyad computation.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Basic tests for the partnership module and Φ_dyad computation.
 
 use symthaea::core::HDC_DIMENSION;
 use symthaea::hdc::relational_consciousness::{

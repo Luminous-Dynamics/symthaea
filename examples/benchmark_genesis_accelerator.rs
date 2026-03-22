@@ -1,4 +1,6 @@
-//! Genesis Mission Challenge 13: Particle Accelerator Control
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Genesis Mission Challenge 13: Particle Accelerator Control
 //!
 //! Demonstrates HDC + CfC + FEP accelerator beam monitoring with
 //! O(1) prediction cost from 1ms to 10 hours.

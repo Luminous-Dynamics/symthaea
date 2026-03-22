@@ -1,4 +1,6 @@
-//! # Consciousness Emergence Experiment
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Consciousness Emergence Experiment
 //!
 //! Tests the hypothesis that phenomenal character emerges through compositional
 //! binding in the physics hierarchy.

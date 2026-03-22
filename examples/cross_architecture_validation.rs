@@ -1,4 +1,6 @@
-//! Cross-Architecture Validation
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Cross-Architecture Validation
 //!
 //! Tests whether the phenomenal signature (Φ) generalizes across architectures:
 //! 1. BGE-M3 (encoder, 24 layers) - baseline

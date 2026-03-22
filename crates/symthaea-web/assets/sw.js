@@ -1,4 +1,6 @@
-// Symthaea Service Worker — caches large WASM assets for instant reload.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root// Symthaea Service Worker — caches large WASM assets for instant reload.
 const CACHE_NAME = 'symthaea-v2';
 
 self.addEventListener('install', event => {

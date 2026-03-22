@@ -1,4 +1,6 @@
-//! Consciousness Advantage Benchmark
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Consciousness Advantage Benchmark
 //!
 //! Demonstrates that the integrated consciousness pipeline (HDC+CfC+Phi+Active Inference
 //! + surprise exploration + prefrontal gating + meta-cognition + embodiment) outperforms

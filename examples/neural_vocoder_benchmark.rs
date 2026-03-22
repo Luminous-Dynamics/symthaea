@@ -1,4 +1,6 @@
-//! Neural vocoder benchmark: compares DSP and neural (BigVGAN) synthesis paths.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Neural vocoder benchmark: compares DSP and neural (BigVGAN) synthesis paths.
 //!
 //! Synthesizes a 5-second utterance through both paths and reports:
 //! - Mel conversion throughput (frames/sec)

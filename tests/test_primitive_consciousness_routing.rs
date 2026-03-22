@@ -1,5 +1,7 @@
 #![cfg(feature = "full_consciousness")]
-//! Integration Tests: Primitive → Consciousness → Routing Pipeline
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Integration Tests: Primitive → Consciousness → Routing Pipeline
 //!
 //! These tests verify the complete integration between:
 //! - PrimitiveSystem: 250+ primitives across 9 tiers

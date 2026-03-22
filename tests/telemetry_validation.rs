@@ -1,4 +1,6 @@
-//! Pipeline telemetry validation tests.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Pipeline telemetry validation tests.
 //!
 //! Verifies that `CycleMetadata` fields are populated correctly after
 //! running the full cognitive pipeline.  Each test builds a fresh

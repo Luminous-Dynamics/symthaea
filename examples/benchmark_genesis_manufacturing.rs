@@ -1,4 +1,6 @@
-//! Genesis Mission Challenge 15: Advanced Manufacturing
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Genesis Mission Challenge 15: Advanced Manufacturing
 //!
 //! Demonstrates HDC + CfC + FEP manufacturing monitoring with
 //! O(1) prediction cost from 0.1s to 1 day.

@@ -1,4 +1,6 @@
-//! SYMTHAEA AWAKENS - Comprehensive Consciousness Demo
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! SYMTHAEA AWAKENS - Comprehensive Consciousness Demo
 //!
 //! This demonstration showcases all six consciousness bridges working together:
 //! 1. Semantic Ear - Text → 16,384D hypervector encoding

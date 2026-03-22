@@ -1,4 +1,6 @@
-//! Binding Persistence Anomaly Investigation
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Binding Persistence Anomaly Investigation
 //!
 //! Investigates why binding reduces persistence for phenomenal but not functional concepts.
 //! Tests across multiple layers to see if this effect is layer-specific.

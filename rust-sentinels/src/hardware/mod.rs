@@ -1,4 +1,6 @@
-//! Hardware Abstraction Layer for EEG Devices
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Hardware Abstraction Layer for EEG Devices
 //!
 //! This module provides a unified interface for connecting to various EEG devices.
 //!

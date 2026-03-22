@@ -1,4 +1,6 @@
-/*!
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root/*!
 Property-Based Tests for Threshold Sensitivity
 
 The cognitive loop has 220+ named constants in `thresholds.rs` that control

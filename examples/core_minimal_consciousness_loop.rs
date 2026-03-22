@@ -1,4 +1,6 @@
-//! Core Minimal Consciousness Loop Demo
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Core Minimal Consciousness Loop Demo
 //!
 //! This example uses the small, stable `symthaea::core` API surface to:
 //! - run a minimal unified consciousness pipeline for a fixed number of steps

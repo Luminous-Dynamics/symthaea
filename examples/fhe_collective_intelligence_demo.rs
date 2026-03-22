@@ -1,4 +1,6 @@
-//! # HDC-FHE Collective Intelligence Demo
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # HDC-FHE Collective Intelligence Demo
 //!
 //! Demonstrates privacy-preserving collective reasoning using
 //! hyperdimensional homomorphic encryption — zero overhead, perfect secrecy.

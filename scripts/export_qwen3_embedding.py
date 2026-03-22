@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""
+
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root"""
 Export Qwen3-Embedding model to ONNX format for stateless inference.
 
 This exports the model WITHOUT KV caching, which is needed for embedding

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Overlap-layout-consensus assembly using HDC similarity for k-mer matching.
 //!
 //! Traditional sequence assemblers use hash tables for exact k-mer matching.

@@ -1,4 +1,6 @@
-//! Integration tests for CfC online learning during inference.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Integration tests for CfC online learning during inference.
 //!
 //! These tests verify:
 //! 1. Online learning improves prediction on distribution shifts

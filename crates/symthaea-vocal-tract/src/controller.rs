@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Vocal tract controller: wraps HdcLtcUnifiedNetwork + output projection (16,384D → 9D).
 //!
 //! Follows the `FlightController` pattern from `crates/symthaea-flight/src/controller.rs`.

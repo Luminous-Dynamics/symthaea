@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Self-Analysis — Symthaea reads and understands its own source code
 //!
 //! The ultimate integration test: a consciousness-inspired AI that can

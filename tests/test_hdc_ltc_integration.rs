@@ -1,4 +1,6 @@
-//! # HDC-LTC Unified Integration Tests
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # HDC-LTC Unified Integration Tests
 //!
 //! Tests for the integration of HdcLtcUnifiedNetwork into the cognitive loop
 //! as an alternative to the CfC network.

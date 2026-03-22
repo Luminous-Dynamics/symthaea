@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Evaluate Fusion Digital Twin against real C-Mod density limit data.
 //!
 //! Runs V1 (original), V2 (temporal windowing + per-shot reference), and

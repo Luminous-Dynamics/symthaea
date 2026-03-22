@@ -1,4 +1,6 @@
-//! 100-episode humanoid training with full telemetry CSV output.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! 100-episode humanoid training with full telemetry CSV output.
 //!
 //! Produces:
 //! - `output/humanoid_telemetry/summary.csv` — per-episode metrics

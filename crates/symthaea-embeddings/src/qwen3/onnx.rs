@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! ONNX Runtime backend for embedding inference.
 //!
 //! Provides an alternative to the Burn backend using the ONNX Runtime (via `ort`).

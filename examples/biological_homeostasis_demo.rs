@@ -1,4 +1,6 @@
-//! Biological Homeostasis Demo (v2 - Warm-up included)
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Biological Homeostasis Demo (v2 - Warm-up included)
 //!
 //! Demonstrates the 'Dynamic Cognitive Throttle':
 //! 1. Warm up the system to avoid cold-start bias.

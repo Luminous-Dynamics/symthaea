@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Spatial coordinate encoding via conjunctive basis binding.
 //!
 //! Grid positions are encoded as `x_basis.bind(&y_basis.permute(1))`,

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Threat Memory — HDV-encoded immune pattern storage
 //!
 //! Encodes detected threat patterns as 16,384-dimensional hyperdimensional

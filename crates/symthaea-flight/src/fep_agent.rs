@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Active Inference flight agent: precision/τ modulation at cognitive rate (25Hz).
 //!
 //! Wraps `symthaea_fep::ActiveInferenceAgent` with flight-specific precision

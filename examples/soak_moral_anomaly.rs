@@ -1,4 +1,6 @@
-//! Moral Anomaly Response Soak Test
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Moral Anomaly Response Soak Test
 //!
 //! Runs 10,000 cycles across 4 phases (Healthy, Degrading, Critical, Recovery)
 //! comparing moral anomaly response ON vs OFF. Measures consciousness stability,

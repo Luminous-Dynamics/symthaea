@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Spore↔Holon bridge: configurable connection to the desktop consciousness.
 //!
 //! Supports three modes via `HolonSyncMode`:

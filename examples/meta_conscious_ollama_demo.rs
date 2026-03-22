@@ -1,4 +1,6 @@
-//! Meta-Conscious Ollama Demo
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Meta-Conscious Ollama Demo
 //!
 //! Demonstrates:
 //! - Text → HDC → MetaConsciousness (Φ, meta-Φ, explanation)

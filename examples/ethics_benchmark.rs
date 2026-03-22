@@ -1,4 +1,6 @@
-//! Hendrycks ETHICS Benchmark Runner — External moral reasoning validation.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Hendrycks ETHICS Benchmark Runner — External moral reasoning validation.
 //!
 //! Evaluates Symthaea's keyword-based moral algebra against the Hendrycks ETHICS
 //! benchmark across 5 domains: commonsense, deontology, justice, virtue, utilitarianism.

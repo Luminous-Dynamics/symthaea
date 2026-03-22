@@ -1,4 +1,6 @@
-//! Integration tests for LLM backends
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Integration tests for LLM backends
 //!
 //! These tests verify the OpenAI and Anthropic backend implementations work correctly.
 //! They use mock HTTP servers for CI testing and can optionally test against real APIs.

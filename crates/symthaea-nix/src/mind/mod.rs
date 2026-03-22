@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! The cognitive core — world model, active inference, causal reasoning.
 //!
 //! This is the heart of the NixOS mind. Instead of classifying intents,

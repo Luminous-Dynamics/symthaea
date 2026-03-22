@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Symthaea Service Daemon
 //!
 //! A persistent service that runs the consciousness loop and accepts
@@ -623,11 +626,25 @@ struct ServiceState {
     voice: Option<VoiceConversation>,
     #[cfg(feature = "voice-tts")]
     voice_enabled: bool,
+    /// Channel for Holon HTTP bridge → consciousness loop.
+    /// HTTP handlers enqueue (device_id, SomaMessage); the consciousness loop
+    /// drains them into Symthaea.holon_enqueue_soma_message() each tick.
+    holon_inbound_rx: std::sync::Mutex<
+        std::sync::mpsc::Receiver<(String, symthaea::consciousness::holon_receiver::SomaMessage)>,
+    >,
 }
+
+/// Sender half for Holon HTTP bridge → consciousness loop.
+type HolonSender =
+    std::sync::mpsc::Sender<(String, symthaea::consciousness::holon_receiver::SomaMessage)>;
 
 impl ServiceState {
     async fn new(
         state_file: Option<PathBuf>,
+        holon_rx: std::sync::mpsc::Receiver<(
+            String,
+            symthaea::consciousness::holon_receiver::SomaMessage,
+        )>,
         #[cfg(feature = "voice-tts")] voice_enabled: bool,
         #[cfg(feature = "voice-tts")] voice_id: u8,
     ) -> Result<Self> {
@@ -683,6 +700,7 @@ impl ServiceState {
             voice,
             #[cfg(feature = "voice-tts")]
             voice_enabled,
+            holon_inbound_rx: std::sync::Mutex::new(holon_rx),
         })
     }
 
@@ -1561,8 +1579,19 @@ where
 }
 
 /// Background consciousness loop
+#[cfg(feature = "api_module")]
+async fn consciousness_loop_with_holon(
+    state: Arc<RwLock<ServiceState>>,
+    holon_http: Arc<symthaea::api::holon::HolonHttpState>,
+    interval_ms: u64,
+    sleep_interval: u64,
+) {
+    consciousness_loop(state, Some(holon_http), interval_ms, sleep_interval).await;
+}
+
 async fn consciousness_loop(
     state: Arc<RwLock<ServiceState>>,
+    #[cfg(feature = "api_module")] holon_http: Option<Arc<symthaea::api::holon::HolonHttpState>>,
     interval_ms: u64,
     sleep_interval: u64,
 ) {
@@ -1572,11 +1601,41 @@ async fn consciousness_loop(
     loop {
         ticker.tick().await;
 
+        // Drain Holon inbound channel → Symthaea.holon_receiver
+        {
+            let mut s = state.write().await;
+            if let Ok(rx) = s.holon_inbound_rx.lock() {
+                for _ in 0..256 {
+                    match rx.try_recv() {
+                        Ok((device_id, msg)) => {
+                            s.symthaea.holon_enqueue_soma_message(device_id, msg);
+                        }
+                        Err(_) => break,
+                    }
+                }
+            }
+            s.symthaea.holon_process_pending();
+
+            // Update HTTP state with latest consciousness + outbound
+            #[cfg(feature = "api_module")]
+            if let Some(ref http) = holon_http {
+                let intro = s.symthaea.introspect();
+                http.set_consciousness(intro.consciousness_level);
+                http.peer_count.store(
+                    s.symthaea.holon_soma_peer_count() as u32,
+                    std::sync::atomic::Ordering::Relaxed,
+                );
+                let responses = s.symthaea.holon_drain_soma_outbound("soma-phone");
+                if !responses.is_empty() {
+                    http.push_outbound(responses);
+                }
+            }
+        }
+
         // Simple consciousness maintenance
         {
             let state = state.read().await;
             let intro = state.symthaea.introspect();
-            // Derive metrics from available data
             let phi = intro.consciousness_level as f64;
             let is_conscious = intro.consciousness_level > 0.5;
             debug!(
@@ -1629,9 +1688,11 @@ async fn main() -> Result<()> {
 
     // Initialize state
     info!("Initializing consciousness...");
+    let (holon_tx, holon_rx) = std::sync::mpsc::channel();
     let state = Arc::new(RwLock::new(
         ServiceState::new(
             args.state_file.clone(),
+            holon_rx,
             #[cfg(feature = "voice-tts")]
             args.voice,
             #[cfg(feature = "voice-tts")]
@@ -1685,20 +1746,58 @@ async fn main() -> Result<()> {
         }
     }
 
-    // Start background consciousness loop
-    let loop_state = Arc::clone(&state);
-    tokio::spawn(async move {
-        consciousness_loop(loop_state, args.loop_interval, args.sleep_interval).await;
-    });
+    // Start background consciousness loop (spawned after holon_http_state is created below)
+    // (moved below holon bridge setup so we can pass the shared state)
 
-    // Holon HTTP bridge for Soma mobile connections.
-    // The router is defined at src/api/holon.rs and accepts Arc<RwLock<Symthaea>>.
-    // To activate: refactor ServiceState to hold Arc<RwLock<Symthaea>> instead of
-    // owning Symthaea directly, then spawn the Axum server on port 5492.
-    // The in-process demo (`cargo run -p symthaea-soma --example soma_holon_live`)
-    // proves the full protocol works end-to-end.
-    // TODO(holon-bridge): Wire holon::holon_router(shared_symthaea) here.
-    info!("Holon bridge: protocol ready, awaiting daemon state refactor for live serving");
+    // Start Holon HTTP bridge for Soma mobile connections (port 5492)
+    // Requires `api_module` feature for Axum dependency.
+    #[cfg(feature = "api_module")]
+    {
+        let holon_http_state = Arc::new(symthaea::api::holon::HolonHttpState::new(holon_tx));
+
+        // Start background consciousness loop (with holon bridge draining)
+        let loop_state = Arc::clone(&state);
+        let loop_holon = Arc::clone(&holon_http_state);
+        tokio::spawn(async move {
+            consciousness_loop_with_holon(
+                loop_state,
+                loop_holon,
+                args.loop_interval,
+                args.sleep_interval,
+            )
+            .await;
+        });
+
+        let http_state = Arc::clone(&holon_http_state);
+        tokio::spawn(async move {
+            let app = symthaea::api::holon::holon_router(http_state);
+            match tokio::net::TcpListener::bind("0.0.0.0:5492").await {
+                Ok(listener) => {
+                    info!("Holon bridge listening on http://0.0.0.0:5492");
+                    println!("📱 Holon bridge: http://0.0.0.0:5492/holon/status");
+                    if let Err(e) = axum::serve(listener, app).await {
+                        error!("Holon bridge server error: {}", e);
+                    }
+                }
+                Err(e) => {
+                    warn!(
+                        "Failed to bind Holon bridge on port 5492: {} (bridge disabled)",
+                        e
+                    );
+                }
+            }
+        });
+    }
+
+    // Without api_module: start consciousness loop without holon HTTP bridge
+    #[cfg(not(feature = "api_module"))]
+    {
+        let loop_state = Arc::clone(&state);
+        tokio::spawn(async move {
+            consciousness_loop(loop_state, None, args.loop_interval, args.sleep_interval).await;
+        });
+        info!("Holon bridge: disabled (build with --features api_module to enable)");
+    }
 
     // Start listening
     if let Some(socket_path) = args.socket {

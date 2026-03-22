@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Deleterious allele tracking and genetic rescue planning.
 //!
 //! Tracks the frequency and distribution of deleterious alleles in a population,

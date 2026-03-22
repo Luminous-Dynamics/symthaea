@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Derived Laws: Physical Laws Emerging from HDC Composition
 //!
 //! **Status**: Exploratory module — HDC encodings for physical law derivation via HDC composition.

@@ -1,4 +1,6 @@
-//! # Sleep Staging Ablation Study
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Sleep Staging Ablation Study
 //!
 //! Systematically removes components from the full HDC+CfC+Phi sleep staging
 //! pipeline to measure each component's contribution. This proves the

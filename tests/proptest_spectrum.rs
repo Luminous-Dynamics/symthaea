@@ -1,4 +1,6 @@
-//! Property tests for the SpectrumManager radio dispatch module.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Property tests for the SpectrumManager radio dispatch module.
 //!
 //! Validates invariants of delta compression, routing determinism,
 //! AIMD bandwidth bounds, network health monotonicity, MTU compliance,

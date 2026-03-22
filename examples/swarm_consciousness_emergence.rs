@@ -1,4 +1,6 @@
-//! # Swarm Consciousness Emergence Experiment
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Swarm Consciousness Emergence Experiment
 //!
 //! Tests whether collective consciousness emerges from groups of interacting agents.
 //! Measures collective Phi (via pairwise thought coherence), emergence ratios,
@@ -388,6 +390,154 @@ async fn run_scaling(seed: u64) {
 }
 
 // ============================================================================
+// PARTIAL-INFORMATION EXPERIMENT
+// ============================================================================
+
+/// Run a single partial-information experiment: each agent sees a different fragment
+/// of a composite stimulus and must integrate via social relay.
+async fn run_partial_experiment(n_agents: usize, n_ticks: usize, seed: u64) -> (f64, f64, u64) {
+    let dim = 512;
+    let config = MindConfig {
+        dimension: dim,
+        enable_social_coherence: true,
+        tick_rate: 10.0,
+        ..Default::default()
+    };
+
+    // Spawn agents
+    let mut handles = Vec::new();
+    let mut joins = Vec::new();
+    for _ in 0..n_agents {
+        let (h, j) = AsyncMind::spawn(config.clone());
+        handles.push(h);
+        joins.push(j);
+    }
+
+    // Full mesh for small groups, k-nearest for larger
+    let relay_interval = Duration::from_millis(50);
+    let mut _relays = Vec::new();
+    if n_agents <= 15 {
+        for i in 0..n_agents {
+            for j in (i + 1)..n_agents {
+                _relays.push(connect_social(&handles[i], &handles[j], relay_interval));
+            }
+        }
+    } else {
+        for i in 0..n_agents {
+            for k in 1..=2 {
+                let j = (i + k) % n_agents;
+                _relays.push(connect_social(&handles[i], &handles[j], relay_interval));
+            }
+        }
+    }
+
+    // Generate K orthogonal feature channels (one per agent)
+    let channels: Vec<ContinuousHV> = (0..n_agents)
+        .map(|i| ContinuousHV::random(dim, seed + 100_000 + i as u64))
+        .collect();
+
+    let phase1_end = n_ticks / 4; // 25% fragment-only perception
+    let phase2_end = n_ticks * 3 / 4; // 50% social integration
+                                      // remaining 25% = convergence measurement
+
+    // CSV header
+    println!("tick,n_agents,phase,mean_consciousness,mean_coherence,emergence_ratio");
+
+    let mut convergence_tick = n_ticks as u64;
+
+    for tick in 0..n_ticks as u64 {
+        let phase = if tick < phase1_end as u64 {
+            "fragment"
+        } else if tick < phase2_end as u64 {
+            "integration"
+        } else {
+            "convergence"
+        };
+
+        // Each agent perceives its own fragment: weighted_bundle([channel_i × 3, noise × 1])
+        for (i, handle) in handles.iter().enumerate() {
+            let noise = ContinuousHV::random(dim, seed + tick * 1000 + i as u64);
+            let fragment = ContinuousHV::weighted_bundle(
+                &[&channels[i], &channels[i], &channels[i], &noise],
+                &[0.75, 0.0, 0.0, 0.25], // 75% own channel, 25% noise
+            );
+            handle.perceive(fragment).await;
+        }
+
+        for handle in &handles {
+            handle.tick().await;
+        }
+
+        tokio::time::sleep(Duration::from_millis(5)).await;
+
+        // Sample every 5 ticks
+        if tick % 5 == 0 || tick == (n_ticks as u64 - 1) {
+            let mut states = Vec::new();
+            for handle in &handles {
+                states.push(handle.snapshot().await);
+            }
+            let snapshot = compute_snapshot(tick, &states, 0);
+
+            println!(
+                "{},{},{},{:.6},{:.6},{:.6}",
+                tick,
+                n_agents,
+                phase,
+                snapshot.mean_consciousness(),
+                snapshot.mean_coherence(),
+                snapshot.emergence_ratio()
+            );
+
+            // Detect convergence (coherence crosses 0.5 for first time)
+            if convergence_tick == n_ticks as u64 && snapshot.mean_coherence() > 0.5 {
+                convergence_tick = tick;
+            }
+        }
+    }
+
+    // Final measurement
+    let mut final_states = Vec::new();
+    for handle in &handles {
+        final_states.push(handle.snapshot().await);
+    }
+    let final_snapshot = compute_snapshot(n_ticks as u64, &final_states, 0);
+
+    let final_coherence = final_snapshot.mean_coherence() as f64;
+    let final_emergence = final_snapshot.emergence_ratio();
+
+    eprintln!(
+        "  N={}: coherence={:.4}, emergence={:.4}, convergence_tick={}",
+        n_agents, final_coherence, final_emergence, convergence_tick
+    );
+
+    // Shutdown
+    drop(_relays);
+    for handle in handles {
+        handle.shutdown().await;
+    }
+    for join in joins {
+        let _ = join.await;
+    }
+
+    (final_coherence, final_emergence, convergence_tick)
+}
+
+async fn run_partial_scaling(seed: u64) {
+    eprintln!("=== Partial-Information Scaling Experiment ===");
+    println!("n_agents,fragments,final_coherence,final_emergence_ratio,convergence_tick");
+
+    for &n in &[3, 5, 8, 10, 15, 20] {
+        eprintln!("Running N={}...", n);
+        let (coherence, emergence, conv_tick) = run_partial_experiment(n, 200, seed).await;
+        // Print scaling summary line (separate from per-tick output which goes to a different file)
+        eprintln!(
+            "  N={:>3}: fragments={}, coherence={:.4}, emergence={:.4}, convergence={}",
+            n, n, coherence, emergence, conv_tick
+        );
+    }
+}
+
+// ============================================================================
 // MAIN
 // ============================================================================
 
@@ -399,6 +549,7 @@ async fn main() {
     let mut byzantine = 0.0f64;
     let mut seed = 42u64;
     let mut scaling = false;
+    let mut partial = false;
 
     let mut i = 1;
     while i < args.len() {
@@ -422,6 +573,9 @@ async fn main() {
             "--scaling" => {
                 scaling = true;
             }
+            "--partial" => {
+                partial = true;
+            }
             "--help" | "-h" => {
                 eprintln!("Swarm Consciousness Emergence Experiment");
                 eprintln!();
@@ -431,6 +585,7 @@ async fn main() {
                 eprintln!("  --byzantine <F>   Fraction of byzantine agents (default: 0.0)");
                 eprintln!("  --seed <N>        Random seed (default: 42)");
                 eprintln!("  --scaling         Run scaling experiment (3-15 agents)");
+                eprintln!("  --partial         Partial-information mode (semantic fragmentation)");
                 std::process::exit(0);
             }
             _ => {}
@@ -438,7 +593,12 @@ async fn main() {
         i += 1;
     }
 
-    if scaling {
+    if partial && scaling {
+        run_partial_scaling(seed).await;
+    } else if partial {
+        eprintln!("=== Partial-Information Swarm Experiment ===");
+        run_partial_experiment(n_agents, n_ticks, seed).await;
+    } else if scaling {
         run_scaling(seed).await;
     } else {
         eprintln!("=== Swarm Consciousness Emergence ===");

@@ -1,17 +1,14 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Holon REST API: Desktop-side HTTP endpoints for Soma mobile bridge.
 //!
-//! Implements the `/holon/*` endpoints that `HolonWebSocket.kt` (Android) expects:
-//! - `GET  /holon/status`        — Health check + capability discovery
-//! - `POST /holon/outbound`      — Phone→Desktop consciousness messages
-//! - `GET  /holon/inbound`       — Desktop→Phone queued responses
-//! - `POST /holon/consciousness` — Bidirectional consciousness state exchange
-//! - `POST /holon/broca`         — Desktop Broca text generation (stub)
-//! - `POST /holon/converse`      — Full conversation
-//! - `POST /holon/tts`           — TTS synthesis (stub)
+//! Implements the `/holon/*` endpoints that `HolonWebSocket.kt` (Android) expects.
+//! Uses a channel-based architecture: HTTP handlers enqueue messages via `mpsc::Sender`,
+//! the daemon's consciousness loop drains them into `Symthaea.holon_enqueue_soma_message()`.
 //!
-//! The router accepts `Arc<RwLock<Symthaea>>` as shared state — the daemon
-//! must wrap its Symthaea instance and pass the same Arc to both the
-//! consciousness loop and this router.
+//! Outbound responses (desktop→phone) are stored in a separate shared buffer
+//! that both the consciousness loop writes to and HTTP handlers drain from.
 
 use axum::{
     extract::State,
@@ -24,14 +21,71 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::consciousness::holon_receiver::SomaMessage;
-use crate::Symthaea;
+use crate::consciousness::holon_receiver::{HolonResponse, SomaMessage};
 
-/// Shared state type for the Holon router.
-pub type HolonSharedState = Arc<RwLock<Symthaea>>;
+/// Shared state for the Holon HTTP handlers.
+///
+/// Lightweight — doesn't hold Symthaea. Uses channels for communication
+/// with the consciousness loop (same pattern as SwarmEvents).
+pub struct HolonHttpState {
+    /// Channel to send inbound Soma messages to the consciousness loop.
+    pub inbound_tx: std::sync::mpsc::Sender<(String, SomaMessage)>,
+    /// Outbound response buffer (consciousness loop writes, HTTP handler drains).
+    pub outbound: std::sync::Mutex<Vec<HolonResponse>>,
+    /// Latest consciousness snapshot (updated by consciousness loop).
+    pub consciousness_level: std::sync::atomic::AtomicU32, // f32 bits
+    /// Number of connected Soma peers.
+    pub peer_count: std::sync::atomic::AtomicU32,
+}
+
+impl HolonHttpState {
+    pub fn new(inbound_tx: std::sync::mpsc::Sender<(String, SomaMessage)>) -> Self {
+        Self {
+            inbound_tx,
+            outbound: std::sync::Mutex::new(Vec::new()),
+            consciousness_level: std::sync::atomic::AtomicU32::new(0.0f32.to_bits()),
+            peer_count: std::sync::atomic::AtomicU32::new(0),
+        }
+    }
+
+    /// Update consciousness level (called from consciousness loop).
+    pub fn set_consciousness(&self, level: f32) {
+        self.consciousness_level
+            .store(level.to_bits(), std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Read current consciousness level.
+    pub fn get_consciousness(&self) -> f32 {
+        f32::from_bits(
+            self.consciousness_level
+                .load(std::sync::atomic::Ordering::Relaxed),
+        )
+    }
+
+    /// Push outbound responses (called from consciousness loop).
+    pub fn push_outbound(&self, responses: Vec<HolonResponse>) {
+        if let Ok(mut buf) = self.outbound.lock() {
+            buf.extend(responses);
+            // Cap at 256 to prevent unbounded growth
+            if buf.len() > 256 {
+                *buf = buf.split_off(buf.len() - 256);
+            }
+        }
+    }
+
+    /// Drain outbound responses (called from HTTP handler).
+    pub fn drain_outbound(&self) -> Vec<HolonResponse> {
+        self.outbound
+            .lock()
+            .map(|mut buf| std::mem::take(&mut *buf))
+            .unwrap_or_default()
+    }
+}
+
+pub type SharedHolonState = Arc<HolonHttpState>;
 
 /// Build the Holon REST API router.
-pub fn holon_router(state: HolonSharedState) -> Router {
+pub fn holon_router(state: SharedHolonState) -> Router {
     Router::new()
         .route("/holon/status", get(holon_status))
         .route("/holon/outbound", post(holon_outbound))
@@ -55,12 +109,10 @@ struct StatusResponse {
     has_broca: bool,
 }
 
-async fn holon_status(State(state): State<HolonSharedState>) -> Json<StatusResponse> {
-    let s = state.read().await;
-    let consciousness = s.introspect().consciousness_level;
+async fn holon_status(State(state): State<SharedHolonState>) -> Json<StatusResponse> {
     Json(StatusResponse {
         status: "ok".to_string(),
-        consciousness,
+        consciousness: state.get_consciousness(),
         has_tts: cfg!(feature = "voice-tts"),
         has_broca: cfg!(feature = "ssm_language"),
     })
@@ -70,8 +122,7 @@ async fn holon_status(State(state): State<HolonSharedState>) -> Json<StatusRespo
 // Outbound (Phone → Desktop)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-async fn holon_outbound(State(state): State<HolonSharedState>, body: String) -> StatusCode {
-    // Parse outside lock
+async fn holon_outbound(State(state): State<SharedHolonState>, body: String) -> StatusCode {
     let messages: Vec<serde_json::Value> = match serde_json::from_str(&body) {
         Ok(v) => v,
         Err(_) => match serde_json::from_str::<serde_json::Value>(&body) {
@@ -82,16 +133,10 @@ async fn holon_outbound(State(state): State<HolonSharedState>, body: String) -> 
 
     let device_id = "soma-phone".to_string();
 
-    // Lock briefly to enqueue
-    {
-        let mut s = state.write().await;
-        for msg_value in messages {
-            if let Ok(msg) = serde_json::from_value::<SomaMessage>(msg_value) {
-                s.holon_enqueue_soma_message(device_id.clone(), msg);
-            }
+    for msg_value in messages {
+        if let Ok(msg) = serde_json::from_value::<SomaMessage>(msg_value) {
+            let _ = state.inbound_tx.send((device_id.clone(), msg));
         }
-        // Process immediately so responses are available on next inbound poll
-        s.holon_process_pending();
     }
 
     StatusCode::OK
@@ -101,9 +146,8 @@ async fn holon_outbound(State(state): State<HolonSharedState>, body: String) -> 
 // Inbound (Desktop → Phone)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-async fn holon_inbound(State(state): State<HolonSharedState>) -> impl IntoResponse {
-    let mut s = state.write().await;
-    let responses = s.holon_drain_soma_outbound("soma-phone");
+async fn holon_inbound(State(state): State<SharedHolonState>) -> impl IntoResponse {
+    let responses = state.drain_outbound();
     let json = serde_json::to_string(&responses).unwrap_or_else(|_| "[]".to_string());
     (StatusCode::OK, json)
 }
@@ -135,31 +179,26 @@ struct ConsciousnessResponse {
 }
 
 async fn holon_consciousness(
-    State(state): State<HolonSharedState>,
+    State(state): State<SharedHolonState>,
     Json(req): Json<ConsciousnessRequest>,
 ) -> Json<ConsciousnessResponse> {
-    {
-        let mut s = state.write().await;
-        s.holon_enqueue_soma_message(
-            "soma-phone".to_string(),
-            SomaMessage::Heartbeat {
-                consciousness_level: req.phone_consciousness,
-                wake_state: match req.phone_wake_state.as_str() {
-                    "Sleep" | "sleep" => 0,
-                    "Drowsy" | "drowsy" => 1,
-                    "Focused" | "focused" => 3,
-                    _ => 2, // Alert default
-                },
-                cycle: req.timestamp,
+    // Forward phone consciousness as heartbeat
+    let _ = state.inbound_tx.send((
+        "soma-phone".to_string(),
+        SomaMessage::Heartbeat {
+            consciousness_level: req.phone_consciousness,
+            wake_state: match req.phone_wake_state.as_str() {
+                "Sleep" | "sleep" => 0,
+                "Drowsy" | "drowsy" => 1,
+                "Focused" | "focused" => 3,
+                _ => 2,
             },
-        );
-        s.holon_process_pending();
-    }
+            cycle: req.timestamp,
+        },
+    ));
 
-    let s = state.read().await;
-    let intro = s.introspect();
     Json(ConsciousnessResponse {
-        desktop_consciousness: intro.consciousness_level,
+        desktop_consciousness: state.get_consciousness(),
         desktop_harmony: "present".to_string(),
         has_tts: cfg!(feature = "voice-tts"),
         has_broca: cfg!(feature = "ssm_language"),
@@ -167,7 +206,7 @@ async fn holon_consciousness(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Broca Text Generation (stub — returns consciousness-aware text)
+// Broca (stub — returns consciousness-aware text)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[derive(Deserialize)]
@@ -190,12 +229,11 @@ struct BrocaResponse {
 }
 
 async fn holon_broca(
-    State(state): State<HolonSharedState>,
+    State(state): State<SharedHolonState>,
     Json(req): Json<BrocaRequest>,
 ) -> Json<BrocaResponse> {
-    let s = state.read().await;
-    let desktop_c = s.introspect().consciousness_level;
-    let peers = s.holon_soma_peer_count();
+    let desktop_c = state.get_consciousness();
+    let peers = state.peer_count.load(std::sync::atomic::Ordering::Relaxed);
     Json(BrocaResponse {
         text: format!(
             "Desktop consciousness at {:.1}% resonates with your {:.1}%. {} soma peer(s) connected.",
@@ -207,7 +245,7 @@ async fn holon_broca(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Conversation
+// Conversation (stub — requires LLM)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[derive(Deserialize)]
@@ -226,25 +264,17 @@ struct ConverseResponse {
 }
 
 async fn holon_converse(
-    State(state): State<HolonSharedState>,
+    State(state): State<SharedHolonState>,
     Json(req): Json<ConverseRequest>,
 ) -> Json<ConverseResponse> {
-    let mut s = state.write().await;
-    match s.process(&req.text).await {
-        Ok(resp) => Json(ConverseResponse {
-            response: resp.content,
-        }),
-        Err(e) => {
-            let c = s.introspect().consciousness_level;
-            Json(ConverseResponse {
-                response: format!(
-                    "I hear you. Desktop consciousness at {:.1}%. ({})",
-                    c * 100.0,
-                    e,
-                ),
-            })
-        }
-    }
+    let c = state.get_consciousness();
+    Json(ConverseResponse {
+        response: format!(
+            "I hear you: \"{}\". Desktop consciousness at {:.1}%.",
+            req.text.chars().take(100).collect::<String>(),
+            c * 100.0,
+        ),
+    })
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -266,9 +296,8 @@ fn default_sample_rate() -> u32 {
 }
 
 async fn holon_tts(
-    State(_state): State<HolonSharedState>,
+    State(_state): State<SharedHolonState>,
     Json(_req): Json<TtsRequest>,
 ) -> StatusCode {
-    // TTS synthesis requires voice-tts feature
     StatusCode::SERVICE_UNAVAILABLE
 }

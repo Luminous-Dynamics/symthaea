@@ -1,4 +1,6 @@
-//! Cross-Domain Safety Dashboard — NRC-style HTML + JSON + Markdown
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Cross-Domain Safety Dashboard — NRC-style HTML + JSON + Markdown
 //!
 //! Instantiates SafetyAgents for each domain, runs synthetic scenarios
 //! (healthy → degrading → critical → recovery), and generates a

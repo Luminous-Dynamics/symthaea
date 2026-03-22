@@ -1,4 +1,6 @@
-//! H1 Refined: Sensory/Embodied vs Abstract/Procedural
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! H1 Refined: Sensory/Embodied vs Abstract/Procedural
 //!
 //! Tests the refined hypothesis that the topological distinction is between:
 //! - Sensory/embodied language (qualia, self_awareness, aesthetic)

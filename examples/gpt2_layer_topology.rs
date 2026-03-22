@@ -1,4 +1,6 @@
-//! GPT-2 Cross-Model Validation
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! GPT-2 Cross-Model Validation
 //!
 //! Tests whether the late-layer phenomenal effect replicates in GPT-2.
 //! If the effect appears across architectures, it strengthens the claim

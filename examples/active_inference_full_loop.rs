@@ -1,4 +1,6 @@
-//! Active Inference Full Loop Example
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Active Inference Full Loop Example
 //!
 //! Demonstrates the complete perception→action→learning cycle integrating:
 //! - FEP Active Inference Agent (perception, action selection, TD learning)

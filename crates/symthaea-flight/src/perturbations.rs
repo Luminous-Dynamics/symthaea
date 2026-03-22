@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Mid-flight physical perturbations for domain randomization (behind `mujoco` feature).
 //!
 //! Instead of training 10,000 drones with different masses and hoping the final

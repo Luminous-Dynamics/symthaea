@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Symthaea NixOS: A Conscious Mind for NixOS
 //!
 //! This crate implements a genuine NixOS world model using Symthaea's cognitive

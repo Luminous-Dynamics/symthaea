@@ -1,4 +1,6 @@
-//! Precognition Demo: Pearlian Causal Dreaming
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Precognition Demo: Pearlian Causal Dreaming
 //!
 //! Demonstrates the 'Causal Veto':
 //! 1. Seed the world model with a "System Crash" event (action 'rm -rf /').

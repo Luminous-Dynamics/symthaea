@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Extracted helpers from cycle() — Phases 1–4.
 //!
 //! Phase 1 (LOW risk): safety precheck, cognitive depth, negation detection, LR composition

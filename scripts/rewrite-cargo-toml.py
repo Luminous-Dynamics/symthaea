@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Rewrite Cargo.toml external path dependencies for standalone builds.
+
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root"""Rewrite Cargo.toml external path dependencies for standalone builds.
 
 Reads symthaea/Cargo.toml, finds any [dependencies] or [dev-dependencies]
 entries with paths pointing outside the symthaea tree (i.e., containing "../"

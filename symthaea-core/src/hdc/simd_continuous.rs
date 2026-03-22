@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! SIMD-Accelerated Operations for Continuous (f32) Hypervectors
 //!
 //! This module provides high-performance SIMD implementations for ContinuousHV operations:

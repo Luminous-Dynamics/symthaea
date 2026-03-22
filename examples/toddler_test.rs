@@ -1,4 +1,6 @@
-//! # The Toddler Test: Multi-Pattern Discrimination
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # The Toddler Test: Multi-Pattern Discrimination
 //!
 //! A toddler can distinguish "dog" from "cat" from "ball" - not just detect objects.
 //! This test validates that our consciousness system can similarly discriminate

@@ -1,4 +1,6 @@
-//! Global Workspace + Cincinnati-LTC Integration Demo
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Global Workspace + Cincinnati-LTC Integration Demo
 //!
 //! Demonstrates how temporal pattern recognition (Cincinnati-LTC) integrates
 //! with the Global Workspace consciousness pipeline.

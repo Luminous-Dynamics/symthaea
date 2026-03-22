@@ -1,4 +1,6 @@
-//! EmotionSentinel - Emotional state detection (Proof of Joy)
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! EmotionSentinel - Emotional state detection (Proof of Joy)
 //!
 //! Detects emotional valence and arousal from EEG using frontal asymmetry
 //! and band power ratios. Validated on DENS dataset with r=0.39 valence.

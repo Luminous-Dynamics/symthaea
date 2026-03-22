@@ -1,4 +1,6 @@
-//! # Two-Agent Cooperation Demo
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Two-Agent Cooperation Demo
 //!
 //! Demonstrates two `ContinuousMind` instances cooperating via local channels,
 //! building Theory-of-Mind models of each other and evolving trust over time.

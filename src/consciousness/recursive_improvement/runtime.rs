@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # MAGI Loop Runtime - The Heartbeat of Symthaea
 //!
 //! This module implements the continuous cognitive cycle that transforms MAGI

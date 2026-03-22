@@ -1,4 +1,6 @@
-//! Calibration harness for the topological immune system's convergence detection.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Calibration harness for the topological immune system's convergence detection.
 //!
 //! Generates labeled scenario families (benign-diverse, benign-repetitive,
 //! adversarial-converging, adversarial-evasive) and produces a report with

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Nuclear attribution agent: match unknown samples against reference database.
 
 use symthaea_core::hdc::unified_hv::ContinuousHV;

@@ -1,5 +1,7 @@
 #![cfg(feature = "unstable-examples")]
-//! Session 20/21: Mechanism Activation Audit
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Session 20/21: Mechanism Activation Audit
 //!
 //! Runs 500 cycles with varied inputs and verifies:
 //! 1. Unified readiness gate stays bounded [0.3, 1.0]

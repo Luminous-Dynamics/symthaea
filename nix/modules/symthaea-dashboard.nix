@@ -1,4 +1,6 @@
-# NixOS Module: Symthaea Local Consciousness Dashboard
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root# NixOS Module: Symthaea Local Consciousness Dashboard
 #
 # Serves the Spore WASM portal on localhost for the "Attune Later" pathway.
 # Users who choose to inoculate without immediate mesh attunement get a local

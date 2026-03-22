@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Core dynamics phase of the cognitive cycle.
 //!
 //! `phase_dynamics()` orchestrates Phases A–11, delegating to three private helpers:

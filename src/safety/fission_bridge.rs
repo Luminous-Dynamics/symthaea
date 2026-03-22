@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Cross-domain bridge: Fission Reactor Digital Twin -> Safety Agent
 //!
 //! Maps `FissionOutput` (free energy, safety level, action) into

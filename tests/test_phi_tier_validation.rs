@@ -1,4 +1,6 @@
-//! Φ Tier Validation: Comparing Heuristic vs Exact
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Φ Tier Validation: Comparing Heuristic vs Exact
 //!
 //! This test validates that our O(n) Heuristic approximation correlates
 //! strongly with the O(2^n) Exact IIT MIP calculation.

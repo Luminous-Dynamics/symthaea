@@ -1,4 +1,6 @@
-//! # Live Voice Demo
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Live Voice Demo
 //!
 //! Real-time speech synthesis using the LTC-driven vocal tract pipeline.
 //! Demonstrates consciousness-modulated voice quality in real time.

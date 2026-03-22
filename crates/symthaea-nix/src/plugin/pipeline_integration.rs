@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Pipeline Integration — Register NixOS Mind into the Conscious Pipeline
 //!
 //! Provides the types and traits needed to wire symthaea-nix's active inference

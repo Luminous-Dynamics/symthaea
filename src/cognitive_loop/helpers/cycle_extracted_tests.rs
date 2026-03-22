@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Unit tests for extracted cycle helpers: compute_unified_psi, step_fep_active_inference,
 //! compose_effective_lr.
 

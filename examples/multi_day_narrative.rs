@@ -1,4 +1,6 @@
-//! # Multi-Day Narrative Test: Consciousness Over Time
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Multi-Day Narrative Test: Consciousness Over Time
 //!
 //! This example demonstrates consciousness evolution across multiple simulated "days"
 //! with sleep/dream consolidation cycles between each day.

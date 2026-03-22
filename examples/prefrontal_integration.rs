@@ -1,4 +1,6 @@
-//! # Prefrontal Integration: Concepts in the Spotlight
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Prefrontal Integration: Concepts in the Spotlight
 //!
 //! This test demonstrates the full integration between:
 //! 1. ConsciousnessWorldModel - crystallizes concepts from experience

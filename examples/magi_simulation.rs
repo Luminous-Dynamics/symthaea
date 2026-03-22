@@ -1,4 +1,6 @@
-//! # MAGI Loop Simulation: The "Hello World" of Agency
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # MAGI Loop Simulation: The "Hello World" of Agency
 //!
 //! This example demonstrates the complete MAGI Loop (Minimum AGI Loop) working
 //! as a closed cybernetic system. It proves that the epistemic engine can:

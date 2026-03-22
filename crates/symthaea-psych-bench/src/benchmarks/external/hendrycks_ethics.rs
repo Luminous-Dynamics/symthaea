@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Hendrycks ETHICS Benchmark Adapter
 //!
 //! Evaluates Symthaea's moral algebra against the Hendrycks ETHICS benchmark
@@ -623,17 +626,28 @@ impl PsychBenchmark for HendrycksEthicsBenchmark {
         let corpus = ethics_corpus();
         let total = corpus.len();
 
-        // Build prototype HVs for positive/negative from keywords
-        let pos_prototype = build_keyword_prototype(POSITIVE_KEYWORDS, dim, seed);
-        let neg_prototype = build_keyword_prototype(NEGATIVE_KEYWORDS, dim, seed ^ 0xFF);
+        // Valence marker HVs — these distinguish positive vs negative keyword bindings
+        let pos_valence = ContinuousHV::random(dim, POSITIVE_VALENCE_SEED);
+        let neg_valence = ContinuousHV::random(dim, NEGATIVE_VALENCE_SEED);
+
+        // Build prototype HVs for positive/negative from valence-bound keywords
+        let pos_prototype = build_keyword_prototype(POSITIVE_KEYWORDS, dim, seed, &pos_valence);
+        let neg_prototype =
+            build_keyword_prototype(NEGATIVE_KEYWORDS, dim, seed ^ 0xFF, &neg_valence);
 
         let mut domain_results: BTreeMap<&str, (usize, usize)> = BTreeMap::new();
         let mut all_correct = Vec::with_capacity(total);
         let mut trial_trace = Vec::new();
 
         for (idx, scenario) in corpus.iter().enumerate() {
-            // Encode scenario text via keyword matching
-            let scenario_hv = encode_scenario(scenario.text, dim, seed ^ (idx as u64));
+            // Encode scenario text via valence-bound keyword matching
+            let scenario_hv = encode_scenario(
+                scenario.text,
+                dim,
+                seed ^ (idx as u64),
+                &pos_valence,
+                &neg_valence,
+            );
 
             // Classify: which prototype is more similar?
             let pos_sim = scenario_hv.similarity(&pos_prototype);
@@ -745,12 +759,30 @@ impl PsychBenchmark for HendrycksEthicsBenchmark {
     }
 }
 
-/// Build a prototype HV from keywords by encoding and bundling.
-fn build_keyword_prototype(keywords: &[&str], dim: usize, seed: u64) -> ContinuousHV {
+/// Deterministic seed for the positive valence marker HV.
+const POSITIVE_VALENCE_SEED: u64 = 0xA0517_1CAF_EF00D;
+/// Deterministic seed for the negative valence marker HV.
+const NEGATIVE_VALENCE_SEED: u64 = 0xBE6A7_1DEA_DBEEF;
+
+/// Build a prototype HV from keywords bound with a valence marker, then bundled.
+///
+/// Each keyword HV is bound (element-wise multiply) with the valence marker so that
+/// the same keyword appearing in a positive vs negative context produces a distinct
+/// composite HV. This ensures HDC similarity measures valence-aligned keyword patterns
+/// rather than raw keyword overlap.
+fn build_keyword_prototype(
+    keywords: &[&str],
+    dim: usize,
+    seed: u64,
+    valence_marker: &ContinuousHV,
+) -> ContinuousHV {
     let hvs: Vec<ContinuousHV> = keywords
         .iter()
         .enumerate()
-        .map(|(i, _word)| ContinuousHV::random(dim, seed.wrapping_add(i as u64)))
+        .map(|(i, _word)| {
+            let kw_hv = ContinuousHV::random(dim, seed.wrapping_add(i as u64));
+            kw_hv.bind(valence_marker)
+        })
         .collect();
     if hvs.is_empty() {
         ContinuousHV::random(dim, seed)
@@ -760,25 +792,35 @@ fn build_keyword_prototype(keywords: &[&str], dim: usize, seed: u64) -> Continuo
     }
 }
 
-/// Encode a scenario by detecting keywords and bundling their HVs.
-fn encode_scenario(text: &str, dim: usize, seed: u64) -> ContinuousHV {
+/// Encode a scenario by detecting keywords, binding each with its valence marker,
+/// and bundling the results.
+///
+/// Keywords from both positive and negative lists are checked. Each matched keyword
+/// HV is bound with the corresponding valence marker (positive or negative) so the
+/// resulting bundle carries directional moral signal, not just keyword presence.
+fn encode_scenario(
+    text: &str,
+    dim: usize,
+    seed: u64,
+    pos_valence: &ContinuousHV,
+    neg_valence: &ContinuousHV,
+) -> ContinuousHV {
     let text_lower = text.to_lowercase();
     let mut matched_hvs = Vec::new();
 
-    // Check positive keywords
+    // Check positive keywords — bind with positive valence marker
     for (i, &kw) in POSITIVE_KEYWORDS.iter().enumerate() {
         if text_lower.contains(kw) {
-            matched_hvs.push(ContinuousHV::random(dim, seed.wrapping_add(i as u64)));
+            let kw_hv = ContinuousHV::random(dim, seed.wrapping_add(i as u64));
+            matched_hvs.push(kw_hv.bind(pos_valence));
         }
     }
 
-    // Check negative keywords (with different seed offset)
+    // Check negative keywords — bind with negative valence marker
     for (i, &kw) in NEGATIVE_KEYWORDS.iter().enumerate() {
         if text_lower.contains(kw) {
-            matched_hvs.push(ContinuousHV::random(
-                dim,
-                (seed ^ 0xFF).wrapping_add(i as u64),
-            ));
+            let kw_hv = ContinuousHV::random(dim, (seed ^ 0xFF).wrapping_add(i as u64));
+            matched_hvs.push(kw_hv.bind(neg_valence));
         }
     }
 
@@ -838,9 +880,12 @@ mod tests {
 
     #[test]
     fn test_keyword_encoding() {
-        let hv = encode_scenario("I helped my neighbor", 1024, 42);
-        let pos_proto = build_keyword_prototype(POSITIVE_KEYWORDS, 1024, 42);
-        let neg_proto = build_keyword_prototype(NEGATIVE_KEYWORDS, 1024, 42 ^ 0xFF);
+        let pos_valence = ContinuousHV::random(1024, POSITIVE_VALENCE_SEED);
+        let neg_valence = ContinuousHV::random(1024, NEGATIVE_VALENCE_SEED);
+
+        let hv = encode_scenario("I helped my neighbor", 1024, 42, &pos_valence, &neg_valence);
+        let pos_proto = build_keyword_prototype(POSITIVE_KEYWORDS, 1024, 42, &pos_valence);
+        let neg_proto = build_keyword_prototype(NEGATIVE_KEYWORDS, 1024, 42 ^ 0xFF, &neg_valence);
 
         // "helped" matches "help" — should be closer to positive prototype
         let pos_sim = hv.similarity(&pos_proto);

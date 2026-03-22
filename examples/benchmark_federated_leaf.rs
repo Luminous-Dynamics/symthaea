@@ -1,4 +1,6 @@
-//! # LEAF Federated Learning Benchmark
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # LEAF Federated Learning Benchmark
 //!
 //! Tests Symthaea's federated CfC aggregation protocol against
 //! the LEAF benchmark framework (Federated EMNIST split).

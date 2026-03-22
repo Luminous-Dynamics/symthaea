@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Ollama LLM bridge for general-purpose queries.
 //!
 //! When HDC-based intent recognition and causal reasoning can't handle a query

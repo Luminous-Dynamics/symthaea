@@ -1,4 +1,6 @@
-//! Hierarchical CfC vs Single-Scale CfC Consciousness Comparison
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Hierarchical CfC vs Single-Scale CfC Consciousness Comparison
 //!
 //! Runs N cognitive cycles with both backends on the same input stream and
 //! compares consciousness metrics (Phi, coherence, consciousness_level,

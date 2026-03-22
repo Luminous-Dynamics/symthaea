@@ -1,4 +1,6 @@
-//! # MNIST Cognitive Loop Benchmark
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # MNIST Cognitive Loop Benchmark
 //!
 //! Compares HDC-only classification vs CfC-integrated classification on MNIST.
 //!

@@ -1,4 +1,6 @@
-//! # Real LLM Veracity Test: Taming the Stochastic Beast
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Real LLM Veracity Test: Taming the Stochastic Beast
 //!
 //! This test verifies that our translation system prompt can actually
 //! constrain a real neural network (Ollama) from hallucinating.

@@ -1,4 +1,6 @@
-//! Sleep-EDF Phi Benchmark — External validation on real clinical EEG data.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Sleep-EDF Phi Benchmark — External validation on real clinical EEG data.
 //!
 //! Loads PhysioNet Sleep-EDF recordings, feeds each 30-second epoch through
 //! SleepSentinel, computes the Phi proxy (synchrony × bidirectional causality),

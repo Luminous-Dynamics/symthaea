@@ -1,4 +1,6 @@
-//! Clinical Validation - Project Hypnos
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Clinical Validation - Project Hypnos
 //!
 //! Validates Symthaea's consciousness detection on REAL clinical EEG data
 //! from the Sleep-EDF database (PhysioNet).

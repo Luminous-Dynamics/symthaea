@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Closed-form Continuous-time (CfC) Neural Networks
 //!
 //! Implementation of CfC networks with closed-form solutions for continuous-time

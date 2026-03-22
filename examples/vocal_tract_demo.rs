@@ -1,4 +1,6 @@
-//! LTC-Driven Vocal Tract Pipeline Demo
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! LTC-Driven Vocal Tract Pipeline Demo
 //!
 //! Demonstrates the full HDC → LTC → FEP active inference pipeline
 //! for articulatory synthesis. Produces WAV audio files in `audio_output/`.

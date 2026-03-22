@@ -1,4 +1,6 @@
-//! Parallel swarm training: N MuJoCo drones with domain randomization.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Parallel swarm training: N MuJoCo drones with domain randomization.
 //!
 //! Each drone has randomized mass and wind profile. All drones share a global
 //! experience buffer. After training, the swarm's collective knowledge produces

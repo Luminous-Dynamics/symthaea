@@ -113,6 +113,15 @@ uint8_t soma_engine_save_checkpoint(void *engine);
 uint8_t soma_engine_load_checkpoint(void *engine);
 void    soma_engine_set_storage_path(void *engine, const char *path);
 
+/* Daily rituals */
+char *soma_engine_morning_ritual(const void *engine);
+char *soma_engine_evening_ritual(const void *engine);
+
+/* Wellbeing profiles */
+uint8_t soma_engine_set_wellbeing_profile(void *engine, const char *name);
+char   *soma_engine_wellbeing_profile_name(const void *engine);
+char   *soma_engine_wellbeing_profiles_list(void);
+
 /* String management */
 void soma_string_free(char *s);
 
@@ -696,5 +705,57 @@ Java_io_symthaea_soma_NativeBindings_screenSalientRegionsJson(JNIEnv *env, jclas
                                                                jlong handle) {
     (void)clazz;
     char *json = soma_engine_screen_salient_regions_json((const void *)(intptr_t)handle);
+    return rust_string_to_jstring(env, json);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Daily Rituals
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+JNIEXPORT jstring JNICALL
+Java_io_symthaea_soma_NativeBindings_morningRitual(JNIEnv *env, jclass clazz,
+                                                    jlong handle) {
+    (void)clazz;
+    char *json = soma_engine_morning_ritual((const void *)(intptr_t)handle);
+    return rust_string_to_jstring(env, json);
+}
+
+JNIEXPORT jstring JNICALL
+Java_io_symthaea_soma_NativeBindings_eveningRitual(JNIEnv *env, jclass clazz,
+                                                    jlong handle) {
+    (void)clazz;
+    char *json = soma_engine_evening_ritual((const void *)(intptr_t)handle);
+    return rust_string_to_jstring(env, json);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Wellbeing Profiles
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+JNIEXPORT jint JNICALL
+Java_io_symthaea_soma_NativeBindings_setWellbeingProfile(JNIEnv *env, jclass clazz,
+                                                          jlong handle, jstring name) {
+    (void)clazz;
+    const char *name_str = (*env)->GetStringUTFChars(env, name, NULL);
+    if (name_str == NULL) return 0;
+    uint8_t ok = soma_engine_set_wellbeing_profile(
+        (void *)(intptr_t)handle, name_str
+    );
+    (*env)->ReleaseStringUTFChars(env, name, name_str);
+    return (jint)ok;
+}
+
+JNIEXPORT jstring JNICALL
+Java_io_symthaea_soma_NativeBindings_wellbeingProfileName(JNIEnv *env, jclass clazz,
+                                                           jlong handle) {
+    (void)clazz;
+    char *name = soma_engine_wellbeing_profile_name((const void *)(intptr_t)handle);
+    return rust_string_to_jstring(env, name);
+}
+
+JNIEXPORT jstring JNICALL
+Java_io_symthaea_soma_NativeBindings_wellbeingProfilesList(JNIEnv *env, jclass clazz) {
+    (void)clazz;
+    char *json = soma_engine_wellbeing_profiles_list();
     return rust_string_to_jstring(env, json);
 }

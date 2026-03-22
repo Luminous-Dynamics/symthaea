@@ -1,4 +1,6 @@
-//! CfC Learning Lookahead - Comprehensive Stress Test
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! CfC Learning Lookahead - Comprehensive Stress Test
 //!
 //! This test validates the CfC lookahead architecture with:
 //! 1. Unit tests for core components

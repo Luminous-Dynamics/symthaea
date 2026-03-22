@@ -1,4 +1,6 @@
-//! Glyph Codex integration tests.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Glyph Codex integration tests.
 //!
 //! Verifies the full glyph pipeline: input text → GlyphManager encodes →
 //! projects onto 11 Field Modality axes → consciousness modulation →

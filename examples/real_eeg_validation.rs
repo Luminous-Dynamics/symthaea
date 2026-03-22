@@ -1,4 +1,6 @@
-//! Validate Cincinnati-LTC and Hybrid Ensemble on Real EEG Data
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Validate Cincinnati-LTC and Hybrid Ensemble on Real EEG Data
 //!
 //! Uses CHB-MIT Scalp EEG Database (PhysioNet)
 //! This is real clinical EEG from pediatric patients

@@ -1,4 +1,6 @@
-//! Cross-project integration tests: Symthaea <-> Mycelix consciousness bridge.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Cross-project integration tests: Symthaea <-> Mycelix consciousness bridge.
 //!
 //! Tests real type interop between the Symthaea cognitive loop and
 //! mycelix-bridge-common consciousness gating. Imports actual types from

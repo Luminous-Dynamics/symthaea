@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Ignorance Type Taxonomy
 //!
 //! Implements the 5-type ignorance taxonomy from GIS v1.0, extended in v4.0 with

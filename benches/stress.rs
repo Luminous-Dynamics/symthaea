@@ -1,4 +1,6 @@
-//! Stress Test Benchmarks
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Stress Test Benchmarks
 //!
 //! Tests system behavior under heavy load:
 //! - Memory usage under sustained operations

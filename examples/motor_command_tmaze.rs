@@ -1,4 +1,6 @@
-//! T-Maze Motor Command Validation Benchmark
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! T-Maze Motor Command Validation Benchmark
 //!
 //! Validates that the FEP active inference motor command system improves
 //! task performance compared to random exploration. Uses a simplified

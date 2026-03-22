@@ -1,4 +1,6 @@
-//! # EEG Seizure Detection Benchmark
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # EEG Seizure Detection Benchmark
 //!
 //! Validates Symthaea's temporal processing (LTC/CfC) for detecting seizures
 //! from EEG signals. Tests the fundamental claim that continuous-time neural

@@ -1,5 +1,7 @@
 #![allow(dead_code)]
-
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Epistemic Gating for Mathematical Claims (Phase 7b)
 //!
 //! Applies epistemic constraints to math outputs so that Symthaea

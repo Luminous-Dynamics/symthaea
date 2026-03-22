@@ -1,4 +1,6 @@
-//! PhiEngine Quick Demo
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! PhiEngine Quick Demo
 //!
 //! Minimal example showing how to use the PhiEngine facade on
 //! small consciousness topologies. This is intentionally small

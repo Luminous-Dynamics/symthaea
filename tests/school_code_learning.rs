@@ -1,5 +1,7 @@
 #![cfg(all(feature = "code_generation", feature = "school_learning"))]
-//! Integration test: School Code Learning with real compilation
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Integration test: School Code Learning with real compilation
 //!
 //! Runs the CodeLearningEngine with real `rustc` execution to validate
 //! that Symthaea can generate, compile, and test Rust code autonomously.

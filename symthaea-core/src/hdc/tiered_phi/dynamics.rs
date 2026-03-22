@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Φ Dynamics and Attractor Analysis
 //!
 //! This module contains temporal dynamics tracking (#93) and attractor analysis (#97).

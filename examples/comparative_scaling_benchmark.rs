@@ -1,4 +1,6 @@
-//! Comparative Scaling Benchmark
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Comparative Scaling Benchmark
 //!
 //! Measures HDC+CfC performance across different configurations to identify
 //! where the architecture has competitive advantages. Compares:

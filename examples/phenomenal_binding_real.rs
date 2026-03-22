@@ -1,4 +1,6 @@
-//! H2: Phenomenal Binding Hypothesis with Real Embeddings
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! H2: Phenomenal Binding Hypothesis with Real Embeddings
 //!
 //! Tests whether HDC binding (XOR) produces higher topological unity than
 //! bundling (majority vote) specifically for phenomenally-unified concept pairs.

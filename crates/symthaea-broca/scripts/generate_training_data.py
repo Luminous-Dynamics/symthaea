@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Generate consciousness-conditioned training data for Broca CfC-HDC.
+
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root"""Generate consciousness-conditioned training data for Broca CfC-HDC.
 
 Uses a local LLM (via Ollama) to generate text responses conditioned on
 ThoughtChannels configurations. Each sample maps a 24-channel consciousness

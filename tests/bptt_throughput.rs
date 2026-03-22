@@ -1,4 +1,6 @@
-//! BPTT throughput benchmark for CfC networks.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! BPTT throughput benchmark for CfC networks.
 //!
 //! Marked `#[ignore]` so it doesn't run in CI.
 //! Run with: cargo test -p symthaea --release --test bptt_throughput -- --ignored --nocapture
