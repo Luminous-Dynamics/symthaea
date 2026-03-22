@@ -15,3 +15,4 @@ holochain_serialized_bytes = { workspace = true }
 mutualaid_pools_integrity = { path = "../integrity" }
 mutualaid-common = { workspace = true }
 mycelix-bridge-common = { workspace = true }
+mycelix-zome-helpers = { workspace = true }

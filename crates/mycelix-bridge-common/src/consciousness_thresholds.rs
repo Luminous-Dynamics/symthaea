@@ -76,8 +76,13 @@ impl Default for ConsciousnessThresholds {
 /// Maximum community member count for bootstrap eligibility.
 pub const BOOTSTRAP_COMMUNITY_THRESHOLD: u32 = 5;
 
-/// TTL for bootstrap credentials: 1 hour in microseconds.
-pub const BOOTSTRAP_TTL_US: u64 = 3_600_000_000;
+/// TTL for bootstrap credentials: 15 minutes in microseconds.
+///
+/// Reduced from 1 hour to minimize the TOCTOU window where a bootstrap
+/// credential remains valid after the community grows past the bootstrap
+/// threshold (5 members). A 15-minute window is sufficient for initial
+/// setup while limiting exposure.
+pub const BOOTSTRAP_TTL_US: u64 = 900_000_000;
 
 /// Minimum identity score required for bootstrap eligibility (Basic MFA = 0.25).
 pub const BOOTSTRAP_MIN_IDENTITY: f64 = 0.25;
@@ -134,7 +139,7 @@ mod tests {
     fn bootstrap_thresholds_defaults() {
         let t = ConsciousnessThresholds::default();
         assert_eq!(t.bootstrap_community_threshold, 5);
-        assert_eq!(t.bootstrap_ttl_us, 3_600_000_000);
+        assert_eq!(t.bootstrap_ttl_us, 900_000_000); // 15 minutes
         assert_eq!(t.bootstrap_min_identity, 0.25);
     }
 

@@ -2,52 +2,20 @@
 //! Business logic for watershed governance, water rights, transfers, and disputes
 
 use hdk::prelude::*;
-use mycelix_bridge_common::{
-    gate_consciousness, requirement_for_constitutional, requirement_for_proposal,
-    requirement_for_voting, GovernanceEligibility, GovernanceRequirement,
-};
+use mycelix_bridge_common::{requirement_for_constitutional, requirement_for_proposal, requirement_for_voting};
+use mycelix_zome_helpers::records_from_links;
 use water_steward_integrity::*;
 
 fn require_consciousness(
-    requirement: &GovernanceRequirement,
+    requirement: &mycelix_bridge_common::GovernanceRequirement,
     action_name: &str,
-) -> ExternResult<GovernanceEligibility> {
-    gate_consciousness("commons_bridge", requirement, action_name)
+) -> ExternResult<mycelix_bridge_common::GovernanceEligibility> {
+    mycelix_zome_helpers::require_consciousness("commons_bridge", requirement, action_name)
 }
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
     hash_entry(&EntryTypes::Anchor(anchor))
-}
-
-fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
-    let Some(details) = get_details(action_hash, GetOptions::default())? else {
-        return Ok(None);
-    };
-    match details {
-        Details::Record(record_details) => {
-            if record_details.updates.is_empty() {
-                Ok(Some(record_details.record))
-            } else {
-                let latest_update = &record_details.updates[record_details.updates.len() - 1];
-                let latest_hash = latest_update.action_address().clone();
-                get_latest_record(latest_hash)
-            }
-        }
-        Details::Entry(_) => Ok(None),
-    }
-}
-
-fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
-    let mut records = Vec::new();
-    for link in links {
-        let action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get_latest_record(action_hash)? {
-            records.push(record);
-        }
-    }
-    Ok(records)
 }
 
 // ============================================================================

@@ -8,17 +8,15 @@
 //! read/write within a space to approved members only.
 
 use hdk::prelude::*;
-use mycelix_bridge_common::{
-    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
-    GovernanceRequirement,
-};
+use mycelix_bridge_common::{requirement_for_basic, requirement_for_proposal};
+use mycelix_zome_helpers::get_latest_record;
 use space_integrity::*;
 
 fn require_consciousness(
-    requirement: &GovernanceRequirement,
+    requirement: &mycelix_bridge_common::GovernanceRequirement,
     action_name: &str,
-) -> ExternResult<GovernanceEligibility> {
-    gate_consciousness("commons_bridge", requirement, action_name)
+) -> ExternResult<mycelix_bridge_common::GovernanceEligibility> {
+    mycelix_zome_helpers::require_consciousness("commons_bridge", requirement, action_name)
 }
 
 /// Helper to get an anchor entry hash
@@ -30,24 +28,6 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Create a new private space
 ///
 /// The caller becomes the first admin member automatically.
-
-fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
-    let Some(details) = get_details(action_hash, GetOptions::default())? else {
-        return Ok(None);
-    };
-    match details {
-        Details::Record(record_details) => {
-            if record_details.updates.is_empty() {
-                Ok(Some(record_details.record))
-            } else {
-                let latest_update = &record_details.updates[record_details.updates.len() - 1];
-                let latest_hash = latest_update.action_address().clone();
-                get_latest_record(latest_hash)
-            }
-        }
-        Details::Entry(_) => Ok(None),
-    }
-}
 
 #[hdk_extern]
 pub fn create_space(input: CreateSpaceInput) -> ExternResult<Record> {

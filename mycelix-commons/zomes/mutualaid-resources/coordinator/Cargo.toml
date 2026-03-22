@@ -16,3 +16,4 @@ mutualaid_resources_integrity = { path = "../integrity" }
 mutualaid-common = { workspace = true }
 commons-types = { workspace = true }
 mycelix-bridge-common = { workspace = true }
+mycelix-zome-helpers = { workspace = true }

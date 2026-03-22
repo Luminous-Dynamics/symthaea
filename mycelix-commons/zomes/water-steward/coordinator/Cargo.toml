@@ -14,4 +14,5 @@ serde_json = { workspace = true }
 holochain_serialized_bytes = { workspace = true }
 water_steward_integrity = { path = "../integrity" }
 mycelix-bridge-common = { workspace = true }
+mycelix-zome-helpers = { workspace = true }
 
