@@ -138,6 +138,10 @@ pub(crate) struct PrimitiveTierManager {
 
     /// Value feedback loop for TD-learning on moral alignment.
     pub value_feedback: ValueFeedbackLoop,
+
+    /// Cached NSM grounding system for epistemic cube → HDC encoding.
+    /// Built once from PrimitiveSystem::global() at construction, reused every Broca cycle.
+    pub epistemic_nsm_grounding: Option<crate::consciousness::EpistemicNSMGrounding>,
 }
 
 impl PrimitiveTierManager {
@@ -365,6 +369,12 @@ impl PrimitiveTierManager {
             grid_encoder,
             primitive_validation_result: None,
             value_feedback: ValueFeedbackLoop::default(),
+            epistemic_nsm_grounding: if has_primitive {
+                let system = symthaea_core::hdc::primitive_system::PrimitiveSystem::global();
+                Some(crate::consciousness::EpistemicNSMGrounding::new(&system))
+            } else {
+                None
+            },
         }
     }
 

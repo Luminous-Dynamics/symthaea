@@ -186,6 +186,77 @@ fn extract_fields_from_text(text: &str) -> Vec<(String, String)> {
     fields
 }
 
+/// Extract fields from a struct signature like "struct Foo { x: i32, y: f64 }".
+fn extract_fields_from_struct_sig(sig: &str) -> Vec<(String, String)> {
+    let mut fields = Vec::new();
+    // Find content between { and }
+    if let Some(brace_start) = sig.find('{') {
+        if let Some(brace_end) = sig.rfind('}') {
+            let body = &sig[brace_start + 1..brace_end];
+            for field_str in body.split(',') {
+                let field_str = field_str.trim();
+                if let Some(colon) = field_str.find(':') {
+                    let name = field_str[..colon].trim().trim_start_matches("pub ");
+                    let typ = field_str[colon + 1..].trim();
+                    if !name.is_empty() && !typ.is_empty() {
+                        fields.push((name.to_string(), typ.to_string()));
+                    }
+                }
+            }
+        }
+    }
+    fields
+}
+
+/// Generate impl methods for a struct based on purpose keywords.
+///
+/// Recognizes patterns like "increment/decrement/get" for counter-like types,
+/// "push/pop/peek" for stack-like types, etc.
+fn generate_purpose_methods(
+    struct_name: &str,
+    fields: &[(String, String)],
+    purpose: &str,
+) -> Vec<String> {
+    let mut methods = Vec::new();
+    let purpose_lower = purpose.to_lowercase();
+
+    // Counter pattern: increment/decrement/get on a numeric field
+    if purpose_lower.contains("increment") || purpose_lower.contains("counter") {
+        if let Some((field_name, field_type)) = fields.first() {
+            if field_type.contains("i32")
+                || field_type.contains("i64")
+                || field_type.contains("u32")
+                || field_type.contains("usize")
+            {
+                methods.push(format!(
+                    "    pub fn increment(&mut self) {{\n        self.{} += 1;\n    }}",
+                    field_name
+                ));
+                if purpose_lower.contains("decrement") {
+                    methods.push(format!(
+                        "    pub fn decrement(&mut self) {{\n        self.{} -= 1;\n    }}",
+                        field_name
+                    ));
+                }
+                if purpose_lower.contains("get") || purpose_lower.contains("value") {
+                    methods.push(format!(
+                        "    pub fn get(&self) -> {} {{\n        self.{}\n    }}",
+                        field_type, field_name
+                    ));
+                }
+                if purpose_lower.contains("reset") {
+                    methods.push(format!(
+                        "    pub fn reset(&mut self) {{\n        self.{} = 0;\n    }}",
+                        field_name
+                    ));
+                }
+            }
+        }
+    }
+
+    methods
+}
+
 /// Infer a reasonable function body from the purpose, params, and return type.
 fn infer_rust_body(
     purpose: &str,
@@ -257,6 +328,43 @@ fn infer_rust_body(
     {
         if params.len() == 1 && (params[0].1.contains("str") || params[0].1.contains("String")) {
             return format!("{}.chars().collect()", params[0].0);
+        }
+    }
+
+    // sum of squares (before generic "sum")
+    if purpose_lower.contains("sum") && purpose_lower.contains("square") {
+        if params.len() == 1 {
+            return format!("{}.iter().map(|x| x * x).sum()", params[0].0);
+        }
+    }
+    // parse string to integer/number → Result
+    if purpose_lower.contains("parse")
+        && (purpose_lower.contains("integer")
+            || purpose_lower.contains("number")
+            || purpose_lower.contains("int"))
+    {
+        if params.len() == 1 {
+            let ret = return_type.unwrap_or("");
+            if ret.contains("Result") {
+                return format!("{}.parse::<i32>().map_err(|e| e.to_string())", params[0].0);
+            } else {
+                return format!("{}.parse::<i32>().unwrap_or(0)", params[0].0);
+            }
+        }
+    }
+    // apply function twice: f(f(x))
+    if purpose_lower.contains("apply") && purpose_lower.contains("twice") {
+        if params.len() == 2 {
+            return format!("{}({}({}))", params[0].0, params[0].0, params[1].0);
+        }
+    }
+    // apply function N times
+    if purpose_lower.contains("apply") && purpose_lower.contains("times") {
+        if params.len() == 3 {
+            return format!(
+                "(0..{}).fold({}, |acc, _| {}(acc))",
+                params[2].0, params[1].0, params[0].0
+            );
         }
     }
 
@@ -1703,7 +1811,18 @@ impl CodeEmitter for RustEmitter {
                 parts.push(format!("/// {}", spec.purpose));
             }
 
-            let fields = extract_fields_from_text(&spec.purpose);
+            // Try to extract fields from the signature first (e.g., "struct Foo { x: i32, y: f64 }")
+            // then fall back to purpose-based extraction.
+            let fields = if let Some(ref sig) = spec.signature {
+                let sig_fields = extract_fields_from_struct_sig(sig);
+                if sig_fields.is_empty() {
+                    extract_fields_from_text(&spec.purpose)
+                } else {
+                    sig_fields
+                }
+            } else {
+                extract_fields_from_text(&spec.purpose)
+            };
             if fields.is_empty() && field_steps > 0 {
                 // Generate placeholder fields from field_steps count
                 parts.push(format!("#[derive(Debug, Clone)]"));
@@ -1731,9 +1850,31 @@ impl CodeEmitter for RustEmitter {
                 .constraints
                 .iter()
                 .any(|c| c.starts_with("MULTI_ENTITY"));
-            if has_impl || method_steps > 0 || is_multi_entity {
+            // Also generate impl block when purpose mentions method-like words
+            let has_method_keywords = {
+                let p = spec.purpose.to_lowercase();
+                p.contains("increment")
+                    || p.contains("decrement")
+                    || p.contains("push")
+                    || p.contains("pop")
+                    || p.contains("enqueue")
+                    || p.contains("dequeue")
+                    || p.contains("method")
+            };
+            if has_impl || method_steps > 0 || is_multi_entity || has_method_keywords {
                 parts.push(format!("impl {} {{", spec.name));
-                let fields = extract_fields_from_text(&spec.purpose);
+                // Use signature-extracted fields if available, otherwise purpose-based
+                let impl_fields = if let Some(ref sig) = spec.signature {
+                    let sf = extract_fields_from_struct_sig(sig);
+                    if sf.is_empty() {
+                        extract_fields_from_text(&spec.purpose)
+                    } else {
+                        sf
+                    }
+                } else {
+                    extract_fields_from_text(&spec.purpose)
+                };
+                let fields = impl_fields;
                 if !fields.is_empty() {
                     let params: Vec<String> = fields
                         .iter()
@@ -1754,6 +1895,13 @@ impl CodeEmitter for RustEmitter {
                     parts.push("    pub fn new() -> Self {".to_string());
                     parts.push("        Self {}".to_string());
                     parts.push("    }".to_string());
+                }
+
+                // Auto-generate methods from purpose keywords (counter, stack, etc.)
+                let purpose_methods = generate_purpose_methods(&spec.name, &fields, &spec.purpose);
+                for method in &purpose_methods {
+                    parts.push(String::new());
+                    parts.push(method.clone());
                 }
 
                 // Auto-generate methods from purpose when MULTI_ENTITY

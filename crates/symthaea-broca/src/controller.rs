@@ -144,7 +144,8 @@ pub struct LanguageControllerConfig {
     /// computing logits. In 16,384D, pairwise cosine similarity has σ ≈ 0.008 —
     /// softmax can barely discriminate tokens. In 256D, σ ≈ 0.063 — 8× more signal.
     /// None = use full HDC_DIMENSION (backward compatible). Some(256) = project to 256D.
-    #[serde(default)]
+    /// Skipped in serialization — restored from checkpoint projection weights.
+    #[serde(skip)]
     pub projection_dim: Option<usize>,
 }
 

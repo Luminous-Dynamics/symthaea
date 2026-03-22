@@ -4401,48 +4401,41 @@ impl CognitiveLoopService {
                 cube_h_value: self.carryover.quality.last_cube_h_value,
                 cube_quality: self.carryover.quality.last_cube_quality,
 
-                // Compute HDC encoding of the epistemic cube via NSM grounding.
-                // This semantically encodes the cube position so the thought HV
+                // Compute HDC encoding of the epistemic cube via cached NSM grounding.
+                // Semantically encodes the cube position so the thought HV
                 // carries *what kind of knowledge this is*, not just scalar metadata.
                 epistemic_cube_hv: {
-                    if let (Some(e), Some(n), Some(m)) = (
+                    if let (Some(e), Some(n), Some(m), Some(ref grounding)) = (
                         self.carryover.quality.last_cube_e_tier,
                         self.carryover.quality.last_cube_n_tier,
                         self.carryover.quality.last_cube_m_tier,
+                        &self.primitive_tier.epistemic_nsm_grounding,
                     ) {
                         use crate::consciousness::epistemic_tiers::{
-                            EmpiricalTier, EpistemicCoordinate, EpistemicNSMGrounding,
-                            MaterialityTier, NormativeTier,
-                        };
-                        let empirical = match e {
-                            0 => EmpiricalTier::E0Null,
-                            1 => EmpiricalTier::E1Testimonial,
-                            2 => EmpiricalTier::E2PrivatelyVerifiable,
-                            3 => EmpiricalTier::E3CryptographicallyProven,
-                            _ => EmpiricalTier::E4PubliclyReproducible,
-                        };
-                        let normative = match n {
-                            0 => NormativeTier::N0Personal,
-                            1 => NormativeTier::N1Communal,
-                            2 => NormativeTier::N2Network,
-                            _ => NormativeTier::N3Axiomatic,
-                        };
-                        let materiality = match m {
-                            0 => MaterialityTier::M0Ephemeral,
-                            1 => MaterialityTier::M1Temporal,
-                            2 => MaterialityTier::M2Persistent,
-                            _ => MaterialityTier::M3Foundational,
+                            EmpiricalTier, EpistemicCoordinate, MaterialityTier, NormativeTier,
                         };
                         let coord = EpistemicCoordinate {
-                            empirical,
-                            normative,
-                            materiality,
+                            empirical: match e {
+                                0 => EmpiricalTier::E0Null,
+                                1 => EmpiricalTier::E1Testimonial,
+                                2 => EmpiricalTier::E2PrivatelyVerifiable,
+                                3 => EmpiricalTier::E3CryptographicallyProven,
+                                _ => EmpiricalTier::E4PubliclyReproducible,
+                            },
+                            normative: match n {
+                                0 => NormativeTier::N0Personal,
+                                1 => NormativeTier::N1Communal,
+                                2 => NormativeTier::N2Network,
+                                _ => NormativeTier::N3Axiomatic,
+                            },
+                            materiality: match m {
+                                0 => MaterialityTier::M0Ephemeral,
+                                1 => MaterialityTier::M1Temporal,
+                                2 => MaterialityTier::M2Persistent,
+                                _ => MaterialityTier::M3Foundational,
+                            },
                         };
-                        let system =
-                            symthaea_core::hdc::primitive_system::PrimitiveSystem::global();
-                        let grounding = EpistemicNSMGrounding::new(&system);
-                        let binary_hv = grounding.encode_coordinate(&coord);
-                        Some(binary_hv.to_continuous())
+                        Some(grounding.encode_coordinate(&coord).to_continuous())
                     } else {
                         None
                     }

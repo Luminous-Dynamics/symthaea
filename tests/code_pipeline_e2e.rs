@@ -92,11 +92,16 @@ fn test_full_code_pipeline() {
     }
     assert!(!string_outcomes.is_empty(), "Should have string lessons");
 
-    // 4. Now run a full session across all Tier 1 objectives
-    eprintln!("\n--- Running full Tier 1 session ---");
+    // 4. Now run a full session across all Tier 1 + Tier 2 objectives
+    eprintln!("\n--- Running Tier 1 + Tier 2 session ---");
     // Reset budget for the session
     engine.reset_budget();
-    let summary = engine.run_session(TIER1_OBJECTIVES);
+    let all_objectives: Vec<&str> = TIER1_OBJECTIVES
+        .iter()
+        .chain(symthaea::school::code_learning::TIER2_OBJECTIVES.iter())
+        .copied()
+        .collect();
+    let summary = engine.run_session(&all_objectives);
 
     eprintln!("  Lessons attempted: {}", summary.lessons_attempted);
     eprintln!(
@@ -193,7 +198,7 @@ fn test_full_code_pipeline() {
     // 9. Core assertions
     assert!(
         summary.lessons_attempted >= 12,
-        "Should run all 12 Tier 1 lessons, got {}",
+        "Should run at least 12 lessons (Tier 1 + Tier 2), got {}",
         summary.lessons_attempted,
     );
 

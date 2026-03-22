@@ -1,0 +1,91 @@
+This is BibTeX, Version 0.99d (TeX Live 2025/nixos.org)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: kosmic_theory.aux
+The style file: apalike.bst
+I found no \bibdata command---while reading file kosmic_theory.aux
+Warning--I didn't find a database entry for "chalmers1995"
+Warning--I didn't find a database entry for "spinoza1677"
+Warning--I didn't find a database entry for "whitehead1929"
+Warning--I didn't find a database entry for "tegmark2008"
+Warning--I didn't find a database entry for "tegmark2014"
+Warning--I didn't find a database entry for "prigogine1977"
+Warning--I didn't find a database entry for "england2013"
+Warning--I didn't find a database entry for "kauffman1993"
+Warning--I didn't find a database entry for "maturana1980"
+Warning--I didn't find a database entry for "margulis1998"
+Warning--I didn't find a database entry for "tononi2004"
+Warning--I didn't find a database entry for "tononi2015"
+Warning--I didn't find a database entry for "friston2010"
+Warning--I didn't find a database entry for "friston2019"
+Warning--I didn't find a database entry for "west2017"
+Warning--I didn't find a database entry for "levin2019"
+Warning--I didn't find a database entry for "levin2021"
+Warning--I didn't find a database entry for "dipoppa2010"
+Warning--I didn't find a database entry for "shani2015"
+Warning--I didn't find a database entry for "nagasawa2017"
+Warning--I didn't find a database entry for "chalmers2016"
+Warning--I didn't find a database entry for "roelofs2019"
+Warning--I didn't find a database entry for "prigogine1984"
+Warning--I didn't find a database entry for "england2015"
+Warning--I didn't find a database entry for "kauffman1995"
+Warning--I didn't find a database entry for "margulis1970"
+Warning--I didn't find a database entry for "tononi2016"
+Warning--I didn't find a database entry for "parr2022"
+Warning--I didn't find a database entry for "friston2013"
+Warning--I didn't find a database entry for "kirchhoff2018"
+Warning--I didn't find a database entry for "levin2023"
+Warning--I didn't find a database entry for "oviedo2010"
+Warning--I didn't find a database entry for "emmons2015"
+Warning--I didn't find a database entry for "bettencourt2007"
+Warning--I didn't find a database entry for "auletta2013"
+Warning--I didn't find a database entry for "ellis2016"
+Warning--I didn't find a database entry for "putnam1967"
+Warning--I didn't find a database entry for "kanerva2009"
+Warning--I didn't find a database entry for "kleyko2022"
+Warning--I didn't find a database entry for "hasani2021"
+Warning--I didn't find a database entry for "hasani2022"
+Warning--I didn't find a database entry for "oizumi2014"
+Warning--I didn't find a database entry for "aaronson2014"
+Warning--I didn't find a database entry for "schwitzgebel2015"
+You've used 0 entries,
+            1935 wiz_defined-function locations,
+            514 strings with 4162 characters,
+and the built_in function-call counts, 17 in all, are:
+= -- 0
+> -- 0
+< -- 0
++ -- 0
+- -- 0
+* -- 0
+:= -- 7
+add.period$ -- 0
+call.type$ -- 0
+change.case$ -- 0
+chr.to.int$ -- 0
+cite$ -- 0
+duplicate$ -- 0
+empty$ -- 1
+format.name$ -- 0
+if$ -- 1
+int.to.chr$ -- 1
+int.to.str$ -- 0
+missing$ -- 0
+newline$ -- 3
+num.names$ -- 0
+pop$ -- 0
+preamble$ -- 1
+purify$ -- 0
+quote$ -- 0
+skip$ -- 1
+stack$ -- 0
+substring$ -- 0
+swap$ -- 0
+text.length$ -- 0
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 0
+warning$ -- 0
+while$ -- 0
+width$ -- 0
+write$ -- 2
+(There was 1 error message)

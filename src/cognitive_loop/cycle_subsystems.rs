@@ -401,11 +401,22 @@ impl CognitiveLoopService {
                 0 // E0: opinion
             };
 
-            // N-tier: personal unless social context indicates broader consensus
-            let n = if self.social_mgr.partner_model.is_some() {
-                1u8 // N1: communal (interacting with another agent)
-            } else {
-                0 // N0: personal
+            // N-tier: from social context breadth
+            // N0=personal, N1=communal (partner), N2=network (swarm), N3=axiomatic
+            let n = {
+                let peers = self.swarm_manager.connected_peers();
+                let has_partner = self.social_mgr.partner_model.is_some();
+                let kg = self.carryover.quality.wm_knowledge_grounding;
+                let sources = self.carryover.quality.wm_knowledge_injection_count;
+                if kg > 0.8 && sources >= 3 {
+                    3u8 // N3: axiomatic — multiple corroborating knowledge sources
+                } else if peers > 3 {
+                    2 // N2: network consensus (multiple swarm peers)
+                } else if has_partner || peers > 0 {
+                    1 // N1: communal (partner or some peers)
+                } else {
+                    0 // N0: personal
+                }
             };
 
             // M-tier: knowledge grounding indicates persistence

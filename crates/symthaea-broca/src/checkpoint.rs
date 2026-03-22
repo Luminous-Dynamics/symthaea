@@ -363,11 +363,17 @@ impl BrocaGenerator {
         *gen.controller_mut().network_mut() = checkpoint.network_state;
 
         // Restore logit projection head weights if present.
-        // The config (from checkpoint) has projection_dim set, so the controller
-        // was already initialized with random projection weights — overwrite them.
+        // projection_dim is #[serde(skip)], so we infer it from weight dimensions.
         if let Some(proj_weights) = checkpoint.logit_projection_weights {
-            if let Some(w) = gen.controller_mut().projection_weights_mut() {
-                *w = proj_weights;
+            let total = proj_weights.len();
+            let dim = symthaea_core::hdc::HDC_DIMENSION;
+            let proj_dim = total / dim;
+            if proj_dim > 0 && proj_dim * dim == total {
+                // Enable projection on the controller, then overwrite with trained weights
+                gen.controller_mut().enable_projection(genesis, proj_dim);
+                if let Some(w) = gen.controller_mut().projection_weights_mut() {
+                    *w = proj_weights;
+                }
                 gen.controller_mut().refresh_projected_embeddings();
             }
         }

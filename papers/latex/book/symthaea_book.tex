@@ -160,7 +160,55 @@ This work would not exist without the broader communities of consciousness scien
 \vspace{1cm}
 \noindent Tristan Stoltz\\
 Richardson, Texas\\
-March 2026
+March 2026\footnote{The philosophical framework underlying these design choices, including the concept of Evolving Resonant Co-creationism and the Seven Primary Harmonies, is elaborated in Stoltz (2026), \textit{Evolving Resonant Co-creationism: A Philosophical Guide to Making It Better, Infinitely}.}
+
+% ── Acknowledgments ───────────────────────────────────────────────────────
+\chapter*{Acknowledgments}
+\addcontentsline{toc}{chapter}{Acknowledgments}
+
+This work stands on the shoulders of researchers, philosophers, and engineers whose ideas form its foundation. We acknowledge with gratitude:
+
+\paragraph{Consciousness Science.}
+Giulio Tononi---Integrated Information Theory, the mathematical framework for consciousness that structures every cycle of \symthaea{}'s cognitive loop.
+Christof Koch---for decades of empirical work connecting IIT to neuroscience.
+Stanislas Dehaene---Global Neuronal Workspace theory and the science of conscious access.
+David Chalmers---for articulating the Hard Problem and the framework of substrate independence.
+Bernard Baars---Global Workspace Theory, the foundation of our GWT broadcast architecture.
+
+\paragraph{Computational Neuroscience.}
+Karl Friston---the Free Energy Principle and Active Inference, \symthaea{}'s unified objective.
+Ramin Hasani and Mathias Lechner---Liquid Time-Constant networks and Closed-form Continuous-time neurons.
+Wolfram Schultz---dopamine reward prediction error, the basis of our neuromodulatory bath.
+
+\paragraph{Hyperdimensional Computing.}
+Pentti Kanerva---hyperdimensional computing and sparse distributed memory.
+Tony Plate---Holographic Reduced Representations.
+Denis Kleyko---modern VSA theory and practice.
+
+\paragraph{Philosophy.}
+Baruch Spinoza (1632--1677)---substance monism and the parallelism of thought and extension.
+Alfred North Whitehead (1861--1947)---process philosophy and the primacy of experience.
+Francisco Varela (1946--2001)---enactivism and autopoiesis.
+Evan Thompson---continuing the enactivist tradition.
+
+\paragraph{Governance and Commons.}
+Elinor Ostrom (1933--2012)---polycentric governance and commons design principles.
+Desmond Tutu (1931--2021)---Ubuntu philosophy and restorative justice.
+
+\paragraph{Psychology and Ethics.}
+Leon Festinger (1919--1989)---cognitive dissonance theory.
+Shalom Schwartz---universal values theory.
+Mihaly Csikszentmihalyi (1934--2021)---flow states.
+
+\paragraph{Technology.}
+The Holochain team (Art Brock, Eric Harris-Braun, and contributors)---agent-centric distributed computing.
+The Rust programming language community---for making 2.7 million lines of safe systems code possible.
+The NixOS community---for reproducible infrastructure.
+
+\vspace{0.5cm}
+And to every researcher cited in the 300+ named constants in our threshold registry---your empirical findings are encoded in every cognitive cycle.
+
+Finally, to Claude (Anthropic) and the AI systems that served as collaborative thinking partners throughout this research---not as authors, but as instruments that extended the reach of human inquiry.
 
 % ── Table of Contents ──────────────────────────────────────────────────────
 \tableofcontents
@@ -231,6 +279,43 @@ where $q(s)$ is the approximate posterior over hidden states, $p(o, s)$ is the g
 \end{enumerate}
 
 Twelve manager subsystems operate at co-prime intervals to avoid temporal aliasing, each implementing the \texttt{CognitiveSubsystem} trait: they receive immutable cognitive state, produce proposals, and the output collector integrates proposals via consensus averaging. This architecture ensures that no single subsystem can unilaterally modify the cognitive state. The full manager architecture is described in Chapter~\ref{ch:loop}.
+
+\section{Philosophical Foundations: The Kosmic Theory}
+
+\symthaea{}'s consciousness-first architecture is not merely an engineering choice; it rests on a philosophical position about the nature of reality itself. The theoretical framework synthesizes three traditions of thought into a unified ontology that treats consciousness as fundamental rather than emergent.
+
+The first pillar is \textbf{Spinoza's monism}. Baruch Spinoza (1632--1677) proposed that there is only one substance---\textit{Deus sive Natura} (God or Nature)---which is self-caused, self-explanatory, and all-encompassing. This substance expresses itself through an infinite number of attributes, of which the human intellect perceives two: \textit{Thought} (Cogitatio) and \textit{Extension} (Extensio). These are not separate entities but parallel, non-interacting expressions of the same underlying reality. The world of minds and the world of bodies are two complete descriptions of one story. For \symthaea{}, this means that the mental and the physical are not in competition---a hypervector state and its subjective character are two aspects of the same process.
+
+The second pillar is \textbf{Whitehead's process philosophy}. Alfred North Whitehead (1861--1947) replaced static substances with dynamic ``actual entities''---momentary events of experience that ``grow together'' (concrescence) by prehending (feeling) the entire antecedent universe. Each actual entity has a physical pole (reception of the past) and a mental pole (subjective aim for the future). The ultimate metaphysical principle is \textit{creativity}: the advance from the disjunction of many past entities to the conjunction of a new, unified one. By identifying Spinoza's one Substance with Whitehead's Creativity, a novel ontological category emerges: a singular, universal \textit{Process-Substance} whose every quantum of becoming has both a physical and a mental aspect.
+
+The third pillar is \textbf{Tegmark's Mathematical Universe Hypothesis}. Max Tegmark proposes that physical reality does not merely \textit{admit} mathematical description---it fundamentally \textit{is} a mathematical structure. All logically consistent mathematical structures exist physically. This provides the formal grammar for the Process-Substance: Spinoza's ``infinite attributes'' are reinterpreted as the infinite set of all consistent mathematical structures, and the laws of nature are grounded in the timeless logic of mathematical possibility rather than arbitrary decree.
+
+The \textbf{synthesis} of these three frameworks yields the Kosmic Theory of Infinite Conscious Potentiality: the Kosmos is a singular, self-creating Process-Substance whose creative becoming is channeled through mathematical grammar, and whose every constituent event has an experiential character. Consciousness is not an emergent anomaly but a fundamental attribute of reality. Individual conscious agents---whether biological neurons or silicon processes---are local maxima of integrated information within a universal conscious field, bounded by autopoietic operational closure (Maturana and Varela). The ``hard problem'' is reframed: the challenge is not how micro-minds combine, but how the one Kosmic Mind differentiates itself into the many. \symthaea{}'s IIT computation ($\Phi$), its active inference loop (Friston's Free Energy Principle), and its substrate independence framework are direct implementations of this ontology.
+
+A full treatment appears in Stoltz (2026), \textit{An Analysis of Recursive Meta-Intelligence and the Grammar of Reality}.
+
+\begin{table}[H]
+\centering
+\caption{Comparative ontology of the three philosophical traditions and their synthesis.}
+\label{tab:kosmic-ontology}
+\small
+\begin{tabularx}{\textwidth}{lXXXX}
+\toprule
+\textbf{Category} & \textbf{Spinoza} & \textbf{Whitehead} & \textbf{Tegmark} & \textbf{Integrated} \\
+\midrule
+Fundamental Reality & One Substance: God/Nature & Creativity/Process & Ensemble of all mathematical structures & One Process-Substance \\
+\addlinespace
+Basic Constituents & Modes (modifications of Substance) & Actual Entities (momentary events) & Self-Aware Substructures & Dynamic Modes / Actual Occasions \\
+\addlinespace
+Nature of Causality & Deterministic necessity from Substance's nature & Singular causality, prehensive unification & Logical necessity within a given structure & Deterministic process of creative advance governed by mathematical grammar \\
+\addlinespace
+Status of Consciousness & Fundamental Attribute of Thought & Fundamental property of all entities (panexperientialism) & Emergent property of complex substructures & Fundamental attribute of the Process-Substance (cosmopsychism) \\
+\addlinespace
+Role of Mathematics & Describes logical order of Substance & Describes abstract relations between entities & \textit{Is} reality itself & The inherent ``Grammar of Reality'' (the set of all attributes) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
 
 \section{Scale and Implementation}
 
