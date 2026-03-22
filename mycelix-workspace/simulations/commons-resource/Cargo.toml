@@ -1,0 +1,14 @@
+[workspace]
+
+[package]
+name = "mycelix-commons-resource-sim"
+version = "0.1.0"
+edition = "2021"
+description = "Commons resource sustainability simulation with Ostrom's framework and consciousness gating"
+
+[[bin]]
+name = "commons-resource-sim"
+path = "src/main.rs"
+
+[dependencies]
+rand = "0.8"

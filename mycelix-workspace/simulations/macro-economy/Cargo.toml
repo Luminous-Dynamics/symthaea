@@ -1,0 +1,15 @@
+[workspace]
+
+[package]
+name = "mycelix-macro-economy-sim"
+version = "0.1.0"
+edition = "2021"
+description = "Multi-currency macro-economic simulation for Mycelix (SAP/TEND/MYCEL)"
+
+[[bin]]
+name = "macro-economy-sim"
+path = "src/main.rs"
+
+[dependencies]
+rand = "0.8"
+rayon = "1.10"

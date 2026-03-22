@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulation Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; }
+        header { background: #2C3E50; color: white; padding: 1rem 2rem; }
+        header h1 { font-size: 1.4rem; font-weight: 600; }
+        header p { font-size: 0.85rem; opacity: 0.8; margin-top: 0.25rem; }
+        .tabs { display: flex; gap: 0; background: #34495E; }
+        .tab { padding: 0.75rem 1.5rem; color: #bdc3c7; cursor: pointer; border: none; background: none; font-size: 0.9rem; }
+        .tab:hover { color: white; background: rgba(255,255,255,0.1); }
+        .tab.active { color: white; background: #2C3E50; border-bottom: 2px solid #3498DB; }
+        .panel { display: none; padding: 1.5rem; }
+        .panel.active { display: block; }
+        .chart-row { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+        .chart-card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); padding: 1rem; flex: 1; min-width: 500px; }
+        .chart-card h3 { font-size: 0.95rem; margin-bottom: 0.5rem; color: #2C3E50; }
+        .controls { background: white; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+        .controls label { font-size: 0.85rem; margin-right: 1rem; }
+        .controls input, .controls select { margin-right: 1.5rem; padding: 0.3rem; }
+        .status { padding: 0.5rem 2rem; background: #ecf0f1; font-size: 0.8rem; color: #7f8c8d; }
+        #file-input { margin: 1rem 2rem; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Mycelix / Symthaea Simulation Dashboard</h1>
+    <p>Interactive exploration of parameter sweep results</p>
+</header>
+
+<div id="file-input">
+    <label>Load sweep-results directory: <input type="file" id="csv-loader" webkitdirectory multiple></label>
+    <span id="load-status" style="margin-left:1rem; font-size:0.85rem; color:#7f8c8d;"></span>
+</div>
+
+<div class="tabs">
+    <button class="tab active" onclick="showPanel('commons')">Commons Resource</button>
+    <button class="tab" onclick="showPanel('macro')">Macro Economy</button>
+    <button class="tab" onclick="showPanel('statespace')">State-Space</button>
+</div>
+
+<!-- COMMONS PANEL -->
+<div id="panel-commons" class="panel active">
+    <div class="controls">
+        <label>Seed: <select id="commons-seed" onchange="updateCommons()">
+            <option value="42">42</option>
+        </select></label>
+        <label>Defector %: <input type="range" id="commons-defpct" min="0.1" max="0.8" step="0.1" value="0.3"
+            oninput="document.getElementById('defpct-val').textContent=this.value; updateCommons()">
+            <span id="defpct-val">0.3</span></label>
+    </div>
+    <div class="chart-row">
+        <div class="chart-card"><h3>Resource Stock Over Time</h3><div id="commons-stock"></div></div>
+        <div class="chart-card"><h3>Cooperation Index</h3><div id="commons-coop"></div></div>
+    </div>
+    <div class="chart-row">
+        <div class="chart-card"><h3>Voting Mode Comparison: Sustainability vs Defector Rate</h3><div id="commons-voting"></div></div>
+        <div class="chart-card"><h3>Consciousness Degradation Impact</h3><div id="commons-degrade"></div></div>
+    </div>
+</div>
+
+<!-- MACRO PANEL -->
+<div id="panel-macro" class="panel">
+    <div class="controls">
+        <label>Seed: <select id="macro-seed" onchange="updateMacro()">
+            <option value="42">42</option>
+        </select></label>
+    </div>
+    <div class="chart-row">
+        <div class="chart-card"><h3>SAP Gini Over Time</h3><div id="macro-gini"></div></div>
+        <div class="chart-card"><h3>TEND Utilization</h3><div id="macro-tend"></div></div>
+    </div>
+    <div class="chart-row">
+        <div class="chart-card"><h3>Tier Distribution</h3><div id="macro-tiers"></div></div>
+        <div class="chart-card"><h3>Demurrage Rate Impact on Velocity</h3><div id="macro-demurrage"></div></div>
+    </div>
+    <div class="chart-row">
+        <div class="chart-card"><h3>Jubilee Impact on MYCEL Inequality</h3><div id="macro-jubilee"></div></div>
+        <div class="chart-card"><h3>Inactivity Impact on Gini</h3><div id="macro-inactive"></div></div>
+    </div>
+</div>
+
+<!-- STATE-SPACE PANEL -->
+<div id="panel-statespace" class="panel">
+    <div class="controls">
+        <label>Axis A: <select id="ss-axis-a" onchange="updateStateSpace()">
+            <option value="integration">Integration</option>
+            <option value="binding" selected>Binding</option>
+            <option value="workspace">Workspace</option>
+            <option value="attention">Attention</option>
+            <option value="recursion">Recursion</option>
+            <option value="efficacy">Efficacy</option>
+            <option value="knowledge">Knowledge</option>
+        </select></label>
+        <label>Axis B: <select id="ss-axis-b" onchange="updateStateSpace()">
+            <option value="integration" selected>Integration</option>
+            <option value="binding">Binding</option>
+            <option value="workspace">Workspace</option>
+            <option value="attention">Attention</option>
+            <option value="recursion">Recursion</option>
+            <option value="efficacy">Efficacy</option>
+            <option value="knowledge">Knowledge</option>
+        </select></label>
+    </div>
+    <div class="chart-row">
+        <div class="chart-card"><h3>Consciousness Heatmap</h3><div id="ss-heatmap"></div></div>
+        <div class="chart-card"><h3>Phase Transitions</h3><div id="ss-transition"></div></div>
+    </div>
+</div>
+
+<div class="status" id="status">Load a sweep-results directory to begin.</div>
+
+<script>
+// ============================================================================
+// DATA STORE
+// ============================================================================
+
+const DATA = {};  // filename -> parsed CSV rows
+
+function parseCSV(text) {
+    const lines = text.trim().split('\n');
+    if (lines.length < 2) return [];
+    const header = lines[0].split(',');
+    return lines.slice(1).map(line => {
+        const vals = line.split(',');
+        const row = {};
+        header.forEach((h, i) => row[h.trim()] = vals[i]?.trim() || '');
+        return row;
+    });
+}
+
+function col(rows, name) {
+    return rows.map(r => parseFloat(r[name]) || 0);
+}
+
+// ============================================================================
+// FILE LOADING
+// ============================================================================
+
+document.getElementById('csv-loader').addEventListener('change', async (e) => {
+    const files = Array.from(e.target.files).filter(f => f.name.endsWith('.csv'));
+    const status = document.getElementById('load-status');
+    status.textContent = `Loading ${files.length} CSV files...`;
+
+    for (const file of files) {
+        const key = file.webkitRelativePath || file.name;
+        const text = await file.text();
+        DATA[key] = parseCSV(text);
+    }
+
+    status.textContent = `Loaded ${files.length} files.`;
+    document.getElementById('status').textContent = `${files.length} CSV files loaded. Select tabs to explore.`;
+
+    // Populate seed dropdowns
+    populateSeeds();
+    updateCommons();
+    updateMacro();
+    updateStateSpace();
+});
+
+function populateSeeds() {
+    const seeds = new Set();
+    for (const key of Object.keys(DATA)) {
+        const m = key.match(/seed[_]?(\d+)/);
+        if (m) seeds.add(m[1]);
+    }
+    const sorted = [...seeds].sort((a, b) => +a - +b);
+    for (const id of ['commons-seed', 'macro-seed']) {
+        const sel = document.getElementById(id);
+        sel.innerHTML = sorted.map(s => `<option value="${s}">${s}</option>`).join('');
+    }
+}
+
+function findFile(pattern) {
+    for (const key of Object.keys(DATA)) {
+        if (key.includes(pattern)) return DATA[key];
+    }
+    return null;
+}
+
+function findFiles(pattern) {
+    const results = {};
+    for (const key of Object.keys(DATA)) {
+        if (key.includes(pattern)) results[key] = DATA[key];
+    }
+    return results;
+}
+
+// ============================================================================
+// PANELS
+// ============================================================================
+
+function showPanel(name) {
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('panel-' + name).classList.add('active');
+    event.target.classList.add('active');
+}
+
+const LAYOUT = { margin: { t: 30, b: 50, l: 60, r: 30 }, height: 350, font: { size: 11 } };
+const COLORS = { consciousness: '#3498DB', flat: '#27AE60', plutocratic: '#E74C3C', random: '#95a5a6', nogovern: '#2C3E50' };
+
+// ============================================================================
+// COMMONS
+// ============================================================================
+
+function updateCommons() {
+    const seed = document.getElementById('commons-seed').value;
+    const defpct = document.getElementById('commons-defpct').value;
+
+    // Stock over time
+    const rows = findFile(`consciousness_def${defpct}_seed${seed}.csv`);
+    if (rows) {
+        Plotly.newPlot('commons-stock', [
+            { x: col(rows, 'day'), y: col(rows, 'avg_stock'), name: 'Avg Stock', line: { color: COLORS.consciousness } },
+            { x: col(rows, 'day'), y: col(rows, 'min_stock'), name: 'Min Stock', line: { color: COLORS.plutocratic, dash: 'dot' } },
+        ], { ...LAYOUT, yaxis: { title: 'Stock Fraction', range: [0, 1] }, xaxis: { title: 'Day' } });
+
+        Plotly.newPlot('commons-coop', [
+            { x: col(rows, 'day'), y: col(rows, 'cooperation_index'), line: { color: COLORS.flat } },
+        ], { ...LAYOUT, yaxis: { title: 'Cooperation Index', range: [0, 1] }, xaxis: { title: 'Day' } });
+    }
+
+    // Voting comparison
+    const modes = ['consciousness', 'flat', 'plutocratic', 'random', 'nogovern'];
+    const defpcts = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8];
+    const traces = [];
+
+    for (const mode of modes) {
+        const means = [], stds = [], valid = [];
+        for (const dp of defpcts) {
+            const finals = [];
+            for (const key of Object.keys(DATA)) {
+                if (key.includes(`${mode}_def${dp}_seed`)) {
+                    const r = DATA[key];
+                    if (r.length) finals.push(parseFloat(r[r.length - 1].sustainability_index) || 0);
+                }
+            }
+            if (finals.length) {
+                valid.push(dp);
+                means.push(finals.reduce((a, b) => a + b, 0) / finals.length);
+                const mean = means[means.length - 1];
+                stds.push(Math.sqrt(finals.reduce((a, b) => a + (b - mean) ** 2, 0) / finals.length));
+            }
+        }
+        if (valid.length) {
+            traces.push({
+                x: valid, y: means,
+                error_y: { type: 'data', array: stds, visible: true },
+                name: mode.charAt(0).toUpperCase() + mode.slice(1),
+                line: { color: COLORS[mode] || '#333', dash: mode === 'nogovern' ? 'dash' : 'solid' },
+                mode: 'lines+markers',
+            });
+        }
+    }
+    if (traces.length) {
+        Plotly.newPlot('commons-voting', traces, {
+            ...LAYOUT, xaxis: { title: 'Defector Fraction' }, yaxis: { title: 'Sustainability Index', range: [0, 1] }
+        });
+    }
+
+    // Degradation
+    const degRates = [0.0, 0.001, 0.002, 0.005, 0.01];
+    const degMeans = [], degStds = [], degValid = [];
+    for (const rate of degRates) {
+        const finals = [];
+        for (const key of Object.keys(DATA)) {
+            if (key.includes(`degrade_${rate}_seed`)) {
+                const r = DATA[key];
+                if (r.length) finals.push(parseFloat(r[r.length - 1].sustainability_index) || 0);
+            }
+        }
+        if (finals.length) {
+            degValid.push(rate);
+            const mean = finals.reduce((a, b) => a + b, 0) / finals.length;
+            degMeans.push(mean);
+            degStds.push(Math.sqrt(finals.reduce((a, b) => a + (b - mean) ** 2, 0) / finals.length));
+        }
+    }
+    if (degValid.length > 1) {
+        Plotly.newPlot('commons-degrade', [{
+            x: degValid, y: degMeans,
+            error_y: { type: 'data', array: degStds, visible: true },
+            line: { color: '#E94F37' }, mode: 'lines+markers',
+        }], { ...LAYOUT, xaxis: { title: 'Degradation Rate (per day)' }, yaxis: { title: 'Sustainability', range: [0, 1] } });
+    }
+}
+
+// ============================================================================
+// MACRO
+// ============================================================================
+
+function updateMacro() {
+    const seed = document.getElementById('macro-seed').value;
+    const rows = findFile(`inactive_1.0_seed_${seed}.csv`) || findFile(`inactive_1.0_seed_42.csv`);
+    if (!rows) return;
+
+    Plotly.newPlot('macro-gini', [
+        { x: col(rows, 'day'), y: col(rows, 'sap_gini'), line: { color: COLORS.consciousness } },
+    ], { ...LAYOUT, yaxis: { title: 'Gini', range: [0, 1] }, xaxis: { title: 'Day' } });
+
+    Plotly.newPlot('macro-tend', [
+        { x: col(rows, 'day'), y: col(rows, 'tend_utilization'), line: { color: '#E94F37' } },
+    ], { ...LAYOUT, yaxis: { title: 'Utilization' }, xaxis: { title: 'Day' } });
+
+    // Tier stacked area
+    const tiers = ['tier_observer', 'tier_participant', 'tier_citizen', 'tier_steward', 'tier_guardian'];
+    const tierNames = ['Observer', 'Participant', 'Citizen', 'Steward', 'Guardian'];
+    const tierColors = ['#95a5a6', '#3498DB', '#27AE60', '#E94F37', '#8E44AD'];
+    const tierTraces = tiers.map((t, i) => ({
+        x: col(rows, 'day'), y: col(rows, t), name: tierNames[i],
+        stackgroup: 'tiers', fillcolor: tierColors[i], line: { width: 0 },
+    }));
+    Plotly.newPlot('macro-tiers', tierTraces, { ...LAYOUT, yaxis: { title: 'Count' }, xaxis: { title: 'Day' } });
+
+    // Sweep aggregation helper
+    function sweepPlot(divId, prefix, paramValues, paramLabel, metric, metricLabel) {
+        const means = [], stds = [], valid = [];
+        for (const pv of paramValues) {
+            const finals = [];
+            for (const key of Object.keys(DATA)) {
+                if (key.includes(`${prefix}${pv}`) && key.includes('seed')) {
+                    const r = DATA[key];
+                    if (r.length) finals.push(parseFloat(r[r.length - 1][metric]) || 0);
+                }
+            }
+            if (finals.length) {
+                valid.push(pv);
+                const mean = finals.reduce((a, b) => a + b, 0) / finals.length;
+                means.push(mean);
+                stds.push(Math.sqrt(finals.reduce((a, b) => a + (b - mean) ** 2, 0) / finals.length));
+            }
+        }
+        if (valid.length) {
+            Plotly.newPlot(divId, [{
+                x: valid, y: means,
+                error_y: { type: 'data', array: stds, visible: true },
+                type: 'bar', marker: { color: COLORS.consciousness },
+            }], { ...LAYOUT, xaxis: { title: paramLabel }, yaxis: { title: metricLabel } });
+        }
+    }
+
+    sweepPlot('macro-inactive', 'inactive_', [0.0, 0.5, 1.0, 1.5, 2.0, 3.0], 'Inactivity Multiplier', 'sap_gini', 'Final Gini');
+    sweepPlot('macro-demurrage', 'demurrage_', [0.01, 0.02, 0.03, 0.04, 0.05], 'Demurrage Rate', 'sap_velocity', 'Final Velocity');
+    sweepPlot('macro-jubilee', 'jubilee_', ['0y', '2y', '4y', '8y'], 'Jubilee Cycle', 'mycel_gini', 'Final MYCEL Gini');
+}
+
+// ============================================================================
+// STATE-SPACE
+// ============================================================================
+
+function updateStateSpace() {
+    const axA = document.getElementById('ss-axis-a').value;
+    const axB = document.getElementById('ss-axis-b').value;
+    const pair = [axA, axB].sort();
+
+    const rows = findFile(`heatmap_${pair[0]}_${pair[1]}.csv`);
+    if (rows) {
+        const cols = Object.keys(rows[0]);
+        const xKey = cols[0], yKey = cols[1];
+        const xVals = [...new Set(rows.map(r => parseFloat(r[xKey])))].sort((a, b) => a - b);
+        const yVals = [...new Set(rows.map(r => parseFloat(r[yKey])))].sort((a, b) => a - b);
+        const z = Array(yVals.length).fill(null).map(() => Array(xVals.length).fill(0));
+
+        for (const r of rows) {
+            const xi = xVals.indexOf(parseFloat(r[xKey]));
+            const yi = yVals.indexOf(parseFloat(r[yKey]));
+            if (xi >= 0 && yi >= 0) z[yi][xi] = parseFloat(r.consciousness) || 0;
+        }
+
+        Plotly.newPlot('ss-heatmap', [{
+            z, x: xVals, y: yVals, type: 'heatmap', colorscale: 'Viridis',
+            colorbar: { title: 'C(t)' },
+        }], { ...LAYOUT, height: 450, xaxis: { title: xKey }, yaxis: { title: yKey } });
+    }
+
+    // Transition
+    const trans = findFile('transition.csv');
+    if (trans) {
+        const components = [...new Set(trans.map(r => r.component))];
+        const compColors = ['#3498DB', '#E74C3C', '#27AE60', '#E94F37', '#8E44AD', '#95a5a6', '#2C3E50'];
+        const traces = components.map((c, i) => {
+            const cRows = trans.filter(r => r.component === c);
+            return {
+                x: col(cRows, 'value'), y: col(cRows, 'consciousness'),
+                name: c, line: { color: compColors[i % compColors.length] },
+            };
+        });
+        Plotly.newPlot('ss-transition', traces, {
+            ...LAYOUT, height: 450, xaxis: { title: 'Component Value' }, yaxis: { title: 'C(t)' }
+        });
+    }
+}
+</script>
+</body>
+</html>

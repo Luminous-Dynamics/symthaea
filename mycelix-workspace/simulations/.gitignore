@@ -1,0 +1,10 @@
+# Generated data (regenerable via sweep.sh)
+sweep-results/
+figures/
+
+# Rust build artifacts
+target/
+
+# Nix
+flake.lock
+result
