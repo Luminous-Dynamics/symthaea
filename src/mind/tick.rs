@@ -708,9 +708,9 @@ impl ContinuousMind {
                 continue;
             }
             if self.mesh_seen_packets.len() >= super::mesh::MESH_DEDUP_RING_SIZE {
-                self.mesh_seen_packets.remove(0);
+                self.mesh_seen_packets.pop_front();
             }
-            self.mesh_seen_packets.push(key);
+            self.mesh_seen_packets.push_back(key);
 
             // Timestamp validation: reject packets older than MESH_MAX_PACKET_AGE_S
             let now_s = std::time::SystemTime::now()

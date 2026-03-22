@@ -2823,6 +2823,10 @@ impl CognitiveLoopService {
                 fep_complexity,
                 fep_surprise,
                 fep_td_error,
+                trajectory_efe: self.fep.trajectory_telemetry.best_efe,
+                trajectory_best_action: self.fep.trajectory_telemetry.best_action,
+                trajectory_surprise: self.fep.trajectory_telemetry.best_trajectory_surprise,
+                trajectory_ode_steps: self.fep.trajectory_telemetry.total_ode_steps,
             },
             reasoning: DynReasoning {
                 reasoning_confidence,
@@ -3362,6 +3366,21 @@ impl CognitiveLoopService {
             1.0 - surprise_norm * FEP_SURPRISE_TAU_SCALE // high surprise → 0.8 (faster), low → 1.0
         } else {
             1.0
+        };
+
+        // ODE trajectory planning: simulate forward trajectories via Dormand-Prince
+        // to compute expected free energy over future horizons.
+        // Friston (2010): genuine active inference requires planning through simulation.
+        // The trajectory surprise augments the FEP tau factor for more informed dynamics.
+        let fep_tau_factor = if let Some(_best_action) =
+            self.fep.plan_trajectories(self.stats.total_cycles as u64)
+        {
+            let traj_surprise = self.fep.trajectory_telemetry.best_trajectory_surprise as f32;
+            let traj_surprise_norm = traj_surprise.clamp(0.0, 2.0) / 2.0;
+            // Blend trajectory surprise into tau: augments single-step FEP surprise
+            fep_tau_factor * (1.0 - traj_surprise_norm * 0.1) // ±10% modulation
+        } else {
+            fep_tau_factor
         };
 
         // Session 10 Item 3: Coherence velocity tau factor.

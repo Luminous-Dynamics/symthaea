@@ -523,6 +523,10 @@ impl CognitiveLoopService {
         let broca_nsm_semantic = config.enable_broca_nsm_semantic;
         #[cfg(feature = "ssm_language")]
         let broca_nsm_gate = config.enable_broca_nsm_gate;
+        // Extract trajectory planning config before moving `config` into the struct
+        let trajectory_planning_enabled = config.enable_trajectory_planning;
+        let trajectory_horizon_seconds = config.trajectory_horizon_seconds;
+        let trajectory_planning_interval = config.trajectory_planning_interval;
         let mut service = Self {
             config,
             encoder,
@@ -601,7 +605,12 @@ impl CognitiveLoopService {
                 learning_signal: 0.0,
                 lr_boost: 1.0,
                 surprise_bridge,
-                trajectory_config: super::fep_module::TrajectoryPlanningConfig::default(),
+                trajectory_config: super::fep_module::TrajectoryPlanningConfig {
+                    enabled: trajectory_planning_enabled,
+                    horizon_seconds: trajectory_horizon_seconds,
+                    planning_interval: trajectory_planning_interval,
+                    ..Default::default()
+                },
                 trajectory_telemetry: super::fep_module::TrajectoryTelemetry::default(),
                 trajectory_history: VecDeque::new(),
             },

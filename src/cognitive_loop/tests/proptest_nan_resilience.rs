@@ -224,4 +224,30 @@ proptest! {
         let micros = (100.0 * inv_tau).clamp(1.0, 10_000_000.0) as u64;
         prop_assert!(micros >= 1 && micros <= 10_000_000);
     }
+
+    /// Guards Round 48 VecDeque ring buffer invariant: cap is maintained
+    /// after arbitrary push/pop sequences.
+    #[test]
+    fn prop_ring_buffer_cap_maintained(
+        cap in 1usize..200,
+        ops in proptest::collection::vec(0u8..3, 0..500),
+    ) {
+        let mut buf = std::collections::VecDeque::<u32>::with_capacity(cap);
+        let mut counter = 0u32;
+        for op in ops {
+            match op {
+                0 => {
+                    // push_back + cap enforcement
+                    buf.push_back(counter);
+                    counter = counter.wrapping_add(1);
+                    if buf.len() > cap {
+                        buf.pop_front();
+                    }
+                }
+                1 => { buf.pop_front(); }
+                _ => { /* no-op */ }
+            }
+            prop_assert!(buf.len() <= cap, "buffer exceeded cap: {} > {}", buf.len(), cap);
+        }
+    }
 }

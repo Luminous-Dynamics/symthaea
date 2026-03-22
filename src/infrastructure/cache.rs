@@ -3,7 +3,7 @@
 //! Provides efficient caching of semantic vectors to avoid recomputation.
 //! Uses an LRU (Least Recently Used) eviction policy.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::hash::Hash;
 use std::time::{Duration, Instant};
 
@@ -13,7 +13,7 @@ pub struct LruCache<K, V> {
     /// Cached entries
     entries: HashMap<K, CacheEntry<V>>,
     /// Access order for LRU eviction (most recent at end)
-    access_order: Vec<K>,
+    access_order: VecDeque<K>,
     /// Maximum cache size
     max_size: usize,
     /// Time-to-live for entries
@@ -57,7 +57,7 @@ impl<K: Eq + Hash + Clone, V: Clone> LruCache<K, V> {
     pub fn new(max_size: usize) -> Self {
         Self {
             entries: HashMap::with_capacity(max_size),
-            access_order: Vec::with_capacity(max_size),
+            access_order: VecDeque::with_capacity(max_size),
             max_size,
             ttl: None,
             stats: CacheStats::default(),
@@ -68,7 +68,7 @@ impl<K: Eq + Hash + Clone, V: Clone> LruCache<K, V> {
     pub fn with_ttl(max_size: usize, ttl: Duration) -> Self {
         Self {
             entries: HashMap::with_capacity(max_size),
-            access_order: Vec::with_capacity(max_size),
+            access_order: VecDeque::with_capacity(max_size),
             max_size,
             ttl: Some(ttl),
             stats: CacheStats::default(),
@@ -134,7 +134,7 @@ impl<K: Eq + Hash + Clone, V: Clone> LruCache<K, V> {
 
         // Remove from access order if exists
         self.access_order.retain(|k| k != &key);
-        self.access_order.push(key.clone());
+        self.access_order.push_back(key.clone());
 
         self.entries.insert(key, entry);
         self.stats.total_size = self.entries.len();
@@ -178,14 +178,14 @@ impl<K: Eq + Hash + Clone, V: Clone> LruCache<K, V> {
     /// Move key to end of access order (most recently used)
     fn touch(&mut self, key: &K) {
         self.access_order.retain(|k| k != key);
-        self.access_order.push(key.clone());
+        self.access_order.push_back(key.clone());
     }
 
     /// Evict least recently used entry
     fn evict_lru(&mut self) {
-        if let Some(key) = self.access_order.first().cloned() {
+        if let Some(key) = self.access_order.front().cloned() {
             self.entries.remove(&key);
-            self.access_order.remove(0);
+            self.access_order.pop_front();
             self.stats.evictions += 1;
             self.stats.total_size = self.entries.len();
         }

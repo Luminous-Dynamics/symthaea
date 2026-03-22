@@ -834,6 +834,218 @@ impl EpistemicGate {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// EpistemicCubeGate — Per-Axis Gating from 4D Epistemic Cube
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Per-axis token words for E-axis (assertion control).
+const E_AXIS_HEDGING: &[&str] = &[
+    "maybe",
+    "perhaps",
+    "possibly",
+    "might",
+    "could",
+    "uncertain",
+    "guess",
+];
+const E_AXIS_ASSERTION: &[&str] = &[
+    "definitely",
+    "certainly",
+    "always",
+    "proven",
+    "verified",
+    "true",
+];
+const E_AXIS_TESTIMONIAL: &[&str] = &[
+    "heard",
+    "told",
+    "said",
+    "someone",
+    "reportedly",
+    "apparently",
+];
+
+/// Per-axis token words for N-axis (social framing).
+const N_AXIS_PERSONAL: &[&str] = &["think", "feel", "believe", "opinion", "view", "guess"];
+const N_AXIS_COMMUNAL: &[&str] = &["we", "our", "community", "together", "shared"];
+const N_AXIS_NETWORK: &[&str] = &["known", "consensus", "agreed", "established", "accepted"];
+const N_AXIS_AXIOMATIC: &[&str] = &["necessarily", "definition", "axiom", "always", "must"];
+
+/// Per-axis token words for M-axis (temporal framing).
+const M_AXIS_EPHEMERAL: &[&str] = &["now", "moment", "currently", "temporary", "briefly"];
+const M_AXIS_PERSISTENT: &[&str] = &["recorded", "established", "documented", "archived"];
+const M_AXIS_FOUNDATIONAL: &[&str] = &["always", "fundamentally", "essentially", "permanently"];
+
+/// Per-axis gating from the full 4D Epistemic Cube channels.
+///
+/// Unlike `EpistemicGate` which reads a single ordinal, this gate reads the
+/// one-hot cube channels (E[5], N[4], M[4], H[1]) and applies axis-specific
+/// logit modulation:
+///
+/// - **E-axis**: Controls assertion vs hedging strength
+/// - **N-axis**: Controls personal vs universal framing
+/// - **M-axis**: Controls temporal vs permanent framing
+/// - **H-axis**: Modulates generation depth/verbosity
+pub struct EpistemicCubeGate {
+    // E-axis token sets
+    hedging_ids: Vec<u32>,
+    assertion_ids: Vec<u32>,
+    testimonial_ids: Vec<u32>,
+    // N-axis token sets
+    personal_ids: Vec<u32>,
+    communal_ids: Vec<u32>,
+    network_ids: Vec<u32>,
+    axiomatic_ids: Vec<u32>,
+    // M-axis token sets
+    ephemeral_ids: Vec<u32>,
+    persistent_ids: Vec<u32>,
+    foundational_ids: Vec<u32>,
+}
+
+impl EpistemicCubeGate {
+    /// Create from a tokenizer, resolving word lists to token IDs.
+    pub fn new(tokenizer: &BpeTokenizer) -> Self {
+        let resolve = |words: &[&str]| -> Vec<u32> {
+            words
+                .iter()
+                .filter_map(|w| {
+                    let id = tokenizer.token_id(w);
+                    if id != tokenizer.unk_id {
+                        Some(id)
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        };
+        Self {
+            hedging_ids: resolve(E_AXIS_HEDGING),
+            assertion_ids: resolve(E_AXIS_ASSERTION),
+            testimonial_ids: resolve(E_AXIS_TESTIMONIAL),
+            personal_ids: resolve(N_AXIS_PERSONAL),
+            communal_ids: resolve(N_AXIS_COMMUNAL),
+            network_ids: resolve(N_AXIS_NETWORK),
+            axiomatic_ids: resolve(N_AXIS_AXIOMATIC),
+            ephemeral_ids: resolve(M_AXIS_EPHEMERAL),
+            persistent_ids: resolve(M_AXIS_PERSISTENT),
+            foundational_ids: resolve(M_AXIS_FOUNDATIONAL),
+        }
+    }
+
+    /// Apply per-axis gating to logits based on epistemic cube channels.
+    ///
+    /// `channels` must be the ThoughtChannels from the current generation.
+    /// Reads cube data via `e_tier()`, `n_tier()`, `m_tier()`, `h_tier()`.
+    pub fn apply(&self, logits: &mut [f32], channels: &ThoughtChannels) {
+        // Only apply if cube channels are populated
+        if !channels.has_epistemic_cube() {
+            return;
+        }
+
+        // ── E-axis: Assertion Control ────────────────────────────────────
+        let e = channels.e_tier().unwrap_or(1);
+        match e {
+            0 => {
+                // E0 (opinion): MAX hedging, suppress assertions
+                Self::boost_ids(logits, &self.hedging_ids, 0.5);
+                Self::penalize_ids(logits, &self.assertion_ids, -0.8);
+            }
+            1 => {
+                // E1 (testimonial): boost testimonial framing
+                Self::boost_ids(logits, &self.testimonial_ids, 0.4);
+                Self::boost_ids(logits, &self.hedging_ids, 0.2);
+                Self::penalize_ids(logits, &self.assertion_ids, -0.3);
+            }
+            2 => {
+                // E2 (verifiable): mild hedging, light assertion
+                Self::boost_ids(logits, &self.hedging_ids, 0.1);
+            }
+            3 => {
+                // E3 (proven): allow confident assertion
+                Self::boost_ids(logits, &self.assertion_ids, 0.2);
+            }
+            4 => {
+                // E4 (reproducible): full confidence
+                Self::boost_ids(logits, &self.assertion_ids, 0.4);
+                Self::penalize_ids(logits, &self.hedging_ids, -0.3);
+            }
+            _ => {}
+        }
+
+        // ── N-axis: Social Framing ──────────────────────────────────────
+        let n = channels.n_tier().unwrap_or(0);
+        match n {
+            0 => {
+                // N0 (personal): boost "I think", "I feel"
+                Self::boost_ids(logits, &self.personal_ids, 0.4);
+            }
+            1 => {
+                // N1 (communal): boost "we", "our community"
+                Self::boost_ids(logits, &self.communal_ids, 0.3);
+            }
+            2 => {
+                // N2 (network): boost "it is known", "consensus"
+                Self::boost_ids(logits, &self.network_ids, 0.3);
+            }
+            3 => {
+                // N3 (axiomatic): boost "necessarily", "by definition"
+                Self::boost_ids(logits, &self.axiomatic_ids, 0.4);
+            }
+            _ => {}
+        }
+
+        // ── M-axis: Temporal Framing ────────────────────────────────────
+        let m = channels.m_tier().unwrap_or(1);
+        match m {
+            0 => {
+                // M0 (ephemeral): boost "for now", "at this moment"
+                Self::boost_ids(logits, &self.ephemeral_ids, 0.3);
+            }
+            1 => {
+                // M1 (temporal): neutral — no specific adjustment
+            }
+            2 => {
+                // M2 (persistent): boost "recorded", "established"
+                Self::boost_ids(logits, &self.persistent_ids, 0.3);
+            }
+            3 => {
+                // M3 (foundational): boost "always", "fundamentally"
+                Self::boost_ids(logits, &self.foundational_ids, 0.4);
+            }
+            _ => {}
+        }
+
+        // ── H-axis: Coherence Depth ────────────────────────────────────
+        let h = channels.h_tier();
+        if h < 0.25 {
+            // H0-H1: Low coherence → flatten distribution (increase temperature effect)
+            // Reduces confidence of all predictions when consciousness is low
+            let dampen = 0.85;
+            for l in logits.iter_mut() {
+                *l *= dampen;
+            }
+        }
+        // H2-H3: Standard generation (no modification)
+        // H4 (transcendent): could boost detail tokens, but keep simple for now
+    }
+
+    fn boost_ids(logits: &mut [f32], ids: &[u32], boost: f32) {
+        for &id in ids {
+            if let Some(l) = logits.get_mut(id as usize) {
+                *l += boost;
+            }
+        }
+    }
+
+    fn penalize_ids(logits: &mut [f32], ids: &[u32], penalty: f32) {
+        for &id in ids {
+            if let Some(l) = logits.get_mut(id as usize) {
+                *l += penalty; // penalty is negative
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // EmotionalModulator
 // ═══════════════════════════════════════════════════════════════════════════════
 

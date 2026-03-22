@@ -770,6 +770,90 @@ mod tests {
     }
 
     #[test]
+    fn test_thought_to_channels_epistemic_cube() {
+        use crate::mind::structured_thought::{
+            DomainContext, ETier, EpistemicCube, HTier, MTier, NTier,
+        };
+        use symthaea_broca::encoder::EPISTEMIC_CUBE_BASE;
+
+        let mut thought = make_test_thought();
+        thought.domain_context = Some(DomainContext {
+            domain: "mathematics".to_string(),
+            entities: vec![],
+            computed_answer: Some("4".to_string()),
+            cube: Some(EpistemicCube::with_harmonic(
+                ETier::E4,
+                NTier::N3,
+                MTier::M3,
+                HTier::H4,
+            )),
+            psi: Some(0.95),
+        });
+
+        let ch = thought_to_channels(&thought, 1.0);
+
+        // E4 → one-hot at index 4
+        assert_eq!(
+            ch.channels[EPISTEMIC_CUBE_BASE + 4],
+            1.0,
+            "E4 should be active"
+        );
+        for i in 0..4 {
+            assert_eq!(
+                ch.channels[EPISTEMIC_CUBE_BASE + i],
+                0.0,
+                "E{i} should be inactive"
+            );
+        }
+
+        // N3 → one-hot at index 3
+        assert_eq!(
+            ch.channels[EPISTEMIC_CUBE_BASE + 5 + 3],
+            1.0,
+            "N3 should be active"
+        );
+
+        // M3 → one-hot at index 3
+        assert_eq!(
+            ch.channels[EPISTEMIC_CUBE_BASE + 9 + 3],
+            1.0,
+            "M3 should be active"
+        );
+
+        // H4 → 1.0
+        assert!(
+            (ch.channels[EPISTEMIC_CUBE_BASE + 13] - 1.0).abs() < 0.01,
+            "H4 should be 1.0"
+        );
+
+        // Quality = (4/4)*0.4 + (3/3)*0.35 + (3/3)*0.25 = 0.4 + 0.35 + 0.25 = 1.0
+        assert!(
+            (ch.channels[EPISTEMIC_CUBE_BASE + 14] - 1.0).abs() < 0.01,
+            "quality should be 1.0"
+        );
+
+        // has_epistemic_cube should be true
+        assert!(ch.has_epistemic_cube());
+    }
+
+    #[test]
+    fn test_thought_to_channels_no_cube_defaults() {
+        use symthaea_broca::encoder::EPISTEMIC_CUBE_BASE;
+
+        let thought = make_test_thought();
+        let ch = thought_to_channels(&thought, 1.0);
+
+        // No cube → all one-hot channels inactive
+        assert!(!ch.has_epistemic_cube());
+
+        // H-tier defaults to 0.25 (H1 neutral)
+        assert!(
+            (ch.h_tier() - 0.25).abs() < 0.01,
+            "default h_tier should be 0.25"
+        );
+    }
+
+    #[test]
     fn test_thought_to_channels_all_epistemic_statuses() {
         let statuses = [
             (EpistemicStatus::Certain, 0.0),

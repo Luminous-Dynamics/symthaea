@@ -36,7 +36,7 @@
 //! | Contrast    | Peak     | Pause   | "but", "however"           |
 
 use crate::voice::LTCPacing;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PHASE 16 CONSCIOUSNESS SIGNALS FOR VOICE
@@ -721,7 +721,7 @@ pub struct CognitiveVoiceBridge {
     /// Smoothing factor for pacing transitions
     smoothing: f32,
     /// History of prediction errors for confidence smoothing
-    error_history: Vec<f32>,
+    error_history: VecDeque<f32>,
     /// Maximum history length
     max_history: usize,
 }
@@ -732,7 +732,7 @@ impl CognitiveVoiceBridge {
         Self {
             current_pacing: CognitivePacing::default(),
             smoothing: 0.3, // 30% new, 70% old
-            error_history: Vec::new(),
+            error_history: VecDeque::new(),
             max_history: 10,
         }
     }
@@ -747,9 +747,9 @@ impl CognitiveVoiceBridge {
         detected_primitives: Vec<String>,
     ) -> &CognitivePacing {
         // Update error history for smoothing
-        self.error_history.push(prediction_error);
+        self.error_history.push_back(prediction_error);
         if self.error_history.len() > self.max_history {
-            self.error_history.remove(0);
+            self.error_history.pop_front();
         }
 
         // Smooth prediction error

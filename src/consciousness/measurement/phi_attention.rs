@@ -36,6 +36,7 @@
 //! ```
 
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 
 /// Types of actions that require different Φ thresholds
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
@@ -258,7 +259,7 @@ pub struct AdaptiveThresholds {
     /// Base thresholds
     base: ConsciousnessThresholds,
     /// Rolling Φ history
-    phi_history: Vec<f32>,
+    phi_history: VecDeque<f32>,
     /// Maximum history size
     history_size: usize,
     /// Success count per action type
@@ -278,7 +279,7 @@ impl AdaptiveThresholds {
     pub fn new(history_size: usize) -> Self {
         Self {
             base: ConsciousnessThresholds::default(),
-            phi_history: Vec::with_capacity(history_size),
+            phi_history: VecDeque::with_capacity(history_size),
             history_size,
             successes: std::collections::HashMap::new(),
             failures: std::collections::HashMap::new(),
@@ -288,9 +289,9 @@ impl AdaptiveThresholds {
     /// Record a new Φ observation
     pub fn observe(&mut self, phi: f32) {
         if self.phi_history.len() >= self.history_size {
-            self.phi_history.remove(0);
+            self.phi_history.pop_front();
         }
-        self.phi_history.push(phi);
+        self.phi_history.push_back(phi);
     }
 
     /// Record an action outcome

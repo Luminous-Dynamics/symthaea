@@ -68,9 +68,13 @@ pub mod temporal_projection;
 
 pub use checkpoint::{AdamState, BrocaCheckpoint};
 pub use controller::{LanguageController, LanguageControllerConfig, NetworkSnapshot};
-pub use encoder::{ThoughtChannels, ThoughtLanguageEncoder};
+pub use encoder::{
+    ThoughtChannels, ThoughtLanguageEncoder, EPISTEMIC_CUBE_BASE, EPISTEMIC_CUBE_CHANNELS,
+};
 pub use evaluation::{EvalConfig, EvalResult, IntentScore};
-pub use gating::{CoherenceFeedback, EmotionalModulator, EpistemicGate, GatingConfig};
+pub use gating::{
+    CoherenceFeedback, EmotionalModulator, EpistemicCubeGate, EpistemicGate, GatingConfig,
+};
 pub use generator::{BrocaConfig, BrocaGenerator, GenerationResult, SamplingStrategy};
 pub use tokenizer::BpeTokenizer;
 pub use training::{

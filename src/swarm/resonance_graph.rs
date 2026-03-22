@@ -12,7 +12,7 @@
 //! # References
 //! - Woolley, A. et al. (2010). Evidence for a collective intelligence factor
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use symthaea_core::hdc::BinaryHV;
 
 /// HDC dimension in bits (16,384 = 2048 bytes * 8).
@@ -81,7 +81,7 @@ pub struct SocialFabricTelemetry {
 #[derive(Debug, Clone)]
 struct PeerResonance {
     /// Recent content from this peer.
-    content: Vec<ContentRef>,
+    content: VecDeque<ContentRef>,
     /// Base resonance with this peer (EMA of Hamming similarities).
     resonance_ema: f64,
     /// Last interaction timestamp.
@@ -95,7 +95,7 @@ pub struct ResonanceGraph {
     /// Our consciousness state embedding (for resonance computation).
     our_state: Option<BinaryHV>,
     /// Recent content interactions for echo chamber detection.
-    recent_sources: Vec<String>,
+    recent_sources: VecDeque<String>,
     /// Configuration.
     max_recent_sources: usize,
 }
@@ -106,7 +106,7 @@ impl ResonanceGraph {
         Self {
             peers: HashMap::new(),
             our_state: None,
-            recent_sources: Vec::new(),
+            recent_sources: VecDeque::new(),
             max_recent_sources: 100,
         }
     }
@@ -135,7 +135,7 @@ impl ResonanceGraph {
             .peers
             .entry(content.source_peer.clone())
             .or_insert_with(|| PeerResonance {
-                content: Vec::new(),
+                content: VecDeque::new(),
                 resonance_ema: 0.5,
                 last_seen: 0,
             });
@@ -150,9 +150,9 @@ impl ResonanceGraph {
 
         // Cap content per peer
         if peer.content.len() >= MAX_CONTENT_PER_PEER {
-            peer.content.remove(0);
+            peer.content.pop_front();
         }
-        peer.content.push(content);
+        peer.content.push_back(content);
     }
 
     /// Rank content by resonance with diversity bonus.
@@ -223,9 +223,9 @@ impl ResonanceGraph {
     /// Record that content from a source was consumed (for echo chamber tracking).
     pub fn record_consumption(&mut self, source_peer: &str) {
         if self.recent_sources.len() >= self.max_recent_sources {
-            self.recent_sources.remove(0);
+            self.recent_sources.pop_front();
         }
-        self.recent_sources.push(source_peer.to_string());
+        self.recent_sources.push_back(source_peer.to_string());
     }
 
     /// Mean resonance across all tracked peers.
@@ -390,7 +390,7 @@ mod tests {
         g.peers.insert(
             "a".to_string(),
             PeerResonance {
-                content: Vec::new(),
+                content: VecDeque::new(),
                 resonance_ema: 0.8,
                 last_seen: 0,
             },
@@ -398,7 +398,7 @@ mod tests {
         g.peers.insert(
             "b".to_string(),
             PeerResonance {
-                content: Vec::new(),
+                content: VecDeque::new(),
                 resonance_ema: 0.4,
                 last_seen: 0,
             },
@@ -458,7 +458,7 @@ mod tests {
             g.peers.insert(
                 format!("p{}", i),
                 PeerResonance {
-                    content: Vec::new(),
+                    content: VecDeque::new(),
                     resonance_ema: 0.5,
                     last_seen: 0,
                 },
@@ -471,7 +471,7 @@ mod tests {
         g.peers.insert(
             "a".to_string(),
             PeerResonance {
-                content: Vec::new(),
+                content: VecDeque::new(),
                 resonance_ema: 0.0,
                 last_seen: 0,
             },
@@ -479,7 +479,7 @@ mod tests {
         g.peers.insert(
             "b".to_string(),
             PeerResonance {
-                content: Vec::new(),
+                content: VecDeque::new(),
                 resonance_ema: 1.0,
                 last_seen: 0,
             },

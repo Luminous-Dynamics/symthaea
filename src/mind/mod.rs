@@ -32,6 +32,7 @@ pub use utils::{
 };
 
 use crate::memory::memory_coordinator::MemorySource;
+use std::collections::VecDeque;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Maximum number of messages retained in unbounded outboxes (federated, social, mesh).
@@ -156,7 +157,7 @@ pub struct ContinuousMind {
     pub(crate) mesh_stats: crate::swarm::mesh::MeshStats,
     /// Ring buffer of recently seen (source_id, sequence) pairs for deduplication.
     #[cfg(feature = "mesh")]
-    mesh_seen_packets: Vec<([u8; 8], u32, u8)>,
+    mesh_seen_packets: VecDeque<([u8; 8], u32, u8)>,
     /// Start of the current bandwidth budget window.
     #[cfg(feature = "mesh")]
     mesh_bandwidth_window_start: std::time::Instant,
@@ -299,7 +300,7 @@ impl ContinuousMind {
             #[cfg(feature = "mesh")]
             mesh_stats: crate::swarm::mesh::MeshStats::default(),
             #[cfg(feature = "mesh")]
-            mesh_seen_packets: Vec::with_capacity(128),
+            mesh_seen_packets: VecDeque::with_capacity(128),
             #[cfg(feature = "mesh")]
             mesh_bandwidth_window_start: std::time::Instant::now(),
             #[cfg(feature = "mesh")]

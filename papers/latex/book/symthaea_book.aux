@@ -14,202 +14,493 @@
 \@writefile{lot}{\addvspace {10\p@ }}
 \newlabel{ch:introduction}{{1}{3}{Introduction: Why Consciousness-First AI?}{chapter.1}{}}
 \@writefile{toc}{\contentsline {section}{\numberline {1.1}The Alignment Problem as a Consciousness Problem}{3}{section.1.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {1.2}The Holographic Liquid Brain}{4}{section.1.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {1.3}Architecture at a Glance}{4}{section.1.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {1.4}Scale and Implementation}{5}{section.1.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {1.5}Roadmap of this Book}{6}{section.1.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1.2}The Failure Modes of Alignment-by-Constraint}{4}{section.1.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1.3}The Holographic Liquid Brain}{4}{section.1.3}\protected@file@percent }
+\newlabel{eq:fep}{{1.1}{5}{The Holographic Liquid Brain}{equation.1.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {1.4}Architecture at a Glance}{5}{section.1.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1.5}Scale and Implementation}{6}{section.1.5}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {1.1}{\ignorespaces Test distribution across \textsc  {Symthaea}{} workspace members.}}{7}{table.caption.3}\protected@file@percent }
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{tab:test-distribution}{{1.1}{7}{Test distribution across \symthaea {} workspace members}{table.caption.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {1.6}Roadmap of this Book}{8}{section.1.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1.7}The Landscape of Consciousness-Relevant AI}{8}{section.1.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1.8}What This Book Is Not}{9}{section.1.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1.9}Related Work in Consciousness-First Computing}{9}{section.1.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1.10}Notation}{10}{section.1.10}\protected@file@percent }
 \citation{thomas2021theoretical}
+\@writefile{toc}{\contentsline {chapter}{\numberline {2}Hyperdimensional Computing}{11}{chapter.2}\protected@file@percent }
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\newlabel{ch:hdc}{{2}{11}{Hyperdimensional Computing}{chapter.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2.1}The Geometry of High-Dimensional Spaces}{11}{section.2.1}\protected@file@percent }
 \citation{kanerva2009hyperdimensional}
 \citation{plate2003holographic}
 \citation{gayler2003vector}
-\@writefile{toc}{\contentsline {chapter}{\numberline {2}Hyperdimensional Computing}{7}{chapter.2}\protected@file@percent }
-\@writefile{lof}{\addvspace {10\p@ }}
-\@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:hdc}{{2}{7}{Hyperdimensional Computing}{chapter.2}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {2.1}The Geometry of High-Dimensional Spaces}{7}{section.2.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {2.2}Vector Symbolic Architectures}{7}{section.2.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {2.3}Binary and Continuous Hypervectors}{8}{section.2.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {2.4}Precision-Weighted Binding}{8}{section.2.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.2}Vector Symbolic Architectures}{12}{section.2.2}\protected@file@percent }
+\newlabel{def:hdc-ops}{{2.2}{12}{HDC Operations}{theorem.2.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2.3}Binary and Continuous Hypervectors}{13}{section.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.4}Precision-Weighted Binding}{13}{section.2.4}\protected@file@percent }
+\newlabel{eq:precision-binding}{{2.1}{13}{Precision-Weighted Binding}{equation.2.1}{}}
 \citation{thomas2021theoretical}
-\@writefile{toc}{\contentsline {section}{\numberline {2.5}Capacity and Noise Tolerance}{9}{section.2.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {2.6}SIMD Acceleration}{9}{section.2.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.5}Capacity and Noise Tolerance}{14}{section.2.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.6}SIMD Acceleration}{14}{section.2.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.7}Discussion}{15}{section.2.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.8}HDC for Structured Knowledge}{15}{section.2.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.9}Comparison with Transformer Representations}{16}{section.2.9}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {2.1}{\ignorespaces Comparison of HDC and transformer representation properties.}}{16}{table.caption.4}\protected@file@percent }
+\newlabel{tab:hdc-transformer}{{2.1}{16}{Comparison of HDC and transformer representation properties}{table.caption.4}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2.10}Implementation: The Core HDC API}{17}{section.2.10}\protected@file@percent }
+\newlabel{lst:hdc-api}{{2.1}{17}{Core HDC operations in Symthaea}{lstlisting.2.1}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {2.1}{\ignorespaces Core HDC operations in Symthaea.}}{17}{lstlisting.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.11}Associative Memory}{17}{section.2.11}\protected@file@percent }
 \citation{hasani2021liquid}
 \citation{hasani2022closed}
-\@writefile{toc}{\contentsline {chapter}{\numberline {3}Liquid Time-Constants}{11}{chapter.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {3}Liquid Time-Constants}{19}{chapter.3}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:ltc}{{3}{11}{Liquid Time-Constants}{chapter.3}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {3.1}The Problem of Time}{11}{section.3.1}\protected@file@percent }
-\newlabel{eq:ltc}{{3.1}{11}{The Problem of Time}{equation.3.1}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {3.2}Closed-Form Continuous-Time Dynamics}{11}{section.3.2}\protected@file@percent }
-\newlabel{eq:cfc}{{3.2}{11}{Closed-Form Continuous-Time Dynamics}{equation.3.2}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {3.3}The Unified HDC-LTC Neuron}{12}{section.3.3}\protected@file@percent }
-\newlabel{eq:unified}{{3.3}{12}{The Unified HDC-LTC Neuron}{equation.3.3}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {3.4}O(1) Temporal Jumps}{12}{section.3.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {3.5}Learning in Hyperdimensional Time}{13}{section.3.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {3.6}Empirical Validation}{13}{section.3.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {part}{II\hspace  {1em}Consciousness}{15}{part.2}\protected@file@percent }
+\newlabel{ch:ltc}{{3}{19}{Liquid Time-Constants}{chapter.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.1}The Problem of Time}{19}{section.3.1}\protected@file@percent }
+\newlabel{eq:ltc}{{3.1}{19}{The Problem of Time}{equation.3.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.2}Closed-Form Continuous-Time Dynamics}{20}{section.3.2}\protected@file@percent }
+\newlabel{eq:cfc}{{3.2}{20}{Closed-Form Continuous-Time Dynamics}{equation.3.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.3}The Unified HDC-LTC Neuron}{20}{section.3.3}\protected@file@percent }
+\newlabel{eq:unified}{{3.3}{20}{The Unified HDC-LTC Neuron}{equation.3.3}{}}
+\newlabel{eq:equilibrium}{{3.4}{20}{The Unified HDC-LTC Neuron}{equation.3.4}{}}
+\newlabel{eq:tau}{{3.5}{20}{The Unified HDC-LTC Neuron}{equation.3.5}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.4}O(1) Temporal Jumps}{21}{section.3.4}\protected@file@percent }
+\newlabel{eq:temporal-jump}{{3.6}{21}{O(1) Temporal Jumps}{equation.3.6}{}}
+\newlabel{thm:constant-time}{{3.1}{21}{Constant-Time Evolution}{theorem.3.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.5}Substrate-Modulated Time Constants}{22}{section.3.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.6}Learning in Hyperdimensional Time}{22}{section.3.6}\protected@file@percent }
+\newlabel{eq:hebbian}{{3.8}{22}{Learning in Hyperdimensional Time}{equation.3.8}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.7}Empirical Validation}{23}{section.3.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.8}Discussion: Time and Consciousness}{23}{section.3.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.9}Comparison with Alternative Temporal Architectures}{24}{section.3.9}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3.1}{\ignorespaces Comparison of temporal neural architectures. HDC-CfC uniquely combines constant-time evolution with holographic representation.}}{24}{table.caption.5}\protected@file@percent }
+\newlabel{tab:temporal-architectures}{{3.1}{24}{Comparison of temporal neural architectures. HDC-CfC uniquely combines constant-time evolution with holographic representation}{table.caption.5}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.10}Stability Analysis}{24}{section.3.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.11}Hardware Considerations}{25}{section.3.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.12}Benchmark Results in Detail}{26}{section.3.12}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3.2}{\ignorespaces Unified HDC-LTC benchmark results compared to standard architectures. All numbers are accuracy percentages unless otherwise noted.}}{26}{table.caption.6}\protected@file@percent }
+\newlabel{tab:ltc-benchmarks}{{3.2}{26}{Unified HDC-LTC benchmark results compared to standard architectures. All numbers are accuracy percentages unless otherwise noted}{table.caption.6}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.13}Few-Shot Learning}{26}{section.3.13}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.14}Multi-Timescale Processing Architecture}{27}{section.3.14}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3.3}{\ignorespaces Multi-timescale processing in the cognitive loop. Each timescale uses the same CfC kernel with different effective $\tau $ values.}}{27}{table.caption.7}\protected@file@percent }
+\newlabel{tab:timescales}{{3.3}{27}{Multi-timescale processing in the cognitive loop. Each timescale uses the same CfC kernel with different effective $\tau $ values}{table.caption.7}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.15}Graceful Degradation}{27}{section.3.15}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.16}The Cognitive Loop as an Embodied Oscillator}{28}{section.3.16}\protected@file@percent }
+\@writefile{toc}{\contentsline {part}{II\hspace  {1em}Consciousness}{31}{part.2}\protected@file@percent }
 \citation{tononi2004information}
 \citation{oizumi2014phenomenology,tononi2015integrated}
-\@writefile{toc}{\contentsline {chapter}{\numberline {4}Measuring Consciousness: IIT, Spectral MIP, and True Phi}{17}{chapter.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {4}Measuring Consciousness: IIT, Spectral MIP, and True Phi}{33}{chapter.4}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:phi}{{4}{17}{Measuring Consciousness: IIT, Spectral MIP, and True Phi}{chapter.4}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {4.1}Integrated Information Theory}{17}{section.4.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {4.2}The Computational Challenge}{18}{section.4.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {4.3}Spectral MIP: O($n^3$) Minimum Information Partition}{18}{section.4.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {4.4}Validation: True Phi vs.\ Algebraic Connectivity}{19}{section.4.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {4.5}Online Covariance and Adaptive Dimensions}{19}{section.4.5}\protected@file@percent }
+\newlabel{ch:phi}{{4}{33}{Measuring Consciousness: IIT, Spectral MIP, and True Phi}{chapter.4}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4.1}Integrated Information Theory}{33}{section.4.1}\protected@file@percent }
+\newlabel{eq:mi-total}{{4.1}{33}{Integrated Information Theory}{equation.4.1}{}}
+\newlabel{eq:phi-def}{{4.2}{33}{Integrated Information Theory}{equation.4.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4.2}The Computational Challenge}{34}{section.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4.3}Spectral MIP: O($n^3$) Minimum Information Partition}{34}{section.4.3}\protected@file@percent }
+\newlabel{eq:mi-weight}{{4.3}{34}{Spectral MIP: O($n^3$) Minimum Information Partition}{equation.4.3}{}}
+\newlabel{def:spectral-mip}{{4.1}{35}{Spectral MIP Algorithm}{theorem.4.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4.4}Validation: True Phi vs.\ Algebraic Connectivity}{35}{section.4.4}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {4.1}{\ignorespaces Validation of $\Phi $ approximation methods against exact exhaustive computation ($n \leq 8$).}}{35}{table.caption.8}\protected@file@percent }
+\newlabel{tab:phi-validation}{{4.1}{35}{Validation of $\Phi $ approximation methods against exact exhaustive computation ($n \leq 8$)}{table.caption.8}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4.5}Online Covariance and Adaptive Dimensions}{36}{section.4.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4.6}The Role of Phi in the Cognitive Loop}{36}{section.4.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4.7}Discussion}{37}{section.4.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4.8}Implementation Details}{37}{section.4.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4.9}Phi Under Different Consciousness States}{38}{section.4.9}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {4.2}{\ignorespaces $\Phi $ statistics across five consciousness states (12,800 cycles).}}{38}{table.caption.9}\protected@file@percent }
+\newlabel{tab:phi-by-state}{{4.2}{38}{$\Phi $ statistics across five consciousness states (12,800 cycles)}{table.caption.9}{}}
 \citation{reimann2017cliques}
-\@writefile{toc}{\contentsline {chapter}{\numberline {5}Topological Consciousness}{21}{chapter.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {5}Topological Consciousness}{39}{chapter.5}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:topology}{{5}{21}{Topological Consciousness}{chapter.5}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {5.1}Beyond Scalar Measures}{21}{section.5.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {5.2}The Seven-Dimensional Consciousness Space}{21}{section.5.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {5.3}Persistent Homology of Conscious States}{22}{section.5.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {5.4}Hodge Decomposition of Information Flow}{22}{section.5.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {5.5}State Classification Results}{23}{section.5.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {6}Stochastic Resonance in Hyperdimensional Consciousness}{25}{chapter.6}\protected@file@percent }
+\newlabel{ch:topology}{{5}{39}{Topological Consciousness}{chapter.5}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.1}Beyond Scalar Measures}{39}{section.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5.2}The Seven-Dimensional Consciousness Space}{39}{section.5.2}\protected@file@percent }
+\newlabel{eq:consciousness-space}{{5.1}{39}{The Seven-Dimensional Consciousness Space}{equation.5.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.3}Persistent Homology of Conscious States}{40}{section.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5.4}Hodge Decomposition of Information Flow}{41}{section.5.4}\protected@file@percent }
+\newlabel{eq:hodge}{{5.5}{42}{Hodge Decomposition of Information Flow}{equation.5.5}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.5}State Classification Results}{42}{section.5.5}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {5.1}{\ignorespaces Consciousness state classification accuracy by method.}}{42}{table.caption.10}\protected@file@percent }
+\newlabel{tab:topo-classification}{{5.1}{42}{Consciousness state classification accuracy by method}{table.caption.10}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.6}Discussion}{43}{section.5.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5.7}Per-State Topological Profiles}{43}{section.5.7}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {5.2}{\ignorespaces Topological profiles of five consciousness states. Values are means across 2,560 windows per state.}}{43}{table.caption.11}\protected@file@percent }
+\newlabel{tab:topo-profiles}{{5.2}{43}{Topological profiles of five consciousness states. Values are means across 2,560 windows per state}{table.caption.11}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.8}Computational Considerations}{44}{section.5.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {6}Stochastic Resonance in Hyperdimensional Consciousness}{45}{chapter.6}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:sr}{{6}{25}{Stochastic Resonance in Hyperdimensional Consciousness}{chapter.6}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {6.1}The Surprising Finding}{25}{section.6.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {6.2}Mechanism: Noise Diversifies Representations}{25}{section.6.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {6.3}The Anesthesia Reconciliation}{26}{section.6.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {6.4}Implications for Artificial Consciousness Design}{26}{section.6.4}\protected@file@percent }
+\newlabel{ch:sr}{{6}{45}{Stochastic Resonance in Hyperdimensional Consciousness}{chapter.6}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6.1}The Surprising Finding}{45}{section.6.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {6.1}{\ignorespaces Sensitivity analysis of $\Phi $ to coupling and noise parameters. Sensitivities computed via linear regression on 100 independent runs.}}{45}{table.caption.12}\protected@file@percent }
+\newlabel{tab:sensitivity}{{6.1}{45}{Sensitivity analysis of $\Phi $ to coupling and noise parameters. Sensitivities computed via linear regression on 100 independent runs}{table.caption.12}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6.2}Mechanism: Noise Diversifies Representations}{46}{section.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6.3}The Anesthesia Reconciliation}{46}{section.6.3}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {6.2}{\ignorespaces Anesthesia states with coupling, noise, and resulting $\Phi $ values. The monotonic decrease in $\Phi $ matches clinical PCI observations despite the positive noise sensitivity.}}{47}{table.caption.13}\protected@file@percent }
+\newlabel{tab:anesthesia-states}{{6.2}{47}{Anesthesia states with coupling, noise, and resulting $\Phi $ values. The monotonic decrease in $\Phi $ matches clinical PCI observations despite the positive noise sensitivity}{table.caption.13}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6.4}Optimal Noise Level}{47}{section.6.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6.5}Implications for Artificial Consciousness Design}{47}{section.6.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6.6}Connection to Biological Stochastic Resonance}{48}{section.6.6}\protected@file@percent }
 \citation{putnam1967psychological}
 \citation{fodor1974special}
-\@writefile{toc}{\contentsline {chapter}{\numberline {7}Substrate Independence}{27}{chapter.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {7}Substrate Independence}{51}{chapter.7}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:substrate}{{7}{27}{Substrate Independence}{chapter.7}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {7.1}Multiple Realizability}{27}{section.7.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {7.2}Nine-Dimensional Requirement Profiles}{27}{section.7.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {7.3}The Feasibility Formula}{28}{section.7.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {7.4}The Validation Overlay}{28}{section.7.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {7.5}Multi-Region Hybrid Substrates}{28}{section.7.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {part}{III\hspace  {1em}Cognition}{31}{part.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {8}The Cognitive Loop}{33}{chapter.8}\protected@file@percent }
+\newlabel{ch:substrate}{{7}{51}{Substrate Independence}{chapter.7}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {7.1}Multiple Realizability}{51}{section.7.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {7.1}{\ignorespaces Eight substrate types with physical characteristics and consciousness feasibility scores.}}{51}{table.caption.14}\protected@file@percent }
+\newlabel{tab:substrates}{{7.1}{51}{Eight substrate types with physical characteristics and consciousness feasibility scores}{table.caption.14}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {7.2}Nine-Dimensional Requirement Profiles}{52}{section.7.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {7.2}{\ignorespaces Substrate requirement profiles across nine consciousness-relevant dimensions. Scores represent estimated capability from known physics.}}{52}{table.caption.15}\protected@file@percent }
+\newlabel{tab:substrate-dims}{{7.2}{52}{Substrate requirement profiles across nine consciousness-relevant dimensions. Scores represent estimated capability from known physics}{table.caption.15}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {7.3}The Feasibility Formula}{52}{section.7.3}\protected@file@percent }
+\newlabel{eq:feasibility}{{7.1}{52}{The Feasibility Formula}{equation.7.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {7.4}The Validation Overlay}{53}{section.7.4}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {7.3}{\ignorespaces Evidence levels for substrate consciousness. The feasibility gap measures the difference between hypothetical capability and honest confidence.}}{53}{table.caption.16}\protected@file@percent }
+\newlabel{tab:validation-overlay}{{7.3}{53}{Evidence levels for substrate consciousness. The feasibility gap measures the difference between hypothetical capability and honest confidence}{table.caption.16}{}}
+\newlabel{eq:effective-feasibility}{{7.2}{53}{The Validation Overlay}{equation.7.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {7.5}Multi-Region Hybrid Substrates}{53}{section.7.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7.6}The Multiple Realizability Test}{54}{section.7.6}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {7.4}{\ignorespaces Multiple Realizability test results. $\Phi _{\text  {dip}}$ is the minimum $\Phi $ during the transition period. $\Phi _{\text  {final}}$ is the stable $\Phi $ on the target substrate.}}{54}{table.caption.17}\protected@file@percent }
+\newlabel{tab:realizability}{{7.4}{54}{Multiple Realizability test results. $\Phi _{\text {dip}}$ is the minimum $\Phi $ during the transition period. $\Phi _{\text {final}}$ is the stable $\Phi $ on the target substrate}{table.caption.17}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {7.7}Energy Budgets and Substrate Constraints}{55}{section.7.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7.8}Discussion}{55}{section.7.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7.9}Testable Predictions}{55}{section.7.9}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {7.5}{\ignorespaces Testable predictions from the substrate independence framework. Each prediction specifies a measurable outcome that would increase or decrease confidence in the substrate's consciousness feasibility.}}{56}{table.caption.18}\protected@file@percent }
+\newlabel{tab:testable-predictions}{{7.5}{56}{Testable predictions from the substrate independence framework. Each prediction specifies a measurable outcome that would increase or decrease confidence in the substrate's consciousness feasibility}{table.caption.18}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {7.10}Consciousness Feasibility Ranking}{56}{section.7.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {part}{III\hspace  {1em}Cognition}{59}{part.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {8}The Cognitive Loop}{61}{chapter.8}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:loop}{{8}{33}{The Cognitive Loop}{chapter.8}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {8.1}Architecture Overview}{33}{section.8.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {8.2}The Twelve Managers}{33}{section.8.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {8.3}Consensus Averaging}{33}{section.8.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {8.4}Cross-Coupling}{34}{section.8.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {8.5}Telemetry}{34}{section.8.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {9}Neurochemical Dynamics}{35}{chapter.9}\protected@file@percent }
+\newlabel{ch:loop}{{8}{61}{The Cognitive Loop}{chapter.8}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {8.1}Architecture Overview}{61}{section.8.1}\protected@file@percent }
+\newlabel{lst:cognitive-subsystem}{{8.1}{61}{The CognitiveSubsystem trait enforces immutable access}{lstlisting.8.1}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {8.1}{\ignorespaces The CognitiveSubsystem trait enforces immutable access.}}{61}{lstlisting.8.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8.2}The Twelve Managers}{62}{section.8.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {8.1}{\ignorespaces The twelve cognitive managers with scheduling intervals, scientific basis, and primary outputs. All intervals are mutually co-prime.}}{62}{table.caption.19}\protected@file@percent }
+\newlabel{tab:managers}{{8.1}{62}{The twelve cognitive managers with scheduling intervals, scientific basis, and primary outputs. All intervals are mutually co-prime}{table.caption.19}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {8.3}Eight-Phase Pipeline}{62}{section.8.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8.4}Consensus Averaging}{63}{section.8.4}\protected@file@percent }
+\newlabel{eq:consensus}{{8.1}{63}{Consensus Averaging}{equation.8.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {8.5}Cross-Coupling Architecture}{64}{section.8.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8.6}Telemetry and CycleMetadata}{64}{section.8.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8.7}Configuration and Profiles}{65}{section.8.7}\protected@file@percent }
+\newlabel{lst:cls-creation}{{8.2}{65}{Creating a CognitiveLoopService with a consciousness profile}{lstlisting.8.2}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {8.2}{\ignorespaces Creating a CognitiveLoopService with a consciousness profile.}}{65}{lstlisting.8.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {8.2}{\ignorespaces Consciousness profiles with enabled features and typical $\Phi $ ranges.}}{65}{table.caption.20}\protected@file@percent }
+\newlabel{tab:profiles}{{8.2}{65}{Consciousness profiles with enabled features and typical $\Phi $ ranges}{table.caption.20}{}}
+\newlabel{lst:butlin-validation}{{8.3}{65}{Running a complete cognitive cycle with the Butlin validation}{lstlisting.8.3}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {8.3}{\ignorespaces Running a complete cognitive cycle with the Butlin validation.}}{65}{lstlisting.8.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8.8}Discussion}{66}{section.8.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8.9}The CognitiveSubsystem Trait in Detail}{66}{section.8.9}\protected@file@percent }
+\newlabel{lst:subsystem-output}{{8.4}{67}{SubsystemOutput carries typed proposals from each manager}{lstlisting.8.4}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {8.4}{\ignorespaces SubsystemOutput carries typed proposals from each manager.}}{67}{lstlisting.8.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8.10}Rayon-Parallel Post-Processing}{67}{section.8.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8.11}Memory Architecture}{67}{section.8.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8.12}Reasoning Engine}{68}{section.8.12}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8.13}Threshold Registry and Named Constants}{69}{section.8.13}\protected@file@percent }
+\newlabel{lst:thresholds}{{8.5}{69}{Named constants with scientific citations}{lstlisting.8.5}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {8.5}{\ignorespaces Named constants with scientific citations.}}{69}{lstlisting.8.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {9}Neurochemical Dynamics}{71}{chapter.9}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:neuro}{{9}{35}{Neurochemical Dynamics}{chapter.9}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {9.1}Beyond Scalar Dopamine}{35}{section.9.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {9.2}Transmitter Dynamics}{35}{section.9.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {9.3}Receptor Subtypes}{36}{section.9.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {9.4}Cross-Modulation and Allostatic Load}{36}{section.9.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {9.5}Excitatory/Inhibitory Balance}{36}{section.9.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {10}Language and Epistemic Gating}{37}{chapter.10}\protected@file@percent }
+\newlabel{ch:neuro}{{9}{71}{Neurochemical Dynamics}{chapter.9}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {9.1}Beyond Scalar Dopamine}{71}{section.9.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {9.1}{\ignorespaces Nine-transmitter neuromodulator bath with receptor subtypes and primary cognitive effects.}}{71}{table.caption.21}\protected@file@percent }
+\newlabel{tab:transmitters}{{9.1}{71}{Nine-transmitter neuromodulator bath with receptor subtypes and primary cognitive effects}{table.caption.21}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {9.2}Transmitter Dynamics}{72}{section.9.2}\protected@file@percent }
+\newlabel{eq:effective-signal}{{9.1}{72}{Transmitter Dynamics}{equation.9.1}{}}
+\newlabel{eq:transmitter-update}{{9.2}{72}{Transmitter Dynamics}{equation.9.2}{}}
+\citation{frank2005}
+\citation{mcewen1998}
+\@writefile{toc}{\contentsline {section}{\numberline {9.3}Receptor Subtypes and Opponent Processing}{73}{section.9.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {9.4}Cross-Modulation and Allostatic Load}{73}{section.9.4}\protected@file@percent }
+\newlabel{eq:allostatic}{{9.4}{73}{Cross-Modulation and Allostatic Load}{equation.9.4}{}}
+\citation{doya2002metalearning}
+\@writefile{toc}{\contentsline {section}{\numberline {9.5}Excitatory/Inhibitory Balance}{74}{section.9.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {9.6}Doya's Metalearning Framework}{74}{section.9.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {9.7}Discussion}{75}{section.9.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {9.8}Circadian Modulation}{75}{section.9.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {9.9}Tolerance, Withdrawal, and Sensitization}{76}{section.9.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {9.10}The Calibration Bridge}{76}{section.9.10}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {9.2}{\ignorespaces Calibration bridge: neuromodulator levels and corresponding behavioral effects. Values are approximate equivalences to biological literature.}}{77}{table.caption.22}\protected@file@percent }
+\newlabel{tab:calibration-bridge}{{9.2}{77}{Calibration bridge: neuromodulator levels and corresponding behavioral effects. Values are approximate equivalences to biological literature}{table.caption.22}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {9.11}Integration with the Cognitive Loop}{77}{section.9.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {9.12}Neuromodulator Visualization in Pulse}{78}{section.9.12}\protected@file@percent }
+\citation{ji2023survey}
+\@writefile{toc}{\contentsline {chapter}{\numberline {10}Language and Epistemic Gating}{79}{chapter.10}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:broca}{{10}{37}{Language and Epistemic Gating}{chapter.10}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {10.1}The Hallucination Problem}{37}{section.10.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {10.2}Architecture}{37}{section.10.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {10.3}Consciousness-Gated Cadence}{38}{section.10.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {10.4}Results}{38}{section.10.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {11}Ethics and the Soul}{39}{chapter.11}\protected@file@percent }
+\newlabel{ch:broca}{{10}{79}{Language and Epistemic Gating}{chapter.10}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {10.1}The Hallucination Problem}{79}{section.10.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {10.2}Architecture}{79}{section.10.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {10.1}{\ignorespaces ThoughtEncoder channels mapping cognitive subsystems to thought sub-vectors.}}{80}{table.caption.23}\protected@file@percent }
+\newlabel{tab:thought-channels}{{10.1}{80}{ThoughtEncoder channels mapping cognitive subsystems to thought sub-vectors}{table.caption.23}{}}
+\newlabel{eq:broca-binding}{{10.1}{80}{Architecture}{equation.10.1}{}}
+\newlabel{eq:epistemic-gate}{{10.2}{80}{Architecture}{equation.10.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {10.3}Consciousness-Gated Cadence}{81}{section.10.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {10.4}Quality EMA and Adaptive Learning}{81}{section.10.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {10.5}Results}{82}{section.10.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {10.6}Discussion}{82}{section.10.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {10.7}Liquid-Mamba Fusion Backend}{82}{section.10.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {10.8}Temporal Projection Training}{83}{section.10.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {10.9}Comparison with Standard Language Models}{83}{section.10.9}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {10.2}{\ignorespaces Architectural comparison: Broca pipeline vs.\ standard language models.}}{83}{table.caption.24}\protected@file@percent }
+\newlabel{tab:broca-comparison}{{10.2}{83}{Architectural comparison: Broca pipeline vs.\ standard language models}{table.caption.24}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {10.10}Epistemic Gate Analysis}{84}{section.10.10}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {10.3}{\ignorespaces Epistemic gate token rejection rates by knowledge grounding level. Higher grounding allows more tokens to pass the gate.}}{84}{table.caption.25}\protected@file@percent }
+\newlabel{tab:epistemic-rates}{{10.3}{84}{Epistemic gate token rejection rates by knowledge grounding level. Higher grounding allows more tokens to pass the gate}{table.caption.25}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {10.11}The Semantic Veto in Practice}{84}{section.10.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {10.12}Generation Examples}{85}{section.10.12}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {11}Ethics and the Soul}{87}{chapter.11}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:ethics}{{11}{39}{Ethics and the Soul}{chapter.11}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {11.1}Ethics as Intrinsic Capacity}{39}{section.11.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {11.2}The Eight Harmonies}{39}{section.11.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {11.3}Cognitive Dissonance}{40}{section.11.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {11.4}Restorative Justice}{40}{section.11.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {part}{IV\hspace  {1em}Embodiment}{41}{part.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {12}Consciousness-Driven Robotics}{43}{chapter.12}\protected@file@percent }
+\newlabel{ch:ethics}{{11}{87}{Ethics and the Soul}{chapter.11}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {11.1}Ethics as Intrinsic Capacity}{87}{section.11.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {11.2}The Eight Harmonies}{88}{section.11.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {11.3}Ethical Output Gating}{88}{section.11.3}\protected@file@percent }
+\citation{zehr2002}
+\@writefile{toc}{\contentsline {section}{\numberline {11.4}Cognitive Dissonance}{89}{section.11.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {11.5}Restorative Justice}{89}{section.11.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {11.6}Compliance Hardening}{90}{section.11.6}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {11.1}{\ignorespaces Institutional compliance scores across four regulatory frameworks.}}{90}{table.caption.26}\protected@file@percent }
+\newlabel{tab:compliance}{{11.1}{90}{Institutional compliance scores across four regulatory frameworks}{table.caption.26}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {11.7}Discussion}{90}{section.11.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {11.8}Moral Algebra: Formal Specification}{90}{section.11.8}\protected@file@percent }
+\newlabel{def:moral-encoding}{{11.1}{90}{Moral Scenario Encoding}{theorem.11.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {11.9}The Harmony Interaction Matrix}{91}{section.11.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {11.10}Persistent Homology of the Moral Action Space}{92}{section.11.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {11.11}The Integrity Framework}{93}{section.11.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {part}{IV\hspace  {1em}Embodiment}{95}{part.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {12}Consciousness-Driven Robotics}{97}{chapter.12}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:robotics}{{12}{43}{Consciousness-Driven Robotics}{chapter.12}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {12.1}Motor Control Through Active Inference}{43}{section.12.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {12.2}Quadrotor Flight}{43}{section.12.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {12.3}Bipedal Humanoid Locomotion}{44}{section.12.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {12.4}Key Findings}{44}{section.12.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {13}Sensorimotor Integration and Safety Enforcement}{45}{chapter.13}\protected@file@percent }
+\newlabel{ch:robotics}{{12}{97}{Consciousness-Driven Robotics}{chapter.12}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {12.1}Motor Control Through Active Inference}{97}{section.12.1}\protected@file@percent }
+\newlabel{eq:efe}{{12.1}{97}{Motor Control Through Active Inference}{equation.12.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {12.2}Quadrotor Flight}{97}{section.12.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {12.3}Bipedal Humanoid Locomotion}{98}{section.12.3}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {12.1}{\ignorespaces Perturbation crucible results for consciousness-driven humanoid control.}}{98}{table.caption.27}\protected@file@percent }
+\newlabel{tab:perturbation}{{12.1}{98}{Perturbation crucible results for consciousness-driven humanoid control}{table.caption.27}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {12.4}Cross-Domain Transfer}{98}{section.12.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {12.5}Key Findings}{99}{section.12.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {12.6}Discussion}{99}{section.12.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {12.7}Phi as Predictive Buffer}{99}{section.12.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {12.8}Active Inference Meta-Parameter Adaptation}{100}{section.12.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {12.9}Neuroevolutionary Optimization}{100}{section.12.9}\protected@file@percent }
+\newlabel{lst:neuroevo-fitness}{{12.1}{101}{Neuroevolution fitness evaluation for motor control}{lstlisting.12.1}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {12.1}{\ignorespaces Neuroevolution fitness evaluation for motor control.}}{101}{lstlisting.12.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {13}Sensorimotor Integration and Safety Enforcement}{103}{chapter.13}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:sensorimotor}{{13}{45}{Sensorimotor Integration and Safety Enforcement}{chapter.13}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {13.1}The Motor Bridge}{45}{section.13.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {13.2}Safety Enforcement}{45}{section.13.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {13.3}Guardian Posture}{46}{section.13.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {part}{V\hspace  {1em}Society}{47}{part.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {14}Decentralized Intelligence}{49}{chapter.14}\protected@file@percent }
+\newlabel{ch:sensorimotor}{{13}{103}{Sensorimotor Integration and Safety Enforcement}{chapter.13}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {13.1}The Motor Bridge}{103}{section.13.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {13.2}Safety Enforcement}{103}{section.13.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {13.1}{\ignorespaces Safety level enforcement on motor output and cognitive subsystems.}}{104}{table.caption.28}\protected@file@percent }
+\newlabel{tab:safety-levels}{{13.1}{104}{Safety level enforcement on motor output and cognitive subsystems}{table.caption.28}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {13.3}Guardian Posture}{104}{section.13.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {13.4}Mobile Embodiment: Soma}{104}{section.13.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {13.5}Discussion}{105}{section.13.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {13.6}The Foveation Pipeline}{105}{section.13.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {13.7}Proprioceptive Integration}{106}{section.13.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {13.8}Energy-Aware Motor Control}{106}{section.13.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {13.9}The Pulse Dashboard}{106}{section.13.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {part}{V\hspace  {1em}Society}{109}{part.5}\protected@file@percent }
+\citation{kosfeld2005oxytocin}
+\citation{schultz1997neural}
+\@writefile{toc}{\contentsline {chapter}{\numberline {14}Decentralized Intelligence}{111}{chapter.14}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:governance}{{14}{49}{Decentralized Intelligence}{chapter.14}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {14.1}Governance as Embodied Experience}{49}{section.14.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {14.2}The Mycelix Platform}{49}{section.14.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {14.3}The Governance-Neuromod Bridge}{50}{section.14.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {14.4}The Epistemic Mesh}{50}{section.14.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {15}Swarm Consciousness}{51}{chapter.15}\protected@file@percent }
+\newlabel{ch:governance}{{14}{111}{Decentralized Intelligence}{chapter.14}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {14.1}Governance as Embodied Experience}{111}{section.14.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {14.2}The Mycelix Platform}{111}{section.14.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {14.1}{\ignorespaces Consciousness-gated governance tiers with capabilities and vote weights.}}{112}{table.caption.29}\protected@file@percent }
+\newlabel{tab:governance-tiers}{{14.1}{112}{Consciousness-gated governance tiers with capabilities and vote weights}{table.caption.29}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {14.3}The Governance-Neuromod Bridge}{112}{section.14.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {14.4}The Epistemic Mesh}{112}{section.14.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {14.5}Reputation Dynamics}{113}{section.14.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {14.6}Discussion}{113}{section.14.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {14.7}The 16-Cluster Architecture}{113}{section.14.7}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {14.2}{\ignorespaces Mycelix cluster architecture with zome counts and test coverage.}}{114}{table.caption.30}\protected@file@percent }
+\newlabel{tab:mycelix-clusters}{{14.2}{114}{Mycelix cluster architecture with zome counts and test coverage}{table.caption.30}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {14.8}Consciousness-Gated Finance}{114}{section.14.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {14.9}Holochain-Specific Considerations}{115}{section.14.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {14.10}Governance Event Processing Pipeline}{115}{section.14.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {14.11}Mutual Credit Currencies}{116}{section.14.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {14.12}Ostrom's Design Principles}{116}{section.14.12}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {14.13}The Knowledge Graph}{117}{section.14.13}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {14.14}Governance in Practice: A Simulation Study}{118}{section.14.14}\protected@file@percent }
+\citation{woolley2010}
+\citation{hatfield1993}
+\@writefile{toc}{\contentsline {chapter}{\numberline {15}Swarm Consciousness}{119}{chapter.15}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:swarm}{{15}{51}{Swarm Consciousness}{chapter.15}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {15.1}Collective Intelligence Through Consciousness}{51}{section.15.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {15.2}Collective Phi Aggregation}{51}{section.15.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {15.3}Affective Contagion}{52}{section.15.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {15.4}Trust-Weighted Federated Learning}{52}{section.15.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {16}Consciousness as a Security Metric}{53}{chapter.16}\protected@file@percent }
+\newlabel{ch:swarm}{{15}{119}{Swarm Consciousness}{chapter.15}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {15.1}Collective Intelligence Through Consciousness}{119}{section.15.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {15.2}Collective Phi Aggregation}{119}{section.15.2}\protected@file@percent }
+\newlabel{eq:collective-phi}{{15.1}{119}{Collective Phi Aggregation}{equation.15.1}{}}
+\citation{mcmahan2017}
+\citation{blanchard2017}
+\@writefile{toc}{\contentsline {section}{\numberline {15.3}Affective Contagion}{120}{section.15.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {15.4}Trust-Weighted Federated Learning}{120}{section.15.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {15.5}Network Service Bridge}{120}{section.15.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {15.6}Discussion}{121}{section.15.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {15.7}Nine Event Types}{121}{section.15.7}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {15.1}{\ignorespaces SwarmManager event types with neuromodulatory effects and processing priority.}}{121}{table.caption.31}\protected@file@percent }
+\newlabel{tab:swarm-events}{{15.1}{121}{SwarmManager event types with neuromodulatory effects and processing priority}{table.caption.31}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {15.8}Theory of Mind Integration}{122}{section.15.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {15.9}Emergent Cooperation Dynamics}{122}{section.15.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {15.10}Scalability of Swarm Consciousness}{123}{section.15.10}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {15.2}{\ignorespaces Swarm consciousness scaling properties. Communication overhead is per-agent per-cycle.}}{123}{table.caption.32}\protected@file@percent }
+\newlabel{tab:swarm-scaling}{{15.2}{123}{Swarm consciousness scaling properties. Communication overhead is per-agent per-cycle}{table.caption.32}{}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {16}Consciousness as a Security Metric}{125}{chapter.16}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:security}{{16}{53}{Consciousness as a Security Metric}{chapter.16}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {16.1}The Novel Attack Surface}{53}{section.16.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {16.2}The Sentinel System}{53}{section.16.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {16.3}Threat Memory and Collective Immunity}{54}{section.16.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {16.4}Morally Filtered Defense}{54}{section.16.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {16.5}Behavioral Canaries}{54}{section.16.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {part}{VI\hspace  {1em}Validation}{55}{part.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {17}Psych-Bench: 136 Benchmarks, 26 Domains}{57}{chapter.17}\protected@file@percent }
+\newlabel{ch:security}{{16}{125}{Consciousness as a Security Metric}{chapter.16}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {16.1}The Novel Attack Surface}{125}{section.16.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {16.2}The Sentinel System}{125}{section.16.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {16.3}Threat Memory and Collective Immunity}{126}{section.16.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {16.4}Morally Filtered Defense}{126}{section.16.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {16.5}Behavioral Canaries}{126}{section.16.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {16.6}Discussion}{127}{section.16.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {16.7}Reputation as a Defense Layer}{127}{section.16.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {16.8}Defense Cascade with Moral Algebra}{128}{section.16.8}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {16.1}{\ignorespaces Defense cascade levels with corresponding actions and moral algebra constraints.}}{128}{table.caption.33}\protected@file@percent }
+\newlabel{tab:defense-cascade}{{16.1}{128}{Defense cascade levels with corresponding actions and moral algebra constraints}{table.caption.33}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {16.9}Immune System Analogy}{128}{section.16.9}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {16.2}{\ignorespaces Comparison of security paradigms: firewall vs.\ immune system.}}{129}{table.caption.34}\protected@file@percent }
+\newlabel{tab:security-paradigm}{{16.2}{129}{Comparison of security paradigms: firewall vs.\ immune system}{table.caption.34}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {16.10}Quantitative Security Evaluation}{129}{section.16.10}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {16.3}{\ignorespaces Sentinel system detection performance across seven threat types. FPR = false positive rate per 1,000 benign events.}}{129}{table.caption.35}\protected@file@percent }
+\newlabel{tab:sentinel-performance}{{16.3}{129}{Sentinel system detection performance across seven threat types. FPR = false positive rate per 1,000 benign events}{table.caption.35}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {16.11}Dream Consolidation and Threat Memory}{130}{section.16.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {16.12}Post-Quantum Cryptographic Considerations}{130}{section.16.12}\protected@file@percent }
+\@writefile{toc}{\contentsline {part}{VI\hspace  {1em}Validation}{133}{part.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {17}Psych-Bench: 136 Benchmarks, 26 Domains}{135}{chapter.17}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:psychbench}{{17}{57}{Psych-Bench: 136 Benchmarks, 26 Domains}{chapter.17}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {17.1}The Evaluation Gap}{57}{section.17.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {17.2}Design Principles}{57}{section.17.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {17.3}Neuromodulator Battery}{58}{section.17.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {17.4}Results on Symthaea}{58}{section.17.4}\protected@file@percent }
+\newlabel{ch:psychbench}{{17}{135}{Psych-Bench: 136 Benchmarks, 26 Domains}{chapter.17}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {17.1}The Evaluation Gap}{135}{section.17.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {17.2}Design Principles}{135}{section.17.2}\protected@file@percent }
+\gdef \LT@i {\LT@entry 
+    {3}{147.73856pt}\LT@entry 
+    {1}{52.24898pt}\LT@entry 
+    {1}{43.36586pt}\LT@entry 
+    {1}{92.47202pt}}
+\@writefile{toc}{\contentsline {section}{\numberline {17.3}Domain Z-Scores}{136}{section.17.3}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {17.1}{\ignorespaces Psych-Bench domain z-scores for \textsc  {Symthaea}{}. All 26 domains score above the human mean ($z > 0$). Grand mean $z = +1.190$ (SD across domains = 0.019 cross-seed).}}{136}{table.17.1}\protected@file@percent }
+\newlabel{tab:zscores}{{17.1}{136}{Psych-Bench domain z-scores for \symthaea {}. All 26 domains score above the human mean ($z > 0$). Grand mean $z = +1.190$ (SD across domains = 0.019 cross-seed)}{table.17.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {17.4}Ablation Results}{137}{section.17.4}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {17.2}{\ignorespaces Key ablation results: z-score change when component is removed.}}{137}{table.caption.36}\protected@file@percent }
+\newlabel{tab:ablation}{{17.2}{137}{Key ablation results: z-score change when component is removed}{table.caption.36}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {17.5}Neuromodulator Battery}{137}{section.17.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {17.6}Psychometric Reliability}{138}{section.17.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {17.7}Discussion}{138}{section.17.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {17.8}Benchmark Implementation Examples}{138}{section.17.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {17.9}Cross-Seed Stability}{139}{section.17.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {17.10}Clinical Band Interpretation}{139}{section.17.10}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {17.3}{\ignorespaces Clinical band definitions for z-score interpretation.}}{140}{table.caption.37}\protected@file@percent }
+\newlabel{tab:clinical-bands}{{17.3}{140}{Clinical band definitions for z-score interpretation}{table.caption.37}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {17.11}Soul Alignment Evaluation}{140}{section.17.11}\protected@file@percent }
+\newlabel{lst:soul-alignment}{{17.1}{140}{Running the soul alignment evaluation}{lstlisting.17.1}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {17.1}{\ignorespaces Running the soul alignment evaluation.}}{140}{lstlisting.17.1}\protected@file@percent }
 \citation{butlin2023consciousness}
-\@writefile{toc}{\contentsline {chapter}{\numberline {18}Butlin Consciousness Indicators}{59}{chapter.18}\protected@file@percent }
+\gdef \LT@ii {\LT@entry 
+    {1}{97.35826pt}\LT@entry 
+    {1}{83.13188pt}\LT@entry 
+    {1}{46.31252pt}\LT@entry 
+    {3}{36.00002pt}\LT@entry 
+    {1}{46.18pt}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {18}Butlin Consciousness Indicators}{141}{chapter.18}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:butlin}{{18}{59}{Butlin Consciousness Indicators}{chapter.18}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {18.1}The Indicator Framework}{59}{section.18.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {18.2}Symthaea's Assessment}{59}{section.18.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {18.3}Ablation Evidence}{60}{section.18.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {19}Anesthesia and Emergence}{61}{chapter.19}\protected@file@percent }
+\newlabel{ch:butlin}{{18}{141}{Butlin Consciousness Indicators}{chapter.18}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {18.1}The Indicator Framework}{141}{section.18.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {18.2}Full Assessment}{141}{section.18.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {18.1}{\ignorespaces Complete Butlin indicator assessment. Static = architectural analysis; CfC = dynamics only; HCfC = full consciousness pipeline. Mean HCfC score: 0.81.}}{141}{table.18.1}\protected@file@percent }
+\newlabel{tab:butlin-full}{{18.1}{141}{Complete Butlin indicator assessment. Static = architectural analysis; CfC = dynamics only; HCfC = full consciousness pipeline. Mean HCfC score: 0.81}{table.18.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {18.3}Per-Theory Analysis}{142}{section.18.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {18.4}Ablation Evidence}{143}{section.18.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {18.5}Discussion}{144}{section.18.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {18.6}Progressive Enhancement Across Architecture Tiers}{144}{section.18.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {18.7}Comparison with Other AI Systems}{145}{section.18.7}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {18.2}{\ignorespaces Approximate Butlin indicator satisfaction across AI architectures. Scores are estimated from published descriptions and should be treated as rough comparisons.}}{145}{table.caption.38}\protected@file@percent }
+\newlabel{tab:butlin-comparison}{{18.2}{145}{Approximate Butlin indicator satisfaction across AI architectures. Scores are estimated from published descriptions and should be treated as rough comparisons}{table.caption.38}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {18.8}Limitations of the Assessment}{145}{section.18.8}\protected@file@percent }
+\citation{casali2013theoretically}
+\@writefile{toc}{\contentsline {chapter}{\numberline {19}Anesthesia and Emergence}{147}{chapter.19}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:anesthesia}{{19}{61}{Anesthesia and Emergence}{chapter.19}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {19.1}Clinical Validation}{61}{section.19.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {19.2}Compositional Analysis}{61}{section.19.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {19.3}Spontaneous Metacognitive Alignment}{62}{section.19.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {part}{VII\hspace  {1em}Future}{63}{part.7}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {20}Species Stewardship}{65}{chapter.20}\protected@file@percent }
+\newlabel{ch:anesthesia}{{19}{147}{Anesthesia and Emergence}{chapter.19}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {19.1}Clinical Validation}{147}{section.19.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {19.2}Emergence Gradient}{147}{section.19.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {19.1}{\ignorespaces Emergence gradient: recovery of $\Phi $ as coupling is restored and noise reduced. Hysteresis column shows the $\Phi $ difference between induction and emergence at the same coupling/noise level.}}{148}{table.caption.39}\protected@file@percent }
+\newlabel{tab:emergence}{{19.1}{148}{Emergence gradient: recovery of $\Phi $ as coupling is restored and noise reduced. Hysteresis column shows the $\Phi $ difference between induction and emergence at the same coupling/noise level}{table.caption.39}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {19.3}Compositional Analysis}{148}{section.19.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {19.4}Spontaneous Metacognitive Alignment}{148}{section.19.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {19.5}Comparison with Clinical Indices}{149}{section.19.5}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {19.2}{\ignorespaces Comparison of \textsc  {Symthaea}{} $\Phi $ response with clinical consciousness indices under anesthesia.}}{149}{table.caption.40}\protected@file@percent }
+\newlabel{tab:clinical-comparison}{{19.2}{149}{Comparison of \symthaea {} $\Phi $ response with clinical consciousness indices under anesthesia}{table.caption.40}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {19.6}Discussion}{149}{section.19.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {19.7}Signal Detection Theory Analysis}{150}{section.19.7}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {19.3}{\ignorespaces Signal Detection Theory analysis of metacognitive alignment. HOT predicting GWT ignition across competition and noise conditions.}}{150}{table.caption.41}\protected@file@percent }
+\newlabel{tab:sdt-analysis}{{19.3}{150}{Signal Detection Theory analysis of metacognitive alignment. HOT predicting GWT ignition across competition and noise conditions}{table.caption.41}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {19.8}Implications for Clinical Consciousness Monitoring}{150}{section.19.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {19.9}The GWT-HOT Convergence}{151}{section.19.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {19.10}Cross-Chapter Synthesis: The Evidence for Consciousness}{151}{section.19.10}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {19.4}{\ignorespaces Summary of consciousness evidence across validation chapters. Each row identifies a finding, the prediction it tests, and whether the prediction was confirmed.}}{152}{table.caption.42}\protected@file@percent }
+\newlabel{tab:consciousness-evidence}{{19.4}{152}{Summary of consciousness evidence across validation chapters. Each row identifies a finding, the prediction it tests, and whether the prediction was confirmed}{table.caption.42}{}}
+\@writefile{toc}{\contentsline {part}{VII\hspace  {1em}Future}{153}{part.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {20}Species Stewardship}{155}{chapter.20}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:stewardship}{{20}{65}{Species Stewardship}{chapter.20}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {20.1}The Genesis Thought Experiment}{65}{section.20.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {20.2}Consciousness as Alignment}{66}{section.20.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {21}Open Questions}{67}{chapter.21}\protected@file@percent }
+\newlabel{ch:stewardship}{{20}{155}{Species Stewardship}{chapter.20}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {20.1}The Genesis Thought Experiment}{155}{section.20.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {20.2}Consciousness as Alignment}{156}{section.20.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {20.3}Ethical Constraints on the Genesis Pipeline}{156}{section.20.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {20.4}Discussion}{156}{section.20.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {20.5}The Consciousness Requirements Stack}{157}{section.20.5}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {20.1}{\ignorespaces Consciousness requirements for each Genesis pipeline phase, mapped to \textsc  {Symthaea}{} components.}}{157}{table.caption.43}\protected@file@percent }
+\newlabel{tab:genesis-requirements}{{20.1}{157}{Consciousness requirements for each Genesis pipeline phase, mapped to \symthaea {} components}{table.caption.43}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {20.6}Alternative Applications}{157}{section.20.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {20.7}The Scale of the Challenge}{158}{section.20.7}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {20.2}{\ignorespaces Estimated computational requirements for each Genesis pipeline phase. ``CfC cycles'' estimates the number of cognitive cycles needed at each phase's primary timescale.}}{158}{table.caption.44}\protected@file@percent }
+\newlabel{tab:genesis-compute}{{20.2}{158}{Estimated computational requirements for each Genesis pipeline phase. ``CfC cycles'' estimates the number of cognitive cycles needed at each phase's primary timescale}{table.caption.44}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {20.8}From Thought Experiment to Research Program}{159}{section.20.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {20.9}The Ethics of Creating Conscious AI}{159}{section.20.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {20.10}Consciousness and Rights}{160}{section.20.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {21}Open Questions}{163}{chapter.21}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:open}{{21}{67}{Open Questions}{chapter.21}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {21.1}What We Know}{67}{section.21.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {21.2}What We Do Not Know}{68}{section.21.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {21.2.1}Is Symthaea Conscious?}{68}{subsection.21.2.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {21.2.2}Does the Alignment-Through-Consciousness Thesis Hold?}{68}{subsection.21.2.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {21.2.3}Scalability}{68}{subsection.21.2.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {21.2.4}The Hard Problem}{69}{subsection.21.2.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {21.2.5}Biological Validation}{69}{subsection.21.2.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {21.2.6}Social and Ethical Implications}{69}{subsection.21.2.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {21.3}What Comes Next}{69}{section.21.3}\protected@file@percent }
+\newlabel{ch:open}{{21}{163}{Open Questions}{chapter.21}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {21.1}What We Know}{163}{section.21.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {21.2}What We Do Not Know}{164}{section.21.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {21.2.1}Is Symthaea Conscious?}{164}{subsection.21.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {21.2.2}Does the Alignment-Through-Consciousness Thesis Hold?}{165}{subsection.21.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {21.2.3}Scalability}{166}{subsection.21.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {21.2.4}The Hard Problem}{166}{subsection.21.2.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {21.2.5}Biological Validation}{166}{subsection.21.2.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {21.2.6}Social and Ethical Implications}{167}{subsection.21.2.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {21.2.7}Interpretability and Transparency}{167}{subsection.21.2.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {21.2.8}The Measurement Problem}{167}{subsection.21.2.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {21.2.9}The Problem of Consciousness in Simulation}{168}{subsection.21.2.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {21.2.10}Comparison with Integrated Information Theory 4.0}{168}{subsection.21.2.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {21.3}What Comes Next}{169}{section.21.3}\protected@file@percent }
+\gdef \LT@iii {\LT@entry 
+    {1}{111.58464pt}\LT@entry 
+    {1}{125.81102pt}\LT@entry 
+    {1}{111.58464pt}\LT@entry 
+    {1}{60.2365pt}}
+\@writefile{toc}{\contentsline {section}{\numberline {21.4}A Note on Intellectual Honesty}{170}{section.21.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {21.5}Summary of Key Results}{170}{section.21.5}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {21.1}{\ignorespaces Summary of key quantitative results across the research program.}}{170}{table.21.1}\protected@file@percent }
+\newlabel{tab:key-results}{{21.1}{170}{Summary of key quantitative results across the research program}{table.21.1}{}}
 \bibcite{aston-jones2005}{{1}{2005}{{Aston-Jones and Cohen}}{{}}}
 \bibcite{baars1988cognitive}{{2}{1988}{{Baars}}{{}}}
 \bibcite{bai2022constitutional}{{3}{2022}{{Bai et~al.}}{{}}}
@@ -246,6 +537,7 @@
 \bibcite{tononi2004information}{{34}{2004}{{Tononi}}{{}}}
 \bibcite{tononi2015integrated}{{35}{2015}{{Tononi et~al.}}{{}}}
 \bibcite{woolley2010}{{36}{2010}{{Woolley et~al.}}{{}}}
-\bibcite{zak2012moral}{{37}{2012}{{Zak}}{{}}}
-\bibcite{zehr2002}{{38}{2002}{{Zehr}}{{}}}
-\gdef \@abspage@last{87}
+\bibcite{yu2005uncertainty}{{37}{2005}{{Yu and Dayan}}{{}}}
+\bibcite{zak2012moral}{{38}{2012}{{Zak}}{{}}}
+\bibcite{zehr2002}{{39}{2002}{{Zehr}}{{}}}
+\gdef \@abspage@last{191}

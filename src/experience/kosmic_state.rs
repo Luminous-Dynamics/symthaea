@@ -10,7 +10,7 @@
 //! and evaluating that guide response generation.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 /// Unified identity state combining Φ, Harmonies, and GIS
 ///
@@ -336,7 +336,7 @@ pub struct HarmonicState {
     pub weight: f32,
 
     /// Recent evidence that influenced this harmony
-    pub recent_evidence: Vec<HarmonicEvidence>,
+    pub recent_evidence: VecDeque<HarmonicEvidence>,
 }
 
 impl HarmonicState {
@@ -345,7 +345,7 @@ impl HarmonicState {
             name: name.to_string(),
             activation: 0.5,
             weight,
-            recent_evidence: Vec::new(),
+            recent_evidence: VecDeque::new(),
         }
     }
 
@@ -356,10 +356,10 @@ impl HarmonicState {
 
     /// Add evidence
     pub fn add_evidence(&mut self, evidence: HarmonicEvidence) {
-        self.recent_evidence.push(evidence);
+        self.recent_evidence.push_back(evidence);
         // Keep only last 10 evidence items
         if self.recent_evidence.len() > 10 {
-            self.recent_evidence.remove(0);
+            self.recent_evidence.pop_front();
         }
     }
 }
