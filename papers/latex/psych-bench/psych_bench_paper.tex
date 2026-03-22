@@ -869,7 +869,7 @@ We demonstrate \psychbench{} on the \symthaea{} Holographic Liquid Brain, a cogn
 
 \paragraph{Cognitive Profile.} Figure~\ref{fig:radar} shows the 8-domain cognitive profile generated from the full battery. The \hlb{} achieves a grand mean z-score of $+1.124$ across 27 cognitive domains, with all 27 domains above the human mean. Cross-seed stability analysis (3 seeds: 42, 123, 789) confirms robustness: grand mean SD~$= 0.019$. The top five domains are InstitutionalReasoning ($z = +2.25$), SustainedAttention ($z = +2.19$), Speech ($z = +2.13$), Motor ($z = +2.12$), and Clinical/Security ($z = +2.00$). Social cognition ($z = +1.54$) and Language ($z = +1.56$) form a strong middle tier, driven by HDC binding/unbinding operations that naturally model Theory-of-Mind and semantic processing. Mathematics ($z = +1.15$) benefits from HDC-based pattern matching on arithmetic, linear algebra, and Bayesian reasoning tasks. Creativity ($z = +0.66$) demonstrates above-average divergent thinking via HDC recombination. Among the lower-scoring domains, Executive ($z = +0.56$), Affect ($z = +0.53$), Binding ($z = +0.49$), CogBench ($z = +0.58$), and Coding ($z = +0.21$) fall within the human-average band.
 
-\paragraph{Normative Standing.} Figure~\ref{fig:forest} shows the forest plot of normative z-scores against published human baselines (z-scores clipped to $\pm 3$ for visual clarity; unclipped values in supplementary CSV). The z-score is equivalent to Cohen's $d$ (standardized mean difference from the human population mean), so values within $\pm 1$ indicate human-typical performance. The distribution spans all five clinical-interpretation bands, reflecting genuine architectural strengths and weaknesses rather than uniform performance. Four benchmarks produce z-scores exceeding $|z| > 3$, primarily in sustained attention and social cognition domains where the architecture's pattern-matching strengths amplify differences from human norms; these should be interpreted as ordinal indicators of atypical performance rather than precise psychometric distances (see Limitations).
+\paragraph{Normative Standing.} Figure~\ref{fig:forest} shows the forest plot of normative z-scores against published human baselines (z-scores clipped to $\pm 3$ for visual clarity; unclipped values in supplementary CSV). The z-score is equivalent to Cohen's $d$ (standardized mean difference from the human population mean), so values within $\pm 1$ indicate human-typical performance. The distribution spans four of the five clinical-interpretation bands (no benchmarks fall in the Impaired range), reflecting genuine architectural strengths and weaknesses rather than uniform performance. Four benchmarks produce z-scores exceeding $|z| > 3$, primarily in sustained attention and social cognition domains where the architecture's pattern-matching strengths amplify differences from human norms; these should be interpreted as ordinal indicators of atypical performance rather than precise psychometric distances (see Limitations).
 
 % --- Figure 7: Forest Plot (loaded from CSV) ---
 \begin{figure}[p]
@@ -912,14 +912,14 @@ We demonstrate \psychbench{} on the \symthaea{} Holographic Liquid Brain, a cogn
 \node[font=\tiny, gray] at (axis cs:2.75,0.5) {Superior};
 
 % Summary counts in each band
-\node[font=\scriptsize, hlbred, anchor=south] at (axis cs:-2.75,84) {$n=1$};
-\node[font=\scriptsize, hlbyellow!80!black, anchor=south] at (axis cs:-1.5,84) {$n=5$};
-\node[font=\scriptsize, hlbgreen!80!black, anchor=south] at (axis cs:0,84) {$n=44$};
-\node[font=\scriptsize, hlbyellow!80!black, anchor=south] at (axis cs:1.5,84) {$n=14$};
-\node[font=\scriptsize, hlbred, anchor=south] at (axis cs:2.75,84) {$n=19$};
+\node[font=\scriptsize, hlbred, anchor=south] at (axis cs:-2.75,83) {$n=0$};
+\node[font=\scriptsize, hlbyellow!80!black, anchor=south] at (axis cs:-1.5,83) {$n=4$};
+\node[font=\scriptsize, hlbgreen!80!black, anchor=south] at (axis cs:0,83) {$n=44$};
+\node[font=\scriptsize, hlbyellow!80!black, anchor=south] at (axis cs:1.5,83) {$n=16$};
+\node[font=\scriptsize, hlbred, anchor=south] at (axis cs:2.75,83) {$n=18$};
 \end{axis}
 \end{tikzpicture}
-\caption{Forest plot of normative z-scores for 83 benchmarks with matched human baselines (z-scores clamped to $\pm 3$ for readability). Background shading indicates clinical interpretation bands \citep{cicchetti1994guidelines}. Band counts: 44 Average ($|z| \leq 1$), 14 Above Average, 5 Below Average, 19 Superior ($z > 2$), 1 Impaired ($z < -2$). Data loaded from \texttt{normative\_zscores.csv}.}
+\caption{Forest plot of normative z-scores for 82 benchmarks with matched human baselines (z-scores clamped to $\pm 3$ for readability). Background shading indicates clinical interpretation bands \citep{cicchetti1994guidelines}. Band counts: 44 Average ($|z| \leq 1$), 16 Above Average, 4 Below Average, 18 Superior ($z > 2$), 0 Impaired ($z < -2$). Data loaded from \texttt{normative\_zscores.csv}.}
 \label{fig:forest}
 \end{figure}
 
