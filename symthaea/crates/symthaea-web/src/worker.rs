@@ -121,6 +121,18 @@ impl EngineWorker {
 
             w.set_onmessage(Some(onmessage.as_ref().unchecked_ref()));
             onmessage.forget(); // Leak — lives for app lifetime
+
+            // Error handler — catches WASM traps and worker crashes
+            let onerror = Closure::wrap(Box::new(move |e: web_sys::ErrorEvent| {
+                log::error!(
+                    "Worker error: {} ({}:{})",
+                    e.message(),
+                    e.filename(),
+                    e.lineno()
+                );
+            }) as Box<dyn FnMut(web_sys::ErrorEvent)>);
+            w.set_onerror(Some(onerror.as_ref().unchecked_ref()));
+            onerror.forget();
         } else {
             log::warn!("SporeEngine worker not available — running in UI-only mode");
         }

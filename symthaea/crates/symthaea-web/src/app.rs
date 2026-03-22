@@ -157,6 +157,22 @@ pub fn App() -> impl IntoView {
                         }
                         Err(e) => log::warn!("Failed to start loop: {:?}", e),
                     }
+
+                    // Progressively load full Broca pipeline in background
+                    // (335 MB via LFS — cached by service worker after first load)
+                    let engine_bg = engine.clone();
+                    wasm_bindgen_futures::spawn_local(async move {
+                        log::info!("Loading full Broca pipeline (335 MB)...");
+                        let promise = engine_bg.send_simple("loadBrocaPipeline");
+                        match JsFuture::from(promise).await {
+                            Ok(_) => {
+                                log::info!("Full Broca pipeline loaded — chat will use production language generation");
+                            }
+                            Err(_) => {
+                                log::info!("Full Broca pipeline not available — using BrocaLite");
+                            }
+                        }
+                    });
                 }
                 Err(e) => log::error!("Engine init failed: {:?}", e),
             }
