@@ -417,4 +417,46 @@ mod tests {
 
         assert_eq!(transaction.total_price_cents, 100_000_000);
     }
+
+    // ===== Gap 2: Finance Settlement Tests =====
+
+    #[test]
+    fn test_marketplace_settlement_result_serde() {
+        // settled = true variant
+        let result = TransactionSettlementResult {
+            settled: true,
+            finance_reference: Some(
+                "payment:mycelix-marketplace:did:key:buyer:123456".to_string(),
+            ),
+            error: None,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let back: TransactionSettlementResult = serde_json::from_str(&json).unwrap();
+        assert!(back.settled);
+        assert!(back.finance_reference.is_some());
+        assert!(back.error.is_none());
+
+        // settled = false — finance unavailable
+        let result2 = TransactionSettlementResult {
+            settled: false,
+            finance_reference: None,
+            error: Some("Finance cluster not available".to_string()),
+        };
+        let json2 = serde_json::to_string(&result2).unwrap();
+        let back2: TransactionSettlementResult = serde_json::from_str(&json2).unwrap();
+        assert!(!back2.settled);
+        assert!(back2.finance_reference.is_none());
+        assert!(back2.error.as_deref().unwrap().contains("not available"));
+
+        // settled = false — rejected by finance
+        let result3 = TransactionSettlementResult {
+            settled: false,
+            finance_reference: None,
+            error: Some("Finance cluster rejected settlement: Unauthorized".to_string()),
+        };
+        let json3 = serde_json::to_string(&result3).unwrap();
+        let back3: TransactionSettlementResult = serde_json::from_str(&json3).unwrap();
+        assert!(!back3.settled);
+        assert!(back3.error.as_deref().unwrap().contains("rejected"));
+    }
 }

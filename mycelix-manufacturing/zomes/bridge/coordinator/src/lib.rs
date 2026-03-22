@@ -261,6 +261,212 @@ pub fn request_procurement(input: ProcurementRequestInput) -> ExternResult<Procu
     }
 }
 
+// ============================================================================
+// Gap 3: Commons ↔ Manufacturing — local-first sourcing
+// ============================================================================
+
+/// Input for querying commons inventory.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CommonsInventoryQueryInput {
+    /// SKU or resource category to look for.
+    pub sku_or_category: String,
+}
+
+/// Result returned from the commons query.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CommonsInventoryResult {
+    /// Available quantity from commons (None if commons not installed).
+    pub available_quantity: Option<u64>,
+    /// Whether the commons cluster was reachable.
+    pub commons_available: bool,
+    /// Non-fatal error if commons was unreachable.
+    pub error: Option<String>,
+}
+
+/// Query the commons resource-mesh cluster for available resources matching
+/// a SKU or category before falling back to the supplychain cluster.
+///
+/// Calls `get_resource_status` on the commons `resource_mesh` zome.
+/// If the commons cluster is not installed the call returns `Err`, which is
+/// caught and surfaced as a graceful `CommonsInventoryResult`.
+#[hdk_extern]
+pub fn query_commons_inventory(
+    input: CommonsInventoryQueryInput,
+) -> ExternResult<CommonsInventoryResult> {
+    if input.sku_or_category.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "sku_or_category must not be empty".to_string()
+        )));
+    }
+
+    let payload = ExternIO::encode(serde_json::json!({
+        "resource_type": input.sku_or_category,
+        "location": null,
+        "limit": 50,
+    }))
+    .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+
+    match call(
+        CallTargetCell::OtherRole("commons".into()),
+        ZomeName::from("resource_mesh"),
+        FunctionName::from("get_resource_status"),
+        None,
+        payload,
+    ) {
+        Ok(ZomeCallResponse::Ok(data)) => {
+            // get_resource_status returns Vec<SensorReading>.
+            // Each SensorReading has a `value: f64` field representing the current
+            // measurement (e.g., quantity on hand). We sum them for total available.
+            let readings: serde_json::Value =
+                data.decode().unwrap_or(serde_json::Value::Array(vec![]));
+
+            let total: u64 = readings
+                .as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|r| r.get("value").and_then(|v| v.as_f64()))
+                        .filter(|v| v.is_finite() && *v > 0.0)
+                        .map(|v| v.round() as u64)
+                        .sum()
+                })
+                .unwrap_or(0);
+
+            Ok(CommonsInventoryResult {
+                available_quantity: Some(total),
+                commons_available: true,
+                error: None,
+            })
+        }
+        Ok(other) => Ok(CommonsInventoryResult {
+            available_quantity: None,
+            commons_available: true,
+            error: Some(format!(
+                "Commons cluster call rejected: {:?}",
+                other
+            )),
+        }),
+        Err(_) => Ok(CommonsInventoryResult {
+            available_quantity: None,
+            commons_available: false,
+            error: Some("Commons cluster not available".to_string()),
+        }),
+    }
+}
+
+/// Combined availability result from local-preference sourcing.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LocalPreferenceResult {
+    /// Quantity sourced from commons (0 if unavailable or insufficient).
+    pub from_commons: u64,
+    /// Quantity that must come from supplychain.
+    pub from_supplychain: u64,
+    /// Whether commons was reachable.
+    pub commons_available: bool,
+    /// Whether supplychain was queried for the deficit.
+    pub supplychain_queried: bool,
+    /// Whether supplychain has sufficient stock for the deficit.
+    pub supplychain_sufficient: bool,
+    /// Non-fatal message or error.
+    pub message: String,
+}
+
+/// Source a quantity of a part/resource with local commons preference.
+///
+/// First queries commons via `query_commons_inventory`.  If commons has
+/// enough, supplychain is not contacted.  If commons is insufficient (or
+/// unavailable), the deficit is looked up in supplychain via
+/// `get_stock_level_by_sku`.
+#[hdk_extern]
+pub fn source_with_local_preference(
+    input: ProcurementRequestInput,
+) -> ExternResult<LocalPreferenceResult> {
+    if input.part_id.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "part_id is required".to_string()
+        )));
+    }
+    if input.quantity == 0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "quantity must be > 0".to_string()
+        )));
+    }
+
+    // Step 1: Try commons first
+    let commons_result = query_commons_inventory(CommonsInventoryQueryInput {
+        sku_or_category: input.part_id.clone(),
+    })?;
+
+    let commons_qty = commons_result.available_quantity.unwrap_or(0);
+    let commons_available = commons_result.commons_available;
+
+    if commons_qty >= input.quantity {
+        // Commons alone can satisfy the request
+        return Ok(LocalPreferenceResult {
+            from_commons: input.quantity,
+            from_supplychain: 0,
+            commons_available,
+            supplychain_queried: false,
+            supplychain_sufficient: false,
+            message: format!(
+                "Commons can fully supply {} units of {}",
+                input.quantity, input.part_id
+            ),
+        });
+    }
+
+    let deficit = input.quantity.saturating_sub(commons_qty);
+
+    // Step 2: Query supplychain for the deficit
+    let sc_payload = ExternIO::encode(serde_json::json!({ "sku": input.part_id }))
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+
+    let (sc_sufficient, message) = match call(
+        CallTargetCell::OtherRole("supplychain".into()),
+        ZomeName::from("inventory_coordinator"),
+        FunctionName::from("get_stock_level_by_sku"),
+        None,
+        sc_payload,
+    ) {
+        Ok(ZomeCallResponse::Ok(data)) => {
+            let level: serde_json::Value = data.decode().unwrap_or(serde_json::Value::Null);
+            let sc_qty = level
+                .get("quantity")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let sufficient = sc_qty >= deficit;
+            let msg = if sufficient {
+                format!(
+                    "Commons supplies {} units; supplychain covers {} unit deficit",
+                    commons_qty, deficit
+                )
+            } else {
+                format!(
+                    "Commons supplies {} units; supplychain only has {} of {} needed",
+                    commons_qty, sc_qty, deficit
+                )
+            };
+            (sufficient, msg)
+        }
+        Ok(other) => (
+            false,
+            format!("Supplychain call rejected: {:?}", other),
+        ),
+        Err(_) => (
+            false,
+            "Supplychain cluster not available".to_string(),
+        ),
+    };
+
+    Ok(LocalPreferenceResult {
+        from_commons: commons_qty,
+        from_supplychain: deficit,
+        commons_available,
+        supplychain_queried: true,
+        supplychain_sufficient: sc_sufficient,
+        message,
+    })
+}
+
 /// List all bridge events (for auditing / debugging).
 #[hdk_extern]
 pub fn list_bridge_events(_: ()) -> ExternResult<Vec<Link>> {
@@ -342,5 +548,68 @@ mod tests {
         let back: ProcurementRequestOutput = serde_json::from_str(&json).unwrap();
         assert!(!back.accepted);
         assert!(back.message.contains("unavailable"));
+    }
+
+    // ===== Gap 3: Commons ↔ Manufacturing Tests =====
+
+    #[test]
+    fn test_commons_query_result_serde() {
+        // Commons available with quantity
+        let result = CommonsInventoryResult {
+            available_quantity: Some(250),
+            commons_available: true,
+            error: None,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let back: CommonsInventoryResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.available_quantity, Some(250));
+        assert!(back.commons_available);
+        assert!(back.error.is_none());
+
+        // Commons unavailable
+        let result2 = CommonsInventoryResult {
+            available_quantity: None,
+            commons_available: false,
+            error: Some("Commons cluster not available".to_string()),
+        };
+        let json2 = serde_json::to_string(&result2).unwrap();
+        let back2: CommonsInventoryResult = serde_json::from_str(&json2).unwrap();
+        assert!(back2.available_quantity.is_none());
+        assert!(!back2.commons_available);
+        assert!(back2.error.is_some());
+    }
+
+    #[test]
+    fn test_local_preference_result_serde() {
+        // Commons fully covers the request
+        let result = LocalPreferenceResult {
+            from_commons: 100,
+            from_supplychain: 0,
+            commons_available: true,
+            supplychain_queried: false,
+            supplychain_sufficient: false,
+            message: "Commons can fully supply 100 units of BOLT-M6".to_string(),
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let back: LocalPreferenceResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.from_commons, 100);
+        assert_eq!(back.from_supplychain, 0);
+        assert!(!back.supplychain_queried);
+
+        // Mixed sourcing
+        let result2 = LocalPreferenceResult {
+            from_commons: 40,
+            from_supplychain: 60,
+            commons_available: true,
+            supplychain_queried: true,
+            supplychain_sufficient: true,
+            message: "Commons supplies 40 units; supplychain covers 60 unit deficit".to_string(),
+        };
+        let json2 = serde_json::to_string(&result2).unwrap();
+        let back2: LocalPreferenceResult = serde_json::from_str(&json2).unwrap();
+        assert_eq!(back2.from_commons, 40);
+        assert_eq!(back2.from_supplychain, 60);
+        assert!(back2.supplychain_queried);
+        assert!(back2.supplychain_sufficient);
     }
 }

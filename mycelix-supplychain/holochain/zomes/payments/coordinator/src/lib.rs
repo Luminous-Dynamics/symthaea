@@ -362,6 +362,9 @@ pub fn process_fulfillment_payment(
     let payment_hash = create_payment(payment_input)?;
     confirm_payment(payment_hash.clone())?;
 
+    // Step 6: Best-effort settlement in the finance cluster
+    let _ = settle_in_finance(payment_hash.clone());
+
     Ok(FulfillmentPaymentResult {
         action: "payment_created".to_string(),
         payment_hash: Some(payment_hash),
@@ -378,6 +381,96 @@ pub fn get_po_total_paid(po_hash: ActionHash) -> ExternResult<u64> {
         .map(|p| p.amount)
         .sum();
     Ok(total)
+}
+
+// ============================================================================
+// Gap 1: Finance Settlement Bridge
+// ============================================================================
+
+/// Result of attempting to settle a supplychain payment in the finance cluster.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FinanceSettlementResult {
+    pub settled: bool,
+    pub finance_reference: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Settle a local supplychain payment in the finance cluster.
+///
+/// Looks up the local payment by `payment_hash`, then calls the finance cluster's
+/// `process_payment` function via `CallTargetCell::OtherRole("finance")`.
+/// If the finance cluster is not installed (role not found) the call will return
+/// an `Err`, which is caught and surfaced as a non-fatal `FinanceSettlementResult`.
+pub fn settle_in_finance(payment_hash: ActionHash) -> ExternResult<FinanceSettlementResult> {
+    // Retrieve the local payment record
+    let payment = match get_payment(payment_hash.clone())? {
+        Some(p) => p,
+        None => {
+            return Ok(FinanceSettlementResult {
+                settled: false,
+                finance_reference: None,
+                error: Some(format!("Payment {} not found locally", payment_hash)),
+            });
+        }
+    };
+
+    // Build a finance-compatible cross-hApp payment payload.
+    // Finance bridge `process_payment` expects: source_happ, from_did (payer),
+    // to_did (payee), amount, currency, reference.
+    // We derive DIDs from the agent pub keys using a simple base64 encoding
+    // that is consistent with how other clusters express DIDs for agent keys.
+    let payload = serde_json::json!({
+        "source_happ": "mycelix-supplychain",
+        "from_did": format!("did:key:{}", payment.payer),
+        "to_did": format!("did:key:{}", payment.payee),
+        "amount": payment.amount,
+        "currency": payment.currency,
+        "reference": payment.reference,
+    });
+
+    let encoded = ExternIO::encode(payload)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+
+    match call(
+        CallTargetCell::OtherRole("finance".into()),
+        ZomeName::from("finance_bridge"),
+        FunctionName::from("process_payment"),
+        None,
+        encoded,
+    ) {
+        Ok(ZomeCallResponse::Ok(data)) => {
+            // Decode the returned Record as a serde_json::Value to extract the ID
+            let value: serde_json::Value = data
+                .decode()
+                .unwrap_or(serde_json::Value::Null);
+            let finance_reference = value
+                .get("entry")
+                .and_then(|e| e.get("id"))
+                .and_then(|id| id.as_str())
+                .map(|s| s.to_string());
+            Ok(FinanceSettlementResult {
+                settled: true,
+                finance_reference,
+                error: None,
+            })
+        }
+        Ok(other) => {
+            // Finance cluster installed but call was rejected (auth, countersigning, etc.)
+            Ok(FinanceSettlementResult {
+                settled: false,
+                finance_reference: None,
+                error: Some(format!("Finance cluster rejected settlement: {:?}", other)),
+            })
+        }
+        Err(_) => {
+            // Finance cluster not installed or unreachable — degrade gracefully
+            Ok(FinanceSettlementResult {
+                settled: false,
+                finance_reference: None,
+                error: Some("Finance cluster not available".to_string()),
+            })
+        }
+    }
 }
 
 #[cfg(test)]
@@ -489,5 +582,45 @@ mod tests {
             .map(|p| p.amount)
             .sum();
         assert_eq!(total, 400); // 100 + 300
+    }
+
+    #[test]
+    fn test_finance_settlement_result_serde() {
+        // settled = true variant
+        let result = FinanceSettlementResult {
+            settled: true,
+            finance_reference: Some("payment:mycelix-supplychain:did:key:abc:1234".to_string()),
+            error: None,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let back: FinanceSettlementResult = serde_json::from_str(&json).unwrap();
+        assert!(back.settled);
+        assert!(back.finance_reference.is_some());
+        assert!(back.error.is_none());
+
+        // settled = false variant
+        let result2 = FinanceSettlementResult {
+            settled: false,
+            finance_reference: None,
+            error: Some("Finance cluster not available".to_string()),
+        };
+        let json2 = serde_json::to_string(&result2).unwrap();
+        let back2: FinanceSettlementResult = serde_json::from_str(&json2).unwrap();
+        assert!(!back2.settled);
+        assert!(back2.finance_reference.is_none());
+        assert!(back2.error.is_some());
+    }
+
+    #[test]
+    fn test_settlement_result_with_error() {
+        let result = FinanceSettlementResult {
+            settled: false,
+            finance_reference: None,
+            error: Some("Finance cluster rejected settlement: Unauthorized".to_string()),
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let back: FinanceSettlementResult = serde_json::from_str(&json).unwrap();
+        assert!(!back.settled);
+        assert!(back.error.as_deref().unwrap().contains("rejected"));
     }
 }

@@ -1,6 +1,8 @@
 //! Bridge Coordinator Zome
 //!
-//! Provides CRUD operations for cross-hApp bridge records.
+//! Provides CRUD operations for cross-hApp bridge records plus one-shot
+//! procurement settlement helpers that coordinate local supplychain zomes
+//! with the finance cluster.
 
 use hdk::prelude::*;
 use bridge_integrity::*;
@@ -356,6 +358,146 @@ mod tests {
         assert!(back.shipments.is_empty());
         assert!(back.payments.is_empty());
     }
+}
+
+// =============================================================================
+// Gap 1: One-shot Procurement Payment Settlement
+// =============================================================================
+
+/// Combined result of procuring and settling a purchase order payment.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ProcurementSettlementResult {
+    /// Whether a local payment was created or an escrow was released.
+    pub local_action: String,
+    /// The local payment action hash if one was created/released.
+    pub payment_hash: Option<ActionHash>,
+    /// The local payment amount.
+    pub amount: u64,
+    /// Currency used for the payment.
+    pub currency: String,
+    /// Whether the payment was successfully forwarded to the finance cluster.
+    pub finance_settled: bool,
+    /// Finance cluster reference ID, if settled.
+    pub finance_reference: Option<String>,
+    /// Any non-fatal error message from the finance settlement step.
+    pub finance_error: Option<String>,
+}
+
+/// One-shot function: process a PO fulfillment payment locally, then settle it
+/// in the finance cluster.
+///
+/// This is the primary entry point for UIs, CLIs, and the cognitive loop.
+/// It calls `process_fulfillment_payment` in the local payments coordinator,
+/// then, if a payment was created, calls `settle_in_finance` in the same zome.
+/// Finance cluster unavailability is handled gracefully — the local payment is
+/// always the authoritative record.
+#[hdk_extern]
+pub fn settle_procurement_payment(po_hash: ActionHash) -> ExternResult<serde_json::Value> {
+    // Step 1: Process the fulfillment payment locally
+    let fulfillment_payload = ExternIO::encode(serde_json::json!({ "po_hash": po_hash }))
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+
+    let fulfillment_response = call(
+        CallTargetCell::Local,
+        ZomeName::from("payments_coordinator"),
+        FunctionName::from("process_fulfillment_payment"),
+        None,
+        fulfillment_payload,
+    )?;
+
+    let fulfillment_value: serde_json::Value = match fulfillment_response {
+        ZomeCallResponse::Ok(data) => data
+            .decode()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
+        other => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "process_fulfillment_payment failed: {:?}",
+                other
+            ))));
+        }
+    };
+
+    let local_action = fulfillment_value
+        .get("action")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown")
+        .to_string();
+    let amount = fulfillment_value
+        .get("amount")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
+    let currency = fulfillment_value
+        .get("currency")
+        .and_then(|v| v.as_str())
+        .unwrap_or("USD")
+        .to_string();
+
+    // Decode the payment_hash if present (it is an ActionHash serialized as bytes)
+    let payment_hash: Option<ActionHash> = fulfillment_value
+        .get("payment_hash")
+        .and_then(|v| {
+            serde_json::from_value::<ActionHash>(v.clone()).ok()
+        });
+
+    // Step 2: If a payment was created, settle in finance
+    let (finance_settled, finance_reference, finance_error) =
+        if local_action == "payment_created" {
+            if let Some(ref ph) = payment_hash {
+                let settle_payload =
+                    ExternIO::encode(ph.clone())
+                        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+
+                match call(
+                    CallTargetCell::Local,
+                    ZomeName::from("payments_coordinator"),
+                    FunctionName::from("settle_in_finance"),
+                    None,
+                    settle_payload,
+                ) {
+                    Ok(ZomeCallResponse::Ok(data)) => {
+                        let settlement: serde_json::Value =
+                            data.decode().unwrap_or(serde_json::Value::Null);
+                        let settled = settlement
+                            .get("settled")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false);
+                        let reference = settlement
+                            .get("finance_reference")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+                        let error = settlement
+                            .get("error")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+                        (settled, reference, error)
+                    }
+                    Ok(other) => (
+                        false,
+                        None,
+                        Some(format!("settle_in_finance returned: {:?}", other)),
+                    ),
+                    Err(e) => (false, None, Some(format!("settle_in_finance error: {:?}", e))),
+                }
+            } else {
+                (false, None, Some("No payment hash to settle".to_string()))
+            }
+        } else {
+            // escrow_released, already_paid, po_not_received — no new payment to settle
+            (false, None, None)
+        };
+
+    let result = ProcurementSettlementResult {
+        local_action,
+        payment_hash,
+        amount,
+        currency,
+        finance_settled,
+        finance_reference,
+        finance_error,
+    };
+
+    serde_json::to_value(&result)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))
 }
 
 /// Get bridge connections for a specific hApp

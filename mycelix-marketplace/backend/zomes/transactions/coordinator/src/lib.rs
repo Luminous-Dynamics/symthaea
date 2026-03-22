@@ -428,6 +428,90 @@ pub fn get_listing_transactions(
     Ok(TransactionsResponse { transactions })
 }
 
+// ===== Gap 2: Finance Settlement Bridge =====
+
+/// Result of attempting to settle a marketplace transaction in the finance cluster.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TransactionSettlementResult {
+    pub settled: bool,
+    pub finance_reference: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Settle a completed marketplace transaction in the finance cluster.
+///
+/// Looks up the local transaction by `transaction_hash`, builds a cross-hApp
+/// payment payload, and calls the finance cluster via `CallTargetCell::OtherRole`.
+/// If the finance cluster is not installed the call will return `Err`, which is
+/// caught and surfaced as a non-fatal result.
+pub fn settle_transaction_in_finance(
+    transaction_hash: ActionHash,
+) -> ExternResult<TransactionSettlementResult> {
+    let output = match get_transaction(transaction_hash.clone())? {
+        Some(o) => o,
+        None => {
+            return Ok(TransactionSettlementResult {
+                settled: false,
+                finance_reference: None,
+                error: Some(format!("Transaction {} not found", transaction_hash)),
+            });
+        }
+    };
+
+    let tx = &output.transaction;
+
+    // Convert AgentPubKey to a DID string (did:key:<base64 pubkey>)
+    let buyer_did = format!("did:key:{:?}", tx.buyer);
+    let seller_did = format!("did:key:{:?}", tx.seller);
+
+    let payload = serde_json::json!({
+        "source_happ": "mycelix-marketplace",
+        "from_did": buyer_did,
+        "to_did": seller_did,
+        "amount": tx.total_price_cents,
+        "currency": "SAP",
+        "reference": format!("marketplace_tx:{}", transaction_hash),
+    });
+
+    let encoded = ExternIO::encode(payload)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+
+    match call(
+        CallTargetCell::OtherRole("finance".into()),
+        ZomeName::from("finance_bridge"),
+        FunctionName::from("process_payment"),
+        None,
+        encoded,
+    ) {
+        Ok(ZomeCallResponse::Ok(data)) => {
+            let value: serde_json::Value = data.decode().unwrap_or(serde_json::Value::Null);
+            let finance_reference = value
+                .get("entry")
+                .and_then(|e| e.get("id"))
+                .and_then(|id| id.as_str())
+                .map(|s| s.to_string());
+            Ok(TransactionSettlementResult {
+                settled: true,
+                finance_reference,
+                error: None,
+            })
+        }
+        Ok(other) => Ok(TransactionSettlementResult {
+            settled: false,
+            finance_reference: None,
+            error: Some(format!(
+                "Finance cluster rejected settlement: {:?}",
+                other
+            )),
+        }),
+        Err(_) => Ok(TransactionSettlementResult {
+            settled: false,
+            finance_reference: None,
+            error: Some("Finance cluster not available".to_string()),
+        }),
+    }
+}
+
 // ===== Helper Functions =====
 
 /// Update transaction status with validation

@@ -922,6 +922,193 @@ pub fn get_project(project_id: String) -> ExternResult<Option<Record>> {
     }
 }
 
+// =============================================================================
+// Gap 4: Energy Equipment Procurement via Supplychain
+// =============================================================================
+
+/// Input for procuring equipment via the supplychain cluster.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EquipmentProcurementInput {
+    /// Equipment type / SKU (e.g., "INVERTER-10KW", "SOLAR-PANEL-400W").
+    pub equipment_type: String,
+    /// Number of units required.
+    pub quantity: u64,
+    /// Reference to the energy project requiring the equipment.
+    pub project_hash: ActionHash,
+}
+
+/// Result of an equipment procurement attempt.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EquipmentProcurementResult {
+    /// Whether procurement was initiated successfully.
+    pub procurement_initiated: bool,
+    /// Stock level found in supplychain (None if unavailable/not found).
+    pub stock_available: Option<u64>,
+    /// Supplychain purchase order hash if a PO was created.
+    pub purchase_order_hash: Option<String>,
+    /// Non-fatal error message.
+    pub error: Option<String>,
+}
+
+/// Procure equipment from the supplychain cluster for an energy project.
+///
+/// 1. Checks stock availability via `get_stock_level_by_sku` in the supplychain
+///    inventory zome.
+/// 2. If stock is available, calls `select_best_supplier` then
+///    `create_purchase_order` in the supplychain procurement zome.
+/// 3. Returns a result the caller can handle; all cross-cluster failures are
+///    non-fatal.
+#[hdk_extern]
+pub fn procure_equipment(input: EquipmentProcurementInput) -> ExternResult<EquipmentProcurementResult> {
+    if input.equipment_type.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "equipment_type is required".to_string()
+        )));
+    }
+    if input.quantity == 0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "quantity must be > 0".to_string()
+        )));
+    }
+
+    // Step 1: Check inventory stock level by SKU
+    let stock_payload = ExternIO::encode(serde_json::json!({ "sku": input.equipment_type }))
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+
+    let stock_level: Option<u64> = match call(
+        CallTargetCell::OtherRole("supplychain".into()),
+        ZomeName::from("inventory_coordinator"),
+        FunctionName::from("get_stock_level_by_sku"),
+        None,
+        stock_payload,
+    ) {
+        Ok(ZomeCallResponse::Ok(data)) => {
+            let value: serde_json::Value = data.decode().unwrap_or(serde_json::Value::Null);
+            // get_stock_level_by_sku returns Option<InventoryLevel>
+            // InventoryLevel has a `quantity` field
+            value
+                .get("quantity")
+                .and_then(|v| v.as_u64())
+        }
+        Ok(_) => None,
+        Err(_) => {
+            return Ok(EquipmentProcurementResult {
+                procurement_initiated: false,
+                stock_available: None,
+                purchase_order_hash: None,
+                error: Some("Supplychain cluster not available".to_string()),
+            });
+        }
+    };
+
+    let available = stock_level.unwrap_or(0);
+    if available < input.quantity {
+        return Ok(EquipmentProcurementResult {
+            procurement_initiated: false,
+            stock_available: Some(available),
+            purchase_order_hash: None,
+            error: Some(format!(
+                "Insufficient stock: {} available, {} required",
+                available, input.quantity
+            )),
+        });
+    }
+
+    // Step 2: Select best supplier
+    let supplier_payload = ExternIO::encode(serde_json::json!({
+        "category": input.equipment_type,
+        "quantity": input.quantity,
+    }))
+    .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+
+    let supplier_key: Option<serde_json::Value> = match call(
+        CallTargetCell::OtherRole("supplychain".into()),
+        ZomeName::from("procurement_coordinator"),
+        FunctionName::from("select_best_supplier"),
+        None,
+        supplier_payload,
+    ) {
+        Ok(ZomeCallResponse::Ok(data)) => {
+            data.decode::<serde_json::Value>().ok()
+        }
+        Ok(other) => {
+            return Ok(EquipmentProcurementResult {
+                procurement_initiated: false,
+                stock_available: Some(available),
+                purchase_order_hash: None,
+                error: Some(format!("select_best_supplier rejected: {:?}", other)),
+            });
+        }
+        Err(_) => {
+            return Ok(EquipmentProcurementResult {
+                procurement_initiated: false,
+                stock_available: Some(available),
+                purchase_order_hash: None,
+                error: Some("Supplychain procurement zome not available".to_string()),
+            });
+        }
+    };
+
+    // Step 3: Create purchase order
+    // Unit price is derived from the supplier response if present, defaulting to 1.
+    let unit_price = supplier_key
+        .as_ref()
+        .and_then(|v| v.get("minimum_order_value"))
+        .and_then(|v| v.as_u64())
+        .map(|v| v.max(1))
+        .unwrap_or(1);
+
+    let supplier_agent = supplier_key
+        .as_ref()
+        .and_then(|v| v.get("agent"))
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
+
+    let po_payload = ExternIO::encode(serde_json::json!({
+        "po_number": format!("ENERGY-{}-{}", input.equipment_type, input.project_hash),
+        "supplier": supplier_agent,
+        "items": [{
+            "sku": input.equipment_type,
+            "description": format!("{} units of {}", input.quantity, input.equipment_type),
+            "quantity": input.quantity,
+            "unit_price": unit_price,
+        }],
+        "currency": "USD",
+        "notes": format!("Equipment for energy project {}", input.project_hash),
+    }))
+    .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+
+    match call(
+        CallTargetCell::OtherRole("supplychain".into()),
+        ZomeName::from("procurement_coordinator"),
+        FunctionName::from("create_purchase_order"),
+        None,
+        po_payload,
+    ) {
+        Ok(ZomeCallResponse::Ok(data)) => {
+            let po_hash: serde_json::Value = data.decode().unwrap_or(serde_json::Value::Null);
+            Ok(EquipmentProcurementResult {
+                procurement_initiated: true,
+                stock_available: Some(available),
+                purchase_order_hash: Some(po_hash.to_string()),
+                error: None,
+            })
+        }
+        Ok(other) => Ok(EquipmentProcurementResult {
+            procurement_initiated: false,
+            stock_available: Some(available),
+            purchase_order_hash: None,
+            error: Some(format!("create_purchase_order rejected: {:?}", other)),
+        }),
+        Err(e) => Ok(EquipmentProcurementResult {
+            procurement_initiated: false,
+            stock_available: Some(available),
+            purchase_order_hash: None,
+            error: Some(format!("create_purchase_order error: {:?}", e)),
+        }),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1709,5 +1896,65 @@ mod tests {
         assert!(!payload_str.is_empty());
         assert!(payload_str.contains("certificate_id"));
         assert!(payload_str.contains("sap_value"));
+    }
+
+    // =========================================================================
+    // Gap 4: Equipment Procurement Tests
+    // =========================================================================
+
+    #[test]
+    fn test_equipment_procurement_input_serde() {
+        let input = EquipmentProcurementInput {
+            equipment_type: "INVERTER-10KW".to_string(),
+            quantity: 5,
+            project_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: EquipmentProcurementInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.equipment_type, "INVERTER-10KW");
+        assert_eq!(back.quantity, 5);
+    }
+
+    #[test]
+    fn test_equipment_procurement_result_serde() {
+        // Successful procurement
+        let result = EquipmentProcurementResult {
+            procurement_initiated: true,
+            stock_available: Some(20),
+            purchase_order_hash: Some("ENERGY-INVERTER-10KW-abc123".to_string()),
+            error: None,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let back: EquipmentProcurementResult = serde_json::from_str(&json).unwrap();
+        assert!(back.procurement_initiated);
+        assert_eq!(back.stock_available, Some(20));
+        assert!(back.purchase_order_hash.is_some());
+        assert!(back.error.is_none());
+
+        // Insufficient stock
+        let result2 = EquipmentProcurementResult {
+            procurement_initiated: false,
+            stock_available: Some(2),
+            purchase_order_hash: None,
+            error: Some("Insufficient stock: 2 available, 5 required".to_string()),
+        };
+        let json2 = serde_json::to_string(&result2).unwrap();
+        let back2: EquipmentProcurementResult = serde_json::from_str(&json2).unwrap();
+        assert!(!back2.procurement_initiated);
+        assert_eq!(back2.stock_available, Some(2));
+        assert!(back2.error.as_deref().unwrap().contains("Insufficient"));
+
+        // Cluster unavailable
+        let result3 = EquipmentProcurementResult {
+            procurement_initiated: false,
+            stock_available: None,
+            purchase_order_hash: None,
+            error: Some("Supplychain cluster not available".to_string()),
+        };
+        let json3 = serde_json::to_string(&result3).unwrap();
+        let back3: EquipmentProcurementResult = serde_json::from_str(&json3).unwrap();
+        assert!(!back3.procurement_initiated);
+        assert!(back3.stock_available.is_none());
+        assert!(back3.error.is_some());
     }
 }
