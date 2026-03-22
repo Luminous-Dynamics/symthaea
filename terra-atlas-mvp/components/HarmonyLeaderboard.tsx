@@ -1,7 +1,9 @@
-'use client'
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root'use client'
 
 import { useEffect, useState } from 'react'
-import { ConsciousnessScore } from './ConsciousnessScore'
+import { TrustScore } from './TrustScore'
 
 interface LeaderboardProject {
   id: string
@@ -91,7 +93,7 @@ export function HarmonyLeaderboard({ limit = 10, className = '' }: HarmonyLeader
                 )}
               </div>
 
-              <ConsciousnessScore
+              <TrustScore
                 phiScore={project.consciousness?.phi_score}
                 harmonyAlignment={project.consciousness?.harmony_alignment}
                 size="sm"

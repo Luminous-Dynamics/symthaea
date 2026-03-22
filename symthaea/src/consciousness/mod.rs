@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Consciousness Module: Integration and Awareness
 //!
 //! This module provides consciousness-related capabilities including:
@@ -447,6 +450,11 @@ pub mod causal_byzantine;
 #[cfg(feature = "mycelix")]
 pub mod mycelix_bridge;
 
+#[cfg(feature = "mycelix")]
+pub mod asset_evaluator;
+
+pub mod holon_receiver;
+
 // ============================================================================
 // Re-exports — backward-compatible type-level imports
 // ============================================================================
@@ -468,7 +476,11 @@ pub use dream::{
     DreamEngine, DreamEngineConfig, DreamEngineStats, DreamEvent, DreamResult, Wisdom,
 };
 pub use eight_harmonies::{AlignmentResult, EightHarmonies, Harmony, HarmonyAlignment};
-pub use epistemic_tiers::{EmpiricalTier, EpistemicCoordinate, MaterialityTier, NormativeTier};
+pub use epistemic_tiers::{
+    EmpiricalTier, EmpiricalTierPrimitiveGrounding, EpistemicCoordinate, EpistemicNSMGrounding,
+    MaterialityTier, MaterialityTierPrimitiveGrounding, NormativeTier,
+    NormativeTierPrimitiveGrounding,
+};
 pub use fep_active_inference::{
     ActionSelectionResult, ActiveInferenceAgent, ActiveInferenceAgentConfig,
     ActiveInferenceAgentStats, ActiveInferenceSummary, CognitiveLoopFEPBridge,

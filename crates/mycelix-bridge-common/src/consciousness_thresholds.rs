@@ -1,4 +1,6 @@
-//! Canonical consciousness threshold configuration — single source of truth.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Canonical consciousness threshold configuration — single source of truth.
 //!
 //! All Mycelix components import these values instead of hardcoding their own.
 //! FL core, governance, and personal cluster all reference this module for
@@ -45,6 +47,14 @@ pub struct ConsciousnessThresholds {
     /// Constitutional change threshold (default 0.6)
     pub consciousness_gate_constitutional: f64,
 
+    // Allocation gating (Conscious Allocation Network)
+    /// Pledge submission threshold (default 0.2, Participant tier)
+    pub consciousness_gate_pledge: f64,
+    /// Running matching threshold (default 0.3, Citizen tier)
+    pub consciousness_gate_matching: f64,
+    /// Impact reporting threshold (default 0.2, Participant tier)
+    pub consciousness_gate_impact: f64,
+
     // Bootstrap gating (cold-start communities)
     /// Maximum community size for bootstrap eligibility (default 5)
     pub bootstrap_community_threshold: u32,
@@ -66,6 +76,9 @@ impl Default for ConsciousnessThresholds {
             consciousness_gate_proposal: 0.3,
             consciousness_gate_voting: 0.4,
             consciousness_gate_constitutional: 0.6,
+            consciousness_gate_pledge: 0.2,
+            consciousness_gate_matching: 0.3,
+            consciousness_gate_impact: 0.2,
             bootstrap_community_threshold: BOOTSTRAP_COMMUNITY_THRESHOLD,
             bootstrap_ttl_us: BOOTSTRAP_TTL_US,
             bootstrap_min_identity: BOOTSTRAP_MIN_IDENTITY,
@@ -133,6 +146,25 @@ mod tests {
         assert_eq!(t.consciousness_gate_proposal, 0.3);
         assert_eq!(t.consciousness_gate_voting, 0.4);
         assert_eq!(t.consciousness_gate_constitutional, 0.6);
+    }
+
+    #[test]
+    fn allocation_thresholds_defaults() {
+        let t = consciousness_thresholds();
+        assert_eq!(t.consciousness_gate_pledge, 0.2);
+        assert_eq!(t.consciousness_gate_matching, 0.3);
+        assert_eq!(t.consciousness_gate_impact, 0.2);
+    }
+
+    #[test]
+    fn allocation_thresholds_consistent_with_governance() {
+        let t = ConsciousnessThresholds::default();
+        // Pledge uses basic tier (Participant)
+        assert_eq!(t.consciousness_gate_pledge, t.consciousness_gate_basic);
+        // Matching uses proposal tier (Citizen)
+        assert_eq!(t.consciousness_gate_matching, t.consciousness_gate_proposal);
+        // Impact uses basic tier (Participant)
+        assert_eq!(t.consciousness_gate_impact, t.consciousness_gate_basic);
     }
 
     #[test]

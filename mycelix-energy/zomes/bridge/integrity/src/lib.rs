@@ -1,4 +1,6 @@
-//! Energy Bridge Integrity Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Energy Bridge Integrity Zome
 //!
 //! Entry types for Terra Atlas integration, investment tracking,
 //! and regenerative exit coordination.
@@ -147,6 +149,13 @@ pub enum EnergyEventType {
     StatusChanged,
     SyncPending,
     CertificateCollateralRegistered,
+    ConsciousnessAssessed,
+    PledgeSubmitted,
+    PledgeWithdrawn,
+    MatchProposed,
+    MatchAccepted,
+    MatchRejected,
+    ImpactReported,
 }
 
 /// Production metrics for energy projects
@@ -166,6 +175,119 @@ pub struct ProductionRecord {
     pub self_consumption_mwh: f64,   // energy used locally
     pub recorded_at: Timestamp,
     pub verified_by: Option<String>, // DID of verifier (e.g., grid operator)
+}
+
+/// Consciousness assessment from Symthaea for a project
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ConsciousnessAssessment {
+    pub id: String,
+    pub project_id: String,              // Links to TerraAtlasProject
+    pub scorer_did: String,              // Symthaea instance DID
+    pub phi_score: f64,                  // Φ integrated information [0,1]
+    pub harmony_alignment: f64,          // Eight Harmonies composite [0,1]
+    pub per_harmony_scores: String,      // JSON HashMap<String, f64>
+    pub care_activation: f64,            // CARE system activation [0,1]
+    pub meta_awareness: f64,             // Meta-awareness level [0,1]
+    pub assessment_cycle: u64,           // Symthaea cycle number
+    pub assessed_at: Timestamp,
+}
+
+/// Allocation pledge — a trust-weighted commitment of resources toward a project
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct AllocationPledge {
+    pub id: String,
+    pub pledger_did: String,
+    pub project_id: String,
+    pub amount: u64,                        // In smallest currency unit
+    pub currency: String,                   // "TEND" | "SAP" | community currency ID
+    pub trust_score: f64,                   // Pledger's trust profile combined_score [0,1]
+    pub trust_tier: String,                 // Tier name for audit trail
+    pub harmony_intent: String,             // Which harmony does this serve
+    pub status: PledgeStatus,
+    pub pledged_at: Timestamp,
+    pub expires_at: Timestamp,              // 24h default (matches credential TTL)
+    pub matched_at: Option<Timestamp>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum PledgeStatus {
+    Pending,
+    Matched,
+    Fulfilled,
+    Expired,
+    Withdrawn,
+}
+
+/// Allocation match — a confirmed bilateral match between a pledge and an asset
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct AllocationMatch {
+    pub id: String,
+    pub pledge_id: String,
+    pub project_id: String,
+    pub pledger_did: String,
+    pub holder_did: String,
+    pub amount: u64,
+    pub match_score: f64,               // Composite trust-weighted score [0,1]
+    pub trust_weight: f64,              // Pledger's trust contribution to score
+    pub amount_fit: f64,                // How well pledge fills funding gap [0,1]
+    pub harmony_alignment: f64,         // Harmony evaluation of pledge intent [0,1]
+    pub community_proximity: f64,       // Geographic/community closeness [0,1]
+    pub status: MatchStatus,
+    pub proposed_at: Timestamp,
+    pub resolved_at: Option<Timestamp>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum MatchStatus {
+    Proposed,
+    Accepted,
+    Rejected,
+    Completed,
+}
+
+/// QOL impact record — real-world impact data for a project
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ImpactRecord {
+    pub id: String,
+    pub project_id: String,
+    pub reporter_did: String,
+    pub period_start: Timestamp,
+    pub period_end: Timestamp,
+    pub co2_avoided_tonnes: f64,
+    pub jobs_created: u32,
+    pub community_trust_delta: f64,         // [-1, +1]
+    pub energy_access_households: u32,
+    pub biodiversity_index_delta: f64,
+    pub verification_evidence: Option<String>,  // IPFS hash or GPS-stamped proof
+    pub verified_by: Option<String>,            // Verifier DID
+    pub recorded_at: Timestamp,
+}
+
+/// Reputation feedback after a match completes — both parties rate the outcome
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct MatchFeedback {
+    pub id: String,
+    pub match_id: String,
+    pub project_id: String,
+    pub rater_did: String,
+    pub rated_did: String,
+    pub role: FeedbackRole,
+    pub outcome_score: f64,          // Did the match deliver? [0,1]
+    pub harmony_fulfilled: f64,      // Was harmony intent honored? [0,1]
+    pub would_match_again: bool,
+    pub comment: Option<String>,
+    pub rated_at: Timestamp,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum FeedbackRole {
+    Pledger,
+    Holder,
 }
 
 /// Pending sync record for bidirectional sync to Terra Atlas
@@ -189,6 +311,8 @@ pub enum SyncType {
     MilestoneProgress,
     StatusChange,
     TransitionProgress,
+    ConsciousnessScore,
+    ImpactMetrics,
 }
 
 /// Regenerative transition tracking
@@ -231,6 +355,11 @@ pub enum EntryTypes {
     ProductionRecord(ProductionRecord),
     PendingSyncRecord(PendingSyncRecord),
     TransitionRecord(TransitionRecord),
+    ConsciousnessAssessment(ConsciousnessAssessment),
+    AllocationPledge(AllocationPledge),
+    AllocationMatch(AllocationMatch),
+    ImpactRecord(ImpactRecord),
+    MatchFeedback(MatchFeedback),
 }
 
 #[hdk_link_types]
@@ -245,6 +374,13 @@ pub enum LinkTypes {
     PendingSyncs,
     ProjectToTransitions,
     ActiveTransitions,
+    ProjectToAssessments,
+    AssetToPledges,
+    PledgerToPledges,
+    AssetToMatches,
+    PledgeToMatch,
+    AssetToImpacts,
+    MatchToFeedback,
 }
 
 #[hdk_extern]
@@ -317,6 +453,114 @@ fn validate_entry(entry: &EntryTypes) -> ExternResult<ValidateCallbackResult> {
             }
             Ok(ValidateCallbackResult::Valid)
         }
+        EntryTypes::MatchFeedback(fb) => {
+            if !fb.rater_did.starts_with("did:mycelix:") {
+                return Ok(ValidateCallbackResult::Invalid("Rater must have valid DID".into()));
+            }
+            if !fb.rated_did.starts_with("did:mycelix:") {
+                return Ok(ValidateCallbackResult::Invalid("Rated party must have valid DID".into()));
+            }
+            if fb.rater_did == fb.rated_did {
+                return Ok(ValidateCallbackResult::Invalid("Cannot rate yourself".into()));
+            }
+            if fb.match_id.is_empty() {
+                return Ok(ValidateCallbackResult::Invalid("Match ID required".into()));
+            }
+            if !fb.outcome_score.is_finite() || fb.outcome_score < 0.0 || fb.outcome_score > 1.0 {
+                return Ok(ValidateCallbackResult::Invalid("Outcome score must be 0.0-1.0".into()));
+            }
+            if !fb.harmony_fulfilled.is_finite() || fb.harmony_fulfilled < 0.0 || fb.harmony_fulfilled > 1.0 {
+                return Ok(ValidateCallbackResult::Invalid("Harmony fulfilled must be 0.0-1.0".into()));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        EntryTypes::AllocationMatch(m) => {
+            if m.pledge_id.is_empty() || m.project_id.is_empty() {
+                return Ok(ValidateCallbackResult::Invalid("Pledge ID and project ID required".into()));
+            }
+            if !m.pledger_did.starts_with("did:mycelix:") {
+                return Ok(ValidateCallbackResult::Invalid("Pledger must have valid DID".into()));
+            }
+            if !m.holder_did.starts_with("did:mycelix:") {
+                return Ok(ValidateCallbackResult::Invalid("Holder must have valid DID".into()));
+            }
+            if m.amount == 0 {
+                return Ok(ValidateCallbackResult::Invalid("Match amount must be positive".into()));
+            }
+            if !m.match_score.is_finite() || m.match_score < 0.0 || m.match_score > 1.0 {
+                return Ok(ValidateCallbackResult::Invalid("Match score must be 0.0-1.0".into()));
+            }
+            if !m.trust_weight.is_finite() || m.trust_weight < 0.0 || m.trust_weight > 1.0 {
+                return Ok(ValidateCallbackResult::Invalid("Trust weight must be 0.0-1.0".into()));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        EntryTypes::ImpactRecord(impact) => {
+            if !impact.reporter_did.starts_with("did:mycelix:") {
+                return Ok(ValidateCallbackResult::Invalid("Reporter must have valid DID".into()));
+            }
+            if impact.project_id.is_empty() {
+                return Ok(ValidateCallbackResult::Invalid("Project ID required".into()));
+            }
+            if !impact.co2_avoided_tonnes.is_finite() || impact.co2_avoided_tonnes < 0.0 {
+                return Ok(ValidateCallbackResult::Invalid("CO2 avoided must be non-negative".into()));
+            }
+            if !impact.community_trust_delta.is_finite() || impact.community_trust_delta < -1.0 || impact.community_trust_delta > 1.0 {
+                return Ok(ValidateCallbackResult::Invalid("Community trust delta must be -1.0 to 1.0".into()));
+            }
+            if !impact.biodiversity_index_delta.is_finite() {
+                return Ok(ValidateCallbackResult::Invalid("Biodiversity index must be finite".into()));
+            }
+            if impact.period_end <= impact.period_start {
+                return Ok(ValidateCallbackResult::Invalid("Period end must be after period start".into()));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        EntryTypes::AllocationPledge(pledge) => {
+            if !pledge.pledger_did.starts_with("did:mycelix:") {
+                return Ok(ValidateCallbackResult::Invalid("Pledger must have valid DID".into()));
+            }
+            if pledge.project_id.is_empty() {
+                return Ok(ValidateCallbackResult::Invalid("Project ID required".into()));
+            }
+            if pledge.amount == 0 {
+                return Ok(ValidateCallbackResult::Invalid("Pledge amount must be positive".into()));
+            }
+            if pledge.currency.is_empty() {
+                return Ok(ValidateCallbackResult::Invalid("Currency required".into()));
+            }
+            if !pledge.trust_score.is_finite() || pledge.trust_score < 0.0 || pledge.trust_score > 1.0 {
+                return Ok(ValidateCallbackResult::Invalid("Trust score must be 0.0-1.0".into()));
+            }
+            if pledge.harmony_intent.is_empty() {
+                return Ok(ValidateCallbackResult::Invalid("Harmony intent required".into()));
+            }
+            if pledge.expires_at <= pledge.pledged_at {
+                return Ok(ValidateCallbackResult::Invalid("Expiry must be after pledge time".into()));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        EntryTypes::ConsciousnessAssessment(assessment) => {
+            if !assessment.scorer_did.starts_with("did:mycelix:") {
+                return Ok(ValidateCallbackResult::Invalid("Scorer must have valid DID".into()));
+            }
+            if assessment.project_id.is_empty() {
+                return Ok(ValidateCallbackResult::Invalid("Project ID required".into()));
+            }
+            if !assessment.phi_score.is_finite() || assessment.phi_score < 0.0 || assessment.phi_score > 1.0 {
+                return Ok(ValidateCallbackResult::Invalid("Phi score must be 0.0-1.0".into()));
+            }
+            if !assessment.harmony_alignment.is_finite() || assessment.harmony_alignment < 0.0 || assessment.harmony_alignment > 1.0 {
+                return Ok(ValidateCallbackResult::Invalid("Harmony alignment must be 0.0-1.0".into()));
+            }
+            if !assessment.care_activation.is_finite() || assessment.care_activation < 0.0 || assessment.care_activation > 1.0 {
+                return Ok(ValidateCallbackResult::Invalid("Care activation must be 0.0-1.0".into()));
+            }
+            if !assessment.meta_awareness.is_finite() || assessment.meta_awareness < 0.0 || assessment.meta_awareness > 1.0 {
+                return Ok(ValidateCallbackResult::Invalid("Meta awareness must be 0.0-1.0".into()));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
         _ => Ok(ValidateCallbackResult::Valid),
     }
 }
@@ -324,6 +568,7 @@ fn validate_entry(entry: &EntryTypes) -> ExternResult<ValidateCallbackResult> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     // =========================================================================
     // Test Helpers
@@ -998,5 +1243,651 @@ mod tests {
         let record = valid_transition_record();
         let result = serde_json::to_string(&record);
         assert!(result.is_ok());
+    }
+
+    // =========================================================================
+    // ConsciousnessAssessment Tests
+    // =========================================================================
+
+    fn valid_consciousness_assessment() -> ConsciousnessAssessment {
+        ConsciousnessAssessment {
+            id: "assess:project1:did:mycelix:symthaea1:123456".to_string(),
+            project_id: "project:solar_farm_alpha".to_string(),
+            scorer_did: "did:mycelix:symthaea1".to_string(),
+            phi_score: 0.72,
+            harmony_alignment: 0.85,
+            per_harmony_scores: r#"{"ResonantCoherence":0.9,"PanSentientFlourishing":0.8}"#.to_string(),
+            care_activation: 0.65,
+            meta_awareness: 0.70,
+            assessment_cycle: 42000,
+            assessed_at: create_test_timestamp(),
+        }
+    }
+
+    #[test]
+    fn test_consciousness_assessment_valid() {
+        let assessment = valid_consciousness_assessment();
+        assert!(assessment.scorer_did.starts_with("did:mycelix:"));
+        assert!(assessment.phi_score >= 0.0 && assessment.phi_score <= 1.0);
+        assert!(assessment.harmony_alignment >= 0.0 && assessment.harmony_alignment <= 1.0);
+        assert!(assessment.care_activation >= 0.0 && assessment.care_activation <= 1.0);
+        assert!(assessment.meta_awareness >= 0.0 && assessment.meta_awareness <= 1.0);
+    }
+
+    #[test]
+    fn test_consciousness_assessment_invalid_did() {
+        let assessment = ConsciousnessAssessment {
+            scorer_did: "symthaea1".to_string(),
+            ..valid_consciousness_assessment()
+        };
+        assert!(!assessment.scorer_did.starts_with("did:mycelix:"));
+    }
+
+    #[test]
+    fn test_consciousness_assessment_phi_out_of_range() {
+        let assessment = ConsciousnessAssessment {
+            phi_score: 1.5,
+            ..valid_consciousness_assessment()
+        };
+        assert!(assessment.phi_score > 1.0);
+    }
+
+    #[test]
+    fn test_consciousness_assessment_negative_phi() {
+        let assessment = ConsciousnessAssessment {
+            phi_score: -0.1,
+            ..valid_consciousness_assessment()
+        };
+        assert!(assessment.phi_score < 0.0);
+    }
+
+    #[test]
+    fn test_consciousness_assessment_harmony_out_of_range() {
+        let assessment = ConsciousnessAssessment {
+            harmony_alignment: 1.2,
+            ..valid_consciousness_assessment()
+        };
+        assert!(assessment.harmony_alignment > 1.0);
+    }
+
+    #[test]
+    fn test_consciousness_assessment_care_out_of_range() {
+        let assessment = ConsciousnessAssessment {
+            care_activation: -0.5,
+            ..valid_consciousness_assessment()
+        };
+        assert!(assessment.care_activation < 0.0);
+    }
+
+    #[test]
+    fn test_consciousness_assessment_meta_out_of_range() {
+        let assessment = ConsciousnessAssessment {
+            meta_awareness: 2.0,
+            ..valid_consciousness_assessment()
+        };
+        assert!(assessment.meta_awareness > 1.0);
+    }
+
+    #[test]
+    fn test_consciousness_assessment_nan_phi() {
+        let assessment = ConsciousnessAssessment {
+            phi_score: f64::NAN,
+            ..valid_consciousness_assessment()
+        };
+        assert!(!assessment.phi_score.is_finite());
+    }
+
+    #[test]
+    fn test_consciousness_assessment_infinity_harmony() {
+        let assessment = ConsciousnessAssessment {
+            harmony_alignment: f64::INFINITY,
+            ..valid_consciousness_assessment()
+        };
+        assert!(!assessment.harmony_alignment.is_finite());
+    }
+
+    #[test]
+    fn test_consciousness_assessment_empty_project_invalid() {
+        let assessment = ConsciousnessAssessment {
+            project_id: "".to_string(),
+            ..valid_consciousness_assessment()
+        };
+        assert!(assessment.project_id.is_empty());
+    }
+
+    #[test]
+    fn test_consciousness_assessment_boundary_values() {
+        let assessment = ConsciousnessAssessment {
+            phi_score: 0.0,
+            harmony_alignment: 1.0,
+            care_activation: 0.0,
+            meta_awareness: 1.0,
+            ..valid_consciousness_assessment()
+        };
+        assert!(assessment.phi_score >= 0.0 && assessment.phi_score <= 1.0);
+        assert!(assessment.harmony_alignment >= 0.0 && assessment.harmony_alignment <= 1.0);
+    }
+
+    #[test]
+    fn test_consciousness_assessment_per_harmony_json() {
+        let assessment = valid_consciousness_assessment();
+        let parsed: Result<HashMap<String, f64>, _> = serde_json::from_str(&assessment.per_harmony_scores);
+        assert!(parsed.is_ok());
+        let scores = parsed.unwrap();
+        assert!(scores.contains_key("ResonantCoherence"));
+    }
+
+    #[test]
+    fn test_serialization_consciousness_assessment() {
+        let assessment = valid_consciousness_assessment();
+        let result = serde_json::to_string(&assessment);
+        assert!(result.is_ok());
+        let roundtrip: Result<ConsciousnessAssessment, _> = serde_json::from_str(&result.unwrap());
+        assert!(roundtrip.is_ok());
+        assert_eq!(roundtrip.unwrap().phi_score, 0.72);
+    }
+
+    #[test]
+    fn test_consciousness_assessment_cycle_tracking() {
+        let a1 = ConsciousnessAssessment {
+            assessment_cycle: 1000,
+            ..valid_consciousness_assessment()
+        };
+        let a2 = ConsciousnessAssessment {
+            assessment_cycle: 2000,
+            ..valid_consciousness_assessment()
+        };
+        assert!(a2.assessment_cycle > a1.assessment_cycle);
+    }
+
+    #[test]
+    fn test_energy_event_type_consciousness_assessed() {
+        let event_type = EnergyEventType::ConsciousnessAssessed;
+        let json = serde_json::to_string(&event_type);
+        assert!(json.is_ok());
+        assert_eq!(json.unwrap(), "\"ConsciousnessAssessed\"");
+    }
+
+    #[test]
+    fn test_sync_type_trust_score() {
+        let sync_type = SyncType::ConsciousnessScore;
+        let json = serde_json::to_string(&sync_type);
+        assert!(json.is_ok());
+        assert_eq!(json.unwrap(), "\"ConsciousnessScore\"");
+    }
+
+    // =========================================================================
+    // AllocationPledge Tests
+    // =========================================================================
+
+    fn valid_allocation_pledge() -> AllocationPledge {
+        AllocationPledge {
+            id: "pledge:project1:did:mycelix:alice:123456".to_string(),
+            pledger_did: "did:mycelix:alice".to_string(),
+            project_id: "project:solar_farm_alpha".to_string(),
+            amount: 40,
+            currency: "TEND".to_string(),
+            trust_score: 0.55,
+            trust_tier: "Citizen".to_string(),
+            harmony_intent: "Ecological Reciprocity — supporting community energy access".to_string(),
+            status: PledgeStatus::Pending,
+            pledged_at: create_test_timestamp(),
+            expires_at: Timestamp::from_micros(1704067200000000 + 86_400_000_000), // +24h
+            matched_at: None,
+        }
+    }
+
+    #[test]
+    fn test_allocation_pledge_valid() {
+        let pledge = valid_allocation_pledge();
+        assert!(pledge.pledger_did.starts_with("did:mycelix:"));
+        assert!(pledge.amount > 0);
+        assert!(pledge.trust_score >= 0.0 && pledge.trust_score <= 1.0);
+        assert!(!pledge.harmony_intent.is_empty());
+        assert!(pledge.expires_at > pledge.pledged_at);
+    }
+
+    #[test]
+    fn test_allocation_pledge_invalid_did() {
+        let pledge = AllocationPledge {
+            pledger_did: "alice".to_string(),
+            ..valid_allocation_pledge()
+        };
+        assert!(!pledge.pledger_did.starts_with("did:mycelix:"));
+    }
+
+    #[test]
+    fn test_allocation_pledge_zero_amount() {
+        let pledge = AllocationPledge {
+            amount: 0,
+            ..valid_allocation_pledge()
+        };
+        assert_eq!(pledge.amount, 0);
+    }
+
+    #[test]
+    fn test_allocation_pledge_consciousness_out_of_range() {
+        let pledge = AllocationPledge {
+            trust_score: 1.5,
+            ..valid_allocation_pledge()
+        };
+        assert!(pledge.trust_score > 1.0);
+    }
+
+    #[test]
+    fn test_allocation_pledge_negative_consciousness() {
+        let pledge = AllocationPledge {
+            trust_score: -0.1,
+            ..valid_allocation_pledge()
+        };
+        assert!(pledge.trust_score < 0.0);
+    }
+
+    #[test]
+    fn test_allocation_pledge_nan_consciousness() {
+        let pledge = AllocationPledge {
+            trust_score: f64::NAN,
+            ..valid_allocation_pledge()
+        };
+        assert!(!pledge.trust_score.is_finite());
+    }
+
+    #[test]
+    fn test_allocation_pledge_empty_project() {
+        let pledge = AllocationPledge {
+            project_id: "".to_string(),
+            ..valid_allocation_pledge()
+        };
+        assert!(pledge.project_id.is_empty());
+    }
+
+    #[test]
+    fn test_allocation_pledge_empty_currency() {
+        let pledge = AllocationPledge {
+            currency: "".to_string(),
+            ..valid_allocation_pledge()
+        };
+        assert!(pledge.currency.is_empty());
+    }
+
+    #[test]
+    fn test_allocation_pledge_empty_harmony_intent() {
+        let pledge = AllocationPledge {
+            harmony_intent: "".to_string(),
+            ..valid_allocation_pledge()
+        };
+        assert!(pledge.harmony_intent.is_empty());
+    }
+
+    #[test]
+    fn test_allocation_pledge_expiry_before_pledge() {
+        let pledge = AllocationPledge {
+            pledged_at: Timestamp::from_micros(1704067200000000 + 86_400_000_000),
+            expires_at: create_test_timestamp(), // Before pledged_at
+            ..valid_allocation_pledge()
+        };
+        assert!(pledge.expires_at <= pledge.pledged_at);
+    }
+
+    #[test]
+    fn test_allocation_pledge_status_lifecycle() {
+        let statuses = vec![
+            PledgeStatus::Pending,
+            PledgeStatus::Matched,
+            PledgeStatus::Fulfilled,
+            PledgeStatus::Expired,
+            PledgeStatus::Withdrawn,
+        ];
+        assert_eq!(statuses.len(), 5);
+    }
+
+    #[test]
+    fn test_allocation_pledge_matched() {
+        let pledge = AllocationPledge {
+            status: PledgeStatus::Matched,
+            matched_at: Some(Timestamp::from_micros(1704067200000000 + 3600_000_000)),
+            ..valid_allocation_pledge()
+        };
+        assert!(pledge.matched_at.is_some());
+        assert_eq!(pledge.status, PledgeStatus::Matched);
+    }
+
+    #[test]
+    fn test_allocation_pledge_tend_currency() {
+        let pledge = valid_allocation_pledge();
+        assert_eq!(pledge.currency, "TEND");
+        assert!(pledge.amount <= 40); // TEND balance cap
+    }
+
+    #[test]
+    fn test_serialization_allocation_pledge() {
+        let pledge = valid_allocation_pledge();
+        let json = serde_json::to_string(&pledge).unwrap();
+        let back: AllocationPledge = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.pledger_did, "did:mycelix:alice");
+        assert_eq!(back.amount, 40);
+        assert_eq!(back.status, PledgeStatus::Pending);
+    }
+
+    #[test]
+    fn test_pledge_status_serialization() {
+        let status = PledgeStatus::Matched;
+        let json = serde_json::to_string(&status).unwrap();
+        assert_eq!(json, "\"Matched\"");
+    }
+
+    #[test]
+    fn test_energy_event_type_pledge_submitted() {
+        let event = EnergyEventType::PledgeSubmitted;
+        let json = serde_json::to_string(&event).unwrap();
+        assert_eq!(json, "\"PledgeSubmitted\"");
+    }
+
+    // =========================================================================
+    // AllocationMatch Tests
+    // =========================================================================
+
+    fn valid_allocation_match() -> AllocationMatch {
+        AllocationMatch {
+            id: "match:project1:pledge1:123456".to_string(),
+            pledge_id: "pledge:project1:did:mycelix:alice:111".to_string(),
+            project_id: "project:solar_farm_alpha".to_string(),
+            pledger_did: "did:mycelix:alice".to_string(),
+            holder_did: "did:mycelix:developer_bob".to_string(),
+            amount: 30,
+            match_score: 0.75, // 0.40*0.65 + 0.30*0.90 + 0.20*0.85 + 0.10*0.50
+            trust_weight: 0.65,
+            amount_fit: 0.90,
+            harmony_alignment: 0.85,
+            community_proximity: 0.50,
+            status: MatchStatus::Proposed,
+            proposed_at: create_test_timestamp(),
+            resolved_at: None,
+        }
+    }
+
+    #[test]
+    fn test_allocation_match_valid() {
+        let m = valid_allocation_match();
+        assert!(m.pledger_did.starts_with("did:mycelix:"));
+        assert!(m.holder_did.starts_with("did:mycelix:"));
+        assert!(m.match_score >= 0.0 && m.match_score <= 1.0);
+        assert!(m.trust_weight >= 0.0 && m.trust_weight <= 1.0);
+        assert!(m.amount > 0);
+    }
+
+    #[test]
+    fn test_allocation_match_score_components() {
+        let m = valid_allocation_match();
+        // Verify the 4 scoring components are valid
+        assert!(m.trust_weight >= 0.0 && m.trust_weight <= 1.0);
+        assert!(m.amount_fit >= 0.0 && m.amount_fit <= 1.0);
+        assert!(m.harmony_alignment >= 0.0 && m.harmony_alignment <= 1.0);
+        assert!(m.community_proximity >= 0.0 && m.community_proximity <= 1.0);
+        // Composite should be weighted average of components
+        let expected = 0.40 * m.trust_weight + 0.30 * m.amount_fit
+            + 0.20 * m.harmony_alignment + 0.10 * m.community_proximity;
+        assert!((m.match_score - expected).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_allocation_match_invalid_pledger_did() {
+        let m = AllocationMatch { pledger_did: "alice".to_string(), ..valid_allocation_match() };
+        assert!(!m.pledger_did.starts_with("did:mycelix:"));
+    }
+
+    #[test]
+    fn test_allocation_match_invalid_holder_did() {
+        let m = AllocationMatch { holder_did: "bob".to_string(), ..valid_allocation_match() };
+        assert!(!m.holder_did.starts_with("did:mycelix:"));
+    }
+
+    #[test]
+    fn test_allocation_match_zero_amount() {
+        let m = AllocationMatch { amount: 0, ..valid_allocation_match() };
+        assert_eq!(m.amount, 0);
+    }
+
+    #[test]
+    fn test_allocation_match_score_out_of_range() {
+        let m = AllocationMatch { match_score: 1.5, ..valid_allocation_match() };
+        assert!(m.match_score > 1.0);
+    }
+
+    #[test]
+    fn test_allocation_match_nan_score() {
+        let m = AllocationMatch { match_score: f64::NAN, ..valid_allocation_match() };
+        assert!(!m.match_score.is_finite());
+    }
+
+    #[test]
+    fn test_allocation_match_status_lifecycle() {
+        let statuses = vec![MatchStatus::Proposed, MatchStatus::Accepted, MatchStatus::Rejected, MatchStatus::Completed];
+        assert_eq!(statuses.len(), 4);
+    }
+
+    #[test]
+    fn test_allocation_match_accepted() {
+        let m = AllocationMatch {
+            status: MatchStatus::Accepted,
+            resolved_at: Some(Timestamp::from_micros(1704067200000000 + 3600_000_000)),
+            ..valid_allocation_match()
+        };
+        assert_eq!(m.status, MatchStatus::Accepted);
+        assert!(m.resolved_at.is_some());
+    }
+
+    #[test]
+    fn test_serialization_allocation_match() {
+        let m = valid_allocation_match();
+        let json = serde_json::to_string(&m).unwrap();
+        let back: AllocationMatch = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.match_score, 0.75);
+        assert_eq!(back.status, MatchStatus::Proposed);
+    }
+
+    // =========================================================================
+    // ImpactRecord Tests
+    // =========================================================================
+
+    fn valid_impact_record() -> ImpactRecord {
+        ImpactRecord {
+            id: "impact:project1:did:mycelix:reporter:123456".to_string(),
+            project_id: "project:solar_farm_alpha".to_string(),
+            reporter_did: "did:mycelix:reporter".to_string(),
+            period_start: create_test_timestamp(),
+            period_end: Timestamp::from_micros(1704067200000000 + 2_592_000_000_000), // +30 days
+            co2_avoided_tonnes: 267.5,
+            jobs_created: 12,
+            community_trust_delta: 0.14,
+            energy_access_households: 500,
+            biodiversity_index_delta: 0.03,
+            verification_evidence: Some("ipfs://QmSolar123...".to_string()),
+            verified_by: Some("did:mycelix:grid_verifier".to_string()),
+            recorded_at: Timestamp::from_micros(1706745600000000),
+        }
+    }
+
+    #[test]
+    fn test_impact_record_valid() {
+        let impact = valid_impact_record();
+        assert!(impact.reporter_did.starts_with("did:mycelix:"));
+        assert!(impact.co2_avoided_tonnes >= 0.0);
+        assert!(impact.community_trust_delta >= -1.0 && impact.community_trust_delta <= 1.0);
+        assert!(impact.period_end > impact.period_start);
+    }
+
+    #[test]
+    fn test_impact_record_invalid_reporter_did() {
+        let impact = ImpactRecord { reporter_did: "reporter".to_string(), ..valid_impact_record() };
+        assert!(!impact.reporter_did.starts_with("did:mycelix:"));
+    }
+
+    #[test]
+    fn test_impact_record_negative_co2() {
+        let impact = ImpactRecord { co2_avoided_tonnes: -10.0, ..valid_impact_record() };
+        assert!(impact.co2_avoided_tonnes < 0.0);
+    }
+
+    #[test]
+    fn test_impact_record_trust_out_of_range() {
+        let impact = ImpactRecord { community_trust_delta: 1.5, ..valid_impact_record() };
+        assert!(impact.community_trust_delta > 1.0);
+    }
+
+    #[test]
+    fn test_impact_record_trust_negative() {
+        let impact = ImpactRecord { community_trust_delta: -0.3, ..valid_impact_record() };
+        assert!(impact.community_trust_delta >= -1.0 && impact.community_trust_delta <= 0.0);
+    }
+
+    #[test]
+    fn test_impact_record_nan_biodiversity() {
+        let impact = ImpactRecord { biodiversity_index_delta: f64::NAN, ..valid_impact_record() };
+        assert!(!impact.biodiversity_index_delta.is_finite());
+    }
+
+    #[test]
+    fn test_impact_record_period_end_before_start() {
+        let impact = ImpactRecord {
+            period_start: Timestamp::from_micros(1706745600000000),
+            period_end: create_test_timestamp(), // Before start
+            ..valid_impact_record()
+        };
+        assert!(impact.period_end <= impact.period_start);
+    }
+
+    #[test]
+    fn test_impact_record_unverified() {
+        let impact = ImpactRecord {
+            verification_evidence: None,
+            verified_by: None,
+            ..valid_impact_record()
+        };
+        assert!(impact.verification_evidence.is_none());
+        assert!(impact.verified_by.is_none());
+    }
+
+    #[test]
+    fn test_impact_record_qol_composite() {
+        let impact = valid_impact_record();
+        // Net Humanity Benefit: weighted composite of QOL metrics
+        let nhb = (impact.co2_avoided_tonnes / 1000.0) * 0.3
+            + (impact.jobs_created as f64 / 100.0) * 0.25
+            + impact.community_trust_delta * 0.25
+            + (impact.energy_access_households as f64 / 1000.0) * 0.2;
+        assert!(nhb > 0.0); // Positive project should have positive NHB
+    }
+
+    #[test]
+    fn test_serialization_impact_record() {
+        let impact = valid_impact_record();
+        let json = serde_json::to_string(&impact).unwrap();
+        let back: ImpactRecord = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.co2_avoided_tonnes, 267.5);
+        assert_eq!(back.jobs_created, 12);
+        assert_eq!(back.energy_access_households, 500);
+    }
+
+    #[test]
+    fn test_match_status_serialization() {
+        let s = MatchStatus::Accepted;
+        let json = serde_json::to_string(&s).unwrap();
+        assert_eq!(json, "\"Accepted\"");
+    }
+
+    #[test]
+    fn test_impact_event_type() {
+        let e = EnergyEventType::ImpactReported;
+        let json = serde_json::to_string(&e).unwrap();
+        assert_eq!(json, "\"ImpactReported\"");
+    }
+
+    #[test]
+    fn test_sync_type_impact_metrics() {
+        let s = SyncType::ImpactMetrics;
+        let json = serde_json::to_string(&s).unwrap();
+        assert_eq!(json, "\"ImpactMetrics\"");
+    }
+
+    // =========================================================================
+    // MatchFeedback Tests
+    // =========================================================================
+
+    fn valid_match_feedback() -> MatchFeedback {
+        MatchFeedback {
+            id: "feedback:match1:Pledger:123456".to_string(),
+            match_id: "match:project1:pledge1:111".to_string(),
+            project_id: "project:solar_farm_alpha".to_string(),
+            rater_did: "did:mycelix:alice".to_string(),
+            rated_did: "did:mycelix:developer_bob".to_string(),
+            role: FeedbackRole::Pledger,
+            outcome_score: 0.85,
+            harmony_fulfilled: 0.90,
+            would_match_again: true,
+            comment: Some("Project delivered on ecological promises".to_string()),
+            rated_at: create_test_timestamp(),
+        }
+    }
+
+    #[test]
+    fn test_match_feedback_valid() {
+        let fb = valid_match_feedback();
+        assert!(fb.rater_did.starts_with("did:mycelix:"));
+        assert!(fb.rated_did.starts_with("did:mycelix:"));
+        assert_ne!(fb.rater_did, fb.rated_did);
+        assert!(fb.outcome_score >= 0.0 && fb.outcome_score <= 1.0);
+        assert!(fb.harmony_fulfilled >= 0.0 && fb.harmony_fulfilled <= 1.0);
+    }
+
+    #[test]
+    fn test_match_feedback_self_rate_invalid() {
+        let fb = MatchFeedback {
+            rated_did: "did:mycelix:alice".to_string(), // same as rater
+            ..valid_match_feedback()
+        };
+        assert_eq!(fb.rater_did, fb.rated_did);
+    }
+
+    #[test]
+    fn test_match_feedback_outcome_out_of_range() {
+        let fb = MatchFeedback { outcome_score: 1.5, ..valid_match_feedback() };
+        assert!(fb.outcome_score > 1.0);
+    }
+
+    #[test]
+    fn test_match_feedback_harmony_nan() {
+        let fb = MatchFeedback { harmony_fulfilled: f64::NAN, ..valid_match_feedback() };
+        assert!(!fb.harmony_fulfilled.is_finite());
+    }
+
+    #[test]
+    fn test_match_feedback_roles() {
+        let pledger = FeedbackRole::Pledger;
+        let holder = FeedbackRole::Holder;
+        assert_ne!(pledger, holder);
+    }
+
+    #[test]
+    fn test_match_feedback_no_comment() {
+        let fb = MatchFeedback { comment: None, ..valid_match_feedback() };
+        assert!(fb.comment.is_none());
+    }
+
+    #[test]
+    fn test_serialization_match_feedback() {
+        let fb = valid_match_feedback();
+        let json = serde_json::to_string(&fb).unwrap();
+        let back: MatchFeedback = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.outcome_score, 0.85);
+        assert!(back.would_match_again);
+        assert_eq!(back.role, FeedbackRole::Pledger);
+    }
+
+    #[test]
+    fn test_feedback_role_serialization() {
+        let r = FeedbackRole::Holder;
+        let json = serde_json::to_string(&r).unwrap();
+        assert_eq!(json, "\"Holder\"");
     }
 }

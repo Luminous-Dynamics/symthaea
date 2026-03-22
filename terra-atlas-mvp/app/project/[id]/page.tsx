@@ -1,4 +1,6 @@
-'use client'
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root'use client'
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
@@ -8,7 +10,9 @@ import { ArrowLeft, MapPin, Zap, DollarSign, Users, Leaf, TrendingUp, Battery, G
 import InvestmentFlow from '@/components/InvestmentFlow'
 import { useAuth } from '@/app/contexts/AuthContext'
 import { AIScoreBadge, AIAnalysisCard } from '@/components/AIScoreBadge'
-import { PledgeForm, PledgeProgress } from '@/components/PledgeForm'
+import { PledgeForm } from '@/components/PledgeForm'
+import { TrustScore } from '@/components/TrustScore'
+import { ImpactDashboard } from '@/components/ImpactDashboard'
 
 interface AIAnalysis {
   overallScore: number
@@ -270,6 +274,9 @@ export default function ProjectDetailPage() {
                 </span>
               </div>
               <h1 className="text-4xl font-bold text-white mb-2">{project.name}</h1>
+              <div className="mb-2">
+                <TrustScore phiScore={null} harmonyAlignment={null} size="md" />
+              </div>
               <div className="flex items-center gap-4 text-white/80">
                 <span className="flex items-center gap-1">
                   <MapPin className="h-4 w-4" />
@@ -535,6 +542,9 @@ export default function ProjectDetailPage() {
                 user={user ? { id: user.id, email: user.email } : undefined}
               />
               
+              {/* QOL Impact Dashboard */}
+              <ImpactDashboard projectId={params.id as string} className="mt-6" />
+
               {/* Quick Stats */}
               <div className="mt-6 bg-gray-900/50 backdrop-blur-md rounded-xl p-6 border border-gray-800">
                 <h4 className="font-bold text-white mb-4">Investment Highlights</h4>

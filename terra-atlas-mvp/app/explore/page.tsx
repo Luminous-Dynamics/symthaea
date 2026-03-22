@@ -1,9 +1,12 @@
-'use client'
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { AIScoreBadge, AIAnalysisCard } from '@/components/AIScoreBadge'
+import { TrustScore } from '@/components/TrustScore'
 import { clusterSites, sampleSites } from '@/lib/clustering'
 
 // Dynamically import Three.js globe for SSR safety
@@ -29,6 +32,11 @@ interface Project {
   investment: number
   state: string
   aiScore?: number
+  consciousness?: {
+    phi_score: number
+    harmony_alignment: number
+  } | null
+  discovery_score?: number
 }
 
 interface AIAnalysis {
@@ -425,14 +433,24 @@ export default function ExplorePage() {
               <div className="p-4 bg-gradient-to-b from-purple-950/20 to-transparent border border-purple-500/20 rounded-lg">
                 <div className="flex items-start justify-between mb-2">
                   <h3 className="font-bold text-purple-400">{selectedProject.name}</h3>
-                  {selectedAnalysis && (
-                    <AIScoreBadge
-                      score={selectedAnalysis.overallScore}
-                      viability={selectedAnalysis.viabilityRating as any}
-                      showLabel={false}
-                      size="sm"
-                    />
-                  )}
+                  <div className="flex flex-col items-end gap-1">
+                    {selectedProject.consciousness && (
+                      <TrustScore
+                        phiScore={selectedProject.consciousness.phi_score}
+                        harmonyAlignment={selectedProject.consciousness.harmony_alignment}
+                        size="sm"
+                        showLabel={false}
+                      />
+                    )}
+                    {selectedAnalysis && (
+                      <AIScoreBadge
+                        score={selectedAnalysis.overallScore}
+                        viability={selectedAnalysis.viabilityRating as any}
+                        showLabel={false}
+                        size="sm"
+                      />
+                    )}
+                  </div>
                 </div>
                 {(selectedProject as any).isCluster && (selectedProject as any).site_count && (
                   <div className="mb-2 px-2 py-1 bg-blue-500/10 border border-blue-500/30 rounded text-xs text-blue-400">

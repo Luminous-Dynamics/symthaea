@@ -1,4 +1,6 @@
-export const dynamic = 'force-dynamic';
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository rootexport const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server'
 import logger from '@/lib/logger'
 import { ProjectsQuerySchema } from '@/lib/schemas/projects'
@@ -248,12 +250,12 @@ async function fetchProjects(params: {
 }
 
 /**
- * Enrich projects with consciousness scores from Supabase and sort by
- * discovery score (harmony-weighted). Higher-consciousness projects surface first.
+ * Enrich projects with trust scores from Supabase and sort by
+ * discovery score (harmony-weighted). Higher-trust projects surface first.
  *
  * Discovery score = phi * 0.3 + harmony * 0.3 + co2_norm * 0.2 + trust_norm * 0.2
  */
-async function enrichWithConsciousness(projects: Record<string, unknown>[]) {
+async function enrichWithTrustScores(projects: Record<string, unknown>[]) {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -261,7 +263,7 @@ async function enrichWithConsciousness(projects: Record<string, unknown>[]) {
 
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // Batch fetch consciousness scores for all project IDs
+    // Batch fetch trust scores for all project IDs
     const projectIds = projects.map((p) => String(p.id)).filter(Boolean)
     if (projectIds.length === 0) return projects
 
@@ -330,7 +332,7 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url)
-  const sortBy = searchParams.get('sort') // 'harmony' for consciousness-weighted discovery
+  const sortBy = searchParams.get('sort') // 'harmony' for trust-weighted discovery
   const rawQuery = {
     limit: searchParams.get('limit') ?? undefined,
     offset: searchParams.get('offset') ?? undefined,
@@ -403,9 +405,9 @@ export async function GET(request: Request) {
       search,
     })
 
-    // Enrich with consciousness scores and sort by harmony if requested
+    // Enrich with trust scores and sort by harmony if requested
     if (sortBy === 'harmony') {
-      const enriched = await enrichWithConsciousness(payload.projects)
+      const enriched = await enrichWithTrustScores(payload.projects)
       return NextResponse.json({
         ...payload,
         projects: enriched,

@@ -1,4 +1,6 @@
-//! Conductor Bridge — abstraction over Holochain conductor connections.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Conductor Bridge — abstraction over Holochain conductor connections.
 //!
 //! Phase 2: External conductor via WebSocket (current).
 //! Phase 3: Embedded conductor via child process (Kangaroo pattern).

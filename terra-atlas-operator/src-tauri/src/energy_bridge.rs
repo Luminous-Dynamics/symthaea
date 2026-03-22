@@ -1,4 +1,6 @@
-//! Energy Bridge — typed interface to mycelix-energy zome functions.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Energy Bridge — typed interface to mycelix-energy zome functions.
 //!
 //! Maps Tauri commands to Holochain zome calls for energy project
 //! management, investment tracking, and consciousness scoring.
@@ -54,6 +56,58 @@ pub struct FieldVerification {
     pub gps_accuracy_m: f32,
     pub verification_type: String,
     pub notes: Option<String>,
+}
+
+/// Impact summary for QOL dashboard.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImpactSummary {
+    pub project_id: String,
+    pub total_co2_avoided: f64,
+    pub total_jobs_created: u32,
+    pub total_trust_delta: f64,
+    pub peak_households: u32,
+    pub report_count: u32,
+    pub net_humanity_benefit: f64,
+}
+
+/// Allocation pledge for the Conscious Allocation Network.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PledgeSummary {
+    pub id: String,
+    pub project_id: String,
+    pub pledger_did: String,
+    pub amount: u64,
+    pub currency: String,
+    pub consciousness_tier: String,
+    pub harmony_intent: String,
+    pub status: String,
+    pub expires_at: String,
+}
+
+/// Match result from the consciousness-weighted matching engine.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MatchSummary {
+    pub id: String,
+    pub pledge_id: String,
+    pub project_id: String,
+    pub pledger_did: String,
+    pub amount: u64,
+    pub match_score: f64,
+    pub consciousness_weight: f64,
+    pub status: String,
+}
+
+/// Full allocation dashboard combining consciousness + pledges + matches + impact.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AllocationDashboard {
+    pub project_id: String,
+    pub consciousness: Option<ConsciousnessScore>,
+    pub impact: Option<ImpactSummary>,
+    pub pending_pledges: u32,
+    pub matched_pledges: u32,
+    pub total_pledged: u64,
+    pub net_humanity_benefit: f64,
+    pub discovery_score: f64,
 }
 
 /// Demo projects for when the conductor isn't fully wired.

@@ -1,13 +1,16 @@
-'use client'
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root'use client'
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import { 
+import {
   Activity, TrendingUp, Users, Zap, Wind, Sun, Battery, Droplets,
   Globe, DollarSign, Briefcase, Building, MapPin, Award, Target,
   Calendar, Clock, AlertCircle, CheckCircle, BarChart3, PieChart
 } from 'lucide-react'
+import { HarmonyLeaderboard } from '@/components/HarmonyLeaderboard'
 
 // Dynamically import RealtimeCharts for better performance
 const RealtimeCharts = dynamic(() => import('@/components/RealtimeCharts'), {
@@ -653,6 +656,9 @@ export default function DashboardPage() {
             </div>
           </Link>
           
+          {/* Consciousness-Weighted Harmony Leaderboard */}
+          <HarmonyLeaderboard limit={5} className="col-span-full" />
+
           <div className="p-4 bg-gradient-to-r from-cyan-950/20 to-transparent border border-cyan-500/20 rounded-xl hover:border-cyan-500/40 transition group">
             <div className="flex items-center justify-between mb-3">
               <div>

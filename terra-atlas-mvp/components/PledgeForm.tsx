@@ -1,7 +1,9 @@
-'use client'
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root'use client'
 
 import { useState } from 'react'
-import { ConsciousnessScore } from './ConsciousnessScore'
+import { TrustScore } from './TrustScore'
 
 interface PledgeFormProps {
   projectId: string
@@ -105,7 +107,7 @@ export function PledgeForm({
         <div>
           <span className="text-xs text-gray-400">Your Consciousness</span>
           <div className="flex items-center gap-2 mt-0.5">
-            <ConsciousnessScore phiScore={consciousnessScore} harmonyAlignment={consciousnessScore} size="sm" showLabel={false} />
+            <TrustScore phiScore={consciousnessScore} harmonyAlignment={consciousnessScore} size="sm" showLabel={false} />
             <span className="text-xs text-gray-400">{consciousnessTier}</span>
           </div>
         </div>

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Symthaea ↔ Mycelix Conductor Adapter
 //!
 //! Bridges Symthaea's governance dispatch commands to a real Holochain conductor.
@@ -44,6 +47,16 @@ pub enum DispatchCommand {
         rationale: String,
     },
     QueryActiveProposals,
+    /// Evaluate an asset and record consciousness assessment on-chain.
+    EvaluateAsset {
+        correlation_id: u64,
+        project_id: String,
+        phi_score: f64,
+        harmony_alignment: f64,
+        per_harmony_scores: String,
+        care_activation: f64,
+        meta_awareness: f64,
+    },
 }
 
 /// Outcome received back from the conductor.
@@ -280,6 +293,57 @@ impl<T: ConductorTransport> GovernanceDispatcher<T> {
                     action_hash: None,
                 }
             }
+
+            DispatchCommand::EvaluateAsset {
+                correlation_id,
+                project_id,
+                phi_score,
+                harmony_alignment,
+                per_harmony_scores,
+                care_activation,
+                meta_awareness,
+            } => {
+                let payload = serde_json::json!({
+                    "project_id": project_id,
+                    "scorer_did": "did:mycelix:symthaea",
+                    "phi_score": phi_score,
+                    "harmony_alignment": harmony_alignment,
+                    "per_harmony_scores": per_harmony_scores,
+                    "care_activation": care_activation,
+                    "meta_awareness": meta_awareness,
+                    "assessment_cycle": 0,
+                });
+                let payload_bytes = rmp_serde::to_vec(&payload).unwrap_or_default();
+
+                match self
+                    .transport
+                    .call_zome(
+                        "energy",
+                        "energy_bridge",
+                        "record_consciousness_assessment",
+                        payload_bytes,
+                    )
+                    .await
+                {
+                    Ok(result) => {
+                        let action_hash = String::from_utf8(result).ok();
+                        info!(correlation_id, %project_id, phi_score, harmony_alignment,
+                            "Asset consciousness assessment recorded on-chain");
+                        DispatchOutcome::ProposalAccepted {
+                            correlation_id,
+                            action_hash,
+                        }
+                    }
+                    Err(reason) => {
+                        warn!(correlation_id, %project_id, %reason,
+                            "Asset assessment rejected by conductor");
+                        DispatchOutcome::ProposalRejected {
+                            correlation_id,
+                            reason,
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -302,6 +366,7 @@ impl<T: ConductorTransport> GovernanceDispatcher<T> {
                     DispatchCommand::SubmitProposal { correlation_id, .. } => *correlation_id,
                     DispatchCommand::CastVote { correlation_id, .. } => *correlation_id,
                     DispatchCommand::QueryActiveProposals => 0,
+                    DispatchCommand::EvaluateAsset { correlation_id, .. } => *correlation_id,
                 };
                 if corr_id > 0 {
                     pending.push((corr_id, std::time::Instant::now()));
