@@ -172,10 +172,16 @@ impl MultiObjectiveEvolution {
             .cloned()
             .collect();
 
-        // Find best in each dimension
-        let highest_phi = self.find_highest_phi();
-        let highest_entropy = self.find_highest_entropy();
-        let highest_complexity = self.find_highest_complexity();
+        // Find best in each dimension — requires non-empty population
+        let Some(highest_phi) = self.find_highest_phi() else {
+            anyhow::bail!("Multi-objective evolution produced empty population");
+        };
+        let highest_entropy = self
+            .find_highest_entropy()
+            .unwrap_or_else(|| highest_phi.clone());
+        let highest_complexity = self
+            .find_highest_complexity()
+            .unwrap_or_else(|| highest_phi.clone());
         let highest_composite = pareto_frontier_obj
             .highest_composite()
             .and_then(|prof| {
@@ -281,30 +287,27 @@ impl MultiObjectiveEvolution {
     }
 
     /// Find primitive with highest Φ
-    fn find_highest_phi(&self) -> PrimitiveWithProfile {
+    fn find_highest_phi(&self) -> Option<PrimitiveWithProfile> {
         self.population
             .iter()
             .max_by(|a, b| a.profile.phi.total_cmp(&b.profile.phi))
-            .expect("population must not be empty when finding highest phi")
-            .clone()
+            .cloned()
     }
 
     /// Find primitive with highest entropy
-    fn find_highest_entropy(&self) -> PrimitiveWithProfile {
+    fn find_highest_entropy(&self) -> Option<PrimitiveWithProfile> {
         self.population
             .iter()
             .max_by(|a, b| a.profile.entropy.total_cmp(&b.profile.entropy))
-            .expect("population must not be empty when finding highest entropy")
-            .clone()
+            .cloned()
     }
 
     /// Find primitive with highest complexity
-    fn find_highest_complexity(&self) -> PrimitiveWithProfile {
+    fn find_highest_complexity(&self) -> Option<PrimitiveWithProfile> {
         self.population
             .iter()
             .max_by(|a, b| a.profile.complexity.total_cmp(&b.profile.complexity))
-            .expect("population must not be empty when finding highest complexity")
-            .clone()
+            .cloned()
     }
 
     /// Compute frontier spread (diversity metric)
