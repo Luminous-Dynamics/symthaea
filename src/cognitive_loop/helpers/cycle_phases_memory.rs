@@ -31,6 +31,7 @@ impl CognitiveLoopService {
             if let Some(ref mut res_mem) = self.memory_consol.resonator_memory {
                 let res_dim_ok = compressed_state.len() == res_mem.resonator.config.dim;
                 if res_dim_ok
+                    && self.config.resonator_growth_interval > 0
                     && self.stats.total_cycles % self.config.resonator_growth_interval == 0
                 {
                     if let Some(ref mut semantic_cb) = res_mem.resonator.codebooks.get_mut(0) {

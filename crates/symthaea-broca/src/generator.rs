@@ -216,6 +216,9 @@ pub struct BrocaGenerator {
     /// Seeded RNG for reproducible sampling (TopK/TopP). Recreated each generation
     /// from `config.sampling_seed`. If `None`, uses thread-local RNG.
     sampling_rng: Option<StdRng>,
+    /// Cached NSM semantic gate (built once at construction, reused per-generation).
+    /// `None` when `enable_nsm_gate` is false.
+    nsm_gate: Option<crate::gating::NsmSemanticGate>,
 }
 
 impl BrocaGenerator {
@@ -242,6 +245,12 @@ impl BrocaGenerator {
         );
         let sampling_rng = config.sampling_seed.map(StdRng::seed_from_u64);
 
+        let nsm_gate = if config.enable_nsm_gate {
+            Some(crate::gating::NsmSemanticGate::new_with_lexicon(&tokenizer))
+        } else {
+            None
+        };
+
         Self {
             controller,
             tokenizer,
@@ -250,6 +259,7 @@ impl BrocaGenerator {
             emotional_modulator,
             coherence_feedback,
             sampling_rng,
+            nsm_gate,
             config,
         }
     }
@@ -288,6 +298,12 @@ impl BrocaGenerator {
         );
         let sampling_rng = config.sampling_seed.map(StdRng::seed_from_u64);
 
+        let nsm_gate = if config.enable_nsm_gate {
+            Some(crate::gating::NsmSemanticGate::new_with_lexicon(&tokenizer))
+        } else {
+            None
+        };
+
         Self {
             controller,
             tokenizer,
@@ -296,6 +312,7 @@ impl BrocaGenerator {
             emotional_modulator,
             coherence_feedback,
             sampling_rng,
+            nsm_gate,
             config,
         }
     }
@@ -414,15 +431,9 @@ impl BrocaGenerator {
             self.sampling_rng = Some(StdRng::seed_from_u64(seed));
         }
 
-        // 4b. Construct NSM gate and tracker if enabled and primes are provided.
-        let nsm_gate = if self.config.enable_nsm_gate && !active_primes.is_empty() {
-            Some(crate::gating::NsmSemanticGate::new_with_lexicon(
-                &self.tokenizer,
-            ))
-        } else {
-            None
-        };
-        let mut nsm_tracker = if nsm_gate.is_some() {
+        // 4b. Use cached NSM gate (built once at construction) and create a fresh tracker.
+        let use_nsm = self.nsm_gate.is_some() && !active_primes.is_empty();
+        let mut nsm_tracker = if use_nsm {
             Some(crate::gating::NsmCoherenceTracker::new(active_primes))
         } else {
             None
@@ -520,7 +531,7 @@ impl BrocaGenerator {
 
             // NSM semantic gate: boost logits for tokens expressing active primes.
             // Inserted after epistemic/emotional/therapeutic gates, before coherence feedback.
-            let this_nsm_boost = if let Some(ref gate) = nsm_gate {
+            let this_nsm_boost = if let Some(ref gate) = self.nsm_gate {
                 gate.apply(
                     &mut logits,
                     active_primes,

@@ -209,7 +209,7 @@ fn baseline_for_benchmark<'a>(
         }
 
         // Creativity
-        name if name.contains("AlternateUses") => Some(("aut_fluency", &bl.creativity)),
+        name if name.contains("AlternateUses") => Some(("aut_originality", &bl.creativity)),
         name if name.contains("RemoteAssociates") => {
             Some(("rat_mean_solution_rank", &bl.creativity))
         }

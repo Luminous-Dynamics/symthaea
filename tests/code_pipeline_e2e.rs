@@ -124,6 +124,40 @@ fn test_full_code_pipeline() {
     );
     eprintln!("  Hallucination rate: {:.3}", summary.hallucination_rate);
 
+    // Print EVERY lesson outcome for diagnosis
+    eprintln!("\n--- Per-Lesson Breakdown ---");
+    for outcome in &summary.outcomes {
+        let status = if outcome.is_success() {
+            "PASS"
+        } else if outcome.compiled {
+            "COMPILED (tests failed)"
+        } else {
+            "FAIL"
+        };
+        eprintln!(
+            "  [{}] {} | tests={}/{} | retries={} | surprise={:.3}",
+            outcome.objective_id,
+            status,
+            outcome.tests_passed,
+            outcome.tests_passed + outcome.tests_failed,
+            outcome.retries_used,
+            outcome.surprise,
+        );
+        if !outcome.compiled {
+            // Print first 8 lines of source to diagnose
+            let preview: String = outcome
+                .source
+                .lines()
+                .take(8)
+                .collect::<Vec<_>>()
+                .join("\n");
+            eprintln!(
+                "    Source (first 8 lines):\n    {}",
+                preview.replace('\n', "\n    ")
+            );
+        }
+    }
+
     // 5. Verify distillation cache is populated
     let distill_count = engine.distillation_count();
     eprintln!("\n--- Distillation Cache ({} entries) ---", distill_count);

@@ -947,6 +947,13 @@ impl BenchmarkReport {
             ),
             ("binding_preservation", "binding_preservation", &bl.security),
             ("accuracy_at_scale", "accuracy_at_scale", &bl.security),
+            // Coding domain
+            ("pass_at_1", "humaneval_pass_at_1", &bl.coding),
+            (
+                "delta_magnitude",
+                "bug_detection_delta_magnitude",
+                &bl.coding,
+            ),
         ];
 
         for (metric_key, baseline_key, baselines) in &mappings {
@@ -2300,6 +2307,9 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("ScalingAnalysis") => "accuracy_at_scale",
         b if b.contains("EncryptedClassification") => "encrypted_accuracy",
         b if b.contains("CollectiveAggregation") => "aggregation_fidelity",
+        // Coding domain
+        b if b.contains("HumanEvalMini") => "pass_at_1",
+        b if b.contains("BugDetection") => "delta_magnitude",
         _ => "overall_accuracy",
     }
 }

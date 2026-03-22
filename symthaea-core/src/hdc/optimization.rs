@@ -4,10 +4,25 @@
 //!
 //! ## Methods
 //!
-//! - **Gradient descent**: with line search and momentum
-//! - **Nelder-Mead simplex**: derivative-free optimization
-//! - **L-BFGS**: limited-memory quasi-Newton for large problems
-//! - **Penalty method**: constrained optimization via penalty functions
+//! - **Gradient descent**: with backtracking Armijo line search and momentum
+//! - **Nelder-Mead simplex**: derivative-free optimization (reflection, expansion, contraction, shrink)
+//! - **L-BFGS**: limited-memory quasi-Newton (m=10 history) for large-scale problems
+//! - **Penalty method**: constrained optimization via quadratic penalty functions
+//!
+//! ## ObjectiveFunction Trait
+//!
+//! Implement [`ObjectiveFunction`] for type-safe optimization, or use closures directly.
+//! The trait provides `eval()` (required) and `gradient()` (optional, with finite-difference fallback).
+//!
+//! ## Convenience
+//!
+//! [`minimize`] dispatches to the appropriate solver based on [`OptMethod`].
+//!
+//! ## References
+//!
+//! - Nocedal & Wright (2006) — *Numerical Optimization*, Springer (L-BFGS, Armijo)
+//! - Nelder & Mead (1965) — A simplex method for function minimization. *Computer Journal*.
+//! - Kanerva (2009) — Hyperdimensional computing encodings
 
 use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::seed_from_name;
@@ -19,6 +34,43 @@ const MAX_ITERATIONS: usize = 1000;
 const DEFAULT_TOL: f64 = 1e-10;
 const DEFAULT_LEARNING_RATE: f64 = 0.01;
 const LBFGS_MEMORY: usize = 10;
+const ARMIJO_C1: f64 = 1e-4;
+const ARMIJO_SHRINK: f64 = 0.5;
+const ARMIJO_MAX_BACKTRACKS: usize = 30;
+const FINITE_DIFF_EPS: f64 = 1e-7;
+
+// ─── ObjectiveFunction Trait ─────────────────────────────────────────────────
+
+/// Trait for objective functions that can be optimized.
+///
+/// Implement `eval` (required) and optionally `gradient` for gradient-based methods.
+/// If `gradient` is not provided, a finite-difference approximation is used.
+pub trait ObjectiveFunction {
+    /// Evaluate the objective function at point `x`.
+    fn eval(&self, x: &[f64]) -> f64;
+
+    /// Compute the gradient at point `x`. Returns `None` to use finite differences.
+    fn gradient(&self, x: &[f64]) -> Option<Vec<f64>> {
+        let _ = x;
+        None
+    }
+}
+
+/// Compute the gradient via central finite differences.
+fn numerical_gradient<F: Fn(&[f64]) -> f64>(f: &F, x: &[f64]) -> Vec<f64> {
+    let n = x.len();
+    let mut grad = vec![0.0; n];
+    let mut x_plus = x.to_vec();
+    let mut x_minus = x.to_vec();
+    for i in 0..n {
+        x_plus[i] = x[i] + FINITE_DIFF_EPS;
+        x_minus[i] = x[i] - FINITE_DIFF_EPS;
+        grad[i] = (f(&x_plus) - f(&x_minus)) / (2.0 * FINITE_DIFF_EPS);
+        x_plus[i] = x[i];
+        x_minus[i] = x[i];
+    }
+    grad
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -58,6 +110,114 @@ pub struct OptResult {
     pub phi: f64,
     /// HDC encoding
     pub encoding: BinaryHV,
+}
+
+/// Convenience type alias matching the task spec naming convention.
+pub type OptimizationResult = OptResult;
+
+// ─── Box Constraints ─────────────────────────────────────────────────────────
+
+/// Simple box constraints: lower[i] <= x[i] <= upper[i].
+#[derive(Debug, Clone)]
+pub struct BoxConstraints {
+    pub lower: Vec<f64>,
+    pub upper: Vec<f64>,
+}
+
+impl BoxConstraints {
+    /// Create box constraints. Each dimension i is constrained to [lower[i], upper[i]].
+    pub fn new(lower: Vec<f64>, upper: Vec<f64>) -> Self {
+        assert_eq!(
+            lower.len(),
+            upper.len(),
+            "Lower and upper bounds must have same length"
+        );
+        Self { lower, upper }
+    }
+
+    /// Project a point onto the feasible box.
+    pub fn project(&self, x: &[f64]) -> Vec<f64> {
+        x.iter()
+            .enumerate()
+            .map(|(i, &xi)| xi.max(self.lower[i]).min(self.upper[i]))
+            .collect()
+    }
+
+    /// Convert to penalty-style inequality constraints: g_i(x) <= 0.
+    /// For each dimension, two constraints: x[i] - upper[i] <= 0 and lower[i] - x[i] <= 0.
+    pub fn to_penalty_constraints(&self) -> Vec<Box<dyn Fn(&[f64]) -> f64>> {
+        let n = self.lower.len();
+        let mut constraints: Vec<Box<dyn Fn(&[f64]) -> f64>> = Vec::with_capacity(2 * n);
+        for i in 0..n {
+            let lo = self.lower[i];
+            let hi = self.upper[i];
+            constraints.push(Box::new(move |x: &[f64]| x[i] - hi)); // x[i] <= upper[i]
+            constraints.push(Box::new(move |x: &[f64]| lo - x[i])); // lower[i] <= x[i]
+        }
+        constraints
+    }
+}
+
+// ─── Minimize Dispatcher ─────────────────────────────────────────────────────
+
+/// Convenience dispatcher: minimize `f` starting from `x0` using the given method.
+///
+/// For gradient-based methods (GradientDescent, LBFGS), computes gradients via
+/// central finite differences if not provided.
+pub fn minimize<F>(f: F, x0: &[f64], method: OptMethod) -> OptResult
+where
+    F: Fn(&[f64]) -> f64,
+{
+    minimize_with_tol(f, x0, method, DEFAULT_TOL)
+}
+
+/// Like [`minimize`] but with explicit tolerance.
+pub fn minimize_with_tol<F>(f: F, x0: &[f64], method: OptMethod, tol: f64) -> OptResult
+where
+    F: Fn(&[f64]) -> f64,
+{
+    match method {
+        OptMethod::GradientDescent => {
+            let grad = |x: &[f64]| numerical_gradient(&f, x);
+            OptimizationEngine::gradient_descent(&f, &grad, x0, DEFAULT_LEARNING_RATE, 0.0, tol)
+        }
+        OptMethod::NelderMead => OptimizationEngine::nelder_mead(&f, x0, 1.0, tol),
+        OptMethod::LBFGS => {
+            let grad = |x: &[f64]| numerical_gradient(&f, x);
+            OptimizationEngine::lbfgs(&f, &grad, x0, tol)
+        }
+    }
+}
+
+/// Minimize an [`ObjectiveFunction`] impl starting from `x0`.
+pub fn minimize_objective(obj: &dyn ObjectiveFunction, x0: &[f64], method: OptMethod) -> OptResult {
+    let f = |x: &[f64]| obj.eval(x);
+    let has_analytic_grad = obj.gradient(x0).is_some();
+
+    match method {
+        OptMethod::GradientDescent => {
+            let grad = |x: &[f64]| obj.gradient(x).unwrap_or_else(|| numerical_gradient(&f, x));
+            OptimizationEngine::gradient_descent(
+                &f,
+                &grad,
+                x0,
+                DEFAULT_LEARNING_RATE,
+                0.0,
+                DEFAULT_TOL,
+            )
+        }
+        OptMethod::NelderMead => OptimizationEngine::nelder_mead(&f, x0, 1.0, DEFAULT_TOL),
+        OptMethod::LBFGS => {
+            let grad = |x: &[f64]| {
+                if has_analytic_grad {
+                    obj.gradient(x).unwrap_or_else(|| numerical_gradient(&f, x))
+                } else {
+                    numerical_gradient(&f, x)
+                }
+            };
+            OptimizationEngine::lbfgs(&f, &grad, x0, DEFAULT_TOL)
+        }
+    }
 }
 
 // ─── Optimization Engine ─────────────────────────────────────────────────────
@@ -119,9 +279,26 @@ impl OptimizationEngine {
                 };
             }
 
+            // Backtracking Armijo line search for step size
+            let descent: f64 = g.iter().map(|gi| gi * gi).sum();
+            let mut step = lr;
+            for _ in 0..ARMIJO_MAX_BACKTRACKS {
+                let x_trial: Vec<f64> = x
+                    .iter()
+                    .zip(g.iter())
+                    .zip(velocity.iter())
+                    .map(|((&xi, &gi), &vi)| xi + momentum * vi - step * gi)
+                    .collect();
+                let f_trial = f(&x_trial);
+                if f_trial <= fx - ARMIJO_C1 * step * descent {
+                    break;
+                }
+                step *= ARMIJO_SHRINK;
+            }
+
             // Update with momentum
             for i in 0..n {
-                velocity[i] = momentum * velocity[i] - lr * g[i];
+                velocity[i] = momentum * velocity[i] - step * g[i];
                 x[i] += velocity[i];
             }
         }

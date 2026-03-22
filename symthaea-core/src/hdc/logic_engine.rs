@@ -625,6 +625,567 @@ impl LogicEngine {
         None
     }
 
+    /// Disjunctive Syllogism: from P ∨ Q and ¬P, derive Q
+    pub fn disjunctive_syllogism(
+        disjunction: &Proposition,
+        negation: &Proposition,
+    ) -> Option<ProofResult> {
+        if let Proposition::Or(p, q) = disjunction {
+            if let Proposition::Not(inner) = negation {
+                if **inner == **p {
+                    return Some(ProofResult {
+                        valid: true,
+                        proof_steps: vec![
+                            ProofStepLogic {
+                                step_number: 1,
+                                rule: "Premise".to_string(),
+                                formula: format!("{}", disjunction),
+                                justification: "Given".to_string(),
+                            },
+                            ProofStepLogic {
+                                step_number: 2,
+                                rule: "Premise".to_string(),
+                                formula: format!("{}", negation),
+                                justification: "Given".to_string(),
+                            },
+                            ProofStepLogic {
+                                step_number: 3,
+                                rule: "Disjunctive Syllogism".to_string(),
+                                formula: format!("{}", q),
+                                justification: "From 1, 2 by DS".to_string(),
+                            },
+                        ],
+                        phi: 0.4,
+                        description: format!(
+                            "Disjunctive Syllogism: {} and {} → {}",
+                            disjunction, negation, q
+                        ),
+                    });
+                }
+                // Also check the symmetric case: ¬Q eliminates Q from P ∨ Q
+                if **inner == **q {
+                    return Some(ProofResult {
+                        valid: true,
+                        proof_steps: vec![
+                            ProofStepLogic {
+                                step_number: 1,
+                                rule: "Premise".to_string(),
+                                formula: format!("{}", disjunction),
+                                justification: "Given".to_string(),
+                            },
+                            ProofStepLogic {
+                                step_number: 2,
+                                rule: "Premise".to_string(),
+                                formula: format!("{}", negation),
+                                justification: "Given".to_string(),
+                            },
+                            ProofStepLogic {
+                                step_number: 3,
+                                rule: "Disjunctive Syllogism".to_string(),
+                                formula: format!("{}", p),
+                                justification: "From 1, 2 by DS".to_string(),
+                            },
+                        ],
+                        phi: 0.4,
+                        description: format!(
+                            "Disjunctive Syllogism: {} and {} → {}",
+                            disjunction, negation, p
+                        ),
+                    });
+                }
+            }
+        }
+        None
+    }
+
+    // ─── Resolution Prover (FOL) ─────────────────────────────────────────
+
+    /// A clause in resolution is a set of literals (predicate, polarity).
+    /// We represent it as a Vec of (predicate_name, args, positive?).
+    type ResClause = Vec<(String, Vec<FOLTerm>, bool)>;
+
+    /// Apply a substitution to a resolution clause.
+    fn apply_subst_clause(
+        clause: &[(String, Vec<FOLTerm>, bool)],
+        subst: &HashMap<String, FOLTerm>,
+    ) -> Vec<(String, Vec<FOLTerm>, bool)> {
+        clause
+            .iter()
+            .map(|(name, args, pol)| {
+                let new_args: Vec<FOLTerm> =
+                    args.iter().map(|a| Self::apply_subst(a, subst)).collect();
+                (name.clone(), new_args, *pol)
+            })
+            .collect()
+    }
+
+    /// Try to resolve two clauses on complementary literals.
+    /// Returns resolved clauses (possibly multiple, one per complementary pair).
+    fn resolve_clauses(
+        c1: &[(String, Vec<FOLTerm>, bool)],
+        c2: &[(String, Vec<FOLTerm>, bool)],
+    ) -> Vec<Vec<(String, Vec<FOLTerm>, bool)>> {
+        let mut results = Vec::new();
+
+        for (i, (name1, args1, pol1)) in c1.iter().enumerate() {
+            for (j, (name2, args2, pol2)) in c2.iter().enumerate() {
+                // Complementary: same predicate, opposite polarity
+                if name1 == name2 && pol1 != pol2 && args1.len() == args2.len() {
+                    // Try to unify the argument lists
+                    let mut subst = HashMap::new();
+                    let mut unifiable = true;
+                    for (a1, a2) in args1.iter().zip(args2.iter()) {
+                        if !Self::unify_recursive(a1, a2, &mut subst) {
+                            unifiable = false;
+                            break;
+                        }
+                    }
+                    if unifiable {
+                        // Build resolvent: all literals from c1 except i, all from c2 except j
+                        let mut resolvent = Vec::new();
+                        for (k, lit) in c1.iter().enumerate() {
+                            if k != i {
+                                resolvent.push(lit.clone());
+                            }
+                        }
+                        for (k, lit) in c2.iter().enumerate() {
+                            if k != j {
+                                resolvent.push(lit.clone());
+                            }
+                        }
+                        // Apply the unifier
+                        let resolvent = Self::apply_subst_clause(&resolvent, &subst);
+                        results.push(resolvent);
+                    }
+                }
+            }
+        }
+
+        results
+    }
+
+    /// Convert an FOL formula into a set of clauses for resolution.
+    /// This performs skolemization and clausification.
+    pub fn fol_to_clauses(formula: &FOLFormula) -> Vec<Vec<(String, Vec<FOLTerm>, bool)>> {
+        let mut counter = 0;
+        let negated = Self::negate_fol(formula);
+        let skolemized = Self::skolemize(&negated, &[], &mut counter);
+        let mut clauses = Vec::new();
+        Self::clausify(&skolemized, &mut clauses);
+        clauses
+    }
+
+    fn negate_fol(formula: &FOLFormula) -> FOLFormula {
+        FOLFormula::Not(Box::new(formula.clone()))
+    }
+
+    /// Simplify FOL negations (push NOT inward, eliminate double negation).
+    fn simplify_fol_not(formula: &FOLFormula) -> FOLFormula {
+        match formula {
+            FOLFormula::Not(inner) => match inner.as_ref() {
+                FOLFormula::Not(p) => Self::simplify_fol_not(p),
+                FOLFormula::And(p, q) => FOLFormula::Or(
+                    Box::new(Self::simplify_fol_not(&FOLFormula::Not(p.clone()))),
+                    Box::new(Self::simplify_fol_not(&FOLFormula::Not(q.clone()))),
+                ),
+                FOLFormula::Or(p, q) => FOLFormula::And(
+                    Box::new(Self::simplify_fol_not(&FOLFormula::Not(p.clone()))),
+                    Box::new(Self::simplify_fol_not(&FOLFormula::Not(q.clone()))),
+                ),
+                FOLFormula::ForAll(v, p) => FOLFormula::Exists(
+                    v.clone(),
+                    Box::new(Self::simplify_fol_not(&FOLFormula::Not(p.clone()))),
+                ),
+                FOLFormula::Exists(v, p) => FOLFormula::ForAll(
+                    v.clone(),
+                    Box::new(Self::simplify_fol_not(&FOLFormula::Not(p.clone()))),
+                ),
+                FOLFormula::Implies(p, q) => FOLFormula::And(
+                    Box::new(Self::simplify_fol_not(p)),
+                    Box::new(Self::simplify_fol_not(&FOLFormula::Not(q.clone()))),
+                ),
+                _ => formula.clone(),
+            },
+            FOLFormula::And(p, q) => FOLFormula::And(
+                Box::new(Self::simplify_fol_not(p)),
+                Box::new(Self::simplify_fol_not(q)),
+            ),
+            FOLFormula::Or(p, q) => FOLFormula::Or(
+                Box::new(Self::simplify_fol_not(p)),
+                Box::new(Self::simplify_fol_not(q)),
+            ),
+            FOLFormula::Implies(p, q) => FOLFormula::Or(
+                Box::new(Self::simplify_fol_not(&FOLFormula::Not(Box::new(
+                    p.as_ref().clone(),
+                )))),
+                Box::new(Self::simplify_fol_not(q)),
+            ),
+            FOLFormula::ForAll(v, p) => {
+                FOLFormula::ForAll(v.clone(), Box::new(Self::simplify_fol_not(p)))
+            }
+            FOLFormula::Exists(v, p) => {
+                FOLFormula::Exists(v.clone(), Box::new(Self::simplify_fol_not(p)))
+            }
+            _ => formula.clone(),
+        }
+    }
+
+    /// Skolemize: replace existentially quantified variables with Skolem functions.
+    fn skolemize(
+        formula: &FOLFormula,
+        universal_vars: &[String],
+        counter: &mut usize,
+    ) -> FOLFormula {
+        let simplified = Self::simplify_fol_not(formula);
+        match &simplified {
+            FOLFormula::ForAll(v, body) => {
+                let mut new_vars = universal_vars.to_vec();
+                new_vars.push(v.clone());
+                Self::skolemize(body, &new_vars, counter)
+            }
+            FOLFormula::Exists(v, body) => {
+                *counter += 1;
+                let skolem_name = format!("sk{}", counter);
+                let skolem_term = if universal_vars.is_empty() {
+                    FOLTerm::Const(skolem_name)
+                } else {
+                    FOLTerm::Func(
+                        skolem_name,
+                        universal_vars
+                            .iter()
+                            .map(|u| FOLTerm::Var(u.clone()))
+                            .collect(),
+                    )
+                };
+                let replaced = Self::substitute_fol(body, v, &skolem_term);
+                Self::skolemize(&replaced, universal_vars, counter)
+            }
+            FOLFormula::And(p, q) => FOLFormula::And(
+                Box::new(Self::skolemize(p, universal_vars, counter)),
+                Box::new(Self::skolemize(q, universal_vars, counter)),
+            ),
+            FOLFormula::Or(p, q) => FOLFormula::Or(
+                Box::new(Self::skolemize(p, universal_vars, counter)),
+                Box::new(Self::skolemize(q, universal_vars, counter)),
+            ),
+            _ => simplified,
+        }
+    }
+
+    /// Substitute a variable with a term in an FOL formula.
+    fn substitute_fol(formula: &FOLFormula, var: &str, term: &FOLTerm) -> FOLFormula {
+        match formula {
+            FOLFormula::Predicate(name, args) => FOLFormula::Predicate(
+                name.clone(),
+                args.iter()
+                    .map(|a| Self::substitute_term(a, var, term))
+                    .collect(),
+            ),
+            FOLFormula::Not(p) => FOLFormula::Not(Box::new(Self::substitute_fol(p, var, term))),
+            FOLFormula::And(p, q) => FOLFormula::And(
+                Box::new(Self::substitute_fol(p, var, term)),
+                Box::new(Self::substitute_fol(q, var, term)),
+            ),
+            FOLFormula::Or(p, q) => FOLFormula::Or(
+                Box::new(Self::substitute_fol(p, var, term)),
+                Box::new(Self::substitute_fol(q, var, term)),
+            ),
+            FOLFormula::Implies(p, q) => FOLFormula::Implies(
+                Box::new(Self::substitute_fol(p, var, term)),
+                Box::new(Self::substitute_fol(q, var, term)),
+            ),
+            FOLFormula::ForAll(v, p) => {
+                if v == var {
+                    formula.clone() // Bound variable, don't substitute
+                } else {
+                    FOLFormula::ForAll(v.clone(), Box::new(Self::substitute_fol(p, var, term)))
+                }
+            }
+            FOLFormula::Exists(v, p) => {
+                if v == var {
+                    formula.clone()
+                } else {
+                    FOLFormula::Exists(v.clone(), Box::new(Self::substitute_fol(p, var, term)))
+                }
+            }
+        }
+    }
+
+    fn substitute_term(t: &FOLTerm, var: &str, replacement: &FOLTerm) -> FOLTerm {
+        match t {
+            FOLTerm::Var(v) if v == var => replacement.clone(),
+            FOLTerm::Var(_) | FOLTerm::Const(_) => t.clone(),
+            FOLTerm::Func(name, args) => FOLTerm::Func(
+                name.clone(),
+                args.iter()
+                    .map(|a| Self::substitute_term(a, var, replacement))
+                    .collect(),
+            ),
+        }
+    }
+
+    /// Convert a quantifier-free FOL formula into clauses (CNF).
+    fn clausify(formula: &FOLFormula, clauses: &mut Vec<Vec<(String, Vec<FOLTerm>, bool)>>) {
+        match formula {
+            FOLFormula::And(p, q) => {
+                Self::clausify(p, clauses);
+                Self::clausify(q, clauses);
+            }
+            _ => {
+                let mut clause = Vec::new();
+                Self::collect_fol_literals(formula, &mut clause);
+                if !clause.is_empty() {
+                    clauses.push(clause);
+                }
+            }
+        }
+    }
+
+    fn collect_fol_literals(formula: &FOLFormula, clause: &mut Vec<(String, Vec<FOLTerm>, bool)>) {
+        match formula {
+            FOLFormula::Predicate(name, args) => {
+                clause.push((name.clone(), args.clone(), true));
+            }
+            FOLFormula::Not(inner) => {
+                if let FOLFormula::Predicate(name, args) = inner.as_ref() {
+                    clause.push((name.clone(), args.clone(), false));
+                }
+            }
+            FOLFormula::Or(p, q) => {
+                Self::collect_fol_literals(p, clause);
+                Self::collect_fol_literals(q, clause);
+            }
+            _ => {}
+        }
+    }
+
+    /// Resolution prover for FOL.
+    ///
+    /// Attempts to prove a goal by refutation: negate the goal,
+    /// add to the knowledge base, and derive the empty clause.
+    ///
+    /// `max_steps` limits resolution iterations to prevent infinite loops.
+    pub fn resolution_prove(
+        knowledge_base: &[FOLFormula],
+        goal: &FOLFormula,
+        max_steps: usize,
+    ) -> ProofResult {
+        let mut clauses: Vec<Vec<(String, Vec<FOLTerm>, bool)>> = Vec::new();
+        let mut steps = Vec::new();
+
+        // Clausify the knowledge base
+        for (i, formula) in knowledge_base.iter().enumerate() {
+            let formula_clauses = Self::fol_to_clauses(&Self::negate_fol(formula));
+            // KB formulas go in as-is (not negated — we negated the negation)
+            let mut kb_clauses = Vec::new();
+            Self::clausify_direct(formula, &mut kb_clauses);
+            for c in &kb_clauses {
+                steps.push(ProofStepLogic {
+                    step_number: steps.len() + 1,
+                    rule: "KB Clause".to_string(),
+                    formula: Self::format_clause(c),
+                    justification: format!("From KB formula {}", i + 1),
+                });
+            }
+            clauses.extend(kb_clauses);
+            let _ = formula_clauses; // Consumed above via direct clausification
+        }
+
+        // Negate the goal and clausify
+        let negated_goal = Self::negate_fol(goal);
+        let mut skolem_counter = 100; // Avoid collision with KB skolem constants
+        let skolemized = Self::skolemize(&negated_goal, &[], &mut skolem_counter);
+        let mut goal_clauses = Vec::new();
+        Self::clausify(&skolemized, &mut goal_clauses);
+        for c in &goal_clauses {
+            steps.push(ProofStepLogic {
+                step_number: steps.len() + 1,
+                rule: "Negated Goal".to_string(),
+                formula: Self::format_clause(c),
+                justification: "Negation of goal for refutation".to_string(),
+            });
+        }
+        clauses.extend(goal_clauses);
+
+        // Resolution loop
+        for _step in 0..max_steps {
+            let n = clauses.len();
+            let mut new_clauses = Vec::new();
+
+            for i in 0..n {
+                for j in (i + 1)..n {
+                    let resolvents = Self::resolve_clauses(&clauses[i], &clauses[j]);
+                    for resolvent in resolvents {
+                        if resolvent.is_empty() {
+                            // Derived the empty clause — contradiction found!
+                            steps.push(ProofStepLogic {
+                                step_number: steps.len() + 1,
+                                rule: "Resolution".to_string(),
+                                formula: "□ (empty clause)".to_string(),
+                                justification: format!(
+                                    "Resolving {} with {}",
+                                    Self::format_clause(&clauses[i]),
+                                    Self::format_clause(&clauses[j])
+                                ),
+                            });
+                            return ProofResult {
+                                valid: true,
+                                proof_steps: steps,
+                                phi: 0.6,
+                                description: "Proved by refutation: empty clause derived"
+                                    .to_string(),
+                            };
+                        }
+                        // Avoid adding duplicate clauses
+                        if !clauses.contains(&resolvent) && !new_clauses.contains(&resolvent) {
+                            steps.push(ProofStepLogic {
+                                step_number: steps.len() + 1,
+                                rule: "Resolution".to_string(),
+                                formula: Self::format_clause(&resolvent),
+                                justification: format!(
+                                    "Resolving {} with {}",
+                                    Self::format_clause(&clauses[i]),
+                                    Self::format_clause(&clauses[j])
+                                ),
+                            });
+                            new_clauses.push(resolvent);
+                        }
+                    }
+                }
+            }
+
+            if new_clauses.is_empty() {
+                // No new clauses — cannot prove
+                break;
+            }
+
+            clauses.extend(new_clauses);
+        }
+
+        ProofResult {
+            valid: false,
+            proof_steps: steps,
+            phi: 0.2,
+            description: "Could not derive empty clause within step limit".to_string(),
+        }
+    }
+
+    /// Clausify an FOL formula directly (without negation), for KB formulas.
+    fn clausify_direct(formula: &FOLFormula, clauses: &mut Vec<Vec<(String, Vec<FOLTerm>, bool)>>) {
+        let mut counter = 0;
+        let skolemized = Self::skolemize(formula, &[], &mut counter);
+        Self::clausify(&skolemized, clauses);
+    }
+
+    /// Format a clause for display.
+    fn format_clause(clause: &[(String, Vec<FOLTerm>, bool)]) -> String {
+        if clause.is_empty() {
+            return "□".to_string();
+        }
+        let lits: Vec<String> = clause
+            .iter()
+            .map(|(name, args, pol)| {
+                let args_str: Vec<String> = args.iter().map(|a| Self::format_term(a)).collect();
+                let pred = format!("{}({})", name, args_str.join(", "));
+                if *pol {
+                    pred
+                } else {
+                    format!("¬{}", pred)
+                }
+            })
+            .collect();
+        format!("{{{}}}", lits.join(", "))
+    }
+
+    fn format_term(term: &FOLTerm) -> String {
+        match term {
+            FOLTerm::Var(v) => v.clone(),
+            FOLTerm::Const(c) => c.clone(),
+            FOLTerm::Func(name, args) => {
+                let args_str: Vec<String> = args.iter().map(|a| Self::format_term(a)).collect();
+                format!("{}({})", name, args_str.join(", "))
+            }
+        }
+    }
+
+    // ─── Pigeonhole Principle ─────────────────────────────────────────────
+
+    /// Build the pigeonhole principle formula for n+1 pigeons in n holes.
+    ///
+    /// This is a classic UNSAT instance: you cannot place n+1 pigeons
+    /// into n holes without two pigeons sharing a hole.
+    pub fn pigeonhole(pigeons: usize, holes: usize) -> Proposition {
+        // Each pigeon must go in some hole
+        let mut conjuncts: Vec<Proposition> = Vec::new();
+
+        for p in 0..pigeons {
+            let mut disjuncts: Vec<Proposition> = Vec::new();
+            for h in 0..holes {
+                disjuncts.push(Proposition::atom(&format!("P{}H{}", p, h)));
+            }
+            // p0h0 ∨ p0h1 ∨ ... ∨ p0h(n-1)
+            if let Some(first) = disjuncts.into_iter().reduce(|a, b| a.or(b)) {
+                conjuncts.push(first);
+            }
+        }
+
+        // No two pigeons in the same hole
+        for h in 0..holes {
+            for p1 in 0..pigeons {
+                for p2 in (p1 + 1)..pigeons {
+                    // ¬(P_p1_h ∧ P_p2_h) = ¬P_p1_h ∨ ¬P_p2_h
+                    let conflict = Proposition::atom(&format!("P{}H{}", p1, h))
+                        .not()
+                        .or(Proposition::atom(&format!("P{}H{}", p2, h)).not());
+                    conjuncts.push(conflict);
+                }
+            }
+        }
+
+        conjuncts
+            .into_iter()
+            .reduce(|a, b| a.and(b))
+            .unwrap_or(Proposition::True)
+    }
+
+    /// Build a SAT encoding for graph k-coloring.
+    ///
+    /// Variables: C_v_k = vertex v has color k.
+    /// Constraints: each vertex has at least one color, adjacent vertices differ.
+    pub fn graph_coloring_sat(
+        edges: &[(usize, usize)],
+        n_vertices: usize,
+        n_colors: usize,
+    ) -> Proposition {
+        let mut conjuncts: Vec<Proposition> = Vec::new();
+
+        // Each vertex has at least one color
+        for v in 0..n_vertices {
+            let mut disjuncts: Vec<Proposition> = Vec::new();
+            for c in 0..n_colors {
+                disjuncts.push(Proposition::atom(&format!("C{}_{}", v, c)));
+            }
+            if let Some(first) = disjuncts.into_iter().reduce(|a, b| a.or(b)) {
+                conjuncts.push(first);
+            }
+        }
+
+        // Adjacent vertices have different colors
+        for &(u, v) in edges {
+            for c in 0..n_colors {
+                let conflict = Proposition::atom(&format!("C{}_{}", u, c))
+                    .not()
+                    .or(Proposition::atom(&format!("C{}_{}", v, c)).not());
+                conjuncts.push(conflict);
+            }
+        }
+
+        conjuncts
+            .into_iter()
+            .reduce(|a, b| a.and(b))
+            .unwrap_or(Proposition::True)
+    }
+
     // ─── FOL Unification ─────────────────────────────────────────────────
 
     /// Robinson's unification algorithm.

@@ -417,7 +417,9 @@ impl CognitiveLoopService {
                 .contribute_local_wisdom(&perception.encoding.hv16_cached);
 
             // Try aggregation at configured interval
-            if self.stats.total_cycles as usize % self.config.fhe_aggregation_interval == 0 {
+            if self.config.fhe_aggregation_interval > 0
+                && self.stats.total_cycles as usize % self.config.fhe_aggregation_interval == 0
+            {
                 if let Some(collective_wisdom) = self.swarm_manager.try_aggregate_and_decrypt() {
                     // Integrate collective wisdom: blend into the encoder's codebook
                     // via similarity-weighted update. The decrypted aggregate carries
