@@ -1,4 +1,6 @@
-# **THE GOVERNANCE CHARTER (v1.0)**
+# **THE GOVERNANCE CHARTER (v1.1)**
+
+*Updated March 2026: FLOW renamed SAP to align with production implementation*
 
 **Companion instrument to the Mycelix Spore Constitution (v0.24) and part of the modular Mycelix Charter Set (v1.0).**
 
@@ -60,19 +62,19 @@ Any delegate may be recalled by a ⅔ vote of their originating DAO.
 
 ### **Section 1\. Local DAOs**
 
-Manage local community governance and allocate local project funding (up to 50,000 FLOW without higher approval).
+Manage local community governance and allocate local project funding (up to 50,000 SAP without higher approval).
 
 ### **Section 2\. Sector DAOs**
 
-Govern economic, technical, and ethical standards within their domain and approve project funding up to 500,000 FLOW.
+Govern economic, technical, and ethical standards within their domain and approve project funding up to 500,000 SAP.
 
 ### **Section 3\. Regional DAOs**
 
-Handle cross-jurisdictional legal compliance, manage language standardization, and approve funding up to 500,000 FLOW for regional initiatives.
+Handle cross-jurisdictional legal compliance, manage language standardization, and approve funding up to 500,000 SAP for regional initiatives.
 
 ### **Section 4\. Global Mycelix DAO**
 
-Exercises ultimate constitutional authority, ratifies amendments, approves protocol-level changes (via MIPs), and allocates treasury funds \>500,000 FLOW.
+Exercises ultimate constitutional authority, ratifies amendments, approves protocol-level changes (via MIPs), and allocates treasury funds \>500,000 SAP.
 
 ### **Section 5\. Accountability and Reporting**
 
@@ -164,7 +166,7 @@ b. **Safeguards**: No emergency action may violate the Bill of Rights (Constitut
 
 c. **Sunset and Ratification**: All emergency powers and temporary bodies automatically expire after 30 days unless renewed by a ⅔ Global DAO vote with published justification. All actions taken under emergency authority require retroactive ratification by the appropriate DAO tier to remain in effect.
 
-d. **Task DAO Limitations**: i. Emergency Task DAOs may not amend the Constitution or Core Principles, allocate treasury funds greater than 500,000 FLOW without separate Global DAO approval, suspend Member rights as defined in Article VI, or override decisions of the Member Redress Council. ii. All actions taken by a Task DAO require daily public reporting to the Network. iii. Any Member may petition the Member Redress Council for an expedited (3-day) review of a Task DAO's actions for constitutional violations. iv. Task DAOs automatically dissolve after 30 days unless renewed by ⅔ Global DAO vote with published justification.
+d. **Task DAO Limitations**: i. Emergency Task DAOs may not amend the Constitution or Core Principles, allocate treasury funds greater than 500,000 SAP without separate Global DAO approval, suspend Member rights as defined in Article VI, or override decisions of the Member Redress Council. ii. All actions taken by a Task DAO require daily public reporting to the Network. iii. Any Member may petition the Member Redress Council for an expedited (3-day) review of a Task DAO's actions for constitutional violations. iv. Task DAOs automatically dissolve after 30 days unless renewed by ⅔ Global DAO vote with published justification.
 
 ### **Section 4\. Voting Mechanisms**
 
@@ -330,7 +332,7 @@ b. **Support**: Knowledge Council provides:
 * Cultural translation of governance concepts  
 * Onboarding resources
 
-c. **Funding**: Incubators may receive grants from Global Solidarity Fund (up to 10,000 FLOW) for capacity building.
+c. **Funding**: Incubators may receive grants from Global Solidarity Fund (up to 10,000 SAP) for capacity building.
 
 d. **Transition**: Incubators transition to Civic Uplift Trusts when they reach 10 verified Members and demonstrate basic governance capacity.
 
@@ -430,7 +432,7 @@ This Charter sunsets automatically if the Constitution is fundamentally restruct
 
 **Liminal DAO**: A provisional, agile DAO designed for experimentation or inter-domain coordination that exists outside the primary federated tiers but is anchored to the formal structure for accountability.
 
-## **APPENDIX B – GOVERNANCE WORKFLOW DIAGRAMS**
+## **APPENDIX B – GOVERNANCE WORKSAP DIAGRAMS**
 
 *(Non-binding) (To be developed: Visual flowcharts for key governance processes, including the Epistemic Claim Lifecycle, Dispute Resolution Tiers, and Emergency Response Procedures.)*
 

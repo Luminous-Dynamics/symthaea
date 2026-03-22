@@ -1,4 +1,6 @@
-# **COMMONS CHARTER: COMPOSTING EXTENSION (v1.0)**
+# **COMMONS CHARTER: COMPOSTING EXTENSION (v1.1)**
+
+*Updated March 2026: CGC renamed to MYCEL recognition, CIV renamed to MYCEL — aligned with production implementation*
 
 **Amendment to the Commons Charter (v1.0) under the Living Protocol Initiative**
 
@@ -8,7 +10,7 @@
 
 This document specifies the **Composting Protocol** as an extension to the Commons Charter (v1.0), adding a formal mechanism for gracefully retiring failed patterns, outdated knowledge, and deprecated structures.
 
-Composting joins the existing Commons mechanisms (CGC, TEND, ROOT, BEACON, HEARTH) as an optional module that DAOs may activate via MIP-C proposal.
+Composting joins the existing Commons mechanisms (MYCEL recognition, TEND, ROOT, BEACON, HEARTH) as an optional module that DAOs may activate via MIP-C proposal.
 
 **Constitutional Alignment**: Constitution Article I, Section 2 (Adaptability, Epistemic Humility), Epistemic Charter v2.0 (claim lifecycle).
 
@@ -153,8 +155,8 @@ For entities with Materiality M2 (Persistent) or higher:
 #### **4.3 Extraction Incentives**
 
 Contributors to value extraction receive:
-- CGC recognition (10 CGC per quality extraction)
-- CIV bonus (+0.01 per verified lesson)
+- MYCEL peer recognition (10 recognition events per quality extraction)
+- MYCEL bonus (+0.01 per verified lesson)
 - Author credit in Wisdom Library
 
 ### **Section 5. Composting and the DKG**
@@ -214,9 +216,9 @@ Composting aligns with the Metabolism Cycle:
 | **Integration** | Mineralization; completion |
 
 **Phase Bonuses**:
-- Initiation during Release: +10% CGC bonus
-- Extraction during Creation: +10% CGC bonus
-- Completion during Integration: +10% CGC bonus
+- Initiation during Release: +10% MYCEL recognition bonus
+- Extraction during Creation: +10% MYCEL recognition bonus
+- Completion during Integration: +10% MYCEL recognition bonus
 
 ### **Section 7. Governance Integration**
 

@@ -1,0 +1,229 @@
+# Terra Atlas Decentralized Stack
+#
+# Self-hosted replacement for Vercel + Supabase + Mapbox.
+# All services run locally with decentralized data via Holochain + IPFS.
+#
+# Usage:
+#   cp .env.docker.example .env.docker
+#   docker compose up -d
+#   open http://localhost:3002
+#
+# Services:
+#   nextjs     — Terra Atlas web app (public investor frontend)
+#   desci-api  — Mycelix DeSci REST API (Axum, bridges to Holochain)
+#   conductor  — Holochain 0.6.0 conductor (decentralized state)
+#   ipfs       — IPFS node (decentralized file storage)
+#   tileserver — MapLibre tile server (self-hosted map tiles)
+#   postgres   — PostGIS database (replaces Supabase)
+#   prometheus — Metrics collection
+#   grafana    — Dashboards
+
+services:
+  # ══════════════════════════════════════════════════════════════════════
+  # Frontend: Terra Atlas (Next.js)
+  # ══════════════════════════════════════════════════════════════════════
+  nextjs:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: terra-atlas-web
+    restart: unless-stopped
+    ports:
+      - "${ATLAS_PORT:-3002}:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_TILE_SERVER_URL=http://tileserver:8090
+      - NEXT_PUBLIC_DESCI_API_URL=http://desci-api:8080
+      - DATABASE_URL=postgresql://atlas:${POSTGRES_PASSWORD}@postgres:5432/terra_atlas
+      - NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY:-}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      tileserver:
+        condition: service_started
+    networks:
+      - atlas-net
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # ══════════════════════════════════════════════════════════════════════
+  # Backend: DeSci REST API (Axum/Rust)
+  # ══════════════════════════════════════════════════════════════════════
+  # Bridges Terra Atlas to Holochain conductor for decentralized state.
+  # Energy projects, investments, carbon credits, consciousness scores.
+  desci-api:
+    build:
+      context: ../mycelix-desci
+      dockerfile: Dockerfile
+    container_name: terra-atlas-api
+    restart: unless-stopped
+    ports:
+      - "${DESCI_PORT:-8080}:8080"
+    environment:
+      - PORT=8080
+      - RUST_LOG=mycelix_api=info
+      - CORS_ORIGINS=http://localhost:${ATLAS_PORT:-3002},http://nextjs:3000
+      - CONDUCTOR_URL=ws://conductor:8888
+    depends_on:
+      conductor:
+        condition: service_healthy
+    networks:
+      - atlas-net
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ══════════════════════════════════════════════════════════════════════
+  # Holochain Conductor
+  # ══════════════════════════════════════════════════════════════════════
+  # Decentralized state management. Runs mycelix-energy DNA for project
+  # tracking, investments, and consciousness scoring.
+  conductor:
+    build:
+      context: ../mycelix-workspace
+      dockerfile: deploy/Dockerfile.conductor
+    container_name: terra-atlas-conductor
+    restart: unless-stopped
+    environment:
+      - LAIR_PASSPHRASE=${LAIR_PASSPHRASE:?Set LAIR_PASSPHRASE in .env.docker}
+    ports:
+      # Admin WS — localhost only (security)
+      - "127.0.0.1:${CONDUCTOR_ADMIN_PORT:-4444}:4444"
+      # App WS — accessible to other services + Tauri operator console
+      - "${CONDUCTOR_APP_PORT:-8888}:8888"
+    volumes:
+      - holochain-data:/data/holochain
+    networks:
+      - atlas-net
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "--max-time", "3", "http://localhost:4444/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # ══════════════════════════════════════════════════════════════════════
+  # IPFS Node (Decentralized File Storage)
+  # ══════════════════════════════════════════════════════════════════════
+  # Stores project documents, GeoJSON data, verification photos.
+  # Gateway serves static assets without centralized hosting.
+  ipfs:
+    image: ipfs/kubo:latest
+    container_name: terra-atlas-ipfs
+    restart: unless-stopped
+    ports:
+      - "${IPFS_SWARM_PORT:-4001}:4001"      # P2P swarm
+      - "127.0.0.1:5001:5001"                 # API (localhost only)
+      - "${IPFS_GATEWAY_PORT:-8180}:8080"     # Gateway
+    volumes:
+      - ipfs-data:/data/ipfs
+    environment:
+      - IPFS_PROFILE=server
+    networks:
+      - atlas-net
+
+  # ══════════════════════════════════════════════════════════════════════
+  # Tile Server (Self-Hosted Map Tiles)
+  # ══════════════════════════════════════════════════════════════════════
+  # Serves OpenStreetMap vector tiles for MapLibre GL.
+  # Mount your .mbtiles or .pmtiles file into /data/.
+  # Download tiles: https://data.maptiler.com/downloads/planet/
+  tileserver:
+    image: maptiler/tileserver-gl-light:latest
+    container_name: terra-atlas-tiles
+    restart: unless-stopped
+    ports:
+      - "${TILE_PORT:-8090}:8080"
+    volumes:
+      - tile-data:/data
+    networks:
+      - atlas-net
+
+  # ══════════════════════════════════════════════════════════════════════
+  # PostgreSQL + PostGIS
+  # ══════════════════════════════════════════════════════════════════════
+  # Replaces Supabase PostgreSQL. PostGIS for spatial queries.
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: terra-atlas-db
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5434}:5432"
+    environment:
+      - POSTGRES_USER=atlas
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.docker}
+      - POSTGRES_DB=terra_atlas
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - atlas-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U atlas -d terra_atlas"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ══════════════════════════════════════════════════════════════════════
+  # Monitoring (Optional — start with: docker compose --profile monitoring up)
+  # ══════════════════════════════════════════════════════════════════════
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: terra-atlas-prometheus
+    restart: unless-stopped
+    profiles: ["monitoring"]
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - atlas-net
+
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: terra-atlas-grafana
+    restart: unless-stopped
+    profiles: ["monitoring"]
+    ports:
+      - "${GRAFANA_PORT:-3003}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - atlas-net
+
+# ══════════════════════════════════════════════════════════════════════════
+# Networks
+# ══════════════════════════════════════════════════════════════════════════
+networks:
+  atlas-net:
+    driver: bridge
+
+# ══════════════════════════════════════════════════════════════════════════
+# Volumes
+# ══════════════════════════════════════════════════════════════════════════
+volumes:
+  holochain-data:
+    driver: local
+  ipfs-data:
+    driver: local
+  tile-data:
+    driver: local
+  postgres-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local

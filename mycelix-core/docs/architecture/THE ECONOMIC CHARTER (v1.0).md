@@ -1,4 +1,6 @@
-# **THE ECONOMIC CHARTER (v1.0)**
+# **THE ECONOMIC CHARTER (v1.1)**
+
+*Updated March 2026: CIV renamed MYCEL (soulbound reputation), FLOW renamed SAP (circulation medium with demurrage) — aligned with production implementation*
 
 **Companion instrument to the Mycelix Spore Constitution (v0.24) and part of the modular Mycelix Charter Set (v1.0).**
 
@@ -67,25 +69,25 @@ Results shall inform reserve target adjustments via MIP.
 
 If protocol revenue falls below certain thresholds, graduated responses are triggered:
 
-**Warning State** (Revenue \<150K FLOW for 1 quarter):
+**Warning State** (Revenue \<150K SAP for 1 quarter):
 
 * Monitoring only  
 * No action required  
 * Alert published to Global DAO
 
-**Conservation State** (Revenue \<100K FLOW for 2 quarters):
+**Conservation State** (Revenue \<100K SAP for 2 quarters):
 
 * 10% discretionary budget cut  
 * Hiring freeze for non-critical roles  
 * Mandatory efficiency audit by Audit Guild
 
-**Emergency State** (Revenue \<50K FLOW for 3 quarters):
+**Emergency State** (Revenue \<50K SAP for 3 quarters):
 
 * 25% budget cut (including oversight, down to 9% from 12%)  
 * Foundation reserve fund activated  
 * Global DAO votes on austerity plan
 
-**Existential State** (Revenue \<25K FLOW for 4 quarters):
+**Existential State** (Revenue \<25K SAP for 4 quarters):
 
 * Orderly wind-down plan activated  
 * Member assets protected (Constitution Article X, Section 2.2)  
@@ -192,14 +194,14 @@ If bridge exploit **exceeds available recovery funding**:
 **Validator Slashing for Bridge Exploits**: If exploit caused by validator negligence or collusion:
 
 * Guilty validators: **100% reputation slash** (ejected permanently)  
-* Guilty validators: **100% stake slash** (e.g., 5,000 FLOW bonded amount)  
+* Guilty validators: **100% stake slash** (e.g., 5,000 SAP bonded amount)  
 * Slashed funds go to bridge recovery fund
 
 **Proof Requirements**: Audit Guild must provide cryptographic proof of validator fault (e.g., signed invalid Merkle proof, participated in 51% attack).
 
 **Due Process**: Accused validators may appeal to Member Redress Council within 7 days. MRC conducts expedited review (decision within 14 days).
 
-**Validator Insurance Requirements**: To serve as bridge validator, must carry professional liability insurance (minimum $1M coverage) OR post additional collateral (10,000 FLOW minimum).
+**Validator Insurance Requirements**: To serve as bridge validator, must carry professional liability insurance (minimum $1M coverage) OR post additional collateral (10,000 SAP minimum).
 
 #### **5.7 Multi-Bridge Redundancy**
 
@@ -236,13 +238,13 @@ The proposal must address the following components or mainnet launch will be del
 
 **2\. Compensation Structure**:
 
-* Base rewards (e.g., X FLOW per epoch for participation)  
+* Base rewards (e.g., X SAP per epoch for participation)  
 * Performance bonuses (e.g., \+Y% for 100% uptime, \+Z% for perfect validation accuracy)  
 * Geographic diversity bonuses (e.g., 2x multiplier for underrepresented regions \<10% of validator set)
 
 **3\. Collateral and Staking**:
 
-* Minimum stake: 5,000 FLOW (confirmed)  
+* Minimum stake: 5,000 SAP (confirmed)  
 * Staking period: Minimum lock-up duration (e.g., 90 days)  
 * Unstaking cooldown: Period before stake can be withdrawn after exit (e.g., 14 days)  
 * Stake utility: Used for slashing in case of misbehavior
@@ -292,7 +294,7 @@ Regions defined by: North America, South America, Europe, Africa, Middle East, A
 
 **9\. Economic Sustainability Model**:
 
-* Revenue sources: Bridge fees (estimated X% of TVL annually), transaction fees (if FLOW adopted)  
+* Revenue sources: Bridge fees (estimated X% of TVL annually), transaction fees (if SAP adopted)  
 * Validator pool allocation: Y% of protocol revenue distributed to validator pool  
 * Reserve buffer: Z% of validator rewards held in reserve for low-revenue periods
 
@@ -325,8 +327,8 @@ Regions defined by: North America, South America, Europe, Africa, Middle East, A
 **Phase 3 (24+ months)**: Local DAOs and peer-to-peer issuance:
 
 * Local DAOs issue VCs for local contributions once they demonstrate stability  
-* Individual Members above CIV threshold may issue peer attestations  
-* Lower-weight in global CIV calculations initially  
+* Individual Members above MYCEL threshold may issue peer attestations  
+* Lower-weight in global MYCEL calculations initially  
 * Examples: VC:LedCommunityProjectX, VC:HearthMentor
 
 ### **Section 2\. Participation Incentives & Reputation Dynamics**
@@ -335,21 +337,21 @@ Regions defined by: North America, South America, Europe, Africa, Middle East, A
 
 Members earn reputation bonuses for consistent voting and submitting high-quality proposals:
 
-* Vote on \>50% of proposals in your domain: \+0.02 CIV per quarter  
-* Vote on \>80% of proposals: \+0.05 CIV per quarter  
-* Perfect attendance (100% of votes): \+0.1 CIV per quarter \+ "Engaged Citizen" badge
+* Vote on \>50% of proposals in your domain: \+0.02 MYCEL per quarter  
+* Vote on \>80% of proposals: \+0.05 MYCEL per quarter  
+* Perfect attendance (100% of votes): \+0.1 MYCEL per quarter \+ "Engaged Citizen" badge
 
 Delegates face removal for poor attendance (\<90% participation rate).
 
 **Delegate Recognition Program**:
 
-* Delegate rewards: 0.5 FLOW per delegator per month (if FLOW adopted)  
+* Delegate rewards: 0.5 SAP per delegator per month (if SAP adopted)  
 * Max 100 delegators per delegate (prevents over-concentration)  
 * Delegates must vote on \>90% of proposals (auto-removal if below)
 
 **Proposal Quality Incentives**:
 
-* Proposals passing with \>75% approval: Sponsor receives 500 FLOW reward  
+* Proposals passing with \>75% approval: Sponsor receives 500 SAP reward  
 * Proposals failing badly (\<25% approval): Sponsor loses proposal bond  
 * Encourages high-quality, consensus-building proposals
 

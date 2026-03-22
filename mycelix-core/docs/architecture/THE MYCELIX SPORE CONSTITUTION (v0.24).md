@@ -1,6 +1,7 @@
-# **THE MYCELIX SPORE CONSTITUTION (v0.24)**
+# **THE MYCELIX SPORE CONSTITUTION (v0.25)**
 
 **Drafted for the Mycelix Network – December 2025**
+**Updated March 2026: CIV renamed MYCEL, FLOW renamed SAP, CGC absorbed into MYCEL peer recognition — aligned with production implementation**
 
 ## **Plain English Summary (Non-Binding)**
 
@@ -38,7 +39,7 @@
 
 **All governance, computation, and coordination under Mycelix shall adhere to:**
 
-**Epistemic Verifiability: All assertions, decisions, and data that materially affect constitutional rights, resource allocation greater than 100,000 FLOW, or Core Principles must be epistemically categorized and subject to a standard of verifiability appropriate to their type. Routine operational decisions may use simplified attestation. The Knowledge Council shall maintain and publish guidelines distinguishing "material" from "routine" claims. The Network affirms a layered model of epistemic governance (Publicly Reproducible, Cryptographically Proven, Privately Verifiable, Testimonial). All significant epistemic inputs influencing governance must be clearly labeled with their type, provenance, and auditability status. No binding governance action may be taken solely on the basis of epistemically unclassified or Tier 0 ('Null') claims.**
+**Epistemic Verifiability: All assertions, decisions, and data that materially affect constitutional rights, resource allocation greater than 100,000 SAP, or Core Principles must be epistemically categorized and subject to a standard of verifiability appropriate to their type. Routine operational decisions may use simplified attestation. The Knowledge Council shall maintain and publish guidelines distinguishing "material" from "routine" claims. The Network affirms a layered model of epistemic governance (Publicly Reproducible, Cryptographically Proven, Privately Verifiable, Testimonial). All significant epistemic inputs influencing governance must be clearly labeled with their type, provenance, and auditability status. No binding governance action may be taken solely on the basis of epistemically unclassified or Tier 0 ('Null') claims.**
 
 **Verifiable Computation: All reputation calculations, validator selections, and governance aggregations that materially affect Member rights or resource allocation shall be accompanied by zero-knowledge proofs of correct execution. The Network employs zk-STARK proofs to ensure algorithmic transparency without compromising privacy.**
 
@@ -171,9 +172,9 @@
 
 **Target Classification: Utility Token / Network Access Token**
 
-* **CIV (Civic Standing): Non-transferable reputation, not a security**  
-* **CGC (Civic Gifting Credits): Non-transferable social signal, not a security**  
-* **FLOW (if adopted): Utility token for fees/staking, not investment contract**
+* **MYCEL (Soulbound Reputation): Non-transferable reputation, not a security**
+* **MYCEL peer recognition categories (SPARK, EMBER, etc.): Non-transferable social signal, not a security**
+* **SAP: Circulation medium with demurrage, not investment contract**
 
 **If Classified as Security (Failure Mode):**
 
@@ -185,7 +186,7 @@
 
 * **Foundation transitions to pure governance model (no economic tokens)**  
 * **All fee payments shift to wrapped BTC/ETH on bridge**  
-* **CIV becomes pure voting rights (likely not a security)**
+* **MYCEL becomes pure voting rights (likely not a security)**
 
 ##### **2.5.5 Data Sovereignty and Privacy**
 
@@ -223,9 +224,9 @@
 
 * **Foundation disclaims tax advice (Members consult own advisors)**  
 * **Foundation publishes general guidance on common tax treatment:**  
-  * **CIV: Non-taxable (no economic value, non-transferable)**  
-  * **CGC: Non-taxable (gift-like, no market value)**  
-  * **FLOW (if adopted): Likely treated as property (capital gains on sale)**  
+  * **MYCEL: Non-taxable (no economic value, non-transferable)**
+  * **MYCEL peer recognition: Non-taxable (gift-like, no market value)**
+  * **SAP: Likely treated as property (capital gains on sale)**
   * **DAO proposal rewards: Likely taxable income**
 
 **IRS Reporting (US Members):**
@@ -331,10 +332,10 @@
 
 **The Guild maintains a public risk register prioritizing protocol components for audit. Bug bounties are paid from the Guild treasury according to severity:**
 
-* **Critical (bridge vulnerabilities, direct fund theft): 100,000 FLOW**  
-* **High (e.g., MATL exploits, bypassing Sybil detection): 50,000 FLOW**  
-* **Medium (DOS or griefing attacks): 10,000 FLOW**  
-* **Low (minimal impact): 1,000 FLOW**
+* **Critical (bridge vulnerabilities, direct fund theft): 100,000 SAP**  
+* **High (e.g., MATL exploits, bypassing Sybil detection): 50,000 SAP**  
+* **Medium (DOS or griefing attacks): 10,000 SAP**  
+* **Low (minimal impact): 1,000 SAP**
 
 **Payout Requirements:**
 
@@ -360,14 +361,14 @@
 
 #### **5.3 Appeals Process**
 
-**a. Members file appeals with a 100 FLOW bond (refunded if appeal succeeds). b. The MRC has 14 days to review and issue a preliminary ruling. c. Final rulings are published on-chain with anonymized details to protect privacy. d. MRC decisions may be appealed to the Global DAO only on constitutional grounds (requires ⅔ supermajority).**
+**a. Members file appeals with a 100 SAP bond (refunded if appeal succeeds). b. The MRC has 14 days to review and issue a preliminary ruling. c. Final rulings are published on-chain with anonymized details to protect privacy. d. MRC decisions may be appealed to the Global DAO only on constitutional grounds (requires ⅔ supermajority).**
 
 #### **5.4 Compensation**
 
 **The MRC treasury (4% of protocol revenues) pays:**
 
-* **500 FLOW per case to serving arbitrators.**  
-* **Remedies awarded to Members (up to 10,000 FLOW per case, or restoration of quantifiable economic losses).**  
+* **500 SAP per case to serving arbitrators.**  
+* **Remedies awarded to Members (up to 10,000 SAP per case, or restoration of quantifiable economic losses).**  
 * **If the MRC treasury is depleted, the Foundation reserve fund provides an emergency backfill.**
 
 #### **5.5 Accountability**
@@ -469,7 +470,7 @@
 
 **MIP Process:**
 
-**a. Proposal submission (requires 1000 FLOW stake or 100 Member signatures). b. 30-day public review and comment period. c. Technical review by Audit Guild (15 days). d. Vote (simple majority in both Global DAO houses). e. Implementation attestation by Audit Guild.**
+**a. Proposal submission (requires 1000 SAP stake or 100 Member signatures). b. 30-day public review and comment period. c. Technical review by Audit Guild (15 days). d. Vote (simple majority in both Global DAO houses). e. Implementation attestation by Audit Guild.**
 
 **MIP Categories:**
 
@@ -573,7 +574,7 @@
 
 **e. Testing and Audits: The Network shall fund quarterly audits by independent accessibility consultants and conduct regular user testing with paid participation from Members with disabilities. Accessibility issues violating WCAG A standards shall be categorized as critical bugs that block releases. The Knowledge Council shall assign and oversee these audits.**
 
-**f. Accommodation: Members may petition the Member Redress Council for reasonable accommodations. The Foundation shall maintain an annual accessibility fund of no less than 50,000 FLOW to fulfill such requests.**
+**f. Accommodation: Members may petition the Member Redress Council for reasonable accommodations. The Foundation shall maintain an annual accessibility fund of no less than 50,000 SAP to fulfill such requests.**
 
 ### **Section 11\. Right to Explanation**
 
@@ -654,7 +655,7 @@
 
 #### **2.4 Spending Transparency**
 
-**All treasury expenditures \> 10,000 FLOW must be published with justifications. Expenditures \> 100,000 FLOW require Audit Guild attestation.**
+**All treasury expenditures \> 10,000 SAP must be published with justifications. Expenditures \> 100,000 SAP require Audit Guild attestation.**
 
 **Bridge Security Spending: All bridge insurance premiums, security audit costs, and recovery fund contributions shall be published monthly with itemized justifications. Bridge Recovery Fund balance must be disclosed in real-time via on-chain oracle.**
 
@@ -688,45 +689,33 @@
 
 **The Network shall recognize the following core economic primitives:**
 
-#### **5.1 Civic Standing (CIV)**
+#### **5.1 MYCEL (Soulbound Reputation)**
 
-**A non-transferable reputation score representing a Member's verifiable contributions, expertise, and trustworthiness within the Network. CIV serves as the foundation for governance weight and validator selection. Also known by cultural aliases such as STONE or FOUNDATION.**
-
-**Properties:**
-
-* **Non-transferable and non-tradeable**  
-* **Subject to growth and decay mechanisms (defined in Charter)**  
-* **Used for reputation-weighted voting**  
-* **Used for RB-BFT validator selection**
-
-#### **5.2 Civic Gifting Credit (CGC)**
-
-**A non-transferable social signaling primitive used to recognize and acknowledge non-market contributions such as mentorship, community support, artistic expression, and knowledge sharing.**
+**A non-transferable reputation score (0.0–1.0) representing a Member's verifiable contributions, expertise, and trustworthiness within the Network. MYCEL serves as the foundation for governance weight, consciousness-gated tier progression, and fee rate determination.**
 
 **Properties:**
 
-* **Periodic allocation to all verified Members**  
-* **Non-cumulative (expires each cycle)**  
-* **Publicly recorded when gifted**  
-* **May influence reputation allocation at Local DAO discretion (max 10% weight)**  
-* **Cultural aliases encouraged (e.g., SPARK, EMBER, PETAL, LIGHT)**
+* **Non-transferable and non-tradeable (soulbound)**
+* **Computed from four weighted components: Participation (40%), Peer Recognition (20%), Validation Quality (20%), Longevity (20%)**
+* **Decays 5% annually without activity; compresses 0.8× every four years via jubilee**
+* **Used for reputation-weighted voting, tier progression (Apprentice < 0.3, Member 0.3–0.7, Steward > 0.7), and fee rate determination**
+* **Peer recognition (10 recognitions/month per member, minimum MYCEL 0.3 to give, weighted by recognizer's score) replaces the former CGC social signaling primitive — recognition categories may use cultural aliases (SPARK, EMBER, PETAL, LIGHT)**
 
-#### **5.3 Utility Token (FLOW) \- Optional**
+#### **5.2 SAP (Circulation Medium)**
 
-**A transferable token that may be activated via MIP-E proposal to enable:**
-
-* **Transaction fees and gas payments**  
-* **Quadratic funding participation**  
-* **Economic staking for services**  
-* **Computational resource allocation**
+**A transferable token serving as the primary medium of exchange, subject to demurrage (2% annual decay). SAP that decays from private accounts flows to commons pools (70% local, 20% regional, 10% global).**
 
 **Properties:**
 
-* **Explicitly separated from governance power**  
-* **If adopted, must not be required to access core governance functions**  
+* **Transferable, subject to demurrage**
+* **Mintable against physical assets (energy certificates, agricultural production, fiat bridges)**
+* **Redeemable for real goods and services**
+* **Commons pool SAP exempt from demurrage (waqf principle)**
+* **Constitutional inalienable reserve: 25% minimum in commons pools**
+* **Explicitly separated from governance power**
 * **Subject to securities law compliance (Article II, Section 2.5.4)**
 
-**Constitutional Mandate: Governance tokens (CIV) shall not be financialized or transferable. Ecosystem utility tokens (FLOW) may coexist but remain functionally and economically distinct.**
+**Constitutional Mandate: Governance reputation (MYCEL) shall not be financialized or transferable. The circulation medium (SAP) remains functionally and economically distinct from governance weight.**
 
 ## **ARTICLE IX – EMERGENCY PROVISIONS**
 
@@ -773,7 +762,7 @@
 
 **Upon dissolution:**
 
-**a. All remaining funds in the General Treasury, the Foundation Reserve Fund, and all Oversight Body treasuries (Knowledge Council, Audit Guild, and Member Redress Council) shall be transferred to a single, immutable "Dissolution Contract". b. The Dissolution Contract shall distribute all pooled assets proportionally to all verified Members based on their final, pre-dissolution Civic Standing (CIV) scores. c. The distribution mechanism specified in the Dissolution Contract must be ratified as part of the dissolution vote. d. All IP remains irrevocably in the public domain.**
+**a. All remaining funds in the General Treasury, the Foundation Reserve Fund, and all Oversight Body treasuries (Knowledge Council, Audit Guild, and Member Redress Council) shall be transferred to a single, immutable "Dissolution Contract". b. The Dissolution Contract shall distribute all pooled assets proportionally to all verified Members based on their final, pre-dissolution MYCEL reputation scores. c. The distribution mechanism specified in the Dissolution Contract must be ratified as part of the dissolution vote. d. All IP remains irrevocably in the public domain.**
 
 #### **2.3 Data Preservation**
 
@@ -783,13 +772,13 @@
 
 ### **Section 1\. Sovereignty of Natural Persons**
 
-**The Network affirms that only natural persons may be recognized as Members with full civic sovereignty, including voting rights, constitutional protections, and the right to hold reputation (CIV).**
+**The Network affirms that only natural persons may be recognized as Members with full civic sovereignty, including voting rights, constitutional protections, and the right to hold reputation (MYCEL).**
 
 ### **Section 2\. Instrumental Actors**
 
 **Non-human agents (including autonomous AI systems, bots, and oracles) may be registered as Instrumental Actors, subject to the following constraints:**
 
-**a. Must be verifiably sponsored by and accountable to a recognized Member or DAO b. Subject to continuous audit and performance monitoring c. May not hold CIV (reputation) or vote in governance d. Must clearly identify as non-human in all interactions e. Subject to immediate suspension if behavior violates Core Principles**
+**a. Must be verifiably sponsored by and accountable to a recognized Member or DAO b. Subject to continuous audit and performance monitoring c. May not hold MYCEL (reputation) or vote in governance d. Must clearly identify as non-human in all interactions e. Subject to immediate suspension if behavior violates Core Principles**
 
 **Integrity Scoring for Instrumental Actors: Non-human entities shall be evaluated via a separate Computational Trust Quotient (CTQ) or Synthetic Reputation Index (SRI) derived from uptime, audit logs, and deterministic output validity—not peer attestation. CTQ/SRI systems defined via MIP-T proposals.**
 
@@ -829,7 +818,7 @@
 
 **Civilization Recovery Bundle (CRB): A minimal, open-source Mycelix instance containing the core code and constitutional documents, archived for planetary-scale resilience.**
 
-**Civic Gifting Credit (CGC): A non-monetary, non-transferable signaling primitive used to recognize non-market contributions within the Network.**
+**Peer Recognition (formerly CGC): Non-market contributions are recognized through MYCEL's peer recognition component (20% weight). Recognition categories may use cultural aliases (SPARK, EMBER, PETAL, LIGHT). 10 recognitions per member per monthly cycle, weighted by recognizer's MYCEL score.**
 
 **Epistemic Injustice: Harm done to an individual or group in their capacity as a knower, including testimonial injustice (undue credibility deficit) and hermeneutical injustice (lack of collective interpretive resources).**
 
@@ -868,7 +857,7 @@
 **United States:**
 
 * **Firm: Sullivan & Cromwell, Cooley, Debevoise & Plimpton, or equivalent**  
-* **Scope: Securities classification of CIV, CGC, and FLOW (if adopted) under Howey test**
+* **Scope: Securities classification of MYCEL and SAP under Howey test**
 
 **European Union:**
 
@@ -906,9 +895,9 @@
    * **Optional templates for DAO rituals, ceremonies, and value-alignment workshops**  
    * **Registry of cultural aliases for economic primitives**  
 2. **Symbol Registry: Maintain the official Mycelix Symbol Registry with design guidelines:**  
-   * **CIV (Civic Standing): 🏛️ Stone/Structure**  
-   * **CGC (Civic Gifting Credit): ✨ Fire/Light (aliases: SPARK, EMBER, PETAL)**  
-   * **FLOW (Utility Token): 💧 Water/Flow (aliases: ARC, STREAM)**  
+   * **MYCEL (Soulbound Reputation): 🏛️ Stone/Structure (aliases: CIV, STANDING, FOUNDATION)**  
+   * **MYCEL Recognition Categories: ✨ Fire/Light (aliases: SPARK, EMBER, PETAL, LIGHT, GRATITUDE)**
+   * **SAP (Circulation Medium): 💧 Water/Flow**  
    * **TEND (Time Exchange): 🤲 Care/Time**  
    * **ROOT/SEED (Stewardship): 🌱 Earth/Regeneration**  
    * **BEACON/WIND (Signaling): 🧭 Direction/Voice**  
@@ -948,7 +937,9 @@
 * **Analyze MIPs against various ethical frameworks**  
 * **Offer advisory input without legislative power**
 
-**(Version History: v0.24 – CRITICAL ALIGNMENT & SECURITY UPDATE. Added "Verifiable Computation" as a Core Principle (Art I.2) to constitutionally ground the MATL. Updated all proposal acronyms from MYC-X to MIP-X and all token references from MYC to FLOW for network-wide consistency. Removed 5-year time window from AI Sovereignty moratorium (Art XI.3), relying on the Immutable Core amendment process. Added definitions for MATL and MIP (Art XII).**
+**(Version History: v0.25 – PRODUCTION ALIGNMENT UPDATE. Renamed CIV (Civic Standing) to MYCEL (soulbound reputation, 0.0–1.0, four-component weighted). Renamed FLOW (Utility Token) to SAP (circulation medium with 2% annual demurrage). Absorbed CGC (Civic Gifting Credits) into MYCEL's peer recognition component (20% weight, 10 recognitions/month, culturally aliasable). Updated Article VIII Section 5 (Economic Primitives) to reflect the three-currency production implementation: MYCEL, SAP, TEND. All changes align charter with running Holochain zome code.**
+
+**v0.24 – CRITICAL ALIGNMENT & SECURITY UPDATE. Added "Verifiable Computation" as a Core Principle (Art I.2) to constitutionally ground the MATL. Updated all proposal acronyms from MYC-X to MIP-X and all token references from MYC to FLOW for network-wide consistency. Removed 5-year time window from AI Sovereignty moratorium (Art XI.3), relying on the Immutable Core amendment process. Added definitions for MATL and MIP (Art XII).**
 
 **v0.23 – CRITICAL PRE-MAINNET UPDATE. Formalized Sybil resistance protocol (Gitcoin Passport ≥20) with audit requirements. Added mandatory pre-mainnet legal opinion requirements from top-tier firms in US/EU/Switzerland. Enhanced Golden Veto abuse protections with explicit probation/impeachment thresholds. Clarified Strategic Override cumulative renewal limit (max 72 months). Added regulatory engagement phase triggers. Expanded definitions to include Gitcoin Passport and Humanity Score.)**
 

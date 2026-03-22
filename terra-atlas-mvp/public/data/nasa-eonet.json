@@ -1,0 +1,3111 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Tropical Storm Mario",
+        "categories": [
+          "Severe Storms"
+        ],
+        "event_id": "EONET_15458",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15458",
+        "closed": null,
+        "magnitude": 50.0,
+        "magnitude_unit": "kts",
+        "date": "2025-09-16T00:00:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -114.6,
+          21.1
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "SMR Unit 100/101 Rx 0911 Prescribed Fire, Wakulla, Florida",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15432",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15432",
+        "closed": null,
+        "magnitude": 1047.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-11T09:06:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -84.179833,
+          30.144067
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Rx Quanah Prescribed Fire, Comanche, Oklahoma",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15435",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15435",
+        "closed": null,
+        "magnitude": 4383.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-11T08:44:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -98.646225,
+          34.695669
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "SMR Unit 21-138 Rx 0910 Prescribed Fire, Jefferson, Florida",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15437",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15437",
+        "closed": null,
+        "magnitude": 9793.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-10T10:06:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -84.046317,
+          30.1314
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "WOODEN ROAD Wildfire, Walla Walla, Washington",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15434",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15434",
+        "closed": null,
+        "magnitude": 4905.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-09T12:51:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -118.54042,
+          46.49877
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "rx-Middle Marsh Prescribed Fire, Dodge, Wisconsin",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15439",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15439",
+        "closed": null,
+        "magnitude": 787.6,
+        "magnitude_unit": "acres",
+        "date": "2025-09-09T09:09:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -88.6516802,
+          43.4993813
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Tropical Cyclone Blossom",
+        "categories": [
+          "Severe Storms"
+        ],
+        "event_id": "EONET_15410",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15410",
+        "closed": null,
+        "magnitude": 30.0,
+        "magnitude_unit": "kts",
+        "date": "2025-09-12T06:00:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          61.5,
+          -8.2
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "1016 DEEP CREEK Wildfire, Wasco, Oregon",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15431",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15431",
+        "closed": null,
+        "magnitude": 500.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-07T18:22:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -120.951333,
+          45.116167
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "PYRITE Wildfire, Riverside, California",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15380",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15380",
+        "closed": null,
+        "magnitude": 551.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-05T20:25:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -117.462368,
+          34.017805
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "BLACK ROCK Wildfire, Wasco, Oregon",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15385",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15385",
+        "closed": null,
+        "magnitude": 20349.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-04T22:46:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -120.487917,
+          44.989367
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Moon Complex Incident Complex, Curry, Oregon",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15387",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15387",
+        "closed": null,
+        "magnitude": 1506.75,
+        "magnitude_unit": "acres",
+        "date": "2025-09-04T19:25:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -123.915264,
+          42.687458
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Backbone Wildfire, Curry, Oregon",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15382",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15382",
+        "closed": null,
+        "magnitude": 1088.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-04T19:21:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -123.947333,
+          42.705167
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Pinnacle Wildfire, Curry, Oregon",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15381",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15381",
+        "closed": null,
+        "magnitude": 904.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-04T15:20:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -123.922833,
+          42.692833
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Kelsey Peak Wildfire, Curry, Oregon",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15388",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15388",
+        "closed": null,
+        "magnitude": 1036.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-03T22:28:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -123.76,
+          42.72971284
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Sentinel Wildfire, Humboldt, Nevada",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15384",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15384",
+        "closed": null,
+        "magnitude": 1247.67,
+        "magnitude_unit": "acres",
+        "date": "2025-09-03T22:18:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -117.993817,
+          41.827033
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Timber Butte Wildfire, Beaverhead, Montana",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15282",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15282",
+        "closed": null,
+        "magnitude": 1062.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-03T18:44:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -112.829033,
+          44.723633
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Isabella Wildfire, Sanders, Montana",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15433",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15433",
+        "closed": null,
+        "magnitude": 770.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-03T16:03:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -115.678583,
+          48.122583
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "3 AM (53) Wildfire, Polk, Florida",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15301",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15301",
+        "closed": null,
+        "magnitude": 735.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-02T21:49:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -81.8444444,
+          27.7119444
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "4-Jan Wildfire, Mariposa, California",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15284",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15284",
+        "closed": null,
+        "magnitude": 4451.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-02T20:56:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -120.072833,
+          37.241167
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Strong Draw Wildfire, Johnson, Wyoming",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15300",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15300",
+        "closed": null,
+        "magnitude": 769.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-02T19:02:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -106.413096,
+          43.73965
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "TCU SEPTEMBER LIGHTNING COMPLEX Incident Complex, Tuolumne, California",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15290",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15290",
+        "closed": null,
+        "magnitude": 13790.62,
+        "magnitude_unit": "acres",
+        "date": "2025-09-02T18:36:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -120.512173,
+          37.909117
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Lynx Mountain Wildfire, Ferry, Washington",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15297",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15297",
+        "closed": null,
+        "magnitude": 600.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-02T17:42:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -118.341111,
+          48.340277
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "MARKS CREEK Wildfire, Crook, Oregon",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15283",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15283",
+        "closed": null,
+        "magnitude": 2500.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-02T16:12:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -120.48975,
+          44.419667
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "8-Feb Wildfire, Calaveras, California",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15285",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15285",
+        "closed": null,
+        "magnitude": 1333.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-02T15:05:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -120.642167,
+          37.886167
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "7-Feb Wildfire, Calaveras, California",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15288",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15288",
+        "closed": null,
+        "magnitude": 599.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-02T14:59:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -120.48974,
+          38.106192
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "5-Jun Wildfire, Tuolumne, California",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15289",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15289",
+        "closed": null,
+        "magnitude": 6984.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-02T13:35:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -120.437333,
+          37.819667
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "2-Jun Wildfire, Tuolumne, California",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15286",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15286",
+        "closed": null,
+        "magnitude": 1028.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-02T11:45:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -120.384618,
+          37.776687
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "2-Feb Wildfire, Stanislaus, California",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15287",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15287",
+        "closed": null,
+        "magnitude": 3462.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-02T09:10:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -120.843757,
+          37.944756
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "SALT Wildfire, Fresno, California",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15279",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15279",
+        "closed": null,
+        "magnitude": 13500.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-02T06:01:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -120.311182,
+          36.099461
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "SNOW PEAK Wildfire, Ferry, Washington",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15386",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15386",
+        "closed": null,
+        "magnitude": 700.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-01T20:13:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -118.466867,
+          48.56315
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "LOWER SUGARLOAF Wildfire, Chelan, Washington",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15296",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15296",
+        "closed": null,
+        "magnitude": 4004.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-01T17:24:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -120.549617,
+          47.7533
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "SWIFT COMPLEX Incident Complex, Trinity, California",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15298",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15298",
+        "closed": null,
+        "magnitude": 538.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-01T16:02:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -122.804478,
+          40.967679
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "LABOR MOUNTAIN Wildfire, Kittitas, Washington",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15383",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15383",
+        "closed": null,
+        "magnitude": 1984.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-01T15:42:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -120.819522,
+          47.382805
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "ROOT Wildfire, Shasta, California",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15294",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15294",
+        "closed": null,
+        "magnitude": 758.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-01T15:38:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -122.397417,
+          41.160217
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Rattlesnake Wildfire, Ferry, Washington",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15299",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15299",
+        "closed": null,
+        "magnitude": 6030.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-01T12:58:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -118.374666,
+          47.873166
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "TACOMA CREEK Wildfire, Stevens, Washington",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15295",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15295",
+        "closed": null,
+        "magnitude": 651.0,
+        "magnitude_unit": "acres",
+        "date": "2025-09-01T11:45:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -117.511367,
+          48.49425
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "White Pine Wildfire, Latah, Idaho",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15436",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15436",
+        "closed": null,
+        "magnitude": 797.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-31T22:33:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -116.655633,
+          47.018117
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "KATY CREEK Wildfire, Ferry, Washington",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15151",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15151",
+        "closed": null,
+        "magnitude": 600.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-31T20:52:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -118.16,
+          48.6766667
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Ulm Creek Wildfire, Shoshone, Idaho",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15291",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15291",
+        "closed": null,
+        "magnitude": 1800.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-30T15:49:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -115.987167,
+          47.879833
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "KATY CREEK Wildfire, Ferry, Washington",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15292",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15292",
+        "closed": null,
+        "magnitude": 881.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-30T10:53:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -118.15995,
+          48.676667
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "BLACKHAWK MOUNTAIN Wildfire, Stevens, Washington",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15293",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15293",
+        "closed": null,
+        "magnitude": 630.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-29T23:26:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -117.824,
+          48.864833
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "CROWN CREEK Wildfire, Stevens, Washington",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15145",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15145",
+        "closed": null,
+        "magnitude": 3193.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-29T22:35:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -117.883167,
+          48.833
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "R-14 BUFFALO Wildfire, Washoe, Nevada",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15149",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15149",
+        "closed": null,
+        "magnitude": 1276.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-29T20:16:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -119.7323,
+          40.7461
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "RX San Patricio 4111 Prescribed Fire, San Patricio, Texas",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15152",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15152",
+        "closed": null,
+        "magnitude": 500.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-29T08:14:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -97.5763,
+          27.9007
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Juniper Canyon Wildfire, Umatilla, Oregon",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15148",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15148",
+        "closed": null,
+        "magnitude": 7585.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-29T03:17:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -118.995336,
+          45.962929
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Dempo Volcano, Indonesia",
+        "categories": [
+          "Volcanoes"
+        ],
+        "event_id": "EONET_15327",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15327",
+        "closed": null,
+        "magnitude": null,
+        "magnitude_unit": null,
+        "date": "2025-08-29T00:00:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          103.121,
+          -4.016
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "SMR Unit 5/120 Rx 0827 Prescribed Fire, Wakulla, Florida",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15156",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15156",
+        "closed": null,
+        "magnitude": 827.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-28T10:43:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -84.144083,
+          30.160267
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "SMR Unit 108/122 Rx 0828 Prescribed Fire, Wakulla, Florida",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15154",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15154",
+        "closed": null,
+        "magnitude": 882.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-28T10:42:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -84.14165,
+          30.136267
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "BUTTE Wildfire, Malheur, Oregon",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15085",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15085",
+        "closed": null,
+        "magnitude": 4912.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-28T02:13:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -117.512,
+          42.687883
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Bagana Volcano, Papua New Guinea",
+        "categories": [
+          "Volcanoes"
+        ],
+        "event_id": "EONET_15326",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15326",
+        "closed": null,
+        "magnitude": null,
+        "magnitude_unit": null,
+        "date": "2025-08-28T00:00:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          155.196,
+          -6.137
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Whakaari/White Island Volcano, New Zealand",
+        "categories": [
+          "Volcanoes"
+        ],
+        "event_id": "EONET_15329",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15329",
+        "closed": null,
+        "magnitude": null,
+        "magnitude_unit": null,
+        "date": "2025-08-28T00:00:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          177.18,
+          -37.52
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Perry Wildfire, Whatcom, Washington",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15146",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15146",
+        "closed": null,
+        "magnitude": 737.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-27T22:06:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -121.104893,
+          48.922702
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "BLUE Wildfire, Siskiyou, California",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15147",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15147",
+        "closed": null,
+        "magnitude": 1236.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-27T17:44:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -123.185,
+          41.790117
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Canyon Wildfire, Ventura, California",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15091",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15091",
+        "closed": null,
+        "magnitude": 5370.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-27T12:09:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -118.7344877,
+          34.44045713
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Pony Wildfire, Rosebud, Montana",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15092",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15092",
+        "closed": null,
+        "magnitude": 853.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-27T10:40:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -106.52255,
+          45.91109
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "LOG Wildfire, Siskiyou, California",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15280",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15280",
+        "closed": null,
+        "magnitude": 872.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-26T17:24:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -123.266433,
+          41.414917
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "SMR BU 413/414 Rx 0826 Prescribed Fire, Wakulla, Florida",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15094",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15094",
+        "closed": null,
+        "magnitude": 996.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-26T09:41:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -84.441267,
+          30.0104
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "The backburn Wildfire, Rolette, North Dakota",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15096",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15096",
+        "closed": null,
+        "magnitude": 1342.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-26T06:54:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -99.817396,
+          48.853448
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Karymsky Volcano, Russia",
+        "categories": [
+          "Volcanoes"
+        ],
+        "event_id": "EONET_15328",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15328",
+        "closed": null,
+        "magnitude": null,
+        "magnitude_unit": null,
+        "date": "2025-08-26T00:00:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          159.443,
+          54.049
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Dillon Wildfire, Siskiyou, California",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15087",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15087",
+        "closed": null,
+        "magnitude": 2134.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-25T21:39:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -123.540583,
+          41.530133
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "WILDCAT Wildfire, Yakima, Washington",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15144",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15144",
+        "closed": null,
+        "magnitude": 1268.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-25T21:23:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -121.3967,
+          46.845383
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "PEAK Wildfire, Trinity, California",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15281",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15281",
+        "closed": null,
+        "magnitude": 506.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-25T18:34:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -122.850456,
+          40.902691
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Krasheninnikov Volcano, Russia",
+        "categories": [
+          "Volcanoes"
+        ],
+        "event_id": "EONET_15330",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15330",
+        "closed": null,
+        "magnitude": null,
+        "magnitude_unit": null,
+        "date": "2025-08-25T00:00:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          160.27,
+          54.596
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Big Butte Wildfire, Elko, Nevada",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15046",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15046",
+        "closed": null,
+        "magnitude": 3612.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-24T20:03:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -116.59,
+          41.138
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Emigrant Wildfire, Lane, Oregon",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15086",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15086",
+        "closed": null,
+        "magnitude": 7764.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-24T18:26:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -122.241617,
+          43.468783
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Five Points Wildfire, Scotland, North Carolina",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15058",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15058",
+        "closed": null,
+        "magnitude": 761.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-24T16:32:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -79.4626667,
+          34.9691667
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "R-3 Wildfire, Lassen, California",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15050",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15050",
+        "closed": null,
+        "magnitude": 500.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-24T15:44:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -120.477333,
+          40.435833
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "GARNET Wildfire, Fresno, California",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15045",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15045",
+        "closed": null,
+        "magnitude": 4420.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-24T11:39:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -119.042959,
+          36.860693
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Widemouth Wildfire, Millard, Utah",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15057",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15057",
+        "closed": null,
+        "magnitude": 500.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-23T17:13:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -112.518978,
+          38.723474
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Walk Wildfire, Idaho, Idaho",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15389",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15389",
+        "closed": null,
+        "magnitude": 920.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-23T14:21:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -114.998067,
+          45.904267
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Dollar Lake Wildfire, Sublette, Wyoming",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15056",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15056",
+        "closed": null,
+        "magnitude": 9891.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-22T21:32:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -110.0038333,
+          43.3246667
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "LITTLE Wildfire, Kern, California",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15052",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15052",
+        "closed": null,
+        "magnitude": 2537.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-22T18:14:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -118.5865,
+          35.564333
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Needwood Wildfire, Collingsworth, Texas",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15059",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15059",
+        "closed": null,
+        "magnitude": 672.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-22T17:47:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -100.0051536,
+          35.01891131
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "5 Mile 2025 Wildfire, Kleberg, Texas",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15048",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15048",
+        "closed": null,
+        "magnitude": 5747.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-22T15:34:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -97.339378,
+          27.342234
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Willow Creek Wildfire, Lincoln, Wyoming",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15088",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15088",
+        "closed": null,
+        "magnitude": 4356.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-22T13:35:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -110.958833,
+          42.554167
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "FLAT Wildfire, Jefferson, Oregon",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15051",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15051",
+        "closed": null,
+        "magnitude": 21971.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-21T19:59:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -121.354533,
+          44.513117
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "PICKETT Wildfire, Napa, California",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15049",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15049",
+        "closed": null,
+        "magnitude": 6803.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-21T18:00:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -122.550064,
+          38.591983
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Dollar Lake Wildfire, Sublette, Wyoming",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15053",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15053",
+        "closed": null,
+        "magnitude": 10000.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-21T16:39:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -110.006,
+          43.32806
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Ransome Wildfire, Lincoln, Montana",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15150",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15150",
+        "closed": null,
+        "magnitude": 622.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-21T10:07:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -115.64005,
+          48.5401
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Iceberg A23F",
+        "categories": [
+          "Sea and Lake Ice"
+        ],
+        "event_id": "EONET_15060",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15060",
+        "closed": null,
+        "magnitude": 22.99,
+        "magnitude_unit": "NM^2",
+        "date": "2025-08-21T00:00:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -35.52,
+          -53.88
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Rhoda Creek Wildfire, Idaho, Idaho",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15095",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15095",
+        "closed": null,
+        "magnitude": 1334.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-20T19:34:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -115.0895,
+          46.239167
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Devil Mountain Wildfire, Powell, Montana",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15089",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15089",
+        "closed": null,
+        "magnitude": 1650.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-20T19:13:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -112.869,
+          46.745833
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "COYOTE Wildfire, El Dorado, California",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_14954",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_14954",
+        "closed": null,
+        "magnitude": 624.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-20T17:17:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -120.641667,
+          38.534833
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "East Wildfire, Idaho, Idaho",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15055",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15055",
+        "closed": null,
+        "magnitude": 700.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-20T14:28:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -114.838833,
+          46.5645
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Lonely Mountain Wildfire, Idaho, Idaho",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15153",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15153",
+        "closed": null,
+        "magnitude": 617.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-20T12:06:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -114.865667,
+          45.750667
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "FT. GREEN RD. (53) Wildfire, Polk, Florida",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_14960",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_14960",
+        "closed": null,
+        "magnitude": 640.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-19T22:24:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -81.9627778,
+          27.7161111
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "West Fork Wildfire, Gallatin, Montana",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_14956",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_14956",
+        "closed": null,
+        "magnitude": 500.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-19T20:23:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -111.3681,
+          44.9432
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "MILE MARKER 39 FIRE (06) Wildfire, Broward, Florida",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_14955",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_14955",
+        "closed": null,
+        "magnitude": 19200.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-19T17:06:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.5413889,
+          26.2161111
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Fishhook Wildfire, Greenlee, Arizona",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15093",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15093",
+        "closed": null,
+        "magnitude": 540.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-19T14:14:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -109.208833,
+          33.640167
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Pot Mountain Wildfire, Flathead, Montana",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_15155",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_15155",
+        "closed": null,
+        "magnitude": 526.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-18T20:51:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -113.160883,
+          47.9275
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Moser Dome Wildfire, Yellowstone, Montana",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_14962",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_14962",
+        "closed": null,
+        "magnitude": 930.15,
+        "magnitude_unit": "acres",
+        "date": "2025-08-18T20:41:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -108.74616,
+          45.59207
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Dry Head 2 Wildfire, Big Horn, Montana",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_14961",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_14961",
+        "closed": null,
+        "magnitude": 700.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-18T17:15:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -108.2475,
+          45.254833
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Marceaux Wildfire, Cameron, Louisiana",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_14959",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_14959",
+        "closed": null,
+        "magnitude": 1456.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-18T15:22:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -93.754461,
+          29.897157
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Cow Creek Wildfire, Elko, Nevada",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_14897",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_14897",
+        "closed": null,
+        "magnitude": 506.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-17T19:05:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -114.509567,
+          41.878117
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Knowles Wildfire, Sanders, Montana",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_14958",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_14958",
+        "closed": null,
+        "magnitude": 2000.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-17T17:37:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -114.7133,
+          47.346967
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "BULL LAKE Wildfire, Fremont, Wyoming",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_14957",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_14957",
+        "closed": null,
+        "magnitude": 525.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-17T16:09:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -109.209167,
+          43.159333
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Derby Wildfire, Eagle, Colorado",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_14953",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_14953",
+        "closed": null,
+        "magnitude": 1720.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-17T15:39:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -107.091173,
+          39.849463
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "LG25 6416 - McAllister Wildfire, Madison, Montana",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_14893",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_14893",
+        "closed": null,
+        "magnitude": 3500.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-16T18:29:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -111.721783,
+          45.49225
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Cow Creek Wildfire, Elko, Nevada",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_14894",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_14894",
+        "closed": null,
+        "magnitude": 506.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-16T18:29:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -114.5095,
+          41.878167
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "natural_event",
+        "source": "NASA EONET",
+        "title": "Cottonwood Peak Wildfire, Elko, Nevada",
+        "categories": [
+          "Wildfires"
+        ],
+        "event_id": "EONET_14895",
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_14895",
+        "closed": null,
+        "magnitude": 28000.0,
+        "magnitude_unit": "acres",
+        "date": "2025-08-15T23:03:00Z",
+        "quality_score": 0.9,
+        "data_lineage": [
+          "NASA",
+          "EONET",
+          "Satellite Observation"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -116.209267,
+          41.389933
+        ]
+      }
+    }
+  ],
+  "metadata": {
+    "source": "NASA EONET",
+    "timestamp": "2025-09-16T02:57:10.035469",
+    "count": 100,
+    "trust_level": "official_space_agency"
+  }
+}

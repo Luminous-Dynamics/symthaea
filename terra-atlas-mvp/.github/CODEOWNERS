@@ -1,0 +1,10 @@
+# Code Owners for Luminous Dynamics repos
+# These owners will be requested for review when PRs touch their areas
+
+# Global owner - all files
+* @Tristan-Stoltz-ERC
+
+# Documentation
+*.md @Tristan-Stoltz-ERC
+/docs/ @Tristan-Stoltz-ERC
+

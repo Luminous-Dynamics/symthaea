@@ -1,0 +1,135 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather",
+        "source": "Demo Data",
+        "city": "New York",
+        "temperature": 20.28101152844166,
+        "humidity": 63,
+        "wind_speed": 16.318063989506236,
+        "weather": "Clear",
+        "quality_score": 0.8,
+        "data_lineage": [
+          "Demo",
+          "Synthetic"
+        ],
+        "timestamp": "2025-09-16T07:39:42.853095"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.006,
+          40.7128
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather",
+        "source": "Demo Data",
+        "city": "London",
+        "temperature": 11.269120676935847,
+        "humidity": 66,
+        "wind_speed": 19.161251223894993,
+        "weather": "Cloudy",
+        "quality_score": 0.8,
+        "data_lineage": [
+          "Demo",
+          "Synthetic"
+        ],
+        "timestamp": "2025-09-16T07:39:42.853116"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.1278,
+          51.5074
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather",
+        "source": "Demo Data",
+        "city": "Tokyo",
+        "temperature": 33.37363416901546,
+        "humidity": 49,
+        "wind_speed": 8.539134800133887,
+        "weather": "Cloudy",
+        "quality_score": 0.8,
+        "data_lineage": [
+          "Demo",
+          "Synthetic"
+        ],
+        "timestamp": "2025-09-16T07:39:42.853124"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          139.6503,
+          35.6762
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather",
+        "source": "Demo Data",
+        "city": "Sydney",
+        "temperature": 10.236005172439235,
+        "humidity": 69,
+        "wind_speed": 15.71756211940829,
+        "weather": "Sunny",
+        "quality_score": 0.8,
+        "data_lineage": [
+          "Demo",
+          "Synthetic"
+        ],
+        "timestamp": "2025-09-16T07:39:42.853130"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          151.2093,
+          -33.8688
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather",
+        "source": "Demo Data",
+        "city": "Mumbai",
+        "temperature": 21.460299051756373,
+        "humidity": 40,
+        "wind_speed": 7.400267379187535,
+        "weather": "Cloudy",
+        "quality_score": 0.8,
+        "data_lineage": [
+          "Demo",
+          "Synthetic"
+        ],
+        "timestamp": "2025-09-16T07:39:42.853136"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          72.8777,
+          19.076
+        ]
+      }
+    }
+  ],
+  "metadata": {
+    "source": "Demo Data",
+    "timestamp": "2025-09-16T07:39:42.853154",
+    "count": 5
+  }
+}

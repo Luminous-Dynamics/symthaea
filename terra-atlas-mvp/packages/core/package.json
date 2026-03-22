@@ -1,0 +1,24 @@
+{
+  "name": "@luminous-dynamics/core",
+  "version": "0.0.1",
+  "private": false,
+  "main": "dist/index.cjs",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup src/index.ts --dts --format cjs,esm",
+    "lint": "eslint src --ext .ts,.tsx",
+    "test": "vitest run",
+    "clean": "rimraf dist"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "@stripe/stripe-js": "^4.2.0",
+    "lucide-react": "^0.453.0"
+  }
+}

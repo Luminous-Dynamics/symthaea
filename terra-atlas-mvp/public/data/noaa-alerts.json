@@ -1,0 +1,3513 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Dense Fog Advisory",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Dense Fog Advisory issued September 16 at 12:49AM PDT until September 16 at 10:00AM PDT by NWS San Francisco CA",
+        "description": "* WHAT...Visibility one quarter mile or less in dense fog.\n\n* WHERE...Southern Monterey Bay and the Big Sur Coast.\n\n* WHEN...Until 10 AM PDT this morning.\n\n* IMPACTS...Low visibility could make drivin",
+        "effective": "2025-09-16T00:49:00-07:00",
+        "expires": "2025-09-16T09:00:00-07:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Winter Weather Advisory",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Winter Weather Advisory issued September 16 at 1:22AM MDT until September 17 at 12:00AM MDT by NWS Billings MT",
+        "description": "* WHAT...Wet snow over the Beartooth Highway above 10000 feet. One\nto three inches of accumulation expected.\n\n* WHERE...Absaroka/Beartooth Mountains.\n\n* WHEN...Until midnight MDT tonight.\n\n* IMPACTS..",
+        "effective": "2025-09-16T01:22:00-06:00",
+        "expires": "2025-09-17T00:00:00-06:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Heat Advisory",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Heat Advisory issued September 16 at 3:18AM AST until September 16 at 5:00PM AST by NWS San Juan PR",
+        "description": "* WHAT...This level of heat affect most individuals sensitive to\nheat, especially those without effective cooling and/or adequate\nhydration. Impacts possible in some health system and in\nheat-sensitiv",
+        "effective": "2025-09-16T03:18:00-04:00",
+        "expires": "2025-09-16T11:30:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 16 at 2:43AM EDT until September 16 at 10:00AM EDT by NWS Newport/Morehead City NC",
+        "description": "* WHAT...Northwest winds 20 to 30 kt with gusts up to 35 kt and\nvery rough waters.\n\n* WHERE...Pamlico Sound.\n\n* WHEN...Until 10 AM EDT this morning.\n\n* IMPACTS...Strong winds will cause hazardous seas",
+        "effective": "2025-09-16T02:43:00-04:00",
+        "expires": "2025-09-16T10:00:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 16 at 2:43AM EDT until September 16 at 10:00AM EDT by NWS Newport/Morehead City NC",
+        "description": "* WHAT...Northeast winds 25 to 30 kt with gusts up to 40 kt and\nseas 10 to 13 ft.\n\n* WHERE...The coastal waters from Duck to Oregon Inlet.\n\n* WHEN...Until 10 AM EDT this morning.\n\n* IMPACTS...Strong w",
+        "effective": "2025-09-16T02:43:00-04:00",
+        "expires": "2025-09-16T10:00:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 16 at 2:43AM EDT until September 16 at 7:00AM EDT by NWS Newport/Morehead City NC",
+        "description": "* WHAT...North winds 20 to 25 kt with gusts up to 35 kt and\nrough waters.\n\n* WHERE...Albemarle, Croatan, and Roanoke Sounds and the\nAlligator River.\n\n* WHEN...Until 7 AM EDT this morning.\n\n* IMPACTS..",
+        "effective": "2025-09-16T02:43:00-04:00",
+        "expires": "2025-09-16T07:00:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 16 at 2:43AM EDT until September 16 at 10:00AM EDT by NWS Newport/Morehead City NC",
+        "description": "* WHAT...Northwest winds 20 to 30 kt with gusts up to 35 kt and\nseas 7 to 12 ft.\n\n* WHERE...The coastal waters from Oregon Inlet to Cape Lookout.\n\n* WHEN...Until 10 AM EDT this morning.\n\n* IMPACTS...S",
+        "effective": "2025-09-16T02:43:00-04:00",
+        "expires": "2025-09-16T10:00:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 16 at 2:42AM EDT until September 16 at 6:00PM EDT by NWS Mount Holly NJ",
+        "description": "* WHAT...For the Small Craft Advisory, northeast winds 15 to 20\nkt with gusts up to 25 kt and choppy waters. For the Gale\nWarning, northeast winds 15 to 25 kt with gusts up to 35 kt\nand rough waters e",
+        "effective": "2025-09-16T02:42:00-04:00",
+        "expires": "2025-09-16T17:00:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 16 at 2:42AM EDT until September 16 at 10:00PM EDT by NWS Mount Holly NJ",
+        "description": "* WHAT...For the Small Craft Advisory, northeast winds 20 to 25\nkt with gusts up to 30 kt and seas 5 to 8 ft. For the Gale\nWarning, northeast winds 20 to 30 kt with gusts up to 40 kt\nand seas 7 to 10 ",
+        "effective": "2025-09-16T02:42:00-04:00",
+        "expires": "2025-09-16T17:00:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Wind Advisory",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Wind Advisory issued September 16 at 2:26AM EDT until September 16 at 8:00PM EDT by NWS Wakefield VA",
+        "description": "* WHAT...Northeast winds 20 to 30 mph with gusts up to 45 mph.\n\n* WHERE...Mathews, Northampton, Accomack, Gloucester,\nHampton/Poquoson, and York Counties.\n\n* WHEN...Until 8 PM EDT this evening.\n\n* IMP",
+        "effective": "2025-09-16T02:26:00-04:00",
+        "expires": "2025-09-16T10:30:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Wind Advisory",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Wind Advisory issued September 16 at 2:26AM EDT until September 16 at 1:00PM EDT by NWS Wakefield VA",
+        "description": "* WHAT...Northeast winds 25 to 30 mph with gusts up to 45 mph.\n\n* WHERE...Eastern Currituck County.\n\n* WHEN...Until 1 PM EDT this afternoon.\n\n* IMPACTS...Gusty winds will blow around unsecured objects",
+        "effective": "2025-09-16T02:26:00-04:00",
+        "expires": "2025-09-16T10:30:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Wind Advisory",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Wind Advisory issued September 16 at 2:26AM EDT until September 16 at 6:00PM EDT by NWS Wakefield VA",
+        "description": "* WHAT...Northeast winds 20 to 30 mph with gusts up to 45 mph.\n\n* WHERE...Chesapeake.\n\n* WHEN...Until 6 PM EDT this evening.\n\n* IMPACTS...Gusty winds will blow around unsecured objects. Tree\nlimbs cou",
+        "effective": "2025-09-16T02:26:00-04:00",
+        "expires": "2025-09-16T10:30:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Wind Advisory",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Wind Advisory issued September 16 at 2:26AM EDT until September 16 at 6:00PM EDT by NWS Wakefield VA",
+        "description": "* WHAT...Northeast winds 20 to 35 mph with gusts up to 50 mph.\n\n* WHERE...Norfolk/Portsmouth County, and Virginia Beach.\n\n* WHEN...Until 6 PM EDT this evening.\n\n* IMPACTS...Gusty winds will blow aroun",
+        "effective": "2025-09-16T02:26:00-04:00",
+        "expires": "2025-09-16T10:30:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Coastal Flood Warning",
+        "severity": "Severe",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Coastal Flood Warning issued September 16 at 2:05AM EDT until September 17 at 2:00AM EDT by NWS Wakefield VA",
+        "description": "* WHAT...For the Coastal Flood Advisory, up to one foot of\ninundation above ground level in low-lying areas near shorelines\nand tidal waterways. For the Coastal Flood Warning, one to two\nfeet of inund",
+        "effective": "2025-09-16T02:05:00-04:00",
+        "expires": "2025-09-16T10:15:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Coastal Flood Warning",
+        "severity": "Severe",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Coastal Flood Warning issued September 16 at 2:05AM EDT until September 16 at 11:00PM EDT by NWS Wakefield VA",
+        "description": "* WHAT...For the Coastal Flood Advisory, up to one foot of\ninundation above ground level in low-lying areas near shorelines\nand tidal waterways. For the Coastal Flood Warning, one to two\nfeet of inund",
+        "effective": "2025-09-16T02:05:00-04:00",
+        "expires": "2025-09-16T10:15:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Coastal Flood Warning",
+        "severity": "Severe",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Coastal Flood Warning issued September 16 at 2:05AM EDT until September 16 at 11:00PM EDT by NWS Wakefield VA",
+        "description": "* WHAT...For the Coastal Flood Advisory, up to one foot of\ninundation above ground level in low-lying areas near shorelines\nand tidal waterways. For the Coastal Flood Warning, one to two\nfeet of inund",
+        "effective": "2025-09-16T02:05:00-04:00",
+        "expires": "2025-09-16T10:15:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Coastal Flood Warning",
+        "severity": "Severe",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Coastal Flood Warning issued September 16 at 2:05AM EDT until September 16 at 11:00PM EDT by NWS Wakefield VA",
+        "description": "* WHAT...For the High Surf Advisory, large breaking waves of 7 to\n10 feet in the surf zone. For the Beach Hazards Statement, a\nhigh risk of rip currents. For the Coastal Flood Warning, one to\ntwo feet",
+        "effective": "2025-09-16T02:05:00-04:00",
+        "expires": "2025-09-16T10:15:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Beach Hazards Statement",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Beach Hazards Statement issued September 16 at 2:05AM EDT until September 16 at 8:00PM EDT by NWS Wakefield VA",
+        "description": "* WHAT...For the High Surf Advisory, large breaking waves of 7 to\n10 feet in the surf zone. For the Beach Hazards Statement, a\nhigh risk of rip currents. For the Coastal Flood Warning, one to\ntwo feet",
+        "effective": "2025-09-16T02:05:00-04:00",
+        "expires": "2025-09-16T10:15:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Coastal Flood Warning",
+        "severity": "Severe",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Coastal Flood Warning issued September 16 at 2:05AM EDT until September 17 at 2:00AM EDT by NWS Wakefield VA",
+        "description": "* WHAT...For the Coastal Flood Advisory, up to one foot of\ninundation above ground level in low-lying areas near shorelines\nand tidal waterways. For the Coastal Flood Warning, one to three\nfeet of inu",
+        "effective": "2025-09-16T02:05:00-04:00",
+        "expires": "2025-09-16T10:15:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Beach Hazards Statement",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Beach Hazards Statement issued September 16 at 2:05AM EDT until September 16 at 8:00PM EDT by NWS Wakefield VA",
+        "description": "* WHAT...For the High Surf Advisory, large breaking waves of 7 to\n10 feet in the surf zone. For the Beach Hazards Statement, a\nhigh risk of rip currents. For the Coastal Flood Advisory, up to\none foot",
+        "effective": "2025-09-16T02:05:00-04:00",
+        "expires": "2025-09-16T10:15:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Beach Hazards Statement",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Beach Hazards Statement issued September 16 at 2:05AM EDT until September 16 at 8:00PM EDT by NWS Wakefield VA",
+        "description": "* WHAT...For the High Surf Advisory, large breaking waves of 7 to\n10 feet in the surf zone. For the Beach Hazards Statement, a\nhigh risk of rip currents. For the Coastal Flood Advisory, up\nto one foot",
+        "effective": "2025-09-16T02:05:00-04:00",
+        "expires": "2025-09-16T10:15:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Beach Hazards Statement",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Beach Hazards Statement issued September 16 at 2:05AM EDT until September 16 at 8:00PM EDT by NWS Wakefield VA",
+        "description": "* WHAT...For the Coastal Flood Advisory, up to one foot of\ninundation above ground level in low-lying areas near shorelines\nand tidal waterways. For the High Surf Advisory, large breaking\nwaves of 7 t",
+        "effective": "2025-09-16T02:05:00-04:00",
+        "expires": "2025-09-16T10:15:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Coastal Flood Warning",
+        "severity": "Severe",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Coastal Flood Warning issued September 16 at 2:05AM EDT until September 16 at 11:00PM EDT by NWS Wakefield VA",
+        "description": "* WHAT...For the High Surf Advisory, large breaking waves of 7 to\n11 feet in the surf zone. For the Coastal Flood Advisory, up to\none foot of inundation above ground level in low-lying areas\nnear shor",
+        "effective": "2025-09-16T02:05:00-04:00",
+        "expires": "2025-09-16T10:15:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Beach Hazards Statement",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Beach Hazards Statement issued September 16 at 2:05AM EDT until September 16 at 8:00PM EDT by NWS Wakefield VA",
+        "description": "* WHAT...For the High Surf Advisory, large breaking waves of 7 to\n11 feet in the surf zone. For the Coastal Flood Advisory, up to\none foot of inundation above ground level in low-lying areas\nnear shor",
+        "effective": "2025-09-16T02:05:00-04:00",
+        "expires": "2025-09-16T10:15:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 16 at 2:03AM EDT until September 16 at 9:00PM EDT by NWS Baltimore MD/Washington DC",
+        "description": "* WHAT...For the Small Craft Advisory, northeast winds 20 to 25 kt\nwith gusts up to 30 kt and waves 2 to 4 ft. For the Gale\nWarning, northeast winds 20 to 30 kt with gusts up to 40 kt and\nwaves 2 to 5",
+        "effective": "2025-09-16T02:03:00-04:00",
+        "expires": "2025-09-16T12:00:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Rip Current Statement",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Rip Current Statement issued September 16 at 1:58AM EDT until September 16 at 8:00PM EDT by NWS Upton NY",
+        "description": "* WHAT...Dangerous rip currents expected.\n\n* WHERE...Kings (Brooklyn), Southwest Suffolk, Southeast\nSuffolk, Southern Queens and Southern Nassau Counties.\n\n* WHEN...From 6 AM EDT this morning through ",
+        "effective": "2025-09-16T01:58:00-04:00",
+        "expires": "2025-09-16T20:00:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Wind Advisory",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Wind Advisory issued September 16 at 1:55AM EDT until September 16 at 8:00AM EDT by NWS Newport/Morehead City NC",
+        "description": "* WHAT...North winds 20 to 30 mph with gusts up to 45 mph.\n\n* WHERE...Hatteras Island, Northern Outer Banks, and Ocracoke Island.\n\n* WHEN...Until 8 AM EDT this morning.\n\n* IMPACTS...Gusty winds will b",
+        "effective": "2025-09-16T01:55:00-04:00",
+        "expires": "2025-09-16T08:00:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "High Wind Watch",
+        "severity": "Severe",
+        "urgency": "Future",
+        "certainty": "Possible",
+        "headline": "High Wind Watch issued September 15 at 9:54PM AKDT until September 17 at 10:00PM AKDT by NWS Juneau AK",
+        "description": "* WHAT...Southeast winds 20 to 30 mph with gusts up to around 60\nmph possible.\n\n* WHERE...City and Borough of Yakutat.\n\n* WHEN...From Wednesday morning through Wednesday evening.\n\n* IMPACTS...High win",
+        "effective": "2025-09-15T21:54:00-08:00",
+        "expires": "2025-09-16T07:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "High Wind Watch",
+        "severity": "Severe",
+        "urgency": "Future",
+        "certainty": "Possible",
+        "headline": "High Wind Watch issued September 15 at 9:54PM AKDT until September 17 at 7:00PM AKDT by NWS Juneau AK",
+        "description": "* WHAT...Southeast winds 30 to 40 mph with gusts up to around 60\nmph possible.\n\n* WHERE...Eastern Chichagof Island, Cape Fairweather to\nLisianski Strait, City and Borough of Sitka and Western\nKupreano",
+        "effective": "2025-09-15T21:54:00-08:00",
+        "expires": "2025-09-16T07:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "High Wind Watch",
+        "severity": "Severe",
+        "urgency": "Future",
+        "certainty": "Possible",
+        "headline": "High Wind Watch issued September 15 at 9:54PM AKDT until September 17 at 4:00PM AKDT by NWS Juneau AK",
+        "description": "* WHAT...South winds 25 to 35 mph with gusts up to around 60 mph\npossible.\n\n* WHERE...Prince of Wales Island and Annette Island.\n\n* WHEN...From Tuesday evening through Wednesday afternoon.\n\n* IMPACTS.",
+        "effective": "2025-09-15T21:54:00-08:00",
+        "expires": "2025-09-16T07:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 16 at 1:53AM EDT until September 16 at 10:00PM EDT by NWS Wakefield VA",
+        "description": "* WHAT...Northeast winds 25 to 30 kt with gusts up to 40 kt and\nwaves 3 to 6 ft.\n\n* WHERE...Chesapeake Bay from Smith Point to Windmill Point VA\nand Chesapeake Bay from Windmill Point to New Point Com",
+        "effective": "2025-09-16T01:53:00-04:00",
+        "expires": "2025-09-16T10:00:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 16 at 1:53AM EDT until September 16 at 10:00PM EDT by NWS Wakefield VA",
+        "description": "* WHAT...Northeast winds 25 to 35 kt with gusts up to 45 kt and\nseas 8 to 13 ft.\n\n* WHERE...Coastal waters from Fenwick Island DE to Chincoteague\nVA out 20 nm and Coastal waters from Chincoteague to P",
+        "effective": "2025-09-16T01:53:00-04:00",
+        "expires": "2025-09-16T10:00:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 16 at 1:53AM EDT until September 16 at 1:00PM EDT by NWS Wakefield VA",
+        "description": "* WHAT...Northeast winds 20 to 30 kt with gusts up to 40 kt and\nwaves around 2 ft.\n\n* WHERE...Currituck Sound.\n\n* WHEN...Until 1 PM EDT this afternoon.\n\n* IMPACTS...Strong winds will cause hazardous w",
+        "effective": "2025-09-16T01:53:00-04:00",
+        "expires": "2025-09-16T10:00:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 16 at 1:53AM EDT until September 16 at 7:00PM EDT by NWS Wakefield VA",
+        "description": "* WHAT...Northeast winds 25 to 30 kt with gusts up to 40 kt and\nwaves 2 to 4 ft.\n\n* WHERE...Rappahannock River from Urbanna to Windmill Point,\nYork River and James River from Jamestown to the James Ri",
+        "effective": "2025-09-16T01:53:00-04:00",
+        "expires": "2025-09-16T10:00:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 16 at 1:53AM EDT until September 16 at 7:00PM EDT by NWS Wakefield VA",
+        "description": "* WHAT...Northeast winds 25 to 35 kt with gusts up to 45 kt and\nwaves 5 to 8 ft.\n\n* WHERE...Chesapeake Bay from New Point Comfort to Little Creek\nVA and Chesapeake Bay from Little Creek VA to Cape Hen",
+        "effective": "2025-09-16T01:53:00-04:00",
+        "expires": "2025-09-16T10:00:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 16 at 1:53AM EDT until September 16 at 7:00PM EDT by NWS Wakefield VA",
+        "description": "* WHAT...Northeast winds 25 to 30 kt with gusts up to 40 kt and\nwaves 3 to 5 ft.\n\n* WHERE...James River from James River Bridge to Hampton Roads\nBridge-Tunnel.\n\n* WHEN...Until 7 PM EDT this evening.\n\n",
+        "effective": "2025-09-16T01:53:00-04:00",
+        "expires": "2025-09-16T10:00:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 16 at 1:53AM EDT until September 16 at 7:00PM EDT by NWS Wakefield VA",
+        "description": "* WHAT...Northeast winds 25 to 35 kt with gusts up to 45 kt and\nseas 9 to 13 ft.\n\n* WHERE...Coastal waters from Parramore Island to Cape Charles\nLight VA out 20 nm and Coastal Waters from Cape Charles",
+        "effective": "2025-09-16T01:53:00-04:00",
+        "expires": "2025-09-16T10:00:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 16 at 1:53AM EDT until September 16 at 1:00PM EDT by NWS Wakefield VA",
+        "description": "* WHAT...Northeast winds 25 to 30 kt with gusts up to 40 kt and\nseas 9 to 12 ft.\n\n* WHERE...Coastal waters from NC VA border to Currituck Beach\nLight NC out 20 nm.\n\n* WHEN...Until 1 PM EDT this aftern",
+        "effective": "2025-09-16T01:53:00-04:00",
+        "expires": "2025-09-16T10:00:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Wind Advisory",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Wind Advisory issued September 15 at 10:18PM PDT until September 17 at 12:00AM PDT by NWS Seattle WA",
+        "description": "* WHAT...East winds 10 to 20 mph with gusts 35 to 45 mph expected.\nIsolated gusts to 50 possible in favored areas such as ridgetops\nand mountain gaps.\n\n* WHERE...Foothills and Valleys of the Cascades ",
+        "effective": "2025-09-15T22:18:00-07:00",
+        "expires": "2025-09-16T07:00:00-07:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Rip Current Statement",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Rip Current Statement issued September 16 at 1:17AM EDT until September 17 at 8:00PM EDT by NWS Miami FL",
+        "description": "* WHAT...Dangerous rip currents.\n\n* WHERE...Coastal Palm Beach County.\n\n* WHEN...Through Wednesday evening.\n\n* IMPACTS...Rip currents can sweep even the best swimmers away\nfrom shore into deeper water",
+        "effective": "2025-09-16T01:17:00-04:00",
+        "expires": "2025-09-16T20:00:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Beach Hazards Statement",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Beach Hazards Statement issued September 15 at 11:59PM EDT until September 16 at 8:00PM EDT by NWS Newport/Morehead City NC",
+        "description": "* WHAT...For the Coastal Flood Advisory, 1 to 2 feet of\ninundation above ground level in low-lying areas near\nshorelines and tidal waterways. For the High Surf Advisory,\nlarge breaking waves of 7 to 1",
+        "effective": "2025-09-15T23:59:00-04:00",
+        "expires": "2025-09-16T12:00:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Flood Warning",
+        "severity": "Severe",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Flood Warning issued September 15 at 6:35PM AKDT until September 16 at 6:00AM AKDT by NWS Juneau AK",
+        "description": "Very heavy rain continues over the Ketchikan area due to an\nAtmospheric River. The rain is expected to continue through Monday\nevening before starting to diminish after midnight.\n\n* WHAT...Urban area ",
+        "effective": "2025-09-15T18:35:00-08:00",
+        "expires": "2025-09-16T02:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -131.85,
+              55.42
+            ],
+            [
+              -131.7,
+              55.53
+            ],
+            [
+              -131.45,
+              55.45
+            ],
+            [
+              -131.39999999999998,
+              55.410000000000004
+            ],
+            [
+              -131.49999999999997,
+              55.31
+            ],
+            [
+              -131.54999999999998,
+              55.28
+            ],
+            [
+              -131.57,
+              55.28
+            ],
+            [
+              -131.54999999999998,
+              55.27
+            ],
+            [
+              -131.58999999999997,
+              55.27
+            ],
+            [
+              -131.59999999999997,
+              55.24
+            ],
+            [
+              -131.60999999999996,
+              55.24
+            ],
+            [
+              -131.76999999999995,
+              55.14
+            ],
+            [
+              -131.85,
+              55.42
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Flood Watch",
+        "severity": "Severe",
+        "urgency": "Future",
+        "certainty": "Possible",
+        "headline": "Flood Watch issued September 15 at 9:22PM EDT until September 17 at 2:00AM EDT by NWS Raleigh NC",
+        "description": "* WHAT...Flooding caused by excessive rainfall is possible.\n\n* WHERE...A portion of central North Carolina, including the\nfollowing counties, Edgecombe, Franklin, Halifax, Nash, Vance,\nWarren and Wils",
+        "effective": "2025-09-15T21:22:00-04:00",
+        "expires": "2025-09-16T08:00:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Flood Warning",
+        "severity": "Severe",
+        "urgency": "Immediate",
+        "certainty": "Observed",
+        "headline": "Flood Warning issued September 15 at 8:59PM EDT by NWS Melbourne FL",
+        "description": "...The Flood Warning continues for the following rivers in Florida...\n\nSt Johns River Near Astor affecting Lake and Volusia Counties.\n\n.On the Saint Johns River near Astor, northerly winds over the ba",
+        "effective": "2025-09-15T20:59:00-04:00",
+        "expires": "2025-09-16T12:00:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -81.5,
+              29.08
+            ],
+            [
+              -81.69,
+              29.319999999999997
+            ],
+            [
+              -81.5699999,
+              29.349999999999998
+            ],
+            [
+              -81.42,
+              29.099999999999998
+            ],
+            [
+              -81.5,
+              29.08
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Flood Watch",
+        "severity": "Severe",
+        "urgency": "Future",
+        "certainty": "Possible",
+        "headline": "Flood Watch issued September 15 at 8:34PM EDT until September 17 at 2:00AM EDT by NWS Wakefield VA",
+        "description": "* WHAT...Flooding caused by excessive rainfall continues to be\npossible.\n\n* WHERE...Portions of northeast North Carolina, including the\nfollowing areas, Bertie, Camden, Chowan, Eastern Currituck, Gate",
+        "effective": "2025-09-15T20:34:00-04:00",
+        "expires": "2025-09-16T06:00:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:34PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-15T15:34:00-08:00",
+        "expires": "2025-09-16T05:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:34PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-15T15:34:00-08:00",
+        "expires": "2025-09-16T05:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:34PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-15T15:34:00-08:00",
+        "expires": "2025-09-16T05:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:34PM AKDT until September 16 at 5:00PM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-15T15:34:00-08:00",
+        "expires": "2025-09-16T05:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:34PM AKDT until September 16 at 5:00PM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-15T15:34:00-08:00",
+        "expires": "2025-09-16T05:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:34PM AKDT until September 16 at 5:00PM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-15T15:34:00-08:00",
+        "expires": "2025-09-16T05:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:34PM AKDT until September 16 at 5:00PM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-15T15:34:00-08:00",
+        "expires": "2025-09-16T05:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:34PM AKDT until September 16 at 5:00PM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-15T15:34:00-08:00",
+        "expires": "2025-09-16T05:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:34PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-15T15:34:00-08:00",
+        "expires": "2025-09-16T05:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:34PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-15T15:34:00-08:00",
+        "expires": "2025-09-16T05:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:34PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-15T15:34:00-08:00",
+        "expires": "2025-09-16T05:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:34PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-15T15:34:00-08:00",
+        "expires": "2025-09-16T05:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Storm Warning",
+        "severity": "Severe",
+        "urgency": "Immediate",
+        "certainty": "Observed",
+        "headline": "Storm Warning issued September 15 at 3:33PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Offshore Waters Forecast for the Bering Sea\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecasts represent an average of the highest\none-third of the combined wind wave ",
+        "effective": "2025-09-15T15:33:00-08:00",
+        "expires": "2025-09-16T07:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:33PM AKDT until September 16 at 5:00PM AKDT by NWS Anchorage AK",
+        "description": "Offshore Waters Forecast for the Bering Sea\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecasts represent an average of the highest\none-third of the combined wind wave ",
+        "effective": "2025-09-15T15:33:00-08:00",
+        "expires": "2025-09-16T07:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:33PM AKDT until September 16 at 5:00PM AKDT by NWS Anchorage AK",
+        "description": "Offshore Waters Forecast for the Bering Sea\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecasts represent an average of the highest\none-third of the combined wind wave ",
+        "effective": "2025-09-15T15:33:00-08:00",
+        "expires": "2025-09-16T07:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:32PM AKDT until September 17 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Offshore waters forecast for the Gulf of Alaska West of 144W\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecasts represent an average of the highest\none-third of the co",
+        "effective": "2025-09-15T15:32:00-08:00",
+        "expires": "2025-09-16T06:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:31PM AKDT until September 16 at 5:00PM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for the Northern Gulf of Alaska Coast\nup to 100 nm out including Kodiak Island and Cook Inlet.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecas",
+        "effective": "2025-09-15T15:31:00-08:00",
+        "expires": "2025-09-16T05:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:31PM AKDT until September 17 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for the Northern Gulf of Alaska Coast\nup to 100 nm out including Kodiak Island and Cook Inlet.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecas",
+        "effective": "2025-09-15T15:31:00-08:00",
+        "expires": "2025-09-16T05:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:31PM AKDT until September 16 at 5:00PM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for the Northern Gulf of Alaska Coast\nup to 100 nm out including Kodiak Island and Cook Inlet.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecas",
+        "effective": "2025-09-15T15:31:00-08:00",
+        "expires": "2025-09-16T05:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:31PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for the Northern Gulf of Alaska Coast\nup to 100 nm out including Kodiak Island and Cook Inlet.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecas",
+        "effective": "2025-09-15T15:31:00-08:00",
+        "expires": "2025-09-16T05:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:31PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for the Northern Gulf of Alaska Coast\nup to 100 nm out including Kodiak Island and Cook Inlet.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecas",
+        "effective": "2025-09-15T15:31:00-08:00",
+        "expires": "2025-09-16T05:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:09PM AKDT until September 16 at 5:00PM AKDT by NWS Juneau AK",
+        "description": "Southeast Alaska Coastal Waters from Dixon Entrance to\nCape Suckling out 100 NM\n\nWind forecasts reflect the predominant speed and direction\nexpected. Seas forecasts represent the average of the highes",
+        "effective": "2025-09-15T15:09:00-08:00",
+        "expires": "2025-09-16T09:15:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:09PM AKDT until September 16 at 5:00PM AKDT by NWS Juneau AK",
+        "description": "Southeast Alaska Coastal Waters from Dixon Entrance to\nCape Suckling out 100 NM\n\nWind forecasts reflect the predominant speed and direction\nexpected. Seas forecasts represent the average of the highes",
+        "effective": "2025-09-15T15:09:00-08:00",
+        "expires": "2025-09-16T09:15:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:09PM AKDT until September 16 at 5:00PM AKDT by NWS Juneau AK",
+        "description": "Southeast Alaska Coastal Waters from Dixon Entrance to\nCape Suckling out 100 NM\n\nWind forecasts reflect the predominant speed and direction\nexpected. Seas forecasts represent the average of the highes",
+        "effective": "2025-09-15T15:09:00-08:00",
+        "expires": "2025-09-16T09:15:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:09PM AKDT until September 16 at 5:00PM AKDT by NWS Juneau AK",
+        "description": "Southeast Alaska Coastal Waters from Dixon Entrance to\nCape Suckling out 100 NM\n\nWind forecasts reflect the predominant speed and direction\nexpected. Seas forecasts represent the average of the highes",
+        "effective": "2025-09-15T15:09:00-08:00",
+        "expires": "2025-09-16T09:15:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:09PM AKDT until September 16 at 5:00PM AKDT by NWS Juneau AK",
+        "description": "Southeast Alaska Coastal Waters from Dixon Entrance to\nCape Suckling out 100 NM\n\nWind forecasts reflect the predominant speed and direction\nexpected. Seas forecasts represent the average of the highes",
+        "effective": "2025-09-15T15:09:00-08:00",
+        "expires": "2025-09-16T09:15:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:09PM AKDT until September 16 at 5:00PM AKDT by NWS Juneau AK",
+        "description": "Southeast Alaska Coastal Waters from Dixon Entrance to\nCape Suckling out 100 NM\n\nWind forecasts reflect the predominant speed and direction\nexpected. Seas forecasts represent the average of the highes",
+        "effective": "2025-09-15T15:09:00-08:00",
+        "expires": "2025-09-16T09:15:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:09PM AKDT until September 16 at 5:00PM AKDT by NWS Juneau AK",
+        "description": "Southeast Alaska Coastal Waters from Dixon Entrance to\nCape Suckling out 100 NM\n\nWind forecasts reflect the predominant speed and direction\nexpected. Seas forecasts represent the average of the highes",
+        "effective": "2025-09-15T15:09:00-08:00",
+        "expires": "2025-09-16T09:15:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:09PM AKDT until September 16 at 5:00AM AKDT by NWS Juneau AK",
+        "description": "Southeast Alaska Coastal Waters from Dixon Entrance to\nCape Suckling out 100 NM\n\nWind forecasts reflect the predominant speed and direction\nexpected. Seas forecasts represent the average of the highes",
+        "effective": "2025-09-15T15:09:00-08:00",
+        "expires": "2025-09-16T09:15:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:09PM AKDT until September 16 at 5:00AM AKDT by NWS Juneau AK",
+        "description": "Southeast Alaska Coastal Waters from Dixon Entrance to\nCape Suckling out 100 NM\n\nWind forecasts reflect the predominant speed and direction\nexpected. Seas forecasts represent the average of the highes",
+        "effective": "2025-09-15T15:09:00-08:00",
+        "expires": "2025-09-16T09:15:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:09PM AKDT until September 16 at 5:00AM AKDT by NWS Juneau AK",
+        "description": "Southeast Alaska Coastal Waters from Dixon Entrance to\nCape Suckling out 100 NM\n\nWind forecasts reflect the predominant speed and direction\nexpected. Seas forecasts represent the average of the highes",
+        "effective": "2025-09-15T15:09:00-08:00",
+        "expires": "2025-09-16T09:15:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 2:44PM AKDT until September 16 at 5:00PM AKDT by NWS Juneau AK",
+        "description": "Southeast Alaska Coastal Waters from Dixon Entrance to\nCape Suckling out 100 NM\n\nWind forecasts reflect the predominant speed and direction\nexpected. Seas forecasts represent the average of the highes",
+        "effective": "2025-09-15T14:44:00-08:00",
+        "expires": "2025-09-16T08:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 2:44PM AKDT until September 16 at 5:00PM AKDT by NWS Juneau AK",
+        "description": "Southeast Alaska Coastal Waters from Dixon Entrance to\nCape Suckling out 100 NM\n\nWind forecasts reflect the predominant speed and direction\nexpected. Seas forecasts represent the average of the highes",
+        "effective": "2025-09-15T14:44:00-08:00",
+        "expires": "2025-09-16T08:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 2:44PM AKDT until September 16 at 5:00PM AKDT by NWS Juneau AK",
+        "description": "Southeast Alaska Coastal Waters from Dixon Entrance to\nCape Suckling out 100 NM\n\nWind forecasts reflect the predominant speed and direction\nexpected. Seas forecasts represent the average of the highes",
+        "effective": "2025-09-15T14:44:00-08:00",
+        "expires": "2025-09-16T08:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 2:44PM AKDT until September 16 at 5:00PM AKDT by NWS Juneau AK",
+        "description": "Southeast Alaska Coastal Waters from Dixon Entrance to\nCape Suckling out 100 NM\n\nWind forecasts reflect the predominant speed and direction\nexpected. Seas forecasts represent the average of the highes",
+        "effective": "2025-09-15T14:44:00-08:00",
+        "expires": "2025-09-16T08:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 2:44PM AKDT until September 16 at 5:00PM AKDT by NWS Juneau AK",
+        "description": "Southeast Alaska Coastal Waters from Dixon Entrance to\nCape Suckling out 100 NM\n\nWind forecasts reflect the predominant speed and direction\nexpected. Seas forecasts represent the average of the highes",
+        "effective": "2025-09-15T14:44:00-08:00",
+        "expires": "2025-09-16T08:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 2:44PM AKDT until September 16 at 5:00PM AKDT by NWS Juneau AK",
+        "description": "Southeast Alaska Coastal Waters from Dixon Entrance to\nCape Suckling out 100 NM\n\nWind forecasts reflect the predominant speed and direction\nexpected. Seas forecasts represent the average of the highes",
+        "effective": "2025-09-15T14:44:00-08:00",
+        "expires": "2025-09-16T08:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 2:44PM AKDT until September 16 at 5:00PM AKDT by NWS Juneau AK",
+        "description": "Southeast Alaska Coastal Waters from Dixon Entrance to\nCape Suckling out 100 NM\n\nWind forecasts reflect the predominant speed and direction\nexpected. Seas forecasts represent the average of the highes",
+        "effective": "2025-09-15T14:44:00-08:00",
+        "expires": "2025-09-16T08:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 2:44PM AKDT until September 16 at 5:00AM AKDT by NWS Juneau AK",
+        "description": "Southeast Alaska Coastal Waters from Dixon Entrance to\nCape Suckling out 100 NM\n\nWind forecasts reflect the predominant speed and direction\nexpected. Seas forecasts represent the average of the highes",
+        "effective": "2025-09-15T14:44:00-08:00",
+        "expires": "2025-09-16T08:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 2:44PM AKDT until September 16 at 5:00AM AKDT by NWS Juneau AK",
+        "description": "Southeast Alaska Coastal Waters from Dixon Entrance to\nCape Suckling out 100 NM\n\nWind forecasts reflect the predominant speed and direction\nexpected. Seas forecasts represent the average of the highes",
+        "effective": "2025-09-15T14:44:00-08:00",
+        "expires": "2025-09-16T08:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 2:44PM AKDT until September 16 at 5:00AM AKDT by NWS Juneau AK",
+        "description": "Southeast Alaska Coastal Waters from Dixon Entrance to\nCape Suckling out 100 NM\n\nWind forecasts reflect the predominant speed and direction\nexpected. Seas forecasts represent the average of the highes",
+        "effective": "2025-09-15T14:44:00-08:00",
+        "expires": "2025-09-16T08:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 2:43PM AKDT until September 16 at 5:00AM AKDT by NWS Juneau AK",
+        "description": "Offshore waters forecast for Gulf of Alaska east of 144W\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecasts represent the average of the highest\none-third of the combi",
+        "effective": "2025-09-15T14:43:00-08:00",
+        "expires": "2025-09-16T08:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 2:43PM AKDT until September 16 at 5:00AM AKDT by NWS Juneau AK",
+        "description": "Offshore waters forecast for Gulf of Alaska east of 144W\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecasts represent the average of the highest\none-third of the combi",
+        "effective": "2025-09-15T14:43:00-08:00",
+        "expires": "2025-09-16T08:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Lake Wind Advisory",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Lake Wind Advisory issued September 15 at 4:35PM MDT until September 16 at 8:00PM MDT by NWS Pocatello ID",
+        "description": "* WHAT...Northeast winds 10 to 15 mph expected for American Falls\nReservoir.\n\n* WHERE...American Falls Reservoir.\n\n* WHEN...From noon to 8 PM MDT Tuesday.\n\n* IMPACTS...Northeast winds will create roug",
+        "effective": "2025-09-15T16:35:00-06:00",
+        "expires": "2025-09-16T20:00:00-06:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Rip Current Statement",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Rip Current Statement issued September 15 at 5:24PM EDT until September 16 at 8:00PM EDT by NWS Mount Holly NJ",
+        "description": "* WHAT...For the High Rip Current Risk, dangerous rip currents\nexpected. For the Coastal Flood Advisory, up to one half foot\nof inundation above ground level expected in low-lying areas\nnear shoreline",
+        "effective": "2025-09-15T17:24:00-04:00",
+        "expires": "2025-09-16T06:30:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Rip Current Statement",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Rip Current Statement issued September 15 at 5:24PM EDT until September 16 at 8:00PM EDT by NWS Mount Holly NJ",
+        "description": "* WHAT...Dangerous rip currents expected.\n\n* WHERE...Eastern Monmouth, Atlantic Coastal Cape May, Coastal\nAtlantic and Coastal Ocean.\n\n* WHEN...From Tuesday morning through Tuesday evening.\n\n* IMPACTS",
+        "effective": "2025-09-15T17:24:00-04:00",
+        "expires": "2025-09-16T06:30:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Red Flag Warning",
+        "severity": "Severe",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Red Flag Warning issued September 15 at 12:51PM PDT until September 16 at 11:00PM PDT by NWS Seattle WA",
+        "description": "The National Weather Service in Seattle has issued a Red Flag\nWarning for gusty winds and low relative humidity, which is in\neffect from 5 AM to 11 PM PDT Tuesday. The Fire Weather Watch is\nno longer ",
+        "effective": "2025-09-15T12:51:00-07:00",
+        "expires": "2025-09-16T03:00:00-07:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Coastal Flood Watch",
+        "severity": "Moderate",
+        "urgency": "Past",
+        "certainty": "Observed",
+        "headline": "The Coastal Flood Watch has been replaced. Please see the latest information from NWS Wakefield VA on this developing situation.",
+        "description": "The Coastal Flood Watch has been replaced. Please see the latest information from NWS Wakefield VA on this developing situation.",
+        "effective": "2025-09-15T14:19:00-04:00",
+        "expires": "2025-09-15T14:34:23-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Coastal Flood Watch",
+        "severity": "Moderate",
+        "urgency": "Past",
+        "certainty": "Observed",
+        "headline": "The Coastal Flood Watch has been replaced. Please see the latest information from NWS Wakefield VA on this developing situation.",
+        "description": "The Coastal Flood Watch has been replaced. Please see the latest information from NWS Wakefield VA on this developing situation.",
+        "effective": "2025-09-15T14:19:00-04:00",
+        "expires": "2025-09-15T14:34:23-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Coastal Flood Watch",
+        "severity": "Moderate",
+        "urgency": "Past",
+        "certainty": "Observed",
+        "headline": "The Coastal Flood Watch has been replaced. Please see the latest information from NWS Wakefield VA on this developing situation.",
+        "description": "The Coastal Flood Watch has been replaced. Please see the latest information from NWS Wakefield VA on this developing situation.",
+        "effective": "2025-09-15T14:19:00-04:00",
+        "expires": "2025-09-15T14:34:23-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Flood Watch",
+        "severity": "Severe",
+        "urgency": "Future",
+        "certainty": "Possible",
+        "headline": "Flood Watch issued September 15 at 2:05PM EDT until September 16 at 5:00PM EDT by NWS Newport/Morehead City NC",
+        "description": "* WHAT...Flooding caused by excessive rainfall is possible.\n\n* WHERE...A portion of eastern North Carolina, including the\nfollowing areas, Beaufort, Greene, Hatteras Island, Mainland Dare,\nMainland Hy",
+        "effective": "2025-09-15T14:05:00-04:00",
+        "expires": "2025-09-16T05:15:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Flood Watch",
+        "severity": "Severe",
+        "urgency": "Future",
+        "certainty": "Possible",
+        "headline": "Flood Watch issued September 15 at 2:05PM EDT until September 16 at 11:00AM EDT by NWS Newport/Morehead City NC",
+        "description": "* WHAT...Flooding caused by excessive rainfall is possible.\n\n* WHERE...A portion of eastern North Carolina, including the\nfollowing areas, East Carteret, Northern Craven, Pamlico, Southern\nCraven and ",
+        "effective": "2025-09-15T14:05:00-04:00",
+        "expires": "2025-09-16T05:15:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Freeze Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Freeze Warning issued September 15 at 10:45AM MDT until September 16 at 7:00AM MDT by NWS Riverton WY",
+        "description": "* WHAT...Sub-freezing temperatures of 30 to 33 expected, with\nisolated areas as low as 28.\n\n* WHERE...Jackson Hole and Star Valley.\n\n* WHEN...From 1 AM to 7 AM MDT Tuesday.\n\n* IMPACTS...Frost and free",
+        "effective": "2025-09-15T10:45:00-06:00",
+        "expires": "2025-09-16T07:00:00-06:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Freeze Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Freeze Warning issued September 15 at 10:45AM MDT until September 16 at 7:00AM MDT by NWS Riverton WY",
+        "description": "* WHAT...Sub-freezing temperatures as low as 28 expected across the\nnorthern half of the basin, including Big Piney. Isolated colder\ntemperatures possible along the Green River. Warmer lows 38 to 40\nd",
+        "effective": "2025-09-15T10:45:00-06:00",
+        "expires": "2025-09-16T07:00:00-06:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Freeze Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Freeze Warning issued September 15 at 10:45AM MDT until September 16 at 7:00AM MDT by NWS Riverton WY",
+        "description": "* WHAT...Sub-freezing temperatures 28 to 32 expected around\nPinedale, 26 to 30 around Daniel, and as low as 23 around\nBondurant.\n\n* WHERE...Upper Green River Basin Foothills.\n\n* WHEN...From 1 AM to 7 ",
+        "effective": "2025-09-15T10:45:00-06:00",
+        "expires": "2025-09-16T07:00:00-06:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 4:33AM AKDT until September 16 at 5:00AM AKDT by NWS Juneau AK",
+        "description": "Offshore waters forecast for Gulf of Alaska east of 144W\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecasts represent the average of the highest\none-third of the combi",
+        "effective": "2025-09-15T04:33:00-08:00",
+        "expires": "2025-09-15T22:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 4:31AM AKDT until September 16 at 5:00AM AKDT by NWS Juneau AK",
+        "description": "Southeast Alaska Coastal Waters from Dixon Entrance to\nCape Suckling out 100 NM\n\nWind forecasts reflect the predominant speed and direction\nexpected. Seas forecasts represent the average of the highes",
+        "effective": "2025-09-15T04:31:00-08:00",
+        "expires": "2025-09-15T22:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 4:00AM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-15T04:00:00-08:00",
+        "expires": "2025-09-15T17:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 4:00AM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-15T04:00:00-08:00",
+        "expires": "2025-09-15T17:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 4:00AM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-15T04:00:00-08:00",
+        "expires": "2025-09-15T17:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 4:00AM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-15T04:00:00-08:00",
+        "expires": "2025-09-15T17:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 4:00AM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-15T04:00:00-08:00",
+        "expires": "2025-09-15T17:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 4:00AM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-15T04:00:00-08:00",
+        "expires": "2025-09-15T17:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 4:00AM AKDT until September 16 at 5:00PM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-15T04:00:00-08:00",
+        "expires": "2025-09-15T17:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 4:00AM AKDT until September 16 at 5:00PM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-15T04:00:00-08:00",
+        "expires": "2025-09-15T17:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 4:00AM AKDT until September 16 at 5:00PM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-15T04:00:00-08:00",
+        "expires": "2025-09-15T17:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 4:00AM AKDT until September 16 at 5:00PM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-15T04:00:00-08:00",
+        "expires": "2025-09-15T17:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 4:00AM AKDT until September 16 at 5:00PM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-15T04:00:00-08:00",
+        "expires": "2025-09-15T17:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 4:00AM AKDT until September 16 at 5:00PM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-15T04:00:00-08:00",
+        "expires": "2025-09-15T17:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 4:00AM AKDT until September 16 at 5:00PM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-15T04:00:00-08:00",
+        "expires": "2025-09-15T17:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:51AM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for the Northern Gulf of Alaska Coast\nup to 100 nm out including Kodiak Island and Cook Inlet.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecas",
+        "effective": "2025-09-15T03:51:00-08:00",
+        "expires": "2025-09-15T16:30:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:51AM AKDT until September 16 at 5:00PM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for the Northern Gulf of Alaska Coast\nup to 100 nm out including Kodiak Island and Cook Inlet.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecas",
+        "effective": "2025-09-15T03:51:00-08:00",
+        "expires": "2025-09-15T16:30:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:51AM AKDT until September 16 at 5:00PM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for the Northern Gulf of Alaska Coast\nup to 100 nm out including Kodiak Island and Cook Inlet.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecas",
+        "effective": "2025-09-15T03:51:00-08:00",
+        "expires": "2025-09-15T16:30:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:51AM AKDT until September 16 at 5:00PM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for the Northern Gulf of Alaska Coast\nup to 100 nm out including Kodiak Island and Cook Inlet.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecas",
+        "effective": "2025-09-15T03:51:00-08:00",
+        "expires": "2025-09-15T16:30:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:51AM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Offshore waters forecast for the Gulf of Alaska West of 144W\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecasts represent an average of the highest\none-third of the co",
+        "effective": "2025-09-15T03:51:00-08:00",
+        "expires": "2025-09-15T17:30:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:51AM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Offshore waters forecast for the Gulf of Alaska West of 144W\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecasts represent an average of the highest\none-third of the co",
+        "effective": "2025-09-15T03:51:00-08:00",
+        "expires": "2025-09-15T17:30:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:46AM AKDT until September 16 at 5:00PM AKDT by NWS Anchorage AK",
+        "description": "Offshore Waters Forecast for the Bering Sea\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecasts represent an average of the highest\none-third of the combined wind wave ",
+        "effective": "2025-09-15T03:46:00-08:00",
+        "expires": "2025-09-15T17:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Storm Warning",
+        "severity": "Severe",
+        "urgency": "Immediate",
+        "certainty": "Observed",
+        "headline": "Storm Warning issued September 15 at 3:46AM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Offshore Waters Forecast for the Bering Sea\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecasts represent an average of the highest\none-third of the combined wind wave ",
+        "effective": "2025-09-15T03:46:00-08:00",
+        "expires": "2025-09-15T17:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 15 at 3:46AM AKDT until September 16 at 5:00PM AKDT by NWS Anchorage AK",
+        "description": "Offshore Waters Forecast for the Bering Sea\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecasts represent an average of the highest\none-third of the combined wind wave ",
+        "effective": "2025-09-15T03:46:00-08:00",
+        "expires": "2025-09-15T17:00:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Rip Current Statement",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Rip Current Statement issued September 15 at 2:03AM EDT until September 16 at 4:00AM EDT by NWS Melbourne FL",
+        "description": "* WHAT...Dangerous rip currents.\n\n* WHERE...Beaches of Volusia, Brevard, Indian River, Saint Lucie,\nand Martin Counties.\n\n* WHEN...Through late tonight.\n\n* IMPACTS...Rip currents can sweep even the be",
+        "effective": "2025-09-15T02:03:00-04:00",
+        "expires": "2025-09-16T04:00:00-04:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 14 at 3:37PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for the Northern Gulf of Alaska Coast\nup to 100 nm out including Kodiak Island and Cook Inlet.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecas",
+        "effective": "2025-09-14T15:37:00-08:00",
+        "expires": "2025-09-15T04:30:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 14 at 3:37PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for the Northern Gulf of Alaska Coast\nup to 100 nm out including Kodiak Island and Cook Inlet.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecas",
+        "effective": "2025-09-14T15:37:00-08:00",
+        "expires": "2025-09-15T04:30:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 14 at 3:37PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for the Northern Gulf of Alaska Coast\nup to 100 nm out including Kodiak Island and Cook Inlet.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecas",
+        "effective": "2025-09-14T15:37:00-08:00",
+        "expires": "2025-09-15T04:30:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 14 at 3:37PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for the Northern Gulf of Alaska Coast\nup to 100 nm out including Kodiak Island and Cook Inlet.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecas",
+        "effective": "2025-09-14T15:37:00-08:00",
+        "expires": "2025-09-15T04:30:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 14 at 3:36PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Offshore waters forecast for the Gulf of Alaska West of 144W\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecasts represent an average of the highest\none-third of the co",
+        "effective": "2025-09-14T15:36:00-08:00",
+        "expires": "2025-09-15T06:30:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 14 at 3:29PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-14T15:29:00-08:00",
+        "expires": "2025-09-15T04:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 14 at 3:29PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-14T15:29:00-08:00",
+        "expires": "2025-09-15T04:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 14 at 3:29PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-14T15:29:00-08:00",
+        "expires": "2025-09-15T04:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 14 at 3:29PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-14T15:29:00-08:00",
+        "expires": "2025-09-15T04:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 14 at 3:29PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Offshore Waters Forecast for the Bering Sea\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecasts represent an average of the highest\none-third of the combined wind wave ",
+        "effective": "2025-09-14T15:29:00-08:00",
+        "expires": "2025-09-15T06:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 14 at 3:29PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Offshore Waters Forecast for the Bering Sea\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecasts represent an average of the highest\none-third of the combined wind wave ",
+        "effective": "2025-09-14T15:29:00-08:00",
+        "expires": "2025-09-15T06:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 14 at 3:29PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Offshore Waters Forecast for the Bering Sea\n\nWind forecasts reflect the predominant speed and direction\nexpected. Sea forecasts represent an average of the highest\none-third of the combined wind wave ",
+        "effective": "2025-09-14T15:29:00-08:00",
+        "expires": "2025-09-15T06:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 14 at 3:29PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-14T15:29:00-08:00",
+        "expires": "2025-09-15T04:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 14 at 3:29PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-14T15:29:00-08:00",
+        "expires": "2025-09-15T04:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 14 at 3:29PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-14T15:29:00-08:00",
+        "expires": "2025-09-15T04:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 14 at 3:29PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-14T15:29:00-08:00",
+        "expires": "2025-09-15T04:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 14 at 3:29PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-14T15:29:00-08:00",
+        "expires": "2025-09-15T04:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 14 at 3:29PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-14T15:29:00-08:00",
+        "expires": "2025-09-15T04:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Gale Warning",
+        "severity": "Moderate",
+        "urgency": "Expected",
+        "certainty": "Likely",
+        "headline": "Gale Warning issued September 14 at 3:29PM AKDT until September 16 at 5:00AM AKDT by NWS Anchorage AK",
+        "description": "Coastal Waters Forecast for Southwest Alaska+Bristol Bay+The\nAlaska Peninsula Waters and the Aleutian Islands up to 100 nm out.\n\nWind forecasts reflect the predominant speed and direction\nexpected. Se",
+        "effective": "2025-09-14T15:29:00-08:00",
+        "expires": "2025-09-15T04:45:00-08:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Flood Warning",
+        "severity": "Severe",
+        "urgency": "Immediate",
+        "certainty": "Observed",
+        "headline": "Flood Warning issued September 14 at 9:20AM CDT by NWS Aberdeen SD",
+        "description": "...The Flood Warning continues for the following rivers in South\nDakota...\n\nJames River near Stratford affecting Brown and Spink Counties.\n\nJames River at Columbia affecting Brown County.\n\n.For sites ",
+        "effective": "2025-09-14T09:20:00-05:00",
+        "expires": "2025-09-17T17:30:00-05:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -98.18,
+              45.52
+            ],
+            [
+              -98.38000000000001,
+              45.150000000000006
+            ],
+            [
+              -98.45,
+              45.150000000000006
+            ],
+            [
+              -98.3,
+              45.52
+            ],
+            [
+              -98.18,
+              45.52
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "weather_alert",
+        "source": "NOAA",
+        "event": "Flood Warning",
+        "severity": "Severe",
+        "urgency": "Immediate",
+        "certainty": "Observed",
+        "headline": "Flood Warning issued September 14 at 9:20AM CDT by NWS Aberdeen SD",
+        "description": "...The Flood Warning continues for the following rivers in South\nDakota...\n\nJames River near Stratford affecting Brown and Spink Counties.\n\nJames River at Columbia affecting Brown County.\n\n.For sites ",
+        "effective": "2025-09-14T09:20:00-05:00",
+        "expires": "2025-09-17T17:30:00-05:00",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "National Weather Service",
+          "Real-time"
+        ],
+        "verification_status": "official"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -98.17,
+              45.86
+            ],
+            [
+              -98.27,
+              45.63
+            ],
+            [
+              -98.17999999999999,
+              45.52
+            ],
+            [
+              -98.3,
+              45.52
+            ],
+            [
+              -98.36999999999999,
+              45.63
+            ],
+            [
+              -98.24,
+              45.86
+            ],
+            [
+              -98.17,
+              45.86
+            ]
+          ]
+        ]
+      }
+    }
+  ],
+  "metadata": {
+    "source": "NOAA National Weather Service",
+    "timestamp": "2025-09-16T02:57:09.295967",
+    "count": 146,
+    "trust_level": "official_government"
+  }
+}

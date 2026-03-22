@@ -93,7 +93,7 @@ gantt
     dateFormat  YYYY-MM-DD
     title  Phase III — Economic & External Integration
     section Treasury & Analytics
-    Economic Dashboard (Treasury + CIV) :crit, a1, 2026-04-05, 45d
+    Economic Dashboard (Treasury + MYCEL) :crit, a1, 2026-04-05, 45d
     section Core Engineering
     ZK-STARK Bridge Phase 2              :active, a2, after a1, 60d
     section Governance
@@ -108,7 +108,7 @@ gantt
 - Prepare Mycelix for institutional partnerships and middleware deployment.  
 
 **Deliverables:**
-- 💹 Economic Dashboard (Treasury, CIV, FLOW analytics)  
+- 💹 Economic Dashboard (Treasury, MYCEL, SAP analytics)  
 - 🔒 ZK-STARK Bridge Phase 2 (Proof-based interoperability)  
 - 🧾 Governance MIP Library (MIP-E/S/T standards)  
 - 💼 MATL Licensing Framework (SDK revenue model)  
@@ -172,7 +172,7 @@ graph TD
 | # | Deliverable | Description | Owner | Priority |
 |---|--------------|-------------|--------|-----------|
 | 1 | **Charter Compliance Map** | Link each constitutional article to implemented modules | Governance | 🔥 |
-| 2 | **Economic Model v0.2** | Model tokenomics, CIV weighting, and treasury flow | Treasury | 🔥 |
+| 2 | **Economic Model v0.2** | Model tokenomics, MYCEL weighting, and treasury flow | Treasury | 🔥 |
 | 3 | **Bridge Runbook v1.0** | Post-exploit SOP and recovery playbook | Security Guild | 🔥 |
 | 4 | **Visual Documentation Package** | Figma + SVG exports for Layer & Trust flow | Design | ⚡ |
 | 5 | **MATL SDK Spec (Draft)** | Developer integration reference for licensing | DevRel | ⚡ |

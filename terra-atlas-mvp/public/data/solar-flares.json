@@ -1,0 +1,37 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "solar_flare",
+        "source": "NOAA SWPC",
+        "class": "C2.5",
+        "begin_time": "2025-09-16T04:46:00Z",
+        "max_time": "2025-09-16T04:58:00Z",
+        "end_time": "2025-09-16T05:09:00Z",
+        "active_region": "",
+        "quality_score": 0.95,
+        "data_lineage": [
+          "NOAA",
+          "GOES Satellite",
+          "Real-time"
+        ],
+        "verification_status": "satellite_confirmed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          0,
+          0
+        ]
+      }
+    }
+  ],
+  "metadata": {
+    "source": "NOAA Space Weather Prediction Center",
+    "timestamp": "2025-09-16T02:57:10.422310",
+    "count": 1,
+    "trust_level": "official_space_weather"
+  }
+}

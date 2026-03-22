@@ -61,7 +61,7 @@ Automatic Risk Mitigation: MATL automatically applies mitigations based on the o
 
 **Economic Penalties**:
 
-* **Validator Bonding Requirement**: All validators must stake **5,000 FLOW** (slashable deposit).  
+* **Validator Bonding Requirement**: All validators must stake **5,000 SAP** (slashable deposit).  
 * If identified as a malicious cartel member (Phase 3 Dissolution): **100% slash** (entire stake).  
 * Slashed funds distributed to whistleblowers (30%) and treasury (70%).
 
@@ -71,13 +71,13 @@ Automatic Risk Mitigation: MATL automatically applies mitigations based on the o
 
 * Anonymous reporting via Tor hidden service (operated by Audit Guild).  
 * Zero-knowledge proof of evidence (don't reveal reporter identity).  
-* Whistleblower rewards: 30% of slashed stake (up to 50,000 FLOW) if cartel confirmed.  
+* Whistleblower rewards: 30% of slashed stake (up to 50,000 SAP) if cartel confirmed.  
 * Protection from retaliation (Member Redress Council jurisdiction).
 
 **False Accusation Penalties**:
 
-* False cartel accusation (proven malicious): 1,000 FLOW fine \+ reputation penalty.  
-* Negligent false accusation (honest mistake): 100 FLOW fine, no reputation penalty.
+* False cartel accusation (proven malicious): 1,000 SAP fine \+ reputation penalty.  
+* Negligent false accusation (honest mistake): 100 SAP fine, no reputation penalty.
 
 ### **Section 5\. Mycelix Adaptive Trust Layer (MATL)**
 
@@ -132,7 +132,7 @@ Voting on Constitutional matters (per Governance Charter Article III, Section 2\
 MATL components subject to same audit requirements as core protocol (per Economic Charter Article I, Section 5):
 
 * Security Audit \#2 must include MATL composite scoring, cartel detection, and zkVM integration.  
-* Bug bounty: MATL exploits (bypassing Sybil detection) classified as High severity (50,000 FLOW).  
+* Bug bounty: MATL exploits (bypassing Sybil detection) classified as High severity (50,000 SAP).  
 * Knowledge Council reviews MATL parameter tuning annually.
 
 #### **5.7 Evolution and Middleware**
@@ -188,21 +188,21 @@ When conflicting Tier 2+ claims are submitted, disputes are resolved through tie
 
 **Tier A: Routine Claims** (claim\_materiality \= "routine")
 
-* Threshold: \<10,000 FLOW impact, no governance implications.  
+* Threshold: \<10,000 SAP impact, no governance implications.  
 * Process: 3-member Sector DAO panel issues binding decision in 14 days.  
-* Appeal: 50 FLOW bond to escalate to Tier B.
+* Appeal: 50 SAP bond to escalate to Tier B.
 
 **Tier B: Significant Claims** (claim\_materiality \= "significant")
 
-* Threshold: 10K-100K FLOW impact or sector-wide policy.  
+* Threshold: 10K-100K SAP impact or sector-wide policy.  
 * Process: 5-member Knowledge Council panel → Relevant Sector/Regional DAO votes (simple majority, 30% quorum).  
 * Fallback: If quorum fails twice, Knowledge Council decision is binding.
 
 **Tier C: Constitutional Claims** (claim\_materiality \= "constitutional")
 
-* Threshold: Affects Core Principles, Member rights, or \>100K FLOW.  
+* Threshold: Affects Core Principles, Member rights, or \>100K SAP.  
 * Process:  
-  1. Disputing party files challenge (500 FLOW equivalent bond).  
+  1. Disputing party files challenge (500 SAP equivalent bond).  
   2. Knowledge Council \+ Audit Guild joint panel (7 members) conducts review.  
   3. Mandatory public comment period (30 days).  
   4. Global DAO votes with special majority: 60% approval required in both houses.  
@@ -241,7 +241,7 @@ When conflicting Tier 2+ claims are submitted, disputes are resolved through tie
 
 ##### **v. Bond Distribution**
 
-* **Challenge succeeds**: Bond returned \+ 50 FLOW reward from losing party.  
+* **Challenge succeeds**: Bond returned \+ 50 SAP reward from losing party.  
 * **Challenge fails**: Bond split: 50% to defending party, 50% to dispute resolution body treasury.  
 * **Frivolous challenges**: Bond forfeited \+ reputation penalty.
 

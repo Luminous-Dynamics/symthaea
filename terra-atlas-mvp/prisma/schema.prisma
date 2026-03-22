@@ -1,0 +1,303 @@
+// Prisma Schema for Terra Atlas
+// PostgreSQL with PostGIS extensions
+
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  extensions = [uuid_ossp(map: "uuid-ossp"), postgis, pg_trgm]
+}
+
+// =====================================================
+// USER MANAGEMENT & AUTHENTICATION
+// =====================================================
+
+model User {
+  id                String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  email             String    @unique @db.VarChar(255)
+  username          String    @unique @db.VarChar(100)
+  passwordHash      String    @map("password_hash") @db.VarChar(255)
+  fullName          String?   @map("full_name") @db.VarChar(255)
+  avatarUrl         String?   @map("avatar_url") @db.VarChar(500)
+  bio               String?   @db.Text
+  
+  // Reputation and validation stats
+  reputationScore      Int       @default(0) @map("reputation_score")
+  validationsCount     Int       @default(0) @map("validations_count")
+  accurateValidations  Int       @default(0) @map("accurate_validations")
+  validationAccuracy   Decimal   @default(0.00) @map("validation_accuracy") @db.Decimal(5, 2)
+  trustLevel          String    @default("novice") @map("trust_level") @db.VarChar(50)
+  
+  // Account status
+  emailVerified    Boolean   @default(false) @map("email_verified")
+  isActive         Boolean   @default(true) @map("is_active")
+  isModerator      Boolean   @default(false) @map("is_moderator")
+  isAdmin          Boolean   @default(false) @map("is_admin")
+  
+  // Timestamps
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  lastLoginAt      DateTime? @map("last_login_at") @db.Timestamptz(6)
+  
+  // Preferences (JSON)
+  preferences           Json     @default("{}") @db.JsonB
+  notificationSettings  Json     @default("{\"email_validations\": true, \"email_updates\": true, \"push_alerts\": false}") @map("notification_settings") @db.JsonB
+  
+  // Relations
+  validations      Validation[]
+  apiKeys          UserApiKey[]
+  sessions         Session[]
+  activityLogs     ActivityLog[]
+  
+  @@index([email])
+  @@index([username])
+  @@index([reputationScore(sort: Desc)])
+  @@index([createdAt])
+  @@map("users")
+}
+
+// =====================================================
+// DATA SOURCES & LAYERS
+// =====================================================
+
+model DataSource {
+  id              String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  sourceId        String    @unique @map("source_id") @db.VarChar(100)
+  name            String    @db.VarChar(255)
+  description     String?   @db.Text
+  provider        String?   @db.VarChar(255)
+  apiEndpoint     String?   @map("api_endpoint") @db.VarChar(500)
+  
+  // API Configuration
+  requiresApiKey     Boolean   @default(false) @map("requires_api_key")
+  apiKeyEncrypted    String?   @map("api_key_encrypted") @db.VarChar(500)
+  rateLimit          Int?      @map("rate_limit")
+  
+  // Trust metrics
+  baseTrustScore      Decimal   @default(75.00) @map("base_trust_score") @db.Decimal(5, 2)
+  verificationType    String?   @map("verification_type") @db.VarChar(100)
+  
+  // Status
+  isActive           Boolean   @default(true) @map("is_active")
+  lastFetchAt        DateTime? @map("last_fetch_at") @db.Timestamptz(6)
+  lastFetchStatus    String?   @map("last_fetch_status") @db.VarChar(50)
+  lastErrorMessage   String?   @map("last_error_message") @db.Text
+  
+  // Metadata
+  metadata        Json      @default("{}") @db.JsonB
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  // Relations
+  dataPoints      DataPoint[]
+  
+  @@map("data_sources")
+}
+
+// =====================================================
+// GEOSPATIAL DATA STORAGE
+// =====================================================
+
+model DataPoint {
+  id              String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  sourceId        String    @map("source_id") @db.VarChar(100)
+  externalId      String?   @map("external_id") @db.VarChar(255)
+  
+  // Geospatial data - stored as JSON for now, use raw SQL for PostGIS operations
+  geometry        Json      @db.JsonB // Will use ST_AsGeoJSON/ST_GeomFromGeoJSON
+  properties      Json      @db.JsonB
+  
+  // Data classification
+  dataType        String?   @map("data_type") @db.VarChar(100)
+  severity        String?   @db.VarChar(50)
+  magnitude       Decimal?  @db.Decimal(5, 2)
+  
+  // Temporal data
+  eventTime       DateTime? @map("event_time") @db.Timestamptz(6)
+  detectedAt      DateTime? @map("detected_at") @db.Timestamptz(6)
+  expiresAt       DateTime? @map("expires_at") @db.Timestamptz(6)
+  
+  // Trust and verification
+  qualityScore         Decimal   @default(50.00) @map("quality_score") @db.Decimal(5, 2)
+  trustScore           Decimal   @default(50.00) @map("trust_score") @db.Decimal(5, 2)
+  verificationStatus   String    @default("unverified") @map("verification_status") @db.VarChar(50)
+  verificationMethod   String?   @map("verification_method") @db.VarChar(100)
+  
+  // Validation counts (denormalized for performance)
+  confirmsCount   Int       @default(0) @map("confirms_count")
+  disputesCount   Int       @default(0) @map("disputes_count")
+  flagsCount      Int       @default(0) @map("flags_count")
+  
+  // Metadata
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  // Relations
+  source          DataSource @relation(fields: [sourceId], references: [sourceId])
+  validations     Validation[]
+  
+  @@unique([sourceId, externalId])
+  @@index([eventTime(sort: Desc)])
+  @@index([dataType])
+  @@index([trustScore(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
+  @@map("data_points")
+}
+
+// =====================================================
+// USER VALIDATIONS & REPUTATION
+// =====================================================
+
+enum ValidationType {
+  confirm
+  dispute
+  flag
+}
+
+model Validation {
+  id              String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId          String         @map("user_id") @db.Uuid
+  dataPointId     String         @map("data_point_id") @db.Uuid
+  
+  // Validation action
+  validationType  ValidationType @map("validation_type")
+  previousType    ValidationType? @map("previous_type")
+  
+  // Optional feedback
+  comment         String?        @db.Text
+  evidenceUrls    String[]       @map("evidence_urls")
+  
+  // Validation metadata
+  ipAddress       String?        @map("ip_address") @db.Inet
+  userAgent       String?        @map("user_agent") @db.Text
+  clientFingerprint String?      @map("client_fingerprint") @db.VarChar(255)
+  
+  // Timestamps
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  // Relations
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dataPoint       DataPoint      @relation(fields: [dataPointId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, dataPointId])
+  @@index([userId])
+  @@index([dataPointId])
+  @@index([validationType])
+  @@index([createdAt(sort: Desc)])
+  @@map("validations")
+}
+
+// =====================================================
+// API KEYS MANAGEMENT
+// =====================================================
+
+model UserApiKey {
+  id              String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
+  
+  keyHash         String    @unique @map("key_hash") @db.VarChar(255)
+  keyPrefix       String    @map("key_prefix") @db.VarChar(20)
+  name            String?   @db.VarChar(255)
+  description     String?   @db.Text
+  
+  // Permissions
+  scopes          String[]  @default(["read"])
+  
+  // Rate limiting
+  rateLimit       Int       @default(1000) @map("rate_limit")
+  requestsCount   Int       @default(0) @map("requests_count")
+  requestsResetAt DateTime? @map("requests_reset_at") @db.Timestamptz(6)
+  
+  // Status
+  isActive        Boolean   @default(true) @map("is_active")
+  expiresAt       DateTime? @map("expires_at") @db.Timestamptz(6)
+  lastUsedAt      DateTime? @map("last_used_at") @db.Timestamptz(6)
+  
+  // Metadata
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  revokedAt       DateTime? @map("revoked_at") @db.Timestamptz(6)
+  
+  // Relations
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("user_api_keys")
+}
+
+// =====================================================
+// AUDIT & ACTIVITY LOGGING
+// =====================================================
+
+model ActivityLog {
+  id              String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId          String?   @map("user_id") @db.Uuid
+  
+  // Action details
+  action          String    @db.VarChar(100)
+  resourceType    String?   @map("resource_type") @db.VarChar(50)
+  resourceId      String?   @map("resource_id") @db.Uuid
+  
+  // Request metadata
+  ipAddress       String?   @map("ip_address") @db.Inet
+  userAgent       String?   @map("user_agent") @db.Text
+  requestMethod   String?   @map("request_method") @db.VarChar(10)
+  requestPath     String?   @map("request_path") @db.VarChar(500)
+  
+  // Response
+  statusCode      Int?      @map("status_code")
+  errorMessage    String?   @map("error_message") @db.Text
+  
+  // Performance
+  durationMs      Int?      @map("duration_ms")
+  
+  // Timestamp
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  
+  // Relations
+  user            User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt(sort: Desc)])
+  @@map("activity_log")
+}
+
+// =====================================================
+// SESSIONS
+// =====================================================
+
+model Session {
+  id                 String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId             String    @map("user_id") @db.Uuid
+  
+  tokenHash          String    @unique @map("token_hash") @db.VarChar(255)
+  refreshTokenHash   String?   @unique @map("refresh_token_hash") @db.VarChar(255)
+  
+  // Session metadata
+  ipAddress          String?   @map("ip_address") @db.Inet
+  userAgent          String?   @map("user_agent") @db.Text
+  
+  // Expiration
+  expiresAt          DateTime  @map("expires_at") @db.Timestamptz(6)
+  refreshExpiresAt   DateTime? @map("refresh_expires_at") @db.Timestamptz(6)
+  
+  // Status
+  isActive           Boolean   @default(true) @map("is_active")
+  revokedAt          DateTime? @map("revoked_at") @db.Timestamptz(6)
+  
+  // Timestamps
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastActivityAt     DateTime  @default(now()) @map("last_activity_at") @db.Timestamptz(6)
+  
+  // Relations
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([expiresAt])
+  @@map("sessions")
+}

@@ -129,9 +129,9 @@ graph TD
 
 | Primitive | Code | Type | Function | Key Layers | Risks & Mitigations |  
 |-----------|------|------|----------|------------|---------------------|  
-| Civic Standing | CIV | Non-transferable | Reputation, Gov Weight | L6, L7 | Centralization (Quadratic Voting), Gaming (MATL Detection) |  
-| Civic Gifting | CGC | Non-transferable | Social Signal, Recognition | L7 | Gaming (Transparency Thresholds, AG Monitoring) |  
-| Utility Token | FLOW | Transferable | Fees, Staking, Compute | L4, L7, L8 | Regulatory Risk (Securities) (Legal Opinions, Utility Focus), Volatility (Treasury Diversification) |  
+| Civic Standing | MYCEL | Non-transferable | Reputation, Gov Weight | L6, L7 | Centralization (Quadratic Voting), Gaming (MATL Detection) |  
+| Civic Gifting | MYCEL recognition | Non-transferable | Social Signal, Recognition | L7 | Gaming (Transparency Thresholds, AG Monitoring) |  
+| Utility Token | SAP | Transferable | Fees, Staking, Compute | L4, L7, L8 | Regulatory Risk (Securities) (Legal Opinions, Utility Focus), Volatility (Treasury Diversification) |  
 | Treasury Assets | \- | Stablecoins, ETH, BTC | Funding, Reserves | L7 | Smart Contract Risk (Audits), Depeg Risk (Diversification) |
 
 \*\*Optional Commons Modules (Charter Appendix G):\*\*
@@ -153,7 +153,7 @@ graph TD
 
 \*\*The Problem with Classical BFT:\*\* Limited to \`f \< n/3\` Byzantine nodes (33% tolerance). Vulnerable to Sybils joining with equal power.
 
-\*\*The RB-BFT Solution:\*\* Weight validator voting power quadratically by their reputation (CIV score, informed by MATL).
+\*\*The RB-BFT Solution:\*\* Weight validator voting power quadratically by their reputation (MYCEL score, informed by MATL).
 
 \`\`\`rust  
 // Simplified voting power calculation (See L7 for full implementation context)  
@@ -285,8 +285,8 @@ pub struct EpistemicClaim {
 }
 
 pub enum ClaimMateriality {  
-    Routine,      // \<10K FLOW impact  
-    Significant,  // 10K-100K FLOW  
+    Routine,      // \<10K SAP impact  
+    Significant,  // 10K-100K SAP  
     Constitutional, // Affects Core Principles  
     Existential,  // Threatens network viability  
 }
@@ -329,7 +329,7 @@ pub enum VerificationStatus {
 \`\`\`rust  
 pub struct EpistemicDisputeResolution {  
     pub tier: DisputeTier,  
-    pub bond\_required: u64, // In FLOW  
+    pub bond\_required: u64, // In SAP  
     pub resolution\_body: ResolutionBody,  
     pub timeframe\_days: u32,  
     pub appeal\_allowed: bool,  
@@ -563,7 +563,7 @@ pub struct ValidatorSet {
 
 pub struct BridgeValidator {  
     pub did: DID,  
-    pub stake: u64, // 5,000 FLOW minimum  
+    pub stake: u64, // 5,000 SAP minimum  
     pub reputation: f64, // From MATL  
     pub matl\_cartel\_risk\_score: f64, // From L6  
     pub uptime: f64,  
@@ -640,7 +640,7 @@ pub struct RecoveryFund {
 }
 
 pub struct ValidatorCollateral {  
-    pub minimum\_stake: u64, // 5,000 FLOW per Charter X.6  
+    pub minimum\_stake: u64, // 5,000 SAP per Charter X.6  
     pub slashing\_conditions: Vec\<SlashingCondition\>,  
 }
 
@@ -808,7 +808,7 @@ pub enum CosmosChain {
 \*\*Bridge Fee Structure:\*\*  
 \`\`\`rust  
 pub struct BridgeFeeStructure {  
-    pub base\_fee: u64, // e.g., 10 FLOW  
+    pub base\_fee: u64, // e.g., 10 SAP  
     pub percentage\_fee: f64, // e.g., 0.1% of amount  
     pub fee\_distribution: FeeDistribution,  
 }
@@ -831,12 +831,12 @@ pub struct ValidatorInsurance {
 
 pub enum ValidatorInsuranceType {  
     ProfessionalLiability { coverage: u64 }, // $1M minimum  
-    AdditionalCollateral { amount: u64 },    // 10,000 FLOW  
+    AdditionalCollateral { amount: u64 },    // 10,000 SAP  
 }
 
 // Bridge validators must have ONE of:  
 // \- Professional liability insurance ($1M+)  
-// \- Additional collateral (10,000 FLOW on top of 5,000 FLOW stake)  
+// \- Additional collateral (10,000 SAP on top of 5,000 SAP stake)  
 \`\`\`
 
 \#\#\#\# \*\*Phase 1 Testing Requirements (CRITICAL)\*\*
@@ -1067,7 +1067,7 @@ let ai\_safety\_vc\_schema \= VCSchema {
 
 \*\*Phase 3 (24+ months):\*\*
 
-Local DAOs and peer-to-peer issuance (lower initial weight in CIV):
+Local DAOs and peer-to-peer issuance (lower initial weight in MYCEL):
 
 \`\`\`rust  
 pub fn issue\_vc\_phase3\_peer(  
@@ -1076,13 +1076,13 @@ pub fn issue\_vc\_phase3\_peer(
     credential\_type: CredentialType,  
     issuer\_reputation: f64,  
 ) \-\> Result\<VerifiableCredential\> {  
-    // Peer issuance requires minimum CIV threshold  
+    // Peer issuance requires minimum MYCEL threshold  
     require(issuer\_reputation \>= 0.6)?;  
       
     // Issue VC with weight modifier  
     let mut vc \= issue\_vc(issuer, subject, credential\_type)?;  
       
-    // Phase 3 peer VCs have lower initial weight in global CIV calculations  
+    // Phase 3 peer VCs have lower initial weight in global MYCEL calculations  
     vc.credential\_subject.claims.insert(  
         "reputation\_weight".to\_string(),  
         serde\_json::Value::Number(0.5.into()), // 50% weight vs. institutional VCs  
@@ -1625,7 +1625,7 @@ pub fn execute\_mitigation(
             }  
               
             // Distribute slashed funds  
-            let total\_slashed \= cluster.members.len() as u64 \* 5000; // 5K FLOW per validator  
+            let total\_slashed \= cluster.members.len() as u64 \* 5000; // 5K SAP per validator  
             distribute\_slashed\_funds(total\_slashed)?; // 30% whistleblower, 70% treasury  
               
             Ok(MitigationReport {  
@@ -2266,7 +2266,7 @@ pub struct MIPLifecycle {
 }
 
 pub struct MIPSubmission {  
-    pub bond\_required: u64, // 1000 FLOW or 100 Member signatures  
+    pub bond\_required: u64, // 1000 SAP or 100 Member signatures  
     pub initial\_review: Duration, // 7 days  
 }
 
@@ -2333,7 +2333,7 @@ pub struct MIPLifecycle {
 }
 
 pub struct MIPSubmission {  
-    pub bond\_required: u64, // 1000 FLOW or 100 Member signatures  
+    pub bond\_required: u64, // 1000 SAP or 100 Member signatures  
     pub initial\_review: Duration, // 7 days  
 }
 
@@ -2487,9 +2487,9 @@ pub struct MultiSigConfig {
 }
 
 pub struct SpendingLimits {  
-    pub local\_dao\_limit: u64,      // 50,000 FLOW  
-    pub sector\_regional\_limit: u64, // 500,000 FLOW  
-    pub global\_dao\_only: u64,      // \>500,000 FLOW  
+    pub local\_dao\_limit: u64,      // 50,000 SAP  
+    pub sector\_regional\_limit: u64, // 500,000 SAP  
+    pub global\_dao\_only: u64,      // \>500,000 SAP  
 }
 
 pub struct OversightTreasuries {  
@@ -2585,7 +2585,7 @@ pub struct RedundancyConfig {
 }
 
 pub struct CompensationStructure {  
-    pub base\_rewards\_per\_epoch: u64,  // e.g., 50 FLOW per epoch  
+    pub base\_rewards\_per\_epoch: u64,  // e.g., 50 SAP per epoch  
     pub performance\_bonuses: Vec,  
     pub geographic\_diversity\_bonuses: HashMap, // Multipliers  
     pub matl\_score\_adjustments: MATLRewardAdjustments, // NEW  
@@ -2610,7 +2610,7 @@ pub struct MATLRewardAdjustments {
 }
 
 pub struct CollateralStaking {  
-    pub minimum\_stake: u64,          // 5,000 FLOW  
+    pub minimum\_stake: u64,          // 5,000 SAP  
     pub staking\_period\_days: u32,    // 90 days minimum  
     pub unstaking\_cooldown\_days: u32, // 14 days  
     pub stake\_utility: StakeUtility,  
@@ -2655,7 +2655,7 @@ pub fn calculate\_validator\_reward(
     epoch\_performance: \&EpochPerformance,  
     matl\_score: \&CompositeTrustScore, // NEW: MATL input  
 ) \-\> u64 {  
-    let base\_reward \= BASE\_REWARDS\_PER\_EPOCH; // e.g., 50 FLOW  
+    let base\_reward \= BASE\_REWARDS\_PER\_EPOCH; // e.g., 50 SAP  
       
     // Performance multiplier  
     let mut multiplier \= 1.0;  
@@ -2793,7 +2793,7 @@ pub async fn register\_validator(
     stake: u64,  
 ) \-\> Result {  
     // 1\. Verify stake  
-    require(stake \>= 5\_000)?; // Minimum 5,000 FLOW  
+    require(stake \>= 5\_000)?; // Minimum 5,000 SAP  
       
     // 2\. Verify hardware meets requirements  
     require(hardware\_specs.cpu\_cores \>= 4)?;  
@@ -4527,7 +4527,7 @@ P3 (Low): Non-critical issues
 
 \#\# Article VI: Cultural Expression (Optional)  
 \- \*\*Cultural Framework:\*\* \[e.g., "We draw inspiration from..."\]  
-\- \*\*Symbolic Names:\*\* \[CGC \= "SPARK", CIV \= "STONE", etc.\]  
+\- \*\*Symbolic Names:\*\* \[MYCEL recognition \= "SPARK", MYCEL \= "STONE", etc.\]  
 \- \*\*Rituals:\*\* \[Any regular ceremonies or practices\]
 
 \#\# Article VII: Alignment  
@@ -4549,8 +4549,8 @@ Date: \[Date\]
 
 | Term | Definition | Reference |  
 |------|------------|-----------|  
-| \*\*CIV (Civic Standing)\*\* | Non-transferable reputation score representing a Member's contributions and trustworthiness | Constitution Article VIII |  
-| \*\*CGC (Civic Gifting Credit)\*\* | Non-transferable social signal for recognizing non-market contributions | Charter Article XI |  
+| \*\*MYCEL (Civic Standing)\*\* | Non-transferable reputation score representing a Member's contributions and trustworthiness | Constitution Article VIII |  
+| \*\*MYCEL recognition (Civic Gifting Credit)\*\* | Non-transferable social signal for recognizing non-market contributions | Charter Article XI |  
 | \*\*MATL (Mycelix Adaptive Trust Layer)\*\* | Verifiable middleware combining composite trust scoring, cartel detection, and zk-STARK proofs | Architecture v5.2, Layer 6 |  
 | \*\*RB-BFT (Reputation-Based BFT)\*\* | Consensus algorithm achieving 45% Byzantine tolerance via reputation-weighted voting | Architecture v5.2 |  
 | \*\*PoGQ (Proof of Quality)\*\* | Validation mechanism for federated learning gradients | Architecture v5.2, Layer 9 |  

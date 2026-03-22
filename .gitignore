@@ -255,7 +255,18 @@ workdir/
 _websites/
 _development/
 _infrastructure/
-terra-atlas-mvp/
+# terra-atlas-mvp/ — absorbed into monorepo (2026-03-22)
+terra-atlas-mvp/.next/
+terra-atlas-mvp/node_modules/
+terra-atlas-mvp/.postgres/
+terra-atlas-mvp/postgres-data/
+terra-atlas-mvp/package-lock.json
+terra-atlas-mvp/data/usace-dams*.json
+terra-atlas-mvp/data/ferc-queue*.json
+terra-atlas-mvp/data/archive-from-old/
+terra-atlas-mvp/public/data/sites-multi-level.json
+terra-atlas-mvp/public/data/sites-clustered.json
+terra-atlas-mvp/public/data/demo-sites.json
 terra-lumina/
 repos/
 phi-lab/

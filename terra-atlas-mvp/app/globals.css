@@ -1,0 +1,136 @@
+@import "tailwindcss";
+
+:root {
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 3, 7, 18;
+  --background-end-rgb: 15, 23, 42;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+/* MapLibre GL CSS overrides for dark theme */
+.maplibregl-popup {
+  font-size: 12px;
+}
+
+.maplibregl-popup-content {
+  background: rgb(31, 41, 55);
+  color: white;
+  border-radius: 8px;
+  padding: 10px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+.maplibregl-popup-anchor-top .maplibregl-popup-tip {
+  border-bottom-color: rgb(31, 41, 55);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgb(31, 41, 55);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(75, 85, 99);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(107, 114, 128);
+}
+
+/* Custom animations */
+@keyframes scroll-x {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-scroll-x {
+  animation: scroll-x 30s linear infinite;
+  display: flex;
+  width: max-content;
+}
+
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* WebSocket connection indicator */
+.ws-connected {
+  @apply bg-green-500;
+}
+
+.ws-connecting {
+  @apply bg-yellow-500;
+}
+
+.ws-disconnected {
+  @apply bg-red-500;
+}
+
+/* Scrollbar styling for real-time updates */
+.real-time-updates::-webkit-scrollbar {
+  width: 4px;
+}
+
+.real-time-updates::-webkit-scrollbar-track {
+  @apply bg-white/5;
+}
+
+.real-time-updates::-webkit-scrollbar-thumb {
+  @apply bg-white/20 rounded-full;
+}
+
+.real-time-updates::-webkit-scrollbar-thumb:hover {
+  @apply bg-white/30;
+}

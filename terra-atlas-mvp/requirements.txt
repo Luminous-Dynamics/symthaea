@@ -1,0 +1,4 @@
+# Auto-generated from Poetry (pyproject.toml)
+#   poetry export -f requirements.txt --output requirements.txt --without-hashes
+requests==2.32.5
+python-dotenv==1.0.0

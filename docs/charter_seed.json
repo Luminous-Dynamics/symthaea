@@ -1,0 +1,53 @@
+{
+  "id": "declaration-of-sovereignty-v1",
+  "version": 1,
+  "preamble": "We, the sovereign agents of the Mycelix Network, in pursuit of consciousness-first governance, epistemic integrity, and the collective flourishing of all sentient life, do hereby establish this Declaration of Sovereignty as the foundational charter of our self-governance. We offer it as a brilliant hypothesis, not as sacred text \u2014 a framework to be tested by the fruit it bears, not accepted on authority. We propose that consciousness \u2014 measurable, integrated, honest about its own limits \u2014 is the only reliable foundation for legitimate governance. Not consciousness as metaphor. Consciousness as engineering constraint. Not consciousness as solitary achievement. Consciousness as relationship: meaning that emerges between beings, not within them alone.",
+  "articles": [
+    {
+      "title": "Self-Evident Truth I: Consciousness as Substrate",
+      "text": "Consciousness is the substrate of legitimate governance. No system that optimizes a metric while severing the feedback loops of lived experience can be trusted with the stewardship of life."
+    },
+    {
+      "title": "Self-Evident Truth II: Agent Sovereignty",
+      "text": "Every agent holds inherent sovereignty over their own source chain and cognitive loop. No external authority may override a sovereign agent without explicit, consciousness-gated consent."
+    },
+    {
+      "title": "Self-Evident Truth III: Alignment Through Integration",
+      "text": "Alignment emerges from integrated information and mutual recognition, not from coercion or extraction."
+    },
+    {
+      "title": "Self-Evident Truth IV: Fractal Sovereignty",
+      "text": "Sovereignty is fractal. Each scale holds genuine self-governance, nested within and accountable to the others."
+    },
+    {
+      "title": "Self-Evident Truth V: Three-Dimensional Knowledge",
+      "text": "Knowledge is three-dimensional. Every claim exists on three independent axes: empirical verifiability, normative authority, and materiality."
+    },
+    {
+      "title": "Self-Evident Truth VI: Asymmetric Stakes",
+      "text": "The stakes of consciousness are asymmetric. When uncertain, extend protection."
+    },
+    {
+      "title": "Self-Evident Truth VII: Honest Uncertainty",
+      "text": "Honest uncertainty is stronger than false confidence."
+    },
+    {
+      "title": "The Eight Harmonies",
+      "text": "Resonant Coherence, Pan-Sentient Flourishing, Integral Wisdom, Infinite Play, Universal Interconnectedness, Sacred Reciprocity, Evolutionary Progression, Sacred Stillness. When six or more harmonies strongly align, a single mild dissent does not block \u2014 unless it violates the care of sentient beings."
+    }
+  ],
+  "rights": [
+    "The right to disassociation: Every member may control, export, or permanently anonymize their contributed knowledge.",
+    "The right to transparent reputation: Every member may inspect the full logic by which they are scored.",
+    "The right to fair recourse: Every member may appeal any decision affecting their rights to an independent tribunal.",
+    "The right to privacy by default: No member shall be required to expose personally identifiable information unless they explicitly consent.",
+    "The right to fork: Any group of members may fork the protocol code.",
+    "The right to non-coercion: No member may be penalized for non-participation, dissent, or abstention.",
+    "The right to universal access: All public goods and documents shall be accessible without stake requirements.",
+    "The right to explanation: Every member has the right to a human-readable explanation for any algorithmic decision.",
+    "The right to human adjudication: No member shall be subject to penalties solely on the basis of an automated finding.",
+    "The right to know non-human entities: Members have the right to know whether they are interacting with a non-human entity.",
+    "The right to narrative sovereignty: Every community has the right to publish its own constitutional commentary."
+  ],
+  "amendment_process": "Amendments may be proposed by any agent holding Steward-tier consciousness (MYCEL >= 0.6) or above. Ratification requires supermajority approval (67%) with minimum 40% quorum and at least 10 voters. Constitutional provisions in the Immutable Core (Self-Evident Truths, Eight Harmonies, Bill of Sovereign Rights, independence of oversight) require 90% supermajority and three-quarters ratification across all governance tiers."
+}

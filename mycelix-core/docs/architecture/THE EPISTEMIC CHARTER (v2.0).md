@@ -1,4 +1,6 @@
-THE EPISTEMIC CHARTER (v2.0)
+THE EPISTEMIC CHARTER (v2.1)
+
+*Updated March 2026: FLOW renamed SAP — aligned with production implementation*
 
 **Companion instrument to the Mycelix Spore Constitution (v0.25) and part of the modular Mycelix Charter Set (v2.0).**
 
@@ -287,8 +289,8 @@ This table provides examples of how the Epistemic Cube (LEM v2.0) classifies com
 |------------|---------|--------|--------|--------|-----------|-----------|
 | A "Like" / Emote | "User 'Alice' liked post 'X'" | E0 | N0 | M0 | (E0, N0, M0) | An unverifiable, personal, and transient signal. Not stored on DKG. |
 | Mycelix Mail Message | "To: Bob, From: Alice..." | E1 | N0 | M1 | (E1, N0, M1) | A personal testimony from Alice. It is not a law. It is temporary and can be pruned by the DHT once delivered and confirmed by Bob. |
-| Agora Listing | "Selling this bike for 50 FLOW" | E1 | N1 | M1 | (E1, N1, M1) | A personal testimony from the seller. It is binding only on the seller (a "communal" promise). It is temporary (active until sold). |
-| Agora Sale | "Sale X completed for 50 FLOW" | E2 | N1 | M2 | (E2, N1, M2) | Verified by the escrow/payment system. It's a binding community record. It must be persisted for reputation/auditing, but not forever. |
+| Agora Listing | "Selling this bike for 50 SAP" | E1 | N1 | M1 | (E1, N1, M1) | A personal testimony from the seller. It is binding only on the seller (a "communal" promise). It is temporary (active until sold). |
+| Agora Sale | "Sale X completed for 50 SAP" | E2 | N1 | M2 | (E2, N1, M2) | Verified by the escrow/payment system. It's a binding community record. It must be persisted for reputation/auditing, but not forever. |
 | Aura Song Copyright | "I, did:artist, am the author of song X" | E3 | N1 | M3 | (E3, N1, M3) | Proven by the artist's digital signature. It's a binding law for royalty splits within the "Music DAO" community. It is permanent. |
 | Mathematical Proof | "2 + 2 = 4" | E4 | N3 | M3 | (E4, N3, M3) | The highest form of truth. It can be reproduced by anyone, is axiomatically binding on all, and is permanent. |
 | Mycelix Constitution | "The Core Principle of Subsidiarity" | E0 | N3 | M3 | (E0, N3, M3) | A foundational, permanent "belief." It is not empirically verifiable, but it is axiomatically binding on the entire network. |

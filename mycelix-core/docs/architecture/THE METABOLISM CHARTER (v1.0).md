@@ -1,4 +1,6 @@
-# **THE METABOLISM CHARTER (v1.0)**
+# **THE METABOLISM CHARTER (v1.1)**
+
+*Updated March 2026: CGC bonus renamed to MYCEL recognition bonus — aligned with production implementation*
 
 **Companion instrument to the Mycelix Spore Constitution (v0.24) and part of the modular Mycelix Charter Set (v2.0).**
 
@@ -133,7 +135,7 @@ All governance operations shall be classified according to their phase sensitivi
 
 | Classification | Definition | Effect |
 |----------------|------------|--------|
-| **Phase-Encouraged** | Aligned with phase purpose | 1.05x CGC bonus for participants |
+| **Phase-Encouraged** | Aligned with phase purpose | 1.05x MYCEL recognition bonus for participants |
 | **Phase-Neutral** | Neither aligned nor misaligned | Standard operation |
 | **Phase-Discouraged** | Contrary to phase purpose | Warning issued; no penalty |
 | **Phase-Blocked** | Fundamentally incompatible | Requires governance override |

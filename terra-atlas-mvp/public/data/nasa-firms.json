@@ -1,0 +1,1160 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 94,
+        "brightness": 387.658338881423,
+        "detection_time": "2025-09-16T02:39:42.850887",
+        "quality_score": 0.9703790382401303,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -117.3274255973644,
+          33.38781112242297
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 60,
+        "brightness": 402.365881697884,
+        "detection_time": "2025-09-16T02:39:42.850906",
+        "quality_score": 0.5026135927385957,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -119.27380762988872,
+          33.7993416199054
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 69,
+        "brightness": 321.39031563318866,
+        "detection_time": "2025-09-16T02:39:42.850913",
+        "quality_score": 0.6646454777202278,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -116.8178592120269,
+          41.11993969865895
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 83,
+        "brightness": 315.6722112933077,
+        "detection_time": "2025-09-16T02:39:42.850918",
+        "quality_score": 0.955638513687755,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -123.44870489910925,
+          38.96030788547026
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 82,
+        "brightness": 437.27090214738314,
+        "detection_time": "2025-09-16T02:39:42.850922",
+        "quality_score": 0.9737082568891164,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -120.73704885022326,
+          39.91791942494849
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 95,
+        "brightness": 430.4442626067217,
+        "detection_time": "2025-09-16T02:39:42.850926",
+        "quality_score": 0.9630134160282532,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -120.71250025410487,
+          33.95099989324672
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 67,
+        "brightness": 420.7599662732435,
+        "detection_time": "2025-09-16T02:39:42.850930",
+        "quality_score": 0.6387746460609736,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -120.0123193770488,
+          36.41529263342814
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 74,
+        "brightness": 414.4584285296625,
+        "detection_time": "2025-09-16T02:39:42.850933",
+        "quality_score": 0.6032057856928128,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -124.87301292341891,
+          36.325971101966545
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 62,
+        "brightness": 456.0237208360212,
+        "detection_time": "2025-09-16T02:39:42.850937",
+        "quality_score": 0.8279029844178114,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -124.08858493490446,
+          39.52568248412179
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 75,
+        "brightness": 349.41204221244254,
+        "detection_time": "2025-09-16T02:39:42.850941",
+        "quality_score": 0.6296183880919513,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -115.98955642975486,
+          33.54772679771613
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 77,
+        "brightness": 495.29782683858787,
+        "detection_time": "2025-09-16T02:39:42.850946",
+        "quality_score": 0.7807877119579074,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          134.81138080944748,
+          -23.75938457413443
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 80,
+        "brightness": 322.1771225072885,
+        "detection_time": "2025-09-16T02:39:42.850950",
+        "quality_score": 0.626075012415386,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          133.50135061011042,
+          -29.598927600291464
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 76,
+        "brightness": 333.22355546522675,
+        "detection_time": "2025-09-16T02:39:42.850953",
+        "quality_score": 0.7657705352331204,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          130.2363555795737,
+          -28.451347842076274
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 71,
+        "brightness": 348.87186823432114,
+        "detection_time": "2025-09-16T02:39:42.850957",
+        "quality_score": 0.9413959355148598,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          135.34934132357876,
+          -28.010734316321567
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 66,
+        "brightness": 482.23724744398794,
+        "detection_time": "2025-09-16T02:39:42.850961",
+        "quality_score": 0.5080595884060606,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          137.6876149614907,
+          -20.617029902344026
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 84,
+        "brightness": 460.87518877854137,
+        "detection_time": "2025-09-16T02:39:42.850964",
+        "quality_score": 0.7930951333795633,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          136.12513266593328,
+          -22.81267293380744
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 94,
+        "brightness": 419.135843976119,
+        "detection_time": "2025-09-16T02:39:42.850969",
+        "quality_score": 0.9572129435407866,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          134.44334084947195,
+          -21.359076314139777
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 92,
+        "brightness": 378.7849406809646,
+        "detection_time": "2025-09-16T02:39:42.850973",
+        "quality_score": 0.8825808851216324,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          137.91652049814334,
+          -20.212742466729143
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 100,
+        "brightness": 444.90257131505405,
+        "detection_time": "2025-09-16T02:39:42.850977",
+        "quality_score": 0.6617648223868322,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -55.118476241549814,
+          -4.9161938650113814
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 91,
+        "brightness": 339.03338243439833,
+        "detection_time": "2025-09-16T02:39:42.850980",
+        "quality_score": 0.9187175096407374,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -55.34831937078664,
+          -8.980813245290777
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 77,
+        "brightness": 393.29384308093495,
+        "detection_time": "2025-09-16T02:39:42.850984",
+        "quality_score": 0.8088385466175222,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -55.48877531369047,
+          -8.89049427873955
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 99,
+        "brightness": 449.3737214103188,
+        "detection_time": "2025-09-16T02:39:42.850988",
+        "quality_score": 0.929510142930749,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -59.27031766416311,
+          -4.14892742962156
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 90,
+        "brightness": 430.38206365945933,
+        "detection_time": "2025-09-16T02:39:42.850992",
+        "quality_score": 0.5811260565284259,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.698801577061296,
+          -9.031212844533062
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 93,
+        "brightness": 374.57663405175316,
+        "detection_time": "2025-09-16T02:39:42.850995",
+        "quality_score": 0.6437692318757141,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -63.630812285678445,
+          -2.8677229391064056
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 67,
+        "brightness": 395.25202359153025,
+        "detection_time": "2025-09-16T02:39:42.850999",
+        "quality_score": 0.5378154115877529,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -55.76096775718217,
+          -4.201705599374963
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 74,
+        "brightness": 493.2547063493364,
+        "detection_time": "2025-09-16T02:39:42.851004",
+        "quality_score": 0.9498122202100291,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -60.64944958572224,
+          -9.796825377507108
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 67,
+        "brightness": 394.966109208375,
+        "detection_time": "2025-09-16T02:39:42.851008",
+        "quality_score": 0.7019812767934366,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -61.09059727052348,
+          -7.287266715167743
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 96,
+        "brightness": 484.41157537048196,
+        "detection_time": "2025-09-16T02:39:42.851012",
+        "quality_score": 0.7662427269464133,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -55.068960321573314,
+          -2.582163807738242
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 80,
+        "brightness": 383.0808688780419,
+        "detection_time": "2025-09-16T02:39:42.851016",
+        "quality_score": 0.8822222673547901,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -57.69597610921006,
+          -3.615027233664188
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 92,
+        "brightness": 495.4436761690683,
+        "detection_time": "2025-09-16T02:39:42.851019",
+        "quality_score": 0.6006374347904309,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -64.69273552255171,
+          -2.9273213983147572
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 68,
+        "brightness": 322.09237153164713,
+        "detection_time": "2025-09-16T02:39:42.851033",
+        "quality_score": 0.8695998251709032,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          24.35157235863236,
+          1.211739511691876
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 66,
+        "brightness": 475.6406433113559,
+        "detection_time": "2025-09-16T02:39:42.851036",
+        "quality_score": 0.6761052743279812,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          16.570558506441717,
+          -5.179398939465629
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 52,
+        "brightness": 350.05418746026555,
+        "detection_time": "2025-09-16T02:39:42.851040",
+        "quality_score": 0.5972704285485438,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          24.59484157792746,
+          2.30532900628204
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 78,
+        "brightness": 341.2302763769514,
+        "detection_time": "2025-09-16T02:39:42.851044",
+        "quality_score": 0.8150155335820364,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          22.675142429123785,
+          -3.550047572069656
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 71,
+        "brightness": 334.14221482966747,
+        "detection_time": "2025-09-16T02:39:42.851047",
+        "quality_score": 0.8218381639086462,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          24.121947095750578,
+          0.5618588941733567
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 81,
+        "brightness": 482.3749328780717,
+        "detection_time": "2025-09-16T02:39:42.851051",
+        "quality_score": 0.8698523429080584,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          19.18041209909876,
+          -5.544931467849436
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 76,
+        "brightness": 453.48160373671647,
+        "detection_time": "2025-09-16T02:39:42.851055",
+        "quality_score": 0.9537562606593546,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.95692669100488,
+          0.5171552663545977
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 99,
+        "brightness": 371.38331182681907,
+        "detection_time": "2025-09-16T02:39:42.851058",
+        "quality_score": 0.6766754182974768,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          15.567390442598619,
+          -6.29604445353562
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 75,
+        "brightness": 357.1698384987519,
+        "detection_time": "2025-09-16T02:39:42.851062",
+        "quality_score": 0.9772394693203857,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.343946806077223,
+          2.9555850808210966
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 74,
+        "brightness": 339.191536473453,
+        "detection_time": "2025-09-16T02:39:42.851066",
+        "quality_score": 0.7401823694507228,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.685178058904732,
+          -0.024114755618601436
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 52,
+        "brightness": 343.86041452536597,
+        "detection_time": "2025-09-16T02:39:42.851070",
+        "quality_score": 0.6155476572780183,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          96.02702894525564,
+          60.950754672608
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 58,
+        "brightness": 464.2322765817121,
+        "detection_time": "2025-09-16T02:39:42.851075",
+        "quality_score": 0.6149037989295122,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          95.07535923392953,
+          56.25979194178785
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 90,
+        "brightness": 445.47351380569694,
+        "detection_time": "2025-09-16T02:39:42.851079",
+        "quality_score": 0.6999497699319859,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          98.10197062224269,
+          63.453967991102445
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 66,
+        "brightness": 437.3658572564182,
+        "detection_time": "2025-09-16T02:39:42.851082",
+        "quality_score": 0.5265266564288869,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          95.76964606878978,
+          57.91623147371638
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 56,
+        "brightness": 354.41443835817097,
+        "detection_time": "2025-09-16T02:39:42.851086",
+        "quality_score": 0.796859422128875,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          101.03937413727363,
+          60.47930517049768
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 58,
+        "brightness": 472.9153532371947,
+        "detection_time": "2025-09-16T02:39:42.851090",
+        "quality_score": 0.8642828613840667,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          97.32819194111576,
+          63.213288009347
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 78,
+        "brightness": 464.5908320845374,
+        "detection_time": "2025-09-16T02:39:42.851094",
+        "quality_score": 0.5770733613769189,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          100.8426318444852,
+          64.20615606315351
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 78,
+        "brightness": 495.1962954408182,
+        "detection_time": "2025-09-16T02:39:42.851098",
+        "quality_score": 0.9118024776983926,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          99.239305456639,
+          61.240430129042764
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 66,
+        "brightness": 482.41804049482073,
+        "detection_time": "2025-09-16T02:39:42.851101",
+        "quality_score": 0.6917888747699106,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          103.99843181602922,
+          60.12953599810065
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "fire",
+        "source": "Demo Data",
+        "confidence": 81,
+        "brightness": 442.6182815068695,
+        "detection_time": "2025-09-16T02:39:42.851105",
+        "quality_score": 0.8504486052668367,
+        "data_lineage": [
+          "Demo",
+          "Synthetic",
+          "Generated"
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          95.82968203555978,
+          62.806579277327955
+        ]
+      }
+    }
+  ],
+  "metadata": {
+    "source": "Demo Data",
+    "timestamp": "2025-09-16T07:39:42.851154",
+    "count": 50
+  }
+}

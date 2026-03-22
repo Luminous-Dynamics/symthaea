@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "terra-atlas-python"
+version = "0.1.0"
+description = "Utility scripts and ML helpers for Terra Atlas"
+authors = ["Luminous Dynamics Engineering <engineering@luminousdynamics.org>"]
+packages = [
+  { include = "backend" },
+  { include = "ml-backend" },
+  { include = "scripts" },
+]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+requests = "2.31.0"
+python-dotenv = "1.0.0"
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.3"
+ruff = "^0.5.0"
+
+[build-system]
+requires = ["poetry-core>=1.8.0"]
+build-backend = "poetry.core.masonry.api"

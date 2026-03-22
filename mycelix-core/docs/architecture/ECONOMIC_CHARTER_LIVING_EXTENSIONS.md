@@ -1,4 +1,6 @@
-# **ECONOMIC CHARTER: LIVING EXTENSIONS (v1.0)**
+# **ECONOMIC CHARTER: LIVING EXTENSIONS (v1.1)**
+
+*Updated March 2026: CIV renamed MYCEL, FLOW renamed SAP, CGC renamed MYCEL recognition — aligned with production implementation*
 
 **Amendments to the Economic Charter (v1.0) under the Living Protocol Initiative**
 
@@ -10,7 +12,7 @@ This document specifies two extensions to the Economic Charter (v1.0):
 
 1. **Wound Healing Protocol** (Article II-A): A regenerative alternative to punitive slashing for good-faith failures.
 
-2. **Kenosis Protocol** (Article II-B): A voluntary mechanism for releasing accumulated CIV to the commons.
+2. **Kenosis Protocol** (Article II-B): A voluntary mechanism for releasing accumulated MYCEL to the commons.
 
 These extensions are activated via MIP-E (Economic) proposal and integrated with existing Economic Charter provisions. They align with the Metabolism Charter (v1.0) temporal framework and the Constitutional principle of Reciprocity and Fair Exchange.
 
@@ -58,10 +60,10 @@ These extensions are activated via MIP-E (Economic) proposal and integrated with
 
 | Severity | Impact | Escrow Requirement | Resolution Body |
 |----------|--------|-------------------|-----------------|
-| **Minor** | <1,000 FLOW equivalent | 1% of harmer's stake | Peer mediation |
-| **Moderate** | 1,000-10,000 FLOW | 5% of harmer's stake | Sector DAO panel |
-| **Severe** | 10,000-100,000 FLOW | 20% of harmer's stake | MRC mediation |
-| **Critical** | >100,000 FLOW or rights violation | 50% of harmer's stake | MRC + Global DAO |
+| **Minor** | <1,000 SAP equivalent | 1% of harmer's stake | Peer mediation |
+| **Moderate** | 1,000-10,000 SAP | 5% of harmer's stake | Sector DAO panel |
+| **Severe** | 10,000-100,000 SAP | 20% of harmer's stake | MRC mediation |
+| **Critical** | >100,000 SAP or rights violation | 50% of harmer's stake | MRC + Global DAO |
 
 #### **2.3 Wound Categories**
 
@@ -199,8 +201,8 @@ interface IWoundEscrow {
 #### **4.2 Escrow Source**
 
 Escrow may be drawn from:
-- Harmer's staked FLOW (primary)
-- Harmer's locked CIV equivalent (secondary)
+- Harmer's staked SAP (primary)
+- Harmer's locked MYCEL equivalent (secondary)
 - Wound Insurance Pool (if harmer insolvent)
 
 #### **4.3 Escrow Release**
@@ -281,7 +283,7 @@ Wounds may span multiple cycles. Each phase may complete in any Metabolism phase
 
 ### **Section 1. Purpose and Philosophy**
 
-**1.1 Definition**: Kenosis (Greek: κένωσις, "emptying") is the voluntary release of accumulated reputation (CIV) or resources (FLOW) to the commons pool.
+**1.1 Definition**: Kenosis (Greek: κένωσις, "emptying") is the voluntary release of accumulated reputation (MYCEL) or resources (SAP) to the commons pool.
 
 **1.2 Philosophical Basis**: Recognizing that:
 - Accumulated power tends toward concentration
@@ -307,8 +309,8 @@ Wounds may span multiple cycles. Each phase may complete in any Metabolism phase
 
 | Type | What is Released | Mechanism |
 |------|------------------|-----------|
-| **CIV Kenosis** | Civic Standing (reputation) | CIV reduced; goes to Newcomer Pool |
-| **FLOW Kenosis** | Utility tokens | Burned or pooled (configurable) |
+| **MYCEL Kenosis** | Civic Standing (reputation) | MYCEL reduced; goes to Newcomer Pool |
+| **SAP Kenosis** | Utility tokens | Burned or pooled (configurable) |
 | **Voting Kenosis** | Governance weight | Temporarily reduced voting power |
 | **Blended Kenosis** | Combination of above | Proportional release |
 
@@ -317,7 +319,7 @@ Wounds may span multiple cycles. Each phase may complete in any Metabolism phase
 | Limit | Value | Rationale |
 |-------|-------|-----------|
 | **Maximum per cycle** | 20% of holdings | Prevent impulsive over-release |
-| **Minimum floor** | 0.1 CIV / 100 FLOW | Maintain minimum participation |
+| **Minimum floor** | 0.1 MYCEL / 100 SAP | Maintain minimum participation |
 | **Cooldown** | 1 cycle between releases | Prevent gaming |
 | **Lifetime maximum** | 80% cumulative | Ensure agent retains stake |
 
@@ -346,7 +348,7 @@ Pool allocations may be adjusted via MIP-E with ⅔ supermajority.
 
 Execution occurs during the Integration phase of the current Metabolism Cycle:
 
-1. CIV/FLOW deducted from agent
+1. MYCEL/SAP deducted from agent
 2. Value distributed to destination pools
 3. Recognition recorded in agent's profile
 4. Kenosis event published to network
@@ -377,7 +379,7 @@ interface IKenosisBurn {
 | Cumulative Kenosis | Recognition | Benefits |
 |-------------------|-------------|----------|
 | 1-5% | "Contributor" | Badge display |
-| 5-10% | "Generous" | 1.05x CGC multiplier |
+| 5-10% | "Generous" | 1.05x MYCEL recognition multiplier |
 | 10-20% | "Selfless" | Advisory voice on pool allocation |
 | 20%+ | "Elder" | Emeritus recognition |
 
@@ -403,8 +405,8 @@ To prevent gaming:
 
 **Purpose**: Boost starting reputation for new verified members.
 
-**Allocation**: New members receive bonus CIV from pool:
-- Standard bonus: 0.05 CIV (on top of 0.1 baseline)
+**Allocation**: New members receive bonus MYCEL from pool:
+- Standard bonus: 0.05 MYCEL (on top of 0.1 baseline)
 - Pool-dependent: If pool depleted, bonus reduces proportionally
 
 **Governance**: Automatic distribution; no discretion.
@@ -554,8 +556,8 @@ pub struct KenosisRecord {
 }
 
 pub enum ReleaseType {
-    CIV,
-    FLOW,
+    MYCEL,
+    SAP,
     Voting,
     Blended { civ_pct: u8, flow_pct: u8, voting_pct: u8 },
 }
@@ -590,7 +592,7 @@ pub struct PoolAllocation {
 │  │                        INTEGRATION LAYER                         │   │
 │  ├─────────────────────────────────────────────────────────────────┤   │
 │  │                                                                   │   │
-│  │  MATL ◀───────── Trust impacts ──────────▶ CIV/FLOW             │   │
+│  │  MATL ◀───────── Trust impacts ──────────▶ MYCEL/SAP             │   │
 │  │                                                                   │   │
 │  │  Metabolism Cycle ◀─── Phase alignment ───▶ Timing bonuses       │   │
 │  │                                                                   │   │

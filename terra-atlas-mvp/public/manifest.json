@@ -1,0 +1,39 @@
+{
+  "name": "Terra Atlas - The Planetary Nervous System",
+  "short_name": "Terra Atlas",
+  "description": "Real-time planetary intelligence platform for climate monitoring and renewable energy coordination",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#030712",
+  "theme_color": "#0ea5e9",
+  "orientation": "landscape",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["climate", "energy", "data", "visualization"],
+  "screenshots": [
+    {
+      "src": "/screenshot-1.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "label": "Global fire monitoring dashboard"
+    },
+    {
+      "src": "/screenshot-2.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "label": "Earthquake detection map"
+    }
+  ]
+}

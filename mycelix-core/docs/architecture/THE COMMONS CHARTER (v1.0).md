@@ -1,48 +1,50 @@
-# **THE COMMONS CHARTER (v1.0)**
+# **THE COMMONS CHARTER (v1.1)**
 
-**Companion instrument to the Mycelix Spore Constitution (v0.24) and part of the modular Mycelix Charter Set (v1.0).**
+**Companion instrument to the Mycelix Spore Constitution (v0.25) and part of the modular Mycelix Charter Set (v1.1).**
 
-***Editor's Note:** This Commons Charter (v1.0) is a refactored module of the original THE FEDERATED DAO HIERARCHY CHARTER (v0.24). It isolates articles and appendices pertaining to Civic Gifting Credits (CGCs) and the registry of optional commons mechanisms (formerly Article XI.3.b and Appendix G). All information is sourced directly from the v0.24 Charter.*
+*Updated March 2026: CIV renamed MYCEL, FLOW renamed SAP, CGC absorbed into MYCEL peer recognition — aligned with production implementation*
 
-## **ARTICLE I – CIVIC GIFTING CREDITS (CGCs)**
+***Editor's Note:** This Commons Charter (v1.1) is a refactored module of the original THE FEDERATED DAO HIERARCHY CHARTER. It covers peer recognition (formerly CGCs) and the registry of optional commons mechanisms.*
+
+## **ARTICLE I – PEER RECOGNITION (MYCEL Recognition Component)**
+
+*The former Civic Gifting Credit (CGC) primitive has been absorbed into MYCEL's peer recognition component (20% of MYCEL score weight). Recognition events serve the same social-signaling function but feed directly into soulbound reputation rather than existing as a standalone token.*
 
 ### **Section 1\. Allocation**
 
-Each verified Member receives **10 CGCs per month**. These credits are non-cumulative and expire at the end of each monthly cycle.
+Each verified Member may issue **10 peer recognitions per monthly cycle**. The allocation resets at the end of each cycle.
 
-### **Section 2\. Transfer Transparency**
+### **Section 2\. Recognition Mechanics**
 
-Rather than hard caps, CGCs use transparency thresholds:
+a. Minimum MYCEL score of 0.3 required to give recognition.
 
-a. No hard limits on CGC transfers (preserves flexibility).
+b. Recognition weight is proportional to the recognizer's own MYCEL score (Sybil-resistant).
 
-b. Members receiving \>100 CGCs/month OR \>50 from single source flagged in public "High-Activity CGC Report".
+c. Members receiving disproportionate recognition volume are flagged in public audit reports.
 
-c. Audit Guild reviews flagged accounts quarterly for gaming patterns.
-
-d. Legitimate high-value contributors (educators, organizers) may appeal flag to Knowledge Council with explanation.
+d. Legitimate high-value contributors (educators, organizers) may appeal flags to Knowledge Council.
 
 ### **Section 3\. Sybil Protection**
 
-The Audit Guild shall monitor CGC flows for fraudulent patterns:
+The Audit Guild shall monitor recognition flows for fraudulent patterns:
 
-a. Circular gifting (A→B→C→A) triggers review.
+a. Circular recognition (A→B→C→A) triggers review.
 
-b. Reputation penalty for confirmed gaming.
+b. MYCEL penalty for confirmed gaming.
 
 c. Whistleblower rewards for reporting (30% of penalties).
 
 ### **Section 4\. Reputation Integration**
 
-Net CGC inflow may be used as one discretionary input (with a maximum weight of 10%) in local reputation calculations, as determined by Local DAO policy.
+Peer recognition constitutes 20% of the MYCEL composite score, alongside Participation (40%), Validation Quality (20%), and Longevity (20%).
 
 ### **Section 5\. Cultural Naming**
 
-Local DAOs may adopt cultural aliases for CGCs while maintaining interoperability:
+Local DAOs may adopt cultural aliases for recognition categories while maintaining interoperability:
 
 a. Examples: SPARK, EMBER, PETAL, LIGHT, GRATITUDE.
 
-b. All aliases map to same underlying CGC primitive.
+b. All aliases map to the same underlying MYCEL recognition event type.
 
 c. Symbol Registry (maintained by Knowledge Council) tracks aliases.
 
@@ -54,9 +56,8 @@ This article catalogs optional economic modules that DAOs may activate via MIPs.
 
 | Name | Code | Type | Function | Symbol |
 | :---- | :---- | :---- | :---- | :---- |
-| **Civic Standing** | CIV | Non-transferable | Reputation, governance weight | 🏛️ |
-| **Civic Gifting Credit** | CGC | Non-transferable | Social signal, gratitude | ✨ |
-| **Utility Token** | FLOW | Transferable (optional) | Fees, staking, compute | 💧 |
+| **Soulbound Reputation** | MYCEL | Non-transferable | Reputation, governance weight, peer recognition | 🏛️ |
+| **Circulation Medium** | SAP | Transferable | Exchange, demurrage, commons composting | 💧 |
 
 ### **Section 2\. Charter-Enabled Optional Commons Modules**
 
@@ -73,8 +74,8 @@ DAOs may elect to activate additional mechanisms via approved MIPs and Eco-OS te
 
 Each primitive supports cultural aliases enabling local expression while maintaining interoperability:
 
-* **CGC aliases**: SPARK, EMBER, PETAL, LIGHT, GRATITUDE  
-* **CIV aliases**: STONE, FOUNDATION, STANDING  
+* **MYCEL recognition aliases**: SPARK, EMBER, PETAL, LIGHT, GRATITUDE
+* **MYCEL reputation aliases**: STONE, FOUNDATION, STANDING
 * **ROOT aliases**: SEED, FROND, GROWTH  
 * **HEARTH aliases**: WELL, CAMPFIRE, COMMONS
 
@@ -109,7 +110,7 @@ MIP-C-042: Time Exchange Module for Local DAOs
 
 **Interoperability**:
 - TEND balances queryable via standard DKG API
-- Optional: TEND may influence local CIV calculations (max 5% weight)
+- Optional: TEND may influence local MYCEL calculations (max 5% weight)
 
 **Cultural Layer**: DAOs may rename TEND (e.g., "CARE", "HOURS")
 
@@ -131,13 +132,11 @@ The Mycelix Spore Constitution prevails over this Charter in any case of conflic
 
 ## **APPENDIX A – DEFINITIONS**
 
-*(Editor's Note: Definitions relevant to the Commons Charter. CIV and FLOW definitions included for context, though primarily governed by the Economic Charter.)*
+*(Editor's Note: Definitions relevant to the Commons Charter. MYCEL and SAP definitions included for context, though primarily governed by the Economic Charter.)*
 
-**Civic Standing (CIV)**: A non-transferable reputation score representing a Member's verifiable contributions, expertise, and trustworthiness within the Network. CIV serves as the foundation for governance weight and validator selection. Also known by cultural aliases such as STONE or FOUNDATION.
+**MYCEL (Soulbound Reputation)**: A non-transferable reputation score (0.0–1.0) computed from Participation (40%), Peer Recognition (20%), Validation Quality (20%), and Longevity (20%). Serves as foundation for governance weight, tier progression, and fee rates. Includes peer recognition component (formerly CGC) with cultural aliases (SPARK, EMBER, PETAL, LIGHT). Also known by reputation aliases STONE or FOUNDATION.
 
-**Civic Gifting Credit (CGC)**: A non-monetary, non-transferable signaling primitive used to recognize non-market contributions within the Network. Also known by cultural aliases such as SPARK, EMBER, PETAL, LIGHT.
-
-**Utility Token (FLOW)**: A transferable token (optional activation) used for fees, staking, compute, and other economic functions separate from governance power.
+**SAP (Circulation Medium)**: A transferable token serving as the primary medium of exchange. Subject to 2% annual demurrage; decayed SAP flows to commons pools. Mintable against physical assets.
 
 **Optional Commons Modules**: Additional economic or social mechanisms (e.g., Time Exchange TEND, Stewardship Credits ROOT/SEED) that DAOs can activate via MIP.
 
@@ -158,8 +157,8 @@ Markdown
 
 ### Economic Primitives
 We use the following cultural names for Network primitives:
-- CIV (Civic Standing): [Cultural name, e.g., "STONE"]
-- CGC (Civic Gifting Credit): [Cultural name, e.g., "EMBER"]
+- MYCEL (Reputation): [Cultural name, e.g., "STONE"]
+- MYCEL Recognition: [Cultural name, e.g., "EMBER"]
 - [Additional commons modules if adopted]
 
 ### Rituals and Practices
