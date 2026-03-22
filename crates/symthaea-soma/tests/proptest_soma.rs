@@ -29,7 +29,7 @@ proptest! {
         social_pressure in 0u32..100,
     ) {
         let mut bridge = SensorBridge::new();
-        bridge.update(accel, light, proximity_near, barometer, gps_novelty);
+        bridge.set_sensors(accel, light, proximity_near, barometer, gps_novelty);
         bridge.set_gyroscope(gyro);
         bridge.set_ambient_db(ambient_db);
         bridge.set_social_pressure(social_pressure);
@@ -55,7 +55,7 @@ proptest! {
         gps_novelty in 0.0f32..1.0,
     ) {
         let mut bridge = SensorBridge::new();
-        bridge.update(accel, light, true, barometer, gps_novelty);
+        bridge.set_sensors(accel, light, true, barometer, gps_novelty);
 
         prop_assert!(bridge.privacy_mode(),
             "proximity_near=true should activate privacy mode");

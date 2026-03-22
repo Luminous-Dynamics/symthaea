@@ -870,6 +870,24 @@ impl MycelixBridge {
     }
 
     // ========================================================================
+    // ASSET EVALUATION
+    // ========================================================================
+
+    /// Evaluate a regenerative asset against the Eight Harmonies.
+    ///
+    /// This is the bridge method that connects Symthaea consciousness scoring
+    /// to the Mycelix energy cluster. It wraps `AssetEvaluator::evaluate()`
+    /// for convenience when you already have a `MycelixBridge` instance.
+    pub fn evaluate_asset(
+        &self,
+        metadata: &super::asset_evaluator::AssetMetadata,
+        consciousness: &ConsciousnessSnapshot,
+    ) -> super::asset_evaluator::AssetConsciousnessScore {
+        let evaluator = super::asset_evaluator::AssetEvaluator::new();
+        evaluator.evaluate(metadata, consciousness)
+    }
+
+    // ========================================================================
     // HELPERS
     // ========================================================================
 

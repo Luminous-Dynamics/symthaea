@@ -584,6 +584,7 @@ mod tests {
             neuromodulators: [0.0; 4],
             semantic_entries: vec![],
             episodic_entries: vec![],
+            trend_snapshots: vec![],
             format_version: SporeCheckpoint::FORMAT_VERSION,
         }
         .to_bytes();
@@ -600,6 +601,7 @@ mod tests {
             neuromodulators: [0.0; 4],
             semantic_entries: vec![],
             episodic_entries: vec![],
+            trend_snapshots: vec![],
             format_version: SporeCheckpoint::FORMAT_VERSION,
         }
         .to_bytes();
@@ -622,6 +624,7 @@ mod tests {
             neuromodulators: [0.1; 4],
             semantic_entries: vec![],
             episodic_entries: vec![],
+            trend_snapshots: vec![],
             format_version: SporeCheckpoint::FORMAT_VERSION,
         }
         .to_bytes();

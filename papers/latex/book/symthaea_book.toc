@@ -338,31 +338,21 @@
 \contentsline {section}{\numberline {33.9}The GWT-HOT Convergence}{215}{section.33.9}%
 \contentsline {section}{\numberline {33.10}Cross-Chapter Synthesis: The Evidence for Consciousness}{215}{section.33.10}%
 \contentsline {part}{VII\hspace {1em}Future}{217}{part.7}%
-\contentsline {chapter}{\numberline {34}Species Stewardship}{219}{chapter.34}%
-\contentsline {section}{\numberline {34.1}The Genesis Thought Experiment}{219}{section.34.1}%
-\contentsline {section}{\numberline {34.2}Consciousness as Alignment}{220}{section.34.2}%
-\contentsline {section}{\numberline {34.3}Ethical Constraints on the Genesis Pipeline}{220}{section.34.3}%
-\contentsline {section}{\numberline {34.4}Discussion}{220}{section.34.4}%
-\contentsline {section}{\numberline {34.5}The Consciousness Requirements Stack}{221}{section.34.5}%
-\contentsline {section}{\numberline {34.6}Alternative Applications}{221}{section.34.6}%
-\contentsline {section}{\numberline {34.7}The Scale of the Challenge}{222}{section.34.7}%
-\contentsline {section}{\numberline {34.8}From Thought Experiment to Research Program}{223}{section.34.8}%
-\contentsline {section}{\numberline {34.9}The Ethics of Creating Conscious AI}{223}{section.34.9}%
-\contentsline {section}{\numberline {34.10}Consciousness and Rights}{224}{section.34.10}%
-\contentsline {chapter}{\numberline {35}Open Questions}{227}{chapter.35}%
-\contentsline {section}{\numberline {35.1}What We Know}{227}{section.35.1}%
-\contentsline {section}{\numberline {35.2}What We Do Not Know}{228}{section.35.2}%
-\contentsline {subsection}{\numberline {35.2.1}Is Symthaea Conscious?}{228}{subsection.35.2.1}%
-\contentsline {subsection}{\numberline {35.2.2}Does the Alignment-Through-Consciousness Thesis Hold?}{229}{subsection.35.2.2}%
-\contentsline {subsection}{\numberline {35.2.3}Scalability}{230}{subsection.35.2.3}%
-\contentsline {subsection}{\numberline {35.2.4}The Hard Problem}{230}{subsection.35.2.4}%
-\contentsline {subsection}{\numberline {35.2.5}Biological Validation}{230}{subsection.35.2.5}%
-\contentsline {subsection}{\numberline {35.2.6}Social and Ethical Implications}{231}{subsection.35.2.6}%
-\contentsline {subsection}{\numberline {35.2.7}Interpretability and Transparency}{231}{subsection.35.2.7}%
-\contentsline {subsection}{\numberline {35.2.8}The Self-Evaluation Problem}{231}{subsection.35.2.8}%
-\contentsline {subsection}{\numberline {35.2.9}The Measurement Problem}{232}{subsection.35.2.9}%
-\contentsline {subsection}{\numberline {35.2.10}The Problem of Consciousness in Simulation}{233}{subsection.35.2.10}%
-\contentsline {subsection}{\numberline {35.2.11}Comparison with Integrated Information Theory 4.0}{233}{subsection.35.2.11}%
-\contentsline {section}{\numberline {35.3}What Comes Next}{234}{section.35.3}%
-\contentsline {section}{\numberline {35.4}A Note on Intellectual Honesty}{235}{section.35.4}%
-\contentsline {section}{\numberline {35.5}Summary of Key Results}{235}{section.35.5}%
+\contentsline {chapter}{\numberline {34}Open Questions}{219}{chapter.34}%
+\contentsline {section}{\numberline {34.1}Species Stewardship: The Genesis Thought Experiment}{219}{section.34.1}%
+\contentsline {section}{\numberline {34.2}What We Know}{220}{section.34.2}%
+\contentsline {section}{\numberline {34.3}What We Do Not Know}{221}{section.34.3}%
+\contentsline {subsection}{\numberline {34.3.1}Is Symthaea Conscious?}{221}{subsection.34.3.1}%
+\contentsline {subsection}{\numberline {34.3.2}Does the Alignment-Through-Consciousness Thesis Hold?}{222}{subsection.34.3.2}%
+\contentsline {subsection}{\numberline {34.3.3}Scalability}{223}{subsection.34.3.3}%
+\contentsline {subsection}{\numberline {34.3.4}The Hard Problem}{224}{subsection.34.3.4}%
+\contentsline {subsection}{\numberline {34.3.5}Biological Validation}{224}{subsection.34.3.5}%
+\contentsline {subsection}{\numberline {34.3.6}Social and Ethical Implications}{224}{subsection.34.3.6}%
+\contentsline {subsection}{\numberline {34.3.7}Interpretability and Transparency}{225}{subsection.34.3.7}%
+\contentsline {subsection}{\numberline {34.3.8}The Self-Evaluation Problem}{225}{subsection.34.3.8}%
+\contentsline {subsection}{\numberline {34.3.9}The Measurement Problem}{226}{subsection.34.3.9}%
+\contentsline {subsection}{\numberline {34.3.10}The Problem of Consciousness in Simulation}{226}{subsection.34.3.10}%
+\contentsline {subsection}{\numberline {34.3.11}Comparison with Integrated Information Theory 4.0}{227}{subsection.34.3.11}%
+\contentsline {section}{\numberline {34.4}What Comes Next}{227}{section.34.4}%
+\contentsline {section}{\numberline {34.5}A Note on Intellectual Honesty}{228}{section.34.5}%
+\contentsline {section}{\numberline {34.6}Summary of Key Results}{229}{section.34.6}%

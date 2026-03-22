@@ -447,6 +447,9 @@ pub mod causal_byzantine;
 #[cfg(feature = "mycelix")]
 pub mod mycelix_bridge;
 
+#[cfg(feature = "mycelix")]
+pub mod asset_evaluator;
+
 pub mod holon_receiver;
 
 // ============================================================================

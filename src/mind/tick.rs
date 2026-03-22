@@ -1675,7 +1675,7 @@ mod tests {
         mind.working_memory.push(crate::mind::WorkingMemoryEntry {
             content: ContinuousHV::random(512, 42),
             arrival_tick: 0,
-            source: MemorySource::Direct,
+            source: MemorySource::Internal,
             is_verified: false,
             metadata: std::collections::HashMap::new(),
         });
@@ -1707,7 +1707,7 @@ mod tests {
         mind.working_memory.push(crate::mind::WorkingMemoryEntry {
             content: ContinuousHV::random(512, 42),
             arrival_tick: 0,
-            source: MemorySource::Direct,
+            source: MemorySource::Internal,
             is_verified: false,
             metadata: std::collections::HashMap::new(),
         });

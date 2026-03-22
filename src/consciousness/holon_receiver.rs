@@ -242,7 +242,7 @@ impl HolonReceiver {
     pub fn drain_outbound(&mut self, device_id: &str) -> Vec<HolonResponse> {
         self.outbound
             .get_mut(device_id)
-            .map(|q| q.drain(..).collect())
+            .map(std::mem::take)
             .unwrap_or_default()
     }
 
