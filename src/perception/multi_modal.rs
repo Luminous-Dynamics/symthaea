@@ -4,7 +4,7 @@
 //! information from different sensory modalities.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use symthaea_core::hdc::ContinuousHV;
 
 /// Types of sensory modalities
@@ -359,7 +359,7 @@ pub struct MultiModalIntegrator {
     /// Configuration
     config: MultiModalConfig,
     /// Integration history
-    history: Vec<PerceptionOutput>,
+    history: VecDeque<PerceptionOutput>,
     /// Max history size
     max_history: usize,
 }
@@ -369,7 +369,7 @@ impl MultiModalIntegrator {
     pub fn new(config: MultiModalConfig) -> Self {
         Self {
             config,
-            history: Vec::new(),
+            history: VecDeque::new(),
             max_history: 100,
         }
     }
@@ -420,9 +420,9 @@ impl MultiModalIntegrator {
         // Store in history
         for output in outputs {
             if self.history.len() >= self.max_history {
-                self.history.remove(0);
+                self.history.pop_front();
             }
-            self.history.push(output.clone());
+            self.history.push_back(output.clone());
         }
 
         IntegrationResult {
@@ -434,7 +434,7 @@ impl MultiModalIntegrator {
     }
 
     /// Get history
-    pub fn history(&self) -> &[PerceptionOutput] {
+    pub fn history(&self) -> &VecDeque<PerceptionOutput> {
         &self.history
     }
 }

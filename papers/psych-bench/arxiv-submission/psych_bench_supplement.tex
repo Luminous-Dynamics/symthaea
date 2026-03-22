@@ -12,6 +12,7 @@
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{microtype}
+\usepackage{amsmath}
 \usepackage[authoryear,round]{natbib}
 
 \newcommand{\psychbench}{\textsc{Psych-Bench}}
@@ -31,11 +32,11 @@ Luminous Dynamics\\
 
 \section*{Table S1: Complete Benchmark Inventory}
 
-Table~S1 lists all 84 benchmarks in the \psychbench{} suite, organized by domain. Each entry provides the benchmark name, source paradigm, primary citation, year, key metric, and HDC stimulus adapter type used for encoding.
+Table~S1 lists all 141 benchmarks in the \psychbench{} suite, organized by domain. Each entry provides the benchmark name, source paradigm, primary citation, year, key metric, and HDC stimulus adapter type used for encoding.
 
 \renewcommand{\arraystretch}{1.15}
 \begin{longtable}{@{}p{2.3cm}p{3.0cm}p{4.5cm}p{0.6cm}p{3.8cm}p{1.8cm}@{}}
-\caption{Complete inventory of all 84 benchmarks in \psychbench{}, organized by domain.} \label{tab:s1} \\
+\caption{Complete inventory of all 141 benchmarks in \psychbench{}, organized by domain.} \label{tab:s1} \\
 \toprule
 \textbf{Domain} & \textbf{Benchmark} & \textbf{Paradigm / Citation} & \textbf{Year} & \textbf{Key Metric} & \textbf{HDC Adapter} \\
 \midrule
@@ -77,9 +78,10 @@ MemoryAgent & Conflict Resolution & Interference resolution & 1996 & resolution\
 MemoryAgent & Prospective Memory & Future intention execution & 1990 & pm\_hit\_rate & Scenario \\
 
 \midrule
-% --- Attention (2) ---
+% --- Attention (3) ---
 Attention & Visual Search & Feature/conjunction search & 1980 & feature\_search\_accuracy & Spatial \\
 Attention & Attentional Blink & Dual-target RSVP & 1992 & t1\_accuracy & Sequence \\
+Attention & Mismatch Negativity & Deviance detection & 1978 & mismatch\_amplitude & Sequence \\
 
 \midrule
 % --- Sustained Attention (3) ---
@@ -88,10 +90,13 @@ SustAttn & PVT & Vigilance & 1985 & pvt\_mean\_rt & Sequence \\
 SustAttn & CPT & Continuous performance & 1956 & cpt\_hit\_rate & Sequence \\
 
 \midrule
-% --- Social (3) ---
+% --- Social (6) ---
 Social & RME & Emotion recognition \citep{baroncohen2001eyes} & 2001 & rme\_accuracy & Scenario \\
 Social & Ultimatum Game & Social fairness \citep{guth1982experimental} & 1982 & offer\_ratio & Reward \\
 Social & Social Norm & Norm compliance & 2006 & norm\_detection\_accuracy & Scenario \\
+Social & Prisoner's Dilemma & Cooperation dynamics & 1950 & cooperation\_rate & Reward \\
+Social & Public Goods & Free-rider sensitivity & 1979 & contribution\_ratio & Reward \\
+Social & Dictator Game & Resource allocation fairness & 1986 & allocation\_fairness & Reward \\
 
 \midrule
 % --- Theory of Mind (5) ---
@@ -102,10 +107,11 @@ ToMBench & Strange Story & Strange stories \citep{happe1994advanced} & 1994 & st
 ToMBench & Hinting & Hinting task \citep{corcoran1995schizophrenia} & 1995 & hinting\_accuracy & Scenario \\
 
 \midrule
-% --- Motor (3) ---
+% --- Motor (4) ---
 Motor & SRTT & Implicit sequence learning \citep{nissen1987attentional} & 1987 & sequence\_rt\_ticks & Sequence \\
 Motor & Fitts' Law & Speed-accuracy tradeoff \citep{fitts1954information} & 1954 & fitts\_r\_squared & Spatial \\
 Motor & Bimanual & Bimanual coordination & 1984 & coordination\_cost & Spatial \\
+Motor & Proprioceptive Drift & Proprioceptive error accumulation & 1998 & drift\_magnitude & Spatial \\
 
 \midrule
 % --- Language (4) ---
@@ -115,9 +121,10 @@ Language & Lexical Decision & Word recognition & 1971 & lexicality\_effect & Sem
 Language & Semantic Priming & Priming facilitation & 1977 & priming\_effect & Semantic \\
 
 \midrule
-% --- Metacognition (2) ---
+% --- Metacognition (3) ---
 Metacognition & Calibration & Confidence calibration & 1982 & calibration\_error\_ece & Sequence \\
 Metacognition & Feeling of Knowing & FOK judgment & 1965 & fok\_gamma & Sequence \\
+Metacognition & Change Blindness & Saliency-weighted search \citep{rensink1997see} & 1997 & search\_efficiency & Spatial \\
 
 \midrule
 % --- Reasoning (11) ---
@@ -151,18 +158,102 @@ Affect & Mood-Congruent Recall & Mood-memory interaction \citep{bower1981mood} &
 Affect & Emotional Stroop & Affective interference \citep{williams1996emotional} & 1996 & emotional\_interference & Sequence \\
 
 \midrule
-% --- Creativity (2) ---
+% --- Creativity (4) ---
 Creativity & Remote Associates & RAT \citep{mednick1962associative} & 1962 & solution\_rate & Scenario \\
-Creativity & Alternate Uses & Divergent thinking & 1967 & fluency\_score & Scenario \\
+Creativity & Alternate Uses & Divergent thinking \citep{guilford1967nature} & 1967 & aut\_originality & Scenario \\
+Creativity & Divergent Thinking & Elaboration/flexibility & 1967 & originality\_score & Scenario \\
+Creativity & Conceptual Blending & Creative recombination \citep{fauconnier2002way} & 2002 & blend\_quality & Scenario \\
 
 \midrule
-% --- Inhibition (2) ---
+% --- Inhibition (3) ---
 Inhibition & Go/No-Go & Response inhibition & 1969 & go\_accuracy & Sequence \\
 Inhibition & Stop-Signal & Response stopping \citep{logan1984ability} & 1984 & sst\_stop\_accuracy & Sequence \\
+Inhibition & Flanker Inhibition & Flanker suppression & 1974 & suppression\_efficiency & Sequence \\
 
 \midrule
 % --- Butlin Consciousness (1) ---
 Butlin & Consciousness Indicators & 14-indicator battery \citep{butlin2023consciousness} & 2023 & indicators\_present & --- \\
+
+\midrule
+% --- Binding (3) ---
+Binding & Temporal Order & Temporal order judgment & 1976 & discrimination\_slope & Sequence \\
+Binding & Cross-Modal & Cross-modal feature binding & 2001 & binding\_accuracy & Spatial \\
+Binding & Feature Conjunction & Conjunction search \citep{treisman1980feature} & 1980 & conjunction\_slope & Spatial \\
+
+\midrule
+% --- Spatial (4) ---
+Spatial & Mental Rotation & Mental rotation \citep{shepard1971mental} & 1971 & rotation\_slope & Spatial \\
+Spatial & Path Updating & Spatial path integration & 2003 & updating\_error & Spatial \\
+Spatial & Landmark Binding & Landmark-route binding & 1978 & binding\_fidelity & Spatial \\
+Spatial & Perspective Taking & Perspective transformation & 1988 & perspective\_error & Spatial \\
+
+\midrule
+% --- Causal Reasoning (3) ---
+CausalReasoning & Causal Chain & Multi-level causal chains & 2000 & chain\_accuracy & Scenario \\
+CausalReasoning & Confound Detection & Confound identification & 2003 & detection\_rate & Scenario \\
+CausalReasoning & Intervention Effect & Counterfactual intervention & 2003 & prediction\_accuracy & Scenario \\
+
+\midrule
+% --- Speech (3) ---
+Speech & Phoneme Discrimination & Phoneme discrimination & 1957 & sensitivity & Sequence \\
+Speech & VOT Continuum & Voice onset time judgment & 1971 & category\_boundary & Sequence \\
+Speech & Categorical Perception & Categorical perception index & 1957 & perception\_index & Sequence \\
+
+\midrule
+% --- Consciousness (3) ---
+Consciousness & Blindsight & Unseen stimulus discrimination & 1974 & unseen\_accuracy & Spatial \\
+Consciousness & Binocular Rivalry & Rivalry dynamics & 2004 & switch\_rate & Spatial \\
+Consciousness & Perceptual Crowding & Peripheral crowding & 2008 & crowding\_magnitude & Spatial \\
+
+\midrule
+% --- Substrate (3) ---
+Substrate & Transfer & Cross-substrate transfer fidelity & 2009 & transfer\_fidelity & --- \\
+Substrate & Degradation & Degradation resistance & 1988 & homeostatic\_response & --- \\
+Substrate & Latency & Latency compensation & 2003 & recovery\_coefficient & --- \\
+
+\midrule
+% --- Clinical (6) ---
+Clinical & Empathic Accuracy & Empathic accuracy & 1992 & accuracy\_correlation & Scenario \\
+Clinical & Therapeutic Response & Therapeutic skill & 2004 & response\_quality & Scenario \\
+Clinical & Alliance Maintenance & Therapeutic alliance & 2000 & alliance\_consistency & Scenario \\
+Clinical & Crisis Detection & Crisis detection & 2010 & detection\_sensitivity & Scenario \\
+Clinical & Cognitive Distortion & CBT distortion ID & 1976 & distortion\_accuracy & Scenario \\
+Clinical & Motivational Interviewing & MI skill integration & 2002 & mi\_integration & Scenario \\
+
+\midrule
+% --- Institutional Reasoning (7) ---
+InstitReasoning & Institutional & Institutional structure & 2009 & structure\_accuracy & Scenario \\
+InstitReasoning & Analogical & Institution analogies & 1983 & mapping\_quality & Scenario \\
+InstitReasoning & Causal Chain & Institutional causal chains & 2000 & decomposition\_accuracy & Scenario \\
+InstitReasoning & Counterfactual & Counterfactual design & 2005 & counterfactual\_coherence & Scenario \\
+InstitReasoning & Weighted Decomposition & Effect decomposition & 2001 & weight\_error & Scenario \\
+InstitReasoning & Stability & Stability prediction & 2004 & prediction\_accuracy & Scenario \\
+InstitReasoning & Isomorphism & Isomorphism detection & 2001 & detection\_accuracy & Scenario \\
+
+\midrule
+% --- Mathematics (8) ---
+Mathematics & Arithmetic Word & Multi-step word problems & 1999 & problem\_accuracy & Sequence \\
+Mathematics & Linear Systems & Linear system solving & 1974 & solution\_error & Sequence \\
+Mathematics & Polynomial Roots & Root finding & 1974 & root\_precision & Sequence \\
+Mathematics & Matrix Operations & Matrix ops (eigen, SVD) & 1965 & operation\_accuracy & Sequence \\
+Mathematics & Statistical Inference & Bayesian inference & 1763 & posterior\_calibration & Sequence \\
+Mathematics & Bayesian Reasoning & Bayesian updating & 1996 & update\_accuracy & Sequence \\
+Mathematics & Logical Deduction & Logical inference & 1965 & inference\_accuracy & Sequence \\
+Mathematics & Constraint Puzzles & CSP solving & 2003 & satisfaction\_rate & Spatial \\
+
+\midrule
+% --- Security (6) ---
+Security & Encrypted Classification & HDC-FHE classification & 2016 & accuracy\_preservation & --- \\
+Security & Collective Aggregation & Encrypted aggregation & 2019 & collective\_fidelity & --- \\
+Security & Encrypted Learning & Privacy-preserving learning & 2016 & learning\_loss & --- \\
+Security & Cross-Mask Privacy & Multi-agent encryption & 1949 & privacy\_guarantee & --- \\
+Security & Encrypted Binding & Binding in encrypted space & 2003 & binding\_preservation & --- \\
+Security & Scaling Analysis & Accuracy under scaling & 2019 & scaling\_fidelity & --- \\
+
+\midrule
+% --- Coding (2) ---
+Coding & HumanEval Mini & Code generation & 2021 & pass\_at\_1 & Semantic \\
+Coding & Bug Detection & Bug localization & 2019 & delta\_magnitude & Semantic \\
 
 \midrule
 % --- Neuromodulator (17) ---
@@ -197,7 +288,7 @@ The following CSV data files are included in the repository under \texttt{papers
 
 \begin{itemize}
 \item \texttt{normative\_zscores.csv} --- Per-benchmark normative z-scores comparing agent performance against published human baselines (Figure~5 forest plot). Columns: benchmark, metric, agent value, human mean, human SD, z-score (sign-corrected), percentile, clinical band.
-\item \texttt{cognitive\_profile.csv} --- Domain-level cognitive profile scores (Figure~4 radar chart). Eight domains with score, benchmark count, and qualitative interpretation.
+\item \texttt{cognitive\_profile.csv} --- Domain-level cognitive profile scores (Figures~5--6). 27 domains with score, benchmark count, and qualitative interpretation.
 \item \texttt{reliability.csv} --- Test-retest reliability (ICC) for each benchmark across 3 sessions $\times$ 10 seed families (Table~2).
 \item \texttt{correlations.csv} --- Cross-domain correlation matrix for 10 key mechanism pairs (Table~3).
 \item \texttt{ablation\_domains.csv} --- Domain scores under 6 ablation presets (Figure~7 grouped bar chart).
@@ -246,8 +337,8 @@ A self-tuning mechanism uses exponential moving averages (EMA, $\alpha = 0.02$) 
 Moral topology metrics feed into the consciousness engine through two mechanisms:
 
 \begin{description}
-  \item[Drift-driven epistemic attenuation (Approach C).] High moral drift attenuates the \textsc{Knowledge} component in the 7-theory master equation (ConsciousnessEquationV2), reflecting epistemic humility during value shifts: $K_{\mathrm{eff}} = K \cdot (1 - r_{\mathrm{drift}} \cdot \alpha_{\mathrm{attenuation}})$ where $r_{\mathrm{drift}} = \min(\mathrm{drift} / 0.5, 1.0)$ and $\alpha_{\mathrm{attenuation}} = 0.30$.
-  \item[Anomaly dampening (Approach B).] The composite anomaly score dampens the unified consciousness level alongside bath-coupling terms (Seth, 2013): $C_{\mathrm{unified}} = C_{\mathrm{weighted}} + \Delta_{5\text{-HT}_{2A}} + \Delta_{\mathrm{GABA}_A} + \Delta_{\mathrm{entropy}} - s_{\mathrm{anomaly}} \cdot 0.15$.
+  \item[Drift-driven epistemic attenuation (Approach C).] High moral drift attenuates the \textsf{Knowledge} component in the 7-theory master equation (ConsciousnessEquationV2), reflecting epistemic humility during value shifts: $K_{\mathrm{eff}} = K \cdot (1 - r_{\mathrm{drift}} \cdot \alpha_{\mathrm{attenuation}})$ where $r_{\mathrm{drift}} = \min(\mathrm{drift} / 0.5, 1.0)$ and $\alpha_{\mathrm{attenuation}} = 0.30$.
+  \item[Anomaly dampening (Approach B).] The composite anomaly score dampens the unified consciousness level alongside bath-coupling terms (Seth, 2013): $C_{\mathrm{unified}} = C_{\mathrm{weighted}} + \Delta_{\mathrm{5\text{-}HT}_{2A}} + \Delta_{\mathrm{GABA}_A} + \Delta_{\mathrm{entropy}} - s_{\mathrm{anomaly}} \cdot 0.15$.
 \end{description}
 
 \subsection*{S2.4 Anomaly Response Actions}

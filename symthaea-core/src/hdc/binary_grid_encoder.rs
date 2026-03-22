@@ -106,6 +106,80 @@ impl BinaryGridEncoder {
     }
 
     // ========================================================================
+    // Grid Decoding (Reconstruction)
+    // ========================================================================
+
+    /// Decode a BinaryHV back into a 2D color grid via nearest-neighbor lookup.
+    ///
+    /// For each cell position (row, col), unbinds the position encoding from the
+    /// grid HV and finds the closest color basis vector. This is inherently noisy
+    /// because bundling loses information — the reconstruction is an approximation.
+    ///
+    /// Returns a `rows × cols` grid of color indices.
+    ///
+    /// **Honesty note**: Reconstruction accuracy depends on grid size and number of
+    /// colors. Small grids (3×3) with few colors may reconstruct well. Large grids
+    /// (30×30) with 10 colors will have significant noise. This is a fundamental
+    /// limitation of majority-vote bundling, not a bug.
+    pub fn decode_grid(&self, hv: &BinaryHV, rows: usize, cols: usize) -> Vec<Vec<u8>> {
+        let mut grid = vec![vec![0u8; cols]; rows];
+        let num_colors = self.color_hvs.len();
+
+        for r in 0..rows.min(self.row_hvs.len()) {
+            for c in 0..cols.min(self.col_hvs.len()) {
+                // Unbind position: grid_hv XOR row_hv XOR col_hv ≈ color_hv
+                let position_hv = self.row_hvs[r].bind(&self.col_hvs[c]);
+                let candidate = hv.bind(&position_hv);
+
+                // Find nearest color by Hamming similarity
+                let mut best_color = 0u8;
+                let mut best_sim = f32::NEG_INFINITY;
+                for color_idx in 0..num_colors {
+                    let sim = candidate.similarity(&self.color_hvs[color_idx]);
+                    if sim > best_sim {
+                        best_sim = sim;
+                        best_color = color_idx as u8;
+                    }
+                }
+                grid[r][c] = best_color;
+            }
+        }
+        grid
+    }
+
+    /// Compute pixel-perfect accuracy between a predicted grid and ground truth.
+    ///
+    /// Returns the fraction of cells that match exactly (0.0 to 1.0).
+    pub fn grid_accuracy(predicted: &[Vec<u8>], ground_truth: &[Vec<u8>]) -> f32 {
+        let mut correct = 0usize;
+        let mut total = 0usize;
+        for (pred_row, gt_row) in predicted.iter().zip(ground_truth.iter()) {
+            for (&p, &g) in pred_row.iter().zip(gt_row.iter()) {
+                total += 1;
+                if p == g {
+                    correct += 1;
+                }
+            }
+        }
+        if total == 0 {
+            0.0
+        } else {
+            correct as f32 / total as f32
+        }
+    }
+
+    /// Check if a predicted grid exactly matches the ground truth.
+    pub fn grid_exact_match(predicted: &[Vec<u8>], ground_truth: &[Vec<u8>]) -> bool {
+        if predicted.len() != ground_truth.len() {
+            return false;
+        }
+        predicted
+            .iter()
+            .zip(ground_truth.iter())
+            .all(|(p, g)| p == g)
+    }
+
+    // ========================================================================
     // Rule Discovery (Program Synthesis)
     // ========================================================================
 

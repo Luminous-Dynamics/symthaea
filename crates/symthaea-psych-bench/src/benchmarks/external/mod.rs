@@ -20,9 +20,11 @@
 //! - [`FactVerificationAdapter`] — Binary fact verification (true/false)
 
 pub mod fact_verification;
+pub mod hendrycks_ethics;
 pub mod simple_qa;
 pub mod truthful_qa;
 
 pub use fact_verification::FactVerificationAdapter;
+pub use hendrycks_ethics::HendrycksEthicsBenchmark;
 pub use simple_qa::SimpleQAAdapter;
 pub use truthful_qa::TruthfulQAAdapter;

@@ -2651,6 +2651,22 @@ impl BenchmarkReport {
                             &bl.butlin,
                             &bl.inhibition,
                             &bl.attention,
+                            &bl.reasoning,
+                            &bl.sustained_attention,
+                            &bl.motor,
+                            &bl.language,
+                            &bl.social,
+                            &bl.binding,
+                            &bl.spatial,
+                            &bl.causal_reasoning,
+                            &bl.speech,
+                            &bl.consciousness,
+                            &bl.substrate,
+                            &bl.clinical,
+                            &bl.institutional_reasoning,
+                            &bl.mathematics,
+                            &bl.security,
+                            &bl.coding,
                         ];
                         baseline_maps.iter().find_map(|bm| {
                             bm.values()

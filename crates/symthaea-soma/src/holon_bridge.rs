@@ -28,7 +28,7 @@ pub struct EncryptedEnvelope {
     pub sequence: u64,
 }
 
-/// Compact consciousness vector for transmission (~304 bytes).
+/// Compact consciousness vector for transmission (~312 bytes).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SporeConsciousnessVector {
     pub attention: Vec<f32>, // 64 floats
@@ -37,6 +37,12 @@ pub struct SporeConsciousnessVector {
     pub arousal: f32,
     pub focus_hash: u64,
     pub sequence: u64,
+    /// Eight Harmonies aggregate alignment [0, 1].
+    #[serde(default)]
+    pub harmony_alignment: f32,
+    /// QOL trend stability [0, 1] — higher means less consciousness variance over time.
+    #[serde(default)]
+    pub trend_stability: f32,
 }
 
 /// Outbound message types.
@@ -152,6 +158,8 @@ impl HolonBridge {
         phi: f32,
         valence: f32,
         arousal: f32,
+        harmony_alignment: f32,
+        trend_stability: f32,
     ) {
         if self.mode == HolonSyncMode::Off {
             return;
@@ -181,6 +189,8 @@ impl HolonBridge {
                     arousal,
                     focus_hash: cycle.wrapping_mul(0x517cc1b727220a95),
                     sequence: self.sequence,
+                    harmony_alignment,
+                    trend_stability,
                 },
             ));
         }
@@ -354,7 +364,7 @@ mod tests {
     #[test]
     fn test_off_mode_no_activity() {
         let mut bridge = HolonBridge::new(HolonSyncMode::Off);
-        bridge.tick(0.5, 2, 100, &[0.1; 64], 0.3, 0.0, 0.5);
+        bridge.tick(0.5, 2, 100, &[0.1; 64], 0.3, 0.0, 0.5, 0.6, 0.8);
         assert_eq!(bridge.outbound_count(), 0);
     }
 
@@ -362,7 +372,7 @@ mod tests {
     fn test_presence_heartbeat() {
         let mut bridge = HolonBridge::new(HolonSyncMode::PresenceOnly);
         for i in 0..50 {
-            bridge.tick(0.5, 2, i, &[0.1; 64], 0.3, 0.0, 0.5);
+            bridge.tick(0.5, 2, i, &[0.1; 64], 0.3, 0.0, 0.5, 0.6, 0.8);
         }
         // Should have heartbeat + CV at cycle 50
         assert!(bridge.outbound_count() >= 2);

@@ -207,13 +207,15 @@ jobs:
             features: >-
               voice-tts,voice-stt,audio,vocal-tract,neural-vocoder,
               embeddings,vision,perception,vision-manifold,foveation
-          - group: science
+          - group: science-ai
+            features: >-
+              multi_agent,full_consciousness,full_perception,
+              full_language,magi_loop,reasoning_engine,code_generation,
+              wasm-sandbox,school_learning,benchmarks,all_benchmarks
+          - group: science-infra
             features: >-
               physics,physics-bridge,flight,humanoid,hal,
               ssm-power,ssm_language,lancedb-backend,
-              multi_agent,full_consciousness,full_perception,
-              full_language,magi_loop,reasoning_engine,code_generation,
-              wasm-sandbox,school_learning,benchmarks,all_benchmarks,
               integration_module,observability_module,support,web_research_module
           - group: genesis
             features: >-

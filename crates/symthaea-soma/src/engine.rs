@@ -211,6 +211,8 @@ impl SomaEngine {
                 .last_output_ref()
                 .map(|out| &out.values[..64.min(out.values.len())])
                 .unwrap_or(&[]);
+            let harmony = self.spore.harmony_alignment();
+            let stability = self.spore.trend_summary_stability();
             self.holon_bridge.tick(
                 consciousness_level,
                 wake.as_u8(),
@@ -219,6 +221,8 @@ impl SomaEngine {
                 consciousness_level, // phi proxy
                 valence,
                 arousal,
+                harmony,
+                stability,
             );
         }
 

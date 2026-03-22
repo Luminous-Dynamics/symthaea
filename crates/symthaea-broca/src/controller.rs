@@ -445,6 +445,26 @@ impl LanguageController {
         }
     }
 
+    /// Re-project only specific token embeddings by index.
+    /// Much faster than `refresh_projected_embeddings()` when few embeddings changed.
+    pub fn refresh_projected_embeddings_sparse(&mut self, indices: &[usize]) {
+        if let (Some(ref weights), Some(ref mut proj_embs), Some(proj_dim)) = (
+            &self.projection_weights,
+            &mut self.projected_embeddings,
+            self.config.projection_dim,
+        ) {
+            for &i in indices {
+                if i < self.token_embeddings.len() && i < proj_embs.len() {
+                    proj_embs[i] = Self::project_and_normalize(
+                        self.token_embeddings[i].as_slice(),
+                        weights,
+                        proj_dim,
+                    );
+                }
+            }
+        }
+    }
+
     /// Initialize projection head on an existing controller (e.g., when adding
     /// projection to a resumed checkpoint that didn't have one).
     pub fn enable_projection(&mut self, genesis: &GenesisSeed, proj_dim: usize) {

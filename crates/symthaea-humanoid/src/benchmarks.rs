@@ -245,6 +245,135 @@ pub fn format_comparison(result: &DmcBenchmarkResult, task: &HumanoidTask) -> St
     )
 }
 
+/// Format a LaTeX comparison table for publication.
+///
+/// Produces a standalone LaTeX tabular environment comparing HDC-LTC-FEP results
+/// against published SAC/TD3/D4PG baselines for each task.
+pub fn format_comparison_table(results: &[(HumanoidTask, DmcBenchmarkResult)]) -> String {
+    let mut latex = String::new();
+    latex.push_str("\\begin{table}[H]\n");
+    latex.push_str("\\centering\n");
+    latex.push_str("\\caption{DMC Humanoid benchmark: HDC-LTC-FEP vs.~published RL baselines.}\n");
+    latex.push_str("\\label{tab:dmc-humanoid}\n");
+    latex.push_str("\\begin{tabular}{lcccc}\n");
+    latex.push_str("\\toprule\n");
+    latex.push_str("\\textbf{Task} & \\textbf{HDC-LTC-FEP} & \\textbf{SAC} & \\textbf{TD3} & \\textbf{D4PG} \\\\\n");
+    latex.push_str("\\midrule\n");
+
+    for (task, result) in results {
+        let baselines = BaselineScores::for_task(task);
+        latex.push_str(&format!(
+            "{:?} & {:.3} & {:.3} & {:.3} & {:.3} \\\\\n",
+            task,
+            result.mean_return,
+            baselines.sac_return,
+            baselines.td3_return,
+            baselines.d4pg_return,
+        ));
+    }
+
+    latex.push_str("\\bottomrule\n");
+    latex.push_str("\\end{tabular}\n");
+
+    // Add gait quality sub-table
+    latex.push_str("\\vspace{0.5em}\n\n");
+    latex.push_str("\\begin{tabular}{lccccc}\n");
+    latex.push_str("\\toprule\n");
+    latex.push_str("\\textbf{Task} & \\textbf{Standing\\%} & \\textbf{Fell?} & \\textbf{CoT} & \\textbf{Asymmetry} & \\textbf{Regularity} \\\\\n");
+    latex.push_str("\\midrule\n");
+
+    for (task, result) in results {
+        latex.push_str(&format!(
+            "{:?} & {:.1}\\% & {} & {:.2} & {:.4} & {:.3} \\\\\n",
+            task,
+            result.standing_fraction * 100.0,
+            if result.fell { "Yes" } else { "No" },
+            result.cost_of_transport,
+            result.gait_asymmetry,
+            result.step_regularity,
+        ));
+    }
+
+    latex.push_str("\\bottomrule\n");
+    latex.push_str("\\end{tabular}\n");
+    latex.push_str("\\end{table}\n");
+    latex
+}
+
+/// Format a JSON report for automated comparison.
+pub fn format_json_report(results: &[(HumanoidTask, DmcBenchmarkResult)]) -> String {
+    let mut json = String::from("{\n  \"benchmark\": \"dmc_humanoid\",\n  \"tasks\": [\n");
+
+    for (i, (task, result)) in results.iter().enumerate() {
+        let baselines = BaselineScores::for_task(task);
+        json.push_str(&format!(
+            "    {{\n\
+             \x20     \"task\": \"{:?}\",\n\
+             \x20     \"hdc_ltc_fep\": {:.4},\n\
+             \x20     \"sac_baseline\": {:.4},\n\
+             \x20     \"td3_baseline\": {:.4},\n\
+             \x20     \"d4pg_baseline\": {:.4},\n\
+             \x20     \"standing_fraction\": {:.4},\n\
+             \x20     \"fell\": {},\n\
+             \x20     \"mean_head_height\": {:.4},\n\
+             \x20     \"mean_uprightness\": {:.4},\n\
+             \x20     \"mean_horizontal_speed\": {:.4},\n\
+             \x20     \"cost_of_transport\": {:.4},\n\
+             \x20     \"gait_asymmetry\": {:.4},\n\
+             \x20     \"step_regularity\": {:.4}\n\
+             \x20   }}",
+            task,
+            result.mean_return,
+            baselines.sac_return,
+            baselines.td3_return,
+            baselines.d4pg_return,
+            result.standing_fraction,
+            result.fell,
+            result.mean_head_height,
+            result.mean_uprightness,
+            result.mean_horizontal_speed,
+            result.cost_of_transport,
+            result.gait_asymmetry,
+            result.step_regularity,
+        ));
+        if i + 1 < results.len() {
+            json.push(',');
+        }
+        json.push('\n');
+    }
+
+    json.push_str("  ]\n}\n");
+    json
+}
+
+/// Perturbation recovery summary for JSON output.
+pub fn format_perturbation_json(
+    task: &HumanoidTask,
+    perturbation_name: &str,
+    result: &crate::perturbations::PerturbationBenchmarkResult,
+) -> String {
+    format!(
+        "{{\n\
+         \x20 \"task\": \"{:?}\",\n\
+         \x20 \"perturbation\": \"{}\",\n\
+         \x20 \"pre_reward\": {:.4},\n\
+         \x20 \"min_reward\": {:.4},\n\
+         \x20 \"final_reward\": {:.4},\n\
+         \x20 \"recovery_steps\": {},\n\
+         \x20 \"fell\": {},\n\
+         \x20 \"min_tau\": {:.4}\n\
+         }}",
+        task,
+        perturbation_name,
+        result.pre_perturbation_reward,
+        result.min_reward,
+        result.final_reward,
+        result.recovery_steps,
+        result.fell,
+        result.min_tau,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

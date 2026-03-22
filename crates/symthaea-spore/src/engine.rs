@@ -1648,6 +1648,11 @@ impl SporeEngine {
         self.trend_history.count()
     }
 
+    /// Get the consciousness stability from the trend summary [0, 1].
+    pub fn trend_summary_stability(&self) -> f32 {
+        self.trend_history.trend_summary().consciousness_stability
+    }
+
     // ======================================================================
     // Wellbeing Profiles
     // ======================================================================

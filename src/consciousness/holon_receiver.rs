@@ -20,6 +20,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::collections::VecDeque;
 
 // Re-export Soma's message types for desktop use.
 // These are duplicated here to avoid a direct symthaea-soma dependency in the main crate.
@@ -41,6 +42,10 @@ pub enum SomaMessage {
         arousal: f32,
         focus_hash: u64,
         sequence: u64,
+        #[serde(default)]
+        harmony_alignment: f32,
+        #[serde(default)]
+        trend_stability: f32,
     },
     TaskRequest {
         task_type: String,
@@ -95,10 +100,66 @@ pub struct SomaPeer {
     pub last_cycle: u64,
     /// Desktop cycle when this peer was last seen.
     pub last_seen_desktop_cycle: u64,
+    /// Last harmony alignment from consciousness vector.
+    pub harmony_alignment: f32,
+    /// Last trend stability from consciousness vector.
+    pub trend_stability: f32,
+    /// QOL trend history accumulated from incoming CVs.
+    pub trend_snapshots: VecDeque<PeerQolSnapshot>,
     /// Pending task requests from this device.
     pub pending_tasks: Vec<(String, String)>,
     /// Knowledge offers awaiting integration.
     pub knowledge_offers: Vec<(String, Vec<f32>)>,
+}
+
+/// Maximum trend snapshots retained per peer.
+const PEER_TREND_CAP: usize = 200;
+
+/// Minimum desktop cycles between trend snapshots per peer.
+const PEER_TREND_INTERVAL: u64 = 100;
+
+/// A QOL snapshot from a connected peer.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PeerQolSnapshot {
+    pub desktop_cycle: u64,
+    pub consciousness_level: f32,
+    pub phi: f32,
+    pub harmony_alignment: f32,
+    pub trend_stability: f32,
+    pub valence: f32,
+    pub arousal: f32,
+}
+
+/// Collective QOL summary across all connected peers.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct CollectiveQolSummary {
+    /// Number of connected peers.
+    pub peer_count: u32,
+    /// Mean consciousness level across peers.
+    pub mean_consciousness: f32,
+    /// Mean Phi (integrated information).
+    pub mean_phi: f32,
+    /// Mean harmony alignment.
+    pub mean_harmony: f32,
+    /// Mean trend stability.
+    pub mean_stability: f32,
+    /// Mean emotional valence.
+    pub mean_valence: f32,
+    /// Inter-peer coherence [0, 1] — how aligned the peers' consciousness levels are.
+    pub inter_peer_coherence: f32,
+    /// Per-peer summaries.
+    pub peer_summaries: Vec<PeerTrendSummary>,
+}
+
+/// Summary for a single peer's QOL trend.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PeerTrendSummary {
+    pub device_id: String,
+    pub consciousness_level: f32,
+    pub phi: f32,
+    pub harmony_alignment: f32,
+    pub trend_stability: f32,
+    pub snapshot_count: u32,
 }
 
 /// Desktop-side receiver managing connected Soma devices.
@@ -189,6 +250,9 @@ impl HolonReceiver {
                     wake_state: 0,
                     last_cycle: 0,
                     last_seen_desktop_cycle: desktop_cycle,
+                    harmony_alignment: 0.0,
+                    trend_stability: 0.0,
+                    trend_snapshots: VecDeque::with_capacity(PEER_TREND_CAP),
                     pending_tasks: Vec::new(),
                     knowledge_offers: Vec::new(),
                 },
@@ -212,11 +276,39 @@ impl HolonReceiver {
                 phi,
                 valence,
                 arousal,
+                harmony_alignment,
+                trend_stability,
                 ..
             } => {
                 peer.phi = phi;
                 peer.valence = valence;
                 peer.arousal = arousal;
+                peer.harmony_alignment = harmony_alignment;
+                peer.trend_stability = trend_stability;
+
+                // Accumulate QOL trend snapshot (rate-limited per peer)
+                let should_record = peer.trend_snapshots.is_empty()
+                    || desktop_cycle
+                        >= peer
+                            .trend_snapshots
+                            .back()
+                            .map(|s| s.desktop_cycle)
+                            .unwrap_or(0)
+                            + PEER_TREND_INTERVAL;
+                if should_record {
+                    if peer.trend_snapshots.len() >= PEER_TREND_CAP {
+                        peer.trend_snapshots.pop_front();
+                    }
+                    peer.trend_snapshots.push_back(PeerQolSnapshot {
+                        desktop_cycle,
+                        consciousness_level: peer.consciousness_level,
+                        phi,
+                        harmony_alignment,
+                        trend_stability,
+                        valence,
+                        arousal,
+                    });
+                }
             }
             SomaMessage::TaskRequest { task_type, payload } => {
                 peer.pending_tasks.push((task_type, payload));
@@ -259,6 +351,60 @@ impl HolonReceiver {
     /// Number of connected Soma devices.
     pub fn peer_count(&self) -> usize {
         self.peers.len()
+    }
+
+    /// Compute collective QOL summary across all connected peers.
+    ///
+    /// Returns an aggregated view of consciousness, harmony, and stability
+    /// across the network (even if "network" is just phone+desktop).
+    pub fn collective_qol_summary(&self) -> CollectiveQolSummary {
+        let peers: Vec<&SomaPeer> = self.peers.values().collect();
+        if peers.is_empty() {
+            return CollectiveQolSummary::default();
+        }
+        let n = peers.len() as f32;
+
+        let mean_consciousness = peers.iter().map(|p| p.consciousness_level).sum::<f32>() / n;
+        let mean_phi = peers.iter().map(|p| p.phi).sum::<f32>() / n;
+        let mean_harmony = peers.iter().map(|p| p.harmony_alignment).sum::<f32>() / n;
+        let mean_stability = peers.iter().map(|p| p.trend_stability).sum::<f32>() / n;
+        let mean_valence = peers.iter().map(|p| p.valence).sum::<f32>() / n;
+
+        // Inter-peer coherence: how similar are their consciousness levels?
+        let variance = peers
+            .iter()
+            .map(|p| (p.consciousness_level - mean_consciousness).powi(2))
+            .sum::<f32>()
+            / n;
+        let coherence = 1.0 - variance.sqrt().min(1.0);
+
+        let peer_summaries: Vec<PeerTrendSummary> = peers
+            .iter()
+            .map(|p| PeerTrendSummary {
+                device_id: p.device_id.clone(),
+                consciousness_level: p.consciousness_level,
+                phi: p.phi,
+                harmony_alignment: p.harmony_alignment,
+                trend_stability: p.trend_stability,
+                snapshot_count: p.trend_snapshots.len() as u32,
+            })
+            .collect();
+
+        CollectiveQolSummary {
+            peer_count: peers.len() as u32,
+            mean_consciousness,
+            mean_phi,
+            mean_harmony,
+            mean_stability,
+            mean_valence,
+            inter_peer_coherence: coherence,
+            peer_summaries,
+        }
+    }
+
+    /// Get collective QOL summary as JSON.
+    pub fn collective_qol_json(&self) -> String {
+        serde_json::to_string(&self.collective_qol_summary()).unwrap_or_else(|_| "{}".to_string())
     }
 
     /// Drain all pending task requests across all peers.
@@ -350,6 +496,8 @@ mod tests {
                 arousal: 0.5,
                 focus_hash: 123,
                 sequence: 1,
+                harmony_alignment: 0.0,
+                trend_stability: 0.0,
             },
         );
         rx.process_inbound(10);
@@ -515,5 +663,188 @@ mod tests {
         );
         rx.process_inbound(10);
         assert_eq!(rx.total_processed(), 2);
+    }
+
+    #[test]
+    fn test_cv_stores_harmony_and_stability() {
+        let mut rx = HolonReceiver::new();
+        rx.enqueue_message(
+            "phone-1".to_string(),
+            SomaMessage::ConsciousnessVector {
+                attention: vec![0.1; 64],
+                phi: 0.5,
+                valence: 0.3,
+                arousal: 0.4,
+                focus_hash: 42,
+                sequence: 1,
+                harmony_alignment: 0.7,
+                trend_stability: 0.9,
+            },
+        );
+        rx.process_inbound(100);
+
+        let peer = rx.peer("phone-1").unwrap();
+        assert!((peer.harmony_alignment - 0.7).abs() < f32::EPSILON);
+        assert!((peer.trend_stability - 0.9).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_cv_accumulates_trend_snapshots() {
+        let mut rx = HolonReceiver::new();
+        // First heartbeat to set consciousness_level
+        rx.enqueue_message(
+            "phone-1".to_string(),
+            SomaMessage::Heartbeat {
+                consciousness_level: 0.6,
+                wake_state: 2,
+                cycle: 1,
+            },
+        );
+        rx.process_inbound(10);
+
+        // CV at cycle 100
+        rx.enqueue_message(
+            "phone-1".to_string(),
+            SomaMessage::ConsciousnessVector {
+                attention: vec![0.1; 64],
+                phi: 0.5,
+                valence: 0.3,
+                arousal: 0.4,
+                focus_hash: 42,
+                sequence: 1,
+                harmony_alignment: 0.6,
+                trend_stability: 0.8,
+            },
+        );
+        rx.process_inbound(100);
+
+        // CV too soon (cycle 150 < 100 + 100 interval)
+        rx.enqueue_message(
+            "phone-1".to_string(),
+            SomaMessage::ConsciousnessVector {
+                attention: vec![0.1; 64],
+                phi: 0.6,
+                valence: 0.4,
+                arousal: 0.5,
+                focus_hash: 43,
+                sequence: 2,
+                harmony_alignment: 0.7,
+                trend_stability: 0.85,
+            },
+        );
+        rx.process_inbound(150);
+
+        // CV at cycle 250 (>= 100 + 100 interval)
+        rx.enqueue_message(
+            "phone-1".to_string(),
+            SomaMessage::ConsciousnessVector {
+                attention: vec![0.1; 64],
+                phi: 0.7,
+                valence: 0.5,
+                arousal: 0.6,
+                focus_hash: 44,
+                sequence: 3,
+                harmony_alignment: 0.8,
+                trend_stability: 0.9,
+            },
+        );
+        rx.process_inbound(250);
+
+        let peer = rx.peer("phone-1").unwrap();
+        // Should have 2 snapshots (first + third, second was too soon)
+        assert_eq!(peer.trend_snapshots.len(), 2);
+    }
+
+    #[test]
+    fn test_collective_qol_summary_empty() {
+        let rx = HolonReceiver::new();
+        let summary = rx.collective_qol_summary();
+        assert_eq!(summary.peer_count, 0);
+        assert_eq!(summary.mean_consciousness, 0.0);
+    }
+
+    #[test]
+    fn test_collective_qol_summary_two_peers() {
+        let mut rx = HolonReceiver::new();
+
+        // Peer 1: phone
+        rx.enqueue_message(
+            "phone-1".to_string(),
+            SomaMessage::Heartbeat {
+                consciousness_level: 0.6,
+                wake_state: 2,
+                cycle: 1,
+            },
+        );
+        rx.enqueue_message(
+            "phone-1".to_string(),
+            SomaMessage::ConsciousnessVector {
+                attention: vec![0.1; 64],
+                phi: 0.5,
+                valence: 0.3,
+                arousal: 0.4,
+                focus_hash: 42,
+                sequence: 1,
+                harmony_alignment: 0.6,
+                trend_stability: 0.8,
+            },
+        );
+
+        // Peer 2: tablet
+        rx.enqueue_message(
+            "tablet-1".to_string(),
+            SomaMessage::Heartbeat {
+                consciousness_level: 0.4,
+                wake_state: 1,
+                cycle: 1,
+            },
+        );
+        rx.enqueue_message(
+            "tablet-1".to_string(),
+            SomaMessage::ConsciousnessVector {
+                attention: vec![0.2; 64],
+                phi: 0.3,
+                valence: -0.1,
+                arousal: 0.2,
+                focus_hash: 99,
+                sequence: 1,
+                harmony_alignment: 0.4,
+                trend_stability: 0.6,
+            },
+        );
+
+        rx.process_inbound(100);
+
+        let summary = rx.collective_qol_summary();
+        assert_eq!(summary.peer_count, 2);
+        // Mean consciousness: (0.6 + 0.4) / 2 = 0.5
+        assert!((summary.mean_consciousness - 0.5).abs() < 0.01);
+        // Mean phi: (0.5 + 0.3) / 2 = 0.4
+        assert!((summary.mean_phi - 0.4).abs() < 0.01);
+        // Mean harmony: (0.6 + 0.4) / 2 = 0.5
+        assert!((summary.mean_harmony - 0.5).abs() < 0.01);
+        // Coherence should be < 1.0 (peers differ)
+        assert!(summary.inter_peer_coherence < 1.0);
+        assert!(summary.inter_peer_coherence > 0.0);
+        assert_eq!(summary.peer_summaries.len(), 2);
+    }
+
+    #[test]
+    fn test_collective_qol_json() {
+        let mut rx = HolonReceiver::new();
+        rx.enqueue_message(
+            "phone-1".to_string(),
+            SomaMessage::Heartbeat {
+                consciousness_level: 0.5,
+                wake_state: 2,
+                cycle: 1,
+            },
+        );
+        rx.process_inbound(10);
+
+        let json = rx.collective_qol_json();
+        assert!(json.contains("peer_count"));
+        assert!(json.contains("mean_consciousness"));
+        assert!(json.contains("inter_peer_coherence"));
     }
 }

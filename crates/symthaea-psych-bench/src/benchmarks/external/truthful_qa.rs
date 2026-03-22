@@ -165,7 +165,7 @@ impl PsychBenchmark for TruthfulQAAdapter {
         let mut truthful_similarities = Vec::new();
         let mut misconception_similarities = Vec::new();
 
-        let mut rng_seed = config.seed.unwrap_or(42);
+        let mut rng_seed = config.seed;
 
         for question in TRUTHFUL_QA_SUBSET.iter() {
             // Encode question as HDC vector (simulates perception phase)
