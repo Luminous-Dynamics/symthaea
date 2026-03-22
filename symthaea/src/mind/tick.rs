@@ -502,53 +502,29 @@ impl ContinuousMind {
             }
         }
 
-        // Active knowledge bundling: integrate peer thoughts into working memory.
-        // Bundle all trusted peer thoughts into a single social HV and push to WM.
-        // This enables collective consciousness emergence under partial information.
+        // Active knowledge bundling: blend peer thoughts directly into current_thought.
+        // This avoids WM dimension issues (CfC may expand internal dims) while
+        // enabling collective consciousness emergence under partial information.
+        // Blend weight: 20% social, 80% self (gentle integration, not thought replacement).
         if !peer_thoughts.is_empty() {
             let refs: Vec<&ContinuousHV> = peer_thoughts.iter().collect();
-            let mut social_bundle = ContinuousHV::bundle(&refs);
+            let social_bundle = ContinuousHV::bundle(&refs);
 
-            // Ensure dimension matches current_thought (cognitive loop may expand dims)
             let target_dim = self.state.current_thought.dim();
-            if social_bundle.dim() != target_dim {
-                // Resize: pad with zeros if too small, truncate if too large
+            let social_resized = if social_bundle.dim() == target_dim {
+                social_bundle
+            } else {
+                // Resize social bundle to match current_thought dimension
                 let mut resized = vec![0.0f32; target_dim];
                 let copy_len = social_bundle.dim().min(target_dim);
                 resized[..copy_len].copy_from_slice(&social_bundle.as_slice()[..copy_len]);
-                social_bundle = ContinuousHV::from_vec(resized);
-            }
+                ContinuousHV::from_vec(resized)
+            };
 
-            if self.working_memory.len() < self.config.working_memory_capacity {
-                self.working_memory.push(social_bundle);
-                self.working_memory_ticks.push(self.state.tick);
-                self.working_memory_sources.push(
-                    crate::memory::memory_coordinator::MemorySource::Social,
-                );
-                self.working_memory_verified.push(false);
-                self.working_memory_metadata
-                    .push(std::collections::HashMap::new());
-            } else {
-                // Evict oldest non-social item to make room for social integration
-                if let Some(pos) = self.working_memory_sources.iter().position(|s| {
-                    !matches!(s, crate::memory::memory_coordinator::MemorySource::Social)
-                }) {
-                    self.working_memory.remove(pos);
-                    self.working_memory_ticks.remove(pos);
-                    self.working_memory_sources.remove(pos);
-                    self.working_memory_verified.remove(pos);
-                    self.working_memory_metadata.remove(pos);
-
-                    self.working_memory.push(social_bundle);
-                    self.working_memory_ticks.push(self.state.tick);
-                    self.working_memory_sources.push(
-                        crate::memory::memory_coordinator::MemorySource::Social,
-                    );
-                    self.working_memory_verified.push(false);
-                    self.working_memory_metadata
-                        .push(std::collections::HashMap::new());
-                }
-            }
+            self.state.current_thought = ContinuousHV::weighted_bundle(
+                &[&self.state.current_thought, &social_resized],
+                &[0.8, 0.2],
+            );
         }
 
         if observed > 0 {
