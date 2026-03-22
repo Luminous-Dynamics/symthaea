@@ -5,6 +5,8 @@
 //!
 //! Run: cargo run -p symthaea-fabrication-kernel --example simulation_runtime
 
+use serde::{Deserialize, Serialize};
+use serde_json;
 use symthaea_fabrication_kernel::{
     cincinnati_live::{CincinnatiMonitor, CincinnatiMonitorConfig, SensorReading},
     csg::{BooleanOp, CSGNode, Primitive, Transform3D},
@@ -15,6 +17,31 @@ use symthaea_fabrication_kernel::{
     slicer::{slice_mesh, SliceConfig},
     toolpath::{generate_gcode, ToolpathConfig},
 };
+
+// ── Report types ─────────────────────────────────────────────────────────
+
+/// A single online defect prediction recorded during the print.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct OnlinePrediction {
+    step: u32,
+    predicted_quality: f64,
+}
+
+/// Full simulation report — serialised to `simulation_report.json` at the end of `main()`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct SimulationReport {
+    mesh_triangles: usize,
+    layer_count: usize,
+    infill_segments: usize,
+    gcode_commands: usize,
+    gcode_extrusion_mm: f64,
+    anomaly_count: u64,
+    quality_score: f64,
+    qc_pass: bool,
+    predicted_quality: f64,
+    prediction_confidence: f64,
+    online_predictions: Vec<OnlinePrediction>,
+}
 
 // ── Constants ────────────────────────────────────────────────────────────
 
@@ -91,6 +118,74 @@ fn simulate_temperatures(step: u32) -> (f32, f32) {
 /// Quality check: quality = 1.0 - (anomaly_count * 0.05), clamped to [0, 1].
 fn run_quality_check(anomaly_count: u64) -> f64 {
     (1.0 - anomaly_count as f64 * 0.05).clamp(0.0, 1.0)
+}
+
+/// Compute mean of a slice (returns 0.0 for empty slices).
+fn mean_f32(values: &[f32]) -> f64 {
+    if values.is_empty() {
+        return 0.0;
+    }
+    values.iter().map(|&v| v as f64).sum::<f64>() / values.len() as f64
+}
+
+/// Compute population standard deviation of a slice (returns 0.0 for empty/singleton).
+fn std_dev_f32(values: &[f32]) -> f64 {
+    if values.len() < 2 {
+        return 0.0;
+    }
+    let m = mean_f32(values);
+    let variance = values
+        .iter()
+        .map(|&v| {
+            let d = v as f64 - m;
+            d * d
+        })
+        .sum::<f64>()
+        / values.len() as f64;
+    variance.sqrt()
+}
+
+/// Temperature-aware quality check.
+///
+/// Combines anomaly penalty with temperature stability and accuracy metrics:
+/// - `anomaly_penalty`: 5% per anomaly
+/// - `temp_stability`: penalises nozzle temperature fluctuation
+/// - `bed_stability`: penalises bed temperature fluctuation
+/// - `temp_accuracy`: penalises nozzle mean deviating from target
+fn run_quality_check_thermal(
+    anomaly_count: u64,
+    nozzle_temps: &[f32],
+    bed_temps: &[f32],
+    target_nozzle: f32,
+    target_bed: f32,
+) -> f64 {
+    let anomaly_penalty = anomaly_count as f64 * 0.05;
+
+    // Stability: 1 - stddev/target (lower stddev = better stability).
+    let temp_stability = if target_nozzle > 0.0 {
+        1.0 - std_dev_f32(nozzle_temps) / target_nozzle as f64
+    } else {
+        1.0
+    };
+    let bed_stability = if target_bed > 0.0 {
+        1.0 - std_dev_f32(bed_temps) / target_bed as f64
+    } else {
+        1.0
+    };
+
+    // Accuracy: 1 - |mean - target| / target.
+    let temp_accuracy = if target_nozzle > 0.0 {
+        1.0 - (mean_f32(nozzle_temps) - target_nozzle as f64).abs() / target_nozzle as f64
+    } else {
+        1.0
+    };
+
+    let quality = (1.0 - anomaly_penalty)
+        * temp_stability.max(0.0)
+        * bed_stability.max(0.0)
+        * temp_accuracy.max(0.0);
+
+    quality.clamp(0.0, 1.0)
 }
 
 /// Generate training data from simulation results.
@@ -218,12 +313,24 @@ fn main() {
     let mut monitor = CincinnatiMonitor::new(monitor_config);
     let mut anomaly_events: Vec<(u32, String)> = Vec::new();
 
+    // Collect temperature histories for thermal quality model.
+    let mut nozzle_temp_history: Vec<f32> = Vec::new();
+    let mut bed_temp_history: Vec<f32> = Vec::new();
+
     // Online defect predictor — trains during the print, not just after.
     let mut predictor = DefectPredictor::new();
     let mut prediction_log: Vec<(u32, f64)> = Vec::new();
 
     for step in 0..TOTAL_STEPS {
         let readings = simulate_sensor_readings(step, TOTAL_STEPS);
+        for reading in &readings {
+            // Collect temperatures for thermal model.
+            if reading.channel == "temperature_nozzle" {
+                nozzle_temp_history.push(reading.value as f32);
+            } else if reading.channel == "temperature_bed" {
+                bed_temp_history.push(reading.value as f32);
+            }
+        }
         for reading in readings {
             if let Some(alert) = monitor.ingest_reading(reading) {
                 anomaly_events.push((
@@ -268,10 +375,28 @@ fn main() {
     }
 
     // ── Phase D: QC check ────────────────────────────────────────────
-    println!("\n=== Phase D: Quality Control ===");
-    let quality = run_quality_check(monitor.anomaly_count());
+    println!("\n=== Phase D: Quality Control (Thermal Model) ===");
+    let quality = run_quality_check_thermal(
+        monitor.anomaly_count(),
+        &nozzle_temp_history,
+        &bed_temp_history,
+        200.0, // target nozzle °C
+        60.0,  // target bed °C
+    );
     let pass = quality >= 0.7;
-    println!("  Quality score: {:.2}", quality);
+    println!(
+        "  Nozzle temps: {} readings, mean={:.1}°C, stddev={:.2}°C",
+        nozzle_temp_history.len(),
+        mean_f32(&nozzle_temp_history),
+        std_dev_f32(&nozzle_temp_history)
+    );
+    println!(
+        "  Bed temps:    {} readings, mean={:.1}°C, stddev={:.2}°C",
+        bed_temp_history.len(),
+        mean_f32(&bed_temp_history),
+        std_dev_f32(&bed_temp_history)
+    );
+    println!("  Quality score: {:.3}", quality);
     println!("  Result: {}", if pass { "PASS ✓" } else { "FAIL ✗" });
 
     // ── Phase E: Final defect prediction assessment ──────────────────
@@ -304,6 +429,13 @@ fn main() {
     for (name, weight) in &importance {
         println!("    {}: {:.4}", name, weight);
     }
+
+    // Improvement 5: show what FabricationManager.inject_defect_prediction() would receive.
+    println!("\n  Consciousness feedback:");
+    println!(
+        "    inject_defect_prediction({:.3}, {:.3})",
+        prediction.predicted_quality, prediction.confidence
+    );
 
     // ── Phase F: Consciousness bridge report ─────────────────────────
     report_consciousness_bridge(monitor.anomaly_count(), quality);
@@ -345,6 +477,30 @@ fn main() {
         prediction.predicted_quality
     );
     println!("╚══════════════════════════════════════════════════════════════╝");
+
+    // ── Phase H: JSON report ──────────────────────────────────────────
+    let report = SimulationReport {
+        mesh_triangles: mesh.indices.len(),
+        layer_count: layers.len(),
+        infill_segments: total_infill,
+        gcode_commands: gcode.command_count(),
+        gcode_extrusion_mm: gcode.total_extrusion_mm,
+        anomaly_count: monitor.anomaly_count(),
+        quality_score: quality,
+        qc_pass: pass,
+        predicted_quality: prediction.predicted_quality,
+        prediction_confidence: prediction.confidence,
+        online_predictions: prediction_log
+            .iter()
+            .map(|(step, q)| OnlinePrediction {
+                step: *step,
+                predicted_quality: *q,
+            })
+            .collect(),
+    };
+    let report_json = serde_json::to_string_pretty(&report).expect("serialize report");
+    std::fs::write("simulation_report.json", &report_json).expect("write simulation_report.json");
+    println!("\n  Report written to simulation_report.json");
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────
@@ -389,5 +545,97 @@ mod tests {
 
         let q_many = run_quality_check(100);
         assert!(q_many >= 0.0, "Quality must not go negative");
+    }
+
+    // ── SimulationReport serde ───────────────────────────────────────
+
+    #[test]
+    fn test_simulation_report_serde() {
+        let report = SimulationReport {
+            mesh_triangles: 1000,
+            layer_count: 50,
+            infill_segments: 200,
+            gcode_commands: 5000,
+            gcode_extrusion_mm: 123.456,
+            anomaly_count: 3,
+            quality_score: 0.85,
+            qc_pass: true,
+            predicted_quality: 0.82,
+            prediction_confidence: 0.91,
+            online_predictions: vec![
+                OnlinePrediction {
+                    step: 10,
+                    predicted_quality: 0.80,
+                },
+                OnlinePrediction {
+                    step: 20,
+                    predicted_quality: 0.83,
+                },
+            ],
+        };
+        let json = serde_json::to_string(&report).expect("serialise");
+        let deserialized: SimulationReport = serde_json::from_str(&json).expect("deserialise");
+        assert_eq!(deserialized.mesh_triangles, 1000);
+        assert_eq!(deserialized.layer_count, 50);
+        assert_eq!(deserialized.anomaly_count, 3);
+        assert!((deserialized.quality_score - 0.85).abs() < 1e-10);
+        assert!(deserialized.qc_pass);
+        assert_eq!(deserialized.online_predictions.len(), 2);
+        assert_eq!(deserialized.online_predictions[0].step, 10);
+        assert!((deserialized.online_predictions[1].predicted_quality - 0.83).abs() < 1e-10);
+    }
+
+    // ── Thermal quality model ────────────────────────────────────────
+
+    #[test]
+    fn test_thermal_quality_stable_temps() {
+        // Perfectly stable temps at target → quality degraded only by anomalies.
+        let nozzle_temps: Vec<f32> = vec![200.0; 10];
+        let bed_temps: Vec<f32> = vec![60.0; 10];
+        let q = run_quality_check_thermal(0, &nozzle_temps, &bed_temps, 200.0, 60.0);
+        // With stable temps at target: stddev=0, mean=target → factors all 1.0.
+        assert!(
+            (q - 1.0).abs() < 1e-6,
+            "Stable temps, no anomalies → quality 1.0, got {q}"
+        );
+    }
+
+    #[test]
+    fn test_thermal_quality_unstable_temps() {
+        // High-variance nozzle temps → reduced quality.
+        let nozzle_temps: Vec<f32> = vec![180.0, 220.0, 180.0, 220.0, 180.0, 220.0];
+        let bed_temps: Vec<f32> = vec![60.0; 6];
+        let q_unstable = run_quality_check_thermal(0, &nozzle_temps, &bed_temps, 200.0, 60.0);
+        let q_stable = run_quality_check_thermal(0, &vec![200.0f32; 6], &bed_temps, 200.0, 60.0);
+        assert!(
+            q_unstable < q_stable,
+            "Unstable nozzle temp ({q_unstable:.3}) should yield lower quality than stable ({q_stable:.3})"
+        );
+    }
+
+    #[test]
+    fn test_thermal_quality_off_target() {
+        // Consistently off-target nozzle → reduced quality vs on-target.
+        let on_target: Vec<f32> = vec![200.0; 10];
+        let off_target: Vec<f32> = vec![185.0; 10];
+        let bed_temps: Vec<f32> = vec![60.0; 10];
+        let q_on = run_quality_check_thermal(0, &on_target, &bed_temps, 200.0, 60.0);
+        let q_off = run_quality_check_thermal(0, &off_target, &bed_temps, 200.0, 60.0);
+        assert!(
+            q_off < q_on,
+            "Off-target nozzle temp ({q_off:.3}) should yield lower quality than on-target ({q_on:.3})"
+        );
+    }
+
+    // ── Quality check clamped to [0, 1] ─────────────────────────────
+
+    #[test]
+    fn test_thermal_quality_always_valid() {
+        // Extreme values should not produce NaN or out-of-range results.
+        let nozzle: Vec<f32> = vec![500.0, 0.1, 500.0]; // wild oscillation
+        let bed: Vec<f32> = vec![100.0, 0.0, 100.0];
+        let q = run_quality_check_thermal(100, &nozzle, &bed, 200.0, 60.0);
+        assert!(q.is_finite(), "quality must be finite, got {q}");
+        assert!(q >= 0.0 && q <= 1.0, "quality out of range: {q}");
     }
 }

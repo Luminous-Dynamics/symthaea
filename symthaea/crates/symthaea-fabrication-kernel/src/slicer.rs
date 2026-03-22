@@ -130,6 +130,28 @@ impl Default for SliceConfig {
     }
 }
 
+impl SliceConfig {
+    /// Validate configuration, returning a list of warnings.
+    pub fn validate(&self) -> Vec<String> {
+        let mut warnings = Vec::new();
+        if self.layer_height <= 0.0 {
+            warnings.push("layer_height must be positive".into());
+        }
+        if self.nozzle_diameter <= 0.0 {
+            warnings.push("nozzle_diameter must be positive".into());
+        }
+        if let Some(ref infill) = self.infill {
+            if infill.density <= 0.0 || infill.density > 1.0 {
+                warnings.push(format!(
+                    "infill density {} is outside (0.0, 1.0] — will be clamped",
+                    infill.density
+                ));
+            }
+        }
+        warnings
+    }
+}
+
 /// Result of slicing a mesh at one Z-height.
 #[derive(Debug, Clone)]
 pub struct SliceLayer {
@@ -1051,6 +1073,60 @@ mod tests {
         let a = [0.0, 0.0, 1.0];
         let b = [1.0, 0.0, 1.0];
         assert!(edge_z_intersection(a, b, 1.0).is_none());
+    }
+
+    // ── SliceConfig validation ──────────────────────────────────────
+
+    #[test]
+    fn test_slice_config_valid() {
+        let config = SliceConfig::default();
+        let warnings = config.validate();
+        assert!(
+            warnings.is_empty(),
+            "default config should produce no warnings, got: {:?}",
+            warnings
+        );
+    }
+
+    #[test]
+    fn test_slice_config_invalid_density() {
+        use crate::infill::{InfillConfig, InfillPattern};
+        let config = SliceConfig {
+            infill: Some(InfillConfig {
+                pattern: InfillPattern::Rectilinear,
+                density: 1.5,
+                angle_degrees: 45.0,
+            }),
+            ..SliceConfig::default()
+        };
+        let warnings = config.validate();
+        assert!(
+            !warnings.is_empty(),
+            "density > 1.0 should produce a warning"
+        );
+        assert!(
+            warnings.iter().any(|w| w.contains("density")),
+            "warning should mention density, got: {:?}",
+            warnings
+        );
+    }
+
+    #[test]
+    fn test_slice_config_invalid_layer_height() {
+        let config = SliceConfig {
+            layer_height: -0.1,
+            ..SliceConfig::default()
+        };
+        let warnings = config.validate();
+        assert!(
+            !warnings.is_empty(),
+            "negative layer_height should produce a warning"
+        );
+        assert!(
+            warnings.iter().any(|w| w.contains("layer_height")),
+            "warning should mention layer_height, got: {:?}",
+            warnings
+        );
     }
 
     // ── Turning angle ───────────────────────────────────────────────
