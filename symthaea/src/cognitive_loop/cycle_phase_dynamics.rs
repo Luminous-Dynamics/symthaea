@@ -4373,6 +4373,82 @@ impl CognitiveLoopService {
                 // Use GroundedUnderstanding to build a BinaryHV → ContinuousHV.
                 semantic_hv: nsm_semantic_hv.clone(),
                 semantic_confidence: nsm_semantic_confidence,
+
+                // Epistemic Cube: extract from current structured thought's domain context
+                cube_e_tier: self
+                    .language_comm
+                    .last_structured_thought
+                    .as_ref()
+                    .and_then(|t| t.domain_context.as_ref())
+                    .and_then(|dc| dc.cube.as_ref())
+                    .map(|cube| match cube.e {
+                        crate::mind::structured_thought::ETier::E0 => 0u8,
+                        crate::mind::structured_thought::ETier::E1 => 1,
+                        crate::mind::structured_thought::ETier::E2 => 2,
+                        crate::mind::structured_thought::ETier::E3 => 3,
+                        crate::mind::structured_thought::ETier::E4 => 4,
+                    }),
+                cube_n_tier: self
+                    .language_comm
+                    .last_structured_thought
+                    .as_ref()
+                    .and_then(|t| t.domain_context.as_ref())
+                    .and_then(|dc| dc.cube.as_ref())
+                    .map(|cube| match cube.n {
+                        crate::mind::structured_thought::NTier::N0 => 0u8,
+                        crate::mind::structured_thought::NTier::N1 => 1,
+                        crate::mind::structured_thought::NTier::N2 => 2,
+                        crate::mind::structured_thought::NTier::N3 => 3,
+                    }),
+                cube_m_tier: self
+                    .language_comm
+                    .last_structured_thought
+                    .as_ref()
+                    .and_then(|t| t.domain_context.as_ref())
+                    .and_then(|dc| dc.cube.as_ref())
+                    .map(|cube| match cube.m {
+                        crate::mind::structured_thought::MTier::M0 => 0u8,
+                        crate::mind::structured_thought::MTier::M1 => 1,
+                        crate::mind::structured_thought::MTier::M2 => 2,
+                        crate::mind::structured_thought::MTier::M3 => 3,
+                    }),
+                cube_h_value: self
+                    .language_comm
+                    .last_structured_thought
+                    .as_ref()
+                    .and_then(|t| t.domain_context.as_ref())
+                    .and_then(|dc| dc.cube.as_ref())
+                    .map(|cube| cube.harmonic().to_f64() as f32)
+                    .unwrap_or(0.25),
+                cube_quality: self
+                    .language_comm
+                    .last_structured_thought
+                    .as_ref()
+                    .and_then(|t| t.domain_context.as_ref())
+                    .and_then(|dc| dc.cube.as_ref())
+                    .map(|cube| {
+                        let e = match cube.e {
+                            crate::mind::structured_thought::ETier::E0 => 0.0f32,
+                            crate::mind::structured_thought::ETier::E1 => 1.0,
+                            crate::mind::structured_thought::ETier::E2 => 2.0,
+                            crate::mind::structured_thought::ETier::E3 => 3.0,
+                            crate::mind::structured_thought::ETier::E4 => 4.0,
+                        };
+                        let n = match cube.n {
+                            crate::mind::structured_thought::NTier::N0 => 0.0f32,
+                            crate::mind::structured_thought::NTier::N1 => 1.0,
+                            crate::mind::structured_thought::NTier::N2 => 2.0,
+                            crate::mind::structured_thought::NTier::N3 => 3.0,
+                        };
+                        let m = match cube.m {
+                            crate::mind::structured_thought::MTier::M0 => 0.0f32,
+                            crate::mind::structured_thought::MTier::M1 => 1.0,
+                            crate::mind::structured_thought::MTier::M2 => 2.0,
+                            crate::mind::structured_thought::MTier::M3 => 3.0,
+                        };
+                        (e / 4.0) * 0.40 + (n / 3.0) * 0.35 + (m / 3.0) * 0.25
+                    })
+                    .unwrap_or(0.0),
             };
             if let Some(mut result) = broca.generate(signals) {
                 if !result.text.is_empty() {
