@@ -1,4 +1,6 @@
-/**
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root/**
  * @mycelix/sdk hApp Integrations
  *
  * Pre-built integration modules for all Civilizational OS domains.
@@ -1028,3 +1030,53 @@ export type {
   FHIRConsentProvision,
   FHIRBundle,
 } from './health-fhir/index.js';
+
+// ============================================================================
+// Circular Economy Integration
+// ============================================================================
+
+export type {
+  WasteCategory,
+  ContaminationLevel,
+  EndOfLifeStrategy,
+  WasteStreamStatus,
+  ClassificationMethod,
+  FacilityType,
+  FacilityStatus,
+  WasteStream,
+  WasteClassification,
+  WasteFacility,
+  WasteRouteFactors,
+  DiversionRateResult,
+  ContaminationFeedback,
+  CompostMethod,
+  CompostBatchStatus,
+  CompostActionType,
+  ActionRecommender,
+  CompostInput,
+  CompostReading,
+  RecommendedAction,
+  BatchEvaluation,
+  CarbonAttribution,
+  NutrientEstimate,
+  SecondaryMaterialType,
+  MaterialQualityGrade,
+  ListingStatus,
+  OrderStatus,
+  NutrientInfo,
+  SecondaryMaterialListing,
+  DemandMatchInput,
+  ListingMatch,
+} from './circular/index.js';
+
+export {
+  THERMOPHILIC_MIN_C,
+  THERMOPHILIC_MAX_C,
+  MOISTURE_MIN_PCT,
+  MOISTURE_MAX_PCT,
+  MOISTURE_OPTIMAL_PCT,
+  OXYGEN_MIN_PCT,
+  CN_RATIO_MIN,
+  CN_RATIO_MAX,
+  COMPOST_CO2E_AVOIDED_PER_TONNE,
+} from './circular/index.js';

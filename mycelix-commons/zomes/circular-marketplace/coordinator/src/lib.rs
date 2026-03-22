@@ -372,3 +372,75 @@ mod tests {
         assert!(d > 0.5 && d < 5.0, "Expected ~1.5km, got {}", d);
     }
 }
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn arb_quality() -> impl Strategy<Value = MaterialQualityGrade> {
+        prop_oneof![
+            Just(MaterialQualityGrade::Premium),
+            Just(MaterialQualityGrade::Standard),
+            Just(MaterialQualityGrade::Industrial),
+        ]
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(500))]
+
+        /// Quality filtering is transitive: if A meets B and B meets C, then A meets C.
+        #[test]
+        fn quality_filter_transitive(
+            a in arb_quality(),
+            b in arb_quality(),
+            c in arb_quality(),
+        ) {
+            if quality_meets_minimum(&a, &b) && quality_meets_minimum(&b, &c) {
+                prop_assert!(quality_meets_minimum(&a, &c),
+                    "Transitivity violated: {:?} meets {:?} and {:?} meets {:?} but {:?} doesn't meet {:?}",
+                    a, b, b, c, a, c);
+            }
+        }
+
+        /// Quality filtering is reflexive: every grade meets itself.
+        #[test]
+        fn quality_filter_reflexive(grade in arb_quality()) {
+            prop_assert!(quality_meets_minimum(&grade, &grade),
+                "{:?} should meet itself", grade);
+        }
+
+        /// Premium meets all minimums.
+        #[test]
+        fn premium_meets_all(minimum in arb_quality()) {
+            prop_assert!(quality_meets_minimum(&MaterialQualityGrade::Premium, &minimum),
+                "Premium should meet {:?}", minimum);
+        }
+
+        /// Haversine distance is non-negative and symmetric.
+        #[test]
+        fn haversine_non_negative_symmetric(
+            lat1 in -90.0..=90.0_f64,
+            lon1 in -180.0..=180.0_f64,
+            lat2 in -90.0..=90.0_f64,
+            lon2 in -180.0..=180.0_f64,
+        ) {
+            let d1 = haversine_km(lat1, lon1, lat2, lon2);
+            let d2 = haversine_km(lat2, lon2, lat1, lon1);
+            prop_assert!(d1 >= 0.0, "Distance must be non-negative: {}", d1);
+            prop_assert!(d1.is_finite(), "Distance must be finite");
+            prop_assert!((d1 - d2).abs() < 0.001,
+                "Distance must be symmetric: {} vs {}", d1, d2);
+        }
+
+        /// Same point has zero distance.
+        #[test]
+        fn haversine_same_point_zero(
+            lat in -90.0..=90.0_f64,
+            lon in -180.0..=180.0_f64,
+        ) {
+            let d = haversine_km(lat, lon, lat, lon);
+            prop_assert!(d < 0.001, "Same point should have ~0 distance: {}", d);
+        }
+    }
+}

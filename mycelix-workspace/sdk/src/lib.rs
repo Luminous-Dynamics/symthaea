@@ -1,4 +1,6 @@
-// Clippy configuration - allow certain lints that are too noisy
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root// Clippy configuration - allow certain lints that are too noisy
 #![allow(clippy::type_complexity)]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::unreadable_literal)]
@@ -77,6 +79,7 @@ pub mod matl;
 // TypeScript binding generation (ts-export feature only)
 pub mod agentic;
 pub mod bridge;
+pub mod circular;
 pub mod credentials;
 pub mod economics;
 pub mod epistemic;

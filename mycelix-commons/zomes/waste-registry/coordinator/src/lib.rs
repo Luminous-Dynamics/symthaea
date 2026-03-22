@@ -206,6 +206,115 @@ pub fn get_classifications(stream_hash: ActionHash) -> ExternResult<Vec<Record>>
 }
 
 // ============================================================================
+// CONTAMINATION FEEDBACK LOOP
+// ============================================================================
+
+/// Result of contamination assessment for a waste stream
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ContaminationFeedback {
+    /// Was contamination detected?
+    pub contamination_detected: bool,
+    /// Severity level (0 = clean, 3 = hazardous)
+    pub severity: u8,
+    /// Contaminants found (from classification mismatch)
+    pub contaminants: Vec<String>,
+    /// Alert sent to source?
+    pub alert_emitted: bool,
+}
+
+/// Check a classification for contamination relative to the original stream category.
+/// If contamination is found, emit an alert to the source and update stream status.
+///
+/// This closes the feedback loop: classify → detect contamination → alert source.
+#[hdk_extern]
+pub fn check_contamination_feedback(
+    classification_hash: ActionHash,
+) -> ExternResult<ContaminationFeedback> {
+    let _eligibility =
+        require_consciousness(&requirement_for_basic(), "check_contamination_feedback")?;
+
+    // Get the classification
+    let class_record = get(classification_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Classification not found".into())))?;
+    let classification: WasteClassification = class_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode classification: {}",
+                e
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Classification entry not found".into()
+        )))?;
+
+    // Get the original waste stream
+    let stream_record = get(classification.stream_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Waste stream not found".into())))?;
+    let stream: WasteStream = stream_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode stream: {}",
+                e
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Stream entry not found".into()
+        )))?;
+
+    // Compare classification contamination level against original
+    let class_severity = classification.contamination_level.severity();
+    let stream_severity = stream.contamination_level.severity();
+
+    let contamination_detected = class_severity > stream_severity;
+    let mut contaminants = Vec::new();
+
+    // If the classified category differs from the original, record the mismatch
+    if format!("{:?}", classification.category) != format!("{:?}", stream.waste_category) {
+        contaminants.push(format!(
+            "Expected {:?}, found {:?}",
+            stream.waste_category, classification.category
+        ));
+    }
+
+    // Higher contamination level detected
+    if contamination_detected {
+        contaminants.push(format!(
+            "Contamination level escalated from {:?} to {:?}",
+            stream.contamination_level, classification.contamination_level
+        ));
+    }
+
+    let alert_emitted = !contaminants.is_empty();
+
+    if alert_emitted {
+        // Emit contamination alert signal for UI + upstream notification
+        let _ = emit_signal(&serde_json::json!({
+            "event_type": "contamination_alert",
+            "source_zome": "waste_registry",
+            "payload": {
+                "stream_id": stream.id,
+                "source_did": stream.source_did,
+                "severity": class_severity,
+                "contaminants": contaminants,
+                "confidence": classification.confidence,
+                "method": format!("{:?}", classification.method),
+            }
+        }));
+    }
+
+    Ok(ContaminationFeedback {
+        contamination_detected,
+        severity: class_severity,
+        contaminants,
+        alert_emitted,
+    })
+}
+
+// ============================================================================
 // FACILITIES
 // ============================================================================
 
@@ -602,5 +711,34 @@ mod tests {
         let diverted = composted + recycled;
         let rate = (diverted / total) * 100.0;
         assert!((rate - 50.0).abs() < 0.001);
+    }
+
+    // -- Contamination feedback tests --
+
+    #[test]
+    fn test_contamination_feedback_struct() {
+        let feedback = ContaminationFeedback {
+            contamination_detected: true,
+            severity: 2,
+            contaminants: vec!["Plastic in organic stream".to_string()],
+            alert_emitted: true,
+        };
+        assert!(feedback.contamination_detected);
+        assert_eq!(feedback.severity, 2);
+        assert!(!feedback.contaminants.is_empty());
+        assert!(feedback.alert_emitted);
+    }
+
+    #[test]
+    fn test_clean_stream_no_feedback() {
+        let feedback = ContaminationFeedback {
+            contamination_detected: false,
+            severity: 0,
+            contaminants: vec![],
+            alert_emitted: false,
+        };
+        assert!(!feedback.contamination_detected);
+        assert!(feedback.contaminants.is_empty());
+        assert!(!feedback.alert_emitted);
     }
 }

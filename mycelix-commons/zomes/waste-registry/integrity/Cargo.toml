@@ -15,3 +15,6 @@ serde_json = { workspace = true }
 holochain_serialized_bytes = { workspace = true }
 
 mycelix-bridge-entry-types = { workspace = true }
+
+[dev-dependencies]
+proptest = "1"

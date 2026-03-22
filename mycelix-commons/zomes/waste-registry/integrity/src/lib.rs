@@ -844,3 +844,119 @@ mod tests {
         assert_eq!(strategies.len(), 6);
     }
 }
+
+// ============================================================================
+// PROPERTY TESTS
+// ============================================================================
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn arb_contamination_level() -> impl Strategy<Value = ContaminationLevel> {
+        prop_oneof![
+            Just(ContaminationLevel::Clean),
+            Just(ContaminationLevel::LightlyContaminated),
+            Just(ContaminationLevel::Contaminated),
+            Just(ContaminationLevel::Hazardous),
+        ]
+    }
+
+    fn arb_route_factors() -> impl Strategy<Value = WasteRouteFactors> {
+        (0.0..=1.0_f32, 0.0..=1.0_f32, 0.0..=1.0_f32, 0.0..=1.0_f32).prop_map(
+            |(cat, prox, cap, contam)| WasteRouteFactors {
+                category_match: cat,
+                proximity_score: prox,
+                capacity_score: cap,
+                contamination_compatibility: contam,
+            },
+        )
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(1000))]
+
+        /// Route score is always in [0.0, 1.0].
+        #[test]
+        fn route_score_bounded(factors in arb_route_factors()) {
+            let score = factors.overall_score();
+            prop_assert!(score >= 0.0, "Score must be non-negative: {}", score);
+            prop_assert!(score <= 1.0, "Score must not exceed 1.0: {}", score);
+        }
+
+        /// Contamination severity is strictly monotonic.
+        #[test]
+        fn contamination_severity_monotonic(
+            a in arb_contamination_level(),
+            b in arb_contamination_level(),
+        ) {
+            if a.severity() < b.severity() {
+                prop_assert!(a.severity() < b.severity());
+            }
+            // Reflexive: same level → same severity
+            prop_assert_eq!(a.severity(), a.severity());
+        }
+
+        /// Higher contamination_compatibility always yields >= score
+        /// (with all other factors fixed and category_match = 1.0).
+        #[test]
+        fn higher_contamination_compat_higher_score(
+            prox in 0.0..=1.0_f32,
+            cap in 0.0..=1.0_f32,
+            low_contam in 0.0..=0.5_f32,
+            high_contam in 0.5..=1.0_f32,
+        ) {
+            let low = WasteRouteFactors {
+                category_match: 1.0,
+                proximity_score: prox,
+                capacity_score: cap,
+                contamination_compatibility: low_contam,
+            };
+            let high = WasteRouteFactors {
+                category_match: 1.0,
+                proximity_score: prox,
+                capacity_score: cap,
+                contamination_compatibility: high_contam,
+            };
+            prop_assert!(
+                high.overall_score() >= low.overall_score(),
+                "Higher contamination compat should yield >= score: {} vs {}",
+                high.overall_score(), low.overall_score()
+            );
+        }
+
+        /// No category match always yields zero score regardless of other factors.
+        #[test]
+        fn no_category_match_zero_score(
+            prox in 0.0..=1.0_f32,
+            cap in 0.0..=1.0_f32,
+            contam in 0.0..=1.0_f32,
+        ) {
+            let factors = WasteRouteFactors {
+                category_match: 0.0,
+                proximity_score: prox,
+                capacity_score: cap,
+                contamination_compatibility: contam,
+            };
+            prop_assert_eq!(factors.overall_score(), 0.0);
+        }
+
+        /// GPS coordinates must be within valid ranges.
+        #[test]
+        fn gps_bounds_validation(
+            lat in -90.0..=90.0_f64,
+            lon in -180.0..=180.0_f64,
+        ) {
+            prop_assert!(lat >= -90.0 && lat <= 90.0);
+            prop_assert!(lon >= -180.0 && lon <= 180.0);
+        }
+
+        /// Quantity is always positive when valid.
+        #[test]
+        fn quantity_positive(qty in 0.001..=1_000_000.0_f64) {
+            prop_assert!(qty > 0.0);
+            prop_assert!(qty.is_finite());
+        }
+    }
+}

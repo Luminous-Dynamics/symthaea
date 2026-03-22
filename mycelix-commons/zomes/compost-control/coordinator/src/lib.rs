@@ -824,3 +824,128 @@ mod tests {
         }
     }
 }
+
+// ============================================================================
+// PROPERTY TESTS
+// ============================================================================
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(1000))]
+
+        /// Carbon attribution is always non-negative for non-negative waste.
+        #[test]
+        fn carbon_attribution_non_negative(waste_kg in 0.0..=1_000_000.0_f64) {
+            let co2e = (waste_kg / 1000.0) * COMPOST_CO2E_AVOIDED_PER_TONNE;
+            prop_assert!(co2e >= 0.0, "CO2e must be non-negative for {}kg: {}", waste_kg, co2e);
+            prop_assert!(co2e.is_finite(), "CO2e must be finite for {}kg", waste_kg);
+        }
+
+        /// Carbon attribution scales linearly with waste.
+        #[test]
+        fn carbon_attribution_linear(
+            waste_kg in 1.0..=100_000.0_f64,
+            factor in 1.0..=10.0_f64,
+        ) {
+            let co2e_1 = (waste_kg / 1000.0) * COMPOST_CO2E_AVOIDED_PER_TONNE;
+            let co2e_f = (waste_kg * factor / 1000.0) * COMPOST_CO2E_AVOIDED_PER_TONNE;
+            let ratio = co2e_f / co2e_1;
+            prop_assert!((ratio - factor).abs() < 0.001,
+                "Carbon should scale linearly: ratio {} vs factor {}", ratio, factor);
+        }
+
+        /// Phase transition from Mixing requires temperature >= 55C.
+        #[test]
+        fn mixing_transition_requires_thermophilic(temp in 0.0..=90.0_f64) {
+            let reading = CompostReading {
+                batch_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+                sensor_id: "S1".to_string(),
+                temperature_c: temp,
+                moisture_pct: 55.0,
+                oxygen_pct: 15.0,
+                ph: 7.0,
+                timestamp_us: 100,
+            };
+            let result = evaluate_phase_transition(&CompostBatchStatus::Mixing, &reading);
+            if temp >= 55.0 {
+                prop_assert!(result.is_some(),
+                    "Temp {}C >= 55C should trigger Mixing→Active transition", temp);
+            } else {
+                prop_assert!(result.is_none(),
+                    "Temp {}C < 55C should NOT trigger Mixing transition", temp);
+            }
+        }
+
+        /// Phase transition from ActiveComposting requires temp < 40C.
+        #[test]
+        fn active_transition_requires_cooldown(temp in 0.0..=90.0_f64) {
+            let reading = CompostReading {
+                batch_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+                sensor_id: "S1".to_string(),
+                temperature_c: temp,
+                moisture_pct: 50.0,
+                oxygen_pct: 15.0,
+                ph: 7.0,
+                timestamp_us: 100,
+            };
+            let result = evaluate_phase_transition(&CompostBatchStatus::ActiveComposting, &reading);
+            if temp < 40.0 {
+                prop_assert!(result.is_some(),
+                    "Temp {}C < 40C should trigger Active→Curing transition", temp);
+            } else {
+                prop_assert!(result.is_none(),
+                    "Temp {}C >= 40C should NOT trigger Active transition", temp);
+            }
+        }
+
+        /// Phase transition from Curing requires temp < 25C.
+        #[test]
+        fn curing_transition_requires_ambient(temp in 0.0..=90.0_f64) {
+            let reading = CompostReading {
+                batch_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+                sensor_id: "S1".to_string(),
+                temperature_c: temp,
+                moisture_pct: 40.0,
+                oxygen_pct: 18.0,
+                ph: 7.0,
+                timestamp_us: 100,
+            };
+            let result = evaluate_phase_transition(&CompostBatchStatus::Curing, &reading);
+            if temp < 25.0 {
+                prop_assert!(result.is_some(),
+                    "Temp {}C < 25C should trigger Curing→Screening transition", temp);
+            } else {
+                prop_assert!(result.is_none(),
+                    "Temp {}C >= 25C should NOT trigger Curing transition", temp);
+            }
+        }
+
+        /// NPK estimates are always non-negative for any resource type.
+        #[test]
+        fn npk_always_non_negative(
+            rt in prop_oneof![
+                Just("KitchenWaste"),
+                Just("GreenWaste"),
+                Just("Biochar"),
+                Just("Vermicompost"),
+                Just("Digestate"),
+                Just("Manure"),
+                Just("Mulch"),
+                Just("CoverCrop"),
+                Just("Inoculant"),
+                Just("UnknownType"),
+            ]
+        ) {
+            let (n, p, k) = estimate_npk(rt);
+            prop_assert!(n >= 0.0, "{} nitrogen must be non-negative: {}", rt, n);
+            prop_assert!(p >= 0.0, "{} phosphorus must be non-negative: {}", rt, p);
+            prop_assert!(k >= 0.0, "{} potassium must be non-negative: {}", rt, k);
+            prop_assert!(n.is_finite() && p.is_finite() && k.is_finite(),
+                "NPK values must be finite for {}", rt);
+        }
+    }
+}

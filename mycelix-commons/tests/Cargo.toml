@@ -47,6 +47,10 @@ path = "sweettest_consciousness_gating.rs"
 name = "sweettest_security_hardening"
 path = "sweettest_security_hardening.rs"
 
+[[test]]
+name = "sweettest_circular_economy"
+path = "sweettest_circular_economy.rs"
+
 [features]
 identity_cluster = []
 civic_cluster = []
