@@ -186,6 +186,191 @@ pub fn get_my_payments(_: ()) -> ExternResult<Vec<Payment>> {
 }
 
 #[hdk_extern]
+pub fn get_po_escrow(po_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let filter = LinkTypeFilter::try_from(LinkTypes::PoToEscrow)?;
+    let links = get_links(LinkQuery::new(po_hash, filter), GetStrategy::default())?;
+    if let Some(link) = links.first() {
+        let hash = link.target.clone().into_action_hash()
+            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid escrow link target".to_string())))?;
+        get(hash, GetOptions::default())
+    } else {
+        Ok(None)
+    }
+}
+
+// ============================================================================
+// Workflow 3: Payment Automation
+// ============================================================================
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FulfillmentPaymentInput {
+    pub po_hash: ActionHash,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FulfillmentPaymentResult {
+    /// "escrow_released" | "payment_created" | "already_paid" | "po_not_received"
+    pub action: String,
+    pub payment_hash: Option<ActionHash>,
+    pub amount: u64,
+    pub currency: String,
+}
+
+#[hdk_extern]
+pub fn process_fulfillment_payment(
+    input: FulfillmentPaymentInput,
+) -> ExternResult<FulfillmentPaymentResult> {
+    // Step 1: Get the purchase order via local call to procurement
+    let po_response = call(
+        CallTargetCell::Local,
+        "procurement_coordinator",
+        "get_purchase_order".into(),
+        None,
+        input.po_hash.clone(),
+    )?;
+
+    let po_value: serde_json::Value = match po_response {
+        ZomeCallResponse::Ok(result) => {
+            serde_json::from_slice(
+                result
+                    .decode::<serde_bytes::ByteBuf>()
+                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+                    .as_ref(),
+            )
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        }
+        ZomeCallResponse::NetworkError(e) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Network error fetching PO: {}",
+                e
+            ))))
+        }
+        ZomeCallResponse::Unauthorized(_, _, _, _) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Unauthorized to fetch PO".to_string()
+            )))
+        }
+        ZomeCallResponse::CountersigningSession(_) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Countersigning failed".to_string()
+            )))
+        }
+        _ => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Unexpected response fetching PO".to_string()
+            )))
+        }
+    };
+
+    // Unwrap the Option<PurchaseOrder>
+    let po = match po_value {
+        serde_json::Value::Null => {
+            return Ok(FulfillmentPaymentResult {
+                action: "po_not_received".to_string(),
+                payment_hash: None,
+                amount: 0,
+                currency: "USD".to_string(),
+            })
+        }
+        v => v,
+    };
+
+    let status = po
+        .get("status")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    let total_amount = po
+        .get("total_amount")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
+
+    let currency = po
+        .get("currency")
+        .and_then(|v| v.as_str())
+        .unwrap_or("USD")
+        .to_string();
+
+    let supplier: AgentPubKey = match po.get("supplier") {
+        Some(v) => serde_json::from_value(v.clone())
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
+        None => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "PO missing supplier field".to_string()
+            )))
+        }
+    };
+
+    let po_number = po
+        .get("po_number")
+        .and_then(|v| v.as_str())
+        .unwrap_or("UNKNOWN")
+        .to_string();
+
+    // Step 2: Check PO has been received
+    if status != "Received" {
+        return Ok(FulfillmentPaymentResult {
+            action: "po_not_received".to_string(),
+            payment_hash: None,
+            amount: total_amount,
+            currency,
+        });
+    }
+
+    // Step 3: Check if already paid
+    let total_paid = get_po_total_paid(input.po_hash.clone())?;
+    if total_paid >= total_amount {
+        return Ok(FulfillmentPaymentResult {
+            action: "already_paid".to_string(),
+            payment_hash: None,
+            amount: total_amount,
+            currency,
+        });
+    }
+
+    // Step 4: Check for funded escrow and release it
+    if let Some(escrow_record) = get_po_escrow(input.po_hash.clone())? {
+        if let Some(escrow) = escrow_record
+            .entry()
+            .to_app_option::<EscrowAccount>()
+            .map_err(|e| wasm_error!(e))?
+        {
+            if escrow.funded_at.is_some() && escrow.released_at.is_none() {
+                let escrow_hash = escrow_record.action_address().clone();
+                release_escrow(escrow_hash.clone())?;
+                return Ok(FulfillmentPaymentResult {
+                    action: "escrow_released".to_string(),
+                    payment_hash: Some(escrow_hash),
+                    amount: escrow.amount,
+                    currency: escrow.currency,
+                });
+            }
+        }
+    }
+
+    // Step 5: Create and confirm a direct payment
+    let remaining = total_amount.saturating_sub(total_paid);
+    let payment_input = CreatePaymentInput {
+        po_hash: input.po_hash.clone(),
+        amount: remaining,
+        currency: currency.clone(),
+        method: PaymentMethod::BankTransfer,
+        payee: supplier,
+        reference: format!("Auto-payment for PO {}", po_number),
+    };
+    let payment_hash = create_payment(payment_input)?;
+    confirm_payment(payment_hash.clone())?;
+
+    Ok(FulfillmentPaymentResult {
+        action: "payment_created".to_string(),
+        payment_hash: Some(payment_hash),
+        amount: remaining,
+        currency,
+    })
+}
+
+#[hdk_extern]
 pub fn get_po_total_paid(po_hash: ActionHash) -> ExternResult<u64> {
     let payments = get_po_payments(po_hash)?;
     let total: u64 = payments.iter()
@@ -198,6 +383,45 @@ pub fn get_po_total_paid(po_hash: ActionHash) -> ExternResult<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_fulfillment_payment_input_serde() {
+        let input = FulfillmentPaymentInput {
+            po_hash: ActionHash::from_raw_36(vec![5u8; 36]),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: FulfillmentPaymentInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.po_hash, ActionHash::from_raw_36(vec![5u8; 36]));
+    }
+
+    #[test]
+    fn test_fulfillment_payment_result_serde() {
+        // escrow_released variant
+        let result = FulfillmentPaymentResult {
+            action: "escrow_released".to_string(),
+            payment_hash: Some(ActionHash::from_raw_36(vec![6u8; 36])),
+            amount: 50_000,
+            currency: "USD".to_string(),
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let back: FulfillmentPaymentResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.action, "escrow_released");
+        assert!(back.payment_hash.is_some());
+        assert_eq!(back.amount, 50_000);
+        assert_eq!(back.currency, "USD");
+
+        // po_not_received variant
+        let result2 = FulfillmentPaymentResult {
+            action: "po_not_received".to_string(),
+            payment_hash: None,
+            amount: 0,
+            currency: "EUR".to_string(),
+        };
+        let json2 = serde_json::to_string(&result2).unwrap();
+        let back2: FulfillmentPaymentResult = serde_json::from_str(&json2).unwrap();
+        assert_eq!(back2.action, "po_not_received");
+        assert!(back2.payment_hash.is_none());
+    }
 
     #[test]
     fn test_payment_status_serde_roundtrip() {

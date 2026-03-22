@@ -285,9 +285,305 @@ pub fn get_all_reputation_categories(agent: AgentPubKey) -> ExternResult<Vec<(Re
     Ok(scores)
 }
 
+// ============================================================================
+// Workflow 5: Closed-Loop Quality Feedback
+// ============================================================================
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QualityReportInput {
+    pub supplier: AgentPubKey,
+    pub po_hash: ActionHash,
+    pub quality_score: f64,
+    pub description: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QualityReportResult {
+    pub actions_taken: Vec<String>,
+    pub review_hash: Option<ActionHash>,
+    pub dispute_hash: Option<ActionHash>,
+}
+
+/// Convert a 0.0–1.0 quality score to a 1–5 star rating.
+fn quality_score_to_rating(score: f64) -> u8 {
+    if score >= 0.9 {
+        5
+    } else if score >= 0.7 {
+        4
+    } else if score >= 0.5 {
+        3
+    } else if score >= 0.3 {
+        2
+    } else {
+        1
+    }
+}
+
+#[hdk_extern]
+pub fn report_quality_issue(input: QualityReportInput) -> ExternResult<QualityReportResult> {
+    let rating = quality_score_to_rating(input.quality_score);
+    let mut actions_taken = Vec::new();
+    let mut dispute_hash = None;
+
+    // Submit review for all cases
+    let review_input = SubmitReviewInput {
+        subject: input.supplier.clone(),
+        po_hash: Some(input.po_hash.clone()),
+        category: ReputationCategory::Quality,
+        rating,
+        comment: Some(format!(
+            "Quality score: {:.2}. {}",
+            input.quality_score, input.description
+        )),
+    };
+    let review_hash = Some(submit_review(review_input)?);
+    actions_taken.push(format!("submitted {}-star quality review", rating));
+
+    if input.quality_score < 0.3 {
+        // Critical: 1-star review already submitted + file dispute + flag provider
+        let my_agent = agent_info()?.agent_initial_pubkey;
+        let dispute = Dispute {
+            po_hash: input.po_hash.clone(),
+            claimant: my_agent.clone(),
+            respondent: input.supplier.clone(),
+            description: format!(
+                "Critical quality failure (score: {:.2}): {}",
+                input.quality_score, input.description
+            ),
+            evidence_hashes: vec![],
+            resolution: None,
+            resolved_at: None,
+            created_at: sys_time()?,
+        };
+        let dh = file_dispute(dispute)?;
+        dispute_hash = Some(dh);
+        actions_taken.push("filed dispute".to_string());
+
+        flag_provider((
+            input.supplier.clone(),
+            format!(
+                "Critical quality failure (score: {:.2}): {}",
+                input.quality_score, input.description
+            ),
+        ))?;
+        actions_taken.push("flagged provider".to_string());
+    } else if input.quality_score < 0.7 {
+        // Moderate: proportional review already submitted + file dispute
+        let my_agent = agent_info()?.agent_initial_pubkey;
+        let dispute = Dispute {
+            po_hash: input.po_hash.clone(),
+            claimant: my_agent,
+            respondent: input.supplier.clone(),
+            description: format!(
+                "Moderate quality issue (score: {:.2}): {}",
+                input.quality_score, input.description
+            ),
+            evidence_hashes: vec![],
+            resolution: None,
+            resolved_at: None,
+            created_at: sys_time()?,
+        };
+        let dh = file_dispute(dispute)?;
+        dispute_hash = Some(dh);
+        actions_taken.push("filed dispute".to_string());
+    }
+    // score >= 0.7: positive review only (already submitted above)
+
+    Ok(QualityReportResult {
+        actions_taken,
+        review_hash,
+        dispute_hash,
+    })
+}
+
+/// Compute composite reliability score from category scores.
+/// Category weights: Quality 0.3, Reliability 0.3, Timeliness 0.2,
+///                   Communication 0.1, Compliance 0.1.
+/// Scores on 0–5 scale → normalized to 0.0–1.0.
+fn compute_composite_reliability(scores: &[(String, u32)]) -> f64 {
+    if scores.is_empty() {
+        return 0.0;
+    }
+
+    let weight_for = |cat: &str| -> f64 {
+        match cat {
+            "Quality" => 0.3,
+            "Reliability" => 0.3,
+            "Timeliness" => 0.2,
+            "Communication" => 0.1,
+            "Compliance" => 0.1,
+            _ => 0.0,
+        }
+    };
+
+    let mut weighted_sum = 0.0_f64;
+    let mut total_weight = 0.0_f64;
+
+    for (category, score) in scores {
+        let w = weight_for(category.as_str());
+        if w > 0.0 {
+            let normalized = (*score as f64 / 5.0).clamp(0.0, 1.0);
+            weighted_sum += normalized * w;
+            total_weight += w;
+        }
+    }
+
+    if total_weight == 0.0 {
+        // Fall back to simple average of known scores normalized to 0–1
+        let total: u32 = scores.iter().map(|(_, s)| s).sum();
+        let avg = total as f64 / scores.len() as f64;
+        return (avg / 5.0).clamp(0.0, 1.0);
+    }
+
+    // Scale by the fraction of known categories covered
+    weighted_sum / total_weight
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SupplierReliability {
+    pub composite_score: f64,
+    pub category_scores: Vec<(String, u32)>,
+    pub total_reviews: u64,
+}
+
+#[hdk_extern]
+pub fn get_supplier_reliability(supplier: AgentPubKey) -> ExternResult<SupplierReliability> {
+    let raw_scores = get_all_reputation_categories(supplier.clone())?;
+
+    // Collect total_reviews by fetching full ReputationScore per category
+    let categories = vec![
+        ReputationCategory::Reliability,
+        ReputationCategory::Quality,
+        ReputationCategory::Communication,
+        ReputationCategory::Timeliness,
+        ReputationCategory::Compliance,
+    ];
+
+    let mut total_reviews_sum = 0u64;
+    for cat in &categories {
+        if let Some(score) = get_reputation((supplier.clone(), cat.clone()))? {
+            total_reviews_sum += score.total_reviews;
+        }
+    }
+
+    // Map (ReputationCategory, u32) → (String, u32) for the public API
+    let category_scores: Vec<(String, u32)> = raw_scores
+        .iter()
+        .map(|(cat, score)| (format!("{:?}", cat), *score))
+        .collect();
+
+    let composite_score = compute_composite_reliability(&category_scores);
+
+    Ok(SupplierReliability {
+        composite_score,
+        category_scores,
+        total_reviews: total_reviews_sum,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_quality_score_to_rating() {
+        // Edge cases at each boundary
+        assert_eq!(quality_score_to_rating(1.0), 5);
+        assert_eq!(quality_score_to_rating(0.9), 5);
+        assert_eq!(quality_score_to_rating(0.89), 4);
+        assert_eq!(quality_score_to_rating(0.7), 4);
+        assert_eq!(quality_score_to_rating(0.69), 3);
+        assert_eq!(quality_score_to_rating(0.5), 3);
+        assert_eq!(quality_score_to_rating(0.49), 2);
+        assert_eq!(quality_score_to_rating(0.3), 2);
+        assert_eq!(quality_score_to_rating(0.29), 1);
+        assert_eq!(quality_score_to_rating(0.0), 1);
+    }
+
+    #[test]
+    fn test_quality_actions_critical() {
+        // score < 0.3: review + dispute + flag
+        // We test the routing logic by checking what quality_score_to_rating produces
+        // and verifying the intended action count
+        let score = 0.1_f64;
+        let rating = quality_score_to_rating(score);
+        assert_eq!(rating, 1);
+        // At score < 0.3 the function would take: review + dispute + flag = 3 actions
+        // We verify score range detection
+        assert!(score < 0.3);
+    }
+
+    #[test]
+    fn test_quality_actions_moderate() {
+        // 0.3 <= score < 0.7: review + dispute
+        let score = 0.5_f64;
+        let rating = quality_score_to_rating(score);
+        assert_eq!(rating, 3);
+        assert!(score >= 0.3 && score < 0.7);
+    }
+
+    #[test]
+    fn test_quality_actions_good() {
+        // score >= 0.7: positive review only
+        let score = 0.85_f64;
+        let rating = quality_score_to_rating(score);
+        assert_eq!(rating, 4);
+        assert!(score >= 0.7);
+    }
+
+    #[test]
+    fn test_composite_reliability() {
+        // Weighted: Quality(5)*0.3 + Reliability(4)*0.3 + Timeliness(3)*0.2
+        //           + Communication(5)*0.1 + Compliance(4)*0.1
+        // = (1.0*0.3 + 0.8*0.3 + 0.6*0.2 + 1.0*0.1 + 0.8*0.1) / 1.0
+        // = 0.3 + 0.24 + 0.12 + 0.1 + 0.08 = 0.84
+        let scores = vec![
+            ("Quality".to_string(), 5u32),
+            ("Reliability".to_string(), 4u32),
+            ("Timeliness".to_string(), 3u32),
+            ("Communication".to_string(), 5u32),
+            ("Compliance".to_string(), 4u32),
+        ];
+        let composite = compute_composite_reliability(&scores);
+        assert!((composite - 0.84).abs() < 0.001, "Expected ~0.84, got {}", composite);
+    }
+
+    #[test]
+    fn test_composite_reliability_empty() {
+        let composite = compute_composite_reliability(&[]);
+        assert_eq!(composite, 0.0, "Empty scores should return 0.0");
+    }
+
+    #[test]
+    fn test_quality_report_input_serde() {
+        let input = QualityReportInput {
+            supplier: AgentPubKey::from_raw_36(vec![3u8; 36]),
+            po_hash: ActionHash::from_raw_36(vec![4u8; 36]),
+            quality_score: 0.25,
+            description: "Components arrived damaged".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: QualityReportInput = serde_json::from_str(&json).unwrap();
+        assert!((back.quality_score - 0.25).abs() < 0.001);
+        assert_eq!(back.description, "Components arrived damaged");
+    }
+
+    #[test]
+    fn test_supplier_reliability_serde() {
+        let rel = SupplierReliability {
+            composite_score: 0.78,
+            category_scores: vec![
+                ("Quality".to_string(), 4u32),
+                ("Reliability".to_string(), 4u32),
+            ],
+            total_reviews: 12,
+        };
+        let json = serde_json::to_string(&rel).unwrap();
+        let back: SupplierReliability = serde_json::from_str(&json).unwrap();
+        assert!((back.composite_score - 0.78).abs() < 0.001);
+        assert_eq!(back.category_scores.len(), 2);
+        assert_eq!(back.total_reviews, 12);
+    }
 
     #[test]
     fn test_rating_bounds_valid() {

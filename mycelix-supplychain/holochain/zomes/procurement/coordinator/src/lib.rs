@@ -360,6 +360,70 @@ pub fn cancel_purchase_order(po_hash: ActionHash) -> ExternResult<ActionHash> {
 mod tests {
     use super::*;
 
+    #[test]
+    fn test_score_supplier_perfect() {
+        // Max reputation (5.0), min lead time (1 out of 30), tiny min order
+        let score = score_supplier(5.0, 1, 30, 1, 1000);
+        // rep_norm=1.0, lead_score=1-(1/30)≈0.9667, order_fit=(1-1/1000)≈0.999
+        // 1.0*0.4 + 0.9667*0.3 + 0.999*0.3 ≈ 0.4 + 0.290 + 0.300 = 0.990
+        assert!(score > 0.9, "Perfect supplier should score > 0.9, got {}", score);
+    }
+
+    #[test]
+    fn test_score_supplier_worst() {
+        // Zero reputation, max lead time, unaffordable min order
+        let score = score_supplier(0.0, 30, 30, 10_000, 1);
+        // rep_norm=0.0, lead_score=1-(30/30)=0.0, order_fit clamped to 0.0
+        assert_eq!(score, 0.0, "Worst supplier should score 0.0");
+    }
+
+    #[test]
+    fn test_score_supplier_balanced() {
+        // Mid reputation (2.5/5), mid lead time (15/30), order fits half
+        let score = score_supplier(2.5, 15, 30, 500, 1000);
+        // rep_norm=0.5, lead_score=0.5, order_fit=0.5
+        // 0.5*0.4 + 0.5*0.3 + 0.5*0.3 = 0.2 + 0.15 + 0.15 = 0.5
+        assert!((score - 0.5).abs() < 0.001, "Balanced supplier should score ~0.5, got {}", score);
+    }
+
+    #[test]
+    fn test_score_max_lead_zero_guard() {
+        // max_lead_time=0 should not panic (guarded by .max(1))
+        let score = score_supplier(3.0, 0, 0, 100, 500);
+        // max_lt=1, lead_score=1-(0/1)=1.0
+        assert!(score.is_finite(), "Score must be finite even when max_lead=0");
+    }
+
+    #[test]
+    fn test_supplier_selection_input_serde() {
+        let input = SupplierSelectionInput {
+            category: "electronics".to_string(),
+            required_quantity: 1000,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: SupplierSelectionInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.category, "electronics");
+        assert_eq!(back.required_quantity, 1000);
+    }
+
+    #[test]
+    fn test_ranked_supplier_serde() {
+        let rs = RankedSupplier {
+            agent: AgentPubKey::from_raw_36(vec![2u8; 36]),
+            company_name: "BestParts Inc".to_string(),
+            score: 0.85,
+            reputation_score: 4.2,
+            lead_time_days: 7,
+            minimum_order_value: 500,
+        };
+        let json = serde_json::to_string(&rs).unwrap();
+        let back: RankedSupplier = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.company_name, "BestParts Inc");
+        assert!((back.score - 0.85).abs() < 0.001);
+        assert_eq!(back.lead_time_days, 7);
+        assert_eq!(back.minimum_order_value, 500);
+    }
+
     /// All valid PurchaseOrderStatus transitions used in the coordinator.
     /// Draft → Submitted → Approved → Received (happy path via approve/fulfill).
     /// Draft → Cancelled, any → Cancelled (cancel_purchase_order).
@@ -456,6 +520,99 @@ mod tests {
         assert_eq!(back.items.len(), 1);
         assert_eq!(back.currency, "USD");
     }
+}
+
+// ============================================================================
+// Workflow 2: Supplier Selection
+// ============================================================================
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SupplierSelectionInput {
+    pub category: String,
+    pub required_quantity: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RankedSupplier {
+    pub agent: AgentPubKey,
+    pub company_name: String,
+    pub score: f64,
+    pub reputation_score: f64,
+    pub lead_time_days: u32,
+    pub minimum_order_value: u64,
+}
+
+/// Pure scoring function — testable without HDK context.
+fn score_supplier(
+    reputation: f64,
+    lead_time_days: u32,
+    max_lead_time: u32,
+    min_order_value: u64,
+    required_quantity: u64,
+) -> f64 {
+    let rep_norm = (reputation / 5.0).clamp(0.0, 1.0);
+    let max_lt = max_lead_time.max(1) as f64;
+    let lead_score = 1.0 - (lead_time_days as f64 / max_lt);
+    let order_fit = if required_quantity == 0 {
+        0.0
+    } else {
+        (1.0 - (min_order_value as f64 / required_quantity as f64)).clamp(0.0, 1.0)
+    };
+    rep_norm * 0.4 + lead_score * 0.3 + order_fit * 0.3
+}
+
+#[hdk_extern]
+pub fn select_best_supplier(input: SupplierSelectionInput) -> ExternResult<Vec<RankedSupplier>> {
+    let suppliers = get_suppliers_by_category(input.category)?;
+
+    if suppliers.is_empty() {
+        return Ok(vec![]);
+    }
+
+    // Find max lead time for normalization
+    let max_lead_time = suppliers.iter().map(|s| s.lead_time_days).max().unwrap_or(1);
+
+    let mut ranked: Vec<RankedSupplier> = Vec::new();
+
+    for supplier in &suppliers {
+        // Get reputation rating from trust zome
+        let rating_result = call(
+            CallTargetCell::Local,
+            "trust_coordinator",
+            "get_provider_rating".into(),
+            None,
+            supplier.agent.clone(),
+        );
+
+        let reputation_score = match rating_result {
+            Ok(ZomeCallResponse::Ok(result)) => {
+                result.decode::<f64>().unwrap_or(0.0)
+            }
+            _ => 0.0,
+        };
+
+        let score = score_supplier(
+            reputation_score,
+            supplier.lead_time_days,
+            max_lead_time,
+            supplier.minimum_order_value,
+            input.required_quantity,
+        );
+
+        ranked.push(RankedSupplier {
+            agent: supplier.agent.clone(),
+            company_name: supplier.company_name.clone(),
+            score,
+            reputation_score,
+            lead_time_days: supplier.lead_time_days,
+            minimum_order_value: supplier.minimum_order_value,
+        });
+    }
+
+    // Sort descending by score
+    ranked.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+
+    Ok(ranked)
 }
 
 #[hdk_extern]

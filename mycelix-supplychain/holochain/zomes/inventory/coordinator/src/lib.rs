@@ -382,26 +382,25 @@ pub fn get_stock_level_by_sku(input: InventoryQueryInput) -> ExternResult<Option
 
 #[hdk_extern]
 pub fn get_low_stock_items(_: ()) -> ExternResult<Vec<(InventoryItem, u64)>> {
-    let items = get_all_items(())?;
+    let results = get_low_stock_items_with_hashes(())?;
+    Ok(results.into_iter().map(|(_, item, stock)| (item, stock)).collect())
+}
+
+#[hdk_extern]
+pub fn get_low_stock_items_with_hashes(_: ()) -> ExternResult<Vec<(ActionHash, InventoryItem, u64)>> {
+    let all_path = Path::from("all_items");
+    let typed = all_path.typed(LinkTypes::AllItems)?;
+    let filter = LinkTypeFilter::try_from(LinkTypes::AllItems)?;
+    let links = get_links(LinkQuery::new(typed.path_entry_hash()?, filter), GetStrategy::default())?;
+
     let mut low_stock = Vec::new();
 
-    for item in items {
-        // Get the item's action hash by looking it up
-        let all_path = Path::from("all_items");
-        let typed = all_path.typed(LinkTypes::AllItems)?;
-        let filter = LinkTypeFilter::try_from(LinkTypes::AllItems)?;
-        let links = get_links(LinkQuery::new(typed.path_entry_hash()?, filter), GetStrategy::default())?;
-
-        for link in links {
-            if let Some(hash) = link.target.clone().into_action_hash() {
-                if let Some(found_item) = get_item(hash.clone())? {
-                    if found_item.sku == item.sku {
-                        let total = get_total_stock(hash)?;
-                        if total < item.reorder_point {
-                            low_stock.push((item.clone(), total));
-                        }
-                        break;
-                    }
+    for link in links {
+        if let Some(hash) = link.target.clone().into_action_hash() {
+            if let Some(item) = get_item(hash.clone())? {
+                let total = get_total_stock(hash.clone())?;
+                if total < item.reorder_point {
+                    low_stock.push((hash, item, total));
                 }
             }
         }
@@ -410,9 +409,247 @@ pub fn get_low_stock_items(_: ()) -> ExternResult<Vec<(InventoryItem, u64)>> {
     Ok(low_stock)
 }
 
+// ============================================================================
+// Workflow 1: Demand-Driven Procurement
+// ============================================================================
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ReorderDetail {
+    pub sku: String,
+    pub item_name: String,
+    pub current_stock: u64,
+    pub reorder_quantity: u64,
+    pub supplier_name: String,
+    pub po_hash: ActionHash,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ReorderSummary {
+    pub items_checked: u32,
+    pub orders_created: u32,
+    pub orders: Vec<ReorderDetail>,
+    pub errors: Vec<String>,
+}
+
+#[hdk_extern]
+pub fn check_and_reorder(_: ()) -> ExternResult<ReorderSummary> {
+    let low_stock_items = get_low_stock_items_with_hashes(())?;
+    let items_checked = low_stock_items.len() as u32;
+    let mut orders = Vec::new();
+    let mut errors = Vec::new();
+
+    for (item_hash, item, current_stock) in low_stock_items {
+        // Select the best supplier for this item's category
+        let selection_input = serde_json::json!({
+            "category": item.category,
+            "required_quantity": item.reorder_quantity,
+        });
+
+        let suppliers_result = call(
+            CallTargetCell::Local,
+            "procurement_coordinator",
+            "select_best_supplier".into(),
+            None,
+            selection_input,
+        );
+
+        let suppliers_response = match suppliers_result {
+            Ok(r) => r,
+            Err(e) => {
+                errors.push(format!("SKU {}: failed to select supplier: {}", item.sku, e));
+                continue;
+            }
+        };
+
+        let suppliers_value: serde_json::Value = match suppliers_response {
+            ZomeCallResponse::Ok(result) => {
+                match serde_json::from_slice(result.decode::<serde_bytes::ByteBuf>()
+                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+                    .as_ref())
+                {
+                    Ok(v) => v,
+                    Err(e) => {
+                        errors.push(format!("SKU {}: failed to decode suppliers: {}", item.sku, e));
+                        continue;
+                    }
+                }
+            }
+            ZomeCallResponse::NetworkError(e) => {
+                errors.push(format!("SKU {}: network error selecting supplier: {}", item.sku, e));
+                continue;
+            }
+            ZomeCallResponse::Unauthorized(_, _, _, _) => {
+                errors.push(format!("SKU {}: unauthorized to select supplier", item.sku));
+                continue;
+            }
+            ZomeCallResponse::CountersigningSession(_) => {
+                errors.push(format!("SKU {}: countersigning failed selecting supplier", item.sku));
+                continue;
+            }
+            _ => {
+                errors.push(format!("SKU {}: unexpected response selecting supplier", item.sku));
+                continue;
+            }
+        };
+
+        let suppliers_arr = match suppliers_value.as_array() {
+            Some(a) => a,
+            None => {
+                errors.push(format!("SKU {}: unexpected response format from select_best_supplier", item.sku));
+                continue;
+            }
+        };
+
+        if suppliers_arr.is_empty() {
+            errors.push(format!("SKU {}: no suppliers available for category '{}'", item.sku, item.category));
+            continue;
+        }
+
+        let best_supplier = &suppliers_arr[0];
+        let supplier_agent_raw = match best_supplier.get("agent") {
+            Some(v) => v,
+            None => {
+                errors.push(format!("SKU {}: supplier missing agent field", item.sku));
+                continue;
+            }
+        };
+
+        let supplier_agent: AgentPubKey = match serde_json::from_value(supplier_agent_raw.clone()) {
+            Ok(a) => a,
+            Err(e) => {
+                errors.push(format!("SKU {}: failed to parse supplier agent: {}", item.sku, e));
+                continue;
+            }
+        };
+
+        let company_name = best_supplier
+            .get("company_name")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Unknown")
+            .to_string();
+
+        // Build PO items from the reorder quantity
+        let po_item = serde_json::json!({
+            "item_code": item.sku,
+            "description": item.name,
+            "quantity": item.reorder_quantity,
+            "unit_price": 1u64,
+            "unit": item.unit,
+        });
+
+        let po_number = format!("AUTO-{}-{}", item.sku, sys_time()?.as_millis());
+        let po_input = serde_json::json!({
+            "po_number": po_number,
+            "supplier": supplier_agent,
+            "items": [po_item],
+            "currency": "USD",
+            "due_date": null,
+            "notes": format!("Auto-generated reorder for SKU {} (stock: {}, reorder point: {})",
+                item.sku, current_stock, item.reorder_point),
+        });
+
+        let po_result = call(
+            CallTargetCell::Local,
+            "procurement_coordinator",
+            "create_purchase_order".into(),
+            None,
+            po_input,
+        );
+
+        let po_response = match po_result {
+            Ok(r) => r,
+            Err(e) => {
+                errors.push(format!("SKU {}: failed to create PO: {}", item.sku, e));
+                continue;
+            }
+        };
+
+        let po_hash: ActionHash = match po_response {
+            ZomeCallResponse::Ok(result) => {
+                match result.decode() {
+                    Ok(h) => h,
+                    Err(e) => {
+                        errors.push(format!("SKU {}: failed to decode PO hash: {}", item.sku, e));
+                        continue;
+                    }
+                }
+            }
+            ZomeCallResponse::NetworkError(e) => {
+                errors.push(format!("SKU {}: network error creating PO: {}", item.sku, e));
+                continue;
+            }
+            ZomeCallResponse::Unauthorized(_, _, _, _) => {
+                errors.push(format!("SKU {}: unauthorized to create PO", item.sku));
+                continue;
+            }
+            ZomeCallResponse::CountersigningSession(_) => {
+                errors.push(format!("SKU {}: countersigning failed creating PO", item.sku));
+                continue;
+            }
+            _ => {
+                errors.push(format!("SKU {}: unexpected response creating PO", item.sku));
+                continue;
+            }
+        };
+
+        let _ = item_hash; // consumed above — suppress lint
+        orders.push(ReorderDetail {
+            sku: item.sku,
+            item_name: item.name,
+            current_stock,
+            reorder_quantity: item.reorder_quantity,
+            supplier_name: company_name,
+            po_hash,
+        });
+    }
+
+    let orders_created = orders.len() as u32;
+    Ok(ReorderSummary {
+        items_checked,
+        orders_created,
+        orders,
+        errors,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_reorder_summary_serde() {
+        let summary = ReorderSummary {
+            items_checked: 5,
+            orders_created: 2,
+            orders: vec![],
+            errors: vec!["SKU X: no suppliers".to_string()],
+        };
+        let json = serde_json::to_string(&summary).unwrap();
+        let back: ReorderSummary = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.items_checked, 5);
+        assert_eq!(back.orders_created, 2);
+        assert_eq!(back.errors.len(), 1);
+        assert_eq!(back.orders.len(), 0);
+    }
+
+    #[test]
+    fn test_reorder_detail_serde() {
+        let detail = ReorderDetail {
+            sku: "BOLT-M6".to_string(),
+            item_name: "M6 Bolt".to_string(),
+            current_stock: 10,
+            reorder_quantity: 500,
+            supplier_name: "Acme Corp".to_string(),
+            po_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+        };
+        let json = serde_json::to_string(&detail).unwrap();
+        let back: ReorderDetail = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.sku, "BOLT-M6");
+        assert_eq!(back.item_name, "M6 Bolt");
+        assert_eq!(back.current_stock, 10);
+        assert_eq!(back.reorder_quantity, 500);
+        assert_eq!(back.supplier_name, "Acme Corp");
+    }
 
     #[test]
     fn test_inventory_query_input_serde() {
