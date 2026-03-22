@@ -158,8 +158,8 @@ impl TrendHistory {
     ///
     /// Returns true if a snapshot was recorded.
     pub fn maybe_record(&mut self, snapshot: QolSnapshot) -> bool {
-        if snapshot.cycle < self.last_sample_cycle + TREND_SAMPLE_INTERVAL
-            && self.last_sample_cycle > 0
+        if !self.snapshots.is_empty()
+            && snapshot.cycle < self.last_sample_cycle + TREND_SAMPLE_INTERVAL as u64
         {
             return false;
         }

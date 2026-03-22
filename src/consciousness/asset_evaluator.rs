@@ -77,7 +77,7 @@ impl AssetEvaluator {
     /// This produces both a value alignment score and captures the evaluator's
     /// consciousness level (Phi) at the time of evaluation.
     pub fn evaluate(
-        &self,
+        &mut self,
         metadata: &AssetMetadata,
         snapshot: &ConsciousnessSnapshot,
     ) -> AssetConsciousnessScore {

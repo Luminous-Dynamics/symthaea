@@ -7,7 +7,7 @@
 //! - Trust and reputation modeling
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use symthaea_core::hdc::ContinuousHV;
 
 /// Configuration for social coherence
@@ -93,7 +93,7 @@ pub struct Relationship {
     /// Reciprocity balance (-1 to 1)
     pub reciprocity: f32,
     /// History of interactions
-    pub interaction_history: Vec<Interaction>,
+    pub interaction_history: VecDeque<Interaction>,
     /// Total positive interactions
     pub positive_interactions: u64,
     /// Total negative interactions
@@ -302,7 +302,7 @@ impl SocialCoherence {
                 trust: 0.5,
                 familiarity: 0.0,
                 reciprocity: 0.0,
-                interaction_history: Vec::new(),
+                interaction_history: VecDeque::new(),
                 positive_interactions: 0,
                 negative_interactions: 0,
             });
@@ -317,9 +317,9 @@ impl SocialCoherence {
             their_response: their_response.into(),
         };
 
-        relationship.interaction_history.push(interaction);
+        relationship.interaction_history.push_back(interaction);
         if relationship.interaction_history.len() > self.config.interaction_memory {
-            relationship.interaction_history.remove(0);
+            relationship.interaction_history.pop_front();
         }
 
         // Update trust based on outcome

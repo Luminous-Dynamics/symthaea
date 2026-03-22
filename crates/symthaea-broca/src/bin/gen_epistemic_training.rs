@@ -275,7 +275,9 @@ fn build_channels(
 #[derive(serde::Serialize)]
 struct TrainingPair {
     channels: Vec<f32>,
-    target: String,
+    target_text: String,
+    #[serde(default)]
+    target_ids: Vec<u32>,
     e_tier: u8,
     n_tier: u8,
     m_tier: u8,
@@ -306,11 +308,12 @@ fn generate_pairs(rng: &mut Rng, count: usize) -> Vec<TrainingPair> {
                     let arousal = base_arousal + (rng.next_f32() - 0.5) * 0.2;
 
                     let channels = build_channels(rng, e, n, m, h, quality, valence, arousal, psi);
-                    let target = compose_text(rng, e, n, m, h);
+                    let target_text = compose_text(rng, e, n, m, h);
 
                     pairs.push(TrainingPair {
                         channels: channels.channels.to_vec(),
-                        target,
+                        target_text,
+                        target_ids: Vec::new(),
                         e_tier: e,
                         n_tier: n,
                         m_tier: m,
@@ -340,11 +343,12 @@ fn generate_pairs(rng: &mut Rng, count: usize) -> Vec<TrainingPair> {
         let arousal = base_arousal + (rng.next_f32() - 0.5) * 0.2;
 
         let channels = build_channels(rng, e, n, m, h, quality, valence, arousal, psi);
-        let target = compose_text(rng, e, n, m, h);
+        let target_text = compose_text(rng, e, n, m, h);
 
         pairs.push(TrainingPair {
             channels: channels.channels.to_vec(),
-            target,
+            target_text,
+            target_ids: Vec::new(),
             e_tier: e,
             n_tier: n,
             m_tier: m,

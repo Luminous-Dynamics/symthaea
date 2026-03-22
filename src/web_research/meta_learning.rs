@@ -6,7 +6,7 @@
 //! domain, and develops domain-specific expertise.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use super::types::{ResearchSource, VerificationOutcome};
 
@@ -178,7 +178,7 @@ pub struct EpistemicLearner {
     /// Verification strategies
     strategies: Vec<VerificationStrategy>,
     /// Outcome history
-    outcomes: Vec<VerificationOutcome>,
+    outcomes: VecDeque<VerificationOutcome>,
     /// Meta-Phi tracking
     meta_phi: MetaPhi,
     /// Domain expertise scores
