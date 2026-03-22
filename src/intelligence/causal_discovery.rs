@@ -24,8 +24,8 @@
 //!
 //! This is the best known result on Tübingen benchmark using classical methods.
 
-use rand::SeedableRng;
 use rand::prelude::*;
+use rand::SeedableRng;
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::f64;
@@ -947,7 +947,11 @@ impl CausalDiscoveryEngine {
             .filter(|&&c| c > 0)
             .map(|&c| {
                 let p = c as f64 / n;
-                if p > 1e-15 { -p * p.log2() } else { 0.0 }
+                if p > 1e-15 {
+                    -p * p.log2()
+                } else {
+                    0.0
+                }
             })
             .sum()
     }
@@ -967,7 +971,11 @@ impl CausalDiscoveryEngine {
             .filter(|&&c| c > 0)
             .map(|&c| {
                 let p = c as f64 / n;
-                if p > 1e-15 { -p * p.log2() } else { 0.0 }
+                if p > 1e-15 {
+                    -p * p.log2()
+                } else {
+                    0.0
+                }
             })
             .sum()
     }

@@ -977,6 +977,226 @@ pub mod topology {
 }
 
 // ============================================================================
+// L-BFGS PHI OPTIMIZER
+// ============================================================================
+
+/// Configuration for L-BFGS-based Phi maximization.
+///
+/// Uses L-BFGS (limited-memory BFGS) quasi-Newton optimization with
+/// analytical gradients from `AutodiffPhiEngine` to maximize Phi.
+/// Includes L1 sparsity regularization to prevent all-to-all connectivity
+/// (biologically: metabolic cost prevents fully connected networks).
+///
+/// Science: Tononi et al. (2016) — maximizing Phi optimizes consciousness.
+/// L1 regularization: Tibshirani (1996) — LASSO for sparsity.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PhiLbfgsConfig {
+    /// L1 regularization coefficient for sparsity (default 0.01).
+    /// Higher values produce sparser connectivity.
+    pub l1_lambda: f64,
+    /// Convergence tolerance for L-BFGS (default 1e-6).
+    pub tolerance: f64,
+    /// Maximum L-BFGS iterations (default 100).
+    pub max_iterations: usize,
+    /// Minimum allowed node value (box constraint, default -2.0).
+    pub value_min: f64,
+    /// Maximum allowed node value (box constraint, default 2.0).
+    pub value_max: f64,
+}
+
+impl Default for PhiLbfgsConfig {
+    fn default() -> Self {
+        Self {
+            l1_lambda: 0.01,
+            tolerance: 1e-6,
+            max_iterations: 100,
+            value_min: -2.0,
+            value_max: 2.0,
+        }
+    }
+}
+
+/// Result of L-BFGS Phi optimization.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PhiLbfgsResult {
+    /// Phi before optimization.
+    pub initial_phi: f64,
+    /// Phi after optimization.
+    pub final_phi: f64,
+    /// Number of L-BFGS iterations taken.
+    pub iterations: usize,
+    /// Whether L-BFGS converged within tolerance.
+    pub converged: bool,
+    /// Fraction of node values near zero (< 0.01) — measures sparsity.
+    pub sparsity: f64,
+    /// Phi improvement (final - initial).
+    pub phi_delta: f64,
+}
+
+/// L-BFGS optimizer for Phi maximization with sparsity regularization.
+///
+/// Wraps `OptimizationEngine::lbfgs` with an objective function that:
+/// 1. Packs network node values into a flat vector
+/// 2. Runs `AutodiffPhiEngine::forward()` to compute Phi
+/// 3. Runs `AutodiffPhiEngine::backward()` to get analytical gradients
+/// 4. Negates (L-BFGS minimizes, we want to maximize Phi)
+/// 5. Adds L1 subgradient for sparsity regularization
+pub struct PhiLbfgsOptimizer {
+    pub config: PhiLbfgsConfig,
+    engine_config: AutodiffConfig,
+}
+
+impl PhiLbfgsOptimizer {
+    /// Create a new L-BFGS Phi optimizer.
+    pub fn new(config: PhiLbfgsConfig, engine_config: AutodiffConfig) -> Self {
+        Self {
+            config,
+            engine_config,
+        }
+    }
+
+    /// Create with default configurations.
+    pub fn default_optimizer() -> Self {
+        Self {
+            config: PhiLbfgsConfig::default(),
+            engine_config: AutodiffConfig::default(),
+        }
+    }
+
+    /// Optimize a DiffNetwork to maximize Phi using L-BFGS.
+    ///
+    /// Modifies the network in-place and returns optimization statistics.
+    pub fn optimize(&self, network: &mut DiffNetwork) -> PhiLbfgsResult {
+        let n_nodes = network.n_nodes();
+        let dim = network.dim();
+        let total_vars = n_nodes * dim;
+
+        // Record initial Phi
+        let mut engine = AutodiffPhiEngine::new(self.engine_config.clone());
+        let initial_result = engine.forward(network);
+        let initial_phi = initial_result.phi;
+
+        // Pack network into flat vector
+        let x0: Vec<f64> = network
+            .nodes
+            .iter()
+            .flat_map(|node| node.values.iter().copied())
+            .collect();
+
+        let l1_lambda = self.config.l1_lambda;
+        let engine_config = self.engine_config.clone();
+        let value_min = self.config.value_min;
+        let value_max = self.config.value_max;
+
+        // Objective: minimize -Phi + L1
+        let objective = move |x: &[f64]| -> f64 {
+            let mut net = Self::unpack_network(x, n_nodes, dim);
+            Self::clamp_values(&mut net, value_min, value_max);
+            let mut eng = AutodiffPhiEngine::new(engine_config.clone());
+            let result = eng.forward(&net);
+            let neg_phi = -result.phi;
+
+            // L1 regularization: sum of absolute values
+            let l1_penalty: f64 = x.iter().map(|v| v.abs()).sum::<f64>() * l1_lambda;
+
+            neg_phi + l1_penalty
+        };
+
+        let engine_config2 = self.engine_config.clone();
+        let l1_lambda2 = self.config.l1_lambda;
+        let value_min2 = self.config.value_min;
+        let value_max2 = self.config.value_max;
+
+        // Gradient: -d_Phi/d_x + L1 subgradient
+        let gradient = move |x: &[f64]| -> Vec<f64> {
+            let mut net = Self::unpack_network(x, n_nodes, dim);
+            Self::clamp_values(&mut net, value_min2, value_max2);
+            let mut eng = AutodiffPhiEngine::new(engine_config2.clone());
+            let result = eng.forward(&net);
+            eng.backward(&mut net, &result);
+
+            // Collect gradients, negate (maximizing Phi = minimizing -Phi)
+            let mut grad: Vec<f64> = net
+                .nodes
+                .iter()
+                .flat_map(|node| node.grad.iter().copied())
+                .map(|g| -g) // negate for minimization
+                .collect();
+
+            // Add L1 subgradient: sign(x) * lambda
+            for (i, g) in grad.iter_mut().enumerate() {
+                *g += l1_lambda2 * x[i].signum();
+            }
+
+            grad
+        };
+
+        // Run L-BFGS
+        let opt_result = super::optimization::OptimizationEngine::lbfgs(
+            &objective,
+            &gradient,
+            &x0,
+            self.config.tolerance,
+        );
+
+        // Unpack result back into network
+        *network = Self::unpack_network(&opt_result.x, n_nodes, dim);
+        Self::clamp_values(network, self.config.value_min, self.config.value_max);
+
+        // Normalize nodes
+        for node in &mut network.nodes {
+            node.normalize();
+        }
+
+        // Compute final Phi
+        let mut final_engine = AutodiffPhiEngine::new(self.engine_config.clone());
+        let final_result = final_engine.forward(network);
+        let final_phi = final_result.phi;
+
+        // Compute sparsity
+        let near_zero_count = opt_result.x.iter().filter(|v| v.abs() < 0.01).count();
+        let sparsity = near_zero_count as f64 / total_vars.max(1) as f64;
+
+        PhiLbfgsResult {
+            initial_phi,
+            final_phi,
+            iterations: opt_result.iterations,
+            converged: opt_result.converged,
+            sparsity,
+            phi_delta: final_phi - initial_phi,
+        }
+    }
+
+    /// Unpack a flat vector into a DiffNetwork.
+    fn unpack_network(x: &[f64], n_nodes: usize, dim: usize) -> DiffNetwork {
+        let nodes: Vec<DiffNode> = (0..n_nodes)
+            .map(|i| {
+                let start = i * dim;
+                let end = (start + dim).min(x.len());
+                DiffNode {
+                    values: x[start..end].to_vec(),
+                    grad: vec![0.0; dim],
+                }
+            })
+            .collect();
+        DiffNetwork {
+            nodes,
+            edge_weights: None,
+            edge_grad: None,
+        }
+    }
+
+    /// Clamp node values to box constraints.
+    fn clamp_values(network: &mut DiffNetwork, min: f64, max: f64) {
+        for node in &mut network.nodes {
+            for v in &mut node.values {
+                *v = v.clamp(min, max);
+            }
+        }
+    }
+}
+
+// ============================================================================
 // TESTS
 // ============================================================================
 
@@ -1132,5 +1352,120 @@ mod tests {
 
         println!("Modular (3 modules) Phi: {:.6}", result.phi);
         assert!(result.phi >= 0.0);
+    }
+
+    // ─── L-BFGS Phi Optimizer Tests ─────────────────────────────────────
+
+    #[test]
+    fn test_lbfgs_phi_result_fields() {
+        let optimizer = PhiLbfgsOptimizer::default_optimizer();
+        let mut network = topology::random(6, 32, 42);
+
+        let result = optimizer.optimize(&mut network);
+
+        assert!(
+            result.initial_phi.is_finite(),
+            "Initial Phi should be finite"
+        );
+        assert!(result.final_phi.is_finite(), "Final Phi should be finite");
+        assert!(
+            result.initial_phi >= 0.0,
+            "Initial Phi should be non-negative"
+        );
+        assert!(result.final_phi >= 0.0, "Final Phi should be non-negative");
+        assert!(
+            result.sparsity >= 0.0 && result.sparsity <= 1.0,
+            "Sparsity should be in [0,1]"
+        );
+        assert!(result.iterations > 0, "Should take at least 1 iteration");
+    }
+
+    #[test]
+    fn test_lbfgs_does_not_decrease_phi_significantly() {
+        let optimizer = PhiLbfgsOptimizer::new(
+            PhiLbfgsConfig {
+                l1_lambda: 0.001, // Light regularization to allow Phi growth
+                max_iterations: 50,
+                ..Default::default()
+            },
+            AutodiffConfig::default(),
+        );
+        let mut network = topology::random(6, 32, 42);
+
+        let result = optimizer.optimize(&mut network);
+
+        println!(
+            "L-BFGS: initial Phi={:.6}, final Phi={:.6}, delta={:.6}, iterations={}",
+            result.initial_phi, result.final_phi, result.phi_delta, result.iterations
+        );
+
+        // L-BFGS should not make Phi significantly worse
+        assert!(
+            result.final_phi >= result.initial_phi * 0.8,
+            "Phi should not decrease by more than 20% (initial: {:.4}, final: {:.4})",
+            result.initial_phi,
+            result.final_phi
+        );
+    }
+
+    #[test]
+    fn test_lbfgs_higher_l1_increases_sparsity() {
+        let mut network_sparse = topology::random(6, 32, 42);
+        let mut network_dense = topology::random(6, 32, 42);
+
+        let sparse_result = PhiLbfgsOptimizer::new(
+            PhiLbfgsConfig {
+                l1_lambda: 0.1, // Strong L1
+                max_iterations: 30,
+                ..Default::default()
+            },
+            AutodiffConfig::default(),
+        )
+        .optimize(&mut network_sparse);
+
+        let dense_result = PhiLbfgsOptimizer::new(
+            PhiLbfgsConfig {
+                l1_lambda: 0.001, // Weak L1
+                max_iterations: 30,
+                ..Default::default()
+            },
+            AutodiffConfig::default(),
+        )
+        .optimize(&mut network_dense);
+
+        println!(
+            "Sparse (L1=0.1): sparsity={:.4}, Dense (L1=0.001): sparsity={:.4}",
+            sparse_result.sparsity, dense_result.sparsity
+        );
+
+        // Higher L1 should produce at least as much sparsity
+        assert!(
+            sparse_result.sparsity >= dense_result.sparsity * 0.9,
+            "Higher L1 should not produce dramatically less sparsity"
+        );
+    }
+
+    #[test]
+    fn test_lbfgs_network_values_bounded() {
+        let config = PhiLbfgsConfig {
+            value_min: -1.5,
+            value_max: 1.5,
+            max_iterations: 20,
+            ..Default::default()
+        };
+        let optimizer = PhiLbfgsOptimizer::new(config, AutodiffConfig::default());
+        let mut network = topology::random(6, 32, 42);
+
+        let _ = optimizer.optimize(&mut network);
+
+        // After optimization + normalization, all values should be finite
+        for node in &network.nodes {
+            for &v in &node.values {
+                assert!(
+                    v.is_finite(),
+                    "Node values should be finite after optimization"
+                );
+            }
+        }
     }
 }

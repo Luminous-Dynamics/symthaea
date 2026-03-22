@@ -179,10 +179,23 @@ impl SensorBridge {
 
         // Compute salience from content keywords
         let lower = truncated.to_lowercase();
-        let urgent_keywords = ["urgent", "emergency", "critical", "asap", "important", "help"];
+        let urgent_keywords = [
+            "urgent",
+            "emergency",
+            "critical",
+            "asap",
+            "important",
+            "help",
+        ];
         let social_keywords = ["message", "call", "reply", "friend", "family", "love"];
-        let urgent_count = urgent_keywords.iter().filter(|k| lower.contains(*k)).count();
-        let social_count = social_keywords.iter().filter(|k| lower.contains(*k)).count();
+        let urgent_count = urgent_keywords
+            .iter()
+            .filter(|k| lower.contains(*k))
+            .count();
+        let social_count = social_keywords
+            .iter()
+            .filter(|k| lower.contains(*k))
+            .count();
 
         // Update salience: urgent boosts NE pathway, social boosts OT pathway
         self.social_salience = ((urgent_count as f32 * 0.2 + social_count as f32 * 0.1)
