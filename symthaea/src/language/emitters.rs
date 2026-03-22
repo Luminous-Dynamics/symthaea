@@ -1657,8 +1657,23 @@ impl CodeEmitter for RustEmitter {
         // If we have a parsed function signature, ensure function emission regardless
         // of what actions the CfC planner produced. The planner sometimes emits
         // DefineStruct for simple function tasks (e.g., parse_integer).
+        //
+        // CRITICAL FIX: When we have a function signature and no explicit struct
+        // fields are needed (no MULTI_ENTITY constraint, no extractable fields),
+        // suppress the struct emission entirely. Otherwise we get duplicate name
+        // errors (E0428) — e.g., `pub struct add_numbers` AND `pub fn add_numbers`.
         if parsed_sig.is_some() {
             has_function = true;
+            // Suppress struct if it was only inferred by the CfC planner
+            // and there's no real need for a struct (no fields, no multi-entity)
+            let is_multi_entity = spec
+                .constraints
+                .iter()
+                .any(|c| c.starts_with("MULTI_ENTITY"));
+            let has_real_fields = !extract_fields_from_text(&spec.purpose).is_empty();
+            if has_struct && !is_multi_entity && !has_real_fields && field_steps == 0 {
+                has_struct = false;
+            }
         }
 
         // Emit struct

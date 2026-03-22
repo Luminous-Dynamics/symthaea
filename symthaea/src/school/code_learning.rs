@@ -932,6 +932,19 @@ pub struct CodeLearningEngine {
     error_tracker: ErrorPatternTracker,
     /// Rich distillation records for Broca SSM (Item #4)
     distillation_records: Vec<DistillationRecord>,
+    /// Optional real-time distillation collector — writes training pairs to JSONL.
+    /// When set, successful native generations are streamed to disk immediately
+    /// (in addition to being cached in `distillation_cache`).
+    /// Distillation collector requires ssm_language feature (symthaea-broca).
+    /// When the feature is disabled, this is a unit-type placeholder.
+    #[cfg(feature = "ssm_language")]
+    distillation_collector: Option<crate::language::distillation::DistillationCollector>,
+    #[cfg(not(feature = "ssm_language"))]
+    distillation_collector: (),
+    /// Optional coding experience store — persists error patterns and fix strategies
+    /// across sessions. When set, compilation failures and fixes are recorded,
+    /// and learned templates are stored for future native generation.
+    experience_store: Option<crate::coding_experience::CodingExperienceStore>,
 }
 
 impl CodeLearningEngine {
@@ -951,6 +964,12 @@ impl CodeLearningEngine {
             predictions: PredictionTracker::new(),
             error_tracker: ErrorPatternTracker::new(),
             distillation_records: Vec::new(),
+            #[cfg(feature = "ssm_language")]
+            distillation_collector: crate::language::distillation::DistillationCollector::from_env(
+            ),
+            #[cfg(not(feature = "ssm_language"))]
+            distillation_collector: (),
+            experience_store: None,
         }
     }
 
@@ -967,7 +986,32 @@ impl CodeLearningEngine {
             predictions: PredictionTracker::new(),
             error_tracker: ErrorPatternTracker::new(),
             distillation_records: Vec::new(),
+            #[cfg(feature = "ssm_language")]
+            distillation_collector: crate::language::distillation::DistillationCollector::from_env(
+            ),
+            #[cfg(not(feature = "ssm_language"))]
+            distillation_collector: (),
+            experience_store: None,
         }
+    }
+
+    /// Set a coding experience store for persistent error/fix tracking.
+    pub fn with_experience_store(
+        mut self,
+        store: crate::coding_experience::CodingExperienceStore,
+    ) -> Self {
+        self.experience_store = Some(store);
+        self
+    }
+
+    /// Set an explicit distillation collector (overrides env-var auto-detection).
+    #[cfg(feature = "ssm_language")]
+    pub fn with_distillation_collector(
+        mut self,
+        collector: crate::language::distillation::DistillationCollector,
+    ) -> Self {
+        self.distillation_collector = Some(collector);
+        self
     }
 
     /// Set a custom metabolic budget for this session.
@@ -1056,6 +1100,14 @@ impl CodeLearningEngine {
                     None
                 },
             );
+
+            // Record error in experience store for cross-session learning
+            if let Some(ref mut store) = self.experience_store {
+                let error_sig = exec_result.compile_errors.join("; ");
+                if let Some(ref _fixed) = fix_applied {
+                    store.store_fix_strategy(&error_sig, "auto-fix applied");
+                }
+            }
 
             if let Some(fixed) = fix_applied {
                 source = fixed;
@@ -1147,12 +1199,24 @@ impl CodeLearningEngine {
                 // Item #4: Build rich distillation record
                 self.distillation_records.push(DistillationRecord {
                     purpose: lesson.spec.purpose.clone(),
-                    source: src,
+                    source: src.clone(),
                     quality,
                     objective_id: lesson.objective_id.clone(),
                     native_only: !used_llm,
                     total_retries: retries + llm_retries,
                 });
+
+                // Stream to distillation collector if active (requires ssm_language)
+                #[cfg(feature = "ssm_language")]
+                if let Some(ref collector) = self.distillation_collector {
+                    let channels = symthaea_broca::encoder::ThoughtChannels::default();
+                    collector.record(&channels, &src);
+                }
+
+                // Store learned template in experience store
+                if let Some(ref mut store) = self.experience_store {
+                    store.store_learned_template(&lesson.spec.purpose, &src);
+                }
             }
             // Add to past examples (capped at 16)
             if self.past_examples.len() < 16 {
@@ -1288,6 +1352,50 @@ impl CodeLearningEngine {
         summary
     }
 
+    /// Record all session outcomes into the CodingExperienceStore.
+    ///
+    /// This is the error-driven learning loop:
+    /// - Compilation failures → encoded as error patterns for future fix hints
+    /// - Successful generations → stored as learned templates for future native gen
+    /// - Fix strategies → persisted for cross-session error recovery
+    ///
+    /// Call this after `run_session()` to persist learning across sessions.
+    pub async fn persist_session_learning(&mut self, summary: &SessionSummary) {
+        let store = match self.experience_store.as_mut() {
+            Some(s) => s,
+            None => return,
+        };
+
+        for outcome in &summary.outcomes {
+            let experience = crate::coding_experience::CodingExperience {
+                task: outcome.objective_id.clone(),
+                detail: if outcome.compiled {
+                    format!(
+                        "compiled, {}/{} tests passed",
+                        outcome.tests_passed,
+                        outcome.tests_passed + outcome.tests_failed
+                    )
+                } else {
+                    format!("compilation failed after {} retries", outcome.retries_used)
+                },
+                success: outcome.is_success(),
+                tier: if outcome.used_llm {
+                    "LLM".to_string()
+                } else {
+                    "Native".to_string()
+                },
+                fix_hint: if outcome.retries_used > 0 && outcome.compiled {
+                    Some("auto-fix succeeded".to_string())
+                } else {
+                    None
+                },
+            };
+            store.store(experience).await;
+        }
+
+        store.flush().await;
+    }
+
     /// Get the distillation cache (for Broca SSM training).
     pub fn distillation_cache(&self) -> &[(String, String, f32)] {
         &self.distillation_cache
@@ -1296,6 +1404,68 @@ impl CodeLearningEngine {
     /// Get past successful examples (for few-shot prompting).
     pub fn past_examples(&self) -> &[(String, String)] {
         &self.past_examples
+    }
+
+    /// Export the distillation cache to a JSONL file for Broca SSM training.
+    ///
+    /// This is the distillation feedback loop:
+    /// 1. School runs lessons → successful code gets cached
+    /// 2. This method exports to JSONL with ThoughtChannels
+    /// 3. Broca can be trained on this data to learn code generation natively
+    /// 4. Over time, native generation improves, reducing LLM dependency
+    ///
+    /// Returns the number of training pairs exported.
+    pub fn export_for_broca_training(&self, path: &std::path::Path) -> std::io::Result<usize> {
+        use std::io::Write;
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)?;
+
+        let mut count = 0;
+        for (purpose, source, quality) in &self.distillation_cache {
+            // Only export high-quality generations
+            if *quality < 0.5 {
+                continue;
+            }
+
+            // Build a minimal ThoughtChannels-like record
+            let channels: Vec<f32> = vec![0.0; 24];
+            let record = serde_json::json!({
+                "channels": channels,
+                "target_text": source,
+                "metadata": {
+                    "purpose": purpose,
+                    "quality": quality,
+                    "domain": "code",
+                }
+            });
+
+            if let Ok(json) = serde_json::to_string(&record) {
+                writeln!(file, "{}", json)?;
+                count += 1;
+            }
+        }
+
+        Ok(count)
+    }
+
+    /// Get the native vs LLM generation ratio for this session.
+    ///
+    /// Tracks improvement over time: as Broca learns from distilled code,
+    /// the native_ratio should increase and llm_ratio should decrease.
+    pub fn generation_ratio(&self) -> (f32, f32) {
+        let native = self
+            .distillation_records
+            .iter()
+            .filter(|r| r.native_only)
+            .count();
+        let total = self.distillation_records.len();
+        if total == 0 {
+            return (0.5, 0.5); // uninformative prior
+        }
+        let native_ratio = native as f32 / total as f32;
+        (native_ratio, 1.0 - native_ratio)
     }
 
     /// Number of distillation-eligible generations so far.

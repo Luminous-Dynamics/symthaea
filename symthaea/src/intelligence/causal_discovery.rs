@@ -926,9 +926,8 @@ impl CausalDiscoveryEngine {
 
         v.iter()
             .map(|&x| {
-                let bin = ((x - min_v) / (max_v - min_v + 1e-10) * n_bins as f64)
-                    .clamp(0.0, (n_bins - 1) as f64) as usize;
-                bin
+                ((x - min_v) / (max_v - min_v + 1e-10) * n_bins as f64)
+                    .clamp(0.0, (n_bins - 1) as f64) as usize
             })
             .collect()
     }
@@ -1266,9 +1265,8 @@ impl<'a> ParallelPredictHelper<'a> {
         }
         v.iter()
             .map(|&x| {
-                let bin = ((x - min_v) / (max_v - min_v + 1e-10) * n_bins as f64)
-                    .clamp(0.0, (n_bins - 1) as f64) as usize;
-                bin
+                ((x - min_v) / (max_v - min_v + 1e-10) * n_bins as f64)
+                    .clamp(0.0, (n_bins - 1) as f64) as usize
             })
             .collect()
     }

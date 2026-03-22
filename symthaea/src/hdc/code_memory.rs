@@ -373,6 +373,75 @@ impl CodebaseMemory {
         }
     }
 
+    /// Index an entire directory tree of source files.
+    ///
+    /// Walks the directory recursively, parsing .rs and .py files and indexing
+    /// them into memory. Skips files in `target/`, `node_modules/`, `.git/`,
+    /// and other build artifact directories.
+    ///
+    /// Returns the number of files successfully indexed.
+    pub fn index_directory(&mut self, dir: &Path) -> usize {
+        let mut count = 0;
+        if !dir.is_dir() {
+            return 0;
+        }
+        self.index_directory_recursive(dir, &mut count);
+        count
+    }
+
+    /// Recursive directory walker for index_directory.
+    fn index_directory_recursive(&mut self, dir: &Path, count: &mut usize) {
+        let entries = match std::fs::read_dir(dir) {
+            Ok(e) => e,
+            Err(_) => return,
+        };
+
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name = entry.file_name();
+            let name_str = name.to_string_lossy();
+
+            // Skip build artifacts and hidden directories
+            if path.is_dir() {
+                if name_str.starts_with('.')
+                    || name_str == "target"
+                    || name_str == "node_modules"
+                    || name_str == "venv"
+                    || name_str == "__pycache__"
+                {
+                    continue;
+                }
+                self.index_directory_recursive(&path, count);
+                continue;
+            }
+
+            // Only index Rust and Python files
+            let ext = path.extension().and_then(|e| e.to_str());
+            let language = match ext {
+                Some("rs") => "rust",
+                Some("py") => "python",
+                _ => continue,
+            };
+
+            // Read and parse the file
+            let source = match std::fs::read_to_string(&path) {
+                Ok(s) => s,
+                Err(_) => continue,
+            };
+
+            // Skip very large files (>100KB) to avoid excessive memory use
+            if source.len() > 100_000 {
+                continue;
+            }
+
+            let parsed = ParsedCode::new(&source, language);
+            if !parsed.entities.is_empty() {
+                self.index_file(&path, &parsed);
+                *count += 1;
+            }
+        }
+    }
+
     /// Get memory statistics
     pub fn stats(&self) -> CodebaseMemoryStats {
         CodebaseMemoryStats {

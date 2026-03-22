@@ -333,6 +333,36 @@ mod tests {
     }
 
     #[test]
+    fn test_low_quality_widens_cadence() {
+        use crate::cognitive_loop::thresholds::BROCA_QUALITY_CADENCE_THRESHOLD;
+
+        let mut lm = LanguageManager::default();
+        // Drive quality EMA well below cadence threshold (0.4)
+        let low_quality = snapshot_with(0.1, 0.5, 0.5);
+        for _ in 0..80 {
+            lm.process(&low_quality);
+        }
+        assert!(
+            lm.quality_ema() < BROCA_QUALITY_CADENCE_THRESHOLD,
+            "quality_ema should be below cadence threshold: {} < {}",
+            lm.quality_ema(),
+            BROCA_QUALITY_CADENCE_THRESHOLD
+        );
+
+        // Recover quality above threshold
+        let high_quality = snapshot_with(0.9, 0.5, 0.5);
+        for _ in 0..80 {
+            lm.process(&high_quality);
+        }
+        assert!(
+            lm.quality_ema() >= BROCA_QUALITY_CADENCE_THRESHOLD,
+            "quality_ema should recover above cadence threshold: {} >= {}",
+            lm.quality_ema(),
+            BROCA_QUALITY_CADENCE_THRESHOLD
+        );
+    }
+
+    #[test]
     fn test_coherence_streak_resets_on_recovery() {
         let mut lm = LanguageManager::default();
         // Build low coherence streak

@@ -40,6 +40,36 @@ pub struct ReasoningContext {
     /// Modulates phi_eff: low epistemic quality → conservative reasoning.
     /// Science: epistemic humility — claims with weak evidence get less Phi amplification.
     pub epistemic_quality: f64,
+    /// Optional code-specific reasoning context.
+    /// When present, enables code-aware conflict detection, type safety gating,
+    /// and code-specific MCTS action selection.
+    pub code_context: Option<CodeReasoningContext>,
+}
+
+/// Code-specific reasoning context for the consciousness engine.
+///
+/// Provides domain-specific signals that modulate reasoning when the
+/// engine is processing code generation, modification, or debugging tasks.
+#[derive(Debug, Clone, Default)]
+pub struct CodeReasoningContext {
+    /// Type confidence score (0.0-1.0). Low values indicate unresolved types
+    /// or generic type inference, which should increase caution in code generation.
+    pub type_confidence: f64,
+    /// Whether the code involves unsafe operations (raw pointers, FFI, etc.).
+    /// Triggers stricter gating: requires higher Phi_eff for tool authorization.
+    pub involves_unsafe: bool,
+    /// Compilation success rate from recent attempts (0.0-1.0).
+    /// Low values increase exploration (try different approaches).
+    pub recent_compile_rate: f64,
+    /// Number of auto-fix retries already attempted. Higher values suggest
+    /// the current approach is failing and alternatives should be explored.
+    pub retry_count: u32,
+    /// Whether the code modifies external state (filesystem, network, DB).
+    /// Side-effecting code requires stricter consciousness gating.
+    pub has_side_effects: bool,
+    /// Complexity estimate of the code task (0.0 = trivial, 1.0 = very complex).
+    /// Maps to algorithm pattern complexity from the CfC code sequencer.
+    pub task_complexity: f64,
 }
 
 impl ReasoningContext {
@@ -82,6 +112,7 @@ pub struct ReasoningContextBuilder {
     recent_utility: f64,
     cycle_id: u64,
     epistemic_quality: f64,
+    code_context: Option<CodeReasoningContext>,
 }
 
 impl ReasoningContextBuilder {
@@ -96,7 +127,14 @@ impl ReasoningContextBuilder {
             recent_utility: 0.5,
             cycle_id: 0,
             epistemic_quality: 0.5,
+            code_context: None,
         }
+    }
+
+    /// Set the code-specific reasoning context.
+    pub fn with_code_context(mut self, code_ctx: CodeReasoningContext) -> Self {
+        self.code_context = Some(code_ctx);
+        self
     }
 
     /// Set the multi-theory consciousness metrics.
@@ -174,6 +212,7 @@ impl ReasoningContextBuilder {
             cycle_id: self.cycle_id,
             neuromod_exploration_mod: 1.0,
             epistemic_quality: self.epistemic_quality,
+            code_context: self.code_context,
         }
     }
 }

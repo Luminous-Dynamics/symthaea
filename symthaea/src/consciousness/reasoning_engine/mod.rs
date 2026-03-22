@@ -33,7 +33,8 @@ pub use telemetry::{
     TelemetryExporter, TelemetryExporterBuilder, TelemetrySink,
 };
 pub use types::{
-    PosthocOutcome, ReasoningContext, ReasoningContextBuilder, ReasoningEvent, ReasoningResult,
+    CodeReasoningContext, PosthocOutcome, ReasoningContext, ReasoningContextBuilder,
+    ReasoningEvent, ReasoningResult,
 };
 
 use std::collections::VecDeque;
@@ -145,7 +146,25 @@ impl ConsciousReasoningEngine {
         // Floor at 0.5 so even zero-quality claims retain 50% of their phi_eff.
         // Science: epistemic humility — claims with weak evidence get less Phi amplification.
         let epistemic_mod = 0.5 + 0.5 * ctx.epistemic_quality;
-        let phi_eff = phi_eff_raw * epistemic_mod;
+        let mut phi_eff = phi_eff_raw * epistemic_mod;
+
+        // Code-specific modulation: unsafe code and low compile rates reduce phi_eff
+        if let Some(ref code_ctx) = ctx.code_context {
+            // Unsafe code requires 20% higher consciousness threshold
+            if code_ctx.involves_unsafe {
+                phi_eff *= 0.8;
+            }
+            // Low compile rate → reduce confidence in code generation actions
+            if code_ctx.recent_compile_rate < 0.5 {
+                phi_eff *= 0.7 + 0.3 * code_ctx.recent_compile_rate;
+            }
+            // Side-effecting code → require higher confidence
+            if code_ctx.has_side_effects {
+                phi_eff *= 0.9;
+            }
+            // High retry count → this approach is failing, boost exploration
+            // (handled in MCTS exploration constant below)
+        }
 
         // Create budget tracker
         let budget = ReasoningBudget::new(ctx.available_budget_us, r);
@@ -216,6 +235,12 @@ impl ConsciousReasoningEngine {
                     MctsConfig::tier2()
                 };
                 config.exploration_constant *= ctx.neuromod_exploration_mod;
+                // Code-specific: high retry count → boost exploration to try alternatives
+                if let Some(ref code_ctx) = ctx.code_context {
+                    if code_ctx.retry_count > 1 {
+                        config.exploration_constant *= 1.0 + 0.2 * code_ctx.retry_count as f64;
+                    }
+                }
                 event.did_simulate = true;
                 MctsPlanner::plan(&sim_state, &ctx.available_actions, &config, &budget)
             } else if r >= thresholds::R_EPISTEMIC_MIN {
@@ -319,6 +344,37 @@ impl ConsciousReasoningEngine {
             budget.exceeded(),
         )
         .with_internals(phi_eff_raw, epistemic_mod, evs_val)
+    }
+
+    /// Convenience method for code-specific reasoning.
+    ///
+    /// Wraps `reason()` with a `CodeReasoningContext` pre-populated from
+    /// code generation metrics. Adjusts gating thresholds for code tasks:
+    /// - Unsafe code requires 20% higher Phi_eff
+    /// - Low compile rates increase exploration
+    /// - Side-effecting code requires higher confidence
+    ///
+    /// Returns the same `ReasoningResult` as `reason()`, but code-aware.
+    pub fn reason_about_code(
+        &mut self,
+        base_ctx: &ReasoningContext,
+        type_confidence: f64,
+        compile_rate: f64,
+        retry_count: u32,
+        involves_unsafe: bool,
+        has_side_effects: bool,
+        task_complexity: f64,
+    ) -> ReasoningResult {
+        let mut ctx = base_ctx.clone();
+        ctx.code_context = Some(types::CodeReasoningContext {
+            type_confidence,
+            involves_unsafe,
+            recent_compile_rate: compile_rate,
+            retry_count,
+            has_side_effects,
+            task_complexity,
+        });
+        self.reason(&ctx)
     }
 
     /// Run a counterfactual analysis as part of a reasoning cycle.
@@ -476,6 +532,7 @@ mod tests {
             cycle_id: 1,
             neuromod_exploration_mod: 1.0,
             epistemic_quality: 0.5,
+            code_context: None,
         }
     }
 

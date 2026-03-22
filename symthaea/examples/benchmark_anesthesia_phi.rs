@@ -30,6 +30,7 @@ use std::time::Instant;
 
 use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::phi_engine::PhiEngine;
+use symthaea_core::consciousness_metrics::TruePhiCalculator;
 use symthaea_core::hdc::spectral_connectivity::ConnectivityCalculator;
 
 const HDC_DIM: usize = 512;
@@ -58,6 +59,7 @@ fn main() {
 
     let phi_engine = PhiEngine::auto();
     let conn_calc = ConnectivityCalculator::new();
+    let true_phi_calc = TruePhiCalculator::new();
 
     // ═══════════════════════════════════════════════════════════════
     // Test 1: Discrete Anesthesia States
@@ -113,25 +115,39 @@ fn main() {
     ];
 
     let t = Instant::now();
-    let mut state_phis: Vec<(&str, f64, f64)> = Vec::new(); // (name, phi_engine, algebraic)
+    let mut state_phis: Vec<(&str, f64, f64, f64)> = Vec::new(); // (name, true_phi, spectral, algebraic)
 
+    // Average over N_TRIALS seeds to eliminate random inversions
+    const N_TRIALS: usize = 5;
     for state in &states {
-        let hvs = simulate_neural_state(state, N_NEURONS, HDC_DIM);
-        let phi_result = phi_engine.compute(&hvs);
-        let algebraic = conn_calc.algebraic_connectivity(&hvs);
+        let mut true_phi_sum = 0.0f64;
+        let mut spectral_sum = 0.0f64;
+        let mut algebraic_sum = 0.0f64;
+        for trial in 0..N_TRIALS {
+            let mut trial_state = state.clone();
+            // Use trial as stable seed offset (not expected_phi_rank which varies)
+            trial_state.expected_phi_rank = trial;
+            let hvs = simulate_neural_state(&trial_state, N_NEURONS, HDC_DIM);
+            true_phi_sum += true_phi_calc.compute_true_phi(&hvs).phi;
+            spectral_sum += phi_engine.compute(&hvs).phi;
+            algebraic_sum += conn_calc.algebraic_connectivity(&hvs);
+        }
+        let true_phi_avg = true_phi_sum / N_TRIALS as f64;
+        let spectral_avg = spectral_sum / N_TRIALS as f64;
+        let algebraic_avg = algebraic_sum / N_TRIALS as f64;
 
         println!(
-            "  {:25} │ Φ = {:.6} │ Algebraic = {:.6} │ coupling={:.2} noise={:.2}",
-            state.name, phi_result.phi, algebraic, state.coupling, state.noise
+            "  {:25} │ True Φ = {:.6} │ Spectral = {:.6} │ λ₂ = {:.6} │ coupling={:.2} noise={:.2} (avg of {} trials)",
+            state.name, true_phi_avg, spectral_avg, algebraic_avg, state.coupling, state.noise, N_TRIALS
         );
 
-        state_phis.push((state.name, phi_result.phi, algebraic));
+        state_phis.push((state.name, true_phi_avg, spectral_avg, algebraic_avg));
     }
     println!("  Time: {:.1}ms\n", t.elapsed().as_millis());
 
-    // Check monotonic ordering
+    // Check monotonic ordering — use True Φ as primary metric
     let phi_ordered = state_phis.windows(2).all(|w| w[0].1 >= w[1].1);
-    let algebraic_ordered = state_phis.windows(2).all(|w| w[0].2 >= w[1].2);
+    let algebraic_ordered = state_phis.windows(2).all(|w| w[0].3 >= w[1].3);
 
     // ═══════════════════════════════════════════════════════════════
     // Test 2: Continuous Induction Gradient
@@ -301,8 +317,17 @@ fn main() {
         expected_phi_rank: 0,
     };
 
-    let base_hvs = simulate_neural_state(&base_state, N_NEURONS, HDC_DIM);
-    let base_phi = phi_engine.compute(&base_hvs).phi;
+    // Average True Φ over multiple seeds for stable sensitivity
+    let base_phi = {
+        let mut sum = 0.0f64;
+        for trial in 0..N_TRIALS {
+            let mut s = base_state.clone();
+            s.expected_phi_rank = trial;
+            let hvs = simulate_neural_state(&s, N_NEURONS, HDC_DIM);
+            sum += true_phi_calc.compute_true_phi(&hvs).phi;
+        }
+        sum / N_TRIALS as f64
+    };
 
     let epsilon = 0.10;
     let params = vec![
@@ -333,8 +358,16 @@ fn main() {
     let mut sensitivities = Vec::new();
 
     for (param_name, perturbed_state) in &params {
-        let hvs = simulate_neural_state(perturbed_state, N_NEURONS, HDC_DIM);
-        let perturbed_phi = phi_engine.compute(&hvs).phi;
+        let perturbed_phi = {
+            let mut sum = 0.0f64;
+            for trial in 0..N_TRIALS {
+                let mut s = perturbed_state.clone();
+                s.expected_phi_rank = trial;
+                let hvs = simulate_neural_state(&s, N_NEURONS, HDC_DIM);
+                sum += true_phi_calc.compute_true_phi(&hvs).phi;
+            }
+            sum / N_TRIALS as f64
+        };
         let sensitivity = (perturbed_phi - base_phi) / epsilon as f64;
         sensitivities.push((*param_name, sensitivity));
 
@@ -400,8 +433,8 @@ fn main() {
     let result_json = serde_json::json!({
         "benchmark": "Anesthesia Phi Gradient",
         "timestamp": chrono::Utc::now().to_rfc3339(),
-        "discrete_states": state_phis.iter().map(|(name, phi, alg)| {
-            serde_json::json!({"state": name, "phi": phi, "algebraic": alg})
+        "discrete_states": state_phis.iter().map(|(name, true_phi, spectral, alg)| {
+            serde_json::json!({"state": name, "true_phi": true_phi, "spectral": spectral, "algebraic": alg})
         }).collect::<Vec<_>>(),
         "induction_gradient": {
             "phi_range": phi_range,

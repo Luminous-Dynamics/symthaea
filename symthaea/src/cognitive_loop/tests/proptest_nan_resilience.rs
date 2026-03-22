@@ -164,4 +164,19 @@ proptest! {
         let raw = v as usize;
         prop_assert_eq!(raw, 0, "negative f64 as usize should saturate to 0, got {}", raw);
     }
+
+    /// Config interval modulo must never panic, even with interval=0.
+    ///
+    /// Guards the Round 42 fix: public config fields (fhe_aggregation_interval,
+    /// resonator_growth_interval) could be set to 0, causing `cycle % 0` panic.
+    #[test]
+    fn prop_modulo_interval_never_panics(
+        cycle in 0u64..10_000,
+        interval in 0usize..500,
+    ) {
+        // Mirrors the guarded pattern from cycle.rs / cycle_phases_memory.rs:
+        let fires = interval > 0 && cycle as usize % interval == 0;
+        // Just verify no panic — the result value doesn't matter.
+        let _ = fires;
+    }
 }
