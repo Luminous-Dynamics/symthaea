@@ -181,9 +181,11 @@ impl SporeCheckpoint {
         let format_version = u32::from_le_bytes(data[pos..pos + 4].try_into().ok()?);
         pos += 4;
 
-        if format_version != Self::FORMAT_VERSION {
-            return None; // Version mismatch
+        if format_version > Self::FORMAT_VERSION {
+            return None; // Future version we can't read
         }
+        // Versions <= FORMAT_VERSION are forward-compatible (we read what we can,
+        // missing fields get defaults, extra trailing data is ignored).
 
         // Cycle
         let cycle = u64::from_le_bytes(data[pos..pos + 8].try_into().ok()?);
@@ -351,7 +353,7 @@ mod tests {
     }
 
     #[test]
-    fn checkpoint_bad_version_returns_none() {
+    fn checkpoint_future_version_returns_none() {
         let mut bytes = SporeCheckpoint {
             cycle: 0,
             consciousness_level: 0.0,
@@ -362,9 +364,36 @@ mod tests {
         }
         .to_bytes();
 
-        // Corrupt version field (bytes 4-7)
-        bytes[4] = 99;
-        assert!(SporeCheckpoint::from_bytes(&bytes).is_none());
+        // Set version to a future version (> FORMAT_VERSION)
+        let future_version = (SporeCheckpoint::FORMAT_VERSION + 10).to_le_bytes();
+        bytes[4..8].copy_from_slice(&future_version);
+        assert!(
+            SporeCheckpoint::from_bytes(&bytes).is_none(),
+            "future version should be rejected"
+        );
+    }
+
+    #[test]
+    fn checkpoint_older_version_accepted() {
+        // Version 0 should be readable (forward-compatible: same layout, older version tag)
+        let mut bytes = SporeCheckpoint {
+            cycle: 42,
+            consciousness_level: 0.5,
+            neuromodulators: [0.1; 4],
+            semantic_entries: vec![],
+            episodic_entries: vec![],
+            format_version: SporeCheckpoint::FORMAT_VERSION,
+        }
+        .to_bytes();
+
+        // Downgrade version to 0
+        bytes[4..8].copy_from_slice(&0u32.to_le_bytes());
+        let restored = SporeCheckpoint::from_bytes(&bytes);
+        assert!(
+            restored.is_some(),
+            "older version should be forward-compatible"
+        );
+        assert_eq!(restored.unwrap().cycle, 42);
     }
 
     #[test]

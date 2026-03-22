@@ -447,6 +447,8 @@ pub mod causal_byzantine;
 #[cfg(feature = "mycelix")]
 pub mod mycelix_bridge;
 
+pub mod holon_receiver;
+
 // ============================================================================
 // Re-exports — backward-compatible type-level imports
 // ============================================================================

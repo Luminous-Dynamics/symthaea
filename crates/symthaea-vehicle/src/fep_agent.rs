@@ -142,6 +142,9 @@ pub struct ActiveInferenceVehicleAgent {
     prev_observation: Vec<f64>,
     /// EMA of observation L2 delta (sensor stability signal).
     obs_delta_ema: f64,
+    /// Optional consciousness context from Spore/Holon.
+    /// SafetyLevel gates speed limits; consciousness modulates attention allocation.
+    consciousness_ctx: symthaea_core::ConsciousnessContext,
 }
 
 impl ActiveInferenceVehicleAgent {
@@ -181,7 +184,21 @@ impl ActiveInferenceVehicleAgent {
             target_speed: task.target_speed(),
             prev_observation: Vec::new(),
             obs_delta_ema: 0.5,
+            consciousness_ctx: symthaea_core::ConsciousnessContext::DEFAULT,
         }
+    }
+
+    /// Update the consciousness context from Spore/Holon.
+    ///
+    /// SafetyLevel::Red → emergency braking override.
+    /// Consciousness level modulates exploration gain.
+    pub fn set_consciousness_context(&mut self, ctx: symthaea_core::ConsciousnessContext) {
+        self.consciousness_ctx = ctx;
+    }
+
+    /// Current consciousness context.
+    pub fn consciousness_context(&self) -> &symthaea_core::ConsciousnessContext {
+        &self.consciousness_ctx
     }
 
     /// Build the 11D observation vector from vehicle state.

@@ -393,6 +393,9 @@ pub struct ActiveInferenceFlightAgent {
     current_fe: f64,
     /// Previous free energy.
     prev_fe: f64,
+    /// Optional consciousness context from Spore/Holon.
+    /// When set, modulates exploration gain and triggers emergency descent on Red.
+    consciousness_ctx: symthaea_core::ConsciousnessContext,
 }
 
 impl ActiveInferenceFlightAgent {
@@ -430,7 +433,21 @@ impl ActiveInferenceFlightAgent {
             consecutive_drop_tau: 0,
             current_fe: 0.0,
             prev_fe: 0.0,
+            consciousness_ctx: symthaea_core::ConsciousnessContext::DEFAULT,
         }
+    }
+
+    /// Update the consciousness context from Spore/Holon.
+    ///
+    /// When `is_emergency()`, the next `step()` will override setpoint to descend.
+    /// Exploration gain is modulated by phi and safety level.
+    pub fn set_consciousness_context(&mut self, ctx: symthaea_core::ConsciousnessContext) {
+        self.consciousness_ctx = ctx;
+    }
+
+    /// Current consciousness context.
+    pub fn consciousness_context(&self) -> &symthaea_core::ConsciousnessContext {
+        &self.consciousness_ctx
     }
 
     /// Build the 8D observation vector from flight state.

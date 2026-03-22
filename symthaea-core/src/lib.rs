@@ -73,3 +73,70 @@ pub mod phi_engine;
 pub mod physics;
 /// Shared temporal prediction trait for O(1) CfC-based forecasting.
 pub mod temporal;
+
+// ── Cross-variant consciousness context ─────────────────────────────────────
+
+/// Consciousness state passed from Spore/Holon to embodied FEP agents.
+///
+/// Allows physical controllers (flight, humanoid, vehicle) to modulate behavior
+/// based on the consciousness pipeline's current state. For example:
+/// - `SafetyLevel::Red` → emergency maneuver
+/// - Low `phi` → conservative, reduce exploration
+/// - High `harmony_alignment` → smoother, less aggressive control
+///
+/// This struct is intentionally small and `Copy` so it can be passed every tick
+/// without allocation.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ConsciousnessContext {
+    /// Integrated information (0.0–1.0). Higher = more unified experience.
+    pub phi: f32,
+    /// NRC safety level (0=Green, 1=Yellow, 2=Orange, 3=Red).
+    pub safety_level: u8,
+    /// Eight Harmonies alignment (0.0–1.0).
+    pub harmony_alignment: f32,
+    /// Current prediction error from the consciousness pipeline.
+    pub prediction_error: f32,
+    /// Consciousness level from master equation (0.0–1.0).
+    pub consciousness_level: f32,
+}
+
+impl ConsciousnessContext {
+    /// Default context representing a healthy, moderately-conscious state.
+    pub const DEFAULT: Self = Self {
+        phi: 0.3,
+        safety_level: 0, // Green
+        harmony_alignment: 0.5,
+        prediction_error: 0.1,
+        consciousness_level: 0.5,
+    };
+
+    /// Whether the system is in emergency mode (SafetyLevel::Red).
+    pub fn is_emergency(&self) -> bool {
+        self.safety_level >= 3
+    }
+
+    /// Whether exploration should be suppressed (low consciousness or elevated safety).
+    pub fn should_suppress_exploration(&self) -> bool {
+        self.safety_level >= 2 || self.consciousness_level < 0.15
+    }
+
+    /// Exploration gain multiplier: reduces exploration under threat, boosts under flow.
+    /// Returns 0.0 (no exploration) to 2.0 (maximum exploration).
+    pub fn exploration_gain(&self) -> f32 {
+        if self.is_emergency() {
+            return 0.0;
+        }
+        if self.safety_level >= 2 {
+            return 0.2;
+        }
+        // Flow state: high phi, low PE → boost exploration
+        let flow = (self.phi * 2.0).min(1.0) * (1.0 - self.prediction_error.min(1.0));
+        (0.5 + flow).min(2.0)
+    }
+}
+
+impl Default for ConsciousnessContext {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}

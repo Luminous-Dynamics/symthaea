@@ -37,17 +37,17 @@ struct SwarmSnapshot {
     tick: u64,
     n_agents: usize,
     n_byzantine: usize,
-    individual_consciousness: Vec<f32>,
+    individual_consciousness: Vec<f64>,
     pairwise_similarities: Vec<f32>,
 }
 
 impl SwarmSnapshot {
-    fn mean_consciousness(&self) -> f32 {
+    fn mean_consciousness(&self) -> f64 {
         if self.individual_consciousness.is_empty() {
             return 0.0;
         }
-        self.individual_consciousness.iter().sum::<f32>()
-            / self.individual_consciousness.len() as f32
+        self.individual_consciousness.iter().sum::<f64>()
+            / self.individual_consciousness.len() as f64
     }
 
     fn mean_coherence(&self) -> f32 {
@@ -71,14 +71,14 @@ impl SwarmSnapshot {
             .fold(f32::MAX, f32::min)
     }
 
-    fn emergence_ratio(&self) -> f32 {
+    fn emergence_ratio(&self) -> f64 {
         let mean_c = self.mean_consciousness();
         if mean_c < 0.001 {
             return 0.0;
         }
         // Emergence: collective coherence normalized by individual consciousness
         // Higher coherence relative to individual consciousness = more emergence
-        self.mean_coherence() / mean_c
+        self.mean_coherence() as f64 / mean_c
     }
 
     fn csv_header() -> &'static str {
@@ -92,9 +92,9 @@ impl SwarmSnapshot {
             self.n_agents,
             self.n_byzantine,
             self.mean_consciousness(),
-            self.mean_coherence(),
-            self.max_coherence(),
-            self.min_coherence(),
+            self.mean_coherence() as f64,
+            self.max_coherence() as f64,
+            self.min_coherence() as f64,
             self.emergence_ratio(),
         )
     }
@@ -102,7 +102,7 @@ impl SwarmSnapshot {
 
 fn compute_snapshot(tick: u64, states: &[MindState], n_byzantine: usize) -> SwarmSnapshot {
     let n = states.len();
-    let individual_consciousness: Vec<f32> = states.iter().map(|s| s.consciousness_level).collect();
+    let individual_consciousness: Vec<f64> = states.iter().map(|s| s.consciousness_level).collect();
 
     let mut pairwise = Vec::with_capacity(n * (n - 1) / 2);
     for i in 0..n {
@@ -283,19 +283,19 @@ async fn run_experiment(n_agents: usize, n_ticks: usize, byzantine_fraction: f64
 
     if n_byzantine > 0 {
         // Separate honest vs byzantine consciousness
-        let honest_c: Vec<f32> = final_states[..n_honest]
+        let honest_c: Vec<f64> = final_states[..n_honest]
             .iter()
             .map(|s| s.consciousness_level)
             .collect();
-        let byzantine_c: Vec<f32> = final_states[n_honest..]
+        let byzantine_c: Vec<f64> = final_states[n_honest..]
             .iter()
             .map(|s| s.consciousness_level)
             .collect();
-        let mean_honest: f32 = honest_c.iter().sum::<f32>() / honest_c.len().max(1) as f32;
-        let mean_byzantine: f32 = if byzantine_c.is_empty() {
+        let mean_honest: f64 = honest_c.iter().sum::<f64>() / honest_c.len().max(1) as f64;
+        let mean_byzantine: f64 = if byzantine_c.is_empty() {
             0.0
         } else {
-            byzantine_c.iter().sum::<f32>() / byzantine_c.len() as f32
+            byzantine_c.iter().sum::<f64>() / byzantine_c.len() as f64
         };
         eprintln!(
             "  Honest consciousness: {:.4}, Byzantine: {:.4}",

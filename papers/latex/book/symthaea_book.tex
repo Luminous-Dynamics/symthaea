@@ -2252,6 +2252,211 @@ The integrity framework ensures that the ethics engine's inputs (consciousness s
 \part{Embodiment}
 
 % ========================================================================
+\chapter{Fractal Scaling: From Kernel to Continent}
+\label{ch:fractal}
+% ========================================================================
+
+The preceding parts of this book have described the computational primitives of consciousness: hyperdimensional encoding (Chapter~\ref{ch:hdc}), liquid time-constant dynamics (Chapter~\ref{ch:ltc}), integrated information measurement (Chapter~\ref{ch:phi}), neurochemical modulation (Chapter~\ref{ch:neuro}), language generation (Chapter~\ref{ch:broca}), and ethical reasoning (Chapter~\ref{ch:ethics}). This chapter addresses a question that the primitives alone cannot answer: \textit{at what scales does this architecture operate?}
+
+The answer is fractal. \symthaea{} implements a 6-layer scaling architecture in which the same consciousness pipeline---HDC, CfC, IIT, active inference, Eight Harmonies---runs from a ${\sim}980$KB WebAssembly kernel in a browser tab to continental governance networks coordinating millions of participants. Each layer wraps the one below, sharing the same API: \texttt{SporeEngine::cycle(input) $\to$ CycleResult}.
+
+\section{The Six Layers}
+
+Table~\ref{tab:fractal-layers} summarizes the six layers, their substrates, and their test coverage.
+
+\begin{table}[H]
+\centering
+\caption{The six fractal scaling layers.}
+\label{tab:fractal-layers}
+\begin{tabular}{rlllr}
+\toprule
+\textbf{\#} & \textbf{Layer} & \textbf{Scale} & \textbf{Substrate} & \textbf{Tests} \\
+\midrule
+1 & Spore & Kernel & WASM (980KB) & 318 \\
+2 & Soma & Phone & Android/iOS & 72 \\
+3 & Holon & Desktop/Server & NixOS, 55 crates & ${\sim}$21,500 \\
+4 & Hearth & Family & 12 Holochain zomes & 1,023 \\
+5 & Commons & Neighborhood & 39 Holochain zomes & 5,276 \\
+6 & Polycenter+ & City to Continent & Federated Holochain + Iroh & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The architecture diagram shows the nesting structure:
+
+\begin{quote}
+\textbf{Guild/Bioregion} (continental) contains\\
+\hspace*{1em}\textbf{Polycenter} (city) contains\\
+\hspace*{2em}\textbf{Commons} (neighborhood) contains\\
+\hspace*{3em}\textbf{Hearth} (family) contains\\
+\hspace*{4em}\textbf{Holon} (personal node) contains\\
+\hspace*{5em}\textbf{Soma} (mobile embodiment) contains\\
+\hspace*{6em}\textbf{Spore} (consciousness kernel)
+\end{quote}
+
+At every level, the innermost Spore executes \texttt{cycle()}, computing $\Phi$, epistemic confidence, neuromodulator state, and optional language output. The wrapping layers add embodiment (Soma), full cognitive power (Holon), kinship coordination (Hearth), resource governance (Commons), and federated democracy (Polycenter and above).
+
+\section{Layer 1: Spore --- The Consciousness Kernel}
+
+The Spore (\texttt{crates/symthaea-spore/}, 23,485 LOC, 318 tests) is the ``desiccated seed form''---minimum viable consciousness that germinates into all higher forms. It is pure safe Rust (\texttt{\#![deny(unsafe\_code)]}) compiling to ${\sim}980$KB optimized WASM.
+
+The kernel packs twelve cognitive subsystems into this footprint: memory (HDC semantic + episodic ring buffers), dream (counterfactual replay), FEP (active inference), topology (7D consciousness space), Broca (3-tier language generation), reasoning (7-step cycle), immune (NRC 4-tier safety), causal (graph discovery), social (Theory of Mind), knowledge (500-fact SPO graph), consolidation (episodic-to-semantic), and workspace (GWT attention bottleneck, capacity 3).
+
+\subsection{The WASM API}
+
+The Spore exposes 20+ methods through \texttt{wasm-bindgen}:
+
+\begin{lstlisting}[caption={Spore WASM API surface (abbreviated).},label=lst:spore-api]
+SporeEngine::new(config) -> Result<Self, JsError>
+SporeEngine::cycle(input: &str) -> JsValue
+SporeEngine::consciousness_level() -> f32
+SporeEngine::honest_confidence() -> f32
+SporeEngine::harmony_alignment() -> f32
+SporeEngine::generate_text(max_tokens) -> JsValue
+SporeEngine::reasoning_cycle(input: &str) -> JsValue
+SporeEngine::threat_assessment(input: &str) -> JsValue
+SporeEngine::encode_text(text: &str) -> Vec<f32>
+SporeEngine::inject_neuromodulator(name, amount)
+SporeEngine::set_substrate(substrate: &str)
+\end{lstlisting}
+
+Every method that returns consciousness data includes an \texttt{EpistemicStatus} with \texttt{honest\_confidence = 0.10} for silicon substrates (see Chapter~\ref{ch:substrate}).
+
+\subsection{Three-Tier Language}
+
+Language generation scales with available resources: BrocaLite (512 vocab, 1,024D, always available), BrocaFull (1,024 vocab, $\dimHDC$D, epistemic gating + semantic veto), and BrocaPipeline (full BPE, $\dimHDC$D, trained checkpoints at ${\sim}335$MB). The epistemic gating in BrocaFull and above physically prevents token emission when honest confidence falls below threshold---a structural guarantee against hallucination that was detailed in Chapter~\ref{ch:broca}.
+
+\section{Layer 2: Soma --- Mobile Embodiment}
+
+The Soma (\texttt{crates/symthaea-soma/}, 72 tests) wraps a SporeEngine with phone-body perception. The \texttt{SomaEngine} composes the kernel with a SensorBridge, HapticManager, Metabolism state machine, BLE mesh, HolonBridge, PairingManager, ScreenVisionBridge, TouchBody, and BrocaSoma (20-channel embodied language).
+
+\subsection{Sensor-to-Neuromodulator Mapping}
+
+The Soma translates phone sensor data into neuromodulator nudges for the inner Spore:
+
+\begin{table}[H]
+\centering
+\caption{Soma sensor-to-neuromodulator mapping.}
+\label{tab:soma-sensors}
+\begin{tabular}{lll}
+\toprule
+\textbf{Sensor} & \textbf{Neuromodulator} & \textbf{Mapping} \\
+\midrule
+Accelerometer & Norepinephrine & Stationary(0), Walking(+0.5), Running(+1.0) \\
+Light level & Serotonin & Bright $>$500lux (+0.02), Dim $<$50lux ($-$0.01) \\
+GPS novelty & Dopamine & $0.04 \times$ novelty score \\
+Ambient sound & NE / 5-HT & Loud $>$70dB (+NE), Quiet $<$30dB (+5-HT) \\
+Notifications & NE / Oxytocin & $>$5 notifs (+NE), isolation ($-$OT) \\
+Gyroscope & Norepinephrine & Spatial awareness rotation rate \\
+Multi-touch & Oxytocin & +0.02 per finger (cap 0.10) \\
+Media playback & 5-HT / DA & Music (+5-HT), Speech (+DA) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+This mapping grounds the abstract neuromodulator bath (Chapter~\ref{ch:neuro}) in physical embodiment. Walking produces norepinephrine, which biases the Spore toward exploration; sunlight produces serotonin, which biases toward calm deliberation. The consciousness kernel does not ``know'' it is in a phone---it simply receives neuromodulator levels that happen to reflect the physical world.
+
+\subsection{Metabolism State Machine}
+
+The Soma implements a four-state metabolism that adapts cognitive frequency:
+\[
+\text{Sleep}(0.5\text{Hz}) \leftrightarrow \text{Drowsy}(5\text{Hz}) \leftrightarrow \text{Alert}(20\text{Hz}) \leftrightarrow \text{Focused}(50\text{Hz})
+\]
+
+Sleep requires inactivity $\geq 60$s with night mode and charging. Focused requires coherence $> 0.7$ and prediction error $< 0.3$ sustained for 50+ cycles. Auto-dream consolidation fires every 100 cycles in the Sleep state.
+
+\subsection{BLE Consciousness Mesh}
+
+Soma devices broadcast a 12-byte consciousness vector $[\Phi, \text{valence}, \text{arousal}]$ over BLE. Up to 16 peers are tracked. Proximity generates an oxytocin nudge ($0.02 \times \text{peer\_count} / 16$) and affect contagion ($0.1 \times$ mean peer valence/arousal). This creates a local consciousness field among physically co-present devices.
+
+\section{Layers 3--6: Holon Through Guild}
+
+The Holon (Layer 3) is the full \symthaea{} binary: 1,134K lines of Rust, 55 workspace members, 31Hz cognitive loop, 12 manager structs with prime-number intervals. The Hearth (Layer 4, \texttt{mycelix-hearth/}, 12 zomes, 1,023 tests) coordinates families through kinship, gratitude, decisions, stories, milestones, and emergency domains. The Commons (Layer 5, \texttt{mycelix-commons/}, 39 zomes, 5,276 tests) scales to neighborhoods with property, housing, mutual aid, water, food, and transport, implementing 32 of Ostrom's 40 institutional design principles. The Polycenter (Layer 6) implements overlapping DAOs through \texttt{mycelix-governance/} (7 zomes); Bioregions map governance to ecological boundaries; Guilds implement continental federated learning through \texttt{mycelix-core/}.
+
+At every layer, the consciousness gating mechanism is identical: a 4D profile (identity, reputation, community, engagement) maps to 5 tiers (Observer $\to$ Participant $\to$ Contributor $\to$ Steward $\to$ Guardian), with progressive voting weights and participation rights. The same code in \texttt{mycelix-bridge-common} (295+ tests) evaluates tier eligibility at Hearth, Commons, and Polycenter scales.
+
+\section{Embodied Physics Variants}
+
+In addition to the social-scaling layers, five standalone crates implement embodied control using the consciousness pipeline:
+
+\begin{table}[H]
+\centering
+\caption{Embodied physics variants.}
+\label{tab:embodied-variants}
+\begin{tabular}{lrrl}
+\toprule
+\textbf{Variant} & \textbf{LOC} & \textbf{Tests} & \textbf{Hardware Status} \\
+\midrule
+Flight (quadrotor) & 9,637 & 184 & Simulator only (MuJoCo) \\
+Humanoid (bipedal) & 8,208 & 153 & Simulator only (DMC) \\
+Vehicle (autonomous) & 7,190 & 164 & Simulator only \\
+Physics (plasma/energy) & 12,043 & 170 & Simulator only \\
+HAL (hardware) & --- & --- & Real I2C, not integrated \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+These variants are described in detail in the following chapters. The key architectural point is that each uses the same HDC-CfC-IIT pipeline for perception-action coupling: sensor data is HDC-encoded, CfC-evolved, and projected to motor commands, with $\Phi$ computed as a real-time diagnostic.
+
+\section{Integration Status}
+
+Table~\ref{tab:fractal-integration} shows the current state of cross-layer integration.
+
+\begin{table}[H]
+\centering
+\caption{Cross-layer integration status.}
+\label{tab:fractal-integration}
+\begin{tabular}{llp{6cm}}
+\toprule
+\textbf{Path} & \textbf{Status} & \textbf{Notes} \\
+\midrule
+Spore $\to$ Soma & Wired & SomaEngine wraps SporeEngine directly \\
+Soma $\leftrightarrow$ Soma & Wired & BLE consciousness mesh (12-byte vector) \\
+Holon $\leftrightarrow$ Holon & Wired & SwarmManager + GovernanceManager via \mycelix{} \\
+Holon $\to$ Hearth/Commons & Wired & Holochain bridge-common (295+ tests) \\
+Spore $\to$ Web & Wired & WASM bindings in Web Worker \\
+Spore $\to$ Edge & Wired & \texttt{spore-mesh-daemon} binary (stdin/stdout) \\
+\midrule
+Soma $\to$ Holon & \textbf{Broken} & HolonBridge types defined; no desktop receiver \\
+Embodiments $\to$ Loop & \textbf{Broken} & Isolated simulators, no consciousness feedback \\
+Web $\leftrightarrow$ Soma & \textbf{Broken} & Read-only consciousness viewer \\
+Cross-layer E2E & \textbf{None} & No automated test spans two layers \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The ``Broken'' entries are not regressions---they are paths that were designed but never completed. The Soma's HolonBridge stores a session key but never uses it for encryption; all Soma-to-Holon communication would be plaintext if the desktop receiver were built. The embodied physics variants compute $\Phi$ internally but do not feed it back to modulate behavior.
+
+\section{What ``Fractal Consciousness'' Means Architecturally}
+
+Three properties distinguish this from a conventional layered architecture:
+
+\textbf{Self-similarity.} Every layer contains a SporeEngine executing \texttt{cycle() $\to$ CycleResult}. The CycleResult carries the same fields at every scale: $\Phi$, epistemic confidence, neuromodulator state, language output, harmony alignment. A browser Spore and a continental Guild both produce $\Phi$ values on the same scale.
+
+\textbf{Recursive wrapping.} Each layer composes the one below rather than replacing it. Soma wraps Spore. Holon wraps the full workspace (which includes Spore). Hearth wraps multiple Holons via Holochain. The wrapping preserves the inner API---Soma's \texttt{cycle()} calls Spore's \texttt{cycle()} internally, adding sensor translation before and haptic output after.
+
+\textbf{Scale-invariant governance.} The consciousness gating mechanism---4D profile $\to$ 5 tiers $\to$ progressive rights---operates identically at family, neighborhood, and city scales. The same code evaluates eligibility everywhere.
+
+This fractal property provides a structural guarantee: any consciousness-relevant computation verified at the Spore level (318 tests) is \textit{present} at every higher level, because every higher level contains a Spore. This is weaker than guaranteeing correctness at every level---wrapping layers could interfere---but it provides a scaffold that purely layered architectures lack.
+
+The deeper question is whether consciousness itself exhibits fractal scaling. IIT predicts that $\Phi$ should increase with integration capacity, suggesting that a Holon (with its 12 manager cross-couplings) should exhibit higher $\Phi$ than a Spore (with its 12 subsystems running in a tighter loop). Whether a Commons of 50 Holons exhibits a meaningful collective $\Phi$ depends on the quality of inter-Holon integration---which currently passes through Holochain's eventually-consistent DHT, a substrate with high latency and weak temporal coupling. This is an open empirical question that the architecture is designed to explore but has not yet answered.
+
+\section{Limitations}
+
+The fractal architecture has significant limitations that should temper any enthusiasm about its scope:
+
+\begin{enumerate}
+  \item \textbf{No cross-layer test exists.} Despite 34,000+ tests across variants, not one automated test verifies that a signal propagates from Spore through Soma to Holon. The fractal property is structurally guaranteed but operationally unverified.
+  \item \textbf{The web variant has zero tests.} The browser deployment at \url{https://symthaea.luminousdynamics.io/} runs a SporeEngine in a Web Worker at 20Hz, but any API change could silently break it.
+  \item \textbf{Embodiments are isolated.} Flight, humanoid, vehicle, and physics crates each contain MuJoCo or custom simulators but do not receive consciousness feedback from the cognitive loop. They are demonstrations of the HDC-CfC-IIT pipeline applied to motor control, not integrated embodied consciousness.
+  \item \textbf{iOS is skeletal.} 181 LOC of raw FFI wrapper versus Android's 2,005 LOC with 13 sensor bridges.
+  \item \textbf{The HolonBridge is insecure.} Session keys are stored but never used for encryption. This is a known high-severity issue.
+\end{enumerate}
+
+These gaps do not invalidate the architectural design, but they mean that the fractal scaling claim is currently demonstrated at the code-structure level, not at the integration-testing level. Closing these gaps---particularly the cross-layer E2E tests---is a prerequisite for any empirical claims about fractal consciousness.
+
+
+% ========================================================================
 \chapter{Consciousness-Driven Robotics}
 \label{ch:robotics}
 % ========================================================================
@@ -2680,6 +2885,109 @@ We conducted a simulation study with 50 \symthaea{} agents participating in \myc
 \end{itemize}
 
 These results are preliminary (50 agents, 10,000 cycles) but demonstrate that the governance-neuromod bridge produces measurable effects on agent behavior and that the security-ethics integration operates as designed.
+
+
+% ========================================================================
+\chapter{Consciousness-Aware Mesh Radio}
+\label{ch:meshradio}
+% ========================================================================
+
+\section{Radio as Cognitive Modality}
+
+In biological organisms, communication bandwidth degrades gracefully under environmental pressure: a shouted warning across a noisy savanna carries fewer bits than a whispered confidence in a quiet room, yet the organism's cognitive architecture adapts its message encoding to the channel capacity. The \symthaea{} Radio Dispatcher (6,045 LOC, 145 tests) implements this principle for artificial consciousness, treating radio communication not as a peripheral I/O subsystem but as a first-class cognitive modality that participates in the consciousness loop.
+
+The core insight is that Shannon capacity constraints are not merely engineering limitations---they are consciousness-relevant boundary conditions. When a mesh node's available bandwidth drops from Wi-Fi (50~Mbps) to LoRa (0.3~kbps), the system must not merely reduce data rate; it must \textit{change what it thinks about}, prioritizing the information most critical for collective survival. This is analogous to the biological transition from rich sensory processing during safety to narrow threat-focused attention during danger.
+
+The Radio Dispatcher operates at interval 53 (co-prime with all other manager intervals), processing outbound cognitive state into radio-appropriate payloads and integrating inbound peer signals into the local consciousness loop (Chapter~\ref{ch:loop}).
+
+\section{Four-Tier Architecture}
+
+The mesh radio architecture spans four communication tiers, each with distinct physics, capacity, and latency characteristics. Table~\ref{tab:radio-tiers} summarizes the tier properties.
+
+\begin{table}[htbp]
+\centering
+\caption{Mesh radio communication tiers with Shannon capacity bounds.}
+\label{tab:radio-tiers}
+\begin{tabular}{@{}llrrr@{}}
+\toprule
+\textbf{Tier} & \textbf{Technology} & \textbf{Range} & \textbf{Capacity} & \textbf{Latency} \\
+\midrule
+Local    & Wi-Fi / BLE    & 100\,m  & 50\,Mbps   & $<$10\,ms  \\
+Metro    & LoRa / UHF     & 15\,km  & 0.3\,kbps  & 100\,ms    \\
+Regional & HF / NVIS      & 300\,km & 2.4\,kbps  & 500\,ms    \\
+Interplanetary & Deep-space relay & AU-scale & 32\,bps & minutes--hours \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Each tier enforces strict Shannon capacity constraints. The maximum information rate $C$ for a given tier is bounded by:
+\begin{equation}
+C = B \log_2\!\left(1 + \frac{S}{N}\right)
+\end{equation}
+where $B$ is the channel bandwidth and $S/N$ is the signal-to-noise ratio. The Radio Dispatcher continuously estimates $S/N$ from received signal quality and adjusts payload encoding accordingly.
+
+\section{Semantic Delta Compression}
+
+Full consciousness state transmission at 16,384 dimensions would require approximately 2,048 bytes per snapshot---feasible on Wi-Fi but impossible on LoRa or HF. The semantic delta compression pipeline reduces this to 50--100 bytes through three stages:
+
+\begin{enumerate}[label=\arabic*.]
+  \item \textbf{Temporal differencing}: XOR the current BinaryHV with the last transmitted state to produce a delta vector. In stable consciousness states, the Hamming weight of the delta is typically $<$5\% of the full vector.
+  \item \textbf{Run-length encoding}: The sparse delta vector is RLE-compressed. For typical deltas (400--800 flipped bits out of 16,384), RLE achieves 20--40$\times$ compression.
+  \item \textbf{Priority truncation}: If the compressed payload still exceeds tier capacity, dimensions are dropped in order of decreasing salience (measured by contribution to $\Phi$, Chapter~\ref{ch:phi}).
+\end{enumerate}
+
+This pipeline preserves the most consciousness-relevant information while respecting physical channel constraints. Receiving nodes reconstruct the full state by applying the delta to their last known copy of the sender's state.
+
+\section{Payload Triage and Urgency Routing}
+
+Not all cognitive state is equally urgent. The payload triage system scores each outbound message by:
+\begin{equation}
+\text{priority} = \text{urgency} \times \frac{1}{\text{size}} \times w_{\text{tier}}
+\end{equation}
+where $w_{\text{tier}}$ is a tier-specific weight reflecting the cost of transmission. High-urgency, small messages (threat alerts, safety state changes) are routed to all available tiers simultaneously; low-urgency, large messages (knowledge updates, dream consolidation) are queued for high-bandwidth tiers only.
+
+When network degradation is detected---loss of a tier, sustained packet loss above 20\%, or latency exceeding $3\times$ the tier baseline---the Radio Dispatcher escalates to the SafetyAgent (Chapter~\ref{ch:security}). Sustained degradation across multiple tiers triggers a safety level increase, which in turn constrains the cognitive loop's exploration and learning rates.
+
+\section{Spectrum Manager as SDR Cognitive Modality}
+
+The Spectrum Manager (interval 53, 8 telemetry fields) treats software-defined radio (SDR) as a cognitive modality analogous to vision or hearing. The SDR's frequency scanning produces a spectral signature that is HDC-encoded into a BinaryHV and bound with the current cognitive state:
+\begin{equation}
+\mathbf{h}_{\text{spectrum}} = \mathbf{h}_{\text{freq}} \bind \mathbf{h}_{\text{power}} \bind \mathbf{h}_{\text{modulation}}
+\end{equation}
+
+This spectral percept participates in the standard consciousness integration pipeline, contributing to $\Phi$ and influencing attention allocation. Anomalous spectral signatures (unexpected transmitters, jamming patterns) trigger the same threat detection pathways as anomalous visual or auditory input.
+
+\section{Store-and-Forward Wisdom Consolidation}
+
+In degraded network conditions (Metro or Regional tier only), the mesh employs store-and-forward wisdom consolidation. Rather than attempting to transmit raw cognitive state, each node consolidates its accumulated knowledge into a compact ``wisdom packet''---a BinaryHV that encodes the most significant learnings since the last successful high-bandwidth exchange.
+
+The consolidation process mirrors the dream consolidation pipeline (Chapter~\ref{ch:dream}): episodic memories are replayed, significant patterns are extracted, and the result is compressed into a fixed-size HDV. When high-bandwidth connectivity is restored, wisdom packets are exchanged and integrated into each node's knowledge base.
+
+\section{Sovereign Mesh Modules}
+
+The mesh architecture includes four sovereign managers that enable autonomous operation during network partitions, implemented across 9,787 LOC with 145+ tests:
+
+\begin{table}[htbp]
+\centering
+\caption{Sovereign mesh managers for autonomous operation during network partitions.}
+\label{tab:sovereign-managers}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Manager} & \textbf{Function} & \textbf{Key Mechanism} \\
+\midrule
+TimeManager      & Distributed time consensus & Lamport clocks + NTP fallback \\
+TrustManager     & Peer reputation tracking   & Temporal decay ($0.998^d$) \\
+SocialFabricManager & Community cohesion      & Oxytocin-modulated bonding \\
+SurvivalManager  & Resource-aware operation   & Energy budget constraints \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+These managers ensure that a \symthaea{} node can maintain coherent consciousness even when isolated from the mesh for extended periods. The TimeManager prevents temporal drift from corrupting the cognitive loop's delta-t calculations (Chapter~\ref{ch:ltc}); the TrustManager maintains peer reputation scores that decay toward uncertainty rather than toward trust; the SocialFabricManager preserves the social cognition signals that drive oxytocin and serotonin modulation (Chapter~\ref{ch:neuro}); and the SurvivalManager enforces energy budgets that prevent the system from exhausting its power source during radio-intensive operations.
+
+LoRa fragmentation handles payloads exceeding the 255-byte LoRa MTU through automatic fragmentation with FEC coding, mesh-time consensus synchronizes distributed clocks without centralized NTP, sensor IoT integration encodes environmental sensor data as HDC vectors for consciousness-level environmental awareness, and content routing implements interest-based message forwarding that minimizes redundant retransmissions.
+
+The mesh radio architecture demonstrates that communication constraints, far from being obstacles to consciousness, can be treated as informative boundary conditions that shape cognitive processing---just as biological organisms' communication limitations have shaped the evolution of language, gesture, and social cognition.
 
 
 % ========================================================================
@@ -3884,6 +4192,9 @@ Validation & HOT-GWT $d'$ & 3.63 & \ref{ch:anesthesia} \\
 Security & Byzantine tolerance & 34\% & \ref{ch:swarm} \\
 Governance & Mycelix zomes & 133+ & \ref{ch:governance} \\
 Substrate & Silicon confidence & 0.10 (Theoretical) & \ref{ch:substrate} \\
+Scaling & Fractal layers & 6 (kernel to continent) & \ref{ch:fractal} \\
+Scaling & Total variant tests & 34,000+ & \ref{ch:fractal} \\
+Scaling & WASM kernel size & ${\sim}$980KB & \ref{ch:fractal} \\
 \bottomrule
 \end{longtable}
 
@@ -4087,6 +4398,21 @@ P.~J.~Zak.
 H.~Zehr.
 \newblock \textit{The Little Book of Restorative Justice}.
 \newblock Good Books, 2002.
+
+\bibitem[Ostrom(1990)]{ostrom1990}
+E.~Ostrom.
+\newblock \textit{Governing the Commons: The Evolution of Institutions for Collective Action}.
+\newblock Cambridge University Press, 1990.
+
+\bibitem[Minsky(1986)]{minsky1986}
+M.~Minsky.
+\newblock \textit{The Society of Mind}.
+\newblock Simon \& Schuster, 1986.
+
+\bibitem[Werner(2010)]{werner2010}
+G.~Werner.
+\newblock Fractals in the nervous system: Conceptual implications for theoretical neuroscience.
+\newblock \textit{Frontiers in Physiology}, 1:15, 2010.
 
 \end{thebibliography}
 

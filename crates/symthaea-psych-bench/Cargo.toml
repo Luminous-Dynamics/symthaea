@@ -15,6 +15,7 @@ categories = ["science", "algorithms"]
 default = []
 symthaea-backend = ["dep:symthaea"]
 neuroevolution = ["dep:symthaea-neuroevolution"]
+external-benchmarks = []
 
 [dependencies]
 symthaea-core = { path = "../../symthaea-core" }

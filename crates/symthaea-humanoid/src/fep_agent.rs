@@ -138,6 +138,9 @@ pub struct ActiveInferenceHumanoidAgent {
     prev_fe: f64,
     /// Current task.
     task: HumanoidTask,
+    /// Optional consciousness context from Spore/Holon.
+    /// Low consciousness → conservative stance; Red safety → emergency crouch.
+    consciousness_ctx: symthaea_core::ConsciousnessContext,
 }
 
 impl ActiveInferenceHumanoidAgent {
@@ -174,7 +177,21 @@ impl ActiveInferenceHumanoidAgent {
             current_fe: 0.0,
             prev_fe: 0.0,
             task,
+            consciousness_ctx: symthaea_core::ConsciousnessContext::DEFAULT,
         }
+    }
+
+    /// Update the consciousness context from Spore/Holon.
+    ///
+    /// Low consciousness → conservative stance (reduced exploration).
+    /// SafetyLevel::Red → emergency crouch behavior.
+    pub fn set_consciousness_context(&mut self, ctx: symthaea_core::ConsciousnessContext) {
+        self.consciousness_ctx = ctx;
+    }
+
+    /// Current consciousness context.
+    pub fn consciousness_context(&self) -> &symthaea_core::ConsciousnessContext {
+        &self.consciousness_ctx
     }
 
     /// Build the 10D observation vector from humanoid state.

@@ -196,16 +196,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Split into 3 groups to stay under runner preemption thresholds.
-          # Each group runs ~20 features for ~15-20 min wall-clock.
-          - group: core
+          # Split into 4 groups to stay under runner preemption thresholds.
+          # Each group runs ~13-22 features for ~10-15 min wall-clock.
+          - group: core-infra
             features: >-
               parallel,service,shell,demo,api_module,
-              voice-tts,voice-stt,audio,vocal-tract,neural-vocoder,
-              embeddings,vision,perception,vision-manifold,foveation,
               integrity,semantic-encoder,neural-bridge,webcam,
               mesh,mesh-encryption,mesh-key-exchange,swarm,notifications,
               nix-mind,identity
+          - group: core-media
+            features: >-
+              voice-tts,voice-stt,audio,vocal-tract,neural-vocoder,
+              embeddings,vision,perception,vision-manifold,foveation
           - group: science
             features: >-
               physics,physics-bridge,flight,humanoid,hal,
