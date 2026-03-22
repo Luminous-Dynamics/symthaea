@@ -93,8 +93,11 @@ impl LexicalDecisionBenchmark {
                 // FEP provides top-down predictive refinement; without it, weaker signal
                 let fep_penalty: f32 = if config.enable_fep { 0.0 } else { 0.10 };
                 let noise_degrade = config.effective_noise() as f32 * 0.4;
+                // Difficulty degrades signal via SNR reduction (harder = weaker encoding)
+                let snr_scale = diff_model.signal_multiplier(config.difficulty) as f32;
                 let signal_strength: f32 =
-                    (if is_high_freq { 0.75 } else { 0.55 }) - fep_penalty - noise_degrade;
+                    ((if is_high_freq { 0.75 } else { 0.55 }) - fep_penalty - noise_degrade)
+                        * snr_scale;
                 xor_shift(&mut rng);
                 let noise_hv = ContinuousHV::random(dim, rng);
                 let stimulus = ContinuousHV::weighted_bundle(

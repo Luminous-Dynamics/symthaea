@@ -1805,10 +1805,10 @@ async fn main() -> Result<()> {
         let http_state = Arc::clone(&holon_http_state);
         tokio::spawn(async move {
             let app = symthaea::api::holon::holon_router(http_state);
-            match tokio::net::TcpListener::bind("0.0.0.0:5492").await {
+            match tokio::net::TcpListener::bind("0.0.0.0:5491").await {
                 Ok(listener) => {
-                    info!("Holon bridge listening on http://0.0.0.0:5492");
-                    println!("📱 Holon bridge: http://0.0.0.0:5492/holon/status");
+                    info!("Holon bridge listening on http://0.0.0.0:5491");
+                    println!("📱 Holon bridge: http://0.0.0.0:5491/holon/status");
                     if let Err(e) = axum::serve(listener, app).await {
                         error!("Holon bridge server error: {}", e);
                     }

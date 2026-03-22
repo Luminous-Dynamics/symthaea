@@ -482,6 +482,9 @@ pub struct MycelixBridge {
     /// Pending factcheck epistemic feedback for cognitive loop injection.
     /// Populated by `submit_factcheck_feedback()`, drained by the cognitive loop.
     pending_factcheck_feedback: Vec<FactcheckEpistemicFeedback>,
+    /// Pending waste/circular economy events for CLS injection.
+    #[cfg(feature = "circular")]
+    pending_waste_events: Vec<WasteBridgeEvent>,
     /// Pending governance events for CLS injection
     #[cfg(feature = "mycelix")]
     pending_gov_events: Vec<crate::cognitive_loop::managers::governance_manager::GovernanceEvent>,
@@ -577,6 +580,44 @@ pub enum GovernanceDispatchOutcome {
     VoteRejected { correlation_id: u64, reason: String },
 }
 
+/// Waste/circular economy events dispatched to or received from Mycelix DHT.
+///
+/// These bridge symthaea-circular AI classifications to Holochain waste-registry
+/// entries, closing the AI → DHT → feedback loop.
+#[cfg(feature = "circular")]
+#[derive(Debug, Clone)]
+pub enum WasteBridgeEvent {
+    /// AI classified a waste stream — publish as WasteClassification entry.
+    ClassificationResult {
+        /// Waste stream hash on DHT (if known).
+        stream_hash: Option<String>,
+        /// Determined category (e.g. "Organic", "PlasticPET").
+        category: String,
+        /// Classification confidence [0.0, 1.0].
+        confidence: f32,
+        /// Method used (always "VisionAI" for Symthaea).
+        method: String,
+    },
+    /// Contamination detected — emit alert to source and facility.
+    ContaminationAlert {
+        /// Facility identifier.
+        facility_id: String,
+        /// Contaminant type detected.
+        contaminant: String,
+        /// Severity [0.0, 1.0].
+        severity: f32,
+    },
+    /// Decomposition prediction for a compost batch.
+    DecompositionPrediction {
+        /// Batch identifier.
+        batch_id: String,
+        /// Predicted completion timestamp (Unix microseconds).
+        predicted_completion_us: u64,
+        /// Decomposition percentage at prediction time.
+        decomposition_pct: f32,
+    },
+}
+
 impl MycelixBridge {
     /// Create a new Mycelix bridge
     pub fn new(agent_id: impl Into<String>) -> Self {
@@ -589,6 +630,8 @@ impl MycelixBridge {
             proposal_cache: HashMap::new(),
             cache_ttl: Duration::from_secs(60),
             pending_factcheck_feedback: Vec::new(),
+            #[cfg(feature = "circular")]
+            pending_waste_events: Vec::new(),
             #[cfg(feature = "mycelix")]
             pending_gov_events: Vec::new(),
             #[cfg(feature = "mycelix")]
@@ -615,6 +658,8 @@ impl MycelixBridge {
             proposal_cache: HashMap::new(),
             cache_ttl: Duration::from_secs(60),
             pending_factcheck_feedback: Vec::new(),
+            #[cfg(feature = "circular")]
+            pending_waste_events: Vec::new(),
             #[cfg(feature = "mycelix")]
             pending_gov_events: Vec::new(),
             #[cfg(feature = "mycelix")]
@@ -700,6 +745,28 @@ impl MycelixBridge {
     /// Check if there are pending factcheck results.
     pub fn has_pending_factcheck(&self) -> bool {
         !self.pending_factcheck_feedback.is_empty()
+    }
+
+    // ========================================================================
+    // WASTE BRIDGE EVENTS
+    // ========================================================================
+
+    /// Submit a waste classification result for dispatch to Mycelix DHT.
+    #[cfg(feature = "circular")]
+    pub fn submit_waste_event(&mut self, event: WasteBridgeEvent) {
+        self.pending_waste_events.push(event);
+    }
+
+    /// Drain pending waste events for dispatch to the Holochain conductor.
+    #[cfg(feature = "circular")]
+    pub fn drain_waste_events(&mut self) -> Vec<WasteBridgeEvent> {
+        std::mem::take(&mut self.pending_waste_events)
+    }
+
+    /// Check if there are pending waste events.
+    #[cfg(feature = "circular")]
+    pub fn has_pending_waste_events(&self) -> bool {
+        !self.pending_waste_events.is_empty()
     }
 
     // ========================================================================

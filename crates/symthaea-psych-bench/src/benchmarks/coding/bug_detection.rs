@@ -1,4 +1,6 @@
-//! Bug Detection benchmark.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Bug Detection benchmark.
 //!
 //! Measures the ability to detect and classify seeded bugs in code snippets
 //! via HDC similarity. Each trial encodes a buggy and fixed code pair as

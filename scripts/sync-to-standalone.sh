@@ -155,7 +155,7 @@ SUPPORT_DIRS=(
     rust-sentinels
     static
     systemd
-    tla
+    # tla — excluded: 1.3GB of TLA+ model checker states, not needed for standalone CI
     tools
     validation
 )

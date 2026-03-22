@@ -331,6 +331,20 @@ pub struct SwarmManager {
     #[cfg(feature = "space-alerts")]
     space_lr_acc: f64,
 
+    // ── Waste/Circular Economy tracking ─────────────────────────────────
+    /// Running total of waste tracked (kg).
+    #[cfg(feature = "circular")]
+    waste_total_kg: f32,
+    /// Running mean circularity potential [0.0, 1.0].
+    #[cfg(feature = "circular")]
+    waste_mean_circularity: f32,
+    /// Events processed this interval.
+    #[cfg(feature = "circular")]
+    waste_events_processed: u32,
+    /// Confidence EMA for waste classifications.
+    #[cfg(feature = "circular")]
+    waste_confidence_ema: f64,
+
     // ── Telemetry snapshot ──────────────────────────────────────────────
     /// Last computed telemetry (readable between process calls).
     last_telemetry: SwarmTelemetry,
@@ -391,6 +405,14 @@ impl Default for SwarmManager {
             space_exploration_acc: 0.0,
             #[cfg(feature = "space-alerts")]
             space_lr_acc: 0.0,
+            #[cfg(feature = "circular")]
+            waste_total_kg: 0.0,
+            #[cfg(feature = "circular")]
+            waste_mean_circularity: 0.0,
+            #[cfg(feature = "circular")]
+            waste_events_processed: 0,
+            #[cfg(feature = "circular")]
+            waste_confidence_ema: 0.0,
             last_telemetry: SwarmTelemetry::default(),
             #[cfg(feature = "fhe-wisdom")]
             wisdom_pool: symthaea_core::hdc::hdc_fhe::CollectiveWisdomPool::new(),
@@ -895,6 +917,14 @@ impl SwarmManager {
             space_alert_count: self.space_alert_count,
             #[cfg(feature = "space-alerts")]
             last_space_alert_severity: self.last_space_alert_severity,
+            #[cfg(feature = "circular")]
+            waste_total_kg: self.waste_total_kg,
+            #[cfg(feature = "circular")]
+            waste_mean_circularity: self.waste_mean_circularity,
+            #[cfg(feature = "circular")]
+            waste_events_processed: self.waste_events_processed,
+            #[cfg(feature = "circular")]
+            waste_confidence_ema: self.waste_confidence_ema,
         };
     }
 }

@@ -1,4 +1,6 @@
-//! Full psychological benchmark battery with human baseline comparisons.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Full psychological benchmark battery with human baseline comparisons.
 //!
 //! Runs all 35 benchmarks across 9 suites and generates a report comparing
 //! Symthaea's performance against published human norms.

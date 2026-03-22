@@ -1,4 +1,6 @@
-//! Benchmark reporting: JSON/CSV output and summary formatting.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Benchmark reporting: JSON/CSV output and summary formatting.
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;

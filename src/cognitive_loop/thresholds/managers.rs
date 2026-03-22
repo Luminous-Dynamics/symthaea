@@ -508,6 +508,27 @@ pub const SPACE_ANOMALY_AROUSAL: f32 = 0.08;
 pub const SPACE_MANEUVER_CONFIDENCE: f32 = 0.03;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// CIRCULAR ECONOMY — Waste circularity → neuromodulator coupling
+// Basis: Ellen MacArthur Foundation (2015) — circular economy as feedback loop
+// McEwen (2007) — serotonin role in system stability/homeostatic confidence
+// Arnsten (2009) — noradrenaline vigilance to resource constraints
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Serotonin gain from high circularity potential (system health signal).
+/// Basis: McEwen (2007) — serotonin supports homeostatic confidence.
+pub const CIRCULAR_ECONOMY_SHT_GAIN: f32 = 0.15;
+
+/// Serotonin half-life (cycles) for circularity boost.
+pub const CIRCULAR_ECONOMY_SHT_HALFLIFE: f32 = 8.0;
+
+/// Noradrenaline gain from low material entropy (concentration risk).
+/// Basis: Arnsten (2009) — NE drives vigilance under resource constraint.
+pub const CIRCULAR_ECONOMY_NE_GAIN: f32 = 0.20;
+
+/// NE half-life (cycles) for waste vigilance — fast transient.
+pub const CIRCULAR_ECONOMY_NE_HALFLIFE: f32 = 4.0;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // TRUST MANAGER — Violation response, anomaly detection
 // Basis: Zak (2012) — trust/oxytocin; Dunbar (1998) — social brain
 // ═══════════════════════════════════════════════════════════════════════════════

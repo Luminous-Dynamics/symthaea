@@ -1,4 +1,6 @@
-//! # Fast Fourier Transform Engine
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Fast Fourier Transform Engine
 //!
 //! Cooley-Tukey radix-2 FFT and inverse FFT with HDC encoding.
 //!

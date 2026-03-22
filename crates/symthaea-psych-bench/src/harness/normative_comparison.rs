@@ -1,4 +1,6 @@
-//! Normative comparison of agent performance against human baselines.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Normative comparison of agent performance against human baselines.
 //!
 //! Computes z-scores, percentiles, and clinical-style interpretations for each
 //! benchmark metric by comparing agent values to published human population
@@ -94,7 +96,7 @@ fn baseline_for_benchmark<'a>(
     match benchmark {
         // Executive domain
         name if name.contains("Stroop") && !name.contains("Emotional") => {
-            Some(("stroop_effect", &bl.executive))
+            Some(("stroop_incongruent_accuracy", &bl.executive))
         }
         name if name.contains("WCST") || name.contains("Wisconsin") => {
             Some(("wcst_categories_completed", &bl.executive))
@@ -102,7 +104,7 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("FlankerInhibition") => {
             Some(("interference_suppression", &bl.inhibition))
         }
-        name if name.contains("Flanker") => Some(("flanker_effect", &bl.executive)),
+        name if name.contains("Flanker") => Some(("flanker_incongruent_accuracy", &bl.executive)),
         name if name.contains("TowerOfLondon") => Some(("tol_overall_optimal_rate", &bl.executive)),
         name if name.contains("DualTask") => Some(("dual_task_cost", &bl.executive)),
         name if name.contains("Ravens") => Some(("ravens_overall_accuracy", &bl.executive)),
@@ -143,7 +145,7 @@ fn baseline_for_benchmark<'a>(
 
         // Affect
         name if name.contains("Emotional") && name.contains("Stroop") => {
-            Some(("emotional_interference", &bl.affect))
+            Some(("emotional_negative_accuracy", &bl.affect))
         }
         name if name.contains("MoodCongruent") => Some(("congruence_ratio", &bl.affect)),
         name if name.contains("ValenceClassification") => Some(("valence_accuracy", &bl.affect)),
@@ -153,16 +155,18 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("StopSignal") => Some(("ssrt_ticks", &bl.inhibition)),
 
         // Attention
-        name if name.contains("VisualSearch") => Some(("search_asymmetry", &bl.attention)),
-        name if name.contains("AttentionalBlink") => Some(("blink_magnitude", &bl.attention)),
+        name if name.contains("VisualSearch") => {
+            Some(("conjunction_search_accuracy", &bl.attention))
+        }
+        name if name.contains("AttentionalBlink") => Some(("lag3_t2_accuracy", &bl.attention)),
 
         // Motor
         name if name.contains("FittsLaw") => Some(("fitts_r_squared", &bl.motor)),
-        name if name.contains("SRTT") => Some(("learning_effect", &bl.motor)),
+        name if name.contains("SRTT") => Some(("sequence_accuracy", &bl.motor)),
         name if name.contains("Bimanual") => Some(("coordination_cost", &bl.motor)),
 
         // Language
-        name if name.contains("LexicalDecision") => Some(("lexicality_effect", &bl.language)),
+        name if name.contains("LexicalDecision") => Some(("word_accuracy", &bl.language)),
         name if name.contains("SemanticPriming") => Some(("priming_effect", &bl.language)),
         name if name.contains("SemanticCoherence") => Some(("coherence_mean", &bl.language)),
         name if name.contains("GardenPath") => Some(("disambiguation_cost", &bl.language)),
@@ -217,11 +221,11 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("RemoteAssociates") => Some(("rat_overall_accuracy", &bl.creativity)),
 
         // Butlin
-        name if name.contains("Butlin") => Some(("present_count", &bl.butlin)),
+        name if name.contains("Butlin") => Some(("mean_quality_score", &bl.butlin)),
 
         // Neuromod
         name if name.contains("RewardLearning") => Some(("trials_to_criterion", &bl.neuromod)),
-        name if name.contains("YerkesDodson") => Some(("peak_ne_level", &bl.neuromod)),
+        name if name.contains("YerkesDodson") => Some(("inverted_u_fit_r2", &bl.neuromod)),
         name if name.contains("AttentionNetwork") => Some(("conflict_effect", &bl.neuromod)),
         name if name.contains("MoodInduction") => Some(("mood_congruent_bias", &bl.neuromod)),
         name if name.contains("PharmacologicalAblation") => {

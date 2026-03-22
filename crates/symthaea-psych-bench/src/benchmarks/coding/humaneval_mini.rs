@@ -1,4 +1,6 @@
-//! HumanEval-Mini benchmark.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! HumanEval-Mini benchmark.
 //!
 //! A 20-problem subset of HumanEval (Chen et al., 2021) adapted for HDC-based
 //! program synthesis evaluation. Each problem provides a function signature,
