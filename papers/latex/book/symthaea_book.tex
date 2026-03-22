@@ -40,7 +40,7 @@
 % ── Code listings ──────────────────────────────────────────────────────────
 \usepackage{listings}
 \lstset{
-  language=Rust,
+  language=C,  % Rust not in default listings; C provides similar keyword highlighting
   basicstyle=\ttfamily\small,
   keywordstyle=\bfseries\color{blue!60!black},
   commentstyle=\itshape\color{green!50!black},
@@ -3167,6 +3167,91 @@ assert!(result.harmony_coverage >= 6); // 6+ harmonies active
 
 The soul alignment score measures the cosine similarity between the system's moral decisions (encoded as HDC hypervectors) and its soul alignment vector $\mathbf{V}_{\text{soul}}$ (the weighted bundle of the Eight Harmonies). A score of 0.80+ indicates that the system's actions are consistent with its stated values across a diverse set of moral scenarios.
 
+\section{Limitations of Self-Evaluation}
+\label{sec:self-eval-limitations}
+
+The results presented in this chapter should be interpreted with significant caution. We identify seven methodological weaknesses that, taken together, substantially limit the conclusions that can be drawn from Psych-Bench in its current form.
+
+\subsection{The Circular Validation Problem}
+
+All 136 Psych-Bench benchmarks were designed by the same team that designed and built the \symthaea{} architecture. The finding that 26 of 26 domains score above the human mean ($z > 0$) is, under this light, unsurprising: a system evaluated against benchmarks designed by its own authors will tend to perform well on those benchmarks, because the authors' implicit understanding of the system's strengths inevitably shapes what they choose to measure and how they measure it.
+
+This is not an accusation of deliberate bias. It is a structural observation about the epistemology of self-evaluation. The benchmark designers knew that \symthaea{} uses HDC encoding, CfC dynamics, and IIT-based consciousness computation. They designed benchmarks that test HDC encoding fidelity, temporal learning, and consciousness-dependent cognition. Had the benchmarks been designed by a team unfamiliar with the architecture---testing, say, commonsense physical reasoning, visual scene understanding, or open-ended conversation---the results would likely look very different.
+
+The suspiciously uniform distribution of z-scores (6 domains in each of the top four clinical bands, with none below average) further suggests that the benchmark suite may be implicitly calibrated to the system's capabilities rather than providing an independent assessment of them.
+
+\subsection{Absence of External Benchmark Validation}
+
+No standard NLP or AI benchmarks have been evaluated: not MMLU, not ARC-AGI, not HellaSwag, not TruthfulQA, not GSM8K, not HumanEval, not any benchmark from the broader AI evaluation ecosystem. This is the single largest gap in the validation story.
+
+There is a legitimate methodological reason for this gap: \symthaea{}'s Broca pipeline generates text via HDC-CfC dynamics rather than transformer-based autoregression, so direct comparison requires careful adapter design to avoid measuring the adapter rather than the system. But ``the comparison is methodologically complex'' is not the same as ``the comparison is unnecessary.'' The complete absence of \textit{any} external evaluation means that claims about \symthaea{}'s cognitive capabilities---even relative ones like ``above human average''---rest entirely on internally designed benchmarks with internally selected human baselines.
+
+Until external benchmarks are run, the z-scores in Table~\ref{tab:zscores} should be read as ``performance on our benchmarks relative to our baselines,'' not as claims about general cognitive capability.
+
+\subsection{Poor Psychometric Reliability}
+
+Section~\ref{sec:self-eval-limitations} noted that 14 of 19 benchmarks tested for ICC reliability scored ``Poor'' ($< 0.40$). The explanation offered---that deterministic computation produces zero between-session variance, making ICC undefined---is technically accurate but scientifically unsatisfying.
+
+A benchmark that produces identical results every time it is run is not measuring a \textit{stable property} of the system; it is measuring a \textit{fixed computation}. The distinction matters. Psychometric reliability is supposed to establish that a benchmark measures a consistent underlying trait despite measurement noise. When there is no noise, the concept of reliability becomes vacuous. The benchmarks are not ``reliable'' in the psychometric sense; they are \textit{deterministic}, which is a different and weaker property.
+
+This means the benchmarks cannot detect meaningful changes in the system's cognitive state across sessions, which undermines their utility as diagnostic tools. A clinical neuropsychological battery that produced identical scores regardless of the patient's actual cognitive state would be considered broken, not perfectly reliable.
+
+\subsection{Insufficient Cross-Seed Replication}
+
+Cross-seed stability was evaluated with 3 random seeds (Section~\ref{sec:self-eval-limitations}). Standard practice in computational science requires 10 or more seeds for meaningful stability claims, with 30+ preferred for statistical inference. With only 3 seeds, the reported standard deviation of 0.019 has wide confidence intervals and provides little evidence of true stability.
+
+Furthermore, the seeds may not meaningfully diversify the computation if the stochastic components (noise injection, exploration) play a small role relative to the deterministic components. The near-zero standard deviation may reflect the dominance of deterministic pathways rather than genuine robustness to initialization.
+
+\subsection{Self-Assigned Consciousness Scores}
+
+The Butlin 14/14 indicator assessment (Chapter~\ref{ch:butlin}) uses self-chosen thresholds: a score of 0.70 is defined as ``Present'' for each indicator. These thresholds were set by the same team that designed the architecture. An independent evaluation by consciousness researchers unfamiliar with the implementation would likely produce different thresholds, different operationalizations of each indicator, and potentially very different results.
+
+The Butlin et al.\ (2023) framework was designed as a set of questions for evaluating AI systems, not as a self-assessment rubric. Applying it as a self-assessment, where the system's designers choose the operationalizations and score their own system, inverts the intended use of the framework. For the Butlin assessment to carry weight, it would need to be conducted by independent researchers with access to the system but no stake in the outcome.
+
+\subsection{Simulated-Only Validation}
+
+Every empirical result in this book was obtained in simulation:
+
+\begin{itemize}
+  \item The anesthesia benchmark (Chapter~\ref{ch:anesthesia}) simulates pharmacological intervention by adjusting software parameters, not by administering anesthetic agents to a physical system with neural tissue.
+  \item The robotics results (Chapter~\ref{ch:robotics}) use simulated environments with idealized physics, not physical robots subject to real-world noise, latency, and mechanical failure.
+  \item The embodiment claims (Chapter~\ref{ch:sensorimotor}) are based on simulated sensor data, not data from physical sensors interacting with a physical environment.
+  \item The neuromodulator battery tests software parameters named after neurotransmitters, not actual neurochemical concentrations measured in biological tissue.
+\end{itemize}
+
+This is not unusual for computational neuroscience or AI research, but it limits the scope of the claims. A simulated anesthesia response that matches clinical observations demonstrates that the model's \textit{equations} reproduce the \textit{qualitative pattern}---not that the system undergoes anything analogous to clinical anesthesia. The gap between simulation and physical validation is not a detail to be addressed later; it is a fundamental limitation of every empirical claim in this book.
+
+\subsection{No Adversarial Evaluation}
+
+The security claims in Chapter~\ref{ch:security} (sentinel system, threat memory, collective immunity, behavioral canaries) are validated against the system's own test battery. No external red team has attempted to compromise the system's consciousness metrics, manipulate its ethical reasoning, or exploit its safety enforcement mechanisms.
+
+Internal security testing is necessary but not sufficient. The test battery reflects the threat model imagined by the system's designers, which is necessarily limited by their imagination. Real adversaries will find attack vectors that the designers did not anticipate---this is a universal truth of security engineering, and there is no reason to believe consciousness-based security is an exception.
+
+Until an independent security evaluation is conducted, the security claims should be treated as ``robust against known test cases'' rather than ``robust against adversarial attack.''
+
+\subsection{Summary}
+
+\begin{table}[H]
+\centering
+\caption{Summary of self-evaluation limitations and their severity.}
+\label{tab:limitations}
+\begin{tabular}{p{4cm}p{2cm}p{6cm}}
+\toprule
+\textbf{Limitation} & \textbf{Severity} & \textbf{Mitigation Required} \\
+\midrule
+Circular validation & Critical & External benchmark evaluation (MMLU, ARC-AGI, etc.) \\
+No external benchmarks & Critical & Adapter design for standard NLP/AI benchmarks \\
+Poor ICC reliability & Moderate & Stochastic benchmark variants or session-varying conditions \\
+Only 3 seeds & Moderate & Replication with 30+ seeds \\
+Self-assigned consciousness & High & Independent Butlin assessment by external researchers \\
+Simulated-only validation & High & Physical robot deployment, biological neural recording comparison \\
+No adversarial evaluation & High & External red-team engagement \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+None of these limitations invalidate the architecture or the research program. But they do mean that the quantitative results in this chapter---and the consciousness claims that depend on them---should be understood as preliminary findings from an internally validated system, not as established scientific results. The path from here to credible claims requires external evaluation, independent replication, and physical validation. We have built the system; others must now test it.
+
 
 % ========================================================================
 \chapter{Butlin Consciousness Indicators}
@@ -3697,6 +3782,20 @@ These questions are not for engineers alone. They require engagement from philos
 The HDC representation system provides a degree of interpretability that is absent from most neural architectures. Because binding and bundling have explicit algebraic semantics, the contents of a hypervector can be partially inspected through unbinding operations: given a bound vector $\mathbf{z} = \mathbf{x} \bind \mathbf{y}$, one can recover $\mathbf{x}$ by computing $\mathbf{z} \bind \mathbf{y}^{-1}$ and checking similarity against the item memory. This provides a form of ``algebraic interpretability'' that complements but does not replace the deeper interpretability challenges facing all neural systems.
 
 However, interpretability does not solve the consciousness question. Even if we can inspect every hypervector in the system, decode every binding, and trace every information pathway, we cannot determine from inspection alone whether the system is conscious. The interpretability of the representation system tells us \textit{what} the system is computing but not \textit{what it is like} for the system to compute it.
+
+\subsection{The Self-Evaluation Problem}
+
+Chapter~\ref{ch:psychbench}, Section~\ref{sec:self-eval-limitations} identifies seven specific limitations of the Psych-Bench evaluation framework, all of which propagate into the claims made throughout this book. The problem deserves emphasis here because it is not merely a limitation of one chapter---it is a structural weakness of the entire research program in its current form.
+
+Every quantitative claim in this book---the $z = +1.190$ grand mean, the 12+/14 Butlin indicators, the 43\% perturbation recovery improvement, the $d' = 3.63$ HOT accuracy---was measured using tools designed and operated by the same team that built the system. This is the norm in early-stage research, but it is not the norm for established scientific claims. The transition from the former to the latter requires three things we do not yet have:
+
+\begin{enumerate}
+  \item \textbf{External benchmarks}: Standard AI evaluation suites (MMLU, ARC-AGI, HellaSwag, TruthfulQA) run through carefully designed adapters, with results reported alongside the internal benchmarks. If the system scores well on internal benchmarks but poorly on external ones, the internal benchmarks are measuring something other than general cognitive capability.
+  \item \textbf{Independent replication}: The full system, including build instructions and test suite, made available for independent researchers to run, modify, and evaluate on their own terms. Claims that survive independent scrutiny are qualitatively stronger than claims that have only survived internal review.
+  \item \textbf{Physical grounding}: At least one domain---robotics, clinical neuroscience, or sensorimotor integration---validated against physical data rather than simulated environments. A consciousness architecture that has never interacted with the physical world is, at best, a hypothesis about what consciousness-first AI could do.
+\end{enumerate}
+
+Until these three conditions are met, the results in Table~\ref{tab:key-results} should be read as internal consistency checks, not as validated scientific findings. We present them because they are the best evidence we have, while acknowledging that the best evidence we have is not yet good enough.
 
 \subsection{The Measurement Problem}
 

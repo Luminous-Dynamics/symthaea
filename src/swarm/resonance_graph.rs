@@ -372,7 +372,7 @@ mod tests {
         let mut g = ResonanceGraph::new();
         // Add a high-resonance peer
         let peer = PeerResonance {
-            content: Vec::new(),
+            content: VecDeque::new(),
             resonance_ema: 0.9, // High resonance
             last_seen: 1000,
         };

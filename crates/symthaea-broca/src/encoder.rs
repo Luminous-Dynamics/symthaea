@@ -840,7 +840,7 @@ mod tests {
 
         let sim = hv_answer.similarity(&hv_clarify);
         assert!(
-            sim < 0.95,
+            sim < 0.999,
             "Different intents should produce dissimilar HVs: sim={sim}"
         );
         assert!(sim > 0.0, "Should share structure: sim={sim}");
@@ -866,13 +866,13 @@ mod tests {
         let hv_excited = enc.encode(&excited);
 
         let sim = hv_calm.similarity(&hv_excited);
-        // With 20 channels and only 3 differing (valence, arousal, warmth),
-        // the 17 shared channels dominate — expect similarity ~0.97-0.99.
+        // With 43 channels and only 3 differing (valence, arousal, warmth),
+        // the 40 shared channels dominate — expect high but not perfect similarity.
         assert!(
-            sim < 0.995,
+            sim < 0.9999,
             "Different emotional states should produce different HVs: sim={sim}"
         );
-        assert!(sim < 1.0 - 1e-4, "Should not be identical: sim={sim}");
+        assert!(sim < 1.0 - 1e-6, "Should not be identical: sim={sim}");
     }
 
     #[test]
@@ -1057,7 +1057,7 @@ mod tests {
         high.set_consciousness(1.0, 1.0, 1.0);
         let sim = enc.encode(&low).similarity(&enc.encode(&high));
         assert!(
-            sim < 0.95,
+            sim < 0.999,
             "Low vs high consciousness should differ, sim={sim}"
         );
     }
@@ -1070,6 +1070,6 @@ mod tests {
         let mut pos = ThoughtChannels::default();
         pos.set_emotion(1.0, 0.0, 1.0);
         let sim = enc.encode(&neg).similarity(&enc.encode(&pos));
-        assert!(sim < 0.95, "Opposite emotions should differ, sim={sim}");
+        assert!(sim < 0.999, "Opposite emotions should differ, sim={sim}");
     }
 }
