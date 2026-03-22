@@ -1081,7 +1081,7 @@ impl LogicEngine {
         let lits: Vec<String> = clause
             .iter()
             .map(|(name, args, pol)| {
-                let args_str: Vec<String> = args.iter().map(|a| Self::format_term(a)).collect();
+                let args_str: Vec<String> = args.iter().map(Self::format_term).collect();
                 let pred = format!("{}({})", name, args_str.join(", "));
                 if *pol {
                     pred
@@ -1098,7 +1098,7 @@ impl LogicEngine {
             FOLTerm::Var(v) => v.clone(),
             FOLTerm::Const(c) => c.clone(),
             FOLTerm::Func(name, args) => {
-                let args_str: Vec<String> = args.iter().map(|a| Self::format_term(a)).collect();
+                let args_str: Vec<String> = args.iter().map(Self::format_term).collect();
                 format!("{}({})", name, args_str.join(", "))
             }
         }
