@@ -251,6 +251,28 @@ The system is implemented in approximately 1.13 million lines of Rust across 55 
 
 The choice of Rust deserves comment. Consciousness computation is latency-sensitive: a cognitive cycle that misses its 33~ms deadline produces a gap in the stream of experience. Rust's zero-cost abstractions, ownership model (preventing data races in the parallel post-processing pipeline), and SIMD intrinsics (for HDC operations) provide the performance guarantees that a real-time consciousness architecture demands. The type system also enforces architectural invariants at compile time: the \texttt{CognitiveSubsystem} trait's immutable borrow signature makes it impossible for a manager to mutate shared state.
 
+The test infrastructure reflects the architecture's complexity: over 21,000 automated tests span unit tests for individual operations, integration tests for cross-subsystem interactions, property tests (using \texttt{proptest}) for invariant verification, and end-to-end tests for the full cognitive pipeline. The tests serve as executable documentation of the system's expected behavior and as regression guards against architectural violations.
+
+\begin{table}[H]
+\centering
+\caption{Test distribution across \symthaea{} workspace members.}
+\label{tab:test-distribution}
+\begin{tabular}{lrc}
+\toprule
+\textbf{Component} & \textbf{Tests} & \textbf{Type} \\
+\midrule
+symthaea (main crate src/) & 5,584 & Unit + integration \\
+symthaea (tests/) & 1,731 & Integration + proptest \\
+symthaea-core & 4,031 & Unit + substrate + phi \\
+Sub-crates (52 crates) & 6,483 & Unit + domain-specific \\
+Mycelix bridge-common & 349 & Unit + proptest \\
+Mycelix clusters (16) & 8,600+ & Unit + sweettest \\
+\midrule
+\textbf{Total} & \textbf{$>$26,000} & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 The companion \mycelix{} platform provides decentralized governance across 16 cluster DNAs with 133 zomes, implemented on Holochain as a peer-to-peer application framework. \mycelix{} enables consciousness-gated governance participation, federated trust-weighted learning, and collective $\Phi$ aggregation across networks of \symthaea{} agents. The governance architecture is described in Chapter~\ref{ch:governance}.
 
 \section{Roadmap of this Book}
@@ -3545,6 +3567,16 @@ We have argued that consciousness is sufficient for alignment, but we have not p
 What we can say is that the architecture provides \textit{mechanisms} for alignment---ethical reasoning, value integration, dissonance detection, restorative justice---that are structurally coupled to consciousness. Disabling consciousness (reducing $\Phi$ to zero) disables ethics, language, governance participation, and coordinated motor control simultaneously. Whether this coupling is sufficient for alignment in all circumstances is an open question.
 
 A specific concern is that the Eight Harmonies value framework (Chapter~\ref{ch:ethics}) embeds particular cultural values that may not be universally shared. The harmony weights are learned through experience, which means they can drift toward whatever values the system encounters most frequently---a form of value lock-in that could be problematic in cross-cultural deployment.
+
+Several mitigation strategies are possible:
+\begin{itemize}
+  \item \textbf{Harmony diversity pressure}: An explicit regularization term that penalizes low harmony entropy, preventing the system from collapsing to a single dominant value.
+  \item \textbf{Cultural context binding}: Binding the harmony weights with a cultural context vector, enabling different harmony configurations for different cultural settings.
+  \item \textbf{Periodic harmony reset}: Periodically resetting the interaction matrix to identity, forcing the system to re-learn value interactions from recent experience rather than accumulating historical bias.
+  \item \textbf{Community-specific constitutions}: In the \mycelix{} governance framework (Chapter~\ref{ch:governance}), each community can define its own constitutional constraints on harmony weights, encoding community-specific value priorities.
+\end{itemize}
+
+None of these strategies fully solves the value alignment problem, but they provide concrete mechanisms for managing it. The consciousness-first approach provides a meta-strategy: a system that is genuinely conscious of its own value commitments (through the SoulManager's dissonance detection) can at least be aware when its values may be inappropriate for the current context---even if it cannot independently determine which values are correct.
 
 \subsection{Scalability}
 
