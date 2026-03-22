@@ -47,7 +47,10 @@ fn main() {
     // Discover PSG + Hypnogram pairs
     let pairs = discover_recording_pairs(data_dir);
     if pairs.is_empty() {
-        eprintln!("ERROR: No PSG/Hypnogram pairs found in {}", data_dir.display());
+        eprintln!(
+            "ERROR: No PSG/Hypnogram pairs found in {}",
+            data_dir.display()
+        );
         std::process::exit(1);
     }
     println!("Found {} recording pair(s)\n", pairs.len());
@@ -97,7 +100,11 @@ fn discover_recording_pairs(dir: &Path) -> Vec<(std::path::PathBuf, std::path::P
     let mut psg_files: Vec<std::path::PathBuf> = Vec::new();
     for entry in entries.flatten() {
         let path = entry.path();
-        let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+        let name = path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
         if name.contains("PSG") && name.ends_with(".edf") {
             psg_files.push(path);
         }
@@ -137,10 +144,7 @@ struct EpochResult {
     alpha_power: f32,
 }
 
-fn process_recording(
-    psg_path: &Path,
-    hyp_path: &Path,
-) -> Result<Vec<EpochResult>, String> {
+fn process_recording(psg_path: &Path, hyp_path: &Path) -> Result<Vec<EpochResult>, String> {
     use symthaea::perception::physio::edf_loader::{EdfFile, SleepStage};
     use symthaea::perception::physio::sleep_sentinel::{SleepSentinel, SleepSentinelConfig};
 
@@ -237,11 +241,19 @@ fn parse_hypnogram(
 }
 
 fn print_stage_table(results: &BTreeMap<String, Vec<EpochResult>>) {
-    println!("\n╔══════════════════════════════════════════════════════════════════════════════════╗");
+    println!(
+        "\n╔══════════════════════════════════════════════════════════════════════════════════╗"
+    );
     println!("║  Per-Stage Phi Proxy Results                                                    ║");
-    println!("╠════════════╦════════╦══════════╦════════════╦═══════════╦═══════╦═══════╦════════╣");
-    println!("║ Stage      ║ N      ║ Phi      ║ Synchrony  ║ Complex.  ║ PermE ║ Freq  ║ Delta  ║");
-    println!("╠════════════╬════════╬══════════╬════════════╬═══════════╬═══════╬═══════╬════════╣");
+    println!(
+        "╠════════════╦════════╦══════════╦════════════╦═══════════╦═══════╦═══════╦════════╣"
+    );
+    println!(
+        "║ Stage      ║ N      ║ Phi      ║ Synchrony  ║ Complex.  ║ PermE ║ Freq  ║ Delta  ║"
+    );
+    println!(
+        "╠════════════╬════════╬══════════╬════════════╬═══════════╬═══════╬═══════╬════════╣"
+    );
 
     let stage_order = ["Wake", "N1", "N2", "N3", "REM", "Movement", "Unknown"];
 
@@ -256,8 +268,7 @@ fn print_stage_table(results: &BTreeMap<String, Vec<EpochResult>>) {
             let mean_complex: f32 = epochs.iter().map(|e| e.complexity).sum::<f32>() / n as f32;
             let mean_perm: f32 =
                 epochs.iter().map(|e| e.permutation_entropy).sum::<f32>() / n as f32;
-            let mean_freq: f32 =
-                epochs.iter().map(|e| e.dominant_freq_hz).sum::<f32>() / n as f32;
+            let mean_freq: f32 = epochs.iter().map(|e| e.dominant_freq_hz).sum::<f32>() / n as f32;
             let mean_delta: f32 = epochs.iter().map(|e| e.delta_power).sum::<f32>() / n as f32;
 
             println!(
@@ -266,12 +277,16 @@ fn print_stage_table(results: &BTreeMap<String, Vec<EpochResult>>) {
             );
         }
     }
-    println!("╚════════════╩════════╩══════════╩════════════╩═══════════╩═══════╩═══════╩════════╝");
+    println!(
+        "╚════════════╩════════╩══════════╩════════════╩═══════════╩═══════╩═══════╩════════╝"
+    );
 
     // Print interpretation
     println!("\nInterpretation:");
     println!("  • Phi proxy = synchrony × bidirectional causality (integration measure)");
-    println!("  • Expected: N3 highest synchrony (global delta sync), REM lowest (cortical disconnect)");
+    println!(
+        "  • Expected: N3 highest synchrony (global delta sync), REM lowest (cortical disconnect)"
+    );
     println!("  • This DIFFERS from PCI (Casali 2013) where N3 has LOWEST complexity");
     println!("  • Our measure captures integration, not complexity — complementary, not competing");
 }
@@ -339,8 +354,15 @@ fn print_classification_accuracy(results: &BTreeMap<String, Vec<EpochResult>>) {
         let binary_accuracy = binary_correct as f64 / binary_total as f64;
 
         println!("Binary (Wake vs Sleep):");
-        println!("  Wake epochs: {}, Sleep epochs: {}", wake_epochs.len(), sleep_epochs.len());
-        println!("  Mean Phi — Wake: {:.4}, Sleep: {:.4}", wake_mean_phi, sleep_mean_phi);
+        println!(
+            "  Wake epochs: {}, Sleep epochs: {}",
+            wake_epochs.len(),
+            sleep_epochs.len()
+        );
+        println!(
+            "  Mean Phi — Wake: {:.4}, Sleep: {:.4}",
+            wake_mean_phi, sleep_mean_phi
+        );
         println!(
             "  Multi-feature accuracy: {:.1}% ({}/{})",
             binary_accuracy * 100.0,
@@ -414,7 +436,9 @@ fn save_results_json(results: &BTreeMap<String, Vec<EpochResult>>) {
     let mut json = String::from("{\n  \"benchmark\": \"sleep_edf_phi\",\n");
     json.push_str("  \"description\": \"Phi proxy per sleep stage from PhysioNet Sleep-EDF\",\n");
     json.push_str("  \"comparison\": {\n");
-    json.push_str("    \"casali_2013\": \"PCI measures complexity, our proxy measures integration\",\n");
+    json.push_str(
+        "    \"casali_2013\": \"PCI measures complexity, our proxy measures integration\",\n",
+    );
     json.push_str("    \"massimini_2005\": \"TMS-EEG gold standard for cortical integration\"\n");
     json.push_str("  },\n");
     json.push_str("  \"stages\": {\n");

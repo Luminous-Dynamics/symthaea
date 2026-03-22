@@ -1685,16 +1685,15 @@ impl SporeEngine {
 
     /// List all available wellbeing profiles as JSON array of {name, description}.
     pub fn wellbeing_profiles_json() -> String {
-        let profiles: Vec<serde_json::Value> =
-            crate::wellbeing_profiles::WellbeingProfile::all()
-                .iter()
-                .map(|p| {
-                    serde_json::json!({
-                        "name": p.name(),
-                        "description": p.description(),
-                    })
+        let profiles: Vec<serde_json::Value> = crate::wellbeing_profiles::WellbeingProfile::all()
+            .iter()
+            .map(|p| {
+                serde_json::json!({
+                    "name": p.name(),
+                    "description": p.description(),
                 })
-                .collect();
+            })
+            .collect();
         serde_json::to_string(&profiles).unwrap_or_else(|_| "[]".to_string())
     }
 

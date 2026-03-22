@@ -99,10 +99,7 @@ mod holon_receiver {
                 SomaMessage::ConsciousnessVector { phi, .. } => {
                     peer.phi = phi;
                 }
-                SomaMessage::TaskRequest {
-                    task_type,
-                    payload,
-                } => {
+                SomaMessage::TaskRequest { task_type, payload } => {
                     peer.pending_tasks.push((task_type, payload));
                 }
                 _ => {}
@@ -298,14 +295,21 @@ fn consciousness_vector_preserves_phi() {
         serde_json::from_str(&outbound_json).unwrap_or_default();
 
     // Find the CV message
-    let cv = outbound_msgs.iter().find(|m| {
-        matches!(m, HolonOutbound::ConsciousnessVector(_))
-    });
+    let cv = outbound_msgs
+        .iter()
+        .find(|m| matches!(m, HolonOutbound::ConsciousnessVector(_)));
 
-    assert!(cv.is_some(), "Should have a ConsciousnessVector in outbound");
+    assert!(
+        cv.is_some(),
+        "Should have a ConsciousnessVector in outbound"
+    );
 
     if let Some(HolonOutbound::ConsciousnessVector(cv)) = cv {
-        assert!(cv.phi >= 0.0 && cv.phi <= 1.0, "phi should be bounded: {}", cv.phi);
+        assert!(
+            cv.phi >= 0.0 && cv.phi <= 1.0,
+            "phi should be bounded: {}",
+            cv.phi
+        );
         assert_eq!(cv.attention.len(), 64, "attention should be 64-dim");
         assert!(cv.sequence > 0, "sequence should be > 0");
     }

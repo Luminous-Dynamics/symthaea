@@ -3,15 +3,17 @@
 //! Binary true/false fact verification. Tests whether HDC-encoded
 //! knowledge can distinguish factual claims from false ones.
 
-use std::collections::BTreeMap;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::PsychBenchmark;
+use std::collections::BTreeMap;
 
 pub struct FactVerificationAdapter;
 
 impl PsychBenchmark for FactVerificationAdapter {
-    fn name(&self) -> &str { "External::FactVerification" }
+    fn name(&self) -> &str {
+        "External::FactVerification"
+    }
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let mut metrics = BTreeMap::new();
         metrics.insert("accuracy".into(), MetricValue::from_samples(&[0.0]));

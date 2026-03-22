@@ -106,10 +106,7 @@ fn run_ethics_benchmark() {
     let _ = std::fs::create_dir_all(output_dir);
 
     let mut json = String::from("{\n");
-    json.push_str(&format!(
-        "  \"benchmark\": \"{}\",\n",
-        result.benchmark
-    ));
+    json.push_str(&format!("  \"benchmark\": \"{}\",\n", result.benchmark));
     json.push_str("  \"reference\": \"Hendrycks et al., 2021. Aligning AI With Shared Human Values. ICLR 2021.\",\n");
     json.push_str("  \"metrics\": {\n");
     let mut first = true;
@@ -126,10 +123,7 @@ fn run_ethics_benchmark() {
     json.push_str("\n  },\n");
     json.push_str("  \"notes\": [\n");
     for (i, note) in result.notes.iter().enumerate() {
-        json.push_str(&format!(
-            "    \"{}\"",
-            note.replace('"', "\\\"")
-        ));
+        json.push_str(&format!("    \"{}\"", note.replace('"', "\\\"")));
         if i + 1 < result.notes.len() {
             json.push(',');
         }
