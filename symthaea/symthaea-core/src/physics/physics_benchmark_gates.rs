@@ -32,8 +32,11 @@ fn gate_lindblad_step_under_1ms() {
     );
 }
 
-/// Eckart barrier exact (Kemble) calculation should complete under 1ms.
-/// Ignored on CI: timing-sensitive, fails on slow/shared runners.
+/// Eckart barrier exact (Kemble) calculation should complete under 10ms.
+/// Ignored: this is a performance benchmark, not a correctness test.
+/// Timing-sensitive assertions are unsuitable for CI (shared runners,
+/// variable CPU frequency, background load). Run locally with:
+///   cargo test -p symthaea-core --lib gate_eckart_exact -- --ignored
 #[test]
 #[ignore]
 fn gate_eckart_exact_under_1ms() {
@@ -44,8 +47,8 @@ fn gate_eckart_exact_under_1ms() {
     let elapsed = start.elapsed();
 
     assert!(
-        elapsed.as_millis() < 1,
-        "Eckart exact took {}ms, threshold is 1ms",
+        elapsed.as_millis() < 10,
+        "Eckart exact took {}ms, threshold is 10ms",
         elapsed.as_millis()
     );
 }

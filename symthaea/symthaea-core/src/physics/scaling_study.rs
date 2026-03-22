@@ -286,8 +286,11 @@ impl ScalingStudy {
             mc_feasibilities.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
             let pct = |v: &[f64], p: f64| -> f64 {
-                let idx = ((v.len() as f64) * p) as usize;
-                v[idx.min(v.len() - 1)]
+                if v.is_empty() {
+                    return 0.0;
+                }
+                let idx = ((v.len() as f64) * p).clamp(0.0, (v.len() - 1) as f64) as usize;
+                v[idx]
             };
 
             let cost_mean = mc_costs.iter().sum::<f64>() / n_mc as f64;

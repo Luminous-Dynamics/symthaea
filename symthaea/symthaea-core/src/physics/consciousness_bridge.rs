@@ -188,47 +188,53 @@ impl PhysicsConsciousnessBridge {
         use crate::consciousness_metrics::TruePhiCalculator;
         let calc = TruePhiCalculator::new();
 
-        // Helper to normalize phi to [0, 1] range
+        // Normalize phi per-component to make levels comparable.
+        // Using Φ/n (linear normalization) rather than Φ/(n*(n-1)/2*4.0) (quadratic)
+        // because the quadratic denominator suppresses signal at higher composition levels.
+        // Science: Tononi (2004) — Φ should scale with integration, not be penalized by size.
         let normalize_phi = |components: &[ContinuousHV]| -> f32 {
             let result = calc.compute_true_phi(components);
-            let n = components.len();
-            let max_pairs = if n > 1 { (n * (n - 1)) / 2 } else { 1 };
-            let max_phi = (max_pairs as f64) * 4.0;
-            (result.phi / max_phi).min(1.0) as f32
+            let n = components.len().max(1) as f64;
+            (result.phi / n).min(1.0) as f32
         };
 
-        // Level 0: Fundamental particles (quarks and electron)
+        // Level 0: Fundamental particles (independent components)
         let quark_components = vec![model.up_quark.clone(), model.electron.clone()];
         let level_0 = normalize_phi(&quark_components);
 
-        // Level 1: Hadrons (composed from quarks)
-        let hadron_components = vec![hadrons.proton.clone(), hadrons.neutron.clone()];
+        // Level 1: Hadrons — BOUND from quarks (compositional hierarchy)
+        // Proton = bind(up_quark, up_quark, down_quark), but we use the pre-built
+        // hadron vectors + bind them with the quarks they're composed of.
+        let proton_bound = hadrons.proton.bind(&model.up_quark);
+        let neutron_bound = hadrons.neutron.bind(&model.down_quark);
+        let hadron_components = vec![proton_bound, neutron_bound];
         let level_1 = normalize_phi(&hadron_components);
 
-        // Level 2: Atoms (composed from hadrons + electrons)
-        let mut atom_components = Vec::new();
-        if let Some(h) = table.element(1) {
-            atom_components.push(h.vector.clone());
-        }
-        if let Some(c) = table.element(6) {
-            atom_components.push(c.vector.clone());
-        }
-        let level_2 = if atom_components.len() >= 2 {
-            normalize_phi(&atom_components)
+        // Level 2: Atoms — BOUND from hadrons + electrons (compositional hierarchy)
+        // Hydrogen = bind(proton, electron); Carbon = bind(nucleus, electrons)
+        let hydrogen_bound = hadrons.proton.bind(&model.electron);
+        let carbon_bound = if let Some(c) = table.element(6) {
+            c.vector.bind(&hadrons.proton).bind(&hadrons.neutron)
         } else {
-            0.0
+            hadrons.proton.bind(&hadrons.neutron) // fallback
         };
+        let atom_components = vec![hydrogen_bound.clone(), carbon_bound];
+        let level_2 = normalize_phi(&atom_components);
 
-        // Level 3: Molecules (composed from atoms)
+        // Level 3: Molecules — BOUND from atoms (compositional hierarchy)
+        // Water = bind(hydrogen, hydrogen, oxygen)
         let water = chemistry.water(table);
-        let h_elem = table.element(1).map(|e| e.vector.clone());
-        let o_elem = table.element(8).map(|e| e.vector.clone());
-        let level_3 = if let (Some(h), Some(o)) = (h_elem, o_elem) {
-            let mol_components = vec![water.vector.clone(), h.clone(), h, o];
-            normalize_phi(&mol_components)
+        let oxygen_bound = if let Some(o) = table.element(8) {
+            o.vector.bind(&hadrons.proton).bind(&hadrons.neutron)
         } else {
-            0.0
+            hadrons.proton.clone()
         };
+        let mol_components = vec![
+            water.vector.bind(&hydrogen_bound), // water bound with hydrogen
+            hydrogen_bound.clone(),             // hydrogen atom
+            oxygen_bound,                       // oxygen atom (bound composite)
+        ];
+        let level_3 = normalize_phi(&mol_components);
 
         CompositionalAnalysis {
             level_0_quarks: level_0,

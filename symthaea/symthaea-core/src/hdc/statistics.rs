@@ -11,10 +11,136 @@
 //! - **Bayesian inference**: conjugate priors (Normal-Normal, Beta-Binomial)
 //! - **Correlation**: Pearson, Spearman rank
 //! - **Linear regression**: y = ax + b via least-squares
+//!
+//! ## HDC Integration
+//!
+//! Distributions are encoded into [`BinaryHV`] by binding a distribution-type
+//! primitive with parameter encodings (mean, variance). Bayesian posterior update
+//! maps naturally: `prior.encode().bind(&likelihood.encode()) ≈ posterior.encode()`.
+//!
+//! ## References
+//!
+//! - Abramowitz & Stegun (1964) — error function approximation (Eq. 7.1.26)
+//! - Lanczos (1964) — gamma function approximation
+//! - Wilson & Hilferty (1931) — chi-squared normal approximation
+//! - Kanerva (2009) — hyperdimensional computing encodings
 
 use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::seed_from_name;
 use serde::{Deserialize, Serialize};
+
+// ─── PRNG (Xorshift64) ─────────────────────────────────────────────────────
+
+/// Simple xorshift64 pseudo-random number generator (Marsaglia 2003).
+///
+/// Deterministic from seed — suitable for reproducible sampling.
+/// Period: 2^64 - 1. NOT cryptographically secure.
+#[derive(Debug, Clone)]
+pub struct Xorshift64 {
+    state: u64,
+}
+
+impl Xorshift64 {
+    /// Create a new PRNG from the given seed.
+    ///
+    /// Seed 0 is mapped to 1 to avoid the zero fixed point.
+    pub fn new(seed: u64) -> Self {
+        Self {
+            state: if seed == 0 { 1 } else { seed },
+        }
+    }
+
+    /// Generate the next pseudo-random u64.
+    #[inline]
+    pub fn next_u64(&mut self) -> u64 {
+        let mut x = self.state;
+        x ^= x << 13;
+        x ^= x >> 7;
+        x ^= x << 17;
+        self.state = x;
+        x
+    }
+
+    /// Generate a uniform f64 in [0, 1).
+    #[inline]
+    pub fn next_f64(&mut self) -> f64 {
+        (self.next_u64() >> 11) as f64 / ((1u64 << 53) as f64)
+    }
+
+    /// Generate a standard normal sample via the Box-Muller transform.
+    ///
+    /// Returns two independent N(0,1) samples; we discard the second for simplicity.
+    pub fn next_standard_normal(&mut self) -> f64 {
+        loop {
+            let u1 = self.next_f64();
+            let u2 = self.next_f64();
+            if u1 > 1e-15 {
+                return (-2.0 * u1.ln()).sqrt() * (2.0 * std::f64::consts::PI * u2).cos();
+            }
+        }
+    }
+}
+
+// ─── ProbabilityDistribution Trait ──────────────────────────────────────────
+
+/// Trait for probability distributions with HDC encoding.
+///
+/// Every distribution can compute its PDF/CDF, moments, draw samples,
+/// and encode itself into a [`BinaryHV`] for hyperdimensional reasoning.
+pub trait ProbabilityDistribution {
+    /// Probability density (continuous) or mass (discrete) function.
+    fn pdf(&self, x: f64) -> f64;
+
+    /// Cumulative distribution function P(X ≤ x).
+    fn cdf(&self, x: f64) -> f64;
+
+    /// Expected value E[X].
+    fn dist_mean(&self) -> f64;
+
+    /// Variance Var(X).
+    fn dist_variance(&self) -> f64;
+
+    /// Draw a single sample using the provided PRNG.
+    fn sample(&self, rng: &mut Xorshift64) -> f64;
+
+    /// Encode this distribution as a BinaryHV.
+    ///
+    /// The encoding binds a distribution-type primitive with parameter
+    /// encodings derived from the mean and variance, following the HDC
+    /// algebra: `type_hv ⊕ mean_hv ⊕ var_hv`.
+    fn encode(&self) -> BinaryHV;
+
+    /// Standard deviation √Var(X).
+    fn dist_std(&self) -> f64 {
+        self.dist_variance().sqrt()
+    }
+}
+
+impl ProbabilityDistribution for Distribution {
+    fn pdf(&self, x: f64) -> f64 {
+        Distribution::pdf(self, x)
+    }
+
+    fn cdf(&self, x: f64) -> f64 {
+        Distribution::cdf(self, x)
+    }
+
+    fn dist_mean(&self) -> f64 {
+        self.mean_val()
+    }
+
+    fn dist_variance(&self) -> f64 {
+        self.variance_val()
+    }
+
+    fn sample(&self, rng: &mut Xorshift64) -> f64 {
+        Distribution::sample(self, rng)
+    }
+
+    fn encode(&self) -> BinaryHV {
+        Distribution::encode(self)
+    }
+}
 
 // ─── Descriptive Statistics ──────────────────────────────────────────────────
 
@@ -276,6 +402,72 @@ impl Distribution {
         self.variance_val().sqrt()
     }
 
+    /// Draw a single sample from this distribution.
+    ///
+    /// Uses the provided [`Xorshift64`] PRNG for deterministic, reproducible sampling.
+    /// Continuous distributions use inverse-CDF or Box-Muller transforms;
+    /// discrete distributions use the appropriate counting methods.
+    pub fn sample(&self, rng: &mut Xorshift64) -> f64 {
+        match self {
+            Distribution::Normal { mu, sigma } => {
+                // Box-Muller via the PRNG's helper
+                mu + sigma * rng.next_standard_normal()
+            }
+            Distribution::Uniform { a, b } => {
+                // Inverse CDF: F^{-1}(u) = a + u(b - a)
+                a + rng.next_f64() * (b - a)
+            }
+            Distribution::Bernoulli { p } => {
+                if rng.next_f64() < *p {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
+            Distribution::Binomial { n, p } => {
+                // Sum of n Bernoulli trials
+                let mut count = 0u64;
+                for _ in 0..*n {
+                    if rng.next_f64() < *p {
+                        count += 1;
+                    }
+                }
+                count as f64
+            }
+            Distribution::Poisson { lambda } => {
+                // Knuth's algorithm: generate exponential inter-arrivals
+                let l = (-lambda).exp();
+                let mut k = 0u64;
+                let mut p_val = 1.0;
+                loop {
+                    k += 1;
+                    p_val *= rng.next_f64();
+                    if p_val < l {
+                        break;
+                    }
+                }
+                (k - 1) as f64
+            }
+            Distribution::Exponential { lambda } => {
+                // Inverse CDF: -ln(1-u)/λ
+                let u = rng.next_f64();
+                -(1.0 - u).ln() / lambda
+            }
+            Distribution::Beta { alpha, beta } => {
+                // Joehnk's method for small parameters, or via Gamma ratio:
+                // If X ~ Gamma(α,1), Y ~ Gamma(β,1), then X/(X+Y) ~ Beta(α,β)
+                let x = sample_gamma(*alpha, 1.0, rng);
+                let y = sample_gamma(*beta, 1.0, rng);
+                if x + y > 1e-15 {
+                    x / (x + y)
+                } else {
+                    0.5
+                }
+            }
+            Distribution::Gamma { alpha, beta } => sample_gamma(*alpha, *beta, rng),
+        }
+    }
+
     /// HDC encoding of the distribution
     pub fn encode(&self) -> BinaryHV {
         let dist_name = match self {
@@ -306,24 +498,42 @@ impl Distribution {
 /// Result of a hypothesis test
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HypothesisTestResult {
+    /// Name of the test performed
     pub test_name: String,
+    /// Computed test statistic (t, χ², etc.)
     pub test_statistic: f64,
+    /// Two-sided p-value
     pub p_value: f64,
+    /// Whether H₀ is rejected at the chosen significance level
     pub reject: bool,
+    /// Confidence level (1 − α)
     pub confidence_level: f64,
+    /// Confidence interval (lower, upper) for the estimated parameter.
+    ///
+    /// For t-tests this is the CI for the mean (or difference in means).
+    /// For chi-squared this is `(0.0, 0.0)` (not applicable).
+    pub confidence_interval: (f64, f64),
+    /// Phi (consciousness coupling) — higher when test is informative
     pub phi: f64,
 }
 
-/// One-sample t-test: test if mean equals μ₀
+/// One-sample t-test: test if mean equals μ₀.
+///
+/// Uses the normal approximation for the p-value (accurate for n > 30).
+/// The confidence interval is for the population mean.
 pub fn one_sample_t_test(data: &[f64], mu0: f64, alpha: f64) -> HypothesisTestResult {
     let n = data.len() as f64;
     let m = mean(data);
     let s = sample_variance(data).sqrt();
-    let t = (m - mu0) / (s / n.sqrt());
-    let df = n - 1.0;
+    let se = s / n.sqrt();
+    let t = if se > 1e-15 { (m - mu0) / se } else { 0.0 };
 
     // Approximate p-value using normal approximation (good for df > 30)
     let p_value = 2.0 * (1.0 - normal_cdf(t.abs()));
+
+    // CI for the mean using z-critical (normal approx)
+    let z_crit = z_critical(alpha);
+    let ci = (m - z_crit * se, m + z_crit * se);
 
     HypothesisTestResult {
         test_name: "One-sample t-test".to_string(),
@@ -331,11 +541,14 @@ pub fn one_sample_t_test(data: &[f64], mu0: f64, alpha: f64) -> HypothesisTestRe
         p_value,
         reject: p_value < alpha,
         confidence_level: 1.0 - alpha,
+        confidence_interval: ci,
         phi: if p_value < alpha { 0.3 } else { 0.1 },
     }
 }
 
-/// Two-sample t-test (equal variances assumed)
+/// Two-sample t-test (equal variances assumed, pooled).
+///
+/// Tests H₀: μ₁ = μ₂. The confidence interval is for the difference μ₁ − μ₂.
 pub fn two_sample_t_test(data1: &[f64], data2: &[f64], alpha: f64) -> HypothesisTestResult {
     let n1 = data1.len() as f64;
     let n2 = data2.len() as f64;
@@ -351,12 +564,18 @@ pub fn two_sample_t_test(data1: &[f64], data2: &[f64], alpha: f64) -> Hypothesis
 
     let p_value = 2.0 * (1.0 - normal_cdf(t.abs()));
 
+    // CI for difference in means
+    let z_crit = z_critical(alpha);
+    let diff = m1 - m2;
+    let ci = (diff - z_crit * sp, diff + z_crit * sp);
+
     HypothesisTestResult {
         test_name: "Two-sample t-test".to_string(),
         test_statistic: t,
         p_value,
         reject: p_value < alpha,
         confidence_level: 1.0 - alpha,
+        confidence_interval: ci,
         phi: if p_value < alpha { 0.3 } else { 0.1 },
     }
 }
@@ -383,6 +602,7 @@ pub fn chi_squared_test(observed: &[f64], expected: &[f64], alpha: f64) -> Hypot
         p_value,
         reject: p_value < alpha,
         confidence_level: 1.0 - alpha,
+        confidence_interval: (0.0, 0.0), // Not applicable for chi-squared GOF
         phi: if p_value < alpha { 0.3 } else { 0.1 },
     }
 }
@@ -599,6 +819,50 @@ fn normal_cdf(x: f64) -> f64 {
     0.5 * (1.0 + erf(x / std::f64::consts::SQRT_2))
 }
 
+/// Approximate z-critical value for a two-tailed test at significance α.
+///
+/// Uses the rational approximation of the inverse normal CDF
+/// (Abramowitz & Stegun, Eq. 26.2.23, |ε| < 4.5 × 10⁻⁴).
+fn z_critical(alpha: f64) -> f64 {
+    // We need the (1 - α/2) quantile of the standard normal
+    let p = 1.0 - alpha / 2.0;
+    inverse_normal_cdf(p)
+}
+
+/// Inverse standard normal CDF (probit) via rational approximation.
+///
+/// Accurate to ~4.5 × 10⁻⁴ for p ∈ (0, 1). Uses the Abramowitz & Stegun
+/// approximation (Eq. 26.2.23) with the substitution t = √(-2 ln(1-p)).
+fn inverse_normal_cdf(p: f64) -> f64 {
+    if p <= 0.0 {
+        return f64::NEG_INFINITY;
+    }
+    if p >= 1.0 {
+        return f64::INFINITY;
+    }
+    if (p - 0.5).abs() < 1e-15 {
+        return 0.0;
+    }
+
+    let sign = if p < 0.5 { -1.0 } else { 1.0 };
+    let p_inner = if p < 0.5 { p } else { 1.0 - p };
+
+    let t = (-2.0 * p_inner.ln()).sqrt();
+
+    // Rational approximation coefficients (A&S 26.2.23)
+    let c0 = 2.515517;
+    let c1 = 0.802853;
+    let c2 = 0.010328;
+    let d1 = 1.432788;
+    let d2 = 0.189269;
+    let d3 = 0.001308;
+
+    let numerator = c0 + c1 * t + c2 * t * t;
+    let denominator = 1.0 + d1 * t + d2 * t * t + d3 * t * t * t;
+
+    sign * (t - numerator / denominator)
+}
+
 fn factorial(n: u64) -> u64 {
     (1..=n).product::<u64>().max(1)
 }
@@ -649,6 +913,39 @@ fn beta_function(a: f64, b: f64) -> f64 {
     gamma_function(a) * gamma_function(b) / gamma_function(a + b)
 }
 
+/// Sample from Gamma(alpha, beta) using Marsaglia & Tsang's method (2000).
+///
+/// For α ≥ 1 uses the rejection method directly.
+/// For α < 1 uses the Ahrens-Dieter boost: Gamma(α,β) = Gamma(α+1,β) × U^(1/α).
+fn sample_gamma(alpha: f64, beta: f64, rng: &mut Xorshift64) -> f64 {
+    if alpha < 1.0 {
+        // Boost: X ~ Gamma(alpha+1, beta), then X * U^(1/alpha) ~ Gamma(alpha, beta)
+        let u = rng.next_f64();
+        return sample_gamma(alpha + 1.0, beta, rng) * u.powf(1.0 / alpha);
+    }
+
+    // Marsaglia & Tsang (2000) for alpha >= 1
+    let d = alpha - 1.0 / 3.0;
+    let c = 1.0 / (9.0 * d).sqrt();
+
+    loop {
+        let x = rng.next_standard_normal();
+        let v = 1.0 + c * x;
+        if v <= 0.0 {
+            continue;
+        }
+        let v = v * v * v;
+        let u = rng.next_f64();
+        // Squeeze test
+        if u < 1.0 - 0.0331 * (x * x) * (x * x) {
+            return d * v / beta;
+        }
+        if u.ln() < 0.5 * x * x + d * (1.0 - v + v.ln()) {
+            return d * v / beta;
+        }
+    }
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -695,7 +992,7 @@ mod tests {
     #[test]
     fn test_skewness_symmetric() {
         // Symmetric distribution should have ~0 skewness
-        let data: Vec<f64> = (0..100).map(|i| (i as f64 - 50.0)).collect();
+        let data: Vec<f64> = (0..100).map(|i| i as f64 - 50.0).collect();
         assert!(skewness(&data).abs() < 0.1);
     }
 
@@ -908,6 +1205,122 @@ mod tests {
         assert!(result.r_squared > 0.95);
     }
 
+    // ── Sampling ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_normal_sampling_mean() {
+        // Draw 10,000 samples from N(5, 2) and check empirical mean
+        let dist = Distribution::Normal {
+            mu: 5.0,
+            sigma: 2.0,
+        };
+        let mut rng = Xorshift64::new(42);
+        let samples: Vec<f64> = (0..10_000).map(|_| dist.sample(&mut rng)).collect();
+        let m = mean(&samples);
+        assert!(
+            (m - 5.0).abs() < 0.1,
+            "Empirical mean {m} should be near 5.0"
+        );
+    }
+
+    #[test]
+    fn test_exponential_sampling_mean() {
+        let dist = Distribution::Exponential { lambda: 3.0 };
+        let mut rng = Xorshift64::new(99);
+        let samples: Vec<f64> = (0..10_000).map(|_| dist.sample(&mut rng)).collect();
+        let m = mean(&samples);
+        // E[X] = 1/λ = 1/3 ≈ 0.333
+        assert!(
+            (m - 1.0 / 3.0).abs() < 0.02,
+            "Empirical mean {m} should be near 0.333"
+        );
+    }
+
+    #[test]
+    fn test_beta_sampling_mean() {
+        let dist = Distribution::Beta {
+            alpha: 2.0,
+            beta: 5.0,
+        };
+        let mut rng = Xorshift64::new(7);
+        let samples: Vec<f64> = (0..10_000).map(|_| dist.sample(&mut rng)).collect();
+        let m = mean(&samples);
+        // E[X] = α/(α+β) = 2/7 ≈ 0.286
+        assert!(
+            (m - 2.0 / 7.0).abs() < 0.02,
+            "Empirical mean {m} should be near 0.286"
+        );
+    }
+
+    #[test]
+    fn test_poisson_sampling_mean() {
+        let dist = Distribution::Poisson { lambda: 4.0 };
+        let mut rng = Xorshift64::new(123);
+        let samples: Vec<f64> = (0..10_000).map(|_| dist.sample(&mut rng)).collect();
+        let m = mean(&samples);
+        assert!(
+            (m - 4.0).abs() < 0.15,
+            "Empirical mean {m} should be near 4.0"
+        );
+    }
+
+    // ── Confidence intervals ────────────────────────────────────────────
+
+    #[test]
+    fn test_confidence_interval_contains_true_mean() {
+        // Data drawn from N(10, 1) — CI at 95% should contain 10
+        let data: Vec<f64> = vec![9.8, 10.1, 10.0, 9.9, 10.2, 10.0, 9.9, 10.1, 10.0, 9.8];
+        let result = one_sample_t_test(&data, 10.0, 0.05);
+        let (lo, hi) = result.confidence_interval;
+        assert!(
+            lo < 10.0 && hi > 10.0,
+            "95% CI ({lo:.3}, {hi:.3}) should contain true mean 10.0"
+        );
+    }
+
+    #[test]
+    fn test_two_sample_ci_excludes_zero_when_different() {
+        let data1: Vec<f64> = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let data2: Vec<f64> = vec![10.0, 11.0, 12.0, 13.0, 14.0];
+        let result = two_sample_t_test(&data1, &data2, 0.05);
+        let (lo, hi) = result.confidence_interval;
+        // Both bounds should be negative (data1 < data2, so diff is negative)
+        assert!(
+            hi < 0.0,
+            "CI ({lo:.3}, {hi:.3}) should be entirely below 0 for clearly different groups"
+        );
+    }
+
+    // ── Trait usage ─────────────────────────────────────────────────────
+
+    #[test]
+    fn test_probability_distribution_trait() {
+        // Use via trait object to verify the trait works
+        let dist = Distribution::Normal {
+            mu: 0.0,
+            sigma: 1.0,
+        };
+        let trait_obj: &dyn ProbabilityDistribution = &dist;
+        assert!((trait_obj.dist_mean() - 0.0).abs() < TOL);
+        assert!((trait_obj.dist_variance() - 1.0).abs() < TOL);
+        assert!((trait_obj.dist_std() - 1.0).abs() < TOL);
+        let expected_pdf = 1.0 / (2.0 * std::f64::consts::PI).sqrt();
+        assert!((trait_obj.pdf(0.0) - expected_pdf).abs() < TOL);
+    }
+
+    // ── Kurtosis ────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_kurtosis_normal_like() {
+        // Excess kurtosis of a uniform distribution = -1.2
+        let data: Vec<f64> = (0..10_000).map(|i| i as f64 / 10_000.0).collect();
+        let k = kurtosis(&data);
+        assert!(
+            (k - (-1.2)).abs() < 0.05,
+            "Uniform excess kurtosis {k} should be near -1.2"
+        );
+    }
+
     // ── Helper functions ─────────────────────────────────────────────────
 
     #[test]
@@ -928,5 +1341,24 @@ mod tests {
         assert!((gamma_function(5.0) - 24.0).abs() < 0.001);
         // Γ(0.5) = √π
         assert!((gamma_function(0.5) - std::f64::consts::PI.sqrt()).abs() < TOL);
+    }
+
+    #[test]
+    fn test_inverse_normal_cdf() {
+        // Φ⁻¹(0.5) = 0.0
+        assert!(inverse_normal_cdf(0.5).abs() < 0.001);
+        // Φ⁻¹(0.975) ≈ 1.96
+        assert!((inverse_normal_cdf(0.975) - 1.96).abs() < 0.01);
+        // Φ⁻¹(0.025) ≈ -1.96
+        assert!((inverse_normal_cdf(0.025) + 1.96).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_xorshift_determinism() {
+        let mut rng1 = Xorshift64::new(42);
+        let mut rng2 = Xorshift64::new(42);
+        for _ in 0..100 {
+            assert_eq!(rng1.next_u64(), rng2.next_u64());
+        }
     }
 }

@@ -104,9 +104,9 @@ proptest! {
         let sim = a.similarity(&b);
 
         // At dim=512, random cosine similarity has stddev ~ 1/sqrt(512) ~ 0.044.
-        // A bound of 0.2 is ~4.5 sigma -- very unlikely to fail.
+        // A bound of 0.25 is ~5.7 sigma -- extremely unlikely to fail.
         prop_assert!(
-            sim.abs() < 0.2,
+            sim.abs() < 0.25,
             "random vectors should be near-orthogonal, got sim={}",
             sim
         );

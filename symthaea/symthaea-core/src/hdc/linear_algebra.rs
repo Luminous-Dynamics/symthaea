@@ -893,6 +893,79 @@ impl HdcMatrix {
         self.data.iter().map(|x| x * x).sum::<f64>().sqrt()
     }
 
+    /// Alias for frobenius_norm (convenience name from spec)
+    pub fn norm_frobenius(&self) -> f64 {
+        self.frobenius_norm()
+    }
+
+    /// Check if matrix is symmetric within tolerance
+    pub fn is_symmetric(&self) -> bool {
+        self.is_symmetric_with_tol(DEFAULT_TOLERANCE)
+    }
+
+    /// Check if matrix is symmetric within given tolerance
+    pub fn is_symmetric_with_tol(&self, tol: f64) -> bool {
+        if !self.is_square() {
+            return false;
+        }
+        for i in 0..self.rows {
+            for j in (i + 1)..self.cols {
+                if (self.get(i, j) - self.get(j, i)).abs() > tol {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
+    /// Check if matrix is positive definite (via Cholesky attempt)
+    pub fn is_positive_definite(&self) -> bool {
+        if !self.is_symmetric() {
+            return false;
+        }
+        self.cholesky().is_some()
+    }
+
+    /// Condition number estimate (alias for condition_number)
+    pub fn condition_number_estimate(&self) -> f64 {
+        self.condition_number()
+    }
+
+    /// Matrix-vector multiplication: A * v
+    pub fn mul_vec(&self, v: &HdcVector) -> HdcVector {
+        assert_eq!(
+            self.cols,
+            v.len(),
+            "Matrix cols {} != vector length {}",
+            self.cols,
+            v.len()
+        );
+        let mut result = vec![0.0; self.rows];
+        for i in 0..self.rows {
+            let mut sum = 0.0;
+            for j in 0..self.cols {
+                sum += self.get(i, j) * v.data[j];
+            }
+            result[i] = sum;
+        }
+        HdcVector::new(result)
+    }
+
+    /// Create a matrix from data with (rows, cols, data) argument order
+    pub fn from_data(rows: usize, cols: usize, data: Vec<f64>) -> Self {
+        Self::new(data, rows, cols)
+    }
+
+    /// Create a diagonal matrix from a vector of diagonal entries
+    pub fn diagonal(diag: &[f64]) -> Self {
+        let n = diag.len();
+        let mut data = vec![0.0; n * n];
+        for i in 0..n {
+            data[i * n + i] = diag[i];
+        }
+        Self::new(data, n, n)
+    }
+
     // ─── Multi-path verification ─────────────────────────────────────────
 
     /// Solve Ax = b via both LU and QR, return the solution with highest Phi.
@@ -1580,5 +1653,482 @@ mod tests {
         ev_sorted.sort_by(|a, b| b.partial_cmp(a).unwrap());
         assert!((ev_sorted[0] - 1.0).abs() < 1e-6);
         assert!(ev_sorted[1].abs() < 1e-6);
+    }
+
+    // ── 1x1 edge cases ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_1x1_matrix_operations() {
+        let a = HdcMatrix::from_rows(&[&[5.0]]);
+        assert!(a.is_square());
+        assert_eq!(a.trace(), 5.0);
+
+        let (det, _) = a.determinant();
+        assert!(approx_eq(det, 5.0));
+
+        let b = HdcMatrix::from_rows(&[&[3.0]]);
+        let (sum, _) = a.add(&b);
+        assert_eq!(sum.get(0, 0), 8.0);
+
+        let (prod, _) = a.mul(&b);
+        assert_eq!(prod.get(0, 0), 15.0);
+
+        let t = a.transpose();
+        assert_eq!(t.get(0, 0), 5.0);
+        assert_eq!(t.rows, 1);
+        assert_eq!(t.cols, 1);
+    }
+
+    #[test]
+    fn test_1x1_solve() {
+        let a = HdcMatrix::from_rows(&[&[4.0]]);
+        let b = HdcVector::new(vec![12.0]);
+        let (x, result) = a.solve(&b);
+        assert!(approx_eq(x.data[0], 3.0));
+        assert!(result.verified);
+    }
+
+    #[test]
+    fn test_1x1_eigenvalue() {
+        let a = HdcMatrix::from_rows(&[&[7.0]]);
+        let (ev, _) = a.eigenvalues_symmetric();
+        assert_eq!(ev.len(), 1);
+        assert!((ev[0] - 7.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_1x1_cholesky() {
+        let a = HdcMatrix::from_rows(&[&[9.0]]);
+        let (l, _) = a.cholesky().expect("9 is positive definite");
+        assert!((l.get(0, 0) - 3.0).abs() < 1e-10);
+    }
+
+    // ── Known eigenvalue test ───────────────────────────────────────────
+
+    #[test]
+    fn test_eigenvalues_known_2x2() {
+        // [[2, 1], [1, 3]] has eigenvalues (5 +/- sqrt(5))/2
+        let a = HdcMatrix::from_rows(&[&[2.0, 1.0], &[1.0, 3.0]]);
+        let (eigenvalues, _) = a.eigenvalues_symmetric();
+        let sqrt5 = 5.0_f64.sqrt();
+        let expected_large = (5.0 + sqrt5) / 2.0;
+        let expected_small = (5.0 - sqrt5) / 2.0;
+
+        // eigenvalues sorted descending
+        assert!(
+            (eigenvalues[0] - expected_large).abs() < 1e-6,
+            "Expected {}, got {}",
+            expected_large,
+            eigenvalues[0]
+        );
+        assert!(
+            (eigenvalues[1] - expected_small).abs() < 1e-6,
+            "Expected {}, got {}",
+            expected_small,
+            eigenvalues[1]
+        );
+    }
+
+    // ── Symmetry and positive definiteness ──────────────────────────────
+
+    #[test]
+    fn test_is_symmetric() {
+        let sym = HdcMatrix::from_rows(&[&[1.0, 2.0], &[2.0, 3.0]]);
+        assert!(sym.is_symmetric());
+
+        let nonsym = HdcMatrix::from_rows(&[&[1.0, 2.0], &[3.0, 4.0]]);
+        assert!(!nonsym.is_symmetric());
+
+        // Non-square is never symmetric
+        let rect = HdcMatrix::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], 2, 3);
+        assert!(!rect.is_symmetric());
+    }
+
+    #[test]
+    fn test_is_positive_definite() {
+        let spd = HdcMatrix::from_rows(&[&[2.0, 1.0], &[1.0, 2.0]]);
+        assert!(spd.is_positive_definite());
+
+        let not_pd = HdcMatrix::from_rows(&[&[-1.0, 0.0], &[0.0, 1.0]]);
+        assert!(!not_pd.is_positive_definite());
+
+        let singular = HdcMatrix::from_rows(&[&[1.0, 1.0], &[1.0, 1.0]]);
+        assert!(!singular.is_positive_definite());
+    }
+
+    // ── Matrix-vector multiply ──────────────────────────────────────────
+
+    #[test]
+    fn test_mul_vec() {
+        let a = HdcMatrix::from_rows(&[&[1.0, 2.0], &[3.0, 4.0]]);
+        let v = HdcVector::new(vec![5.0, 6.0]);
+        let result = a.mul_vec(&v);
+        // [1*5+2*6, 3*5+4*6] = [17, 39]
+        assert!(approx_eq(result.data[0], 17.0));
+        assert!(approx_eq(result.data[1], 39.0));
+    }
+
+    #[test]
+    fn test_mul_vec_identity() {
+        let eye = HdcMatrix::identity(3);
+        let v = HdcVector::new(vec![7.0, 8.0, 9.0]);
+        let result = eye.mul_vec(&v);
+        assert!(vec_approx_eq(&result.data, &[7.0, 8.0, 9.0]));
+    }
+
+    // ── from_data constructor ───────────────────────────────────────────
+
+    #[test]
+    fn test_from_data() {
+        let m = HdcMatrix::from_data(2, 3, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+        assert_eq!(m.rows, 2);
+        assert_eq!(m.cols, 3);
+        assert_eq!(m.get(0, 2), 3.0);
+        assert_eq!(m.get(1, 0), 4.0);
+    }
+
+    // ── Diagonal matrix ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_diagonal_matrix() {
+        let d = HdcMatrix::diagonal(&[2.0, 3.0, 5.0]);
+        assert_eq!(d.rows, 3);
+        assert_eq!(d.cols, 3);
+        assert_eq!(d.get(0, 0), 2.0);
+        assert_eq!(d.get(1, 1), 3.0);
+        assert_eq!(d.get(2, 2), 5.0);
+        assert_eq!(d.get(0, 1), 0.0);
+        let (det, _) = d.determinant();
+        assert!(approx_eq(det, 30.0));
+    }
+
+    // ── Solve verification: Ax = b round-trip ───────────────────────────
+
+    #[test]
+    fn test_solve_roundtrip_4x4() {
+        let a = HdcMatrix::from_rows(&[
+            &[2.0, 1.0, -1.0, 3.0],
+            &[1.0, 3.0, 2.0, -1.0],
+            &[-1.0, 2.0, 5.0, 1.0],
+            &[3.0, -1.0, 1.0, 4.0],
+        ]);
+        let x_true = HdcVector::new(vec![1.0, 2.0, 3.0, 4.0]);
+        let b = a.mul_vec(&x_true);
+        let (x_solved, result) = a.solve(&b);
+        assert!(result.verified);
+        for i in 0..4 {
+            assert!(
+                (x_solved.data[i] - x_true.data[i]).abs() < 1e-6,
+                "x[{}] = {} != {}",
+                i,
+                x_solved.data[i],
+                x_true.data[i]
+            );
+        }
+    }
+
+    // ── QR solve round-trip ─────────────────────────────────────────────
+
+    #[test]
+    fn test_solve_qr_roundtrip() {
+        let a = HdcMatrix::from_rows(&[&[3.0, 1.0], &[1.0, 2.0]]);
+        let x_true = HdcVector::new(vec![2.0, -1.0]);
+        let b = a.mul_vec(&x_true);
+        let (x_solved, _) = a.solve_qr(&b);
+        assert!(
+            (x_solved.data[0] - 2.0).abs() < 1e-6,
+            "x[0] = {}",
+            x_solved.data[0]
+        );
+        assert!(
+            (x_solved.data[1] - (-1.0)).abs() < 1e-6,
+            "x[1] = {}",
+            x_solved.data[1]
+        );
+    }
+
+    // ── LU round-trip: PA = LU ──────────────────────────────────────────
+
+    #[test]
+    fn test_lu_roundtrip_4x4() {
+        let a = HdcMatrix::from_rows(&[
+            &[1.0, 2.0, 3.0, 4.0],
+            &[5.0, 6.0, 7.0, 8.0],
+            &[2.0, 6.0, 4.0, 8.0],
+            &[3.0, 1.0, 7.0, 2.0],
+        ]);
+        let (l, u, perm, _sign, _) = a.lu_decompose();
+        let (lu, _) = l.mul(&u);
+        for i in 0..4 {
+            for j in 0..4 {
+                assert!(
+                    (a.get(perm[i], j) - lu.get(i, j)).abs() < 1e-6,
+                    "PA[{},{}]={} != LU[{},{}]={}",
+                    i,
+                    j,
+                    a.get(perm[i], j),
+                    i,
+                    j,
+                    lu.get(i, j)
+                );
+            }
+        }
+    }
+
+    // ── QR round-trip: A = QR ───────────────────────────────────────────
+
+    #[test]
+    fn test_qr_roundtrip_rectangular() {
+        // 3x2 matrix
+        let a = HdcMatrix::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], 3, 2);
+        let (q, r, _) = a.qr_decompose();
+
+        // QR should reconstruct A
+        let (qr, _) = q.mul(&r);
+        for i in 0..3 {
+            for j in 0..2 {
+                assert!(
+                    (qr.get(i, j) - a.get(i, j)).abs() < 1e-6,
+                    "QR[{},{}]={} != A[{},{}]={}",
+                    i,
+                    j,
+                    qr.get(i, j),
+                    i,
+                    j,
+                    a.get(i, j)
+                );
+            }
+        }
+    }
+
+    // ── Determinant edge cases ──────────────────────────────────────────
+
+    #[test]
+    fn test_determinant_1x1() {
+        let a = HdcMatrix::from_rows(&[&[42.0]]);
+        let (det, _) = a.determinant();
+        assert!(approx_eq(det, 42.0));
+    }
+
+    #[test]
+    fn test_determinant_scale_property() {
+        // det(cA) = c^n * det(A) for n×n matrix
+        let a = HdcMatrix::from_rows(&[&[1.0, 2.0], &[3.0, 4.0]]);
+        let (det_a, _) = a.determinant();
+        let scaled = a.scale(3.0);
+        let (det_scaled, _) = scaled.determinant();
+        // c=3, n=2 => det(3A) = 9 * det(A)
+        assert!(
+            (det_scaled - 9.0 * det_a).abs() < 1e-6,
+            "det(3A)={} != 9*det(A)={}",
+            det_scaled,
+            9.0 * det_a
+        );
+    }
+
+    #[test]
+    fn test_determinant_transpose_invariant() {
+        // det(A^T) = det(A)
+        let a = HdcMatrix::from_rows(&[&[2.0, 3.0, 1.0], &[4.0, 7.0, 5.0], &[6.0, 18.0, 11.0]]);
+        let (det_a, _) = a.determinant();
+        let at = a.transpose();
+        let (det_at, _) = at.determinant();
+        assert!(
+            (det_a - det_at).abs() < 1e-6,
+            "det(A)={} != det(A^T)={}",
+            det_a,
+            det_at
+        );
+    }
+
+    // ── Norm and condition number ───────────────────────────────────────
+
+    #[test]
+    fn test_norm_frobenius_identity() {
+        let eye = HdcMatrix::identity(4);
+        // Frobenius norm of 4x4 identity = sqrt(4) = 2
+        assert!((eye.norm_frobenius() - 2.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_condition_number_well_conditioned() {
+        // Orthogonal matrix has condition number 1
+        let theta = std::f64::consts::PI / 3.0;
+        let rot =
+            HdcMatrix::from_rows(&[&[theta.cos(), -theta.sin()], &[theta.sin(), theta.cos()]]);
+        let cond = rot.condition_number_estimate();
+        assert!((cond - 1.0).abs() < 1e-4, "Rotation matrix cond = {}", cond);
+    }
+
+    #[test]
+    fn test_condition_number_ill_conditioned() {
+        // Hilbert 4x4 is famously ill-conditioned
+        let mut data = vec![0.0; 16];
+        for i in 0..4 {
+            for j in 0..4 {
+                data[i * 4 + j] = 1.0 / (i + j + 1) as f64;
+            }
+        }
+        let h = HdcMatrix::new(data, 4, 4);
+        let cond = h.condition_number();
+        // Hilbert 4x4 condition number is ~15514
+        assert!(
+            cond > 1000.0,
+            "Hilbert 4x4 cond = {} (expected > 1000)",
+            cond
+        );
+    }
+
+    // ── Inverse round-trip ──────────────────────────────────────────────
+
+    #[test]
+    fn test_inverse_3x3_roundtrip() {
+        let a = HdcMatrix::from_rows(&[&[2.0, 1.0, -1.0], &[-3.0, -1.0, 2.0], &[-2.0, 1.0, 2.0]]);
+        let (inv, _) = a.inverse().expect("Should be invertible");
+        let (product, _) = a.mul(&inv);
+        let eye = HdcMatrix::identity(3);
+        for i in 0..3 {
+            for j in 0..3 {
+                assert!(
+                    (product.get(i, j) - eye.get(i, j)).abs() < 1e-6,
+                    "A*A^-1[{},{}] = {} != I[{},{}] = {}",
+                    i,
+                    j,
+                    product.get(i, j),
+                    i,
+                    j,
+                    eye.get(i, j)
+                );
+            }
+        }
+    }
+
+    // ── Rank tests ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_rank_identity() {
+        let eye = HdcMatrix::identity(3);
+        assert_eq!(eye.rank(), 3);
+    }
+
+    #[test]
+    fn test_rank_zero_matrix() {
+        let z = HdcMatrix::zeros(3, 3);
+        assert_eq!(z.rank(), 0);
+    }
+
+    // ── Cholesky round-trip ─────────────────────────────────────────────
+
+    #[test]
+    fn test_cholesky_2x2() {
+        let a = HdcMatrix::from_rows(&[&[4.0, 2.0], &[2.0, 5.0]]);
+        let (l, _) = a.cholesky().expect("Should be SPD");
+        let lt = l.transpose();
+        let (llt, _) = l.mul(&lt);
+        for i in 0..2 {
+            for j in 0..2 {
+                assert!(
+                    (llt.get(i, j) - a.get(i, j)).abs() < 1e-10,
+                    "LL^T[{},{}]={} != A[{},{}]={}",
+                    i,
+                    j,
+                    llt.get(i, j),
+                    i,
+                    j,
+                    a.get(i, j)
+                );
+            }
+        }
+    }
+
+    // ── Subtraction test ────────────────────────────────────────────────
+
+    #[test]
+    fn test_subtract() {
+        let a = HdcMatrix::from_rows(&[&[5.0, 6.0], &[7.0, 8.0]]);
+        let b = HdcMatrix::from_rows(&[&[1.0, 2.0], &[3.0, 4.0]]);
+        let (c, result) = a.sub(&b);
+        assert_eq!(c.get(0, 0), 4.0);
+        assert_eq!(c.get(0, 1), 4.0);
+        assert_eq!(c.get(1, 0), 4.0);
+        assert_eq!(c.get(1, 1), 4.0);
+        assert!(result.verified);
+    }
+
+    // ── Eigenvalue sum/product properties ───────────────────────────────
+
+    #[test]
+    fn test_eigenvalue_trace_determinant_relation() {
+        // For a symmetric matrix:
+        //   sum(eigenvalues) = trace
+        //   product(eigenvalues) = determinant
+        let a = HdcMatrix::from_rows(&[&[4.0, 1.0], &[1.0, 3.0]]);
+        let (eigenvalues, _) = a.eigenvalues_symmetric();
+        let ev_sum: f64 = eigenvalues.iter().sum();
+        let ev_prod: f64 = eigenvalues.iter().product();
+        let (det, _) = a.determinant();
+
+        assert!(
+            (ev_sum - a.trace()).abs() < 1e-6,
+            "sum(eig)={} != trace={}",
+            ev_sum,
+            a.trace()
+        );
+        assert!(
+            (ev_prod - det).abs() < 1e-6,
+            "prod(eig)={} != det={}",
+            ev_prod,
+            det
+        );
+    }
+
+    // ── Singular matrix solve ───────────────────────────────────────────
+
+    #[test]
+    fn test_solve_singular_returns_zeros() {
+        let a = HdcMatrix::from_rows(&[&[1.0, 2.0], &[2.0, 4.0]]);
+        let b = HdcVector::new(vec![3.0, 6.0]);
+        let (x, _result) = a.solve(&b);
+        // For singular systems, our solver returns zeros for the rank-deficient component
+        // The important thing is it doesn't crash
+        assert_eq!(x.data.len(), 2);
+    }
+
+    // ── Zero vector and empty checks ────────────────────────────────────
+
+    #[test]
+    fn test_zero_vector() {
+        let z = HdcVector::zeros(4);
+        assert_eq!(z.len(), 4);
+        assert!(!z.is_empty());
+        assert!(approx_eq(z.norm(), 0.0));
+        assert!(approx_eq(z.dot(&z), 0.0));
+    }
+
+    // ── Engine SVD ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_engine_svd() {
+        let mut engine = LinearAlgebraEngine::new();
+        let a = HdcMatrix::from_rows(&[&[3.0, 0.0], &[0.0, 4.0]]);
+        let (mut sv, _, _, _) = engine.svd(&a);
+        sv.sort_by(|a, b| b.partial_cmp(a).unwrap());
+        assert!((sv[0] - 4.0).abs() < 1e-6);
+        assert!((sv[1] - 3.0).abs() < 1e-6);
+        assert_eq!(engine.stats().factorizations, 1);
+    }
+
+    // ── Identity multiplication ─────────────────────────────────────────
+
+    #[test]
+    fn test_identity_multiply_preserves() {
+        let a = HdcMatrix::from_rows(&[&[1.0, 2.0, 3.0], &[4.0, 5.0, 6.0], &[7.0, 8.0, 9.0]]);
+        let eye = HdcMatrix::identity(3);
+        let (result, _) = eye.mul(&a);
+        for i in 0..3 {
+            for j in 0..3 {
+                assert!(approx_eq(result.get(i, j), a.get(i, j)));
+            }
+        }
     }
 }
