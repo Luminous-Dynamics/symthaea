@@ -108,6 +108,16 @@ members = [
     "zomes/resource-mesh/coordinator",
     "zomes/resource-mesh/integrity",
 
+    # Waste/Circular domain (8 zomes)
+    "zomes/waste-registry/integrity",
+    "zomes/waste-registry/coordinator",
+    "zomes/waste-collection/integrity",
+    "zomes/waste-collection/coordinator",
+    "zomes/compost-control/integrity",
+    "zomes/compost-control/coordinator",
+    "zomes/circular-marketplace/integrity",
+    "zomes/circular-marketplace/coordinator",
+
     # Unified bridge (1 zome)
     "zomes/commons-bridge/integrity",
     "zomes/commons-bridge/coordinator",
@@ -117,6 +127,7 @@ exclude = ["tests"]
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
+license = "AGPL-3.0-or-later"
 
 [workspace.dependencies]
 # Holochain 0.6 compatible

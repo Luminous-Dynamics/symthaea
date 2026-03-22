@@ -1,0 +1,18 @@
+[package]
+name = "waste_registry"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "waste_registry"
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+waste_registry_integrity = { path = "../integrity" }
+mycelix-bridge-common = { workspace = true }
+mycelix-zome-helpers = { workspace = true }

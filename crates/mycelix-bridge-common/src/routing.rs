@@ -1,4 +1,6 @@
-//! Type-safe bridge dispatch routing.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Type-safe bridge dispatch routing.
 //!
 //! Replaces the fragile `query_type.contains("transfer")` substring matching
 //! in each bridge's `resolve_domain_zome()` with strongly-typed enums and
@@ -7,7 +9,7 @@
 //! ## Enums
 //!
 //! - [`BridgeDomain`] — 12 domain variants (property, housing, … media)
-//! - [`CommonsZome`] — 38 zome variants in the commons cluster
+//! - [`CommonsZome`] — 42 zome variants in the commons cluster
 //! - [`CivicZome`] — 15 zome variants in the civic cluster
 //! - [`CrossClusterRole`] — commons / civic / identity hApp roles
 //!
@@ -38,6 +40,7 @@ pub enum BridgeDomain {
     Justice,
     Emergency,
     Media,
+    Waste,
 }
 
 /// Domains that belong to the Commons cluster.
@@ -51,6 +54,7 @@ pub const COMMONS_DOMAINS: &[BridgeDomain] = &[
     BridgeDomain::Transport,
     BridgeDomain::Support,
     BridgeDomain::Space,
+    BridgeDomain::Waste,
 ];
 
 /// Domains that belong to the Civic cluster.
@@ -79,6 +83,7 @@ impl BridgeDomain {
             "justice" => Some(Self::Justice),
             "emergency" => Some(Self::Emergency),
             "media" => Some(Self::Media),
+            "waste" | "recycling" | "circular" | "compost" => Some(Self::Waste),
             _ => None,
         }
     }
@@ -98,6 +103,7 @@ impl BridgeDomain {
             Self::Justice => "justice",
             Self::Emergency => "emergency",
             Self::Media => "media",
+            Self::Waste => "waste",
         }
     }
 
@@ -116,7 +122,7 @@ impl BridgeDomain {
 // Commons zome enum (38 variants)
 // ============================================================================
 
-/// All 38 coordinator zomes in the commons cluster.
+/// All 42 coordinator zomes in the commons cluster.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CommonsZome {
     // Property domain (4)
@@ -166,6 +172,11 @@ pub enum CommonsZome {
     SupportDiagnostics,
     // Space domain (1)
     Space,
+    // Waste/Circular domain (4)
+    WasteRegistry,
+    WasteCollection,
+    CompostControl,
+    CircularMarketplace,
 }
 
 impl CommonsZome {
@@ -210,6 +221,10 @@ impl CommonsZome {
             Self::SupportTickets => "support_tickets",
             Self::SupportDiagnostics => "support_diagnostics",
             Self::Space => "space",
+            Self::WasteRegistry => "waste_registry",
+            Self::WasteCollection => "waste_collection",
+            Self::CompostControl => "compost_control",
+            Self::CircularMarketplace => "circular_marketplace",
         }
     }
 
@@ -236,6 +251,10 @@ impl CommonsZome {
                 | Self::FoodDistribution
                 | Self::FoodPreservation
                 | Self::FoodKnowledge
+                | Self::WasteRegistry
+                | Self::WasteCollection
+                | Self::CompostControl
+                | Self::CircularMarketplace
         )
     }
 
@@ -251,12 +270,13 @@ impl CommonsZome {
             BridgeDomain::Transport => Some(Self::TransportRoutes),
             BridgeDomain::Support => Some(Self::SupportKnowledge),
             BridgeDomain::Space => Some(Self::Space),
+            BridgeDomain::Waste => Some(Self::WasteRegistry),
             // Civic domains have no commons zome
             _ => None,
         }
     }
 
-    /// All 38 variants, for consistency checks.
+    /// All 42 variants, for consistency checks.
     pub const ALL: &'static [CommonsZome] = &[
         Self::PropertyRegistry,
         Self::PropertyTransfer,
@@ -296,6 +316,10 @@ impl CommonsZome {
         Self::SupportTickets,
         Self::SupportDiagnostics,
         Self::Space,
+        Self::WasteRegistry,
+        Self::WasteCollection,
+        Self::CompostControl,
+        Self::CircularMarketplace,
     ];
 
     /// Resolve a commons zome name string to the correct sub-cluster hApp role.
@@ -455,6 +479,7 @@ pub fn resolve_commons_zome(domain: BridgeDomain, query_type: &str) -> Option<Co
         BridgeDomain::Transport => Some(resolve_transport(&qt)),
         BridgeDomain::Support => Some(resolve_support(&qt)),
         BridgeDomain::Space => Some(CommonsZome::Space),
+        BridgeDomain::Waste => Some(resolve_waste(&qt)),
         // Civic domains → None
         BridgeDomain::Justice | BridgeDomain::Emergency | BridgeDomain::Media => None,
     }
@@ -595,6 +620,18 @@ fn resolve_support(qt: &str) -> CommonsZome {
         CommonsZome::SupportDiagnostics
     } else {
         CommonsZome::SupportKnowledge
+    }
+}
+
+fn resolve_waste(qt: &str) -> CommonsZome {
+    if qt.contains("collection") || qt.contains("pickup") || qt.contains("run") || qt.contains("vehicle") {
+        CommonsZome::WasteCollection
+    } else if qt.contains("compost") || qt.contains("batch") || qt.contains("reading") || qt.contains("nutrient") {
+        CommonsZome::CompostControl
+    } else if qt.contains("marketplace") || qt.contains("listing") || qt.contains("order") || qt.contains("demand") || qt.contains("secondary") {
+        CommonsZome::CircularMarketplace
+    } else {
+        CommonsZome::WasteRegistry
     }
 }
 
@@ -823,7 +860,7 @@ mod tests {
 
     #[test]
     fn commons_domains_count() {
-        assert_eq!(COMMONS_DOMAINS.len(), 9);
+        assert_eq!(COMMONS_DOMAINS.len(), 10);
     }
 
     #[test]
@@ -861,7 +898,7 @@ mod tests {
 
     #[test]
     fn commons_zome_count() {
-        assert_eq!(CommonsZome::ALL.len(), 38);
+        assert_eq!(CommonsZome::ALL.len(), 42);
     }
 
     #[test]
@@ -886,7 +923,7 @@ mod tests {
     fn commons_zome_land_care_partition() {
         let land_count = CommonsZome::ALL.iter().filter(|z| z.is_land()).count();
         let care_count = CommonsZome::ALL.iter().filter(|z| !z.is_land()).count();
-        assert_eq!(land_count, 19, "Expected 19 land zomes");
+        assert_eq!(land_count, 23, "Expected 23 land zomes");
         assert_eq!(care_count, 19, "Expected 19 care zomes");
     }
 
@@ -1698,6 +1735,10 @@ mod tests {
             "support_tickets",
             "support_diagnostics",
             "space",
+            "waste_registry",
+            "waste_collection",
+            "compost_control",
+            "circular_marketplace",
         ];
         let actual: Vec<&str> = CommonsZome::ALL.iter().map(|z| z.as_str()).collect();
         assert_eq!(actual.len(), expected.len());
