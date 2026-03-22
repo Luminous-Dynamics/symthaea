@@ -154,6 +154,120 @@ impl ConsciousnessSnapshot {
     }
 }
 
+// ============================================================================
+// FACTCHECK → EPISTEMIC CUBE FEEDBACK (Phase 4)
+// ============================================================================
+
+/// Result from a Mycelix factcheck query, mapped to epistemic cube coordinates.
+///
+/// This is the inward direction of the Mycelix-Symthaea loop:
+/// Mycelix factcheck → EpistemicCubeFromFactcheck → inject_epistemic_cube()
+///
+/// The outward direction (Symthaea → Mycelix) is `create_epistemic_claim()`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FactcheckEpistemicFeedback {
+    /// E-tier (0-4): empirical verifiability derived from evidence quality
+    pub e_tier: u8,
+    /// N-tier (0-3): normative authority derived from source consensus
+    pub n_tier: u8,
+    /// M-tier (0-3): materiality/permanence derived from evidence persistence
+    pub m_tier: u8,
+    /// H-value (0.0-1.0): harmonic coherence from verdict confidence
+    pub h_value: f32,
+    /// Composite quality score
+    pub quality: f32,
+    /// Original verdict for logging
+    pub verdict: String,
+    /// Source statement
+    pub statement: String,
+}
+
+impl FactcheckEpistemicFeedback {
+    /// Convert a Mycelix factcheck result into epistemic cube coordinates.
+    ///
+    /// Maps the 3D EpistemicPosition (empirical, normative, mythic) from the
+    /// knowledge graph directly to the consciousness cube axes:
+    /// - `empirical` (0.0-1.0) → E-tier (0-4): evidence quality
+    /// - `normative` (0.0-1.0) → N-tier (0-3): source consensus
+    /// - `mythic` (0.0-1.0) → M-tier (0-3): persistence/foundationality
+    /// - `verdict_confidence` → H-value: how coherently the evidence supports
+    ///
+    /// Science: Goldman (1986) — reliabilist epistemology; knowledge justified
+    /// by the reliability of the process that produced it.
+    pub fn from_factcheck(
+        statement: &str,
+        verdict: &str,
+        verdict_confidence: f64,
+        empirical: f64,
+        normative: f64,
+        mythic: f64,
+        credibility: f64,
+    ) -> Self {
+        // Map continuous 0.0-1.0 to discrete tiers
+        let e_tier = match empirical {
+            e if e >= 0.8 => 4, // reproducible
+            e if e >= 0.6 => 3, // proven
+            e if e >= 0.4 => 2, // verifiable
+            e if e >= 0.2 => 1, // testimonial
+            _ => 0,             // opinion
+        };
+
+        let n_tier = match normative {
+            n if n >= 0.75 => 3, // axiomatic
+            n if n >= 0.5 => 2,  // network consensus
+            n if n >= 0.25 => 1, // communal
+            _ => 0,              // personal
+        };
+
+        let m_tier = match mythic {
+            m if m >= 0.75 => 3, // foundational
+            m if m >= 0.5 => 2,  // persistent
+            m if m >= 0.25 => 1, // temporal
+            _ => 0,              // ephemeral
+        };
+
+        // H-value: blend verdict confidence with credibility
+        let h_value = (verdict_confidence * 0.7 + credibility * 0.3).clamp(0.0, 1.0) as f32;
+
+        // Quality: same formula as the cube encoder
+        let quality =
+            (e_tier as f32 / 4.0) * 0.40 + (n_tier as f32 / 3.0) * 0.35 + (m_tier as f32 / 3.0) * 0.25;
+
+        Self {
+            e_tier,
+            n_tier,
+            m_tier,
+            h_value,
+            quality,
+            verdict: verdict.to_string(),
+            statement: statement.to_string(),
+        }
+    }
+
+    /// Create feedback from a verdict string (convenience for non-Holochain callers).
+    ///
+    /// Maps verdict names to rough epistemic positions:
+    /// - True/MostlyTrue → high empirical, high confidence
+    /// - Mixed → moderate empirical, low confidence
+    /// - MostlyFalse/False → low empirical (contradicted)
+    /// - Unverifiable → E0 (opinion domain)
+    pub fn from_verdict_string(statement: &str, verdict: &str, confidence: f64) -> Self {
+        let (empirical, normative, mythic) = match verdict {
+            "True" => (0.9, 0.7, 0.6),
+            "MostlyTrue" => (0.7, 0.5, 0.5),
+            "Mixed" => (0.4, 0.3, 0.4),
+            "MostlyFalse" => (0.2, 0.3, 0.3),
+            "False" => (0.1, 0.2, 0.2),
+            "Unverifiable" => (0.0, 0.1, 0.1),
+            _ => (0.3, 0.3, 0.3), // unknown verdict → moderate
+        };
+
+        Self::from_factcheck(
+            statement, verdict, confidence, empirical, normative, mythic, confidence,
+        )
+    }
+}
+
 /// Value alignment result for governance
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ValueAlignmentResult {
@@ -361,6 +475,9 @@ pub struct MycelixBridge {
     proposal_cache: HashMap<String, (ValueAlignmentResult, Instant)>,
     /// Cache TTL
     cache_ttl: Duration,
+    /// Pending factcheck epistemic feedback for cognitive loop injection.
+    /// Populated by `submit_factcheck_feedback()`, drained by the cognitive loop.
+    pending_factcheck_feedback: Vec<FactcheckEpistemicFeedback>,
     /// Pending governance events for CLS injection
     #[cfg(feature = "mycelix")]
     pending_gov_events: Vec<crate::cognitive_loop::managers::governance_manager::GovernanceEvent>,
@@ -415,6 +532,21 @@ pub enum GovernanceDispatchCommand {
     },
     /// Query active proposals (response arrives via governance event channel).
     QueryActiveProposals,
+    /// Evaluate an asset and record the consciousness assessment on-chain.
+    EvaluateAsset {
+        correlation_id: u64,
+        project_id: String,
+        description: String,
+        project_type: String,
+        capacity_mw: f64,
+        community_did: Option<String>,
+        impact_claims: Vec<String>,
+        phi_score: f64,
+        harmony_alignment: f64,
+        per_harmony_scores: String,
+        care_activation: f64,
+        meta_awareness: f64,
+    },
 }
 
 /// Outcome received from the conductor confirming or rejecting a dispatched command.
@@ -452,6 +584,7 @@ impl MycelixBridge {
             agent_id: agent_id.into(),
             proposal_cache: HashMap::new(),
             cache_ttl: Duration::from_secs(60),
+            pending_factcheck_feedback: Vec::new(),
             #[cfg(feature = "mycelix")]
             pending_gov_events: Vec::new(),
             #[cfg(feature = "mycelix")]
@@ -477,6 +610,7 @@ impl MycelixBridge {
             agent_id: agent_id.into(),
             proposal_cache: HashMap::new(),
             cache_ttl: Duration::from_secs(60),
+            pending_factcheck_feedback: Vec::new(),
             #[cfg(feature = "mycelix")]
             pending_gov_events: Vec::new(),
             #[cfg(feature = "mycelix")]
@@ -527,6 +661,45 @@ impl MycelixBridge {
         std::sync::mpsc::Receiver<GovernanceDispatchCommand>,
     ) {
         std::sync::mpsc::sync_channel(64)
+    }
+
+    // ========================================================================
+    // FACTCHECK EPISTEMIC FEEDBACK (Phase 4)
+    // ========================================================================
+
+    /// Submit a factcheck result as epistemic feedback for the cognitive loop.
+    ///
+    /// The feedback is queued and will be injected into the consciousness cube
+    /// on the next cognitive cycle via `drain_factcheck_feedback()`.
+    ///
+    /// This is the inward direction of the Mycelix factcheck loop:
+    /// `fact_check()` → `FactcheckEpistemicFeedback` → `inject_epistemic_cube()`
+    pub fn submit_factcheck_feedback(&mut self, feedback: FactcheckEpistemicFeedback) {
+        self.pending_factcheck_feedback.push(feedback);
+    }
+
+    /// Submit a factcheck by verdict string (convenience method).
+    pub fn submit_factcheck_verdict(
+        &mut self,
+        statement: &str,
+        verdict: &str,
+        confidence: f64,
+    ) {
+        let feedback = FactcheckEpistemicFeedback::from_verdict_string(statement, verdict, confidence);
+        self.submit_factcheck_feedback(feedback);
+    }
+
+    /// Drain pending factcheck feedback for injection into the cognitive loop.
+    ///
+    /// Called by the cognitive loop each cycle to pick up any queued factcheck
+    /// results and update the epistemic cube accordingly.
+    pub fn drain_factcheck_feedback(&mut self) -> Vec<FactcheckEpistemicFeedback> {
+        std::mem::take(&mut self.pending_factcheck_feedback)
+    }
+
+    /// Check if there are pending factcheck results.
+    pub fn has_pending_factcheck(&self) -> bool {
+        !self.pending_factcheck_feedback.is_empty()
     }
 
     // ========================================================================
@@ -867,6 +1040,88 @@ impl MycelixBridge {
                 compression_ratio: 2000.0,
             }
         }
+    }
+
+    // ========================================================================
+    // ASSET EVALUATION
+    // ========================================================================
+
+    /// Evaluate a regenerative asset against the Eight Harmonies.
+    ///
+    /// This is the bridge method that connects Symthaea consciousness scoring
+    /// to the Mycelix energy cluster. It wraps `AssetEvaluator::evaluate()`
+    /// for convenience when you already have a `MycelixBridge` instance.
+    /// Evaluate a regenerative asset against the Eight Harmonies.
+    pub fn evaluate_asset(
+        &self,
+        metadata: &super::asset_evaluator::AssetMetadata,
+        consciousness: &ConsciousnessSnapshot,
+    ) -> super::asset_evaluator::AssetConsciousnessScore {
+        let mut evaluator = super::asset_evaluator::AssetEvaluator::new();
+        evaluator.evaluate(metadata, consciousness)
+    }
+
+    /// Evaluate an asset AND dispatch the result to the Holochain conductor.
+    ///
+    /// This is the full pipeline: evaluate → serialize → dispatch.
+    /// The conductor bridge will call `record_consciousness_assessment()`
+    /// on the energy bridge zome to store the result on-chain.
+    #[cfg(feature = "mycelix")]
+    pub fn evaluate_and_dispatch_asset(
+        &mut self,
+        project_id: &str,
+        metadata: &super::asset_evaluator::AssetMetadata,
+        consciousness: &ConsciousnessSnapshot,
+    ) -> Result<super::asset_evaluator::AssetConsciousnessScore, BridgeError> {
+        let score = self.evaluate_asset(metadata, consciousness);
+
+        // Serialize per-harmony scores for on-chain storage
+        let per_harmony_json = serde_json::to_string(&score.per_harmony)
+            .unwrap_or_else(|_| "{}".to_string());
+
+        // Dispatch to conductor
+        let mut disconnected = false;
+        if let Some(ref tx) = self.governance_dispatch_tx {
+            let cid = self.next_correlation_id;
+            self.next_correlation_id += 1;
+
+            match tx.try_send(GovernanceDispatchCommand::EvaluateAsset {
+                correlation_id: cid,
+                project_id: project_id.to_string(),
+                description: metadata.description.clone(),
+                project_type: metadata.project_type.clone(),
+                capacity_mw: metadata.capacity_mw,
+                community_did: metadata.community_did.clone(),
+                impact_claims: metadata.impact_claims.clone(),
+                phi_score: score.phi_score,
+                harmony_alignment: score.harmony_alignment,
+                per_harmony_scores: per_harmony_json,
+                care_activation: score.care_activation,
+                meta_awareness: score.meta_awareness,
+            }) {
+                Ok(()) => {
+                    self.pending_confirmations.insert(cid, Instant::now());
+                    tracing::info!(
+                        project_id,
+                        phi = score.phi_score,
+                        harmony = score.harmony_alignment,
+                        "Asset evaluation dispatched to conductor"
+                    );
+                }
+                Err(std::sync::mpsc::TrySendError::Full(_)) => {
+                    tracing::warn!("Governance dispatch channel full — evaluation not dispatched");
+                }
+                Err(std::sync::mpsc::TrySendError::Disconnected(_)) => {
+                    tracing::warn!("Governance dispatch channel disconnected");
+                    disconnected = true;
+                }
+            }
+        }
+        if disconnected {
+            self.governance_dispatch_tx = None;
+        }
+
+        Ok(score)
     }
 
     // ========================================================================
