@@ -9,7 +9,7 @@
 
 import { SdkError, SdkErrorCode, ZomeCallError } from './errors.js';
 import { withRetryAndTimeout, type RetryConfig } from './retry.js';
-import { ConsciousnessGateError, withGateRetry } from './consciousness-gate.js';
+import { withGateRetry } from './consciousness-gate.js';
 
 import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 

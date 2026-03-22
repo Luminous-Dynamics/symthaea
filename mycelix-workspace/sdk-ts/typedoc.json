@@ -30,6 +30,7 @@
     "*"
   ],
   "sort": ["source-order"],
+  "highlightLanguages": ["typescript", "javascript", "json", "bash", "vue", "svelte", "rust"],
   "visibilityFilters": {
     "protected": true,
     "@internal": false
