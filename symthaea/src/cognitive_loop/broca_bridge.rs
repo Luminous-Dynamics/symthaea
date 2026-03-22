@@ -63,6 +63,19 @@ pub struct BrocaConsciousnessSignals {
     /// Confidence of the NSM semantic decomposition (0.0–1.0).
     /// From `GroundedUnderstanding.understand().confidence`.
     pub semantic_confidence: f32,
+
+    // ── Epistemic Cube (v6) ─────────────────────────────────────────────
+    /// E-tier (empirical verifiability): 0=E0(opinion) .. 4=E4(reproducible).
+    /// None means cube not computed for this cycle.
+    pub cube_e_tier: Option<u8>,
+    /// N-tier (normative authority): 0=N0(personal) .. 3=N3(axiomatic).
+    pub cube_n_tier: Option<u8>,
+    /// M-tier (materiality/permanence): 0=M0(ephemeral) .. 3=M3(foundational).
+    pub cube_m_tier: Option<u8>,
+    /// H-value (harmonic coherence): 0.0-1.0 continuous.
+    pub cube_h_value: f32,
+    /// Epistemic quality score: E×0.4 + N×0.35 + M×0.25 (normalized 0-1).
+    pub cube_quality: f32,
 }
 
 // Re-export telemetry type from the types module.
@@ -223,6 +236,13 @@ impl BrocaManager {
             signals.client_distress_level,
             signals.intervention_depth,
         );
+
+        // Set epistemic cube channels from consciousness signals
+        if let (Some(e), Some(n), Some(m)) =
+            (signals.cube_e_tier, signals.cube_n_tier, signals.cube_m_tier)
+        {
+            channels.set_epistemic_cube(e, n, m, signals.cube_h_value, signals.cube_quality);
+        }
 
         // Multi-turn context: use generate_continuing() after the first turn
         // to preserve CfC temporal context.
