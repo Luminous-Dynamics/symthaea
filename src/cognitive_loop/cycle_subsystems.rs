@@ -383,6 +383,59 @@ impl CognitiveLoopService {
         };
         module_timings.epistemic_gate = _t.elapsed().as_micros() as u64;
 
+        // ── Derive Epistemic Cube from CLS state ────────────────────────
+        // E-tier: epistemic confidence → verifiability level
+        // N-tier: social context → normative authority
+        // M-tier: knowledge grounding → materiality/permanence
+        // H-tier: phi + coherence → harmonic level
+        {
+            let e = if epistemic_gate_confidence > 0.9 {
+                4u8 // E4: reproducible
+            } else if epistemic_gate_confidence > 0.7 {
+                3 // E3: proven
+            } else if epistemic_gate_confidence > 0.4 {
+                2 // E2: verifiable
+            } else if epistemic_gate_confidence > 0.2 {
+                1 // E1: testimonial
+            } else {
+                0 // E0: opinion
+            };
+
+            // N-tier: personal unless social context indicates broader consensus
+            let n = if self.social_mgr.partner_model.is_some() {
+                1u8 // N1: communal (interacting with another agent)
+            } else {
+                0 // N0: personal
+            };
+
+            // M-tier: knowledge grounding indicates persistence
+            let kg = self.carryover.quality.wm_knowledge_grounding as f32;
+            let m = if kg > 0.7 {
+                3u8 // M3: foundational (strong knowledge backing)
+            } else if kg > 0.4 {
+                2 // M2: persistent (moderate grounding)
+            } else if kg > 0.1 {
+                1 // M1: temporal
+            } else {
+                0 // M0: ephemeral
+            };
+
+            // H-tier: from consciousness level + coherence
+            let phi = self.carryover.history.consciousness_level as f32;
+            let coh = self.carryover.quality.last_coherence;
+            let h = ((phi + coh) / 2.0).clamp(0.0, 1.0);
+
+            // Quality: E×0.4 + N×0.35 + M×0.25
+            let quality =
+                (e as f32 / 4.0) * 0.40 + (n as f32 / 3.0) * 0.35 + (m as f32 / 3.0) * 0.25;
+
+            self.carryover.quality.last_cube_e_tier = Some(e);
+            self.carryover.quality.last_cube_n_tier = Some(n);
+            self.carryover.quality.last_cube_m_tier = Some(m);
+            self.carryover.quality.last_cube_h_value = h;
+            self.carryover.quality.last_cube_quality = quality;
+        }
+
         // FEEDBACK: Low epistemic confidence reduces prediction confidence
         if epistemic_gate_confidence < 0.3 && !epistemic_gate_approved {
             self.adjust_confidence("epistemic_gate_low", -0.03);

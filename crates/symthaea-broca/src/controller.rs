@@ -138,6 +138,14 @@ pub struct LanguageControllerConfig {
     /// Default 0.3 — gentle seeding that doesn't overwhelm learned dynamics.
     #[serde(default = "default_thought_seed_scale")]
     pub thought_seed_scale: f32,
+
+    // ── Learned Projection Head ──
+    /// Project CfC output and token embeddings to a lower-dimensional space before
+    /// computing logits. In 16,384D, pairwise cosine similarity has σ ≈ 0.008 —
+    /// softmax can barely discriminate tokens. In 256D, σ ≈ 0.063 — 8× more signal.
+    /// None = use full HDC_DIMENSION (backward compatible). Some(256) = project to 256D.
+    #[serde(default)]
+    pub projection_dim: Option<usize>,
 }
 
 fn default_logit_scale() -> f32 {
@@ -206,6 +214,7 @@ impl Default for LanguageControllerConfig {
             orthogonal_position_count: default_orthogonal_position_count(),
             enable_thought_seeding: true,
             thought_seed_scale: default_thought_seed_scale(),
+            projection_dim: None,
         }
     }
 }
@@ -253,6 +262,11 @@ pub struct LanguageController {
     /// Shape: [vocab_size, HDC_DIMENSION]. Pre-normalized rows.
     #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
     gpu_embeddings: Option<GpuEmbeddingCache>,
+    /// Learned projection matrix: [projection_dim × HDC_DIMENSION], row-major.
+    /// Projects 16,384D CfC output to a lower-dimensional space for logit computation.
+    projection_weights: Option<Vec<f32>>,
+    /// Pre-computed projected token embeddings: [vocab_size][projection_dim], normalized.
+    projected_embeddings: Option<Vec<Vec<f32>>>,
 }
 
 impl LanguageController {
@@ -301,6 +315,16 @@ impl LanguageController {
         #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
         let gpu_embeddings = Self::build_gpu_cache(&token_embeddings);
 
+        // Initialize learned projection head if configured
+        let (projection_weights, projected_embeddings) =
+            if let Some(proj_dim) = config.projection_dim {
+                let weights = Self::init_projection_weights(genesis, proj_dim);
+                let proj_embs = Self::project_all_embeddings(&token_embeddings, &weights, proj_dim);
+                (Some(weights), Some(proj_embs))
+            } else {
+                (None, None)
+            };
+
         Self {
             network,
             token_embeddings,
@@ -314,6 +338,8 @@ impl LanguageController {
             last_logit_hv: None,
             #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
             gpu_embeddings,
+            projection_weights,
+            projected_embeddings,
         }
     }
 
@@ -354,18 +380,134 @@ impl LanguageController {
         }
     }
 
+    // ── Learned Projection Head ──
+
+    /// Initialize projection weights from genesis seed.
+    /// Xavier uniform: U(-√(6/(D_in + D_out)), +√(6/(D_in + D_out)))
+    fn init_projection_weights(genesis: &GenesisSeed, proj_dim: usize) -> Vec<f32> {
+        use rand::Rng;
+        let mut rng = genesis.domain("broca::projection_head");
+        let limit = (6.0 / (HDC_DIMENSION + proj_dim) as f64).sqrt() as f32;
+        (0..proj_dim * HDC_DIMENSION)
+            .map(|_| rng.gen_range(-limit..limit))
+            .collect()
+    }
+
+    /// Project all token embeddings to projection space, normalize each.
+    pub fn project_all_embeddings(
+        embeddings: &[ContinuousHV],
+        weights: &[f32],
+        proj_dim: usize,
+    ) -> Vec<Vec<f32>> {
+        embeddings
+            .iter()
+            .map(|emb| Self::project_and_normalize(emb.as_slice(), weights, proj_dim))
+            .collect()
+    }
+
+    /// Project a single vector: result = W @ input, then L2-normalize.
+    /// W is [proj_dim × HDC_DIMENSION], row-major.
+    pub fn project_and_normalize(input: &[f32], weights: &[f32], proj_dim: usize) -> Vec<f32> {
+        let dim = input.len();
+        let mut projected = vec![0.0f32; proj_dim];
+        for r in 0..proj_dim {
+            let row_start = r * dim;
+            let mut sum = 0.0f32;
+            for (j, &x) in input.iter().enumerate() {
+                sum += weights[row_start + j] * x;
+            }
+            projected[r] = sum;
+        }
+        // L2 normalize
+        let norm = projected
+            .iter()
+            .map(|x| x * x)
+            .sum::<f32>()
+            .sqrt()
+            .max(1e-10);
+        for v in &mut projected {
+            *v /= norm;
+        }
+        projected
+    }
+
+    /// Re-project all token embeddings (call after embedding SGD updates).
+    pub fn refresh_projected_embeddings(&mut self) {
+        if let (Some(ref weights), Some(proj_dim)) =
+            (&self.projection_weights, self.config.projection_dim)
+        {
+            self.projected_embeddings = Some(Self::project_all_embeddings(
+                &self.token_embeddings,
+                weights,
+                proj_dim,
+            ));
+        }
+    }
+
+    /// Initialize projection head on an existing controller (e.g., when adding
+    /// projection to a resumed checkpoint that didn't have one).
+    pub fn enable_projection(&mut self, genesis: &GenesisSeed, proj_dim: usize) {
+        self.config.projection_dim = Some(proj_dim);
+        let weights = Self::init_projection_weights(genesis, proj_dim);
+        let proj_embs = Self::project_all_embeddings(&self.token_embeddings, &weights, proj_dim);
+        self.projection_weights = Some(weights);
+        self.projected_embeddings = Some(proj_embs);
+    }
+
+    /// Get projection weights (for training gradient updates).
+    pub fn projection_weights(&self) -> Option<&[f32]> {
+        self.projection_weights.as_deref()
+    }
+
+    /// Get mutable projection weights (for training gradient updates).
+    pub fn projection_weights_mut(&mut self) -> Option<&mut Vec<f32>> {
+        self.projection_weights.as_mut()
+    }
+
+    /// Get projected embeddings (for training gradient computation).
+    pub fn projected_embeddings(&self) -> Option<&[Vec<f32>]> {
+        self.projected_embeddings.as_deref()
+    }
+
+    /// Get projection dim from config.
+    pub fn projection_dim(&self) -> Option<usize> {
+        self.config.projection_dim
+    }
+
     /// Compute logits for all tokens via weight-tied similarity.
     ///
-    /// `logits[i] = logit_scale * cosine_similarity(output_hv, token_embeddings[i])`
+    /// When `projection_dim` is set, projects both the CfC output and token embeddings
+    /// to a lower-dimensional space before computing cosine similarity. This dramatically
+    /// improves token discrimination by concentrating signal in fewer dimensions.
+    ///
+    /// `logits[i] = logit_scale * cosine_similarity(proj(output_hv), proj(token_emb[i]))`
+    ///
     /// The scale factor (default 20.0, CLIP-style) spreads cosine similarities from
     /// [-1, 1] to a range where softmax can discriminate between tokens.
-    ///
-    /// When the `mamba-cpu` feature is enabled, uses candle tensor ops (GPU if CUDA
-    /// available, otherwise optimized CPU BLAS) for the matrix-vector multiply.
-    /// This replaces 4,096 individual 16,384D cosine similarities with a single
-    /// batched operation.
     pub fn compute_logits(&self, output_hv: &ContinuousHV) -> Vec<f32> {
         let scale = self.config.logit_scale;
+
+        // Projection head path: compute logits in lower-dimensional projected space
+        if let (Some(ref weights), Some(ref proj_embs), Some(proj_dim)) = (
+            &self.projection_weights,
+            &self.projected_embeddings,
+            self.config.projection_dim,
+        ) {
+            let proj_output = Self::project_and_normalize(output_hv.as_slice(), weights, proj_dim);
+            return proj_embs
+                .iter()
+                .map(|proj_emb| {
+                    let dot: f32 = proj_output
+                        .iter()
+                        .zip(proj_emb.iter())
+                        .map(|(a, b)| a * b)
+                        .sum();
+                    scale * dot
+                })
+                .collect();
+        }
+
+        // Full-dimension path (backward compatible)
 
         // Try GPU/candle accelerated path
         #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]

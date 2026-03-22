@@ -1146,6 +1146,78 @@ pub fn train_with_adam(
                     )
                 };
 
+                // Projection head gradient: ∂L/∂W = ∂L/∂p ⊗ o (outer product)
+                // Update projection weights with SGD, then refresh projected embeddings.
+                if !config.freeze_embeddings {
+                    if let Some(proj_dim) = generator.controller().projection_dim() {
+                        let output_hv = generator.controller().output_hv();
+                        let output_slice = output_hv.as_slice();
+
+                        // Compute ∂L/∂p (gradient in projection space)
+                        let proj_weights = generator.controller().projection_weights().unwrap();
+                        let proj_output =
+                            crate::controller::LanguageController::project_and_normalize(
+                                output_slice,
+                                proj_weights,
+                                proj_dim,
+                            );
+                        let proj_embs = generator.controller().projected_embeddings().unwrap();
+                        let n_embs = proj_embs.len().min(logits.len());
+                        let scale = generator.controller().config().logit_scale;
+
+                        let max_logit = logits.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+                        let exps: Vec<f32> =
+                            logits.iter().map(|&l| (l - max_logit).exp()).collect();
+                        let sum_exp: f32 = exps.iter().sum();
+
+                        if sum_exp > 1e-10 {
+                            let mut d_proj = vec![0.0f32; proj_dim];
+                            for i in 0..n_embs {
+                                let prob = exps[i] / sum_exp;
+                                let error = if i == target_id as usize {
+                                    prob - 1.0
+                                } else {
+                                    prob
+                                };
+                                if error.abs() < 1e-4 {
+                                    continue;
+                                }
+                                let cos_i = if scale.abs() > 1e-6 {
+                                    logits[i] / scale
+                                } else {
+                                    0.0
+                                };
+                                let se = scale * error;
+                                for (j, &pe) in proj_embs[i].iter().enumerate() {
+                                    d_proj[j] += se * (pe - cos_i * proj_output[j]);
+                                }
+                            }
+
+                            // SGD update: W -= lr * ∂L/∂W where ∂L/∂W[r,j] = d_proj[r] * o[j]
+                            let proj_lr = lr * 0.5; // Slightly lower LR for projection
+                            let dim = output_slice.len();
+                            if let Some(w) = generator.controller_mut().projection_weights_mut() {
+                                for r in 0..proj_dim {
+                                    let dp = d_proj[r];
+                                    if dp.abs() < 1e-8 {
+                                        continue;
+                                    }
+                                    let row_start = r * dim;
+                                    let update = -proj_lr * dp;
+                                    let update =
+                                        update.clamp(-effective_grad_clip, effective_grad_clip);
+                                    for j in 0..dim {
+                                        w[row_start + j] += update * output_slice[j];
+                                    }
+                                }
+                            }
+
+                            // Refresh projected embeddings after weight update
+                            generator.controller_mut().refresh_projected_embeddings();
+                        }
+                    }
+                }
+
                 // CfC network BPTT: backpropagate CE gradient through the network
                 if let Some(ref d_out) = d_output {
                     let network_lr = lr * config.network_lr_scale;
@@ -1547,10 +1619,63 @@ fn compute_ce_gradient_wrt_output(
         return ContinuousHV::zero(HDC_DIMENSION);
     }
 
+    let scale = controller.config().logit_scale;
+
+    // Projection head path: compute gradient in projected space, then chain through W^T
+    if let (Some(proj_weights), Some(proj_embs), Some(proj_dim)) = (
+        controller.projection_weights(),
+        controller.projected_embeddings(),
+        controller.projection_dim(),
+    ) {
+        let output_hv = controller.output_hv();
+        let proj_output = crate::controller::LanguageController::project_and_normalize(
+            output_hv.as_slice(),
+            proj_weights,
+            proj_dim,
+        );
+        let n = proj_embs.len().min(logits.len());
+
+        // Compute gradient in projection space:
+        // d_proj = scale × Σ_i error_i × (e_proj_i - cos_i × p_hat)
+        let mut d_proj = vec![0.0f32; proj_dim];
+        for i in 0..n {
+            let prob = exps[i] / sum_exp;
+            let error = if i == target { prob - 1.0 } else { prob };
+            if error.abs() < 1e-6 {
+                continue;
+            }
+            let cos_i = if scale.abs() > 1e-6 {
+                logits[i] / scale
+            } else {
+                0.0
+            };
+            let scaled_error = scale * error;
+            for (j, &pe) in proj_embs[i].iter().enumerate() {
+                d_proj[j] += scaled_error * (pe - cos_i * proj_output[j]);
+            }
+        }
+
+        // Chain through projection: d_output = W^T @ d_proj
+        // W is [proj_dim × HDC_DIM], so W^T is [HDC_DIM × proj_dim]
+        let mut d_output = vec![0.0f32; HDC_DIMENSION];
+        for r in 0..proj_dim {
+            let row_start = r * HDC_DIMENSION;
+            let dp = d_proj[r];
+            if dp.abs() < 1e-10 {
+                continue;
+            }
+            for j in 0..HDC_DIMENSION {
+                d_output[j] += dp * proj_weights[row_start + j];
+            }
+        }
+
+        return ContinuousHV::from_slice(&d_output);
+    }
+
+    // Full-dimension path (no projection)
     let embeddings = controller.token_embeddings();
     let output_hv = controller.output_hv();
     let output_slice = output_hv.as_slice();
-    let scale = controller.config().logit_scale;
     let n = embeddings.len().min(logits.len());
 
     // Accumulate: d_output = scale × Σ_i error_i × (e_hat_i - cos_i × o)

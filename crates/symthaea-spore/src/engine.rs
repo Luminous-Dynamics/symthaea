@@ -354,6 +354,12 @@ pub struct SporeEngine {
     // Conversation-level context for topic continuity
     conversation_context: ConversationContext,
 
+    // QOL trend history for personal trend tracking
+    trend_history: crate::persistence::TrendHistory,
+
+    // Wellbeing profile — neuromodulator biases and temporal adjustments
+    wellbeing: crate::wellbeing_profiles::WellbeingConfig,
+
     /// Optional persistence storage.
     storage: Option<Box<dyn crate::persistence::SporeStorage>>,
     /// Auto-checkpoint interval in cycles (0 = disabled).
@@ -465,6 +471,8 @@ impl SporeEngine {
             broca_pipeline: BrocaPipeline::new(42),
             dream_journal: DreamJournal::new(),
             conversation_context: ConversationContext::new(CONVERSATION_MAX_TURNS),
+            trend_history: crate::persistence::TrendHistory::new(),
+            wellbeing: crate::wellbeing_profiles::WellbeingConfig::default(),
             storage: None,
             checkpoint_interval: 0,
             state_trajectory: Vec::with_capacity(100),
@@ -577,6 +585,21 @@ impl SporeEngine {
         self.bath.noradrenaline.reuptake();
         self.bath.serotonin.reuptake();
         self.bath.oxytocin.reuptake();
+
+        // Wellbeing profile bias — gentle additive nudge toward profile targets.
+        // Applied after reuptake, before PE-driven production. The bias is small
+        // enough (~0.03-0.10) to modulate tone without overriding dynamics.
+        {
+            let bias = self.wellbeing.effective_bias(0.0); // allostatic_load is 0 in Spore (full CLS has it)
+            self.bath.dopamine.level =
+                (self.bath.dopamine.level + bias.dopamine * 0.1).clamp(0.0, 1.0);
+            self.bath.noradrenaline.level =
+                (self.bath.noradrenaline.level + bias.norepinephrine * 0.1).clamp(0.0, 1.0);
+            self.bath.serotonin.level =
+                (self.bath.serotonin.level + bias.serotonin * 0.1).clamp(0.0, 1.0);
+            self.bath.oxytocin.level =
+                (self.bath.oxytocin.level + bias.oxytocin * 0.1).clamp(0.0, 1.0);
+        }
 
         // PE-driven production (no manual decay — reuptake handles that).
         // Immune lr_factor attenuates production under threat conditions.
@@ -832,6 +855,23 @@ impl SporeEngine {
             let _consolidation = self.consolidator.consolidate();
         }
 
+        // QOL trend recording (gated by sample interval inside TrendHistory)
+        self.trend_history
+            .maybe_record(crate::persistence::QolSnapshot {
+                cycle: self.cycle_count,
+                timestamp_secs: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0),
+                consciousness_level,
+                harmony_alignment,
+                metacog_accuracy: 0.0, // Full metacog only in CognitiveLoopService
+                allostatic_load: 0.0,  // Full allostatic only in CognitiveLoopService
+                dream_wisdom_count: self.dream_journal.count(),
+                coherence_score: consciousness_level, // Best proxy in Spore (full CLS has temporal coherence)
+                safety_level: self.immune.safety_level() as u8,
+            });
+
         // Auto-checkpoint
         if self.checkpoint_interval > 0 && self.cycle_count % self.checkpoint_interval == 0 {
             self.save_checkpoint();
@@ -937,6 +977,7 @@ impl SporeEngine {
             ],
             semantic_entries,
             episodic_entries,
+            trend_snapshots: self.trend_history.snapshots().iter().cloned().collect(),
             format_version: crate::persistence::SporeCheckpoint::FORMAT_VERSION,
         }
     }
@@ -1016,6 +1057,14 @@ impl SporeEngine {
 
         // Sync coordinator step
         self.memory.step = checkpoint.cycle;
+
+        // Restore QOL trend history (v2+)
+        if !checkpoint.trend_snapshots.is_empty() {
+            self.trend_history = crate::persistence::TrendHistory::new();
+            for snap in &checkpoint.trend_snapshots {
+                self.trend_history.record(snap.clone());
+            }
+        }
     }
 
     /// Deserialize a single episodic entry from its binary representation.
@@ -1577,6 +1626,125 @@ impl SporeEngine {
     /// Number of dream journal fragments.
     pub fn dream_journal_count(&self) -> u32 {
         self.dream_journal.count()
+    }
+
+    // ======================================================================
+    // QOL Trend History
+    // ======================================================================
+
+    /// Get QOL trend snapshots as JSON.
+    pub fn trend_snapshots_json(&self) -> String {
+        self.trend_history.to_json()
+    }
+
+    /// Get a trend summary as JSON.
+    pub fn trend_summary_json(&self) -> String {
+        serde_json::to_string(&self.trend_history.trend_summary())
+            .unwrap_or_else(|_| "{}".to_string())
+    }
+
+    /// Number of QOL trend snapshots stored.
+    pub fn trend_snapshot_count(&self) -> usize {
+        self.trend_history.count()
+    }
+
+    // ======================================================================
+    // Wellbeing Profiles
+    // ======================================================================
+
+    /// Set the active wellbeing profile.
+    pub fn set_wellbeing_profile(&mut self, profile: crate::wellbeing_profiles::WellbeingProfile) {
+        self.wellbeing = crate::wellbeing_profiles::WellbeingConfig::for_profile(profile);
+    }
+
+    /// Set the wellbeing profile by name string.
+    /// Returns true if the profile was recognized and set.
+    pub fn set_wellbeing_profile_by_name(&mut self, name: &str) -> bool {
+        if let Some(profile) = crate::wellbeing_profiles::WellbeingProfile::from_name(name) {
+            self.set_wellbeing_profile(profile);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Get the current wellbeing profile name.
+    pub fn wellbeing_profile_name(&self) -> &'static str {
+        self.wellbeing.profile.name()
+    }
+
+    /// Get the wellbeing configuration as JSON.
+    pub fn wellbeing_config_json(&self) -> String {
+        serde_json::to_string(&self.wellbeing).unwrap_or_else(|_| "{}".to_string())
+    }
+
+    /// List all available wellbeing profiles as JSON array of {name, description}.
+    pub fn wellbeing_profiles_json() -> String {
+        let profiles: Vec<serde_json::Value> = crate::wellbeing_profiles::WellbeingProfile::all()
+            .iter()
+            .map(|p| {
+                serde_json::json!({
+                    "name": p.name(),
+                    "description": p.description(),
+                })
+            })
+            .collect();
+        serde_json::to_string(&profiles).unwrap_or_else(|_| "[]".to_string())
+    }
+
+    // ======================================================================
+    // Daily Rituals — Morning Alignment & Evening Reflection
+    // ======================================================================
+
+    /// Generate a Morning Alignment ritual sequence.
+    ///
+    /// Reads current consciousness state, dream journal, and harmony alignment
+    /// to produce a 3-phase ritual: Awakening → Dream Wisdom → Intention.
+    pub fn generate_morning_ritual(&self) -> crate::daily_ritual::RitualSequence {
+        let recent: Vec<crate::dream_journal::DreamFragment> = self
+            .dream_journal
+            .fragments()
+            .iter()
+            .rev()
+            .take(5)
+            .cloned()
+            .collect();
+
+        let ctx = crate::daily_ritual::MorningContext {
+            consciousness_level: self.last_consciousness,
+            dominant_harmony: self.dominant_harmony(),
+            harmony_alignment: self.harmony_alignment(),
+            recent_dreams: &recent,
+        };
+        crate::daily_ritual::generate_morning(&ctx)
+    }
+
+    /// Generate an Evening Reflection ritual sequence.
+    ///
+    /// Produces a 3-phase ritual: Gratitude → Consolidation → Sleep Preparation.
+    /// Does NOT trigger dream consolidation — call `dream_consolidate()` separately
+    /// after the ritual playback completes so the user experiences the ritual first.
+    pub fn generate_evening_ritual(&self) -> crate::daily_ritual::RitualSequence {
+        let ctx = crate::daily_ritual::EveningContext {
+            consciousness_level: self.last_consciousness,
+            dominant_harmony: self.dominant_harmony(),
+            harmony_alignment: self.harmony_alignment(),
+            cycle_count: self.cycle_count,
+            dream_wisdom_count: self.dream_journal.count(),
+        };
+        crate::daily_ritual::generate_evening(&ctx)
+    }
+
+    /// Generate a morning ritual as JSON string.
+    pub fn morning_ritual_json(&self) -> String {
+        let seq = self.generate_morning_ritual();
+        serde_json::to_string(&seq).unwrap_or_else(|_| "{}".to_string())
+    }
+
+    /// Generate an evening ritual as JSON string.
+    pub fn evening_ritual_json(&self) -> String {
+        let seq = self.generate_evening_ritual();
+        serde_json::to_string(&seq).unwrap_or_else(|_| "{}".to_string())
     }
 
     // ======================================================================

@@ -86,8 +86,22 @@ fn main() {
         let mut config = BrocaConfig::default();
         config.controller.network_layers = opts.network_layers;
         config.controller.neurons_per_layer = opts.neurons_per_layer;
+        if opts.projection_dim > 0 {
+            config.controller.projection_dim = Some(opts.projection_dim);
+        }
         (BrocaGenerator::new_4k(&genesis, config), None)
     };
+
+    // Enable projection head if --projection-dim specified (works for both fresh and resume)
+    if opts.projection_dim > 0 && generator.controller().projection_dim().is_none() {
+        tracing::info!(
+            dim = opts.projection_dim,
+            "Enabling learned projection head"
+        );
+        generator
+            .controller_mut()
+            .enable_projection(&genesis, opts.projection_dim);
+    }
 
     // Re-tokenize all pairs with the generator's BPE tokenizer.
     // The JSONL may have target_ids from a different tokenizer (e.g., GPT-NeoX
@@ -385,6 +399,9 @@ struct TrainOpts {
     network_layers: usize,
     /// CfC neurons per layer (default: 8). Only used for fresh training (not --resume).
     neurons_per_layer: usize,
+    /// Projection head dimension (default: 0 = disabled).
+    /// Projects 16,384D output to this dimension before logit computation.
+    projection_dim: usize,
 }
 
 fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
@@ -426,6 +443,7 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
         hidden_dropout: 0.0,
         network_layers: 3,
         neurons_per_layer: 8,
+        projection_dim: 0,
     };
 
     let mut i = 1;
@@ -655,6 +673,14 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
                     .parse()
                     .map_err(|_| "--neurons-per-layer must be a positive integer")?;
             }
+            "--projection-dim" => {
+                i += 1;
+                opts.projection_dim = args
+                    .get(i)
+                    .ok_or("--projection-dim requires a number")?
+                    .parse()
+                    .map_err(|_| "--projection-dim must be a positive integer")?;
+            }
             "--fusion" => {
                 opts.enable_fusion = true;
             }
@@ -724,5 +750,8 @@ fn print_usage() {
     eprintln!("  --hidden-dropout F   CfC hidden state dropout rate (default: 0.0 = off)");
     eprintln!("  --network-layers N   CfC network layers (default: 3, fresh train only)");
     eprintln!("  --neurons-per-layer N  CfC neurons per layer (default: 8, fresh train only)");
+    eprintln!(
+        "  --projection-dim N   Project to N dimensions for logits (default: 0 = off, try 256)"
+    );
     eprintln!("  --help, -h           Show this help message");
 }

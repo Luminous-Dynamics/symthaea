@@ -262,6 +262,85 @@ pub unsafe extern "C" fn soma_engine_dream_consolidate(engine: *mut SomaEngine) 
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Daily Rituals — Morning Alignment & Evening Reflection
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Generate a Morning Alignment ritual as JSON.
+///
+/// Returns a C string (caller must free with `soma_free_string`).
+/// # Safety: `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn soma_engine_morning_ritual(
+    engine: *const SomaEngine,
+) -> *mut std::ffi::c_char {
+    let json = unsafe { &*engine }.morning_ritual_json();
+    std::ffi::CString::new(json)
+        .map(|c| c.into_raw())
+        .unwrap_or(std::ptr::null_mut())
+}
+
+/// Generate an Evening Reflection ritual as JSON.
+///
+/// Returns a C string (caller must free with `soma_free_string`).
+/// # Safety: `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn soma_engine_evening_ritual(
+    engine: *const SomaEngine,
+) -> *mut std::ffi::c_char {
+    let json = unsafe { &*engine }.evening_ritual_json();
+    std::ffi::CString::new(json)
+        .map(|c| c.into_raw())
+        .unwrap_or(std::ptr::null_mut())
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Wellbeing Profiles
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Set the wellbeing profile by name (e.g., "adhd_support", "grief_mode").
+///
+/// Returns 1 if the profile was recognized, 0 otherwise.
+/// # Safety: `engine` must be valid, `name` must be a valid C string.
+#[no_mangle]
+pub unsafe extern "C" fn soma_engine_set_wellbeing_profile(
+    engine: *mut SomaEngine,
+    name: *const std::ffi::c_char,
+) -> u8 {
+    let name_str = unsafe { std::ffi::CStr::from_ptr(name) }
+        .to_str()
+        .unwrap_or("");
+    if unsafe { &mut *engine }.set_wellbeing_profile_by_name(name_str) {
+        1
+    } else {
+        0
+    }
+}
+
+/// Get the current wellbeing profile name as a C string.
+///
+/// # Safety: `engine` must be valid. Caller must free with `soma_free_string`.
+#[no_mangle]
+pub unsafe extern "C" fn soma_engine_wellbeing_profile_name(
+    engine: *const SomaEngine,
+) -> *mut std::ffi::c_char {
+    let name = unsafe { &*engine }.wellbeing_profile_name();
+    std::ffi::CString::new(name)
+        .map(|c| c.into_raw())
+        .unwrap_or(std::ptr::null_mut())
+}
+
+/// List all available wellbeing profiles as JSON.
+///
+/// # Safety: Caller must free with `soma_free_string`.
+#[no_mangle]
+pub unsafe extern "C" fn soma_engine_wellbeing_profiles_list() -> *mut std::ffi::c_char {
+    let json = symthaea_spore::SporeEngine::wellbeing_profiles_json();
+    std::ffi::CString::new(json)
+        .map(|c| c.into_raw())
+        .unwrap_or(std::ptr::null_mut())
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Sleep/Wake metabolism
 // ═══════════════════════════════════════════════════════════════════════════════
 

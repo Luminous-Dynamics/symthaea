@@ -152,24 +152,24 @@ impl ContinuousMind {
         if self.working_memory.len() >= 2 {
             let mut i = 0;
             while i < self.working_memory.len().saturating_sub(1) {
-                let sim = self.working_memory[i].similarity(&self.working_memory[i + 1]);
+                let sim = self.working_memory[i]
+                    .content
+                    .similarity(&self.working_memory[i + 1].content);
                 if sim > 0.8 {
                     let bundled = ContinuousHV::bundle_owned(&[
-                        self.working_memory[i].clone(),
-                        self.working_memory[i + 1].clone(),
+                        self.working_memory[i].content.clone(),
+                        self.working_memory[i + 1].content.clone(),
                     ]);
-                    self.working_memory[i] = bundled;
-                    self.working_memory.remove(i + 1);
+                    self.working_memory[i].content = bundled;
 
-                    // Keep earliest arrival tick for the merged item
-                    let _merged_tick = self.working_memory_ticks.remove(i + 1);
+                    // Remove the merged entry
+                    let removed = self.working_memory.remove(i + 1);
 
                     // Consolidate source: Feedback > WebResearch > Direct > Internal
-                    let s1 = self.working_memory_sources[i];
-                    let s2 = self.working_memory_sources.remove(i + 1);
-
                     use crate::memory::memory_coordinator::MemorySource;
-                    self.working_memory_sources[i] =
+                    let s1 = self.working_memory[i].source;
+                    let s2 = removed.source;
+                    self.working_memory[i].source =
                         match (s1, s2) {
                             (MemorySource::ActionFeedback, _)
                             | (_, MemorySource::ActionFeedback) => MemorySource::ActionFeedback,
@@ -182,24 +182,18 @@ impl ContinuousMind {
                         };
 
                     // Set verified if either is verified
-                    let v1 = self.working_memory_verified[i];
-                    let v2 = self.working_memory_verified.remove(i + 1);
-                    self.working_memory_verified[i] = v1 || v2;
+                    self.working_memory[i].is_verified =
+                        self.working_memory[i].is_verified || removed.is_verified;
 
                     // Merge metadata (keep existing keys, add missing from merged item)
-                    if !self.working_memory_metadata.is_empty() {
-                        let mut merged = self.working_memory_metadata[i].clone();
-                        let extra = self.working_memory_metadata.remove(i + 1);
-                        for (k, v) in extra {
-                            merged.entry(k).or_insert(v);
-                        }
-                        self.working_memory_metadata[i] = merged;
+                    for (k, v) in removed.metadata {
+                        self.working_memory[i].metadata.entry(k).or_insert(v);
                     }
 
                     return Some(MindOutput {
                         output_type: OutputType::Memorize,
                         content: "Dreaming: Consolidating memories...".to_string(),
-                        embedding: self.working_memory[i].clone(),
+                        embedding: self.working_memory[i].content.clone(),
                         confidence: 0.9,
                         emotional_tone: 0.5,
                     });
@@ -241,45 +235,49 @@ impl ContinuousMind {
             self.stats.inputs_processed += 1;
 
             if self.working_memory.len() < self.config.working_memory_capacity {
-                self.working_memory.push(input.content.clone());
-                self.working_memory_ticks.push(self.state.tick);
-                self.working_memory_sources.push(input.source);
-                self.working_memory_verified.push(input.is_verified);
-                self.working_memory_metadata.push(input.metadata.clone());
+                self.working_memory.push(crate::mind::WorkingMemoryEntry {
+                    content: input.content.clone(),
+                    arrival_tick: self.state.tick,
+                    source: input.source,
+                    is_verified: input.is_verified,
+                    metadata: input.metadata.clone(),
+                });
             } else {
-                let evicted = self.working_memory.remove(0);
-                let arrival_tick = self.working_memory_ticks.remove(0);
-                let source = self.working_memory_sources.remove(0);
-                let verified = self.working_memory_verified.remove(0);
-                let metadata = self.working_memory_metadata.remove(0);
+                let evicted_entry = self.working_memory.remove(0);
 
-                let steps_survived = self.state.tick.saturating_sub(arrival_tick);
+                let steps_survived = self.state.tick.saturating_sub(evicted_entry.arrival_tick);
                 // Graduate evicted item to episodic memory via coordinator
                 self.memory_coordinator.queue_graduation(
                     crate::memory::memory_coordinator::GraduationEvent {
-                        content: evicted.clone(),
-                        label: metadata.get("topic").cloned().unwrap_or_default(),
+                        content: evicted_entry.content.clone(),
+                        label: evicted_entry
+                            .metadata
+                            .get("topic")
+                            .cloned()
+                            .unwrap_or_default(),
                         steps_survived,
                         final_activation: 0.5, // default activation for evicted items
                         psi_at_graduation: self.state.consciousness_level,
                         coherence_at_graduation: self.state.consciousness_level,
-                        source,
-                        is_verified: verified,
+                        source: evicted_entry.source,
+                        is_verified: evicted_entry.is_verified,
                     },
                 );
                 self.evicted_items.push(crate::mind::EvictedMemory {
-                    content: evicted,
+                    content: evicted_entry.content,
                     steps_survived,
-                    source,
-                    is_verified: verified,
-                    metadata,
+                    source: evicted_entry.source,
+                    is_verified: evicted_entry.is_verified,
+                    metadata: evicted_entry.metadata,
                 });
 
-                self.working_memory.push(input.content.clone());
-                self.working_memory_ticks.push(self.state.tick);
-                self.working_memory_sources.push(input.source);
-                self.working_memory_verified.push(input.is_verified);
-                self.working_memory_metadata.push(input.metadata.clone());
+                self.working_memory.push(crate::mind::WorkingMemoryEntry {
+                    content: input.content.clone(),
+                    arrival_tick: self.state.tick,
+                    source: input.source,
+                    is_verified: input.is_verified,
+                    metadata: input.metadata.clone(),
+                });
             }
 
             // Update current thought via Liquid Holocell dynamics
@@ -326,7 +324,9 @@ impl ContinuousMind {
         let mut total_integration = 0.0;
         for i in 0..self.working_memory.len() {
             for j in (i + 1)..self.working_memory.len() {
-                let similarity = self.working_memory[i].similarity(&self.working_memory[j]);
+                let similarity = self.working_memory[i]
+                    .content
+                    .similarity(&self.working_memory[j].content);
                 total_integration += (1.0 - similarity.abs()) as f64;
             }
         }
@@ -500,8 +500,13 @@ impl ContinuousMind {
         if self.state.tick.is_multiple_of(10) {
             let beliefs = if self.working_memory.len() >= 2 {
                 // Bundle top-3 most recent perceptions as our belief state
-                let recent: Vec<ContinuousHV> =
-                    self.working_memory.iter().rev().take(3).cloned().collect();
+                let recent: Vec<ContinuousHV> = self
+                    .working_memory
+                    .iter()
+                    .rev()
+                    .take(3)
+                    .map(|e| e.content.clone())
+                    .collect();
                 ContinuousHV::bundle_owned(&recent)
             } else {
                 self.state.current_thought.clone()
@@ -1417,10 +1422,6 @@ mod tests {
         mind.perceive(ContinuousHV::random(512, 42));
         mind.process_inputs();
         assert_eq!(mind.working_memory.len(), 1);
-        assert_eq!(mind.working_memory_ticks.len(), 1);
-        assert_eq!(mind.working_memory_sources.len(), 1);
-        assert_eq!(mind.working_memory_verified.len(), 1);
-        assert_eq!(mind.working_memory_metadata.len(), 1);
     }
 
     #[test]
@@ -1470,11 +1471,8 @@ mod tests {
             .with_verification(true);
         mind.input(input);
         mind.process_inputs();
-        assert_eq!(
-            mind.working_memory_sources[0],
-            MemorySource::UserInteraction
-        );
-        assert!(mind.working_memory_verified[0]);
+        assert_eq!(mind.working_memory[0].source, MemorySource::UserInteraction);
+        assert!(mind.working_memory[0].is_verified);
     }
 
     #[test]
@@ -1567,7 +1565,13 @@ mod tests {
         let mut mind = activated_mind();
         // Add diverse random vectors — dissimilar items boost integration
         for i in 0..5 {
-            mind.working_memory.push(ContinuousHV::random(512, 100 + i));
+            mind.working_memory.push(crate::mind::WorkingMemoryEntry {
+                content: ContinuousHV::random(512, 100 + i),
+                arrival_tick: 0,
+                source: MemorySource::Internal,
+                is_verified: false,
+                metadata: std::collections::HashMap::new(),
+            });
         }
         mind.update_consciousness();
         assert!(
@@ -1583,7 +1587,13 @@ mod tests {
         let hv = ContinuousHV::random(512, 42);
         // Identical items should have high similarity, low integration
         for _ in 0..4 {
-            mind.working_memory.push(hv.clone());
+            mind.working_memory.push(crate::mind::WorkingMemoryEntry {
+                content: hv.clone(),
+                arrival_tick: 0,
+                source: MemorySource::Internal,
+                is_verified: false,
+                metadata: std::collections::HashMap::new(),
+            });
         }
         mind.update_consciousness();
         // (1 - similarity) for identical vectors ≈ 0
@@ -1598,7 +1608,13 @@ mod tests {
     fn update_consciousness_relational_psi_boost() {
         let mut mind = activated_mind();
         for i in 0..5 {
-            mind.working_memory.push(ContinuousHV::random(512, 200 + i));
+            mind.working_memory.push(crate::mind::WorkingMemoryEntry {
+                content: ContinuousHV::random(512, 200 + i),
+                arrival_tick: 0,
+                source: MemorySource::Internal,
+                is_verified: false,
+                metadata: std::collections::HashMap::new(),
+            });
         }
         mind.update_consciousness();
         let base_level = mind.state.consciousness_level;
@@ -1621,7 +1637,13 @@ mod tests {
     fn update_consciousness_relational_psi_zero_no_boost() {
         let mut mind = activated_mind();
         for i in 0..3 {
-            mind.working_memory.push(ContinuousHV::random(512, 300 + i));
+            mind.working_memory.push(crate::mind::WorkingMemoryEntry {
+                content: ContinuousHV::random(512, 300 + i),
+                arrival_tick: 0,
+                source: MemorySource::Internal,
+                is_verified: false,
+                metadata: std::collections::HashMap::new(),
+            });
         }
         mind.relational_psi = 0.0;
         mind.update_consciousness();
@@ -1650,7 +1672,13 @@ mod tests {
     fn generate_output_requires_tick_multiple_of_10() {
         let mut mind = activated_mind();
         mind.state.consciousness_level = 0.5;
-        mind.working_memory.push(ContinuousHV::random(512, 42));
+        mind.working_memory.push(crate::mind::WorkingMemoryEntry {
+            content: ContinuousHV::random(512, 42),
+            arrival_tick: 0,
+            source: MemorySource::Direct,
+            is_verified: false,
+            metadata: std::collections::HashMap::new(),
+        });
 
         // Tick not a multiple of 10 — should return None
         mind.state.tick = 7;
@@ -1676,7 +1704,13 @@ mod tests {
         mind.state.consciousness_level = 0.5;
         mind.state.thermodynamic_load = 0.9; // High load
         mind.state.tick = 10;
-        mind.working_memory.push(ContinuousHV::random(512, 42));
+        mind.working_memory.push(crate::mind::WorkingMemoryEntry {
+            content: ContinuousHV::random(512, 42),
+            arrival_tick: 0,
+            source: MemorySource::Direct,
+            is_verified: false,
+            metadata: std::collections::HashMap::new(),
+        });
 
         // The holocell.simulate() may or may not exceed 0.9 predicted load,
         // but with high thermodynamic_load the veto path is possible.
@@ -1734,19 +1768,20 @@ mod tests {
         let mut mind = activated_mind();
         // Create two very similar vectors (same seed = identical)
         let hv = ContinuousHV::random(512, 42);
-        mind.working_memory.push(hv.clone());
-        mind.working_memory.push(hv.clone());
-        mind.working_memory_ticks.push(0);
-        mind.working_memory_ticks.push(1);
-        mind.working_memory_sources
-            .push(MemorySource::UserInteraction);
-        mind.working_memory_sources.push(MemorySource::Internal);
-        mind.working_memory_verified.push(true);
-        mind.working_memory_verified.push(false);
-        mind.working_memory_metadata
-            .push(std::collections::HashMap::new());
-        mind.working_memory_metadata
-            .push(std::collections::HashMap::new());
+        mind.working_memory.push(crate::mind::WorkingMemoryEntry {
+            content: hv.clone(),
+            arrival_tick: 0,
+            source: MemorySource::UserInteraction,
+            is_verified: true,
+            metadata: std::collections::HashMap::new(),
+        });
+        mind.working_memory.push(crate::mind::WorkingMemoryEntry {
+            content: hv.clone(),
+            arrival_tick: 1,
+            source: MemorySource::Internal,
+            is_verified: false,
+            metadata: std::collections::HashMap::new(),
+        });
 
         let output = mind.process_dream();
         assert!(output.is_some(), "should consolidate identical memories");
@@ -1761,18 +1796,20 @@ mod tests {
     fn process_dream_preserves_dissimilar_memories() {
         let mut mind = activated_mind();
         // Use different seeds — random 512-dim vectors will be dissimilar
-        mind.working_memory.push(ContinuousHV::random(512, 100));
-        mind.working_memory.push(ContinuousHV::random(512, 200));
-        mind.working_memory_ticks.push(0);
-        mind.working_memory_ticks.push(1);
-        mind.working_memory_sources.push(MemorySource::Internal);
-        mind.working_memory_sources.push(MemorySource::Internal);
-        mind.working_memory_verified.push(false);
-        mind.working_memory_verified.push(false);
-        mind.working_memory_metadata
-            .push(std::collections::HashMap::new());
-        mind.working_memory_metadata
-            .push(std::collections::HashMap::new());
+        mind.working_memory.push(crate::mind::WorkingMemoryEntry {
+            content: ContinuousHV::random(512, 100),
+            arrival_tick: 0,
+            source: MemorySource::Internal,
+            is_verified: false,
+            metadata: std::collections::HashMap::new(),
+        });
+        mind.working_memory.push(crate::mind::WorkingMemoryEntry {
+            content: ContinuousHV::random(512, 200),
+            arrival_tick: 1,
+            source: MemorySource::Internal,
+            is_verified: false,
+            metadata: std::collections::HashMap::new(),
+        });
 
         // Dissimilar vectors should not consolidate (similarity < 0.8)
         // The dream thought is stochastic, so we just verify no panic
@@ -1787,47 +1824,49 @@ mod tests {
     fn process_dream_source_priority_action_feedback_wins() {
         let mut mind = activated_mind();
         let hv = ContinuousHV::random(512, 42);
-        mind.working_memory.push(hv.clone());
-        mind.working_memory.push(hv.clone());
-        mind.working_memory_ticks.push(0);
-        mind.working_memory_ticks.push(1);
-        mind.working_memory_sources
-            .push(MemorySource::ActionFeedback);
-        mind.working_memory_sources
-            .push(MemorySource::UserInteraction);
-        mind.working_memory_verified.push(false);
-        mind.working_memory_verified.push(false);
-        mind.working_memory_metadata
-            .push(std::collections::HashMap::new());
-        mind.working_memory_metadata
-            .push(std::collections::HashMap::new());
+        mind.working_memory.push(crate::mind::WorkingMemoryEntry {
+            content: hv.clone(),
+            arrival_tick: 0,
+            source: MemorySource::ActionFeedback,
+            is_verified: false,
+            metadata: std::collections::HashMap::new(),
+        });
+        mind.working_memory.push(crate::mind::WorkingMemoryEntry {
+            content: hv.clone(),
+            arrival_tick: 1,
+            source: MemorySource::UserInteraction,
+            is_verified: false,
+            metadata: std::collections::HashMap::new(),
+        });
 
         let _ = mind.process_dream();
         // After consolidation, source should be ActionFeedback (highest priority)
-        assert_eq!(mind.working_memory_sources[0], MemorySource::ActionFeedback);
+        assert_eq!(mind.working_memory[0].source, MemorySource::ActionFeedback);
     }
 
     #[test]
     fn process_dream_verified_flag_or_merged() {
         let mut mind = activated_mind();
         let hv = ContinuousHV::random(512, 42);
-        mind.working_memory.push(hv.clone());
-        mind.working_memory.push(hv.clone());
-        mind.working_memory_ticks.push(0);
-        mind.working_memory_ticks.push(1);
-        mind.working_memory_sources.push(MemorySource::Internal);
-        mind.working_memory_sources.push(MemorySource::Internal);
-        mind.working_memory_verified.push(false);
-        mind.working_memory_verified.push(true); // One is verified
-        mind.working_memory_metadata
-            .push(std::collections::HashMap::new());
-        mind.working_memory_metadata
-            .push(std::collections::HashMap::new());
+        mind.working_memory.push(crate::mind::WorkingMemoryEntry {
+            content: hv.clone(),
+            arrival_tick: 0,
+            source: MemorySource::Internal,
+            is_verified: false,
+            metadata: std::collections::HashMap::new(),
+        });
+        mind.working_memory.push(crate::mind::WorkingMemoryEntry {
+            content: hv.clone(),
+            arrival_tick: 1,
+            source: MemorySource::Internal,
+            is_verified: true, // One is verified
+            metadata: std::collections::HashMap::new(),
+        });
 
         let _ = mind.process_dream();
         // Merged verified status should be true (false || true)
         assert!(
-            mind.working_memory_verified[0],
+            mind.working_memory[0].is_verified,
             "merged verification should be true if either is verified"
         );
     }
@@ -1843,12 +1882,13 @@ mod tests {
     #[test]
     fn process_dream_no_crash_on_single_memory() {
         let mut mind = activated_mind();
-        mind.working_memory.push(ContinuousHV::random(512, 42));
-        mind.working_memory_ticks.push(0);
-        mind.working_memory_sources.push(MemorySource::Internal);
-        mind.working_memory_verified.push(false);
-        mind.working_memory_metadata
-            .push(std::collections::HashMap::new());
+        mind.working_memory.push(crate::mind::WorkingMemoryEntry {
+            content: ContinuousHV::random(512, 42),
+            arrival_tick: 0,
+            source: MemorySource::Internal,
+            is_verified: false,
+            metadata: std::collections::HashMap::new(),
+        });
         let _output = mind.process_dream();
         // Single memory cannot be consolidated — should not panic
         assert_eq!(mind.working_memory.len(), 1);

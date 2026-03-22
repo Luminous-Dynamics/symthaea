@@ -40,6 +40,9 @@ screen-vision = []
 # Full 20-channel Broca language center with epistemic gating and semantic veto.
 broca-full = ["dep:symthaea-broca"]
 
+[dev-dependencies]
+proptest = "1"
+
 [[bin]]
 name = "soma_bench"
 path = "src/bin/soma_bench.rs"

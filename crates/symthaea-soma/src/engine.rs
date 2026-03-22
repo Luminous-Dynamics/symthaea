@@ -593,6 +593,41 @@ impl SomaEngine {
         self.spore.dream_cycle()
     }
 
+    // ==================================================================
+    // Daily Rituals — Morning Alignment & Evening Reflection
+    // ==================================================================
+
+    /// Generate a Morning Alignment ritual as JSON.
+    ///
+    /// Returns a serialized `RitualSequence` with 3 phases:
+    /// Awakening → Dream Wisdom Review → Harmony Intention.
+    pub fn morning_ritual_json(&self) -> String {
+        self.spore.morning_ritual_json()
+    }
+
+    /// Generate an Evening Reflection ritual as JSON.
+    ///
+    /// Returns a serialized `RitualSequence` with 3 phases:
+    /// Gratitude → Consolidation → Sleep Preparation.
+    /// Call `dream_consolidate()` after playback completes.
+    pub fn evening_ritual_json(&self) -> String {
+        self.spore.evening_ritual_json()
+    }
+
+    // ==================================================================
+    // Wellbeing Profiles
+    // ==================================================================
+
+    /// Set the wellbeing profile by name. Returns true if recognized.
+    pub fn set_wellbeing_profile_by_name(&mut self, name: &str) -> bool {
+        self.spore.set_wellbeing_profile_by_name(name)
+    }
+
+    /// Get the current wellbeing profile name.
+    pub fn wellbeing_profile_name(&self) -> &'static str {
+        self.spore.wellbeing_profile_name()
+    }
+
     /// Get consciousness report.
     pub fn consciousness_report(&self) -> String {
         format!(

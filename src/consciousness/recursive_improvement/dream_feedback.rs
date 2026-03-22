@@ -40,7 +40,7 @@
 //! ```
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 /// A dream insight - a counterfactual that outperformed reality
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -177,7 +177,7 @@ pub struct DreamFeedbackBridge {
     confidence_adjustments: HashMap<u64, ConfidenceAdjustment>,
 
     /// Recent insights (for analysis)
-    recent_insights: Vec<DreamInsight>,
+    recent_insights: VecDeque<DreamInsight>,
 
     /// Maximum insights to keep
     max_insights: usize,
@@ -201,7 +201,7 @@ impl DreamFeedbackBridge {
         Self {
             action_priors: HashMap::new(),
             confidence_adjustments: HashMap::new(),
-            recent_insights: Vec::new(),
+            recent_insights: VecDeque::new(),
             max_insights: 1000,
             min_phi_improvement: 0.05,
             stats: DreamFeedbackStats::default(),
@@ -249,9 +249,9 @@ impl DreamFeedbackBridge {
         self.stats.priors_created += 1;
 
         // Store insight for analysis
-        self.recent_insights.push(insight);
+        self.recent_insights.push_back(insight);
         if self.recent_insights.len() > self.max_insights {
-            self.recent_insights.remove(0);
+            self.recent_insights.pop_front();
         }
 
         true

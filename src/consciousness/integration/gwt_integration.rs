@@ -40,7 +40,7 @@ use crate::hdc::global_workspace::{
 #[cfg(feature = "observability_module")]
 use crate::observability::{SharedObserver, SymthaeaObserver, WorkspaceIgnitionEvent};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::fmt;
 
 /// Handler callback for GWT broadcast events.
@@ -76,7 +76,7 @@ pub struct UnifiedGlobalWorkspace {
     in_attentional_blink: bool,
 
     /// Metacognitive state assessments
-    metacognitive_assessments: Vec<MetacognitiveAssessment>,
+    metacognitive_assessments: VecDeque<MetacognitiveAssessment>,
 
     /// Current workspace stability metric
     workspace_stability: f64,
@@ -246,7 +246,7 @@ pub struct UnifiedGWTStats {
     pub avg_coalition_size: f64,
 
     /// Workspace occupancy over time
-    pub occupancy_history: Vec<f64>,
+    pub occupancy_history: VecDeque<f64>,
 }
 
 /// Result of unified workspace processing
@@ -279,7 +279,7 @@ impl UnifiedGlobalWorkspace {
             stats: UnifiedGWTStats::default(),
             timesteps_since_ignition: 100,
             in_attentional_blink: false,
-            metacognitive_assessments: Vec::new(),
+            metacognitive_assessments: VecDeque::new(),
             workspace_stability: 1.0,
             phi_estimates: HashMap::new(),
             handlers: HashMap::new(),
@@ -310,7 +310,7 @@ impl UnifiedGlobalWorkspace {
             stats: UnifiedGWTStats::default(),
             timesteps_since_ignition: 100,
             in_attentional_blink: false,
-            metacognitive_assessments: Vec::new(),
+            metacognitive_assessments: VecDeque::new(),
             workspace_stability: 1.0,
             phi_estimates: HashMap::new(),
             handlers: HashMap::new(),
@@ -468,7 +468,7 @@ impl UnifiedGlobalWorkspace {
 
     /// Get current metacognitive state
     pub fn metacognitive_state(&self) -> Option<&MetacognitiveAssessment> {
-        self.metacognitive_assessments.last()
+        self.metacognitive_assessments.back()
     }
 
     /// Submit a strategy for workspace competition
@@ -557,19 +557,19 @@ impl UnifiedGlobalWorkspace {
         // Track occupancy
         self.stats
             .occupancy_history
-            .push(assessment.capacity.occupancy);
+            .push_back(assessment.capacity.occupancy);
         if self.stats.occupancy_history.len() > 1000 {
-            self.stats.occupancy_history.remove(0);
+            self.stats.occupancy_history.pop_front();
         }
 
         // REVOLUTIONARY: Metacognitive assessment
         if self.config.enable_metacognition {
             let meta_assessment = self.metacognitive_assess(&assessment);
-            self.metacognitive_assessments.push(meta_assessment);
+            self.metacognitive_assessments.push_back(meta_assessment);
 
             // Keep history bounded
             if self.metacognitive_assessments.len() > 100 {
-                self.metacognitive_assessments.remove(0);
+                self.metacognitive_assessments.pop_front();
             }
         }
 

@@ -47,12 +47,13 @@ impl ContinuousMind {
             categories_seen.insert(entry.category.to_string());
 
             // Store in working memory (tick 0 = genesis seeding)
-            self.working_memory.push(hv);
-            self.working_memory_ticks.push(0);
-            self.working_memory_sources.push(MemorySource::Internal);
-            self.working_memory_verified.push(true);
-            self.working_memory_metadata
-                .push(std::collections::HashMap::new());
+            self.working_memory.push(crate::mind::WorkingMemoryEntry {
+                content: hv,
+                arrival_tick: 0,
+                source: MemorySource::Internal,
+                is_verified: true,
+                metadata: std::collections::HashMap::new(),
+            });
 
             tracing::debug!(
                 target: "symthaea::mind::seeding",
@@ -201,9 +202,8 @@ impl ContinuousMind {
     fn determine_epistemic_status(&self, state: &MindState) -> EpistemicStatus {
         // If we have input text, use HDC classification
         if let Some(ref text) = self.last_input_text {
-            let assessment = self
-                .intent_classifier
-                .assess_epistemic_text(text, &self.working_memory);
+            let hvs = self.working_memory_hvs();
+            let assessment = self.intent_classifier.assess_epistemic_text(text, &hvs);
 
             // Modulate by consciousness level
             let phi = state.consciousness_level;
@@ -370,7 +370,8 @@ impl ContinuousMind {
         }
 
         // Label all working memory contents
-        let labels = self.intent_classifier.label_concepts(&self.working_memory);
+        let hvs = self.working_memory_hvs();
+        let labels = self.intent_classifier.label_concepts(&hvs);
 
         // Convert to ActivatedConcepts, taking top N by confidence
         labels
@@ -412,7 +413,8 @@ impl ContinuousMind {
         for i in 0..self.working_memory.len() {
             for j in (i + 1)..self.working_memory.len() {
                 let sim = self.working_memory[i]
-                    .similarity(&self.working_memory[j])
+                    .content
+                    .similarity(&self.working_memory[j].content)
                     .abs() as f64;
                 total_similarity += sim;
                 count += 1;

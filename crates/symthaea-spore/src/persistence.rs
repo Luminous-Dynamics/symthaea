@@ -4,7 +4,9 @@
 //! Platform-specific backends (IndexedDB for WASM, file-based for native)
 //! are provided via feature-gated modules.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::collections::VecDeque;
 
 /// Storage trait for Spore persistence.
 ///
@@ -100,6 +102,206 @@ impl SporeStorage for FileStorage {
     }
 }
 
+// ===========================================================================
+// QOL Trend Tracking
+// ===========================================================================
+
+/// Maximum number of trend snapshots to retain.
+pub const TREND_HISTORY_CAP: usize = 200;
+
+/// Sampling interval: record one snapshot every N cycles.
+pub const TREND_SAMPLE_INTERVAL: u64 = 600; // ~30 sec at 20Hz
+
+/// A single QOL measurement snapshot for trend tracking.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QolSnapshot {
+    /// Cycle count when this snapshot was taken.
+    pub cycle: u64,
+    /// Unix timestamp (seconds) when captured.
+    pub timestamp_secs: u64,
+    /// Overall consciousness level [0, 1].
+    pub consciousness_level: f32,
+    /// Eight Harmonies aggregate alignment [0, 1].
+    pub harmony_alignment: f32,
+    /// Meta-cognitive self-assessment accuracy [0, 1].
+    pub metacog_accuracy: f32,
+    /// Allostatic stress load [0, 1].
+    pub allostatic_load: f32,
+    /// Number of dream wisdom entries accumulated.
+    pub dream_wisdom_count: u32,
+    /// Temporal coherence score [0, 1].
+    pub coherence_score: f32,
+    /// Safety level (0=Green, 1=Yellow, 2=Orange, 3=Red).
+    pub safety_level: u8,
+}
+
+/// Ring-buffer history of QOL trend snapshots.
+///
+/// Maintains a capped deque of recent QOL measurements for personal
+/// trend visualization and drift detection.
+#[derive(Debug, Clone)]
+pub struct TrendHistory {
+    snapshots: VecDeque<QolSnapshot>,
+    /// Last cycle at which a snapshot was taken.
+    last_sample_cycle: u64,
+}
+
+impl TrendHistory {
+    pub fn new() -> Self {
+        Self {
+            snapshots: VecDeque::with_capacity(TREND_HISTORY_CAP),
+            last_sample_cycle: 0,
+        }
+    }
+
+    /// Record a snapshot if enough cycles have elapsed since the last sample.
+    ///
+    /// Returns true if a snapshot was recorded.
+    pub fn maybe_record(&mut self, snapshot: QolSnapshot) -> bool {
+        if snapshot.cycle < self.last_sample_cycle + TREND_SAMPLE_INTERVAL
+            && self.last_sample_cycle > 0
+        {
+            return false;
+        }
+        self.last_sample_cycle = snapshot.cycle;
+        if self.snapshots.len() >= TREND_HISTORY_CAP {
+            self.snapshots.pop_front();
+        }
+        self.snapshots.push_back(snapshot);
+        true
+    }
+
+    /// Force-record a snapshot regardless of interval (for manual triggers).
+    pub fn record(&mut self, snapshot: QolSnapshot) {
+        self.last_sample_cycle = snapshot.cycle;
+        if self.snapshots.len() >= TREND_HISTORY_CAP {
+            self.snapshots.pop_front();
+        }
+        self.snapshots.push_back(snapshot);
+    }
+
+    /// Get all snapshots as a slice.
+    pub fn snapshots(&self) -> &VecDeque<QolSnapshot> {
+        &self.snapshots
+    }
+
+    /// Number of snapshots stored.
+    pub fn count(&self) -> usize {
+        self.snapshots.len()
+    }
+
+    /// Get all snapshots as JSON.
+    pub fn to_json(&self) -> String {
+        let v: Vec<&QolSnapshot> = self.snapshots.iter().collect();
+        serde_json::to_string(&v).unwrap_or_else(|_| "[]".to_string())
+    }
+
+    /// Compute a simple trend summary.
+    pub fn trend_summary(&self) -> TrendSummary {
+        if self.snapshots.len() < 2 {
+            return TrendSummary::default();
+        }
+        let first = self.snapshots.front().unwrap();
+        let last = self.snapshots.back().unwrap();
+        let n = self.snapshots.len() as f32;
+
+        let consciousness_delta = last.consciousness_level - first.consciousness_level;
+        let harmony_delta = last.harmony_alignment - first.harmony_alignment;
+
+        let consciousness_mean: f32 = self
+            .snapshots
+            .iter()
+            .map(|s| s.consciousness_level)
+            .sum::<f32>()
+            / n;
+        let harmony_mean: f32 = self
+            .snapshots
+            .iter()
+            .map(|s| s.harmony_alignment)
+            .sum::<f32>()
+            / n;
+
+        // Variance for stability assessment
+        let consciousness_var: f32 = self
+            .snapshots
+            .iter()
+            .map(|s| (s.consciousness_level - consciousness_mean).powi(2))
+            .sum::<f32>()
+            / n;
+
+        TrendSummary {
+            consciousness_delta,
+            harmony_delta,
+            consciousness_mean,
+            harmony_mean,
+            consciousness_stability: 1.0 - consciousness_var.sqrt().min(1.0),
+            sample_count: self.snapshots.len() as u32,
+            span_seconds: last.timestamp_secs.saturating_sub(first.timestamp_secs),
+        }
+    }
+
+    /// Serialize trend snapshots to bytes for checkpoint embedding.
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let json =
+            serde_json::to_vec(&self.snapshots.iter().collect::<Vec<_>>()).unwrap_or_default();
+        let mut buf = Vec::with_capacity(12 + json.len());
+        buf.extend_from_slice(&(json.len() as u32).to_le_bytes());
+        buf.extend_from_slice(&self.last_sample_cycle.to_le_bytes());
+        buf.extend_from_slice(&json);
+        buf
+    }
+
+    /// Deserialize trend snapshots from bytes.
+    pub fn from_bytes(data: &[u8]) -> Option<Self> {
+        if data.len() < 12 {
+            return None;
+        }
+        let json_len = u32::from_le_bytes(data[0..4].try_into().ok()?) as usize;
+        let last_sample_cycle = u64::from_le_bytes(data[4..12].try_into().ok()?);
+        if data.len() < 12 + json_len {
+            return None;
+        }
+        let snapshots: Vec<QolSnapshot> = serde_json::from_slice(&data[12..12 + json_len]).ok()?;
+        let mut deque = VecDeque::with_capacity(TREND_HISTORY_CAP);
+        for s in snapshots.into_iter().rev().take(TREND_HISTORY_CAP) {
+            deque.push_front(s);
+        }
+        Some(Self {
+            snapshots: deque,
+            last_sample_cycle,
+        })
+    }
+}
+
+impl Default for TrendHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Summary statistics for QOL trends.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TrendSummary {
+    /// Change in consciousness from first to last snapshot.
+    pub consciousness_delta: f32,
+    /// Change in harmony alignment from first to last snapshot.
+    pub harmony_delta: f32,
+    /// Mean consciousness level.
+    pub consciousness_mean: f32,
+    /// Mean harmony alignment.
+    pub harmony_mean: f32,
+    /// Stability score [0, 1] — higher means less variance.
+    pub consciousness_stability: f32,
+    /// Number of samples in the trend.
+    pub sample_count: u32,
+    /// Time span in seconds from first to last sample.
+    pub span_seconds: u64,
+}
+
+// ===========================================================================
+// Checkpoint
+// ===========================================================================
+
 /// A serializable snapshot of the Spore engine state.
 ///
 /// Contains the minimal state needed to restore the engine after restart.
@@ -115,13 +317,15 @@ pub struct SporeCheckpoint {
     pub semantic_entries: Vec<(String, Vec<u8>)>,
     /// Serialized episodic memory entries.
     pub episodic_entries: Vec<Vec<u8>>,
+    /// QOL trend history (v2+).
+    pub trend_snapshots: Vec<QolSnapshot>,
     /// Format version for forward compatibility.
     pub format_version: u32,
 }
 
 impl SporeCheckpoint {
     /// Current checkpoint format version.
-    pub const FORMAT_VERSION: u32 = 1;
+    pub const FORMAT_VERSION: u32 = 2;
 
     /// Serialize the checkpoint to bytes.
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -157,6 +361,13 @@ impl SporeCheckpoint {
         for entry in &self.episodic_entries {
             buf.extend_from_slice(&(entry.len() as u32).to_le_bytes());
             buf.extend_from_slice(entry);
+        }
+
+        // v2: QOL trend snapshots (JSON-encoded for flexibility)
+        if self.format_version >= 2 {
+            let trend_json = serde_json::to_vec(&self.trend_snapshots).unwrap_or_default();
+            buf.extend_from_slice(&(trend_json.len() as u32).to_le_bytes());
+            buf.extend_from_slice(&trend_json);
         }
 
         buf
@@ -253,12 +464,27 @@ impl SporeCheckpoint {
             pos += entry_len;
         }
 
+        // v2: QOL trend snapshots
+        let trend_snapshots = if format_version >= 2 && pos + 4 <= data.len() {
+            let trend_len = u32::from_le_bytes(data[pos..pos + 4].try_into().ok()?) as usize;
+            pos += 4;
+            if pos + trend_len <= data.len() {
+                serde_json::from_slice(&data[pos..pos + trend_len]).unwrap_or_default()
+            } else {
+                Vec::new()
+            }
+        } else {
+            Vec::new()
+        };
+        let _ = pos; // suppress unused warning
+
         Some(Self {
             cycle,
             consciousness_level,
             neuromodulators,
             semantic_entries,
             episodic_entries,
+            trend_snapshots,
             format_version,
         })
     }
@@ -303,6 +529,17 @@ mod tests {
                 ("concept2".to_string(), vec![4, 5, 6, 7]),
             ],
             episodic_entries: vec![vec![10, 20, 30], vec![40, 50]],
+            trend_snapshots: vec![QolSnapshot {
+                cycle: 40,
+                timestamp_secs: 1000,
+                consciousness_level: 0.7,
+                harmony_alignment: 0.6,
+                metacog_accuracy: 0.5,
+                allostatic_load: 0.2,
+                dream_wisdom_count: 3,
+                coherence_score: 0.8,
+                safety_level: 0,
+            }],
             format_version: SporeCheckpoint::FORMAT_VERSION,
         };
 
@@ -316,6 +553,8 @@ mod tests {
         assert_eq!(restored.semantic_entries[0].0, "concept1");
         assert_eq!(restored.semantic_entries[0].1, vec![1, 2, 3]);
         assert_eq!(restored.episodic_entries.len(), 2);
+        assert_eq!(restored.trend_snapshots.len(), 1);
+        assert!((restored.trend_snapshots[0].consciousness_level - 0.7).abs() < 1e-6);
     }
 
     #[test]
@@ -326,6 +565,7 @@ mod tests {
             neuromodulators: [0.0; 4],
             semantic_entries: vec![],
             episodic_entries: vec![],
+            trend_snapshots: vec![],
             format_version: SporeCheckpoint::FORMAT_VERSION,
         };
 
@@ -411,6 +651,7 @@ mod tests {
             neuromodulators: [0.6, 0.5, 0.7, 0.3],
             semantic_entries: vec![("test".to_string(), vec![42])],
             episodic_entries: vec![],
+            trend_snapshots: vec![],
             format_version: SporeCheckpoint::FORMAT_VERSION,
         };
 
@@ -421,5 +662,137 @@ mod tests {
         let restored = SporeCheckpoint::from_bytes(&loaded).unwrap();
         assert_eq!(restored.cycle, 100);
         assert!((restored.consciousness_level - 0.85).abs() < 1e-6);
+    }
+
+    // =====================================================================
+    // QOL Trend History tests
+    // =====================================================================
+
+    fn make_snapshot(cycle: u64, consciousness: f32) -> QolSnapshot {
+        QolSnapshot {
+            cycle,
+            timestamp_secs: 1000 + cycle,
+            consciousness_level: consciousness,
+            harmony_alignment: 0.5,
+            metacog_accuracy: 0.5,
+            allostatic_load: 0.1,
+            dream_wisdom_count: 0,
+            coherence_score: 0.8,
+            safety_level: 0,
+        }
+    }
+
+    #[test]
+    fn trend_history_respects_interval() {
+        let mut history = TrendHistory::new();
+        assert!(history.maybe_record(make_snapshot(0, 0.5)));
+        // Too soon — should be rejected
+        assert!(!history.maybe_record(make_snapshot(100, 0.6)));
+        // At interval boundary — should be accepted
+        assert!(history.maybe_record(make_snapshot(600, 0.7)));
+        assert_eq!(history.count(), 2);
+    }
+
+    #[test]
+    fn trend_history_cap_enforced() {
+        let mut history = TrendHistory::new();
+        for i in 0..TREND_HISTORY_CAP + 50 {
+            let cycle = (i as u64) * TREND_SAMPLE_INTERVAL;
+            history.maybe_record(make_snapshot(cycle, 0.5));
+        }
+        assert_eq!(history.count(), TREND_HISTORY_CAP);
+    }
+
+    #[test]
+    fn trend_history_force_record() {
+        let mut history = TrendHistory::new();
+        history.record(make_snapshot(0, 0.5));
+        history.record(make_snapshot(1, 0.6)); // Should succeed despite interval
+        assert_eq!(history.count(), 2);
+    }
+
+    #[test]
+    fn trend_summary_delta() {
+        let mut history = TrendHistory::new();
+        history.record(make_snapshot(0, 0.3));
+        history.record(make_snapshot(600, 0.7));
+        let summary = history.trend_summary();
+        assert!((summary.consciousness_delta - 0.4).abs() < 1e-6);
+        assert_eq!(summary.sample_count, 2);
+        assert_eq!(summary.span_seconds, 600);
+    }
+
+    #[test]
+    fn trend_summary_stability() {
+        let mut history = TrendHistory::new();
+        // All same consciousness = perfect stability
+        for i in 0..10 {
+            history.record(make_snapshot(i * 600, 0.5));
+        }
+        let summary = history.trend_summary();
+        assert!((summary.consciousness_stability - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn trend_history_serialization_roundtrip() {
+        let mut history = TrendHistory::new();
+        history.record(make_snapshot(0, 0.3));
+        history.record(make_snapshot(600, 0.7));
+        let bytes = history.to_bytes();
+        let restored = TrendHistory::from_bytes(&bytes).unwrap();
+        assert_eq!(restored.count(), 2);
+        assert!((restored.snapshots().back().unwrap().consciousness_level - 0.7).abs() < 1e-6);
+    }
+
+    #[test]
+    fn trend_json_roundtrip() {
+        let mut history = TrendHistory::new();
+        history.record(make_snapshot(0, 0.5));
+        let json = history.to_json();
+        assert!(json.contains("consciousness_level"));
+        assert!(json.contains("0.5"));
+    }
+
+    #[test]
+    fn v1_checkpoint_backward_compat_no_trends() {
+        // Simulate a v1 checkpoint (no trend data appended)
+        let v1_checkpoint = SporeCheckpoint {
+            cycle: 42,
+            consciousness_level: 0.5,
+            neuromodulators: [0.5; 4],
+            semantic_entries: vec![],
+            episodic_entries: vec![],
+            trend_snapshots: vec![],
+            format_version: 1, // explicitly v1
+        };
+        // Serialize as v1 (won't include trend section)
+        let bytes = v1_checkpoint.to_bytes();
+
+        // Should deserialize successfully with empty trends
+        let restored = SporeCheckpoint::from_bytes(&bytes).unwrap();
+        assert_eq!(restored.cycle, 42);
+        assert!(restored.trend_snapshots.is_empty());
+    }
+
+    #[test]
+    fn v2_checkpoint_with_trends() {
+        let trends = vec![
+            make_snapshot(100, 0.4),
+            make_snapshot(700, 0.6),
+            make_snapshot(1300, 0.8),
+        ];
+        let checkpoint = SporeCheckpoint {
+            cycle: 1300,
+            consciousness_level: 0.8,
+            neuromodulators: [0.5; 4],
+            semantic_entries: vec![],
+            episodic_entries: vec![],
+            trend_snapshots: trends,
+            format_version: SporeCheckpoint::FORMAT_VERSION,
+        };
+        let bytes = checkpoint.to_bytes();
+        let restored = SporeCheckpoint::from_bytes(&bytes).unwrap();
+        assert_eq!(restored.trend_snapshots.len(), 3);
+        assert!((restored.trend_snapshots[2].consciousness_level - 0.8).abs() < 1e-6);
     }
 }

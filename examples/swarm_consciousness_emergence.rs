@@ -185,7 +185,7 @@ async fn run_experiment(n_agents: usize, n_ticks: usize, byzantine_fraction: f64
     // Phase boundaries
     let phase1_end = n_ticks / 5; // Independent (20%)
     let phase2_end = n_ticks * 3 / 5; // Shared experience (40%)
-    let phase3_end = n_ticks; // Byzantine resilience (40%)
+    let _phase3_end = n_ticks; // Byzantine resilience (40%)
 
     for tick in 0..n_ticks as u64 {
         // Determine stimuli

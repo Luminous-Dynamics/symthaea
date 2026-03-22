@@ -50,23 +50,30 @@ pub struct EvictedMemory {
     pub metadata: std::collections::HashMap<String, String>,
 }
 
+/// A single entry in working memory, bundling content with metadata.
+/// Replaces 5 parallel arrays that previously had to stay synchronized.
+#[derive(Debug, Clone)]
+pub struct WorkingMemoryEntry {
+    /// The HDC content vector.
+    pub content: ContinuousHV,
+    /// Tick when this entry arrived in working memory.
+    pub arrival_tick: u64,
+    /// Source of this entry.
+    pub source: crate::memory::memory_coordinator::MemorySource,
+    /// Whether this entry has been verified.
+    pub is_verified: bool,
+    /// Key-value metadata.
+    pub metadata: std::collections::HashMap<String, String>,
+}
+
 /// The continuous mind system
 pub struct ContinuousMind {
     /// Configuration
     pub(crate) config: MindConfig,
     /// Current state
     pub(crate) state: MindState,
-    /// Working memory
-    pub(crate) working_memory: Vec<ContinuousHV>,
-    /// Arrival tick for each working memory item (parallel array).
-    /// Used to compute accurate `steps_survived` on eviction.
-    pub(crate) working_memory_ticks: Vec<u64>,
-    /// Source of each working memory item.
-    pub(crate) working_memory_sources: Vec<MemorySource>,
-    /// Verification status of each working memory item.
-    pub(crate) working_memory_verified: Vec<bool>,
-    /// Metadata for each working memory item.
-    pub(crate) working_memory_metadata: Vec<std::collections::HashMap<String, String>>,
+    /// Working memory (struct-of-arrays consolidated into array-of-structs).
+    pub(crate) working_memory: Vec<WorkingMemoryEntry>,
     /// Goal stack
     pub(crate) goals: Vec<Goal>,
     /// Input queue
@@ -249,10 +256,6 @@ impl ContinuousMind {
                 ..Default::default()
             },
             working_memory: Vec::new(),
-            working_memory_ticks: Vec::new(),
-            working_memory_sources: Vec::new(),
-            working_memory_verified: Vec::new(),
-            working_memory_metadata: Vec::new(),
             goals: Vec::new(),
             input_queue: Vec::new(),
             stats: MindStats::default(),
@@ -494,14 +497,22 @@ impl ContinuousMind {
         &self.stats
     }
 
-    /// Get working memory contents (7±2 items, activation-decay managed).
-    pub fn working_memory(&self) -> &[ContinuousHV] {
+    /// Get working memory entries (7±2 items, activation-decay managed).
+    pub fn working_memory(&self) -> &[WorkingMemoryEntry] {
         &self.working_memory
     }
 
-    /// Get arrival ticks for working memory items (parallel to `working_memory()`).
-    pub fn working_memory_ticks_slice(&self) -> &[u64] {
-        &self.working_memory_ticks
+    /// Get raw HDC vectors from working memory (backward-compatible).
+    pub fn working_memory_hvs(&self) -> Vec<ContinuousHV> {
+        self.working_memory
+            .iter()
+            .map(|e| e.content.clone())
+            .collect()
+    }
+
+    /// Get arrival ticks for working memory items.
+    pub fn working_memory_ticks_slice(&self) -> Vec<u64> {
+        self.working_memory.iter().map(|e| e.arrival_tick).collect()
     }
 
     /// Drain items evicted from working memory since the last call.

@@ -336,7 +336,11 @@ fn infer_rust_body(
     }
     if purpose_lower.contains("length")
         || purpose_lower.contains("len")
-        || purpose_lower.contains("count")
+        || (purpose_lower.contains("count")
+            && !purpose_lower.contains("vowel")
+            && !purpose_lower.contains("digit")
+            && !purpose_lower.contains("char")
+            && !purpose_lower.contains("word"))
     {
         if params.len() == 1 {
             return format!("{}.len()", params[0].0);
@@ -475,26 +479,26 @@ fn infer_rust_body(
             return format!("{}.binary_search(&{}).ok()", params[0].0, params[1].0);
         }
     }
-    // Sum of collection
+    // Sum of collection (Vec or slice)
     if (purpose_lower.contains("sum") || purpose_lower.contains("total"))
         && params.len() == 1
-        && params[0].1.contains("Vec")
+        && (params[0].1.contains("Vec") || params[0].1.contains("&["))
     {
         return format!("{}.iter().sum()", params[0].0);
     }
-    // Max of collection
+    // Max of collection (Vec or slice)
     if (purpose_lower.contains("max")
         || purpose_lower.contains("largest")
         || purpose_lower.contains("biggest"))
         && params.len() == 1
-        && params[0].1.contains("Vec")
+        && (params[0].1.contains("Vec") || params[0].1.contains("&["))
     {
         return format!("{}.iter().max().copied()", params[0].0);
     }
-    // Min of collection
+    // Min of collection (Vec or slice)
     if (purpose_lower.contains("min") || purpose_lower.contains("smallest"))
         && params.len() == 1
-        && params[0].1.contains("Vec")
+        && (params[0].1.contains("Vec") || params[0].1.contains("&["))
     {
         return format!("{}.iter().min().copied()", params[0].0);
     }

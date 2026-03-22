@@ -14,24 +14,13 @@ impl PsychBenchmark for SimpleQAAdapter {
     fn name(&self) -> &str {
         "External::SimpleQA"
     }
-    fn description(&self) -> &str {
-        "Simple factual QA with known ground truth. Tests HDC factual encoding."
-    }
-    fn expected_metrics(&self) -> Vec<String> {
-        vec!["accuracy".into(), "confidence_calibration".into()]
-    }
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let mut metrics = BTreeMap::new();
         // Placeholder — requires trained HDC knowledge base to be meaningful
-        metrics.insert("accuracy".into(), MetricValue::Float(0.0));
-        metrics.insert("confidence_calibration".into(), MetricValue::Float(0.0));
+        metrics.insert("accuracy".into(), MetricValue::from_samples(&[0.0]));
         metrics.insert(
-            "note".into(),
-            MetricValue::Text(
-                "Requires trained Broca model with knowledge grounding. \
-             Current evaluation uses untrained random HDC vectors."
-                    .into(),
-            ),
+            "confidence_calibration".into(),
+            MetricValue::from_samples(&[0.0]),
         );
         BenchmarkResult {
             benchmark: self.name().to_string(),
@@ -41,7 +30,12 @@ impl PsychBenchmark for SimpleQAAdapter {
             conditions: 0,
             trials_per_condition: 0,
             trial_trace: vec![],
-            notes: vec!["Placeholder — requires trained model for meaningful results".into()],
+            notes: vec![
+                "Placeholder — requires trained model for meaningful results".into(),
+                "Requires trained Broca model with knowledge grounding. \
+                 Current evaluation uses untrained random HDC vectors."
+                    .into(),
+            ],
         }
     }
 }

@@ -4393,36 +4393,59 @@ impl CognitiveLoopService {
                 semantic_hv: nsm_semantic_hv.clone(),
                 semantic_confidence: nsm_semantic_confidence,
 
-                // Epistemic Cube: derive from CLS state when facade hasn't set explicit values.
-                // E-tier from epistemic confidence, H from phi/coherence, N/M default.
-                cube_e_tier: self.carryover.quality.last_cube_e_tier.or_else(|| {
-                    let conf = self.carryover.quality.last_epistemic_confidence;
-                    Some(if conf > 0.9 {
-                        4
-                    } else if conf > 0.7 {
-                        3
-                    } else if conf > 0.4 {
-                        2
-                    } else if conf > 0.2 {
-                        1
+                // Epistemic Cube: populated every cycle in cycle_subsystems.rs
+                // from epistemic confidence, social context, knowledge grounding, and phi.
+                cube_e_tier: self.carryover.quality.last_cube_e_tier,
+                cube_n_tier: self.carryover.quality.last_cube_n_tier,
+                cube_m_tier: self.carryover.quality.last_cube_m_tier,
+                cube_h_value: self.carryover.quality.last_cube_h_value,
+                cube_quality: self.carryover.quality.last_cube_quality,
+
+                // Compute HDC encoding of the epistemic cube via NSM grounding.
+                // This semantically encodes the cube position so the thought HV
+                // carries *what kind of knowledge this is*, not just scalar metadata.
+                epistemic_cube_hv: {
+                    if let (Some(e), Some(n), Some(m)) = (
+                        self.carryover.quality.last_cube_e_tier,
+                        self.carryover.quality.last_cube_n_tier,
+                        self.carryover.quality.last_cube_m_tier,
+                    ) {
+                        use crate::consciousness::epistemic_tiers::{
+                            EmpiricalTier, EpistemicCoordinate, EpistemicNSMGrounding,
+                            MaterialityTier, NormativeTier,
+                        };
+                        let empirical = match e {
+                            0 => EmpiricalTier::E0Null,
+                            1 => EmpiricalTier::E1Testimonial,
+                            2 => EmpiricalTier::E2PrivatelyVerifiable,
+                            3 => EmpiricalTier::E3CryptographicallyProven,
+                            _ => EmpiricalTier::E4PubliclyReproducible,
+                        };
+                        let normative = match n {
+                            0 => NormativeTier::N0Personal,
+                            1 => NormativeTier::N1Communal,
+                            2 => NormativeTier::N2Network,
+                            _ => NormativeTier::N3Axiomatic,
+                        };
+                        let materiality = match m {
+                            0 => MaterialityTier::M0Ephemeral,
+                            1 => MaterialityTier::M1Temporal,
+                            2 => MaterialityTier::M2Persistent,
+                            _ => MaterialityTier::M3Foundational,
+                        };
+                        let coord = EpistemicCoordinate {
+                            empirical,
+                            normative,
+                            materiality,
+                        };
+                        let system =
+                            symthaea_core::hdc::primitive_system::PrimitiveSystem::global();
+                        let grounding = EpistemicNSMGrounding::new(&system);
+                        let binary_hv = grounding.encode_coordinate(&coord);
+                        Some(binary_hv.to_continuous())
                     } else {
-                        0
-                    })
-                }),
-                cube_n_tier: self.carryover.quality.last_cube_n_tier.or(Some(0)), // N0 personal
-                cube_m_tier: self.carryover.quality.last_cube_m_tier.or(Some(1)), // M1 temporal
-                cube_h_value: if self.carryover.quality.last_cube_h_value > 0.01 {
-                    self.carryover.quality.last_cube_h_value
-                } else {
-                    // Derive from phi + coherence
-                    (broca_psi + coherence).clamp(0.0, 2.0) / 2.0
-                },
-                cube_quality: if self.carryover.quality.last_cube_quality > 0.01 {
-                    self.carryover.quality.last_cube_quality
-                } else {
-                    // Derive: E×0.4 + N×0.35 + M×0.25 with defaults
-                    let e = self.carryover.quality.last_epistemic_confidence;
-                    (e * 0.40) + (0.0 / 3.0) * 0.35 + (1.0 / 3.0) * 0.25
+                        None
+                    }
                 },
             };
             if let Some(mut result) = broca.generate(signals) {

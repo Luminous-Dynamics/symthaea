@@ -125,6 +125,10 @@ pub struct BrocaCheckpoint {
     /// regardless of enabled features. Bincode can't round-trip `serde_json::Value` (untagged enum).
     #[serde(default)]
     pub liquid_mamba_config: Option<String>,
+    /// Learned logit projection head weights: [projection_dim × HDC_DIMENSION], row-major.
+    /// Projects CfC output to lower-dimensional space for improved token discrimination.
+    #[serde(default)]
+    pub logit_projection_weights: Option<Vec<f32>>,
     /// Blake3 integrity checksum (set to zeros before hashing).
     pub checksum: [u8; 32],
 }
@@ -144,6 +148,7 @@ impl BrocaCheckpoint {
             adam_state: self.adam_state.clone(),
             projection_weights: self.projection_weights.clone(),
             liquid_mamba_config: self.liquid_mamba_config.clone(),
+            logit_projection_weights: self.logit_projection_weights.clone(),
             checksum: [0u8; 32],
         };
 
@@ -283,6 +288,7 @@ impl BrocaGenerator {
             adam_state,
             projection_weights,
             liquid_mamba_config,
+            logit_projection_weights: self.controller().projection_weights().map(|w| w.to_vec()),
             checksum: [0u8; 32],
         };
 
@@ -315,6 +321,16 @@ impl BrocaGenerator {
         *gen.controller_mut().token_embeddings_mut() = checkpoint.token_embeddings;
         // Restore network state (weights, momentums, etc.)
         *gen.controller_mut().network_mut() = checkpoint.network_state;
+
+        // Restore logit projection head weights if present.
+        // The config (from checkpoint) has projection_dim set, so the controller
+        // was already initialized with random projection weights — overwrite them.
+        if let Some(proj_weights) = checkpoint.logit_projection_weights {
+            if let Some(w) = gen.controller_mut().projection_weights_mut() {
+                *w = proj_weights;
+                gen.controller_mut().refresh_projected_embeddings();
+            }
+        }
 
         Ok((
             gen,

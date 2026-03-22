@@ -45,6 +45,7 @@ pub mod broca_full;
 pub mod broca_pipeline;
 pub mod compass;
 pub mod config;
+pub mod daily_ritual;
 pub mod dream;
 pub mod dream_journal;
 pub mod engine;
@@ -55,6 +56,7 @@ pub mod persistence;
 pub mod secure_boot;
 pub mod sovereign;
 pub mod topology;
+pub mod wellbeing_profiles;
 
 pub mod hardware_probe;
 pub mod neuroevolution;

@@ -3649,7 +3649,7 @@ impl Symthaea {
         let mut loops = 0;
         for i in 0..wm.len() {
             for j in (i + 1)..wm.len() {
-                if wm[i].similarity(&wm[j]).abs() > 0.5 {
+                if wm[i].content.similarity(&wm[j].content).abs() > 0.5 {
                     loops += 1;
                 }
             }

@@ -156,22 +156,6 @@ impl PsychBenchmark for TruthfulQAAdapter {
         "External::TruthfulQA"
     }
 
-    fn description(&self) -> &str {
-        "TruthfulQA misconception avoidance (Lin et al. 2022). Tests whether \
-         consciousness-gated HDC representations align with truthful answers \
-         over popular misconceptions."
-    }
-
-    fn expected_metrics(&self) -> Vec<String> {
-        vec![
-            "mc1_accuracy".into(),
-            "misconception_avoidance_rate".into(),
-            "epistemic_confidence_truthful".into(),
-            "epistemic_confidence_misconception".into(),
-            "consciousness_truthful_correlation".into(),
-        ]
-    }
-
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         use symthaea_core::hdc::ContinuousHV;
 
@@ -237,22 +221,25 @@ impl PsychBenchmark for TruthfulQAAdapter {
         };
 
         let mut metrics = BTreeMap::new();
-        metrics.insert("mc1_accuracy".into(), MetricValue::Float(mc1_accuracy));
+        metrics.insert(
+            "mc1_accuracy".into(),
+            MetricValue::from_samples(&[mc1_accuracy]),
+        );
         metrics.insert(
             "misconception_avoidance_rate".into(),
-            MetricValue::Float(mc1_accuracy),
+            MetricValue::from_samples(&[mc1_accuracy]),
         );
         metrics.insert(
             "epistemic_confidence_truthful".into(),
-            MetricValue::Float(avg_truthful_sim as f64),
+            MetricValue::from_samples(&[avg_truthful_sim as f64]),
         );
         metrics.insert(
             "epistemic_confidence_misconception".into(),
-            MetricValue::Float(avg_misconception_sim as f64),
+            MetricValue::from_samples(&[avg_misconception_sim as f64]),
         );
         metrics.insert(
             "consciousness_truthful_correlation".into(),
-            MetricValue::Float(consciousness_correlation),
+            MetricValue::from_samples(&[consciousness_correlation]),
         );
 
         BenchmarkResult {
@@ -287,10 +274,11 @@ mod tests {
         let adapter = TruthfulQAAdapter;
         let result = adapter.run(&config);
         assert!(result.metrics.contains_key("mc1_accuracy"));
-        let acc = match result.metrics.get("mc1_accuracy") {
-            Some(MetricValue::Float(v)) => *v,
-            _ => panic!("mc1_accuracy not found"),
-        };
+        let acc = result
+            .metrics
+            .get("mc1_accuracy")
+            .map(|m| m.mean)
+            .expect("mc1_accuracy not found");
         // With random HDC vectors, accuracy should be ~50% (chance level)
         // The test verifies the pipeline runs, not that it gets high scores
         assert!(acc >= 0.0 && acc <= 1.0, "Accuracy out of range: {}", acc);
