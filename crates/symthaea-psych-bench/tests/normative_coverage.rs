@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Integration test: verify normative comparison produces scores for all
 //! benchmarks that have matching baselines.
 //!
@@ -85,9 +82,6 @@ fn test_normative_coverage() {
         // Creativity
         Box::new(AlternateUsesBenchmark),
         Box::new(RemoteAssociatesBenchmark),
-        Box::new(DivergentThinkingBenchmark),
-        Box::new(ConceptualBlendingBenchmark),
-        Box::new(InsightProblemBenchmark),
         // Butlin
         Box::new(ButlinIndicatorSuite),
         // Inhibition
@@ -125,6 +119,10 @@ fn test_normative_coverage() {
         Box::new(RmeBenchmark),
         Box::new(UltimatumGameBenchmark),
         Box::new(SocialNormBenchmark),
+        // Coding
+        Box::new(HumanEvalMiniBenchmark),
+        Box::new(BugDetectionBenchmark),
+        Box::new(AlgorithmRecognitionBenchmark),
         // Neuromod
         Box::new(PharmacologicalChallengeBenchmark),
         Box::new(InjectionChallengeBenchmark),
@@ -136,9 +134,6 @@ fn test_normative_coverage() {
         Box::new(PharmacologicalAblationBenchmark),
         Box::new(BehavioralKnockoutBenchmark),
         Box::new(ConsciousnessPharmacologyBenchmark),
-        // Coding
-        Box::new(HumanEvalMiniBenchmark),
-        Box::new(BugDetectionBenchmark),
     ];
 
     // Build a full report from all benchmarks
@@ -188,6 +183,10 @@ fn test_normative_coverage() {
         "Reasoning::ArcRSA",
         "Reasoning::ArcScaling",
         "Reasoning::ArcStaircase",
+        // Coding
+        "Coding::HumanEvalMini",
+        "Coding::BugDetection",
+        "Coding::AlgorithmRecognition",
         // Neuromod
         "Neuromod::PharmacologicalChallenge",
         "Neuromod::InjectionChallenge",

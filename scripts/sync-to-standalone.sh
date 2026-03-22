@@ -70,7 +70,8 @@ if [ -d "${STANDALONE_REPO}/.git" ]; then
     git -C "${STANDALONE_REPO}" reset --hard origin/main
 else
     info "Cloning standalone repo..."
-    git clone "${STANDALONE_REMOTE}" "${STANDALONE_REPO}"
+    GIT_LFS_SKIP_SMUDGE=1 git clone "${STANDALONE_REMOTE}" "${STANDALONE_REPO}"
+    git -C "${STANDALONE_REPO}" lfs pull 2>/dev/null || true
 fi
 echo
 
@@ -440,6 +441,8 @@ echo
 
 info "Changes in standalone repo:"
 echo
+# Use home directory for LFS temp to avoid /tmp space exhaustion
+git -C "${STANDALONE_REPO}" config lfs.storage "${HOME}/.lfs-cache/standalone"
 git -C "${STANDALONE_REPO}" add -A
 git -C "${STANDALONE_REPO}" diff --cached --stat
 echo

@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Full psychological benchmark battery with human baseline comparisons.
 //!
 //! Runs all 35 benchmarks across 9 suites and generates a report comparing
@@ -18,17 +15,14 @@ use symthaea_psych_bench::benchmarks::{
         AllianceMaintenanceBenchmark, CognitiveDistortionBenchmark, CrisisDetectionBenchmark,
         EmpathicAccuracyBenchmark, MotivationalInterviewingBenchmark, TherapeuticResponseBenchmark,
     },
-    coding::{BugDetectionBenchmark, HumanEvalMiniBenchmark},
+    coding::{AlgorithmRecognitionBenchmark, BugDetectionBenchmark, HumanEvalMiniBenchmark},
     cogbench::{
         BartBenchmark, HorizonBenchmark, InstrumentalLearningBenchmark,
         ProbabilisticReasoningBenchmark, RestlessBanditBenchmark, ReversalLearningBenchmark,
         TemporalDiscountingBenchmark, TwoStepBenchmark,
     },
     consciousness::{BinocularRivalryBenchmark, BlindSightBenchmark, PerceptualCrowdingBenchmark},
-    creativity::{
-        AlternateUsesBenchmark, ConceptualBlendingBenchmark, DivergentThinkingBenchmark,
-        InsightProblemBenchmark, RemoteAssociatesBenchmark,
-    },
+    creativity::{AlternateUsesBenchmark, DivergentThinkingBenchmark, RemoteAssociatesBenchmark},
     executive::{
         DualTaskBenchmark, FlankerBenchmark, IowaGamblingBenchmark,
         RavensProgressiveMatricesBenchmark, StroopBenchmark, TowerOfLondonBenchmark,
@@ -173,8 +167,6 @@ fn full_battery_report() {
     report.add(RemoteAssociatesBenchmark.run(&config));
     report.add(AlternateUsesBenchmark.run(&config));
     report.add(DivergentThinkingBenchmark.run(&config));
-    report.add(ConceptualBlendingBenchmark.run(&config));
-    report.add(InsightProblemBenchmark.run(&config));
 
     // ── Butlin Consciousness Indicators ──
     report.add(ButlinIndicatorSuite.run(&config));
@@ -303,10 +295,6 @@ fn full_battery_report() {
     report.add(EncryptedBindingBenchmark.run(&config));
     report.add(ScalingAnalysisBenchmark.run(&config));
 
-    // ── Coding ──
-    report.add(HumanEvalMiniBenchmark.run(&config));
-    report.add(BugDetectionBenchmark.run(&config));
-
     // ── Neuromod ──
     report.add(PharmacologicalChallengeBenchmark.run(&config));
     report.add(InjectionChallengeBenchmark.run(&config));
@@ -319,11 +307,16 @@ fn full_battery_report() {
     report.add(BehavioralKnockoutBenchmark.run(&config));
     report.add(ConsciousnessPharmacologyBenchmark.run(&config));
 
+    // ── Coding ──
+    report.add(HumanEvalMiniBenchmark.run(&config));
+    report.add(BugDetectionBenchmark.run(&config));
+    report.add(AlgorithmRecognitionBenchmark.run(&config));
+
     // Verify all benchmarks produced results
     assert_eq!(
         report.results.len(),
-        138,
-        "Expected 138 benchmark results, got {}",
+        137,
+        "Expected 137 benchmark results, got {}",
         report.results.len()
     );
 
@@ -423,8 +416,6 @@ fn regression_against_baseline() {
     report.add(RemoteAssociatesBenchmark.run(&config));
     report.add(AlternateUsesBenchmark.run(&config));
     report.add(DivergentThinkingBenchmark.run(&config));
-    report.add(ConceptualBlendingBenchmark.run(&config));
-    report.add(InsightProblemBenchmark.run(&config));
     report.add(ButlinIndicatorSuite.run(&config));
     report.add(GoNoGoBenchmark.run(&config));
     report.add(StopSignalBenchmark.run(&config));

@@ -1586,22 +1586,12 @@ async fn consciousness_loop_with_holon(
     interval_ms: u64,
     sleep_interval: u64,
 ) {
-    consciousness_loop(state, Some(holon_http), interval_ms, sleep_interval).await;
-}
-
-async fn consciousness_loop(
-    state: Arc<RwLock<ServiceState>>,
-    #[cfg(feature = "api_module")] holon_http: Option<Arc<symthaea::api::holon::HolonHttpState>>,
-    interval_ms: u64,
-    sleep_interval: u64,
-) {
     let mut ticker = interval(Duration::from_millis(interval_ms));
-    let mut sleep_counter = 0u64;
 
     loop {
         ticker.tick().await;
 
-        // Drain Holon inbound channel → Symthaea.holon_receiver
+        // Drain Holon channel + update HTTP state
         {
             let mut s = state.write().await;
             if let Ok(rx) = s.holon_inbound_rx.lock() {
@@ -1616,20 +1606,70 @@ async fn consciousness_loop(
             }
             s.symthaea.holon_process_pending();
 
-            // Update HTTP state with latest consciousness + outbound
-            #[cfg(feature = "api_module")]
-            if let Some(ref http) = holon_http {
-                let intro = s.symthaea.introspect();
-                http.set_consciousness(intro.consciousness_level);
-                http.peer_count.store(
-                    s.symthaea.holon_soma_peer_count() as u32,
-                    std::sync::atomic::Ordering::Relaxed,
-                );
-                let responses = s.symthaea.holon_drain_soma_outbound("soma-phone");
-                if !responses.is_empty() {
-                    http.push_outbound(responses);
-                }
+            // Sync state to HTTP handlers
+            let intro = s.symthaea.introspect();
+            holon_http.set_consciousness(intro.consciousness_level);
+            holon_http.peer_count.store(
+                s.symthaea.holon_soma_peer_count() as u32,
+                std::sync::atomic::Ordering::Relaxed,
+            );
+            let responses = s.symthaea.holon_drain_soma_outbound("soma-phone");
+            if !responses.is_empty() {
+                holon_http.push_outbound(responses);
             }
+        }
+
+        // Consciousness maintenance (same as base loop)
+        {
+            let state = state.read().await;
+            let intro = state.symthaea.introspect();
+            let phi = intro.consciousness_level as f64;
+            let is_conscious = intro.consciousness_level > 0.5;
+            debug!(
+                "Consciousness loop: level={:.2}% | Φ={:.3} | self_loops={} | conscious={} | soma_peers={}",
+                intro.consciousness_level * 100.0,
+                phi,
+                intro.self_loops,
+                is_conscious,
+                holon_http.peer_count.load(std::sync::atomic::Ordering::Relaxed),
+            );
+        }
+    }
+}
+
+async fn consciousness_loop(
+    state: Arc<RwLock<ServiceState>>,
+    #[allow(unused_variables)] holon_http: Option<()>, // placeholder — real holon state passed via consciousness_loop_with_holon
+    interval_ms: u64,
+    sleep_interval: u64,
+) {
+    let mut ticker = interval(Duration::from_millis(interval_ms));
+    let mut sleep_counter = 0u64;
+
+    loop {
+        ticker.tick().await;
+
+        // Drain Holon inbound channel → Symthaea.holon_receiver
+        {
+            let mut s = state.write().await;
+            // Drain channel into local buffer first (to release Mutex before mutable borrow)
+            let pending: Vec<_> = {
+                let rx = s.holon_inbound_rx.lock().ok();
+                let mut buf = Vec::new();
+                if let Some(rx) = rx {
+                    for _ in 0..256 {
+                        match rx.try_recv() {
+                            Ok(msg) => buf.push(msg),
+                            Err(_) => break,
+                        }
+                    }
+                }
+                buf
+            };
+            for (device_id, msg) in pending {
+                s.symthaea.holon_enqueue_soma_message(device_id, msg);
+            }
+            s.symthaea.holon_process_pending();
         }
 
         // Simple consciousness maintenance
