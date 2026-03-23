@@ -937,8 +937,11 @@ pub fn train_with_adam(
     let mut gpu_trainer: Option<crate::gpu_cfc::GpuTrainer> = if config.use_gpu_cfc {
         let device = crate::gpu_cfc::detect_device();
         let max_pos = config.bptt_window + 4; // headroom for position cache
-        match crate::gpu_cfc::GpuTrainer::from_controller(generator.controller(), &device, max_pos)
-        {
+        match crate::gpu_cfc::GpuTrainer::from_controller(
+            generator.controller(),
+            &device,
+            max_pos,
+        ) {
             Ok(trainer) => Some(trainer),
             Err(e) => {
                 tracing::warn!("GpuTrainer creation failed: {e}, using CPU training");
@@ -1042,7 +1045,7 @@ pub fn train_with_adam(
         }
         for (pair_idx, &dataset_idx) in curriculum_order.iter().enumerate() {
             if pair_idx % 200 == 0 {
-                let running_loss = if total_tokens > 0 {
+                let _running_loss = if total_tokens > 0 {
                     total_loss / total_tokens as f32
                 } else {
                     0.0
@@ -1134,9 +1137,7 @@ pub fn train_with_adam(
 
                         // Loss computation (CPU — cheap)
                         let loss = cross_entropy_loss_smooth(
-                            &logits,
-                            target_id as usize,
-                            config.label_smoothing,
+                            &logits, target_id as usize, config.label_smoothing,
                         );
                         total_loss += loss;
                         total_tokens += 1;
@@ -1185,9 +1186,7 @@ pub fn train_with_adam(
                 match result {
                     Ok(()) => true,
                     Err(e) => {
-                        tracing::warn!(
-                            "GPU training failed: {e}, falling back to CPU for this pair"
-                        );
+                        tracing::warn!("GPU training failed: {e}, falling back to CPU for this pair");
                         false
                     }
                 }
@@ -1341,7 +1340,10 @@ pub fn train_with_adam(
                         let n_embs = proj_embs.len().min(logits.len());
                         let scale = generator.controller().config().logit_scale;
 
-                        let max_logit = logits.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+                        let max_logit = logits
+                            .iter()
+                            .copied()
+                            .fold(f32::NEG_INFINITY, f32::max);
                         let exps: Vec<f32> =
                             logits.iter().map(|&l| (l - max_logit).exp()).collect();
                         let sum_exp: f32 = exps.iter().sum();
@@ -1380,8 +1382,7 @@ pub fn train_with_adam(
                                     }
                                     let row_start = r * dim;
                                     let update = -proj_lr * dp;
-                                    let update =
-                                        update.clamp(-effective_grad_clip, effective_grad_clip);
+                                    let update = update.clamp(-effective_grad_clip, effective_grad_clip);
                                     for j in 0..dim {
                                         w[row_start + j] += update * output_slice[j];
                                     }
@@ -1834,11 +1835,7 @@ fn compute_ce_gradient_wrt_output(
             if error.abs() < 1e-6 {
                 continue;
             }
-            let cos_i = if scale.abs() > 1e-6 {
-                logits[i] / scale
-            } else {
-                0.0
-            };
+            let cos_i = if scale.abs() > 1e-6 { logits[i] / scale } else { 0.0 };
             let scaled_error = scale * error;
             for (j, &pe) in proj_embs[i].iter().enumerate() {
                 d_proj[j] += scaled_error * (pe - cos_i * proj_output[j]);
@@ -1872,9 +1869,9 @@ fn compute_ce_gradient_wrt_output(
     //   cos[i] = logits[i] / scale
     // candle-core is always available (non-optional dep)
     if let Some(cache) = controller.gpu_embedding_cache() {
-        if let Ok(grad) =
-            compute_ce_gradient_gpu(&exps, sum_exp, target, scale, logits, controller, cache)
-        {
+        if let Ok(grad) = compute_ce_gradient_gpu(
+            &exps, sum_exp, target, scale, logits, controller, cache,
+        ) {
             return grad;
         }
         // Fall through to CPU on error
@@ -1909,11 +1906,7 @@ fn compute_ce_gradient_cpu(
         }
         let emb_vals = embeddings[i].as_slice();
         let emb_norm: f32 = emb_vals.iter().map(|v| v * v).sum::<f32>().sqrt().max(1e-8);
-        let cos_i = if scale.abs() > 1e-6 {
-            logits[i] / scale
-        } else {
-            0.0
-        };
+        let cos_i = if scale.abs() > 1e-6 { logits[i] / scale } else { 0.0 };
         let scaled_error = scale * error;
         for (j, &ev) in emb_vals.iter().enumerate() {
             if j < d_output.len() {
@@ -1965,19 +1958,18 @@ fn compute_ce_gradient_gpu(
     // Compute scalar: Σ(error_i × cos_i) for output-projection term
     let cos_sum: f32 = (0..n)
         .map(|i| {
-            let cos_i = if scale.abs() > 1e-6 {
-                logits[i] / scale
-            } else {
-                0.0
-            };
+            let cos_i = if scale.abs() > 1e-6 { logits[i] / scale } else { 0.0 };
             errors[i] * cos_i
         })
         .sum();
 
     // d_output = grad_from_emb - cos_sum × output
     let output_hv = controller.output_hv();
-    let output_tensor =
-        Tensor::from_vec(output_hv.as_slice().to_vec(), (1, HDC_DIMENSION), device)?;
+    let output_tensor = Tensor::from_vec(
+        output_hv.as_slice().to_vec(),
+        (1, HDC_DIMENSION),
+        device,
+    )?;
     let cos_sum_tensor = Tensor::from_vec(vec![cos_sum], (1, 1), device)?;
     let output_term = output_tensor.broadcast_mul(&cos_sum_tensor)?;
     let d_output_tensor = (grad_from_emb - output_term)?;
