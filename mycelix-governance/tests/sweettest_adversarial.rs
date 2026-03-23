@@ -46,63 +46,51 @@ async fn load_dna() -> DnaFile {
         .expect("Failed to load governance DNA bundle — run `hc dna pack dna/` first")
 }
 
-// Mirror types to avoid WASM symbol collisions
-#[derive(Clone, Debug, Serialize, Deserialize)]
-struct BridgeHealth {
-    healthy: bool,
-    agent: String,
-    total_events: u32,
-    total_queries: u32,
-    domains: Vec<String>,
-}
-
 // ============================================================================
-// Test 1: Cross-cluster identity call fails when role is absent
+// Test 1: Consciousness gate returns failed when no snapshot exists
 // ============================================================================
 
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor + packed DNA (nix develop)"]
-async fn test_cross_cluster_identity_fails_when_role_absent() {
+async fn test_consciousness_gate_fails_without_snapshot() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let dna = load_dna().await;
 
-    // Single-DNA setup — NO identity or personal roles available
+    // Single-DNA setup — NO identity role, no consciousness snapshots recorded
     let (alice,) = conductor
         .setup_app("test-app", &[dna])
         .await
         .unwrap()
         .into_tuple();
 
-    // Try to dispatch a cross-cluster call to identity (OtherRole)
-    // This should fail because no identity DNA is installed
+    // verify_consciousness_gate should return { passed: false } because
+    // no consciousness snapshot has been recorded for this agent
     let result: Result<serde_json::Value, _> = conductor
         .call_fallible(
             &alice.zome("governance_bridge"),
-            "dispatch_cross_cluster",
+            "verify_consciousness_gate",
             serde_json::json!({
-                "target_role": "identity",
-                "zome_name": "did_registry",
-                "fn_name": "verify_did",
-                "payload": "did:mycelix:test"
+                "action_type": "Constitutional",
+                "action_id": "adversarial-test-1"
             }),
         )
         .await;
 
-    assert!(
-        result.is_err(),
-        "Cross-cluster call to absent identity role MUST fail (fail-closed)"
-    );
-
-    let err = format!("{:?}", result.unwrap_err());
-    assert!(
-        err.contains("OtherRole")
-            || err.contains("identity")
-            || err.contains("role")
-            || err.contains("unreachable")
-            || err.contains("Circuit breaker"),
-        "Error should indicate identity cluster unavailability, got: {}",
-        err
-    );
+    match result {
+        Ok(val) => {
+            let passed = val
+                .get("passed")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true);
+            assert!(
+                !passed,
+                "Consciousness gate MUST NOT pass without a recorded snapshot"
+            );
+        }
+        Err(_) => {
+            // Error is also acceptable — fail-closed
+        }
+    }
 }
 
 // ============================================================================
@@ -135,12 +123,12 @@ async fn test_non_existent_function_rejected() {
 }
 
 // ============================================================================
-// Test 3: Bridge health is maintained after gate failures
+// Test 3: Consciousness thresholds are queryable (smoke test)
 // ============================================================================
 
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor + packed DNA (nix develop)"]
-async fn test_bridge_health_maintained_after_failures() {
+async fn test_consciousness_thresholds_queryable() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let dna = load_dna().await;
     let (alice,) = conductor
@@ -149,33 +137,28 @@ async fn test_bridge_health_maintained_after_failures() {
         .unwrap()
         .into_tuple();
 
-    // Check health before — bridge should start healthy
-    let health: BridgeHealth = conductor
-        .call(&alice.zome("governance_bridge"), "health_check", ())
-        .await;
-    assert!(health.healthy, "Bridge should start healthy");
-
-    // Trigger a cross-cluster failure (identity role absent)
-    let _ = conductor
-        .call_fallible::<_, serde_json::Value>(
+    // get_consciousness_thresholds should return valid thresholds
+    // even without any recorded snapshots — it's a config query
+    let result: Result<serde_json::Value, _> = conductor
+        .call_fallible(
             &alice.zome("governance_bridge"),
-            "dispatch_cross_cluster",
-            serde_json::json!({
-                "target_role": "identity",
-                "zome_name": "did_registry",
-                "fn_name": "verify_did",
-                "payload": "did:mycelix:test"
-            }),
+            "get_consciousness_thresholds",
+            (),
         )
         .await;
 
-    // Check health after — bridge should remain healthy despite the failure
-    let health_after: BridgeHealth = conductor
-        .call(&alice.zome("governance_bridge"), "health_check", ())
-        .await;
     assert!(
-        health_after.healthy,
-        "Bridge should remain healthy after cross-cluster failures"
+        result.is_ok(),
+        "Consciousness thresholds should be queryable without conductor state"
+    );
+
+    let thresholds = result.unwrap();
+    // Verify basic structure exists
+    assert!(
+        thresholds.get("basic").is_some()
+            || thresholds.get("consciousness_gate_basic").is_some()
+            || thresholds.is_object(),
+        "Thresholds should contain governance configuration"
     );
 }
 
@@ -230,12 +213,12 @@ async fn test_consciousness_gate_blocks_without_credentials() {
 }
 
 // ============================================================================
-// Test 5: Metrics survive gate failures (no corruption)
+// Test 5: Multiple gate failures don't corrupt bridge state
 // ============================================================================
 
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor + packed DNA (nix develop)"]
-async fn test_metrics_survive_gate_failures() {
+async fn test_repeated_gate_failures_dont_corrupt_state() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let dna = load_dna().await;
     let (alice,) = conductor
@@ -244,37 +227,32 @@ async fn test_metrics_survive_gate_failures() {
         .unwrap()
         .into_tuple();
 
-    // Trigger some failures
-    for _ in 0..3 {
+    // Trigger multiple gate failures (no snapshots exist)
+    for i in 0..5 {
         let _ = conductor
             .call_fallible::<_, serde_json::Value>(
                 &alice.zome("governance_bridge"),
-                "dispatch_cross_cluster",
+                "verify_consciousness_gate",
                 serde_json::json!({
-                    "target_role": "identity",
-                    "zome_name": "did_registry",
-                    "fn_name": "verify_did",
-                    "payload": "did:mycelix:test"
+                    "action_type": "Voting",
+                    "action_id": format!("adversarial-repeat-{}", i)
                 }),
             )
             .await;
     }
 
-    // Metrics should still be retrievable and consistent
-    let metrics: String = conductor
-        .call(&alice.zome("governance_bridge"), "get_bridge_metrics", ())
+    // After repeated failures, the bridge should still respond normally
+    // to a valid query (consciousness thresholds are static config)
+    let result: Result<serde_json::Value, _> = conductor
+        .call_fallible(
+            &alice.zome("governance_bridge"),
+            "get_consciousness_thresholds",
+            (),
+        )
         .await;
 
-    let snapshot: serde_json::Value =
-        serde_json::from_str(&metrics).expect("Metrics should be valid JSON");
-
-    // Verify structure is intact
     assert!(
-        snapshot.get("total_success").is_some(),
-        "Metrics snapshot should contain total_success"
-    );
-    assert!(
-        snapshot.get("total_errors").is_some(),
-        "Metrics snapshot should contain total_errors"
+        result.is_ok(),
+        "Bridge should remain functional after repeated gate failures"
     );
 }

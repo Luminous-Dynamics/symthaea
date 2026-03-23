@@ -217,11 +217,8 @@ impl SelfSchema {
         let old_prototype = self.self_prototype.clone();
 
         // Bundle all fact encodings into a new prototype
-        let mut bundled = self.facts[0].encoding.clone();
-        for fact in self.facts.iter().skip(1) {
-            bundled = bundled.bundle(&fact.encoding);
-        }
-        self.self_prototype = bundled;
+        let encodings: Vec<BinaryHV> = self.facts.iter().map(|f| f.encoding.clone()).collect();
+        self.self_prototype = BinaryHV::bundle(&encodings);
 
         // Compute narrative coherence: similarity between old and new prototype
         let sim = old_prototype.similarity(&self.self_prototype);
