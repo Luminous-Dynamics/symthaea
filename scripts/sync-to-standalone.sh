@@ -390,6 +390,17 @@ if $SUBCRATE_ISSUES; then
 else
     ok "All sub-crate Cargo.tomls OK"
 fi
+
+# --- Ensure broca defaults don't include GPU (requires nvcc/CUDA) -----------
+BROCA_TOML="${STANDALONE_REPO}/crates/symthaea-broca/Cargo.toml"
+if [ -f "$BROCA_TOML" ] && grep -q '^default.*"gpu"' "$BROCA_TOML"; then
+    sed -i 's/^default = \["\(.*\)", "gpu"\]/default = ["\1"]/' "$BROCA_TOML"
+    sed -i 's/^default = \["gpu", \(.*\)\]/default = [\1]/' "$BROCA_TOML"
+    # Handle middle position
+    sed -i 's/, "gpu"//' "$BROCA_TOML"
+    ok "Removed 'gpu' from symthaea-broca defaults (CUDA not available in CI)"
+fi
+
 echo
 
 # --- Post-sync cargo check ---------------------------------------------------

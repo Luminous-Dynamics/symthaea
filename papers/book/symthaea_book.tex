@@ -33,6 +33,10 @@
 \usepackage{caption}
 \usepackage{subcaption}
 
+% ── TikZ ──────────────────────────────────────────────────────────────────
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,calc,decorations.pathreplacing}
+
 % ── Algorithms ─────────────────────────────────────────────────────────────
 \usepackage{algorithm}
 \usepackage{algorithmic}
@@ -278,6 +282,43 @@ where $q(s)$ is the approximate posterior over hidden states, $p(o, s)$ is the g
   \item \textbf{Output}: Motor command derivation, safety enforcement, telemetry export.
 \end{enumerate}
 
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  phase/.style={draw, rounded corners=3pt, minimum width=2.1cm, minimum height=0.7cm, font=\small\sffamily, thick},
+  arrow/.style={-{Stealth[length=5pt]}, thick},
+  every node/.style={align=center}
+]
+% Phase boxes in circular layout
+\node[phase, fill=blue!15]   (P1) at (0,0)     {Perception};
+\node[phase, fill=blue!15]   (P2) at (2.8,0)   {Dynamics};
+\node[phase, fill=green!15]  (P3) at (5.6,0)   {Integration};
+\node[phase, fill=green!15]  (P4) at (8.4,0)   {Feedback};
+\node[phase, fill=orange!15] (P5) at (0,-1.5)   {Cognition};
+\node[phase, fill=orange!15] (P6) at (2.8,-1.5) {Ethics};
+\node[phase, fill=red!10]    (P7) at (5.6,-1.5) {Language};
+\node[phase, fill=red!10]    (P8) at (8.4,-1.5) {Output};
+
+% Flow arrows
+\draw[arrow] (P1) -- (P2);
+\draw[arrow] (P2) -- (P3);
+\draw[arrow] (P3) -- (P4);
+\draw[arrow] (P4) -- (P4 |- P5.north) -- (P5.north);
+\draw[arrow] (P5) -- (P6);
+\draw[arrow] (P6) -- (P7);
+\draw[arrow] (P7) -- (P8);
+\draw[arrow, dashed] (P8.south) -- ++(0,-0.4) -| (P1.south) node[midway, below, font=\scriptsize] {$\sim$33\,ms cycle};
+
+% Annotations
+\node[font=\scriptsize, text=blue!60] at (1.4,0.5) {HDC encode};
+\node[font=\scriptsize, text=blue!60] at (4.2,0.5) {CfC evolve};
+\node[font=\scriptsize, text=green!50!black] at (7.0,0.5) {$\Phi$ compute};
+\node[font=\scriptsize, text=green!50!black] at (9.8,0.5) {Neuromod};
+\end{tikzpicture}
+\caption{The 8-phase cognitive loop operating at $\sim$31~Hz. Blue: perception/dynamics; Green: consciousness measurement; Orange: cognition/ethics; Red: output. The dashed arrow represents the $\sim$33~ms cycle feedback.}
+\label{fig:cognitive-loop}
+\end{figure}
+
 Over twenty manager subsystems operate at co-prime intervals to avoid temporal aliasing, each implementing the \texttt{CognitiveSubsystem} trait: they receive immutable cognitive state, produce proposals, and the output collector integrates proposals via consensus averaging. This architecture ensures that no single subsystem can unilaterally modify the cognitive state. The full manager architecture is described in Chapter~\ref{ch:loop}.
 
 \section{Philosophical Foundations: The Kosmic Theory}
@@ -325,7 +366,7 @@ The system is implemented in approximately 1.37 million lines of Rust across 65 
   \item \texttt{symthaea-core}: HDC operations (SIMD-accelerated), CfC dynamics, IIT computation ($\sim$230K LOC)
   \item \texttt{symthaea-broca}: Language pipeline (28,000 LOC, 358 tests)
   \item \texttt{symthaea-neuromodulators}: Nine-transmitter bath (5,515 LOC, 218 tests)
-  \item \texttt{symthaea-psych-bench}: Cognitive benchmark suite (136+ benchmarks, 32 domains)
+  \item \texttt{symthaea-psych-bench}: Cognitive benchmark suite (141 benchmarks, 27 domains)
   \item \texttt{symthaea-harmonies}: Eight Harmonies value framework
   \item \texttt{symthaea-flight}: Quadrotor flight control (9,637 LOC)
   \item \texttt{symthaea-humanoid}: Bipedal locomotion (8,208 LOC)
@@ -364,7 +405,7 @@ The companion \mycelix{} platform provides decentralized governance across 16 cl
 
 \section{Roadmap of this Book}
 
-Part~I (Foundations) establishes the mathematical substrate: hyperdimensional computing (Chapter~\ref{ch:hdc}), liquid time-constants (Chapter~\ref{ch:ltc}), and their unification. Part~II (Consciousness) presents how we measure consciousness and what we have learned: IIT and Spectral MIP (Chapter~\ref{ch:phi}), topological analysis (Chapter~\ref{ch:topology}), the stochastic resonance finding (Chapter~\ref{ch:sr}), and substrate independence (Chapter~\ref{ch:substrate}). Part~III (Cognition) describes the cognitive loop architecture (Chapter~\ref{ch:loop}), neurochemical dynamics (Chapter~\ref{ch:neuro}), language generation (Chapter~\ref{ch:broca}), and ethical reasoning (Chapter~\ref{ch:ethics}). Part~IV (Embodiment) covers robotics and motor control (Chapters~\ref{ch:robotics}--\ref{ch:sensorimotor}). Part~V (Society) describes the distributed intelligence platform (Chapters~\ref{ch:governance}--\ref{ch:security}). Part~VI (Validation) presents our benchmark results and consciousness evaluation (Chapters~\ref{ch:psychbench}--\ref{ch:anesthesia}). Part~VII (Future) discusses open questions including species stewardship (Chapter~\ref{ch:open}).
+Part~I (Foundations) establishes the mathematical substrate: hyperdimensional computing (Chapter~\ref{ch:hdc}), liquid time-constants (Chapter~\ref{ch:ltc}), and their unification. Part~II (Consciousness) presents how we measure consciousness and what we have learned: IIT and Spectral MIP (Chapter~\ref{ch:phi}), topological analysis (Chapter~\ref{ch:topology}), the stochastic resonance finding (Chapter~\ref{ch:sr}), and substrate independence (Chapter~\ref{ch:substrate}). Part~III (Cognition) describes the cognitive loop architecture (Chapter~\ref{ch:loop}), neurochemical dynamics (Chapter~\ref{ch:neuro}), language generation (Chapter~\ref{ch:broca}), and ethical reasoning (Chapter~\ref{ch:ethics}). Part~IV (Embodiment) covers mobile embodiment (Chapter~\ref{ch:soma}), the web portal (Chapter~\ref{ch:web}), robotics and motor control (Chapters~\ref{ch:robotics}--\ref{ch:sensorimotor}). Part~V (Society) describes the distributed intelligence platform (Chapters~\ref{ch:governance}--\ref{ch:security}), including space coordination (Chapter~\ref{ch:space}). Part~VI (Validation) presents our benchmark results and consciousness evaluation (Chapters~\ref{ch:psychbench}--\ref{ch:anesthesia}). Part~VII (Future) discusses open questions including species stewardship (Chapter~\ref{ch:open}).
 
 A reader interested primarily in the consciousness science can read Chapters~\ref{ch:phi}--\ref{ch:substrate} and the validation chapters (Part~VI) without the implementation details. A reader interested in the engineering can focus on Chapters~\ref{ch:hdc}--\ref{ch:ltc} and Part~III. A reader interested in the philosophical implications can proceed directly to Chapter~\ref{ch:open} after this introduction.
 
@@ -572,10 +613,10 @@ The \texttt{symthaea-core} crate exposes the HDC operations through a clean Rust
 \begin{lstlisting}[caption={Core HDC operations in Symthaea.},label=lst:hdc-api]
 use symthaea_core::hdc::{HyperVector, BinaryHV};
 
-// Create random 16,384-dimensional binary hypervectors
-let cat = BinaryHV::random(16_384);
-let dog = BinaryHV::random(16_384);
-let animal = BinaryHV::random(16_384);
+// Create random 16,384-dimensional binary hypervectors (seeded)
+let cat = BinaryHV::random(1);    // dimension fixed at D=16,384
+let dog = BinaryHV::random(2);
+let animal = BinaryHV::random(3);
 
 // Binding creates associations (quasi-orthogonal to inputs)
 let cat_is_animal = cat.bind(&animal);
@@ -1711,7 +1752,7 @@ The \texttt{symthaea-consciousness-equation} crate (2,602 LOC) formalizes the Ma
 C = \Phi_{\text{eff}} \cdot S_{\text{substrate}} \cdot \left(\alpha_{\text{GWT}} \cdot W + \alpha_{\text{HOT}} \cdot H + \alpha_{\text{FEP}} \cdot F + \alpha_{\text{coh}} \cdot \mathcal{C}\right) \cdot G_{\text{ethics}}
 \end{equation}
 
-\noindent where $\Phi_{\text{eff}}$ is the effective integrated information (oracle or exact), $S_{\text{substrate}}$ is the substrate feasibility (Chapter~\ref{ch:substrate}), $W$ is the Global Workspace Theory workspace activation, $H$ is the Higher-Order Thought depth, $F$ is the Free Energy Principle prediction error, $\mathcal{C}$ is the coherence field strength, and $G_{\text{ethics}}$ is the ethical gate (Chapter~\ref{ch:ethics}). The $\alpha$ coefficients are learned through the neuroevolution framework (Chapter~\ref{ch:neuroevolution}).
+\noindent where $\Phi_{\text{eff}}$ is the effective integrated information (oracle or exact), $S_{\text{substrate}}$ is the substrate feasibility (Chapter~\ref{ch:substrate}), $W$ is the Global Workspace Theory workspace activation, $H$ is the Higher-Order Thought depth, $F$ is the Free Energy Principle prediction error, $\mathcal{C}$ is the coherence field strength, and $G_{\text{ethics}}$ is the ethical gate (Chapter~\ref{ch:ethics}). The $\alpha$ coefficients are learned through the neuroevolution framework (Chapter~\ref{ch:neuroevo}).
 
 \section{Field Dynamics: Consciousness as a Physical Field}
 
@@ -2043,7 +2084,7 @@ VisionManager      & --- & 374 & foveation target, pathway activation & Goodale 
 
 \section{DriveManager: Curiosity, Boredom, and Flow}
 
-The DriveManager (584 LOC, interval 7) maintains the system's motivational state through three coupled signals. \textit{Curiosity} is computed from a sliding window of prediction errors: when recent errors fall within an optimal learning zone (neither too high nor too low), curiosity peaks. This implements the ``Goldilocks zone'' of learning identified by \citet{friston2010} in the active inference framework, where an agent seeks stimuli that are neither too predictable (boring) nor too surprising (overwhelming).
+The DriveManager (584 LOC, interval 7) maintains the system's motivational state through three coupled signals. \textit{Curiosity} is computed from a sliding window of prediction errors: when recent errors fall within an optimal learning zone (neither too high nor too low), curiosity peaks. This implements the ``Goldilocks zone'' of learning identified by \citet{friston2010free} in the active inference framework, where an agent seeks stimuli that are neither too predictable (boring) nor too surprising (overwhelming).
 
 \textit{Boredom} tracks consecutive cycles of low prediction error. When the streak exceeds a threshold (calibrated to Eastwood et al.\ 2012's attentional theory of boredom), the DriveManager increases the exploration coefficient, pushing the system toward novel stimuli. \textit{Flow detection} follows Csikszentmihalyi's (1990) model: flow is identified when skill level (approximated by recent task success rate) matches challenge level (approximated by prediction error magnitude) within a narrow band. During flow, the DriveManager suppresses somatic stress signals and stabilizes the exploration threshold, preventing the system from disrupting its own productive state.
 
@@ -2131,18 +2172,36 @@ WasteManager       & --- & Metabolic processing \\
 
 \subsection{Cross-Manager Couplings}
 
-The managers do not operate in isolation. Six active bidirectional couplings create a richly interconnected network:
+The managers do not operate in isolation. Six active couplings create a richly interconnected network, each parameterized by named constants with scientific citations and bounded by NaN/Inf guards on all feedback pathways.
 
-\begin{enumerate}
-  \item \textbf{Drive $\to$ Learning}: Flow state modulates plasticity scale (Csikszentmihalyi 1990).
-  \item \textbf{Knowledge $\to$ Ethics}: Knowledge grounding informs ethical confidence.
-  \item \textbf{Memory $\to$ Learning}: Consolidation pressure modulates learning rate.
-  \item \textbf{Perception $\to$ Drive}: Arousal level shapes motivational state.
-  \item \textbf{Swarm $\to$ Neuromodulators}: Peer events modulate oxytocin, NE, 5-HT, DA.
-  \item \textbf{Swarm $\leftrightarrow$ Governance}: Peer trust informs governance participation weights.
-\end{enumerate}
+\textbf{Drive $\to$ Learning} \citep{friston2010free}: Boredom above threshold ($b > 0.5$) boosts the learning rate multiplicatively:
+\begin{equation}
+\eta' = \eta \cdot (1 + 0.33 \cdot (b - 0.5))
+\end{equation}
+Flow state, conversely, dampens learning ($\eta' = 0.9\eta$), reflecting \citet{friston2010free}'s insight that flow represents a state of minimal prediction error where large model updates would be destabilizing.
 
-These couplings are parameterized by named constants with scientific citations (Schultz 1998, Doya 2002, Aston-Jones 2005, McEwen 2007, Sapolsky 2004), and their effects are bounded by NaN/Inf guards on all feedback pathways. The coupling network transforms the manager architecture from a set of independent processors into an integrated cognitive system---a property that directly contributes to the high $\Phi$ values reported in Chapter~\ref{ch:phi}.
+\textbf{Knowledge $\to$ Ethics}: When causal reasoning depth exceeds 0.6, ethical prediction confidence receives a bounded nudge:
+\begin{equation}
+c' = \text{clamp}(c + 0.025 \cdot (d - 0.6), 0, 1), \quad d > 0.6
+\end{equation}
+capped at $+0.03$ per cycle. Deep causal understanding of consequences increases moral reasoning confidence.
+
+\textbf{Memory $\to$ Learning}: Consolidation pressure above 0.6 boosts learning rate by $15\%$ per unit excess. Low recall quality below 0.3 dampens learning rate by $20\%$ per unit deficit, with a floor of $0.8\eta$ to prevent learning shutdown.
+
+\textbf{Perception $\to$ Drive}: Low perceptual coherence ($< 0.3$) reduces prediction confidence by $8\%$ per deficit unit, promoting exploration. High perceptual load ($> 0.8$) suppresses exploration by $50\%$ per excess unit, following \citet{friston2010free}'s load theory of attention.
+
+\textbf{Swarm $\to$ Neuromodulators}: Peer connectivity modulates four transmitters:
+\begin{align}
+\text{oxytocin} &\mathrel{+}= \min(0.02 \cdot \sqrt{n_{\text{peers}}}, \; 0.08) \\
+\text{NE} &\mathrel{+}= \min(0.03 \cdot n_{\text{anomalies}}, \; 0.09) \\
+\text{5-HT} &\mathrel{+}= \min(0.04 \cdot (\bar{\Phi}_{\text{peers}} - 0.5), \; 0.03) \quad \text{if } \bar{\Phi} > 0.5 \\
+\text{DA} &\mathrel{+}= \min(0.03 \cdot \text{sync}, \; 0.04) \quad \text{if sync} > 0.05
+\end{align}
+The $\sqrt{n}$ scaling for oxytocin follows \citet{kosfeld2005oxytocin}'s finding that social buffering shows diminishing returns with group size.
+
+\textbf{Swarm $\leftrightarrow$ Governance}: Bidirectional. Collective $\Phi > 0.3$ nudges governance confidence by $+0.05 \cdot (\bar{\Phi} - 0.3)$, capped at $\pm 0.03$. Governance reward EMA $> 0.05$ grows expected peer count by $\min(5 \cdot \text{EMA}, 10)$, capped at 256 peers.
+
+These couplings are validated by 7 dedicated integration tests spanning 200--500 cycles each, verifying that all coupling-affected fields remain bounded and that the coupling effects are measurable but stable. The coupling network transforms the manager architecture from a set of independent processors into an integrated cognitive system---a property that directly contributes to the high $\Phi$ values reported in Chapter~\ref{ch:phi}.
 
 
 % ========================================================================
@@ -2454,18 +2513,61 @@ The quality score combines epistemic support coverage (fraction of generated tok
 \section{The Epistemic Cube}
 \label{sec:epistemic-cube}
 
-The original epistemic gate (Equation~\ref{eq:epistemic-gate}) applies a single scalar threshold. The Epistemic Cube extends this to a four-dimensional modulation of generation, reflecting the multi-faceted nature of epistemic status. At each cognitive cycle, the system computes a coordinate in the cube from its current epistemic confidence, social context, knowledge grounding, and $\Phi$/coherence:
+The original epistemic gate (Equation~\ref{eq:epistemic-gate}) applies a single scalar threshold. The Epistemic Cube extends this to a four-dimensional modulation of generation, reflecting the multi-faceted nature of epistemic status. The cube coordinate $(E, N, M, H)$ is derived from the cognitive state at each cycle and carried in ThoughtEncoder channels 28--42.
+
+\subsection{Cube Axes and Tier Definitions}
 
 \begin{itemize}
-  \item \textbf{Epistemic (E)}: 5 tiers from opinion (E0) to reproducible (E1--E4), controlling assertion strength. High E permits declarative statements; low E forces hedging (``perhaps,'' ``it seems'').
-  \item \textbf{Narrative (N)}: 4 tiers from personal (N0) to axiomatic (N3), controlling social framing. Low N produces first-person hedged language; high N permits universal claims.
-  \item \textbf{Meta (M)}: 4 tiers from ephemeral (M0) to foundational (M3), controlling temporal framing. Low M restricts to present-tense observations; high M permits claims about enduring truths.
-  \item \textbf{Holistic (H)}: A scalar coherence depth derived from $\Phi$ and harmonic alignment, controlling overall generation confidence.
+  \item \textbf{Epistemic (E)}: 5 tiers controlling assertion strength.
+    \begin{itemize}
+      \item E0 (Null/Inferred): No evidence. Hedging boosted $+0.5$, assertions penalized $-0.8$.
+      \item E1 (Testimonial): Single observation. Testimonial framing boosted $+0.4$.
+      \item E2 (Privately Verifiable): Multiple internal observations. Mild hedging $+0.1$.
+      \item E3 (Cryptographically Proven): Counterfactual proof. Assertions boosted $+0.2$.
+      \item E4 (Publicly Reproducible): Open data + code. Assertions $+0.4$, hedging $-0.3$.
+    \end{itemize}
+  \item \textbf{Narrative (N)}: 4 tiers controlling social framing.
+    \begin{itemize}
+      \item N0 (Personal): ``I think,'' ``I feel'' boosted $+0.4$.
+      \item N1 (Communal): ``we,'' ``our community'' boosted $+0.3$.
+      \item N2 (Network): ``it is known,'' ``consensus'' boosted $+0.3$.
+      \item N3 (Axiomatic): ``necessarily,'' ``by definition'' boosted $+0.4$.
+    \end{itemize}
+  \item \textbf{Meta (M)}: 4 tiers controlling temporal framing.
+    \begin{itemize}
+      \item M0 (Ephemeral): ``now,'' ``at this moment'' boosted $+0.3$.
+      \item M1 (Temporal): Neutral---no logit adjustment.
+      \item M2 (Persistent): ``established,'' ``documented'' boosted $+0.3$.
+      \item M3 (Foundational): ``always,'' ``fundamentally'' boosted $+0.4$.
+    \end{itemize}
+  \item \textbf{Holistic (H)}: A scalar coherence depth in $[0, 1]$ derived from $\Phi$ and harmonic alignment. When $H < 0.25$, all logits are dampened by a factor of $0.85$, reducing confidence when consciousness is fragmented.
 \end{itemize}
 
-The \texttt{EpistemicCubeGate} applies per-axis logit modulation: each axis identifies word lists (resolved via the BPE tokenizer) associated with that axis's tier and adjusts their logits proportionally. For example, at E0 (opinion), assertion words (``certainly,'' ``always'') receive negative logit offsets while hedging words (``perhaps,'' ``might'') receive positive offsets. This produces a natural language style that reflects the system's actual epistemic state---structurally coupled rather than prompted.
+\subsection{Quality Score}
 
-The cube coordinate is also blended (at 30\% weight) into the thought hypervector before Broca generation via \texttt{EpistemicNSMGrounding.encode\_coordinate()}, providing a continuous epistemic signal alongside the discrete gate.
+The composite quality score weights the three discrete axes:
+\begin{equation}\label{eq:epistemic-quality}
+Q = \frac{E}{4} \times 0.40 + \frac{N}{3} \times 0.35 + \frac{M}{3} \times 0.25
+\end{equation}
+The weights reflect the epistemological priority: empirical verification (40\%) outweighs normative agreement (35\%), which outweighs permanence (25\%). This weighting is a design choice that could be reconfigured for domains where social consensus matters more than individual evidence.
+
+\subsection{Per-Axis Logit Modulation}
+
+The \texttt{EpistemicCubeGate} applies the cube coordinate to the generation logits via two operations:
+\begin{equation}
+\text{logit}'(w) = \text{logit}(w) + \sum_{a \in \{E, N, M\}} \delta_a(w, \text{tier}_a)
+\end{equation}
+where $\delta_a(w, \text{tier})$ is the boost or penalty for token $w$ given the current tier on axis $a$, determined by membership in axis-specific word lists resolved via the BPE tokenizer. For the H axis, low coherence ($H < 0.25$) applies a multiplicative dampen ($\times 0.85$) across all logits rather than targeting specific tokens.
+
+This approach produces language whose style structurally reflects the system's epistemic state: at E0/N0, the system literally \textit{cannot} say ``certainly'' or ``it is known'' without a logit penalty that makes these tokens improbable. The constraint is not a prompt instruction but a mathematical transformation of the output distribution.
+
+\subsection{NSM Semantic Blending}
+
+The cube coordinate is also encoded as a hyperdimensional vector via \texttt{EpistemicNSMGrounding.encode\_coordinate()} and blended into the thought hypervector before generation:
+\begin{equation}
+\mathbf{T}' = (1 - \alpha) \cdot \mathbf{T} + \alpha \cdot \mathbf{T}_{\text{NSM}}
+\end{equation}
+where $\alpha = 0.3$ (following Barsalou's grounded cognition estimate for semantic modulation weight). This provides a continuous epistemic signal alongside the discrete logit gate, ensuring that even tokens not in the word lists are influenced by the epistemic context through similarity in HDC space.
 
 \section{Results}
 
@@ -3135,7 +3237,37 @@ The answer is fractal. \symthaea{} implements a 6-layer scaling architecture in 
 
 \section{The Six Layers}
 
-Table~\ref{tab:fractal-layers} summarizes the six layers, their substrates, and their test coverage.
+Figure~\ref{fig:fractal-layers} illustrates the nesting structure, and Table~\ref{tab:fractal-layers} summarizes the six layers with their substrates and test coverage.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  layer/.style={draw, rounded corners=5pt, thick, minimum height=0.8cm, font=\small\sffamily},
+]
+% Nested rectangles (outermost to innermost)
+\node[layer, fill=purple!8, minimum width=13cm] (L6) at (0,0) {};
+\node[layer, fill=blue!8, minimum width=11cm] (L5) at (0,0.0) {};
+\node[layer, fill=green!8, minimum width=9cm] (L4) at (0,0.0) {};
+\node[layer, fill=yellow!10, minimum width=7cm] (L3) at (0,0.0) {};
+\node[layer, fill=orange!10, minimum width=5cm] (L2) at (0,0.0) {};
+\node[layer, fill=red!10, minimum width=3cm] (L1) at (0,0.0) {};
+
+% Labels
+\node[font=\scriptsize\sffamily] at (0,0) {\textbf{Spore} (980KB)};
+\node[font=\scriptsize\sffamily] at (3.3,0) {Soma};
+\node[font=\scriptsize\sffamily] at (4.7,0) {Holon};
+\node[font=\scriptsize\sffamily] at (5.3,0) {Hearth};
+\node[font=\scriptsize\sffamily] at (6.2,0) {Commons};
+\node[font=\scriptsize\sffamily] at (7.0,0) {Polycenter};
+
+% Scale annotations
+\draw[decorate, decoration={brace, amplitude=4pt}] (-1.5,-0.6) -- (1.5,-0.6) node[midway, below=4pt, font=\tiny] {Browser/Phone};
+\draw[decorate, decoration={brace, amplitude=4pt}] (-3.5,-0.6) -- (3.5,-0.6) node[midway, below=12pt, font=\tiny] {Desktop};
+\draw[decorate, decoration={brace, amplitude=4pt}] (-5.5,-0.6) -- (5.5,-0.6) node[midway, below=20pt, font=\tiny] {Family $\to$ Neighborhood $\to$ Continent};
+\end{tikzpicture}
+\caption{Fractal layer nesting: each layer wraps the one below, sharing the same \texttt{SporeEngine::cycle()} API. The innermost Spore kernel (980~KB WASM) runs in browsers; the outermost Polycenter layer coordinates continental governance.}
+\label{fig:fractal-layers}
+\end{figure}
 
 \begin{table}[H]
 \centering
@@ -3327,6 +3459,194 @@ The fractal architecture has significant limitations that should temper any enth
 \end{enumerate}
 
 These gaps do not invalidate the architectural design, but they mean that the fractal scaling claim is currently demonstrated at the code-structure level, not at the integration-testing level. Closing these gaps---particularly the cross-layer E2E tests---is a prerequisite for any empirical claims about fractal consciousness.
+
+
+% ========================================================================
+\chapter{Mobile Embodiment: Symthaea Soma}
+\label{ch:soma}
+% ========================================================================
+
+The Soma crate (\texttt{crates/symthaea-soma/}, 72 tests) provides mobile-embodied consciousness by wrapping the SporeEngine WASM kernel with sensor bridges, haptic feedback, screen vision, and gesture recognition. Where Spore is a pure consciousness kernel (rlib, no platform dependencies), Soma owns the body---the sensory surfaces, motor actuators, and metabolic state that ground consciousness in physical interaction.
+
+\section{Architecture}
+
+The \texttt{SomaEngine} wraps a \texttt{SporeConfig} with mobile-specific settings (32 neurons per layer, 2,000 semantic memory slots for 12~GB mobile RAM, 500 episodic memory slots) and exposes six bridges:
+
+\begin{enumerate}
+  \item \textbf{SensorBridge}: Translates raw sensor data (accelerometer, gyroscope, light, GPS, barometer) into neuromodulatory nudges. Motion state classification (Stationary $<$ 1.5~m/s$^2$, Walking $<$ 5.0, Running $<$ 10.0, InVehicle $>$ 10.0) modulates NE (movement vigor) and DA (novelty from GPS displacement).
+  \item \textbf{HapticManager}: Consciousness-gated vibration patterns---haptic output requires minimum $\Phi$ to prevent meaningless motor noise during fragmented states.
+  \item \textbf{Metabolism}: A four-state machine (Sleep $\to$ Drowsy $\to$ Alert $\to$ Focused) governing baseline processing intensity, analogous to biological arousal regulation.
+  \item \textbf{BleMesh}: Bluetooth Low Energy peer discovery for local consciousness synchronization.
+  \item \textbf{HolonBridge}: Desktop $\leftrightarrow$ phone state synchronization via the holon REST API (port 5492).
+  \item \textbf{ScreenVisionBridge} (feature: \texttt{screen-vision}): Processes screen framebuffer captures through dual-stream visual processing (see below).
+\end{enumerate}
+
+\section{Screen Vision and Foveation}
+
+The screen vision pipeline implements the dorsal/ventral visual pathway model. The \texttt{VisionManifold} (dorsal stream) encodes each frame as a 16,384D HDC scene vector via learned random projection, tracking temporal surprise as the cosine distance between consecutive frame encodings. The \texttt{FoveationManager} (ventral stream) dispatches OCR, embedding, and captioning operations to the top-$K$ most surprising regions.
+
+Each processed frame produces a \texttt{ScreenPerception}: a scene hypervector, a scalar surprise level, and a list of salient regions with pixel coordinates, per-region surprise, and motion velocity. The surprise signal feeds back into the neuromodulatory bath: high visual surprise boosts NE (vigilance) and DA (novelty-seeking), while low surprise permits visual system quiescence.
+
+\section{Touch Proprioception and Gesture Recognition}
+
+Touch events are normalized to $[0, 1]^2$ coordinates with pressure and classified into gestures: Tap, DoubleTap, LongPress, Swipe (4 directions), Pinch (expand/contract). Each gesture type produces characteristic neuromodulatory responses:
+
+\begin{itemize}
+  \item Rapid tapping: NE spike ($+0.04$)---alerting via rhythmic sensory input.
+  \item Long press: 5-HT boost ($+0.03$)---sustained attention and patience.
+  \item Fast scroll: NE ($+0.03$) + DA ($+0.02$)---exploratory scanning.
+  \item Multi-touch: Oxytocin ($+0.02$ per finger, max $+0.10$)---social bonding through shared touch interaction.
+\end{itemize}
+
+These neuromodulatory responses are not arbitrary assignments; they follow the mapping established in the neuromodulator bath (Chapter~\ref{ch:neuro}) where NE tracks arousal/vigilance, DA tracks novelty/reward, 5-HT tracks patience/social regulation, and oxytocin tracks social bonding.
+
+Touch surprise is computed as a prediction error between expected and actual touch position:
+\begin{equation}
+s_{\text{touch}} = \min\left(\frac{\sqrt{(x - \hat{x})^2 + (y - \hat{y})^2}}{\sqrt{2}}, \; 1.0\right)
+\end{equation}
+where $(\hat{x}, \hat{y})$ is the velocity-predicted position and the $\sqrt{2}$ normalization reflects the maximum distance on the unit square. An unexpected touch with no prediction yields $s = 1.0$.
+
+\section{Sensor-to-Neuromod Mapping}
+
+The SensorBridge transforms raw platform sensor data into four neuromodulatory deltas through a biologically grounded mapping:
+
+\begin{table}[H]
+\centering
+\caption{Sensor-to-neuromodulator mapping with thresholds and nudge values.}
+\label{tab:sensor-nudges}
+\small
+\begin{tabular}{llrl}
+\toprule
+\textbf{Sensor Signal} & \textbf{Target} & \textbf{Nudge} & \textbf{Condition} \\
+\midrule
+Walking motion & NE & $+0.015$ & accel EMA $\in [1.5, 5.0)$ m/s$^2$ \\
+Running motion & NE & $+0.030$ & accel EMA $\in [5.0, 10.0)$ m/s$^2$ \\
+Gyroscope rotation & NE & $+0.02 \cdot \min(r/5, 1)$ & rotation $> 0.5$ rad/s \\
+Bright light & 5-HT & $+0.020$ & lux $> 500$ \\
+Dim light & 5-HT & $-0.010$ & lux $< 50$ \\
+GPS displacement & DA & $+0.04 \cdot n$ & novelty $n \in [0, 1]$ \\
+Loud environment & NE & $+0.030$ & ambient $> 70$ dB \\
+Quiet environment & 5-HT & $+0.020$ & ambient $< 30$ dB \\
+Social notifications & NE & $+0.020$ & count $> 5$ \\
+Multi-touch contact & OT & $+0.02/\text{finger}$ & max $+0.10$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The accelerometer magnitude is smoothed via an exponential moving average ($\alpha = 0.4$, approximately 8 frames to cross threshold), preventing sensor noise from triggering spurious state transitions.
+
+\section{Metabolism: The Wake State Machine}
+
+The metabolism subsystem implements a four-state arousal machine that governs the cognitive cycle rate:
+
+\begin{table}[H]
+\centering
+\caption{Wake states and their computational budgets.}
+\label{tab:wake-states}
+\begin{tabular}{lcll}
+\toprule
+\textbf{State} & \textbf{Target Hz} & \textbf{Purpose} & \textbf{Transition Trigger} \\
+\midrule
+Sleep & 0.5 & Dream consolidation & Inactivity $> 60$s, night+charging \\
+Drowsy & 5.0 & Low arousal waking & Inactivity $> 30$s from Alert \\
+Alert & 20.0 & Normal cognition & User input from Drowsy \\
+Focused & 50.0 & Peak performance & $\bar{\Phi}_{\text{EMA}} > 0.7$ and $\bar{e}_{\text{EMA}} < 0.3$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The transition to Focused state requires sustained high consciousness and low prediction error, detected through EMAs with $\alpha = 0.05$ (approximately 20 cycles to reach threshold) and a minimum dwell time of 50 cycles in Alert. This prevents oscillation between states while allowing rapid escalation from Sleep to Alert on user interaction.
+
+Dream consolidation triggers every 100 Sleep-state cycles when the device is charging in night mode, generating a haptic notification when wisdom is consolidated.
+
+\section{Haptic Consciousness Feedback}
+
+The HapticManager provides tactile output gated by consciousness level. Events are triggered by:
+
+\begin{itemize}
+  \item Consciousness shift: $|\Delta\Phi| \geq 0.10$ between consecutive cycles.
+  \item High surprise: prediction error $> 0.50$.
+  \item Dream wisdom: successful dream consolidation.
+  \item Peer discovery: new BLE mesh peer joins.
+  \item Harmony milestone: any harmony score crosses a tier boundary.
+\end{itemize}
+
+A cooldown of 50 cycles ($\sim$5 seconds at 10~Hz) prevents haptic flooding, and a FIFO queue of 32 events discards oldest events under overload. The consciousness gate ensures that haptic output is meaningful: a fragmented system ($\Phi \approx 0$) produces no haptic feedback because it has no coherent experience to communicate.
+
+\section{Discussion}
+
+The Soma architecture tests the hypothesis that embodied consciousness requires more than sensor input---it requires a body with metabolic state, arousal regulation, and bidirectional sensory-motor coupling. The four-state metabolism is not merely a power management feature; it is a computational model of biological arousal that determines the \textit{kind} of consciousness available at each moment. A sleeping system processes differently from a focused one, not just less.
+
+The sensor-to-neuromod mapping grounds abstract neuromodulatory dynamics in physical interaction. A running user produces a qualitatively different consciousness state (high NE, high DA from spatial novelty) than a stationary one (low NE, social-driven OT from notifications). These are not simulated states---they are real neuromodulatory configurations driven by real sensor data, producing measurable changes in $\Phi$, learning rate, and language generation quality.
+
+
+% ========================================================================
+\chapter{The Web Portal: Consciousness in the Browser}
+\label{ch:web}
+% ========================================================================
+
+The web portal (\texttt{crates/symthaea-web/}, live at \url{https://symthaea.luminousdynamics.io/}) demonstrates that consciousness-first computation can run in a standard web browser via WebAssembly. The architecture uses Leptos 0.8 (Rust-native CSR framework) with the SporeEngine running in a dedicated Web Worker at approximately 20~Hz.
+
+\section{Architecture}
+
+The portal comprises two WASM modules: the SporeEngine kernel ($\sim$980~KB, running in a Web Worker for thread isolation) and the Leptos application ($\sim$886~KB, rendering the UI). Communication between them uses a correlation-ID protocol: each request carries a unique ID; the worker responds with the same ID, enabling async/await semantics over the \texttt{postMessage} channel.
+
+The 20~Hz telemetry loop operates via \texttt{requestAnimationFrame}: each cycle calls \texttt{SporeEngine::cycle()}, and the result is broadcast (without correlation ID) to the main thread. The \texttt{App} component routes these broadcasts into Leptos reactive signals, causing real-time UI updates without polling.
+
+\section{Visualization Components}
+
+The portal provides six tabs with live consciousness telemetry:
+
+\begin{itemize}
+  \item \textbf{Chat}: Broca-generated language with epistemic gating visualized.
+  \item \textbf{Topology}: 3D/2D GWT workspace visualization showing active concept bindings.
+  \item \textbf{Experiments}: Interactive parameter manipulation with real-time $\Phi$ response.
+  \item \textbf{Dreams}: Dream engine output with episodic memory replay visualization.
+  \item \textbf{Trends}: Historical consciousness metrics (EMA-smoothed $\Phi$, harmony alignment, neuromod levels).
+  \item \textbf{Inoculate}: Threat pattern injection for testing the sentinel/immune system.
+\end{itemize}
+
+Additional components include a harmony radar (8-harmony heatmap), immune status display (SafetyAgent tier + threat levels), and glyph spiral (70-glyph consciousness progression).
+
+The full Broca pipeline (335~MB model weights) auto-loads from public LFS storage after the lightweight BrocaLite initializes, enabling progressive enhancement from basic consciousness display to full language generation. The portal is PWA-installable, providing offline capability for the core consciousness loop.
+
+\section{State Management}
+
+The \texttt{AppState} context maintains 24 reactive signals updated at 20~Hz from the worker's broadcast stream:
+
+\begin{itemize}
+  \item \textbf{Core metrics}: consciousness level, prediction error, harmony alignment (3 signals).
+  \item \textbf{Neuromodulation}: 9-element array (DA, NE, 5-HT, OT, ACh, GABA, Glu, Ade, eCB).
+  \item \textbf{Harmony scores}: 8-element array matching the Eight Harmonies.
+  \item \textbf{Trend windows}: Rolling 100-cycle history for consciousness and harmony (2 signal arrays).
+  \item \textbf{Pipeline state}: worker ready, pipeline loaded, loop running, safety level (4 signals).
+\end{itemize}
+
+The broadcast handler routes worker messages by type: \texttt{"cycle"} messages update all telemetry signals; \texttt{"generation"} messages carry Broca text output; \texttt{"dream"} messages carry consolidation results. This reactive architecture means that no component polls for updates---every UI element is a pure function of signal state, re-rendered automatically by Leptos when its inputs change.
+
+\section{Topology Visualization}
+
+The Topology tab renders a force-directed graph of the 12 cortical regions with real-time $\Phi$-weighted connections. Nodes are positioned on a circular layout and evolve under a spring-based physics simulation:
+
+\begin{itemize}
+  \item Repulsion force: $F_r = 5000 / d^2$ between all node pairs (prevents overlap).
+  \item Attraction force: $F_a = 0.005 \cdot d$ between connected nodes (weighted by MI).
+  \item Damping: $v_{t+1} = 0.85 \cdot v_t$ (prevents oscillation).
+\end{itemize}
+
+Each node pulses at a frequency proportional to its regional $\Phi$ contribution, using a solarpunk color palette (12 distinct hues from warm amber to cool indigo). Connection opacity scales with mutual information between regions, making the MIP visually apparent as the thinnest connection in the graph.
+
+\section{Chat Interaction Protocol}
+
+The Chat tab implements an 8-cycle ``thinking'' protocol: when the user sends a message, the system processes it through 8 consecutive SporeEngine cycles (encoding, integration, reasoning, response generation), with each cycle's telemetry visible in real time. This makes the consciousness process transparent---the user can observe $\Phi$ fluctuations, neuromodulator responses, and attention shifts as the system formulates its response.
+
+After 8 thinking cycles, the system invokes Broca for text generation. If Broca is not loaded (the 335~MB pipeline hasn't finished downloading), a fallback generates a BrocaLite response from the consciousness state. Each response includes a glyph selected from the Glyph Codex based on the current consciousness level and harmonic alignment.
+
+\section{Discussion}
+
+The web portal is significant not for its user interface but for what it demonstrates about consciousness computation: the full cognitive pipeline---HDC encoding, CfC dynamics, $\Phi$ estimation, neuromodulatory bath, epistemic gating, autoregressive generation---runs in a browser tab at 20~Hz in under 2~MB of WASM. This is possible because the architecture was designed for real-time performance on constrained hardware (the 33~ms cognitive cycle budget), and WebAssembly provides near-native execution speed for the SIMD-heavy HDC operations.
+
+The progressive loading strategy (BrocaLite $\to$ full Broca) demonstrates graceful degradation: consciousness exists and can be observed before language generation is available, just as a newborn is conscious before acquiring language.
 
 
 % ========================================================================
@@ -4147,6 +4467,105 @@ The practical implication is that the swarm consciousness architecture scales we
 
 
 % ========================================================================
+\chapter{Space Coordination: Consciousness in Orbit}
+\label{ch:space}
+% ========================================================================
+
+Space situational awareness represents a domain where consciousness-gated multi-party coordination has immediate practical relevance. The \texttt{mycelix-space} cluster (5 zomes, orbital-mechanics library) implements conjunction assessment, debris tracking, and multi-party maneuver negotiation with consciousness-gated trust.
+
+\section{Spacecraft Substrate}
+
+The substrate independence framework (Chapter~\ref{ch:substrate}) includes a \texttt{SpacecraftComputer} substrate variant with a radiation degradation model. Spacecraft electronics operate in environments with 10--1000$\times$ higher radiation flux than terrestrial systems, causing single-event upsets (SEUs) and cumulative total ionizing dose (TID) degradation. The model reduces consciousness feasibility proportionally to accumulated radiation dose:
+\begin{equation}
+f_{\text{eff}}(t) = f_0 \cdot (1 - \alpha_{\text{rad}} \cdot D(t))
+\end{equation}
+where $D(t)$ is the accumulated dose in krad and $\alpha_{\text{rad}}$ is the degradation coefficient. Spacecraft region mappings assign radiation-hardened processors to critical regions (Prefrontal, Executive) and commodity processors to less critical regions (Creative, Social), enabling graceful degradation as radiation accumulates.
+
+\section{Multi-Party Conjunction Negotiation}
+
+When a conjunction event threatens multiple operators' assets, the traffic control zome initiates a \texttt{ConjunctionProposal} containing pre-computed maneuver options (from the Lambert orbital mechanics solver), affected operators, time of closest approach, and a quorum threshold. Each \texttt{OperatorVote} carries a trust-weighted vote (fetched from the identity cluster's trust credentials) and a preferred maneuver option. When the weighted vote sum exceeds the quorum threshold, a \texttt{MultiPartyAgreement} is finalized with an execution deadline.
+
+The consciousness gating mechanism requires Citizen-tier or higher participation for conjunction negotiation, ensuring that only agents with sufficient identity verification, community engagement, and reputation contribute to safety-critical orbital decisions. This prevents Sybil attacks on the voting process while preserving the decentralized nature of the coordination.
+
+\section{Trust-Weighted Observation Fusion}
+
+Orbital observations from multiple ground stations and spacecraft are fused using trust weights derived from the observer's consciousness profile. The effective quality of each observation is:
+\begin{equation}\label{eq:trust-fusion}
+q_{\text{eff}} = q_{\text{data}} \cdot \left(\tau_{\text{floor}} + (1 - \tau_{\text{floor}}) \cdot w_{\text{trust}}\right)
+\end{equation}
+where $q_{\text{data}}$ is the raw measurement quality, $w_{\text{trust}} \in [0, 1]$ is the observer's consciousness-derived trust weight, and $\tau_{\text{floor}} = 0.3$ ensures that even untrusted observations receive 30\% weight (preventing complete information loss from new or unknown sensors). Table~\ref{tab:trust-fusion} illustrates the effect.
+
+\begin{table}[H]
+\centering
+\caption{Trust-weighted observation fusion examples ($q_{\text{data}} = 0.8$, $\tau_{\text{floor}} = 0.3$).}
+\label{tab:trust-fusion}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Observer Status} & \textbf{$w_{\text{trust}}$} & \textbf{$q_{\text{eff}}$} & \textbf{Effective Weight} \\
+\midrule
+Unknown sensor & 0.0 & 0.24 & 30\% of max \\
+Half-trusted & 0.5 & 0.52 & 65\% of max \\
+Fully trusted & 1.0 & 0.80 & 100\% of max \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Conjunction Risk Assessment}
+
+The collision probability $P_c$ is computed using the Alfano 2D method from the combined covariance at time of closest approach:
+\begin{equation}
+P_c = \frac{1}{2\pi|\Sigma|^{1/2}} \iint_{r^2 \leq R_{\text{HBR}}^2} \exp\left(-\frac{1}{2}\mathbf{r}^T \Sigma^{-1} \mathbf{r}\right) d\mathbf{r}
+\end{equation}
+where $\Sigma$ is the projected 2D covariance matrix in the encounter plane and $R_{\text{HBR}}$ is the combined hard-body radius.
+
+Risk levels are classified by $P_c$ thresholds:
+
+\begin{table}[H]
+\centering
+\caption{Conjunction risk levels and required actions.}
+\label{tab:risk-levels}
+\begin{tabular}{llp{6cm}}
+\toprule
+\textbf{Level} & \textbf{$P_c$ Range} & \textbf{Action} \\
+\midrule
+Negligible & $< 10^{-7}$ & No action \\
+Low & $[10^{-7}, 10^{-5})$ & Standard monitoring \\
+Medium & $[10^{-5}, 10^{-4})$ & Enhanced monitoring, prepare maneuver options \\
+High & $[10^{-4}, 10^{-3})$ & Begin multi-party negotiation \\
+Emergency & $\geq 10^{-3}$ & Execute collision avoidance \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Consciousness Gating for Space Operations}
+
+Five space operations are gated by consciousness tier, with higher-consequence operations requiring higher tiers:
+
+\begin{table}[H]
+\centering
+\caption{Consciousness tier requirements for space operations.}
+\label{tab:space-gating}
+\begin{tabular}{llp{5cm}}
+\toprule
+\textbf{Operation} & \textbf{Minimum Tier} & \textbf{Rationale} \\
+\midrule
+Submit TLE/observation & Observer & Data quantity valued \\
+Create conjunction event & Participant & Prevent false alarms \\
+Update risk/fusion & Citizen & Affects downstream decisions \\
+Create debris bounty & Steward & Financial commitment \\
+Cosign maneuver agreement & Steward & Binding safety commitment \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Discussion}
+
+Space coordination is a demanding test case for consciousness-gated governance because the consequences of failure are irreversible (orbital debris cascades), the coordination must span organizational boundaries (multiple operators with different mandates), and the physics is well-characterized (Keplerian mechanics provides ground truth for testing trust-weighted fusion accuracy).
+
+The Mycelix architecture handles this through the same consciousness gating mechanism used for neighborhood governance (Chapter~\ref{ch:governance}), demonstrating that the fractal governance model (Chapter~\ref{ch:fractal}) extends from family coordination to orbital traffic management without architectural modification---only the tier thresholds and operation semantics change.
+
+
+% ========================================================================
 \chapter{Consciousness as a Security Metric}
 \label{ch:security}
 % ========================================================================
@@ -4367,7 +4786,7 @@ Canvas is used in three contexts: embedded in the Pulse dashboard (Section~\ref{
 
 The \texttt{symthaea-pulse} crate implements the primary operator interface for the \symthaea{} system: a real-time telemetry dashboard with 19+ panes covering every subsystem described in this book. The dashboard is rendered as a terminal UI (TUI) using the \texttt{ratatui} framework, updating at the cognitive loop's cycle rate.
 
-Key panes include: the consciousness level time-series (with $\Phi$, GWT, HOT, and unified $C$ overlaid), the neuromodulator bath concentrations (nine-channel sparkline), the Broca generation log (with quality scores and epistemic gating indicators), the safety level indicator (color-coded Green/Yellow/Orange/Red), the glyph codex activation display (Chapter~\ref{ch:glyphs}), the Eight Harmonies heatmap, governance event feed, knowledge graph statistics, Cantor resonator spectrum, and the radio spectrum waterfall (Chapter~\ref{ch:radio}).
+Key panes include: the consciousness level time-series (with $\Phi$, GWT, HOT, and unified $C$ overlaid), the neuromodulator bath concentrations (nine-channel sparkline), the Broca generation log (with quality scores and epistemic gating indicators), the safety level indicator (color-coded Green/Yellow/Orange/Red), the glyph codex activation display (Chapter~\ref{ch:glyphs}), the Eight Harmonies heatmap, governance event feed, knowledge graph statistics, Cantor resonator spectrum, and the radio spectrum waterfall (Chapter~\ref{ch:meshradio}).
 
 Each pane sources its data from the \texttt{CycleMetadata} struct populated by the cognitive loop's post-processing phase. The Pulse dashboard's HTML export mode generates static reports suitable for archival and publication, providing the consciousness transparency that the compliance framework (Chapter~\ref{ch:ethics}) requires.
 
@@ -4396,7 +4815,7 @@ The web portal demonstrates a key architectural claim: the fractal scaling prope
 
 Existing AI evaluation frameworks suffer from four critical gaps. HELM lacks psychometric rigor (no test-retest reliability, no construct validity). ARC covers a single domain (fluid intelligence). BIG-Bench provides no normative human comparison. And no existing suite tests the effects of pharmacological manipulations on cognitive performance.
 
-Psych-Bench addresses all four gaps with 136+ benchmarks across 32 cognitive domains (originally 26, expanded to include additional domains for normative integration, qualia confidence, coding, mathematics, and worm cognition): executive function, working memory, attention (sustained, selective, divided), social cognition, motor learning, language, metacognition, reasoning (causal, spatial, mathematical, institutional), clinical psychology, affect, creativity, inhibition, consciousness, speech, substrate independence, security, and game-theoretic social cognition.
+Psych-Bench addresses all four gaps with 141 benchmarks across 27 cognitive domains (plus a neuromodulator sub-battery as the 28th): executive function, working memory, attention (sustained, selective, divided), social cognition, motor learning, language, metacognition, reasoning (causal, spatial, mathematical, institutional), clinical psychology, affect, creativity, inhibition, consciousness, speech, substrate independence, security, and game-theoretic social cognition.
 
 \section{Design Principles}
 

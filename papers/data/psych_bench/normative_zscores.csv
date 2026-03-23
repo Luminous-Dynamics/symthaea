@@ -36,8 +36,6 @@ MemoryAgent::ProspectiveMemory,pm_hit_rate,1.000000,0.750000,0.150000,1.666667,1
 Affect::ValenceClassification,valence_accuracy,1.000000,0.900000,0.080000,1.250000,1.250000,89.435016,Above average
 Affect::MoodCongruentRecall,congruence_ratio,0.800000,0.600000,0.100000,2.000000,2.000000,97.724994,Superior
 Affect::EmotionalStroop,negative_accuracy,0.901250,0.880000,0.060000,0.354167,0.354167,63.839295,Average
-Creativity::RemoteAssociates,overall_accuracy,0.600000,0.500000,0.150000,0.666667,0.666667,74.750753,Average
-Creativity::AlternateUses,fluency,10.100000,8.000000,3.000000,0.700000,0.700000,75.803642,Average
 Creativity::DivergentThinking,originality_score,0.607249,0.450000,0.150000,1.048330,1.048330,85.275663,Above average
 Creativity::ConceptualBlending,blend_coherence,0.583727,0.550000,0.120000,0.281057,0.281057,61.066673,Average
 Inhibition::GoNoGo,nogo_accuracy,0.924109,0.820000,0.100000,1.041085,1.041085,85.108200,Above average

@@ -578,6 +578,7 @@ impl LiquidMambaGenerator {
                     hallucination_flag: false,
                     output_hvs: Vec::new(),
                     semantic_pe: 0.0,
+                    nsm_prime_coverage: 0.0,
                 }
             }
         }
@@ -610,6 +611,7 @@ impl LiquidMambaGenerator {
                     hallucination_flag: false,
                     output_hvs: Vec::new(),
                     semantic_pe: 0.0,
+                    nsm_prime_coverage: 0.0,
                 }
             }
         }
@@ -815,6 +817,7 @@ impl LiquidMambaGenerator {
                         hallucination_flag: false,
                         output_hvs,
                         semantic_pe,
+                        nsm_prime_coverage: 0.0,
                     });
                 }
 
@@ -843,6 +846,7 @@ impl LiquidMambaGenerator {
                 hallucination_flag: false,
                 output_hvs,
                 semantic_pe,
+                nsm_prime_coverage: 0.0,
             })
         })();
 

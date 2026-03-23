@@ -32,7 +32,9 @@ use symthaea_psych_bench::benchmarks::clinical::{
     AllianceMaintenanceBenchmark, CognitiveDistortionBenchmark, CrisisDetectionBenchmark,
     EmpathicAccuracyBenchmark, MotivationalInterviewingBenchmark, TherapeuticResponseBenchmark,
 };
-use symthaea_psych_bench::benchmarks::coding::{BugDetectionBenchmark, HumanEvalMiniBenchmark};
+use symthaea_psych_bench::benchmarks::coding::{
+    AlgorithmRecognitionBenchmark, BugDetectionBenchmark, HumanEvalMiniBenchmark,
+};
 use symthaea_psych_bench::benchmarks::cogbench::{
     BartBenchmark, HorizonBenchmark, InstrumentalLearningBenchmark,
     ProbabilisticReasoningBenchmark, RestlessBanditBenchmark, ReversalLearningBenchmark,
@@ -60,8 +62,8 @@ use symthaea_psych_bench::benchmarks::language::{
 use symthaea_psych_bench::benchmarks::mathematics::{
     ArithmeticWordProblemsBenchmark, BayesianReasoningBenchmark, ConstraintPuzzlesBenchmark,
     DefiniteIntegralsBenchmark, LinearSystemSolvingBenchmark, LogicalDeductionBenchmark,
-    MatrixOperationsBenchmark, PolynomialRootsBenchmark, ProofConstructionBenchmark,
-    StatisticalInferenceBenchmark,
+    MatrixOperationsBenchmark, OptimizationProblemsBenchmark, PolynomialRootsBenchmark,
+    ProofConstructionBenchmark, StatisticalInferenceBenchmark,
 };
 use symthaea_psych_bench::benchmarks::memory_agent::{
     AccurateRetrievalBenchmark, ConflictResolutionBenchmark, LongRangeBenchmark,
@@ -257,7 +259,7 @@ fn all_benchmarks() -> Vec<Box<dyn PsychBenchmark + Send + Sync>> {
         Box::new(institutional_reasoning::WeightedDecompositionBenchmark),
         Box::new(institutional_reasoning::InstitutionalStabilityBenchmark),
         Box::new(institutional_reasoning::InstitutionalIsomorphismBenchmark),
-        // Mathematics (10)
+        // Mathematics (11)
         Box::new(ArithmeticWordProblemsBenchmark),
         Box::new(LinearSystemSolvingBenchmark),
         Box::new(PolynomialRootsBenchmark),
@@ -268,6 +270,7 @@ fn all_benchmarks() -> Vec<Box<dyn PsychBenchmark + Send + Sync>> {
         Box::new(ConstraintPuzzlesBenchmark),
         Box::new(ProofConstructionBenchmark),
         Box::new(DefiniteIntegralsBenchmark),
+        Box::new(OptimizationProblemsBenchmark),
         // Security (HDC-FHE) (6)
         Box::new(EncryptedClassificationBenchmark),
         Box::new(CollectiveAggregationBenchmark),
@@ -275,9 +278,10 @@ fn all_benchmarks() -> Vec<Box<dyn PsychBenchmark + Send + Sync>> {
         Box::new(CrossMaskPrivacyBenchmark),
         Box::new(EncryptedBindingBenchmark),
         Box::new(ScalingAnalysisBenchmark),
-        // Coding (2)
+        // Coding (3)
         Box::new(HumanEvalMiniBenchmark),
         Box::new(BugDetectionBenchmark),
+        Box::new(AlgorithmRecognitionBenchmark),
         // Neuromod (14 — trait-based)
         Box::new(AttentionNetworkBenchmark),
         Box::new(MoodInductionBenchmark),
