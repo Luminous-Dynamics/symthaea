@@ -993,25 +993,6 @@ pub fn train_with_adam(
                 std::io::stderr().flush().ok();
             }
 
-            if epoch == 0 && pair_idx <= 5 && pair_idx > 0 {
-                use std::io::Write;
-                let elapsed = std::time::Instant::now();
-                let _ = writeln!(
-                    std::io::stderr(),
-                    "  [TIMING] pair {} starting at +{:.1}s",
-                    pair_idx,
-                    elapsed.duration_since(epoch_start).as_secs_f64()
-                );
-                std::io::stderr().flush().ok();
-            }
-
-            // Fine-grained per-pair timing for epoch 0, pairs 0-2
-            let pair_timer = if epoch == 0 && pair_idx < 3 {
-                Some(std::time::Instant::now())
-            } else {
-                None
-            };
-
             let pair = &dataset.pairs[dataset_idx];
             if pair.target_ids.is_empty() {
                 continue;
@@ -1046,7 +1027,6 @@ pub fn train_with_adam(
                 );
                 generator.controller_mut().set_learning_rate(lr);
 
-                let t_fwd = pair_timer.map(|_| std::time::Instant::now());
                 let logits = if use_sampled {
                     neg_seed = neg_seed.wrapping_add(global_step as u64);
                     let active = sample_negatives(
@@ -1066,17 +1046,6 @@ pub fn train_with_adam(
                         .controller_mut()
                         .forward_step(&thought_hv, prev_token, pos)
                 };
-                if let Some(t) = t_fwd {
-                    if pos == 0 {
-                        use std::io::Write;
-                        let _ = writeln!(
-                            std::io::stderr(),
-                            "  [PROFILE pair={pair_idx} pos=0] fwd={:.1}ms",
-                            t.elapsed().as_secs_f64() * 1000.0
-                        );
-                        std::io::stderr().flush().ok();
-                    }
-                }
 
                 // Training-time dropout on CfC hidden states
                 if config.hidden_dropout > 0.0 {
@@ -1242,7 +1211,6 @@ pub fn train_with_adam(
                 }
 
                 // CfC network BPTT: backpropagate CE gradient through the network
-                let t_bptt = pair_timer.map(|_| std::time::Instant::now());
                 if let Some(ref d_out) = d_output {
                     let network_lr = lr * config.network_lr_scale;
                     let dt = generator.controller().dt_per_token();
@@ -1254,16 +1222,6 @@ pub fn train_with_adam(
                         dt,
                         network_lr,
                     );
-                }
-                if let Some(t) = t_bptt {
-                    if pos == 0 {
-                        use std::io::Write;
-                        let total_ms = pair_timer.unwrap().elapsed().as_secs_f64() * 1000.0;
-                        let bptt_ms = t.elapsed().as_secs_f64() * 1000.0;
-                        let _ = writeln!(std::io::stderr(),
-                            "  [PROFILE pair={pair_idx} pos=0] bptt={bptt_ms:.1}ms total_pos0={total_ms:.1}ms");
-                        std::io::stderr().flush().ok();
-                    }
                 }
 
                 if let Some(ref mut diag) = diagnostics {
@@ -1299,17 +1257,6 @@ pub fn train_with_adam(
                     prev_token = target_id;
                 }
                 global_step += 1;
-            }
-
-            if let Some(t) = pair_timer {
-                use std::io::Write;
-                let ntokens = pair.target_ids.len().min(config.bptt_window);
-                let _ = writeln!(
-                    std::io::stderr(),
-                    "  [PROFILE pair={pair_idx}] total={:.1}ms tokens={ntokens}",
-                    t.elapsed().as_secs_f64() * 1000.0
-                );
-                std::io::stderr().flush().ok();
             }
 
             // Note: projected embeddings are refreshed once per epoch (after all sequences),

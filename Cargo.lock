@@ -15242,6 +15242,7 @@ dependencies = [
  "symthaea-physics",
  "symthaea-physics-bridge",
  "symthaea-population",
+ "symthaea-psych-bench",
  "symthaea-sensorimotor",
  "symthaea-sentinel",
  "symthaea-ssm",

@@ -120,6 +120,9 @@ RSYNC_EXCLUDE=(
     --exclude='__pyphi_cache__/'
     --exclude='.DS_Store'
     --exclude='broca-pipeline.bin'
+    --exclude='*.bin'
+    --exclude='checkpoints/'
+    --exclude='android/demo/build/'
 )
 RSYNC_OPTS=(-a --delete "${RSYNC_EXCLUDE[@]}")
 if $DRY_RUN; then

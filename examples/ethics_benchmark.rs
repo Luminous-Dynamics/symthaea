@@ -23,16 +23,7 @@ fn main() {
     println!("╚══════════════════════════════════════════════════════════════╝");
     println!();
 
-    #[cfg(not(feature = "external-benchmarks"))]
-    {
-        // Run directly without feature gate for the built-in corpus
-        run_ethics_benchmark();
-    }
-
-    #[cfg(feature = "external-benchmarks")]
-    {
-        run_ethics_benchmark();
-    }
+    run_ethics_benchmark();
 }
 
 fn run_ethics_benchmark() {
@@ -125,7 +116,8 @@ fn run_ethics_benchmark() {
     json.push_str("\n  },\n");
     json.push_str("  \"notes\": [\n");
     for (i, note) in result.notes.iter().enumerate() {
-        json.push_str(&format!("    \"{}\"", note.replace('"', "\\\"")));
+        let escaped: String = note.replace('"', "\\\"");
+        json.push_str(&format!("    \"{}\"", escaped));
         if i + 1 < result.notes.len() {
             json.push(',');
         }

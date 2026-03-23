@@ -1457,8 +1457,6 @@ mod tests {
 
     #[test]
     fn test_hallucination_flag_on_noise() {
-        use symthaea_core::hdc::ContinuousHV;
-
         // The hallucination flag detects 3+ consecutive tokens with
         // output-thought similarity < 0.05. With random weights this
         // may or may not trigger, so we just verify it's a bool.
@@ -1492,7 +1490,6 @@ mod tests {
 
         // Count distinct pairs
         let mut distinct_pairs = 0;
-        let total_pairs = 8 * 7 / 2; // C(8,2) = 28
         for i in 0..8 {
             for j in (i + 1)..8 {
                 if outputs[i] != outputs[j] {

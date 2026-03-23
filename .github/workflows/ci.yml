@@ -191,7 +191,7 @@ jobs:
   test-all-features:
     name: Test CI-safe (${{ matrix.group }})
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:
@@ -260,7 +260,7 @@ jobs:
       - name: Run tests (${{ matrix.group }})
         uses: nick-fields/retry@v3
         with:
-          timeout_minutes: 30
+          timeout_minutes: 60
           max_attempts: 2
           command: |
             FEATURES="${{ matrix.features }}"

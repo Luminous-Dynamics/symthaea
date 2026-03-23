@@ -13,6 +13,8 @@ pub mod cogbench;
 pub mod consciousness;
 pub mod creativity;
 pub mod executive;
+#[cfg(feature = "external-benchmarks")]
+pub mod external;
 pub mod inhibition;
 pub mod institutional_reasoning;
 pub mod language;
