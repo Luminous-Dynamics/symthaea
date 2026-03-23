@@ -38,11 +38,11 @@ struct Args {
     hours_ahead: u64,
 
     /// Collision probability threshold (events above this are reported)
-    #[arg(short, long, default_value = "1e-7")]
+    #[arg(short = 't', long, default_value = "1e-7")]
     pc_threshold: f64,
 
     /// Miss distance screening threshold in km
-    #[arg(short, long, default_value = "5.0")]
+    #[arg(short = 'm', long, default_value = "5.0")]
     miss_threshold_km: f64,
 
     /// Path to TLE catalog file (one TLE per 2-3 lines)

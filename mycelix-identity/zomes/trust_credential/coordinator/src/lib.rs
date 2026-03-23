@@ -1,4 +1,6 @@
-//! Trust Credential Coordinator Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Trust Credential Coordinator Zome
 //!
 //! Business logic for K-Vector trust credentials with ZKP proofs.
 //!
@@ -913,6 +915,53 @@ pub struct VerificationResult {
     pub message: String,
 }
 
+/// Get the trust level for an agent, identified by their AgentPubKey.
+///
+/// Derives the agent's DID from their public key using the standard
+/// `did:mycelix:{agent_pubkey}` convention, then queries all non-revoked
+/// trust credentials for that DID. Returns the highest trust tier found.
+///
+/// This is the endpoint called by mycelix-space's observations coordinator
+/// for trust-weighted sensor fusion via `CallTargetCell::OtherRole("identity")`.
+///
+/// Returns the highest `TrustTier` across all active credentials.
+/// If no credentials exist, returns `TrustTier::Observer` (lowest tier).
+#[hdk_extern]
+pub fn get_agent_trust_level(agent: AgentPubKey) -> ExternResult<TrustTier> {
+    // Derive DID from AgentPubKey using the same convention as issue_trust_credential
+    let did = format!("did:mycelix:{}", agent);
+
+    // Query all non-revoked credentials for this DID
+    let anchor = anchor_hash(&format!("subject:{}", did))?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::SubjectToCredential)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut highest_tier = TrustTier::Observer;
+
+    for link in links {
+        let ah = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(ah, GetOptions::default())? {
+            if let Some(cred) = record
+                .entry()
+                .to_app_option::<TrustCredential>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                if !cred.revoked {
+                    // Take the highest tier across all credentials (compare via min_score)
+                    if cred.trust_tier.min_score() > highest_tier.min_score() {
+                        highest_tier = cred.trust_tier.clone();
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(highest_tier)
+}
+
 /// Pure verification logic — no HDK calls, fully testable.
 /// Returns (commitment_valid, range_valid, tier_consistent, proof_format_valid).
 pub fn verify_credential_pure(
@@ -1107,6 +1156,15 @@ mod tests {
             &[],
         );
         assert!(!pv);
+    }
+
+    #[test]
+    fn test_tier_comparison_via_min_score() {
+        // Verify the min_score ordering used by get_agent_trust_level
+        assert!(TrustTier::Guardian.min_score() > TrustTier::Elevated.min_score());
+        assert!(TrustTier::Elevated.min_score() > TrustTier::Standard.min_score());
+        assert!(TrustTier::Standard.min_score() > TrustTier::Basic.min_score());
+        assert!(TrustTier::Basic.min_score() > TrustTier::Observer.min_score());
     }
 
     #[test]

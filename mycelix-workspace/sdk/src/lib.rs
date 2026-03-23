@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root// Clippy configuration - allow certain lints that are too noisy
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+// Clippy configuration - allow certain lints that are too noisy
 #![allow(clippy::type_complexity)]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::unreadable_literal)]
@@ -79,7 +80,6 @@ pub mod matl;
 // TypeScript binding generation (ts-export feature only)
 pub mod agentic;
 pub mod bridge;
-pub mod circular;
 pub mod credentials;
 pub mod economics;
 pub mod epistemic;
@@ -88,6 +88,7 @@ pub mod error;
 mod export_bindings;
 pub mod finance;
 pub mod hyperfeel;
+pub mod space;
 pub mod identity;
 pub mod intentions;
 pub mod pagination;
@@ -135,6 +136,12 @@ pub use finance::{
     FinanceSummaryResponse, TendBalanceResponse, TendLimitResponse,
 };
 pub use zkproof::{GradientProof, GradientProofCircuit, PublicInputs};
+
+// Space cluster exports (SSA: conjunction screening, negotiation, debris bounties)
+pub use space::{
+    ConjunctionAssessment, CreateBountyRequest, CreateProposalRequest, ManeuverOption,
+    OptionTally, ProposalTally, ScreenConjunctionRequest, SpaceClient, VoteRequest,
+};
 
 // Agentic Economy exports (MIP-E-004: Epistemic-Aware AI Agency)
 pub use agentic::{
