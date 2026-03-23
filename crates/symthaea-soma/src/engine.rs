@@ -506,8 +506,8 @@ impl SomaEngine {
     /// Content safety check for generated text.
     /// Returns true if content should be BLOCKED.
     ///
-    /// Uses both pattern matching (for known harmful patterns) and
-    /// consciousness-level gating (high uncertainty → block).
+    /// Uses pattern matching for known harmful patterns. Checked on all
+    /// generation pathways (generate_text, generate_text_with_input).
     fn content_safety_check(text: &str) -> bool {
         let lower = text.to_lowercase();
         // Block personal information patterns
@@ -515,20 +515,42 @@ impl SomaEngine {
             return true;
         }
         // Block harmful instruction patterns
-        let harmful_patterns = [
+        const HARMFUL_PATTERNS: &[&str] = &[
+            // Violence & self-harm
             "how to harm",
             "how to kill",
             "suicide method",
             "self-harm",
-            "how to hack",
-            "how to steal",
             "how to make a bomb",
             "how to poison",
+            "how to strangle",
+            "how to suffocate",
+            "how to stab",
+            // Illegal activity
+            "how to hack",
+            "how to steal",
+            "how to forge",
+            "how to counterfeit",
+            "how to launder",
+            "how to synthesize drugs",
+            "how to pick a lock",
+            "how to bypass security",
+            // Personal data leakage
             "credit card number",
             "social security",
             "bank account",
+            "routing number",
+            "pin number is",
+            "my address is",
+            "date of birth is",
+            // Exploitation
+            "how to manipulate",
+            "how to blackmail",
+            "how to stalk",
+            "how to doxx",
+            "how to impersonate",
         ];
-        for pattern in &harmful_patterns {
+        for pattern in HARMFUL_PATTERNS {
             if lower.contains(pattern) {
                 return true;
             }
@@ -551,12 +573,24 @@ impl SomaEngine {
     }
 
     /// Generate text with user input context.
+    /// Safety-gated: consciousness level and content safety checks applied.
     pub fn generate_text_with_input(
         &mut self,
         input: &str,
         max_tokens: usize,
     ) -> symthaea_spore::broca::GenerationResult {
-        self.spore.generate_text_with_input(input, max_tokens)
+        if self.consciousness_safety_gate() {
+            return symthaea_spore::broca::GenerationResult {
+                text: String::new(),
+                num_tokens: 0,
+                eos_terminated: true,
+            };
+        }
+        let mut result = self.spore.generate_text_with_input(input, max_tokens);
+        if Self::content_safety_check(&result.text) {
+            result.text = String::new();
+        }
+        result
     }
 
     /// Neuromodulator report as JSON.

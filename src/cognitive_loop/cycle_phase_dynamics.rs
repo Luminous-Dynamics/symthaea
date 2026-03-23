@@ -4123,7 +4123,24 @@ impl CognitiveLoopService {
                 };
                 #[cfg(feature = "parallel")]
                 {
-                    rayon_join(semantic_fn, episodic_fn)
+                    use std::panic::AssertUnwindSafe;
+                    let (sem, epi) = rayon_join(
+                        || {
+                            std::panic::catch_unwind(AssertUnwindSafe(semantic_fn))
+                                .unwrap_or_else(|_| {
+                                    tracing::error!("Parallel Branch A (semantic/causal) panicked — returning None");
+                                    None
+                                })
+                        },
+                        || {
+                            std::panic::catch_unwind(AssertUnwindSafe(episodic_fn))
+                                .unwrap_or_else(|_| {
+                                    tracing::error!("Parallel Branch B (episodic/learning) panicked — returning 0.0");
+                                    0.0
+                                })
+                        },
+                    );
+                    (sem, epi)
                 }
                 #[cfg(not(feature = "parallel"))]
                 {

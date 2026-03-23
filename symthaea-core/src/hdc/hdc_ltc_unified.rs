@@ -1615,6 +1615,46 @@ impl HdcLtcUnifiedNeuron {
         &self.weight_momentum
     }
 
+    /// Get mutable reference to weight momentum
+    pub fn weight_momentum_mut(&mut self) -> &mut ContinuousHV {
+        &mut self.weight_momentum
+    }
+
+    /// Get reference to input mask
+    pub fn input_mask_mut(&mut self) -> &mut ContinuousHV {
+        &mut self.input_mask
+    }
+
+    /// Get reference to input momentum
+    pub fn input_momentum_ref(&self) -> &ContinuousHV {
+        &self.input_momentum
+    }
+
+    /// Get mutable reference to input momentum
+    pub fn input_momentum_mut(&mut self) -> &mut ContinuousHV {
+        &mut self.input_momentum
+    }
+
+    /// Get reference to tau modulator
+    pub fn tau_modulator_ref(&self) -> &ContinuousHV {
+        &self.tau_modulator
+    }
+
+    /// Get mutable reference to tau modulator
+    pub fn tau_modulator_mut(&mut self) -> &mut ContinuousHV {
+        &mut self.tau_modulator
+    }
+
+    /// Get reference to gate weight
+    pub fn gate_weight_ref(&self) -> &ContinuousHV {
+        &self.gate_weight
+    }
+
+    /// Get reference to gate bias
+    pub fn gate_bias_ref(&self) -> &ContinuousHV {
+        &self.gate_bias
+    }
+
     /// Reset momentum accumulators (useful for fine-tuning)
     pub fn reset_momentum(&mut self) {
         self.weight_momentum = ContinuousHV::zero(self.config.dimension);
@@ -1937,6 +1977,16 @@ impl HdcLtcUnifiedNetwork {
     /// Get mutable layer by index
     pub fn layer_mut(&mut self, idx: usize) -> Option<&mut Vec<HdcLtcUnifiedNeuron>> {
         self.layers.get_mut(idx)
+    }
+
+    /// Get network configuration
+    pub fn config(&self) -> &UnifiedNetworkConfig {
+        &self.config
+    }
+
+    /// Get layer binding vector by index
+    pub fn layer_binding(&self, idx: usize) -> &ContinuousHV {
+        &self.layer_bindings[idx]
     }
 
     /// Get the bundled output of a specific layer.

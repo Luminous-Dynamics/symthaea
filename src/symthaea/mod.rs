@@ -2653,6 +2653,10 @@ impl Symthaea {
                         rationale,
                     },
                     GDC::QueryActiveProposals => DispatchCommand::QueryActiveProposals,
+                    GDC::EvaluateAsset { .. } => {
+                        // EvaluateAsset handled directly in the bridge — not dispatched to conductor
+                        continue;
+                    }
                 };
                 if cmd_tx.send(dc).is_err() {
                     break;

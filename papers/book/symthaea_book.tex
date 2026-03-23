@@ -5258,6 +5258,19 @@ Taken together, these results provide the first external anchor points for \symt
 
 The value of consciousness-first AI is not in beating RL at control tasks or LLMs at language tasks. It is in providing a unified architecture that can do all of these things --- poorly, honestly, and with mechanistic transparency about \textit{why} it succeeds or fails. External validation makes these claims testable rather than aspirational.
 
+\section{Reproducibility}
+
+All benchmark results in this chapter can be reproduced from the repository. Each benchmark saves machine-readable JSON to \texttt{data/benchmarks/}:
+
+\begin{itemize}
+  \item \textbf{Ethics}: \texttt{cargo run --example benchmark\_moral\_unified --release} $\to$ \texttt{data/benchmarks/moral\_unified/results.json}
+  \item \textbf{Sleep-EDF}: \texttt{cargo run --example benchmark\_sleepstage --release} $\to$ \texttt{data/benchmarks/sleep-edf/results.json}
+  \item \textbf{ARC-AGI}: \texttt{cargo run --example arc\_agi\_benchmark --release} $\to$ \texttt{data/benchmarks/external/arc\_agi\_synthetic.json}
+  \item \textbf{Ablation}: \texttt{cargo run --example benchmark\_ablation\_ethics --release} $\to$ \texttt{data/benchmarks/ethics/ablation\_results.json}
+\end{itemize}
+
+External datasets (Sleep-EDF from PhysioNet, ARC-AGI from GitHub, Hendrycks ETHICS, Social Chemistry 292K from AllenAI) are cached in \texttt{data/} and can be re-downloaded via scripts in \texttt{scripts/}.
+
 
 % ========================================================================
 \chapter{Butlin Consciousness Indicators}

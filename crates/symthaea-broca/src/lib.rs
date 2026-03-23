@@ -54,6 +54,7 @@ pub mod encoder;
 pub mod evaluation;
 pub mod gating;
 pub mod generator;
+pub mod gpu_cfc;
 pub mod tokenizer;
 pub mod training;
 
