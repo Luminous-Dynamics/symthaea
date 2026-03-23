@@ -496,6 +496,39 @@ else
 fi
 echo
 
+# --- Post-sync workspace validation -----------------------------------------
+#
+# Catch workspace conflicts before committing. A bare [workspace] in a
+# sub-crate Cargo.toml creates a second workspace root, which breaks
+# cargo in the standalone repo.
+
+if ! $DRY_RUN; then
+    info "Validating workspace structure..."
+    VALIDATION_FAILED=false
+
+    # 1. Check that cargo can parse the workspace
+    if ! cargo metadata --format-version 1 --manifest-path "${STANDALONE_REPO}/Cargo.toml" > /dev/null 2>&1; then
+        error "cargo metadata failed — likely workspace conflict (e.g., [workspace] in sub-crate)"
+    fi
+    ok "cargo metadata succeeds"
+
+    # 2. Check for bare [workspace] lines in sub-crate Cargo.tomls
+    BARE_WORKSPACE=$(find "${STANDALONE_REPO}" -name "Cargo.toml" \
+        -not -path "${STANDALONE_REPO}/Cargo.toml" \
+        -not -path "*/target/*" \
+        -not -path "*/stubs/*" \
+        -exec grep -l '^[[:space:]]*\[workspace\][[:space:]]*$' {} + 2>/dev/null || true)
+    if [ -n "$BARE_WORKSPACE" ]; then
+        printf "${RED}[error]${RESET} Sub-crate Cargo.toml(s) contain bare [workspace] (creates second workspace root):\n"
+        echo "$BARE_WORKSPACE" | while read -r f; do
+            echo "  ${f#${STANDALONE_REPO}/}"
+        done
+        exit 1
+    fi
+    ok "No bare [workspace] in sub-crates"
+    echo
+fi
+
 # --- Show diff summary --------------------------------------------------------
 
 info "Changes in standalone repo:"
