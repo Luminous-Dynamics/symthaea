@@ -235,6 +235,7 @@ impl CognitiveLoopService {
     ///
     /// Use sparingly — normal flow waits for sleep→wake transition.
     pub fn apply_pending_calibration(&mut self) {
+        use super::super::thresholds::{NEUROMOD_BASELINE_MAX, NEUROMOD_BASELINE_MIN};
         if let Some(mut cal) = self.neuromod.pending_calibration.take() {
             self.neuromod.pending_calibration_since_cycle = None;
             // Record in history before applying (captures the intended adjustment)
@@ -249,63 +250,75 @@ impl CognitiveLoopService {
             for (transmitter, nudge) in &nudges {
                 let applied = match transmitter.as_str() {
                     "DA" => {
-                        self.neuromod
-                            .bath
-                            .dopamine
-                            .adjust_baseline(*nudge, 0.2, 0.8);
+                        self.neuromod.bath.dopamine.adjust_baseline(
+                            *nudge,
+                            NEUROMOD_BASELINE_MIN,
+                            NEUROMOD_BASELINE_MAX,
+                        );
                         true
                     }
                     "NE" | "NE-alpha" | "NE-beta" => {
-                        self.neuromod
-                            .bath
-                            .noradrenaline
-                            .adjust_baseline(*nudge, 0.2, 0.8);
+                        self.neuromod.bath.noradrenaline.adjust_baseline(
+                            *nudge,
+                            NEUROMOD_BASELINE_MIN,
+                            NEUROMOD_BASELINE_MAX,
+                        );
                         true
                     }
                     "5-HT" => {
-                        self.neuromod
-                            .bath
-                            .serotonin
-                            .adjust_baseline(*nudge, 0.2, 0.8);
+                        self.neuromod.bath.serotonin.adjust_baseline(
+                            *nudge,
+                            NEUROMOD_BASELINE_MIN,
+                            NEUROMOD_BASELINE_MAX,
+                        );
                         true
                     }
                     "ACh" => {
-                        self.neuromod
-                            .bath
-                            .acetylcholine
-                            .adjust_baseline(*nudge, 0.2, 0.8);
+                        self.neuromod.bath.acetylcholine.adjust_baseline(
+                            *nudge,
+                            NEUROMOD_BASELINE_MIN,
+                            NEUROMOD_BASELINE_MAX,
+                        );
                         true
                     }
                     "GABA" | "GABA-A" | "GABA-B" => {
-                        self.neuromod.bath.gaba.adjust_baseline(*nudge, 0.2, 0.8);
+                        self.neuromod.bath.gaba.adjust_baseline(
+                            *nudge,
+                            NEUROMOD_BASELINE_MIN,
+                            NEUROMOD_BASELINE_MAX,
+                        );
                         true
                     }
                     "Oxytocin" => {
-                        self.neuromod
-                            .bath
-                            .oxytocin
-                            .adjust_baseline(*nudge, 0.2, 0.8);
+                        self.neuromod.bath.oxytocin.adjust_baseline(
+                            *nudge,
+                            NEUROMOD_BASELINE_MIN,
+                            NEUROMOD_BASELINE_MAX,
+                        );
                         true
                     }
                     "Glutamate" => {
-                        self.neuromod
-                            .bath
-                            .glutamate
-                            .adjust_baseline(*nudge, 0.2, 0.8);
+                        self.neuromod.bath.glutamate.adjust_baseline(
+                            *nudge,
+                            NEUROMOD_BASELINE_MIN,
+                            NEUROMOD_BASELINE_MAX,
+                        );
                         true
                     }
                     "Adenosine" => {
-                        self.neuromod
-                            .bath
-                            .adenosine
-                            .adjust_baseline(*nudge, 0.2, 0.8);
+                        self.neuromod.bath.adenosine.adjust_baseline(
+                            *nudge,
+                            NEUROMOD_BASELINE_MIN,
+                            NEUROMOD_BASELINE_MAX,
+                        );
                         true
                     }
                     "Endocannabinoid" => {
-                        self.neuromod
-                            .bath
-                            .endocannabinoid
-                            .adjust_baseline(*nudge, 0.2, 0.8);
+                        self.neuromod.bath.endocannabinoid.adjust_baseline(
+                            *nudge,
+                            NEUROMOD_BASELINE_MIN,
+                            NEUROMOD_BASELINE_MAX,
+                        );
                         true
                     }
                     _ => false,

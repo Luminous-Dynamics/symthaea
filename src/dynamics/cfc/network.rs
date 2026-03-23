@@ -636,6 +636,11 @@ impl CfCNetwork {
 
         let mut total_loss = 0.0f32;
 
+        // CONTIGUITY SAFETY: All .expect("... not contiguous") calls in this function
+        // are safe. ndarray Array1/Array2 created via ::zeros() or stored as struct
+        // fields use default C-contiguous layout. as_slice()/as_slice_mut() only fails
+        // on non-contiguous views (transposed 2D, strided subviews). Every array here
+        // is either freshly allocated or a contiguous struct field.
         self.adam_output.t += 1;
         let t_adam = self.adam_output.t as f32;
         let bc1_out = 1.0 - self.adam_output.beta1.powf(t_adam);

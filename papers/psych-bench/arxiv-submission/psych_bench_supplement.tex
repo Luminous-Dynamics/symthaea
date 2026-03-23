@@ -328,7 +328,7 @@ Clinical & 2.00 & 2.00 & 2.00 & 2.00 & 2.00 & 2.00 & 0.000 \\
 Coding & 1.79 & 1.84 & 1.73 & 1.74 & 1.63 & 1.75 & 0.069 \\
 CogBench & 0.58 & 0.51 & 0.58 & 0.56 & 0.47 & 0.54 & 0.045 \\
 Consciousness & 0.69 & 0.71 & 0.73 & 0.61 & 0.64 & 0.68 & 0.045 \\
-\textbf{Creativity} & \textbf{0.80} & \textbf{0.52} & \textbf{0.34} & \textbf{1.21} & \textbf{$-$0.27} & \textbf{0.52} & \textbf{0.491} \\
+\textbf{Creativity} & \textbf{0.67} & \textbf{1.12} & \textbf{1.16} & \textbf{1.37} & \textbf{0.53} & \textbf{0.97} & \textbf{0.316} \\
 Executive & 0.72 & 1.10 & 1.19 & 0.95 & 1.15 & 1.02 & 0.172 \\
 Inhibition & 1.57 & 1.54 & 1.50 & 1.48 & 1.54 & 1.52 & 0.031 \\
 InstitReasoning & 2.25 & 2.25 & 2.25 & 2.25 & 2.25 & 2.25 & 0.000 \\
@@ -347,10 +347,10 @@ SustainedAttention & 2.19 & 2.20 & 2.20 & 2.19 & 2.19 & 2.19 & 0.004 \\
 ToMBench & 1.08 & 1.02 & 1.02 & 0.95 & 0.95 & 1.00 & 0.050 \\
 WorM & 0.73 & 0.77 & 0.86 & 0.73 & 0.68 & 0.75 & 0.058 \\
 \midrule
-\multicolumn{6}{l}{\emph{Grand mean (unweighted domain)}} & 1.27 & 0.024 \\
+\multicolumn{6}{l}{\emph{Grand mean (unweighted domain)}} & 1.25 & 0.065 \\
 \end{longtable}
 
-\noindent The Creativity domain shows anomalously high cross-seed variance (SD $= 0.491$), primarily driven by the RemoteAssociates benchmark whose semantic associations are seed-dependent (see Discussion). Mathematics (SD $= 0.187$), MemoryAgent (SD $= 0.199$), and Executive (SD $= 0.172$) show moderate variance reflecting genuine sensitivity to stimulus configuration. The remaining 23 domains have SD $< 0.12$, with 8 domains showing SD $< 0.01$ (effectively deterministic).
+\noindent The Creativity domain shows the highest cross-seed variance (SD $= 0.316$), reduced from SD $= 0.49$ after fixing the RemoteAssociates semantic adapter to use a stable base seed, but still reflecting that creative task performance depends on stimulus configuration. Mathematics (SD $= 0.187$), MemoryAgent (SD $= 0.199$), and Executive (SD $= 0.172$) show moderate variance reflecting genuine sensitivity to stimulus configuration. The remaining 23 domains have SD $< 0.12$, with 8 domains showing SD $< 0.01$ (effectively deterministic).
 
 % ============================================================
 % Section S3: Moral Topology Analysis

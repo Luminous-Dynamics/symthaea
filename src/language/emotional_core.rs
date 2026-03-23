@@ -362,7 +362,7 @@ impl EmotionalCore {
                 .iter()
                 .map(|kw| if text_lower.contains(kw) { 1.0 } else { 0.0 })
                 .sum::<f32>()
-                / keywords.len() as f32;
+                / keywords.len().max(1) as f32;
             emotion_scores.insert(emotion.to_string(), score);
         }
 

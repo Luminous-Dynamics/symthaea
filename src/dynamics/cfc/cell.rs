@@ -466,6 +466,14 @@ impl CfCCell {
         let hidden_dim = self.config.hidden_dim;
         let effective_input_dim = cache.processed_input.len();
 
+        // CONTIGUITY SAFETY: All .expect("... not contiguous") calls below are safe.
+        // ndarray Array1/Array2 created via ::zeros() or ::from_vec() use default
+        // C-contiguous (row-major) memory layout. as_slice()/as_slice_mut() only
+        // fails on non-contiguous *views* (e.g., transposed 2D slices or strided
+        // subviews). Every array here is either freshly allocated or a cached 1D
+        // array from the forward pass — all guaranteed contiguous.
+        // Ref: https://docs.rs/ndarray/latest/ndarray/type.Array1.html
+
         // Activation derivative (SiLU default)
         // d/dx[x * sigmoid(x)] = sigmoid(x) + x * sigmoid(x) * (1 - sigmoid(x))
         let sigma_prime: Array1<f32> = cache.z.mapv(|x| {

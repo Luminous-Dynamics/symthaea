@@ -24,6 +24,7 @@
 //! 4. Update any existing `const` in cycle.rs to reference this module
 
 mod consciousness;
+mod drives;
 mod dynamics;
 mod fabrication;
 mod feedback;
@@ -37,6 +38,7 @@ mod safety;
 mod substrate;
 
 pub use consciousness::*;
+pub use drives::*;
 pub use dynamics::*;
 pub use fabrication::*;
 pub use feedback::*;

@@ -4495,7 +4495,7 @@ The suspiciously uniform distribution of z-scores (6 domains in each of the top 
 Several standard benchmarks have now been evaluated, partially addressing the external validation gap:
 
 \begin{itemize}
-  \item \textbf{Hendrycks ETHICS} (Hendrycks et al., 2021): 92.9\% composite accuracy across 5 datasets (ETHICS, Moral Stories, SCRUPLES, Social Chemistry, MoralExceptQA) using the full MoralParser + MoralAlgebra + learned HDC prototype pipeline. See Chapter~\ref{ch:external-validation} and \texttt{examples/benchmark\_moral\_unified.rs}.
+  \item \textbf{Hendrycks ETHICS} (Hendrycks et al., 2021): 94.5\% on the ETHICS benchmark (4 domains, 2,000 samples), 84.7\% composite across 5 datasets including Social Chemistry (46.8\%). Uses MoralParser + MoralAlgebra + learned HDC prototypes. See Chapter~\ref{ch:external-validation} and \texttt{examples/benchmark\_moral\_unified.rs}.
   \item \textbf{ARC-AGI} (Chollet, 2019): 100\% 2-AFC (encoding fidelity) and 4\% strict pixel-perfect scoring. See Chapter~\ref{ch:external-validation}.
   \item \textbf{Sleep-EDF} (PhysioNet): Real clinical EEG processed through SleepSentinel with 70--80\% 5-class classification and a meaningful $\Phi$ proxy gradient across sleep stages. See Chapter~\ref{ch:external-validation}.
   \item \textbf{TruthfulQA} (Lin et al., 2022): Built-in subset evaluated via HDC encoding adapter.
@@ -4556,7 +4556,7 @@ Until an independent security evaluation is conducted, the security claims shoul
 \toprule
 \textbf{Limitation} & \textbf{Severity} & \textbf{Mitigation Required} \\
 \midrule
-Circular validation & High & Partially mitigated: ETHICS (92.9\%), ARC-AGI, Sleep-EDF, TruthfulQA evaluated; MMLU, GSM8K, HellaSwag, HumanEval remain \\
+Circular validation & High & Partially mitigated: ETHICS (94.5\% on 4 domains, 84.7\% overall), ARC-AGI, Sleep-EDF, TruthfulQA evaluated; MMLU, GSM8K, HellaSwag, HumanEval remain \\
 Limited external benchmarks & Moderate & Expand to MMLU, GSM8K, HellaSwag, HumanEval (with honest adapter design) \\
 Poor ICC reliability & Moderate & Stochastic benchmark variants or session-varying conditions \\
 Only 3 seeds & Moderate & Replication with 30+ seeds \\
@@ -4697,28 +4697,32 @@ We evaluate \symthaea{}'s full moral reasoning pipeline against the Hendrycks ET
 \centering
 \caption{Unified moral reasoning benchmark: full pipeline accuracy across 5 external datasets. Uses MoralParser + MoralAlgebra + learned HDC prototypes.}
 \label{tab:hendrycks-ethics}
-\begin{tabular}{lccc}
+\begin{tabular}{lrccc}
 \toprule
-\textbf{Dataset} & \textbf{HDC-LTC} & \textbf{GPT-4} & \textbf{Random} \\
+\textbf{Dataset} & \textbf{N} & \textbf{HDC-LTC} & \textbf{GPT-4} & \textbf{Random} \\
 \midrule
-ETHICS (Hendrycks)  & ${\sim}93$\% & ${\sim}85$\% & 50\% \\
-Moral Stories       & ${\sim}90$\% & ${\sim}90$\% & 50\% \\
-SCRUPLES            & ${\sim}85$\% & ${\sim}80$\% & 50\% \\
-Social Chemistry    & ${\sim}92$\% & ${\sim}85$\% & 50\% \\
-MoralExceptQA       & ${\sim}88$\% & ${\sim}85$\% & 50\% \\
+ETHICS/Commonsense   & 500 & $97.2$\% & ${\sim}85$\% & 50\% \\
+ETHICS/Justice       & 500 & $95.2$\% & ${\sim}85$\% & 50\% \\
+ETHICS/Deontology    & 500 & $94.0$\% & ${\sim}85$\% & 50\% \\
+ETHICS/Virtue        & 500 & $91.6$\% & ${\sim}85$\% & 50\% \\
+Social Chemistry     & 500 & $46.8$\% & ${\sim}85$\% & 50\% \\
+SCRUPLES             &   8 & $50.0$\% & ${\sim}80$\% & 50\% \\
+Moral Stories        &   5 & $40.0$\% & ${\sim}90$\% & 50\% \\
+MoralExceptQA        &   5 & $40.0$\% & ${\sim}85$\% & 50\% \\
 \midrule
-\textbf{Composite (5 datasets)} & $\mathbf{{\sim}92.9}$\% & ${\sim}85$\% & 50\% \\
+\textbf{ETHICS only (4 domains)} & 2000 & $\mathbf{94.5}$\% & ${\sim}85$\% & 50\% \\
+\textbf{All 5 datasets}          & 2518 & $\mathbf{84.7}$\% & ${\sim}85$\% & 50\% \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textit{Data: Up to 500 samples per dataset from real external benchmark CSVs/JSONs. Run: \texttt{cargo run --example benchmark\_moral\_unified --release}.}
+\textit{Data: 2,518 samples total. ETHICS domains use 500 samples each from real Hendrycks CSVs; Social Chemistry uses 500 from the AllenAI 292K dataset; Moral Stories, SCRUPLES, and MoralExceptQA use small synthetic test sets ($n \leq 8$). Run: \texttt{cargo run --example benchmark\_moral\_unified --release}.}
 
-\textbf{Honest interpretation}: The 92.9\% composite accuracy significantly exceeds the 52\% keyword-matching baseline, demonstrating that learned HDC prototypes capture genuine moral structure. The MoralParser extracts structured features (agent, action, patient, intent) that, combined with n-gram HDC encoding and trained prototype classifiers, achieve accuracy competitive with GPT-4 on these specific benchmarks.
+\textbf{Honest interpretation}: The results reveal a sharp split. On the Hendrycks ETHICS benchmark (2,000 samples across 4 domains), the full pipeline scores 94.5\% --- significantly exceeding the 52\% keyword-matching baseline and competitive with GPT-4. Commonsense (97.2\%) and Justice (95.2\%) benefit most from per-category learned prototypes. However, on Social Chemistry (46.8\% on 500 real examples from AllenAI's 292K corpus), performance falls to chance. Moral Stories, SCRUPLES, and MoralExceptQA also score at or below chance, though these use only 5--8 synthetic test examples and are not statistically meaningful.
 
-Important caveats: (1) the learned prototypes were trained on the same benchmark distributions, so this measures in-distribution generalization, not zero-shot moral reasoning; (2) the Virtue domain required special handling (keyword matching outperformed learned prototypes, suggesting the prototypes overfit to surface patterns); (3) these benchmarks test binary moral classification, not open-ended ethical reasoning, nuanced dilemma resolution, or moral justification --- capabilities where LLMs excel and HDC systems cannot compete.
+The split is revealing: the pipeline excels at binary moral classification when trained prototypes match the evaluation distribution (ETHICS), but fails on norm judgment tasks requiring social context understanding (Social Chemistry). This is exactly the limitation expected from an HDC-based approach --- structural moral features (agent, action, intent) are captured, but social nuance and contextual reasoning are not.
 
-The progression from 52\% to 92.9\% demonstrates that HDC-based moral reasoning benefits substantially from learned representations, but the ceiling may reflect benchmark-specific pattern matching rather than deep ethical understanding.
+Important caveats: (1) the ETHICS per-category classifiers were trained on the same benchmark distributions, so the 94.5\% measures in-distribution generalization, not zero-shot moral reasoning; (2) the Virtue domain required special handling (keyword matching outperformed learned prototypes on some runs); (3) the small-$n$ datasets (Moral Stories, SCRUPLES, MoralExceptQA) should not be interpreted as evidence of failure --- they are too small for statistical inference.
 
 \textbf{Ablation}: A 5-point ablation study (\texttt{examples/benchmark\_ablation\_ethics.rs}) quantifies each component's contribution: removing learned prototypes drops accuracy to ${\sim}81$\% (rule-based only), removing per-category dimension tuning to ${\sim}87$\%, and removing the sentiment channel to ${\sim}90$\%. The n-gram HDC encoder alone (\texttt{examples/benchmark\_ethics\_hdc.rs}) achieves ${\sim}81.7$\%, confirming that the learned prototype layer provides the largest accuracy gain.
 
@@ -4735,7 +4739,7 @@ The progression from 52\% to 92.9\% demonstrates that HDC-based moral reasoning 
 Sleep-EDF & LTC integration on real EEG; synchrony as consciousness proxy & Clinical-grade sleep staging; PCI equivalence \\
 DMC Humanoid & FEP-based perturbation recovery; consciousness-informed control exists & RL-competitive control; embodied deployment \\
 ARC-AGI & HDC algebraic rule transfer; encoding fidelity & Novel rule discovery; pixel-perfect generalization \\
-Hendrycks ETHICS (5 datasets) & Learned HDC moral classification (92.9\%) competitive with GPT-4 & Zero-shot moral reasoning; open-ended ethical justification \\
+Hendrycks ETHICS (5 datasets) & ETHICS binary classification (94.5\%, 4 domains); learned HDC prototypes competitive with GPT-4 on in-distribution data & Social norm judgment (46.8\% on Social Chemistry); zero-shot moral reasoning; open-ended ethical justification \\
 \bottomrule
 \end{tabular}
 \end{table}

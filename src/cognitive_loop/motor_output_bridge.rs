@@ -488,21 +488,23 @@ impl RobotActuatorCommand {
         // Scale to joint angle range (±45° = ±0.785 rad)
         let scale = std::f64::consts::FRAC_PI_4; // π/4
 
+        use super::thresholds::{JOINT_ELBOW_SCALE, JOINT_KNEE_SCALE, JOINT_SHOULDER_SCALE};
+
         // Left leg: hip (0), knee (1)
         joints[0] = self.cpg_outputs[0] * scale;
-        joints[1] = self.cpg_outputs[1] * scale * 0.7; // knee has less range
+        joints[1] = self.cpg_outputs[1] * scale * JOINT_KNEE_SCALE;
 
         // Right leg: hip (2), knee (3)
         joints[2] = self.cpg_outputs[2] * scale;
-        joints[3] = self.cpg_outputs[3] * scale * 0.7;
+        joints[3] = self.cpg_outputs[3] * scale * JOINT_KNEE_SCALE;
 
         // Left arm: shoulder (4), elbow (5)
-        joints[4] = self.cpg_outputs[4] * scale * 0.5; // arms swing less
-        joints[5] = self.cpg_outputs[5] * scale * 0.3;
+        joints[4] = self.cpg_outputs[4] * scale * JOINT_SHOULDER_SCALE;
+        joints[5] = self.cpg_outputs[5] * scale * JOINT_ELBOW_SCALE;
 
         // Right arm: shoulder (6), elbow (7)
-        joints[6] = self.cpg_outputs[6] * scale * 0.5;
-        joints[7] = self.cpg_outputs[7] * scale * 0.3;
+        joints[6] = self.cpg_outputs[6] * scale * JOINT_SHOULDER_SCALE;
+        joints[7] = self.cpg_outputs[7] * scale * JOINT_ELBOW_SCALE;
 
         // Joints 8-20: centered (torso, head, hands, feet)
 

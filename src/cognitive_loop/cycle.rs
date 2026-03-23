@@ -104,12 +104,15 @@ impl CognitiveLoopService {
             // Frustration → dampen exploration (noisy signals, don't overfit to errors)
             // Flow → boost exploration (user engaged, safe to explore)
             // Science: Yerkes-Dodson (1908) — moderate arousal optimal for learning
-            if state.frustration > 0.5 {
-                self.carryover.quality.last_exploration_bonus *=
-                    1.0 - 0.3 * (state.frustration - 0.5) as f32;
+            if state.frustration > super::thresholds::FRUSTRATION_DAMPEN_THRESHOLD {
+                self.carryover.quality.last_exploration_bonus *= 1.0
+                    - super::thresholds::FRUSTRATION_DAMPEN_GAIN
+                        * (state.frustration - super::thresholds::FRUSTRATION_DAMPEN_THRESHOLD)
+                            as f32;
             }
             if state.is_in_flow() {
-                self.carryover.quality.last_exploration_bonus += 0.05;
+                self.carryover.quality.last_exploration_bonus +=
+                    super::thresholds::FLOW_EXPLORATION_INCREMENT;
             }
 
             // USI → neuromodulator coupling (Sapolsky 2004; Schultz 1997)
@@ -118,9 +121,10 @@ impl CognitiveLoopService {
             // Gentle nudges toward current baseline ± 0.03, naturally decays via bath dynamics
             let frustration = state.frustration as f32;
             let engagement = state.engagement as f32;
-            if frustration > 0.4 {
+            if frustration > super::thresholds::FRUSTRATION_NE_NUDGE_THRESHOLD {
                 let ne_base = self.neuromod.bath.noradrenaline.baseline_val();
-                let ne_nudge = 0.03 * (frustration - 0.4);
+                let ne_nudge = super::thresholds::FRUSTRATION_NE_NUDGE_SCALE
+                    * (frustration - super::thresholds::FRUSTRATION_NE_NUDGE_THRESHOLD);
                 self.neuromod
                     .bath
                     .noradrenaline
@@ -128,11 +132,17 @@ impl CognitiveLoopService {
             }
             if state.is_in_flow() {
                 let da_base = self.neuromod.bath.dopamine.baseline_val();
-                self.neuromod.bath.dopamine.set_baseline(da_base + 0.02);
-            } else if engagement < 0.3 {
+                self.neuromod
+                    .bath
+                    .dopamine
+                    .set_baseline(da_base + super::thresholds::FLOW_DA_NUDGE);
+            } else if (engagement as f64) < super::thresholds::ENGAGEMENT_LOW_THRESHOLD {
                 // Disengagement → slight DA reduction (anhedonia pathway)
                 let da_base = self.neuromod.bath.dopamine.baseline_val();
-                self.neuromod.bath.dopamine.set_baseline(da_base - 0.01);
+                self.neuromod
+                    .bath
+                    .dopamine
+                    .set_baseline(da_base - super::thresholds::DISENGAGEMENT_DA_NUDGE);
             }
         }
 

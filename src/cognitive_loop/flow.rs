@@ -105,7 +105,7 @@ impl FlowState {
             && prediction_confidence > Self::FLOW_CONFIDENCE_THRESHOLD;
 
         // Update running averages (EMA)
-        let alpha = 0.2;
+        let alpha = super::thresholds::EMA_ALPHA_FLOW;
         self.avg_error = self.avg_error * (1.0 - alpha) + prediction_error * alpha;
         self.avg_coherence = self.avg_coherence * (1.0 - alpha) + coherence * alpha;
 
@@ -167,7 +167,7 @@ impl FlowState {
             && prediction_confidence > Self::FLOW_CONFIDENCE_THRESHOLD;
 
         // Update running averages (EMA)
-        let alpha = 0.2;
+        let alpha = super::thresholds::EMA_ALPHA_FLOW;
         self.avg_error = self.avg_error * (1.0 - alpha) + prediction_error * alpha;
         self.avg_coherence = self.avg_coherence * (1.0 - alpha) + coherence * alpha;
 

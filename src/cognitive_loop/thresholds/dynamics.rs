@@ -943,3 +943,18 @@ pub const STILLNESS_BUDGET_THRESHOLD: f64 = 0.5;
 
 /// Maximum attention budget contraction from Sacred Stillness.
 pub const STILLNESS_BUDGET_CONTRACT_CAP: f64 = 0.3;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MOTOR OUTPUT — JOINT SCALE FACTORS
+// ═══════════════════════════════════════════════════════════════════════════════
+// Biomechanical heuristics for humanoid joint mapping from HDC motor commands.
+// Approximate anatomical ROM ratios relative to hip reference.
+
+/// Knee joint scale — reduced ROM relative to hip (anatomical: ~70%).
+pub const JOINT_KNEE_SCALE: f64 = 0.7;
+
+/// Shoulder joint scale — arm swing amplitude relative to hip stride.
+pub const JOINT_SHOULDER_SCALE: f64 = 0.5;
+
+/// Elbow joint scale — distal arm swing, less than shoulder.
+pub const JOINT_ELBOW_SCALE: f64 = 0.3;
