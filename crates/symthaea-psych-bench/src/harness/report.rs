@@ -765,6 +765,16 @@ impl BenchmarkReport {
                 "constraint_queens_8_accuracy",
                 &bl.mathematics,
             ),
+            (
+                "variance_estimation_accuracy",
+                "variance_estimation_accuracy",
+                &bl.mathematics,
+            ),
+            (
+                "mean_estimation_error",
+                "mean_estimation_accuracy",
+                &bl.mathematics,
+            ),
             ("tautology_accuracy", "tautology_accuracy", &bl.mathematics),
             (
                 "derivation_accuracy",

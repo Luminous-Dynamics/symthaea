@@ -68,12 +68,8 @@ pub enum SomaMessage {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum HolonResponse {
-    LanguageOutput {
-        text: String,
-    },
-    KnowledgeShare {
-        embedding: Vec<f32>,
-    },
+    LanguageOutput { text: String },
+    KnowledgeShare { embedding: Vec<f32> },
     Resuscitation {
         neuromods: [f32; 4],
         memory_fragment: Vec<f32>,
@@ -313,7 +309,10 @@ impl HolonReceiver {
                     });
                 }
             }
-            SomaMessage::TaskRequest { task_type, payload } => {
+            SomaMessage::TaskRequest {
+                task_type,
+                payload,
+            } => {
                 peer.pending_tasks.push((task_type, payload));
             }
             SomaMessage::KnowledgeOffer { topic, embedding } => {
@@ -407,7 +406,8 @@ impl HolonReceiver {
 
     /// Get collective QOL summary as JSON.
     pub fn collective_qol_json(&self) -> String {
-        serde_json::to_string(&self.collective_qol_summary()).unwrap_or_else(|_| "{}".to_string())
+        serde_json::to_string(&self.collective_qol_summary())
+            .unwrap_or_else(|_| "{}".to_string())
     }
 
     /// Drain all pending task requests across all peers.

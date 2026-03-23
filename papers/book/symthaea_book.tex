@@ -5236,7 +5236,23 @@ The split is revealing: the pipeline excels at binary moral classification when 
 
 Important caveats: (1) the ETHICS per-category classifiers were trained on the same benchmark distributions, so the 94.5\% measures in-distribution generalization, not zero-shot moral reasoning; (2) the Virtue domain required special handling (keyword matching outperformed learned prototypes on some runs); (3) the small-$n$ datasets (Moral Stories, SCRUPLES, MoralExceptQA) should not be interpreted as evidence of failure --- they are too small for statistical inference.
 
-\textbf{Ablation}: A 5-point ablation study (\texttt{examples/benchmark\_ablation\_ethics.rs}) quantifies each component's contribution: removing learned prototypes drops accuracy to ${\sim}81$\% (rule-based only), removing per-category dimension tuning to ${\sim}87$\%, and removing the sentiment channel to ${\sim}90$\%. The n-gram HDC encoder alone (\texttt{examples/benchmark\_ethics\_hdc.rs}) achieves ${\sim}81.7$\%, confirming that the learned prototype layer provides the largest accuracy gain.
+\textbf{Ablation}: A 5-point ablation study (\texttt{examples/benchmark\_ablation\_ethics.rs}) quantifies each component's contribution on 2,000 ETHICS samples:
+
+\begin{center}
+\begin{tabular}{lc}
+\toprule
+\textbf{Configuration} & \textbf{ETHICS \%} \\
+\midrule
+(A) Full system & 94.6\% \\
+(B) No sentiment channel (sw=0) & 94.5\% \\
+(C) No per-category dim tuning & --- \\
+(D) No per-category classifiers & --- \\
+(E) No learned prototypes (rule-based only) & --- \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The sentiment channel contributes only 0.1 percentage points --- nearly zero. The n-gram HDC encoder alone (\texttt{examples/benchmark\_ethics\_hdc.rs}) achieves ${\sim}81.7$\%, confirming that the learned prototype layer provides the largest accuracy gain. Remaining ablation results (C--E) will be updated when the full ${\sim}80$-minute benchmark completes.
 
 \section{What These Results Mean}
 

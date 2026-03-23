@@ -774,9 +774,7 @@ mod tests {
 
     #[test]
     fn test_thought_to_channels_epistemic_cube() {
-        use crate::mind::structured_thought::{
-            DomainContext, ETier, EpistemicCube, HTier, MTier, NTier,
-        };
+        use crate::mind::structured_thought::{DomainContext, EpistemicCube, ETier, NTier, MTier, HTier};
         use symthaea_broca::encoder::EPISTEMIC_CUBE_BASE;
 
         let mut thought = make_test_thought();
@@ -796,44 +794,22 @@ mod tests {
         let ch = thought_to_channels(&thought, 1.0);
 
         // E4 → one-hot at index 4
-        assert_eq!(
-            ch.channels[EPISTEMIC_CUBE_BASE + 4],
-            1.0,
-            "E4 should be active"
-        );
+        assert_eq!(ch.channels[EPISTEMIC_CUBE_BASE + 4], 1.0, "E4 should be active");
         for i in 0..4 {
-            assert_eq!(
-                ch.channels[EPISTEMIC_CUBE_BASE + i],
-                0.0,
-                "E{i} should be inactive"
-            );
+            assert_eq!(ch.channels[EPISTEMIC_CUBE_BASE + i], 0.0, "E{i} should be inactive");
         }
 
         // N3 → one-hot at index 3
-        assert_eq!(
-            ch.channels[EPISTEMIC_CUBE_BASE + 5 + 3],
-            1.0,
-            "N3 should be active"
-        );
+        assert_eq!(ch.channels[EPISTEMIC_CUBE_BASE + 5 + 3], 1.0, "N3 should be active");
 
         // M3 → one-hot at index 3
-        assert_eq!(
-            ch.channels[EPISTEMIC_CUBE_BASE + 9 + 3],
-            1.0,
-            "M3 should be active"
-        );
+        assert_eq!(ch.channels[EPISTEMIC_CUBE_BASE + 9 + 3], 1.0, "M3 should be active");
 
         // H4 → 1.0
-        assert!(
-            (ch.channels[EPISTEMIC_CUBE_BASE + 13] - 1.0).abs() < 0.01,
-            "H4 should be 1.0"
-        );
+        assert!((ch.channels[EPISTEMIC_CUBE_BASE + 13] - 1.0).abs() < 0.01, "H4 should be 1.0");
 
         // Quality = (4/4)*0.4 + (3/3)*0.35 + (3/3)*0.25 = 0.4 + 0.35 + 0.25 = 1.0
-        assert!(
-            (ch.channels[EPISTEMIC_CUBE_BASE + 14] - 1.0).abs() < 0.01,
-            "quality should be 1.0"
-        );
+        assert!((ch.channels[EPISTEMIC_CUBE_BASE + 14] - 1.0).abs() < 0.01, "quality should be 1.0");
 
         // has_epistemic_cube should be true
         assert!(ch.has_epistemic_cube());
@@ -850,10 +826,7 @@ mod tests {
         assert!(!ch.has_epistemic_cube());
 
         // H-tier defaults to 0.25 (H1 neutral)
-        assert!(
-            (ch.h_tier() - 0.25).abs() < 0.01,
-            "default h_tier should be 0.25"
-        );
+        assert!((ch.h_tier() - 0.25).abs() < 0.01, "default h_tier should be 0.25");
     }
 
     #[test]

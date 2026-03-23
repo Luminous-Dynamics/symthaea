@@ -1086,11 +1086,7 @@ impl LogicEngine {
             .map(|(name, args, pol)| {
                 let args_str: Vec<String> = args.iter().map(Self::format_term).collect();
                 let pred = format!("{}({})", name, args_str.join(", "));
-                if *pol {
-                    pred
-                } else {
-                    format!("¬{}", pred)
-                }
+                if *pol { pred } else { format!("¬{}", pred) }
             })
             .collect();
         format!("{{{}}}", lits.join(", "))
