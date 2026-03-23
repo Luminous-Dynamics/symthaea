@@ -151,16 +151,16 @@
 \contentsline {section}{\numberline {14.5}The Epistemic Cube}{106}{section.14.5}%
 \contentsline {subsection}{\numberline {14.5.1}Cube Axes and Tier Definitions}{106}{subsection.14.5.1}%
 \contentsline {subsection}{\numberline {14.5.2}Quality Score}{107}{subsection.14.5.2}%
-\contentsline {subsection}{\numberline {14.5.3}Per-Axis Logit Modulation}{107}{subsection.14.5.3}%
+\contentsline {subsection}{\numberline {14.5.3}Per-Axis Logit Modulation}{108}{subsection.14.5.3}%
 \contentsline {subsection}{\numberline {14.5.4}NSM Semantic Blending}{108}{subsection.14.5.4}%
 \contentsline {section}{\numberline {14.6}Results}{108}{section.14.6}%
 \contentsline {section}{\numberline {14.7}Discussion}{108}{section.14.7}%
 \contentsline {section}{\numberline {14.8}Liquid-Mamba Fusion Backend}{109}{section.14.8}%
 \contentsline {section}{\numberline {14.9}Temporal Projection Training}{109}{section.14.9}%
-\contentsline {section}{\numberline {14.10}Comparison with Standard Language Models}{109}{section.14.10}%
+\contentsline {section}{\numberline {14.10}Comparison with Standard Language Models}{110}{section.14.10}%
 \contentsline {section}{\numberline {14.11}Epistemic Gate Analysis}{110}{section.14.11}%
 \contentsline {section}{\numberline {14.12}The Semantic Veto in Practice}{111}{section.14.12}%
-\contentsline {section}{\numberline {14.13}Generation Examples}{111}{section.14.13}%
+\contentsline {section}{\numberline {14.13}Generation Examples}{112}{section.14.13}%
 \contentsline {chapter}{\numberline {15}Voice: Speech Recognition and Articulatory Synthesis}{113}{chapter.15}%
 \contentsline {section}{\numberline {15.1}A Complete Voice I/O System}{113}{section.15.1}%
 \contentsline {section}{\numberline {15.2}Speech-to-Text: HDC+LTC Acoustic Processing}{113}{section.15.2}%
@@ -359,9 +359,10 @@
 \contentsline {section}{\numberline {35.1}Methodology}{231}{section.35.1}%
 \contentsline {section}{\numberline {35.2}Sleep-EDF: Real EEG Validation}{231}{section.35.2}%
 \contentsline {section}{\numberline {35.3}DMC Humanoid: Embodied Control}{233}{section.35.3}%
-\contentsline {section}{\numberline {35.4}ARC-AGI: Abstract Reasoning}{233}{section.35.4}%
-\contentsline {section}{\numberline {35.5}Hendrycks ETHICS: Moral Reasoning}{234}{section.35.5}%
-\contentsline {section}{\numberline {35.6}What These Results Mean}{236}{section.35.6}%
+\contentsline {section}{\numberline {35.4}ARC-AGI: Abstract Reasoning}{234}{section.35.4}%
+\contentsline {section}{\numberline {35.5}Hendrycks ETHICS: Moral Reasoning}{235}{section.35.5}%
+\contentsline {section}{\numberline {35.6}What These Results Mean}{237}{section.35.6}%
+\contentsline {section}{\numberline {35.7}Reproducibility}{238}{section.35.7}%
 \contentsline {chapter}{\numberline {36}Butlin Consciousness Indicators}{239}{chapter.36}%
 \contentsline {section}{\numberline {36.1}The Indicator Framework}{239}{section.36.1}%
 \contentsline {section}{\numberline {36.2}Full Assessment}{239}{section.36.2}%
