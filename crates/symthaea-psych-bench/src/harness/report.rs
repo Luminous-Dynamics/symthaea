@@ -776,6 +776,21 @@ impl BenchmarkReport {
                 "integration_accuracy",
                 &bl.mathematics,
             ),
+            (
+                "sphere_accuracy",
+                "optimization_sphere_accuracy",
+                &bl.mathematics,
+            ),
+            (
+                "rosenbrock_accuracy",
+                "optimization_rosenbrock_accuracy",
+                &bl.mathematics,
+            ),
+            (
+                "convergence_rate",
+                "optimization_convergence_rate",
+                &bl.mathematics,
+            ),
             // Institutional Reasoning
             (
                 "institutional_decomposition_accuracy",
@@ -2251,6 +2266,7 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("LogicalDeduction") => "overall_accuracy",
         b if b.contains("ConstraintPuzzle") => "queens_4_accuracy",
         b if b.contains("ProofConstruction") => "tautology_accuracy",
+        b if b.contains("OptimizationProblem") => "sphere_accuracy",
         // CausalReasoning domain (must be before generic "CausalChain" arm below)
         b if b.contains("CausalReasoning::CausalChain")
             || (b.contains("CausalChain") && b.contains("CausalReasoning")) =>
@@ -3285,6 +3301,7 @@ mod tests {
             Box::new(ConstraintPuzzlesBenchmark),
             Box::new(ProofConstructionBenchmark),
             Box::new(DefiniteIntegralsBenchmark),
+            Box::new(OptimizationProblemsBenchmark),
             // Security (HDC-FHE)
             Box::new(EncryptedClassificationBenchmark),
             Box::new(CollectiveAggregationBenchmark),

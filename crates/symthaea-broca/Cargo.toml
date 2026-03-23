@@ -71,7 +71,9 @@ name = "distill-for-spore"
 path = "src/bin/distill_for_spore.rs"
 
 [features]
-default = ["simd", "parallel"]
+default = ["simd", "parallel", "gpu"]
+# GPU tensor acceleration via candle CUDA (auto-detects at runtime)
+gpu = ["candle-core/cuda"]
 parallel = ["dep:rayon"]
 # Mamba CPU-only: base Mamba SSM support without CUDA (for CI / non-GPU machines)
 mamba-cpu = ["dep:candle-nn", "dep:hf-hub", "dep:tokenizers"]

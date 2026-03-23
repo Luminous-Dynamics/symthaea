@@ -947,6 +947,9 @@ impl PhenomenalDetector {
     }
 
     fn activation_to_hv16(&self, activation: &[f32]) -> BinaryHV {
+        if activation.is_empty() {
+            return BinaryHV::random();
+        }
         let mut expanded = Vec::with_capacity(HDC_DIMENSION);
         let tiles = HDC_DIMENSION / activation.len();
         let remainder = HDC_DIMENSION % activation.len();

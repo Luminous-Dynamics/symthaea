@@ -217,8 +217,10 @@ fn baseline_for_benchmark<'a>(
         }
 
         // Creativity
-        name if name.contains("AlternateUses") => Some(("aut_fluency", &bl.creativity)),
-        name if name.contains("RemoteAssociates") => Some(("rat_overall_accuracy", &bl.creativity)),
+        name if name.contains("AlternateUses") => Some(("aut_originality", &bl.creativity)),
+        name if name.contains("RemoteAssociates") => {
+            Some(("rat_mean_solution_rank", &bl.creativity))
+        }
         name if name.contains("ConceptualBlending") => Some(("blend_coherence", &bl.creativity)),
         name if name.contains("DivergentThinking") => Some(("originality_score", &bl.creativity)),
 
@@ -248,6 +250,39 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("BehavioralKnockout") => Some(("da_ko_lr_d", &bl.neuromod)),
         name if name.contains("ConsciousnessPharmacology") => {
             Some(("psychedelic_proxy_peak", &bl.neuromod))
+        }
+
+        // Mathematics domain
+        name if name.contains("ArithmeticWordProblem") => {
+            Some(("arithmetic_accuracy", &bl.mathematics))
+        }
+        name if name.contains("LinearSystemSolving") => {
+            Some(("linear_system_accuracy_2x2", &bl.mathematics))
+        }
+        name if name.contains("PolynomialRoots") => {
+            Some(("polynomial_quadratic_accuracy", &bl.mathematics))
+        }
+        name if name.contains("DefiniteIntegral") => {
+            Some(("integration_accuracy", &bl.mathematics))
+        }
+        name if name.contains("MatrixOperations") => {
+            Some(("determinant_accuracy", &bl.mathematics))
+        }
+        name if name.contains("StatisticalInference") => {
+            Some(("variance_estimation_accuracy", &bl.mathematics))
+        }
+        name if name.contains("BayesianReasoning") => {
+            Some(("bayesian_posterior_accuracy", &bl.mathematics))
+        }
+        name if name.contains("LogicalDeduction") => {
+            Some(("logical_valid_accuracy", &bl.mathematics))
+        }
+        name if name.contains("ConstraintPuzzle") => {
+            Some(("constraint_queens_4_accuracy", &bl.mathematics))
+        }
+        name if name.contains("ProofConstruction") => Some(("tautology_accuracy", &bl.mathematics)),
+        name if name.contains("OptimizationProblem") => {
+            Some(("optimization_sphere_accuracy", &bl.mathematics))
         }
 
         // Coding

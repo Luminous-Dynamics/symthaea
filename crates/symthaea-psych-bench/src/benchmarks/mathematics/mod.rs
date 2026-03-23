@@ -3,10 +3,10 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Mathematics benchmark suite.
 //!
-//! Ten benchmarks covering core mathematical cognition domains:
+//! Eleven benchmarks covering core mathematical cognition domains:
 //! arithmetic, linear algebra, polynomial analysis, numerical integration,
 //! matrix computation, statistical inference, Bayesian reasoning, logical
-//! deduction, constraint satisfaction, and proof construction.
+//! deduction, constraint satisfaction, proof construction, and optimization.
 
 pub mod arithmetic_word_problems;
 pub mod bayesian_reasoning;
@@ -15,6 +15,7 @@ pub mod definite_integrals;
 pub mod linear_system_solving;
 pub mod logical_deduction;
 pub mod matrix_operations;
+pub mod optimization_problems;
 pub mod polynomial_roots;
 pub mod proof_construction;
 pub mod statistical_inference;
@@ -26,6 +27,7 @@ pub use definite_integrals::DefiniteIntegralsBenchmark;
 pub use linear_system_solving::LinearSystemSolvingBenchmark;
 pub use logical_deduction::LogicalDeductionBenchmark;
 pub use matrix_operations::MatrixOperationsBenchmark;
+pub use optimization_problems::OptimizationProblemsBenchmark;
 pub use polynomial_roots::PolynomialRootsBenchmark;
 pub use proof_construction::ProofConstructionBenchmark;
 pub use statistical_inference::StatisticalInferenceBenchmark;

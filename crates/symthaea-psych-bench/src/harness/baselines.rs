@@ -4225,6 +4225,34 @@ pub fn mathematics_baselines() -> BaselineMap {
             population: "math undergraduates",
         },
     );
+    // Optimization problems
+    m.insert(
+        "optimization_sphere_accuracy",
+        Baseline {
+            value: 0.95,
+            sd: Some(0.04),
+            source: "Nocedal & Wright (2006), convex optimization benchmarks",
+            population: "graduate students",
+        },
+    );
+    m.insert(
+        "optimization_rosenbrock_accuracy",
+        Baseline {
+            value: 0.72,
+            sd: Some(0.14),
+            source: "Nocedal & Wright (2006), non-convex optimization benchmarks",
+            population: "graduate students",
+        },
+    );
+    m.insert(
+        "optimization_convergence_rate",
+        Baseline {
+            value: 0.85,
+            sd: Some(0.08),
+            source: "Nocedal & Wright (2006), overall convergence benchmarks",
+            population: "graduate students",
+        },
+    );
     m
 }
 

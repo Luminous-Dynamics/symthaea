@@ -15,6 +15,7 @@ use symthaea_psych_bench::benchmarks::creativity::*;
 use symthaea_psych_bench::benchmarks::executive::*;
 use symthaea_psych_bench::benchmarks::inhibition::*;
 use symthaea_psych_bench::benchmarks::language::*;
+use symthaea_psych_bench::benchmarks::mathematics::*;
 use symthaea_psych_bench::benchmarks::memory_agent::*;
 use symthaea_psych_bench::benchmarks::metacognition::*;
 use symthaea_psych_bench::benchmarks::motor::*;
@@ -125,6 +126,18 @@ fn test_normative_coverage() {
         Box::new(HumanEvalMiniBenchmark),
         Box::new(BugDetectionBenchmark),
         Box::new(AlgorithmRecognitionBenchmark),
+        // Mathematics
+        Box::new(ArithmeticWordProblemsBenchmark),
+        Box::new(LinearSystemSolvingBenchmark),
+        Box::new(PolynomialRootsBenchmark),
+        Box::new(DefiniteIntegralsBenchmark),
+        Box::new(MatrixOperationsBenchmark),
+        Box::new(StatisticalInferenceBenchmark),
+        Box::new(BayesianReasoningBenchmark),
+        Box::new(LogicalDeductionBenchmark),
+        Box::new(ConstraintPuzzlesBenchmark),
+        Box::new(ProofConstructionBenchmark),
+        Box::new(OptimizationProblemsBenchmark),
         // Neuromod
         Box::new(PharmacologicalChallengeBenchmark),
         Box::new(InjectionChallengeBenchmark),
@@ -189,6 +202,18 @@ fn test_normative_coverage() {
         "Coding::HumanEvalMini",
         "Coding::BugDetection",
         "Coding::AlgorithmRecognition",
+        // Mathematics
+        "Mathematics::ArithmeticWordProblems",
+        "Mathematics::LinearSystemSolving",
+        "Mathematics::PolynomialRoots",
+        "Mathematics::DefiniteIntegrals",
+        "Mathematics::MatrixOperations",
+        "Mathematics::StatisticalInference",
+        "Mathematics::BayesianReasoning",
+        "Mathematics::LogicalDeduction",
+        "Mathematics::ConstraintPuzzles",
+        "Mathematics::ProofConstruction",
+        "Mathematics::OptimizationProblems",
         // Neuromod
         "Neuromod::PharmacologicalChallenge",
         "Neuromod::InjectionChallenge",

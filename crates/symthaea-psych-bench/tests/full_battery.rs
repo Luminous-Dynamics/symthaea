@@ -39,8 +39,8 @@ use symthaea_psych_bench::benchmarks::{
     mathematics::{
         ArithmeticWordProblemsBenchmark, BayesianReasoningBenchmark, ConstraintPuzzlesBenchmark,
         DefiniteIntegralsBenchmark, LinearSystemSolvingBenchmark, LogicalDeductionBenchmark,
-        MatrixOperationsBenchmark, PolynomialRootsBenchmark, ProofConstructionBenchmark,
-        StatisticalInferenceBenchmark,
+        MatrixOperationsBenchmark, OptimizationProblemsBenchmark, PolynomialRootsBenchmark,
+        ProofConstructionBenchmark, StatisticalInferenceBenchmark,
     },
     memory_agent::{
         AccurateRetrievalBenchmark, ConflictResolutionBenchmark, LongRangeBenchmark,
@@ -288,6 +288,7 @@ fn full_battery_report() {
     report.add(ConstraintPuzzlesBenchmark.run(&config));
     report.add(ProofConstructionBenchmark.run(&config));
     report.add(DefiniteIntegralsBenchmark.run(&config));
+    report.add(OptimizationProblemsBenchmark.run(&config));
 
     // ── Security (HDC-FHE) ──
     report.add(EncryptedClassificationBenchmark.run(&config));
@@ -497,6 +498,7 @@ fn regression_against_baseline() {
     report.add(ConstraintPuzzlesBenchmark.run(&config));
     report.add(ProofConstructionBenchmark.run(&config));
     report.add(DefiniteIntegralsBenchmark.run(&config));
+    report.add(OptimizationProblemsBenchmark.run(&config));
     report.add(EncryptedClassificationBenchmark.run(&config));
     report.add(CollectiveAggregationBenchmark.run(&config));
     report.add(EncryptedLearningBenchmark.run(&config));
