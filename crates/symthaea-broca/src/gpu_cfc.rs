@@ -490,6 +490,30 @@ impl GpuCfcNetwork {
             .ok_or_else(|| candle_core::Error::Msg("no layers".into()))
     }
 
+    /// Sync neuron states from CPU network to GPU (after CPU forward pass).
+    /// Only syncs states, not weights (weights are updated on GPU and synced back).
+    pub fn sync_states_from_cpu(
+        &mut self,
+        network: &symthaea_core::hdc::hdc_ltc_unified::HdcLtcUnifiedNetwork,
+    ) -> Result<()> {
+        for (l, gpu_layer) in self.layers.iter_mut().enumerate() {
+            if let Some(cpu_layer) = network.layer(l) {
+                let n = cpu_layer.len();
+                let d = gpu_layer.dim;
+                let mut flat = Vec::with_capacity(n * d);
+                for neuron in cpu_layer {
+                    flat.extend_from_slice(neuron.state().as_slice());
+                }
+                gpu_layer.states = Tensor::from_vec(flat, (n, d), &self.device)?;
+            }
+        }
+        // Also sync layer outputs
+        for (l, gpu_layer) in self.layers.iter().enumerate() {
+            self.layer_outputs[l] = gpu_layer.output()?.unsqueeze(0)?;
+        }
+        Ok(())
+    }
+
     /// Full BPTT: backprop d_output through normalize, then through each layer.
     ///
     /// This replaces `LanguageController::backward_step()` for GPU training.

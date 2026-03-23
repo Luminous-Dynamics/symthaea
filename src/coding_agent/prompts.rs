@@ -103,6 +103,40 @@ impl CodingAgent {
             }
         }
 
+        // Inject semantically-ranked fix suggestions from the error knowledge graph.
+        // These are Bayesian-ranked strategies that worked for similar errors in the past.
+        if self.phase == TaskPhase::Fixing {
+            if let Some(ref test_output) = self.last_test_output {
+                let structured =
+                    crate::language::code_executor::parse_structured_errors(test_output);
+                let mut suggestions_added = 0;
+                for error in structured.iter().take(3) {
+                    let error_code = error.code.clone().unwrap_or_default();
+                    let category =
+                        super::error_knowledge::ErrorCategory::from_error_code(&error_code);
+                    let fixes = self.error_knowledge.suggest_fixes(&error_code, category);
+                    if !fixes.is_empty() {
+                        if suggestions_added == 0 {
+                            prompt.push_str("## Learned fix strategies (ranked by success rate)\n");
+                        }
+                        for fix in fixes.iter().take(2) {
+                            prompt.push_str(&format!(
+                                "- {} (success rate: {:.0}%, {} attempts): {}\n",
+                                error_code,
+                                fix.success_rate * 100.0,
+                                fix.attempts,
+                                fix.strategy
+                            ));
+                        }
+                        suggestions_added += 1;
+                    }
+                }
+                if suggestions_added > 0 {
+                    prompt.push('\n');
+                }
+            }
+        }
+
         // Inject failure patterns from THIS run — these are errors we've already
         // seen, so the generator should avoid repeating them.
         if !self.failure_patterns.is_empty() {

@@ -1305,18 +1305,17 @@ pub fn train_with_adam(
                     let network_lr = lr * config.network_lr_scale;
                     let dt = generator.controller().config().dt_per_token;
 
-                    // GPU-accelerated BPTT when available
+                    // GPU-accelerated BPTT when available.
+                    // The GPU network maintains its own state — we compose input on CPU,
+                    // send gradient + input to GPU for backward + gradient update,
+                    // then sync GPU weights back to CPU for the next forward pass.
                     #[cfg(feature = "gpu")]
                     let used_gpu = if config.use_gpu_cfc {
                         if let Some(ref mut gpu_net) = gpu_cfc_network {
-                            // Sync CPU state → GPU before backward
-                            if let Err(e) = crate::gpu_cfc::GpuCfcNetwork::from_cpu_network(
-                                generator.controller().network(),
-                                &gpu_cfc_device,
-                            )
-                            .and_then(|fresh| {
-                                *gpu_net = fresh;
-                                // Compose input on CPU, convert to tensor
+                            let result: candle_core::Result<()> = (|| {
+                                // Sync CPU states → GPU (CPU forward mutated the network)
+                                gpu_net.sync_states_from_cpu(generator.controller().network())?;
+                                // Compose input on CPU, transfer to GPU
                                 let token_emb =
                                     generator.controller().get_token_embedding(prev_token);
                                 let pos_emb =
@@ -1341,9 +1340,10 @@ pub fn train_with_adam(
                                     network_lr,
                                     attenuation,
                                 )?;
-                                // Sync GPU → CPU
+                                // Sync GPU weights → CPU (for next forward pass + checkpointing)
                                 gpu_net.sync_to_cpu(generator.controller_mut().network_mut())
-                            }) {
+                            })();
+                            if let Err(e) = result {
                                 tracing::warn!("GPU CfC backward failed: {e}, falling back to CPU");
                                 false
                             } else {

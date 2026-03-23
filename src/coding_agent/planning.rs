@@ -533,6 +533,12 @@ impl CodingAgent {
                     if result.success {
                         self.tests_passed = Some(true);
                         self.phase = TaskPhase::Done;
+
+                        // Backfill error knowledge: now that tests passed, update all
+                        // recorded fix facts with tests_passed=true. This closes the
+                        // learning loop — Bayesian success rates improve over time.
+                        self.backfill_error_knowledge_test_success();
+
                         tracing::info!(target: "symthaea::coding_agent", "-> Done (tests passed)");
                     } else {
                         self.tests_passed = Some(false);

@@ -78,7 +78,7 @@ pub use encoder::{
 };
 pub use evaluation::{EvalConfig, EvalResult, IntentScore};
 pub use gating::{
-    CoherenceFeedback, EmotionalModulator, EpistemicCubeGate, EpistemicGate, GatingConfig,
+    CodeGate, CoherenceFeedback, EmotionalModulator, EpistemicCubeGate, EpistemicGate, GatingConfig,
 };
 pub use generator::{BrocaConfig, BrocaGenerator, GenerationResult, SamplingStrategy};
 pub use tokenizer::BpeTokenizer;

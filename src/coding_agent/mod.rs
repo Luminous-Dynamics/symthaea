@@ -797,44 +797,5 @@ impl CodingAgent {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_task_phase_display() {
-        assert_eq!(format!("{}", TaskPhase::Understanding), "Understanding");
-        assert_eq!(format!("{}", TaskPhase::Done), "Done");
-    }
-
-    #[test]
-    fn test_confidence_to_epistemic() {
-        assert_eq!(
-            CodingAgent::confidence_to_epistemic(0.95),
-            EpistemicStatus::Certain
-        );
-        assert_eq!(
-            CodingAgent::confidence_to_epistemic(0.8),
-            EpistemicStatus::Probable
-        );
-        assert_eq!(
-            CodingAgent::confidence_to_epistemic(0.5),
-            EpistemicStatus::Uncertain
-        );
-        assert_eq!(
-            CodingAgent::confidence_to_epistemic(0.2),
-            EpistemicStatus::Unknown
-        );
-    }
-
-    // Remaining tests (test_coding_agent_creation, test_coding_agent_runs_and_generates,
-    // test_confidence_to_epistemic_full_range, test_telemetry_json_fields_finite,
-    // test_agent_result_phi_trace_bounded, test_100_cycle_stress,
-    // test_determinism_same_input, test_run_reset_clears_state, etc.)
-    // are all included from tests.rs below.
-
-    // All remaining tests are defined in tests.rs and included below.
-    // Do NOT add test functions here that also exist in tests.rs — it causes E0428.
-    include!("tests.rs");
-}
-// ---- End of mod tests ----
-// (Previous duplicate test bodies removed to fix E0428 redefinition errors)
+#[path = "tests.rs"]
+mod tests;

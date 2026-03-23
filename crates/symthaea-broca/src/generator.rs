@@ -233,6 +233,9 @@ pub struct BrocaGenerator {
     /// Cached NSM semantic gate (built once at construction, reused per-generation).
     /// `None` when `enable_nsm_gate` is false.
     nsm_gate: Option<crate::gating::NsmSemanticGate>,
+    /// Code-aware gating: boosts/suppresses tokens based on code channels (24-27).
+    /// Active only when `GatingConfig::enable_code_gate` is true.
+    code_gate: crate::gating::CodeGate,
 }
 
 impl BrocaGenerator {
@@ -266,6 +269,8 @@ impl BrocaGenerator {
             None
         };
 
+        let code_gate = crate::gating::CodeGate::new(&tokenizer, &config.gating);
+
         Self {
             controller,
             tokenizer,
@@ -276,6 +281,7 @@ impl BrocaGenerator {
             coherence_feedback,
             sampling_rng,
             nsm_gate,
+            code_gate,
             config,
         }
     }
@@ -321,6 +327,8 @@ impl BrocaGenerator {
             None
         };
 
+        let code_gate = crate::gating::CodeGate::new(&tokenizer, &config.gating);
+
         Self {
             controller,
             tokenizer,
@@ -331,6 +339,7 @@ impl BrocaGenerator {
             coherence_feedback,
             sampling_rng,
             nsm_gate,
+            code_gate,
             config,
         }
     }
@@ -567,6 +576,10 @@ impl BrocaGenerator {
             } else {
                 0.0
             };
+
+            // Code-aware gate: boost/suppress tokens based on code channels (24-27).
+            // Structural keywords when complex, error handling when error-prone, etc.
+            self.code_gate.apply(&mut logits, channels);
 
             // Coherence feedback: scale thought HV to strengthen binding when coherence drifts
             let mut this_binding_weight = 1.0f32;

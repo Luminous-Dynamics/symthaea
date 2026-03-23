@@ -427,6 +427,34 @@ if ! $DRY_RUN && ! $SKIP_CHECK; then
         SYNC_CHECK_FAILED=true
     fi
 
+    # Run the same CI feature set to catch compilation errors before pushing.
+    # This mirrors the clippy job's CI_FEATURES in ci.yml.
+    info "Running cargo check --all CI features (catches cross-feature compilation errors)..."
+    CI_FEATURES="parallel,service,shell,demo,api_module,\
+voice-tts,voice-stt,audio,vocal-tract,neural-vocoder,\
+embeddings,vision,perception,vision-manifold,foveation,\
+integrity,semantic-encoder,neural-bridge,webcam,\
+mesh,mesh-encryption,mesh-key-exchange,swarm,notifications,\
+nix-mind,identity,physics,physics-bridge,\
+flight,humanoid,hal,ssm-power,ssm_language,\
+lancedb-backend,multi_agent,full_consciousness,full_perception,\
+full_language,magi_loop,reasoning_engine,code_generation,\
+wasm-sandbox,school_learning,benchmarks,all_benchmarks,\
+integration_module,observability_module,support,web_research_module,\
+genomics,cell-foundry,ectogenesis,nurture,population,genesis,\
+genesis-missions,fusion-twin,safety-agents,lab-controller,\
+materials,nuclear-forensics,water-prediction,physics-unification,\
+grid-scaling,fission-reactor,accelerator,threat-assessment,\
+datacenter,experiment-planner,strategic-materials,critical-minerals,\
+advanced-manufacturing,building-systems,design-production,\
+mycelix,unstable-examples"
+    if (cd "${STANDALONE_REPO}" && cargo check -p symthaea --features "$CI_FEATURES" 2>&1 | tail -10); then
+        ok "cargo check (CI features) passed"
+    else
+        warn "cargo check (CI features) failed — compilation errors will break CI"
+        SYNC_CHECK_FAILED=true
+    fi
+
     if $SYNC_CHECK_FAILED; then
         warn "Pre-push checks failed. Run with --skip-check to bypass, or investigate:"
         echo "  cd ${STANDALONE_REPO} && cargo fmt --check"

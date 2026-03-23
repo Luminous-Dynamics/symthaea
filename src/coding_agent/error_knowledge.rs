@@ -230,6 +230,11 @@ impl CodeErrorKnowledge {
             .map(|s| s.strategy.as_str())
     }
 
+    /// Access the recent facts ring buffer (for backfill queries).
+    pub fn recent_facts(&self) -> &[CodeErrorFact] {
+        &self.facts
+    }
+
     /// Total facts recorded.
     pub fn total_facts(&self) -> u64 {
         self.total_facts

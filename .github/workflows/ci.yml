@@ -28,9 +28,10 @@ jobs:
   governance:
     name: Governance Check (Class A/B Changes)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -40,8 +41,9 @@ jobs:
   fmt:
     name: Format Check
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.93.0
@@ -54,8 +56,9 @@ jobs:
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.93.0
@@ -63,7 +66,7 @@ jobs:
           components: clippy
 
       - name: Cache cargo registry and target
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -117,14 +120,15 @@ jobs:
   test:
     name: Test (default features)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.93.0
 
       - name: Cache cargo registry and target
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -152,13 +156,13 @@ jobs:
     needs: test
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.93.0
 
       - name: Cache cargo registry and target
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -182,7 +186,7 @@ jobs:
 
       - name: Upload integration test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: integration-test-results-${{ github.sha }}
           path: integration-test-output.txt
@@ -196,7 +200,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Split into 5 groups to stay under runner preemption thresholds.
+          # Split into 7 groups to stay under runner preemption thresholds.
           # Each group targets ~10 min wall-clock.
           - group: core-infra
             features: >-
@@ -207,10 +211,13 @@ jobs:
             features: >-
               voice-tts,voice-stt,audio,vocal-tract,neural-vocoder,
               embeddings,vision,perception,vision-manifold,foveation
-          - group: science-ai
+          - group: science-ai-core
             features: >-
               multi_agent,full_consciousness,full_perception,
-              full_language,magi_loop,reasoning_engine,code_generation,
+              full_language,magi_loop
+          - group: science-ai-extended
+            features: >-
+              reasoning_engine,code_generation,
               wasm-sandbox,school_learning
           - group: science-benchmarks
             features: >-
@@ -230,13 +237,13 @@ jobs:
               advanced-manufacturing,building-systems,design-production,
               mycelix,unstable-examples
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.93.0
 
       - name: Cache cargo registry and target
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -286,13 +293,13 @@ jobs:
           - name: pathology_resilience
             cmd: cargo test --test pathology_resilience -- --nocapture
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.93.0
 
       - name: Cache cargo registry and target
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -317,7 +324,7 @@ jobs:
   test-feature-matrix:
     name: Test Feature Combinations
     runs-on: ubuntu-latest
-    timeout-minutes: 420
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
@@ -345,13 +352,13 @@ jobs:
           - "wasm-sandbox"
           - "integrity"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.93.0
 
       - name: Cache cargo registry and target
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -401,12 +408,12 @@ jobs:
       ) ||
       github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Check if psych-bench relevant files changed
         id: changes
         if: github.event_name == 'push' || github.event_name == 'pull_request'
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         with:
           filters: |
             psych_relevant:
@@ -432,7 +439,7 @@ jobs:
 
       - name: Cache cargo registry and target
         if: steps.should_run.outputs.run == 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -455,7 +462,7 @@ jobs:
 
       - name: Upload psych-bench results
         if: steps.should_run.outputs.run == 'true' && always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: psych-bench-results-${{ github.sha }}
           path: psych-bench-output.txt
@@ -464,6 +471,7 @@ jobs:
   feature-interactions:
     name: Feature Interactions
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: test
     strategy:
       fail-fast: false
@@ -502,13 +510,13 @@ jobs:
           - "therapeutic,reasoning_engine"
           - "mesh,safety-agents"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.93.0
 
       - name: Cache cargo registry and target
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -541,7 +549,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust toolchain + wasm32 target
         uses: dtolnay/rust-toolchain@1.93.0
@@ -549,7 +557,7 @@ jobs:
           targets: wasm32-unknown-unknown
 
       - name: Cache cargo registry and target
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -605,8 +613,9 @@ jobs:
   deny:
     name: Dependency Audit (cargo-deny)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install cargo-deny
         uses: EmbarkStudios/cargo-deny-action@v2
@@ -617,14 +626,15 @@ jobs:
   audit:
     name: Security Audit
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.93.0
 
       - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -661,9 +671,10 @@ jobs:
   sbom:
     name: SBOM Generation
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Install cargo-cyclonedx
@@ -674,7 +685,7 @@ jobs:
           # cargo-cyclonedx writes bom.json or bom.cdx.json next to Cargo.toml
           ls -la bom*.json 2>/dev/null || true
       - name: Upload SBOM
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sbom-${{ github.sha }}
           path: bom*.json
@@ -684,6 +695,7 @@ jobs:
   test-subcrates:
     name: Test Sub-Crates
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: test
     strategy:
       fail-fast: false
@@ -732,13 +744,13 @@ jobs:
           - symthaea-exploration
           - symthaea-spore
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.93.0
 
       - name: Cache cargo registry and target
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -759,6 +771,7 @@ jobs:
   genesis-benchmarks:
     name: Genesis Mission Benchmarks
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: test
     strategy:
       fail-fast: false
@@ -781,13 +794,13 @@ jobs:
           - name: temporal_unified
             features: genesis-missions
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.93.0
 
       - name: Cache cargo registry and target
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -815,13 +828,13 @@ jobs:
     # Run on: weekly schedule (same as psych-bench), or manual dispatch
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.93.0
 
       - name: Cache cargo registry and target
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -845,7 +858,7 @@ jobs:
 
       - name: Upload stress test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: stress-test-results-${{ github.sha }}
           path: proptest-*.txt
@@ -856,7 +869,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -864,7 +877,7 @@ jobs:
         uses: dtolnay/rust-toolchain@1.93.0
 
       - name: Cache cargo registry and target
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -903,7 +916,7 @@ jobs:
     needs: test
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -911,7 +924,7 @@ jobs:
         uses: dtolnay/rust-toolchain@1.93.0
 
       - name: Cache cargo registry and target
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -947,7 +960,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -955,7 +968,7 @@ jobs:
         uses: dtolnay/rust-toolchain@1.93.0
 
       - name: Cache cargo registry and target
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -985,8 +998,9 @@ jobs:
   secrets-scan:
     name: Secrets Scan
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Install gitleaks

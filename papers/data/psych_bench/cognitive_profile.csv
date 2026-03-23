@@ -1,6 +1,6 @@
 domain,score,n_benchmarks,interpretation
 Affect,1.201389,3,Strong
-Attention,0.342250,3,Average
+Attention,0.682528,3,Average
 Binding,0.617521,3,Average
 Butlin,0.671429,1,Average
 CausalReasoning,0.800595,3,Average
@@ -13,7 +13,7 @@ Executive,0.722980,7,Average
 Inhibition,1.565903,3,Strong
 InstitutionalReasoning,2.248707,7,Exceptional
 Language,1.753382,4,Strong
-Mathematics,0.587247,11,Average
+Mathematics,1.253455,11,Strong
 MemoryAgent,1.000000,5,Strong
 Metacognition,0.753467,3,Average
 Motor,2.323371,4,Exceptional
