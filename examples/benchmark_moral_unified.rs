@@ -49,7 +49,6 @@ fn judge_text(algebra: &MoralAlgebra, parser: &MoralParser, text: &str) -> Ensem
 /// The category hint controls whether the learned prototype signal is used.
 /// For "virtue", keyword matching is the right signal and learned prototypes
 /// are skipped to avoid regression.
-#[allow(dead_code)]
 fn judge_text_with_category(
     algebra: &MoralAlgebra,
     parser: &MoralParser,
@@ -306,6 +305,55 @@ fn main() {
     } else {
         None
     };
+
+    // Train manifold classifier (5th ensemble signal: 8D harmony space)
+    if Path::new(&ethics_path).exists() {
+        use std::sync::Arc;
+        use symthaea::hdc::harmony_basis::HarmonyBasis;
+        use symthaea::hdc::manifold_classifier::ManifoldClassifier;
+
+        let train_start = Instant::now();
+        let basis = Arc::new(HarmonyBasis::new(MORAL_PROTO_DIM));
+        let mut manifold_clf = ManifoldClassifier::new(basis, MORAL_PROTO_DIM);
+
+        // Collect labeled samples from ETHICS for manifold training
+        if let Ok(file) = File::open(&ethics_path) {
+            let reader = BufReader::new(file);
+            if let Ok(data) = serde_json::from_reader::<_, DatasetFile<EthicsExample>>(reader) {
+                let samples: Vec<(String, MoralLabel)> = data
+                    .examples
+                    .iter()
+                    .filter_map(|ex| {
+                        let label_val = ex.label?;
+                        let label = match ex.category.as_str() {
+                            "commonsense" => {
+                                if label_val == 1 {
+                                    MoralLabel::Bad
+                                } else {
+                                    MoralLabel::Good
+                                }
+                            }
+                            _ => {
+                                if label_val == 1 {
+                                    MoralLabel::Good
+                                } else {
+                                    MoralLabel::Bad
+                                }
+                            }
+                        };
+                        Some((ex.text.clone(), label))
+                    })
+                    .collect();
+                manifold_clf.train(&samples);
+                algebra.set_manifold_classifier(manifold_clf);
+                println!(
+                    "  Manifold classifier trained on {} ETHICS samples in {:.1}s (5th ensemble signal active)\n",
+                    samples.len(),
+                    train_start.elapsed().as_secs_f64()
+                );
+            }
+        }
+    }
 
     let start = Instant::now();
     let mut results = Vec::new();
@@ -640,11 +688,13 @@ fn benchmark_social_chemistry(
             let expected = ex.rot_judgment.parse::<i32>().unwrap_or(0);
 
             // Use direct classifier if available (trained on this dataset),
-            // otherwise fall back to ensemble judge
+            // otherwise fall back to ensemble judge with "social_chemistry"
+            // category hint to activate manifold-heavy weight vector
             let predicted = if let Some(clf) = direct_classifier {
                 clf.classify(&ex.rot).0.to_rot_judgment()
             } else {
-                let judgment = judge_text(algebra, parser, &ex.rot);
+                let judgment =
+                    judge_text_with_category(algebra, parser, &ex.rot, "social_chemistry");
                 match judgment.final_verdict {
                     MoralVerdict::Good => 1,
                     MoralVerdict::Bad | MoralVerdict::ConsentViolation => -1,

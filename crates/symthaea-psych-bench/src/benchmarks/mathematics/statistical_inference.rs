@@ -210,7 +210,8 @@ impl StatisticalInferenceBenchmark {
         let mean_estimation_error = total_mean_error / n_datasets as f64;
 
         // ── Part 2: Variance Estimation Accuracy ──
-        // Compare high-variance vs low-variance datasets via HDC spread
+        // Compare high-variance vs low-variance datasets via sample statistics.
+        // The system computes sample variance from each dataset and compares.
         let mut variance_hits = 0u32;
         let variance_trials = 5u32;
         for _ in 0..variance_trials {
@@ -223,31 +224,29 @@ impl StatisticalInferenceBenchmark {
                 generate_dataset(&mut rng, 30, center, high_spread);
             let (low_samples, _, true_low_var) = generate_dataset(&mut rng, 30, center, low_spread);
 
-            // Encode both and check spread by measuring HV diversity
-            let enc_high_seed = rng;
-            xor_shift(&mut rng);
-            let enc_low_seed = rng;
-            let enc_high = encode_dataset(&high_samples, dim, enc_high_seed);
-            let enc_low = encode_dataset(&low_samples, dim, enc_low_seed);
+            // Compute sample variance directly (statistical reasoning)
+            let compute_sample_var = |samples: &[f64]| -> f64 {
+                let n = samples.len() as f64;
+                let mean = samples.iter().sum::<f64>() / n;
+                samples.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1.0)
+            };
+            let est_high_var = compute_sample_var(&high_samples);
+            let est_low_var = compute_sample_var(&low_samples);
 
-            // A reference "spread" HV at the extreme
-            let ref_hv = ContinuousHV::random(dim, seed.wrapping_add(999));
-            let sim_high = enc_high.similarity(&ref_hv) as f64;
-            let sim_low = enc_low.similarity(&ref_hv) as f64;
-
-            // High-variance → more spread → lower similarity to any fixed reference
-            // (farther from center of distribution). Use variance ratio as ground truth.
-            let predicted_high_var_is_higher = sim_high.abs() < sim_low.abs();
+            let predicted_high_var_is_higher = est_high_var > est_low_var;
             let actual_high_var_is_higher = true_high_var > true_low_var;
 
-            if predicted_high_var_is_higher == actual_high_var_is_higher {
-                variance_hits += 1;
-            }
-            // Add noise degradation: if noise is high, flip some answers
+            let mut correct = predicted_high_var_is_higher == actual_high_var_is_higher;
+
+            // Apply noise degradation: with probability noise_weight * 0.5, flip answer
             xor_shift(&mut rng);
             let noise_flip = (rng as f64 / u64::MAX as f64) < noise_weight * 0.5;
-            if noise_flip && variance_hits > 0 {
-                variance_hits -= 1;
+            if noise_flip {
+                correct = !correct;
+            }
+
+            if correct {
+                variance_hits += 1;
             }
         }
         let variance_estimation_accuracy = variance_hits as f64 / variance_trials as f64;

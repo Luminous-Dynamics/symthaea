@@ -383,6 +383,9 @@ pub mod moral_prototypes;
 /// Shared Eight Harmonies basis vectors and moral free energy (FEP).
 pub mod harmony_basis;
 
+/// Manifold-based moral classifier using 8D harmony basis centroids.
+pub mod manifold_classifier;
+
 /// Persistent homology on moral scenario hypervectors.
 pub mod moral_topology;
 

@@ -98,6 +98,7 @@ fn generate_direct(problem: &HumanEvalProblem) -> String {
              No markdown, no explanation, no tests."
                 .into(),
         ),
+        consciousness_context: None,
     };
 
     // Send the HumanEval prompt directly — it already has signature + docstring

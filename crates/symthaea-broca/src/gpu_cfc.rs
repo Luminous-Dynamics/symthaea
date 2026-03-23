@@ -22,6 +22,12 @@
 
 use candle_core::{Device, Result, Tensor};
 
+/// Expand a [N] scalar-per-neuron tensor to [N, D] by broadcasting.
+/// candle 0.8 doesn't auto-broadcast [N, 1] * [N, D], so we expand explicitly.
+fn expand_nd(scalars: &Tensor, n: usize, d: usize) -> Result<Tensor> {
+    scalars.unsqueeze(1)?.broadcast_as((n, d))
+}
+
 /// GPU-accelerated layer of CfC neurons.
 ///
 /// All N neurons in the layer share the same [N, D] tensor layout,
@@ -105,10 +111,13 @@ impl GpuCfcLayer {
     /// `input` is [1, D] (broadcast to all neurons).
     /// Mutates `self.states` in-place.
     pub fn evolve_closed_form(&mut self, dt: f32, input: &Tensor) -> Result<()> {
+        // Broadcast input [1, D] → [N, D] for element-wise ops with neuron tensors
+        let input_bc = input.broadcast_as(self.states.shape())?;
+
         // ── 1. Equilibrium: x_inf = tanh((W⊗state + U⊗input) * 0.5) ────
         // bind = element-wise multiply
         let wx = (&self.weight_hv * &self.states)?; // [N, D]
-        let uu = (&self.input_mask * input)?; // [N, D] (input broadcasts from [1,D])
+        let uu = (&self.input_mask * &input_bc)?; // [N, D]
         let z = ((&wx + &uu)? * 0.5)?; // [N, D]
         let x_inf = z.tanh()?; // [N, D]
 
@@ -117,8 +126,8 @@ impl GpuCfcLayer {
         let state_norms = self.states.sqr()?.sum(1)?.sqrt()?; // [N]
 
         // input_adjustment[i] = cosine_sim(input, tau_modulator[i])
-        let input_dots = (input * &self.tau_modulator)?.sum(1)?; // [N]
-        let input_norm = input.sqr()?.sum(1)?.sqrt()?; // [1]
+        let input_dots = (&input_bc * &self.tau_modulator)?.sum(1)?; // [N]
+        let input_norm = input_bc.clone().sqr()?.sum(1)?.sqrt()?; // [N]
         let tau_mod_norms = self.tau_modulator.sqr()?.sum(1)?.sqrt()?; // [N]
         let denom = (&input_norm * &tau_mod_norms)?; // [N]
         let input_adj = (&input_dots / &denom.clamp(1e-10, f32::MAX)?)?; // [N]
@@ -132,8 +141,8 @@ impl GpuCfcLayer {
 
         // ── 3. Gating: sigma per neuron ─────────────────────────────────
         // bundle_si = (state + input) * 0.5
-        let bundle_si = ((&self.states + input)? * 0.5)?; // [N, D]
-                                                          // gate_activation = cosine_sim(bundle_si, gate_weight) + mean(gate_bias)
+        let bundle_si = ((&self.states + &input_bc)? * 0.5)?; // [N, D]
+                                                              // gate_activation = cosine_sim(bundle_si, gate_weight) + mean(gate_bias)
         let dot_sg = (&bundle_si * &self.gate_weight)?.sum(1)?; // [N]
         let bundle_norms = bundle_si.sqr()?.sum(1)?.sqrt()?; // [N]
         let gw_norms = self.gate_weight.sqr()?.sum(1)?.sqrt()?; // [N]
@@ -159,16 +168,16 @@ impl GpuCfcLayer {
 
         // ── 4. Interpolation: state = (1-sigma)*state + sigma*x_inf ─────
         // Reshape sigma to [N, 1] for broadcast with [N, D]
-        let sigma_bc = sigma.unsqueeze(1)?; // [N, 1]
-        let one_minus_sigma_bc = (1.0 - &sigma_bc)?;
-        self.states = ((&one_minus_sigma_bc * &self.states)? + (&sigma_bc * &x_inf)?)?;
+        let sigma_nd = expand_nd(&sigma, self.n_neurons, self.dim)?; // [N, D]
+        let one_minus_sigma_nd = (1.0 - &sigma_nd)?;
+        self.states = ((&one_minus_sigma_nd * &self.states)? + (&sigma_nd * &x_inf)?)?;
 
         // ── 5. Norm clip to 5.0 ────────────────────────────────────────
         let norms = self.states.sqr()?.sum(1)?.sqrt()?; // [N]
         let clamped_norms = norms.clamp(5.0, f32::MAX)?;
         let scale = (clamped_norms.recip()? * 5.0)?.clamp(0.0, 1.0)?; // [N]
-        let scale_bc = scale.unsqueeze(1)?;
-        self.states = (&self.states * &scale_bc)?;
+        let scale_nd = expand_nd(&scale, self.n_neurons, self.dim)?;
+        self.states = (&self.states * &scale_nd)?;
 
         Ok(())
     }
@@ -186,18 +195,20 @@ impl GpuCfcLayer {
     /// - dtau: [N] — scalar tau gradient per neuron
     /// - d_input: [N, D] — gradient w.r.t. input (for inter-layer backprop)
     pub fn backward(&self, input: &Tensor, target: &Tensor, dt: f32) -> Result<GpuCfcGradients> {
+        // Broadcast input [1, D] → [N, D]
+        let input_bc = input.broadcast_as(self.states.shape())?;
         let dim_f = self.dim as f64;
 
         // ── Forward recomputation ───────────────────────────────────────
         let wx = (&self.weight_hv * &self.states)?;
-        let uu = (&self.input_mask * input)?;
+        let uu = (&self.input_mask * &input_bc)?;
         let z = ((&wx + &uu)? * 0.5)?;
         let x_inf = z.tanh()?;
 
         // Tau + decay (simplified: using just exp(-dt/tau) without full gating)
         let state_norms = self.states.sqr()?.sum(1)?.sqrt()?;
-        let input_dots = (input * &self.tau_modulator)?.sum(1)?;
-        let input_norm = input.sqr()?.sum(1)?.sqrt()?;
+        let input_dots = (&input_bc * &self.tau_modulator)?.sum(1)?;
+        let input_norm = input_bc.clone().sqr()?.sum(1)?.sqrt()?;
         let tau_mod_norms = self.tau_modulator.sqr()?.sum(1)?.sqrt()?;
         let denom = (&input_norm * &tau_mod_norms)?.clamp(1e-10, f32::MAX)?;
         let input_adj = (&input_dots / &denom)?;
@@ -213,16 +224,16 @@ impl GpuCfcLayer {
         let sigma = ((&decay * -1.0)? + 1.0)?; // 1 - decay [N]
 
         // new_state = sigma*x_inf + (1-sigma)*state
-        let sigma_bc = sigma.unsqueeze(1)?;
-        let one_minus_sigma_bc = (1.0 - &sigma_bc)?;
-        let new_state = ((&sigma_bc * &x_inf)? + (&one_minus_sigma_bc * &self.states)?)?;
+        let sigma_nd = expand_nd(&sigma, self.n_neurons, self.dim)?;
+        let one_minus_sigma_nd = (1.0 - &sigma_nd)?;
+        let new_state = ((&sigma_nd * &x_inf)? + (&one_minus_sigma_nd * &self.states)?)?;
 
         // ── Backward ────────────────────────────────────────────────────
         // dh = 2 * (new_state - target) / D
         let dh = ((&new_state - target)? * (2.0 / dim_f))?; // [N, D]
 
         // dx_inf = dh * sigma
-        let dx_inf = (&dh * &sigma_bc)?; // [N, D]
+        let dx_inf = (&dh * &sigma_nd)?; // [N, D]
 
         // dz = dx_inf * tanh'(z) = dx_inf * (1 - tanh(z)^2)
         let tanh_z_sq = x_inf.sqr()?; // tanh(z)^2
@@ -233,7 +244,7 @@ impl GpuCfcLayer {
         let dw = (&dz * &self.states)?; // [N, D]
 
         // du = dz * input (bind chain rule)
-        let du = (&dz * input)?; // [N, D]
+        let du = (&dz * &input_bc)?; // [N, D]
 
         // dtau_scalar = sum(dh * (x_inf - state)) * (-dt/tau^2) * exp(-dt/tau)
         let diff = (&x_inf - &self.states)?;
@@ -270,9 +281,9 @@ impl GpuCfcLayer {
         // Tau modulator update (project scalar gradient)
         let tau_norm = self.tau_modulator.sqr()?.sum(1)?.sqrt()?; // [N]
         let tau_norm_clamped = tau_norm.clamp(1e-10, f32::MAX)?;
-        let tau_norm_bc = tau_norm_clamped.unsqueeze(1)?;
+        let tau_norm_bc = expand_nd(&tau_norm_clamped, self.n_neurons, self.dim)?;
         let tau_normalized = (&self.tau_modulator / &tau_norm_bc)?;
-        let dtau_bc = grads.dtau.unsqueeze(1)?; // [N, 1]
+        let dtau_bc = expand_nd(&grads.dtau, self.n_neurons, self.dim)?; // [N, D]
         let dtau_scaled = (&dtau_bc * neg_lr)?;
         let tau_delta = (&tau_normalized * &dtau_scaled)?;
         self.tau_modulator = (&self.tau_modulator + &tau_delta)?;
@@ -281,13 +292,13 @@ impl GpuCfcLayer {
         let w_norms = self.weight_hv.sqr()?.sum(1)?.sqrt()?; // [N]
         let w_clamped = w_norms.clamp(2.0, f32::MAX)?;
         let w_scale = (w_clamped.recip()? * 2.0)?.clamp(0.0, 1.0)?;
-        let w_scale_bc = w_scale.unsqueeze(1)?;
+        let w_scale_bc = expand_nd(&w_scale, self.n_neurons, self.dim)?;
         self.weight_hv = (&self.weight_hv * &w_scale_bc)?;
 
         let u_norms = self.input_mask.sqr()?.sum(1)?.sqrt()?;
         let u_clamped = u_norms.clamp(2.0, f32::MAX)?;
         let u_scale = (u_clamped.recip()? * 2.0)?.clamp(0.0, 1.0)?;
-        let u_scale_bc = u_scale.unsqueeze(1)?;
+        let u_scale_bc = expand_nd(&u_scale, self.n_neurons, self.dim)?;
         self.input_mask = (&self.input_mask * &u_scale_bc)?;
 
         Ok(())
@@ -477,6 +488,76 @@ impl GpuCfcNetwork {
             .last()
             .cloned()
             .ok_or_else(|| candle_core::Error::Msg("no layers".into()))
+    }
+
+    /// Full BPTT: backprop d_output through normalize, then through each layer.
+    ///
+    /// This replaces `LanguageController::backward_step()` for GPU training.
+    /// `d_output` is the gradient of CE loss w.r.t. the normalized output HV [1, D].
+    /// `input` is the composed input HV (thought ⊗ token ⊗ pos) [1, D].
+    /// `dt` is the time step. `lr` is the network learning rate.
+    /// `gradient_attenuation` scales gradients for earlier layers (0.0-1.0).
+    pub fn backward_and_update(
+        &mut self,
+        d_output: &Tensor,
+        input: &Tensor,
+        dt: f32,
+        lr: f32,
+        gradient_attenuation: f32,
+    ) -> Result<()> {
+        let last_idx = self.layers.len() - 1;
+
+        // ── 1. Backprop through normalize ──────────────────────────────
+        // output = raw / ||raw||
+        // d_raw = (d_output - dot(d_output, hat) * hat) / ||raw||
+        let raw_output = self.layer_outputs[last_idx].clone(); // [1, D]
+        let raw_norm_sq = raw_output.sqr()?.sum(1)?; // [1]
+        let raw_norm = raw_norm_sq.sqrt()?.clamp(1e-8, f32::MAX)?; // [1]
+        let raw_norm_bc = raw_norm.unsqueeze(1)?.broadcast_as(raw_output.shape())?; // [1, D]
+        let output_hat = (&raw_output / &raw_norm_bc)?; // [1, D]
+        let dot_d_hat = (d_output * &output_hat)?.sum(1)?; // [1]
+        let dot_d_hat_bc = dot_d_hat.unsqueeze(1)?.broadcast_as(raw_output.shape())?; // [1, D]
+        let proj = (&output_hat * &dot_d_hat_bc)?; // [1, D]
+        let d_raw = ((d_output - &proj)? / &raw_norm_bc)?; // [1, D]
+
+        // ── 2. Scale by 1/N (output = mean of neuron states) ──────────
+        let n_neurons = self.layers[last_idx].n_neurons as f64;
+        let d_per_neuron = (&d_raw * (1.0 / n_neurons))?; // [1, D]
+
+        // ── 3. Construct target: target = state - d_per_neuron ─────────
+        // This is how the CPU backward works: MSE(new_state, target)
+        // where target = state - gradient_direction
+        let last_layer = &self.layers[last_idx];
+        let d_per_neuron_bc = d_per_neuron.broadcast_as(last_layer.states.shape())?; // [N, D]
+        let target = (&last_layer.states - &d_per_neuron_bc)?; // [N, D]
+
+        // ── 4. Layer input for last layer ──────────────────────────────
+        let layer_input = if last_idx == 0 {
+            input.clone()
+        } else {
+            self.compute_layer_input(last_idx, input)?
+        };
+
+        // ── 5. Backward + gradient update on last layer ────────────────
+        let grads = self.layers[last_idx].backward(&layer_input, &target, dt)?;
+        self.layers[last_idx].apply_gradients(&grads, lr)?;
+
+        // ── 6. Optionally backprop to earlier layers ───────────────────
+        if last_idx > 0 && gradient_attenuation > 0.0 {
+            // Average d_input across neurons
+            let d_prev = grads.d_input.mean(0)?.unsqueeze(0)?; // [1, D]
+            let d_prev_scaled = (&d_prev * gradient_attenuation as f64)?;
+
+            let layer0_input = input.clone(); // layer 0 gets original input
+            let n0 = self.layers[0].n_neurons as f64;
+            let d_per_neuron_0 = (&d_prev_scaled * (1.0 / n0))?;
+            let d_per_neuron_0_bc = d_per_neuron_0.broadcast_as(self.layers[0].states.shape())?;
+            let target_0 = (&self.layers[0].states - &d_per_neuron_0_bc)?;
+            let grads_0 = self.layers[0].backward(&layer0_input, &target_0, dt)?;
+            self.layers[0].apply_gradients(&grads_0, lr * gradient_attenuation)?;
+        }
+
+        Ok(())
     }
 
     /// Copy all GPU state back to CPU network for serialization.

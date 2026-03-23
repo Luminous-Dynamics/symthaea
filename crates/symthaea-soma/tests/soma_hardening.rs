@@ -46,20 +46,24 @@ fn metabolism_all_state_transitions() {
         "UserInput from Drowsy should transition to Alert"
     );
 
-    // Alert → back to Sleep via night mode
+    // Alert → Sleep requires both NightMode + Charging
     engine.wake_signal(WakeSignal::NightMode(true));
+    engine.wake_signal(WakeSignal::ChargingChanged(true));
     assert_eq!(
         engine.wake_state(),
         symthaea_soma::metabolism::WakeState::Sleep,
-        "NightMode(true) should transition to Sleep"
+        "NightMode(true) + Charging should transition to Sleep"
     );
 
-    // Night off → should wake
+    // Disable night + charging → should allow waking via UserInput
     engine.wake_signal(WakeSignal::NightMode(false));
+    engine.wake_signal(WakeSignal::ChargingChanged(false));
+    engine.wake_signal(WakeSignal::PhonePickup);
+    engine.wake_signal(WakeSignal::UserInput);
     assert_ne!(
         engine.wake_state(),
         symthaea_soma::metabolism::WakeState::Sleep,
-        "NightMode(false) should wake from Sleep"
+        "Should wake after disabling night mode + charging + user input"
     );
 }
 
@@ -78,7 +82,7 @@ fn thermal_throttle_forces_downstate() {
     );
 
     // Thermal level 3 (Serious) should force downgrade
-    engine.set_thermal_level(3);
+    engine.thermal_level = 3;
     engine.cycle("thermal stress");
 
     let state = engine.wake_state();
@@ -136,7 +140,7 @@ fn holon_queue_overflow_handled() {
         ..Default::default()
     };
     engine.set_sharing_config(sharing);
-    engine.set_holon_connected(true);
+    engine.holon_set_connected(true);
 
     // Run many cycles to accumulate outbound messages
     for i in 0..200 {
@@ -311,10 +315,11 @@ fn engagement_score_modulates_consciousness() {
 fn checkpoint_roundtrip() {
     let mut engine = SomaEngine::new(SomaConfig::default());
 
-    // Set storage path to temp dir
+    // Set up file-based storage in temp dir
     let tmp = std::env::temp_dir().join("soma_test_checkpoint");
     std::fs::create_dir_all(&tmp).ok();
-    engine.set_storage_path(tmp.to_str().unwrap());
+    let storage = symthaea_spore::persistence::FileStorage::new(tmp.to_str().unwrap());
+    engine.set_storage(Box::new(storage));
 
     // Run cycles to build up state
     for i in 0..20 {

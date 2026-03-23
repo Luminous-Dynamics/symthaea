@@ -122,6 +122,7 @@ async fn test_llm_completion_roundtrip() {
         temperature: 0.2,
         max_tokens: 2048,
         system_prompt: Some(CODE_GENERATION_SYSTEM_PROMPT.to_string()),
+        consciousness_context: None,
     };
 
     let response = backend.generate(&prompt, &params).await;

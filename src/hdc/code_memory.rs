@@ -60,6 +60,106 @@ struct TypeEntry {
     hv: ContinuousHV,
 }
 
+/// Tracks function call relationships for impact analysis.
+///
+/// Maintains a bidirectional index of caller→callee edges, enabling both
+/// forward dependency queries ("what does this function call?") and reverse
+/// impact analysis ("what breaks if I change this function?").
+#[derive(Debug, Clone, Default)]
+pub struct CallGraph {
+    /// Function name → list of functions it calls
+    callees: HashMap<String, Vec<String>>,
+    /// Function name → list of functions that call it (reverse index)
+    callers: HashMap<String, Vec<String>>,
+}
+
+impl CallGraph {
+    /// Create a new empty call graph
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record that `caller` invokes `callee`.
+    ///
+    /// Duplicate edges are ignored — each (caller, callee) pair is stored at
+    /// most once.
+    pub fn add_call(&mut self, caller: &str, callee: &str) {
+        let callee_list = self.callees.entry(caller.to_string()).or_default();
+        if !callee_list.contains(&callee.to_string()) {
+            callee_list.push(callee.to_string());
+        }
+
+        let caller_list = self.callers.entry(callee.to_string()).or_default();
+        if !caller_list.contains(&caller.to_string()) {
+            caller_list.push(caller.to_string());
+        }
+    }
+
+    /// Get functions called by `name`
+    pub fn callees_of(&self, name: &str) -> &[String] {
+        self.callees.get(name).map_or(&[], |v| v.as_slice())
+    }
+
+    /// Get functions that call `name` (impact analysis)
+    pub fn callers_of(&self, name: &str) -> &[String] {
+        self.callers.get(name).map_or(&[], |v| v.as_slice())
+    }
+
+    /// How many functions would be directly impacted by changing `name`?
+    pub fn impact_count(&self, name: &str) -> usize {
+        self.callers_of(name).len()
+    }
+
+    /// Transitive callers (recursive impact analysis, bounded by depth).
+    ///
+    /// Returns all functions that transitively depend on `name`, up to
+    /// `max_depth` hops. Uses a visited set to prevent infinite recursion
+    /// in the presence of cycles.
+    pub fn transitive_callers(&self, name: &str, max_depth: usize) -> Vec<String> {
+        let mut visited = std::collections::HashSet::new();
+        let mut result = Vec::new();
+        self.collect_transitive_callers(name, max_depth, 0, &mut visited, &mut result);
+        result
+    }
+
+    /// Recursive helper for transitive caller collection.
+    fn collect_transitive_callers(
+        &self,
+        name: &str,
+        max_depth: usize,
+        current_depth: usize,
+        visited: &mut std::collections::HashSet<String>,
+        result: &mut Vec<String>,
+    ) {
+        if current_depth >= max_depth {
+            return;
+        }
+        for caller in self.callers_of(name) {
+            if visited.insert(caller.clone()) {
+                result.push(caller.clone());
+                self.collect_transitive_callers(
+                    caller,
+                    max_depth,
+                    current_depth + 1,
+                    visited,
+                    result,
+                );
+            }
+        }
+    }
+
+    /// Total edges in the graph
+    pub fn edge_count(&self) -> usize {
+        self.callees.values().map(|v| v.len()).sum()
+    }
+
+    /// Clear the graph, removing all edges
+    pub fn clear(&mut self) {
+        self.callees.clear();
+        self.callers.clear();
+    }
+}
+
 /// Project-level HDC memory for fast semantic code retrieval
 pub struct CodebaseMemory {
     encoder: CodeHDEncoder,
@@ -73,6 +173,8 @@ pub struct CodebaseMemory {
     relationships: Vec<ContinuousHV>,
     /// Overall codebase vector (centroid of all modules)
     codebase_hv: Option<ContinuousHV>,
+    /// Call graph for function dependency / impact analysis
+    call_graph: CallGraph,
 }
 
 impl CodebaseMemory {
@@ -85,6 +187,7 @@ impl CodebaseMemory {
             types: Vec::new(),
             relationships: Vec::new(),
             codebase_hv: None,
+            call_graph: CallGraph::new(),
         }
     }
 
@@ -445,6 +548,35 @@ impl CodebaseMemory {
         }
     }
 
+    // ========================================================================
+    // Call Graph / Dependency Tracking
+    // ========================================================================
+
+    /// Index function calls from parsed code relationships.
+    ///
+    /// Call this after indexing functions to build the call graph. Each
+    /// invocation records that `caller_name` calls every function in
+    /// `called_functions`.
+    pub fn index_calls(&mut self, caller_name: &str, called_functions: &[String]) {
+        for callee in called_functions {
+            self.call_graph.add_call(caller_name, callee);
+        }
+    }
+
+    /// Get the call graph for impact analysis
+    pub fn call_graph(&self) -> &CallGraph {
+        &self.call_graph
+    }
+
+    /// Compute task complexity based on dependency depth.
+    ///
+    /// Returns 0.0–1.0 where higher = more callers = more complex to change.
+    /// Formula: `(direct_callers / 10.0).min(1.0)`
+    pub fn dependency_complexity(&self, function_name: &str) -> f32 {
+        let callers = self.call_graph.callers_of(function_name).len() as f32;
+        (callers / 10.0).min(1.0)
+    }
+
     /// Get memory statistics
     pub fn stats(&self) -> CodebaseMemoryStats {
         CodebaseMemoryStats {
@@ -610,5 +742,112 @@ mod tests {
         assert_eq!(stats.functions, 1);
         assert_eq!(stats.types, 1);
         assert!(stats.has_codebase_hv);
+    }
+
+    // ====================================================================
+    // Call Graph tests
+    // ====================================================================
+
+    #[test]
+    fn test_call_graph_basic() {
+        let mut cg = CallGraph::new();
+        cg.add_call("main", "parse");
+        cg.add_call("main", "execute");
+        cg.add_call("execute", "parse");
+
+        // Forward edges
+        assert_eq!(cg.callees_of("main"), &["parse", "execute"]);
+        assert_eq!(cg.callees_of("execute"), &["parse"]);
+
+        // Reverse edges
+        assert_eq!(cg.callers_of("parse"), &["main", "execute"]);
+        assert_eq!(cg.callers_of("execute"), &["main"]);
+
+        // Empty lookups
+        assert!(cg.callees_of("parse").is_empty());
+        assert!(cg.callers_of("main").is_empty());
+
+        // Deduplication: adding same edge again should be a no-op
+        cg.add_call("main", "parse");
+        assert_eq!(cg.callees_of("main").len(), 2);
+        assert_eq!(cg.callers_of("parse").len(), 2);
+    }
+
+    #[test]
+    fn test_call_graph_impact() {
+        let mut cg = CallGraph::new();
+        cg.add_call("a", "core_fn");
+        cg.add_call("b", "core_fn");
+        cg.add_call("c", "core_fn");
+        cg.add_call("d", "core_fn");
+
+        assert_eq!(cg.impact_count("core_fn"), 4);
+        assert_eq!(cg.impact_count("a"), 0);
+        assert_eq!(cg.impact_count("nonexistent"), 0);
+    }
+
+    #[test]
+    fn test_call_graph_transitive() {
+        let mut cg = CallGraph::new();
+        // Chain: d → c → b → a → target
+        cg.add_call("a", "target");
+        cg.add_call("b", "a");
+        cg.add_call("c", "b");
+        cg.add_call("d", "c");
+
+        // Depth 1: only direct callers
+        let t1 = cg.transitive_callers("target", 1);
+        assert_eq!(t1, vec!["a"]);
+
+        // Depth 2: a, b
+        let t2 = cg.transitive_callers("target", 2);
+        assert_eq!(t2, vec!["a", "b"]);
+
+        // Depth 10: all four
+        let tall = cg.transitive_callers("target", 10);
+        assert_eq!(tall.len(), 4);
+        assert!(tall.contains(&"a".to_string()));
+        assert!(tall.contains(&"d".to_string()));
+
+        // Cycle safety: a → b → a (cycle)
+        let mut cg2 = CallGraph::new();
+        cg2.add_call("a", "b");
+        cg2.add_call("b", "a");
+        let tc = cg2.transitive_callers("b", 100);
+        // Should contain "a" but not loop forever
+        assert_eq!(tc, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn test_dependency_complexity() {
+        let mut memory = CodebaseMemory::new(CodeHDEncoder::new(512));
+
+        // No callers → 0.0
+        assert_eq!(memory.dependency_complexity("unknown_fn"), 0.0);
+
+        // 5 callers → 0.5
+        for i in 0..5 {
+            memory.index_calls(&format!("caller_{i}"), &["target".to_string()]);
+        }
+        assert!((memory.dependency_complexity("target") - 0.5).abs() < f32::EPSILON);
+
+        // 15 callers → capped at 1.0
+        for i in 5..15 {
+            memory.index_calls(&format!("caller_{i}"), &["hot_fn".to_string()]);
+        }
+        assert!((memory.dependency_complexity("hot_fn") - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_call_graph_clear() {
+        let mut cg = CallGraph::new();
+        cg.add_call("a", "b");
+        cg.add_call("b", "c");
+        assert_eq!(cg.edge_count(), 2);
+
+        cg.clear();
+        assert_eq!(cg.edge_count(), 0);
+        assert!(cg.callees_of("a").is_empty());
+        assert!(cg.callers_of("b").is_empty());
     }
 }

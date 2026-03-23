@@ -90,6 +90,39 @@ pub const CANONICAL_INFORMAL_WORDS: &[&str] = &[
 /// Canonical softening words boosted under negative valence.
 pub const CANONICAL_SOFTENING_WORDS: &[&str] = &["unfortunately", "sorry", "however", "although"];
 
+/// Canonical Rust structural keywords boosted when syntax_complexity is high.
+pub const CANONICAL_RUST_STRUCTURAL_WORDS: &[&str] = &[
+    "fn", "struct", "enum", "impl", "trait", "pub", "mod", "use", "where", "for", "match", "if",
+    "let", "mut", "ref", "async", "unsafe", "type", "const", "static",
+];
+
+/// Canonical Rust type words suppressed when type_confidence is low.
+pub const CANONICAL_TYPE_WORDS: &[&str] = &[
+    "i32", "i64", "u32", "u64", "f32", "f64", "usize", "bool", "String", "Vec", "Option", "Result",
+    "Box", "Arc", "HashMap", "str",
+];
+
+/// Canonical error handling words boosted when error_likelihood is high.
+pub const CANONICAL_ERROR_HANDLING_WORDS: &[&str] = &[
+    "Result",
+    "Option",
+    "unwrap",
+    "expect",
+    "ok",
+    "err",
+    "Some",
+    "None",
+    "match",
+    "if let",
+    "while let",
+];
+
+/// Canonical algorithm scaffold words boosted when algorithm_pattern is active.
+pub const CANONICAL_ALGORITHM_SCAFFOLD_WORDS: &[&str] = &[
+    "for", "while", "loop", "iter", "map", "filter", "fold", "collect", "sort", "push", "pop",
+    "len", "is_empty", "contains",
+];
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // GatingConfig
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -244,6 +277,25 @@ pub struct GatingConfig {
     #[serde(default = "default_spectral_quality_threshold")]
     pub spectral_quality_threshold: f32,
 
+    // ── Code Generation Gating ──
+    /// Enable code-aware gating for code generation contexts (default: false).
+    /// When enabled, reads ThoughtChannels 24-27 (syntax_complexity, type_confidence,
+    /// algorithm_pattern, error_likelihood) and modulates logits for code tokens.
+    #[serde(default)]
+    pub enable_code_gate: bool,
+    /// Logit boost for structural keywords when syntax_complexity > 0.3 (default 0.5).
+    #[serde(default = "default_code_structural_boost")]
+    pub code_structural_boost: f32,
+    /// Logit penalty scale for concrete type words when type_confidence < 0.4 (default 0.3).
+    #[serde(default = "default_code_type_penalty")]
+    pub code_type_penalty: f32,
+    /// Logit boost for algorithm scaffold words when algorithm_pattern > 0.2 (default 0.4).
+    #[serde(default = "default_code_algorithm_boost")]
+    pub code_algorithm_boost: f32,
+    /// Logit boost for error handling words when error_likelihood > 0.3 (default 0.5).
+    #[serde(default = "default_code_error_boost")]
+    pub code_error_boost: f32,
+
     // ── Temperature-based epistemic gating (Round 2) ──
     /// Enable temperature-based epistemic gating (default: true).
     /// Temperature mode divides ALL logits by an epistemic-dependent factor,
@@ -307,6 +359,11 @@ impl Default for GatingConfig {
             veto_rewind_alpha: 0.5,
             enable_spectral_gating: false,
             spectral_quality_threshold: 0.1,
+            enable_code_gate: false,
+            code_structural_boost: 0.5,
+            code_type_penalty: 0.3,
+            code_algorithm_boost: 0.4,
+            code_error_boost: 0.5,
         }
     }
 }
@@ -425,6 +482,22 @@ fn default_ood_temperature() -> f32 {
 
 fn default_spectral_quality_threshold() -> f32 {
     0.1
+}
+
+fn default_code_structural_boost() -> f32 {
+    0.5
+}
+
+fn default_code_type_penalty() -> f32 {
+    0.3
+}
+
+fn default_code_algorithm_boost() -> f32 {
+    0.4
+}
+
+fn default_code_error_boost() -> f32 {
+    0.5
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1043,6 +1116,139 @@ impl EpistemicCubeGate {
         for &id in ids {
             if let Some(l) = logits.get_mut(id as usize) {
                 *l += penalty; // penalty is negative
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CodeGate — Code Generation Gating from ThoughtChannels 24-27
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Code-aware gating: modulates logits for code generation based on
+/// ThoughtChannels 24-27 (syntax_complexity, type_confidence, algorithm_pattern,
+/// error_likelihood).
+///
+/// - **syntax_complexity > 0.3**: Boosts structural keywords (fn, struct, match, etc.)
+/// - **type_confidence < 0.4**: Suppresses concrete type words, encouraging generic/trait tokens
+/// - **algorithm_pattern > 0.2**: Boosts algorithm scaffold words (iter, map, fold, etc.)
+/// - **error_likelihood > 0.3**: Boosts error handling words (Result, Option, unwrap, etc.)
+///
+/// Opt-in via `GatingConfig::enable_code_gate`.
+pub struct CodeGate {
+    config: GatingConfig,
+    /// Token IDs for Rust structural keywords.
+    structural_ids: Vec<u32>,
+    /// Token IDs for concrete type words.
+    type_ids: Vec<u32>,
+    /// Token IDs for error handling words.
+    error_handling_ids: Vec<u32>,
+    /// Token IDs for algorithm scaffold words.
+    algorithm_ids: Vec<u32>,
+}
+
+impl CodeGate {
+    /// Create a code gate using the BPE tokenizer for token classification.
+    pub fn new(tokenizer: &BpeTokenizer, config: &GatingConfig) -> Self {
+        let resolve = |words: &[&str]| -> Vec<u32> {
+            words
+                .iter()
+                .filter_map(|w| {
+                    let id = tokenizer.token_id(w);
+                    if id != tokenizer.unk_id {
+                        Some(id)
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        };
+
+        Self {
+            config: config.clone(),
+            structural_ids: resolve(CANONICAL_RUST_STRUCTURAL_WORDS),
+            type_ids: resolve(CANONICAL_TYPE_WORDS),
+            error_handling_ids: resolve(CANONICAL_ERROR_HANDLING_WORDS),
+            algorithm_ids: resolve(CANONICAL_ALGORITHM_SCAFFOLD_WORDS),
+        }
+    }
+
+    /// Number of resolved structural token IDs.
+    pub fn structural_count(&self) -> usize {
+        self.structural_ids.len()
+    }
+
+    /// Number of resolved type token IDs.
+    pub fn type_count(&self) -> usize {
+        self.type_ids.len()
+    }
+
+    /// Number of resolved error handling token IDs.
+    pub fn error_handling_count(&self) -> usize {
+        self.error_handling_ids.len()
+    }
+
+    /// Number of resolved algorithm scaffold token IDs.
+    pub fn algorithm_count(&self) -> usize {
+        self.algorithm_ids.len()
+    }
+
+    /// Apply code-aware gating to logits in-place.
+    ///
+    /// Reads code channels from `channels` and modulates logits for code tokens.
+    /// No-op if `enable_code_gate` is false or all code channels are zero.
+    pub fn apply(&self, logits: &mut [f32], channels: &ThoughtChannels) {
+        if !self.config.enable_code_gate {
+            return;
+        }
+
+        let syntax = channels.syntax_complexity();
+        let type_conf = channels.type_confidence();
+        let algo = channels.algorithm_pattern();
+        let error = channels.error_likelihood();
+
+        // Early exit if all code channels are inactive
+        if syntax <= 0.0 && type_conf >= 1.0 && algo <= 0.0 && error <= 0.0 {
+            return;
+        }
+
+        // ── Syntax complexity: boost structural keywords ─────────────────
+        if syntax > 0.3 {
+            let boost = self.config.code_structural_boost * syntax;
+            for &id in &self.structural_ids {
+                if let Some(l) = logits.get_mut(id as usize) {
+                    *l += boost;
+                }
+            }
+        }
+
+        // ── Type confidence: suppress concrete types when low ────────────
+        if type_conf < 0.4 {
+            let penalty = -self.config.code_type_penalty * (1.0 - type_conf);
+            for &id in &self.type_ids {
+                if let Some(l) = logits.get_mut(id as usize) {
+                    *l += penalty;
+                }
+            }
+        }
+
+        // ── Algorithm pattern: boost scaffold words ──────────────────────
+        if algo > 0.2 {
+            let boost = self.config.code_algorithm_boost * algo;
+            for &id in &self.algorithm_ids {
+                if let Some(l) = logits.get_mut(id as usize) {
+                    *l += boost;
+                }
+            }
+        }
+
+        // ── Error likelihood: boost error handling words ─────────────────
+        if error > 0.3 {
+            let boost = self.config.code_error_boost * error;
+            for &id in &self.error_handling_ids {
+                if let Some(l) = logits.get_mut(id as usize) {
+                    *l += boost;
+                }
             }
         }
     }
@@ -2396,6 +2602,174 @@ mod tests {
         feedback.update(&a, &a);
         assert!(!feedback.should_veto(), "Self-similar should never veto");
         assert!((feedback.coherence() - 1.0).abs() < 0.01);
+    }
+
+    // =========================================================================
+    // CodeGate tests
+    // =========================================================================
+
+    #[test]
+    fn test_code_gate_structural_boost() {
+        let mut tok = test_tokenizer();
+        // Ensure structural words are in vocab
+        for &w in CANONICAL_RUST_STRUCTURAL_WORDS {
+            if tok.token_id(w) == tok.unk_id {
+                tok.add_token(w);
+            }
+        }
+
+        let mut config = test_config();
+        config.enable_code_gate = true;
+        let gate = CodeGate::new(&tok, &config);
+
+        let mut channels = ThoughtChannels::default();
+        channels.set_code(0.8, 1.0, 0.0, 0.0); // high syntax_complexity
+
+        let mut logits = vec![0.5; tok.vocab_size()];
+        gate.apply(&mut logits, &channels);
+
+        // Structural tokens should be boosted
+        let mut found_boost = false;
+        for &w in CANONICAL_RUST_STRUCTURAL_WORDS {
+            let id = tok.token_id(w);
+            if id != tok.unk_id && logits[id as usize] > 0.5 + 1e-6 {
+                found_boost = true;
+                break;
+            }
+        }
+        assert!(
+            found_boost,
+            "Structural tokens should be boosted when syntax_complexity > 0.3"
+        );
+    }
+
+    #[test]
+    fn test_code_gate_type_suppression() {
+        let mut tok = test_tokenizer();
+        for &w in CANONICAL_TYPE_WORDS {
+            if tok.token_id(w) == tok.unk_id {
+                tok.add_token(w);
+            }
+        }
+
+        let mut config = test_config();
+        config.enable_code_gate = true;
+        let gate = CodeGate::new(&tok, &config);
+
+        let mut channels = ThoughtChannels::default();
+        channels.set_code(0.0, 0.1, 0.0, 0.0); // low type_confidence
+
+        let mut logits = vec![0.5; tok.vocab_size()];
+        gate.apply(&mut logits, &channels);
+
+        // Type tokens should be suppressed
+        let mut found_suppression = false;
+        for &w in CANONICAL_TYPE_WORDS {
+            let id = tok.token_id(w);
+            if id != tok.unk_id && logits[id as usize] < 0.5 - 1e-6 {
+                found_suppression = true;
+                break;
+            }
+        }
+        assert!(
+            found_suppression,
+            "Type tokens should be suppressed when type_confidence < 0.4"
+        );
+    }
+
+    #[test]
+    fn test_code_gate_algorithm_scaffold() {
+        let mut tok = test_tokenizer();
+        for &w in CANONICAL_ALGORITHM_SCAFFOLD_WORDS {
+            if tok.token_id(w) == tok.unk_id {
+                tok.add_token(w);
+            }
+        }
+
+        let mut config = test_config();
+        config.enable_code_gate = true;
+        let gate = CodeGate::new(&tok, &config);
+
+        let mut channels = ThoughtChannels::default();
+        channels.set_code(0.0, 1.0, 0.7, 0.0); // algorithm_pattern active
+
+        let mut logits = vec![0.5; tok.vocab_size()];
+        gate.apply(&mut logits, &channels);
+
+        // Algorithm scaffold tokens should be boosted
+        let mut found_boost = false;
+        for &w in CANONICAL_ALGORITHM_SCAFFOLD_WORDS {
+            let id = tok.token_id(w);
+            if id != tok.unk_id && logits[id as usize] > 0.5 + 1e-6 {
+                found_boost = true;
+                break;
+            }
+        }
+        assert!(
+            found_boost,
+            "Algorithm scaffold tokens should be boosted when algorithm_pattern > 0.2"
+        );
+    }
+
+    #[test]
+    fn test_code_gate_error_handling() {
+        let mut tok = test_tokenizer();
+        for &w in CANONICAL_ERROR_HANDLING_WORDS {
+            if tok.token_id(w) == tok.unk_id {
+                tok.add_token(w);
+            }
+        }
+
+        let mut config = test_config();
+        config.enable_code_gate = true;
+        let gate = CodeGate::new(&tok, &config);
+
+        let mut channels = ThoughtChannels::default();
+        channels.set_code(0.0, 1.0, 0.0, 0.8); // high error_likelihood
+
+        let mut logits = vec![0.5; tok.vocab_size()];
+        gate.apply(&mut logits, &channels);
+
+        // Error handling tokens should be boosted
+        let mut found_boost = false;
+        for &w in CANONICAL_ERROR_HANDLING_WORDS {
+            let id = tok.token_id(w);
+            if id != tok.unk_id && logits[id as usize] > 0.5 + 1e-6 {
+                found_boost = true;
+                break;
+            }
+        }
+        assert!(
+            found_boost,
+            "Error handling tokens should be boosted when error_likelihood > 0.3"
+        );
+    }
+
+    #[test]
+    fn test_code_gate_inactive_when_no_code() {
+        let mut tok = test_tokenizer();
+        // Add some tokens so the gate has IDs to work with
+        for &w in CANONICAL_RUST_STRUCTURAL_WORDS {
+            if tok.token_id(w) == tok.unk_id {
+                tok.add_token(w);
+            }
+        }
+
+        let mut config = test_config();
+        config.enable_code_gate = true;
+        let gate = CodeGate::new(&tok, &config);
+
+        // All code channels at zero/neutral
+        let channels = ThoughtChannels::default();
+
+        let mut logits = vec![0.5; tok.vocab_size()];
+        let original = logits.clone();
+        gate.apply(&mut logits, &channels);
+
+        assert_eq!(
+            logits, original,
+            "CodeGate should not modify logits when all code channels are zero"
+        );
     }
 
     #[cfg(feature = "mamba-cpu")]

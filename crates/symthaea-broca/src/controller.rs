@@ -712,7 +712,7 @@ impl LanguageController {
     }
 
     /// Get token embedding, returning a zero vector for out-of-range IDs.
-    fn get_token_embedding(&self, token_id: u32) -> ContinuousHV {
+    pub fn get_token_embedding(&self, token_id: u32) -> ContinuousHV {
         self.token_embeddings
             .get(token_id as usize)
             .cloned()
@@ -1035,6 +1035,11 @@ impl LanguageController {
     /// Get mutable reference to token embeddings (for training).
     pub fn token_embeddings_mut(&mut self) -> &mut Vec<ContinuousHV> {
         &mut self.token_embeddings
+    }
+
+    /// Get reference to the position base vector (for external input composition).
+    pub fn position_base_ref(&self) -> &ContinuousHV {
+        &self.position_base
     }
 
     /// Access the GPU embedding cache (for GPU-accelerated gradient computation).

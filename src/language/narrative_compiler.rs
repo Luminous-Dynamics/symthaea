@@ -353,6 +353,7 @@ pub async fn generate_narrative(
         temperature: 0.4,
         max_tokens,
         system_prompt: Some(NARRATIVE_SYSTEM_PROMPT.to_string()),
+        consciousness_context: None,
     };
 
     match backend.generate(&prompt, &params).await {

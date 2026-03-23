@@ -39,6 +39,16 @@ pub enum SemanticRole {
     Cause,
     /// What results from the event
     Result,
+    /// Subject calls/invokes Object (function invocation)
+    Calls,
+    /// Subject implements Object (trait/interface implementation)
+    Implements,
+    /// Subject depends on Object (import/use dependency)
+    DependsOn,
+    /// Subject returns Object (function → return type)
+    ReturnsType,
+    /// Subject error was fixed by Object strategy
+    FixedBy,
     #[cfg(feature = "therapeutic")]
     TherapeuticTarget,
     #[cfg(feature = "therapeutic")]
@@ -62,6 +72,16 @@ pub enum EntityType {
     Process,
     /// An abstract relation or property
     Property,
+    /// A function, method, or closure
+    Function,
+    /// A struct, enum, trait, class, or type alias
+    Type,
+    /// A module, crate, package, or namespace
+    Module,
+    /// A compiler error code or pattern (e.g., E0308)
+    ErrorPattern,
+    /// A fragment of source code
+    CodeSnippet,
     #[cfg(feature = "therapeutic")]
     ClinicalConcept,
     #[cfg(feature = "therapeutic")]
@@ -293,6 +313,380 @@ impl KnowledgeExtractor {
     /// Total facts extracted since creation
     pub fn total_extractions(&self) -> u64 {
         self.total_extractions
+    }
+
+    // ── Code-Specific Extraction ──────────────────────────────────────────
+
+    /// Extract code-specific entities from text containing source code or
+    /// code-adjacent natural language (e.g., documentation, error messages).
+    ///
+    /// Detects function signatures, type declarations, module references,
+    /// compiler error codes, and crate/package references.
+    pub fn extract_code_entities(&self, text: &str) -> Vec<ExtractedEntity> {
+        let mut entities = Vec::new();
+
+        // Function signatures: "fn foo(", "def foo(", "function foo("
+        for prefix in &["fn ", "def ", "function "] {
+            let mut search_from = 0;
+            while let Some(pos) = text[search_from..].find(prefix) {
+                let abs_pos = search_from + pos;
+                let after = &text[abs_pos + prefix.len()..];
+                if let Some(name) = after.split('(').next() {
+                    let name = name.trim();
+                    if !name.is_empty() && name.chars().all(|c| c.is_alphanumeric() || c == '_') {
+                        entities.push(ExtractedEntity {
+                            text: name.to_string(),
+                            entity_type: EntityType::Function,
+                            confidence: 0.9,
+                            offset: abs_pos,
+                        });
+                    }
+                }
+                search_from = abs_pos + prefix.len();
+            }
+        }
+
+        // Type declarations: "struct Foo", "enum Foo", "trait Foo", "class Foo", "type Foo"
+        for keyword in &["struct ", "enum ", "trait ", "class ", "type "] {
+            let mut search_from = 0;
+            while let Some(pos) = text[search_from..].find(keyword) {
+                let abs_pos = search_from + pos;
+                let after = &text[abs_pos + keyword.len()..];
+                if let Some(name) = after
+                    .split(|c: char| !c.is_alphanumeric() && c != '_')
+                    .next()
+                {
+                    let name = name.trim();
+                    if !name.is_empty() && name.chars().next().map_or(false, |c| c.is_uppercase()) {
+                        entities.push(ExtractedEntity {
+                            text: name.to_string(),
+                            entity_type: EntityType::Type,
+                            confidence: 0.9,
+                            offset: abs_pos,
+                        });
+                    }
+                }
+                search_from = abs_pos + keyword.len();
+            }
+        }
+
+        // Module references: "mod foo", "use foo::", "import foo", "from foo import"
+        {
+            // "mod name"
+            let mut search_from = 0;
+            while let Some(pos) = text[search_from..].find("mod ") {
+                let abs_pos = search_from + pos;
+                let after = &text[abs_pos + 4..];
+                if let Some(name) = after
+                    .split(|c: char| !c.is_alphanumeric() && c != '_')
+                    .next()
+                {
+                    let name = name.trim();
+                    if !name.is_empty() {
+                        entities.push(ExtractedEntity {
+                            text: name.to_string(),
+                            entity_type: EntityType::Module,
+                            confidence: 0.85,
+                            offset: abs_pos,
+                        });
+                    }
+                }
+                search_from = abs_pos + 4;
+            }
+
+            // "use foo::" — extract the root module
+            let mut search_from = 0;
+            while let Some(pos) = text[search_from..].find("use ") {
+                let abs_pos = search_from + pos;
+                let after = &text[abs_pos + 4..];
+                if let Some(root) = after.split("::").next() {
+                    let root = root.trim();
+                    if !root.is_empty() && root.chars().all(|c| c.is_alphanumeric() || c == '_') {
+                        entities.push(ExtractedEntity {
+                            text: root.to_string(),
+                            entity_type: EntityType::Module,
+                            confidence: 0.85,
+                            offset: abs_pos,
+                        });
+                    }
+                }
+                search_from = abs_pos + 4;
+            }
+
+            // "import foo"
+            let mut search_from = 0;
+            while let Some(pos) = text[search_from..].find("import ") {
+                let abs_pos = search_from + pos;
+                let after = &text[abs_pos + 7..];
+                if let Some(name) = after
+                    .split(|c: char| !c.is_alphanumeric() && c != '_')
+                    .next()
+                {
+                    let name = name.trim();
+                    if !name.is_empty() {
+                        entities.push(ExtractedEntity {
+                            text: name.to_string(),
+                            entity_type: EntityType::Module,
+                            confidence: 0.85,
+                            offset: abs_pos,
+                        });
+                    }
+                }
+                search_from = abs_pos + 7;
+            }
+
+            // "from foo import"
+            let mut search_from = 0;
+            while let Some(pos) = text[search_from..].find("from ") {
+                let abs_pos = search_from + pos;
+                let after = &text[abs_pos + 5..];
+                if after.contains(" import") {
+                    if let Some(name) = after
+                        .split(|c: char| !c.is_alphanumeric() && c != '_')
+                        .next()
+                    {
+                        let name = name.trim();
+                        if !name.is_empty() {
+                            entities.push(ExtractedEntity {
+                                text: name.to_string(),
+                                entity_type: EntityType::Module,
+                                confidence: 0.85,
+                                offset: abs_pos,
+                            });
+                        }
+                    }
+                }
+                search_from = abs_pos + 5;
+            }
+        }
+
+        // Error codes: E followed by 4 digits (Rust compiler error pattern)
+        {
+            let bytes = text.as_bytes();
+            for i in 0..bytes.len() {
+                if bytes[i] == b'E'
+                    && i + 4 < bytes.len()
+                    && bytes[i + 1..=i + 4].iter().all(|b| b.is_ascii_digit())
+                {
+                    // Ensure it's not part of a longer identifier
+                    let before_ok = i == 0 || !bytes[i - 1].is_ascii_alphanumeric();
+                    let after_ok = i + 5 >= bytes.len() || !bytes[i + 5].is_ascii_alphanumeric();
+                    if before_ok && after_ok {
+                        let code = &text[i..i + 5];
+                        entities.push(ExtractedEntity {
+                            text: code.to_string(),
+                            entity_type: EntityType::ErrorPattern,
+                            confidence: 0.9,
+                            offset: i,
+                        });
+                    }
+                }
+            }
+        }
+
+        // Crate/package references: "crate::", "pub(crate)"
+        {
+            let mut search_from = 0;
+            while let Some(pos) = text[search_from..].find("crate::") {
+                let abs_pos = search_from + pos;
+                let after = &text[abs_pos + 7..];
+                if let Some(name) = after
+                    .split(|c: char| !c.is_alphanumeric() && c != '_')
+                    .next()
+                {
+                    let name = name.trim();
+                    if !name.is_empty() {
+                        entities.push(ExtractedEntity {
+                            text: format!("crate::{}", name),
+                            entity_type: EntityType::CodeSnippet,
+                            confidence: 0.8,
+                            offset: abs_pos,
+                        });
+                    }
+                }
+                search_from = abs_pos + 7;
+            }
+        }
+
+        entities
+    }
+
+    /// Extract code-specific semantic relations from text.
+    ///
+    /// Detects call/invoke patterns, trait implementations, dependency
+    /// relationships, return types, and fix/resolution patterns.
+    pub fn extract_code_relations(&self, text: &str) -> Vec<ExtractedRelation> {
+        let mut relations = Vec::new();
+        let lower = text.to_lowercase();
+
+        // "calls" / "invokes" patterns → Calls role
+        for pattern in &["calls ", "invokes ", "calling "] {
+            if let Some(pos) = lower.find(pattern) {
+                let before = lower[..pos].trim();
+                let after = lower[pos + pattern.len()..].trim();
+                let subject = before.split_whitespace().last().unwrap_or("").to_string();
+                let object = after
+                    .split(|c: char| !c.is_alphanumeric() && c != '_')
+                    .next()
+                    .unwrap_or("")
+                    .to_string();
+                if !subject.is_empty() && !object.is_empty() {
+                    relations.push(ExtractedRelation {
+                        subject,
+                        predicate: pattern.trim().to_string(),
+                        object,
+                        subject_role: SemanticRole::Agent,
+                        object_role: SemanticRole::Calls,
+                        is_causal: false,
+                        is_negated: false,
+                        confidence: 0.8,
+                    });
+                }
+            }
+        }
+
+        // "impl Trait for Type" → Implements role
+        {
+            let mut search_from = 0;
+            while let Some(pos) = text[search_from..].find("impl ") {
+                let abs_pos = search_from + pos;
+                let after = &text[abs_pos + 5..];
+                if let Some(for_pos) = after.find(" for ") {
+                    let trait_name = after[..for_pos].trim();
+                    let type_after = after[for_pos + 5..].trim();
+                    let type_name = type_after
+                        .split(|c: char| !c.is_alphanumeric() && c != '_')
+                        .next()
+                        .unwrap_or("");
+                    if !trait_name.is_empty() && !type_name.is_empty() {
+                        relations.push(ExtractedRelation {
+                            subject: type_name.to_string(),
+                            predicate: "implements".to_string(),
+                            object: trait_name.to_string(),
+                            subject_role: SemanticRole::Agent,
+                            object_role: SemanticRole::Implements,
+                            is_causal: false,
+                            is_negated: false,
+                            confidence: 0.9,
+                        });
+                    }
+                }
+                search_from = abs_pos + 5;
+            }
+        }
+
+        // "implements" in natural language → Implements role
+        if let Some(pos) = lower.find("implements ") {
+            // Skip if this is from "impl ... for" already handled above
+            if !text[..pos].ends_with("impl ") {
+                let before = lower[..pos].trim();
+                let after = lower[pos + 11..].trim();
+                let subject = before.split_whitespace().last().unwrap_or("").to_string();
+                let object = after
+                    .split(|c: char| !c.is_alphanumeric() && c != '_')
+                    .next()
+                    .unwrap_or("")
+                    .to_string();
+                if !subject.is_empty() && !object.is_empty() {
+                    relations.push(ExtractedRelation {
+                        subject,
+                        predicate: "implements".to_string(),
+                        object,
+                        subject_role: SemanticRole::Agent,
+                        object_role: SemanticRole::Implements,
+                        is_causal: false,
+                        is_negated: false,
+                        confidence: 0.85,
+                    });
+                }
+            }
+        }
+
+        // "use" / "import" / "depends on" → DependsOn role
+        for pattern in &["depends on ", "use ", "import "] {
+            if let Some(pos) = lower.find(pattern) {
+                let before = lower[..pos].trim();
+                let after = lower[pos + pattern.len()..].trim();
+                let subject = before.split_whitespace().last().unwrap_or("").to_string();
+                let object = after
+                    .split(|c: char| !c.is_alphanumeric() && c != '_' && c != ':')
+                    .next()
+                    .unwrap_or("")
+                    .to_string();
+                if !subject.is_empty() && !object.is_empty() {
+                    relations.push(ExtractedRelation {
+                        subject,
+                        predicate: pattern.trim().to_string(),
+                        object,
+                        subject_role: SemanticRole::Agent,
+                        object_role: SemanticRole::DependsOn,
+                        is_causal: false,
+                        is_negated: false,
+                        confidence: 0.8,
+                    });
+                }
+            }
+        }
+
+        // "returns" / "->" / "→" → ReturnsType role
+        for pattern in &["returns ", "-> ", "→ "] {
+            if let Some(pos) = lower.find(pattern) {
+                let before = lower[..pos].trim();
+                let after_offset = pos + pattern.len();
+                let after = if after_offset <= text.len() {
+                    text[after_offset..].trim()
+                } else {
+                    ""
+                };
+                let subject = before.split_whitespace().last().unwrap_or("").to_string();
+                let object = after
+                    .split(|c: char| !c.is_alphanumeric() && c != '_' && c != '<' && c != '>')
+                    .next()
+                    .unwrap_or("")
+                    .to_string();
+                if !subject.is_empty() && !object.is_empty() {
+                    relations.push(ExtractedRelation {
+                        subject,
+                        predicate: pattern.trim().to_string(),
+                        object,
+                        subject_role: SemanticRole::Agent,
+                        object_role: SemanticRole::ReturnsType,
+                        is_causal: false,
+                        is_negated: false,
+                        confidence: 0.85,
+                    });
+                }
+            }
+        }
+
+        // "fixed by" / "resolved by" → FixedBy role
+        for pattern in &["fixed by ", "resolved by "] {
+            if let Some(pos) = lower.find(pattern) {
+                let before = lower[..pos].trim();
+                let after = lower[pos + pattern.len()..].trim();
+                let subject = before.split_whitespace().last().unwrap_or("").to_string();
+                let object = after
+                    .split(|c: char| c == '.' || c == ',' || c == ';')
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .to_string();
+                if !subject.is_empty() && !object.is_empty() {
+                    relations.push(ExtractedRelation {
+                        subject,
+                        predicate: pattern.trim().to_string(),
+                        object,
+                        subject_role: SemanticRole::Agent,
+                        object_role: SemanticRole::FixedBy,
+                        is_causal: true,
+                        is_negated: false,
+                        confidence: 0.8,
+                    });
+                }
+            }
+        }
+
+        relations
     }
 
     // ── Internal Methods ────────────────────────────────────────────────
@@ -835,5 +1229,220 @@ mod tests {
 
         let facts = extractor.extract("The blockade disrupted trade, which led to inflation.");
         assert!(!facts.is_empty());
+    }
+
+    // ── Code-Specific Extraction Tests ──────────────────────────────────
+
+    #[test]
+    fn test_extract_code_entities_rust() {
+        let extractor = KnowledgeExtractor::new();
+        let code = r#"
+            fn process_gradients(data: &[f32]) -> Vec<f32> { todo!() }
+            struct CognitiveLoop { phi: f32 }
+            enum SubstrateType { Silicon, Quantum }
+            trait Conscious { fn phi(&self) -> f32; }
+            mod extraction;
+            use std::collections::HashMap;
+        "#;
+
+        let entities = extractor.extract_code_entities(code);
+
+        // Check function detection
+        let functions: Vec<_> = entities
+            .iter()
+            .filter(|e| e.entity_type == EntityType::Function)
+            .collect();
+        assert!(
+            functions.iter().any(|e| e.text == "process_gradients"),
+            "should detect fn process_gradients"
+        );
+        assert!(
+            functions.iter().any(|e| e.text == "phi"),
+            "should detect fn phi inside trait"
+        );
+
+        // Check type detection
+        let types: Vec<_> = entities
+            .iter()
+            .filter(|e| e.entity_type == EntityType::Type)
+            .collect();
+        assert!(
+            types.iter().any(|e| e.text == "CognitiveLoop"),
+            "should detect struct CognitiveLoop"
+        );
+        assert!(
+            types.iter().any(|e| e.text == "SubstrateType"),
+            "should detect enum SubstrateType"
+        );
+        assert!(
+            types.iter().any(|e| e.text == "Conscious"),
+            "should detect trait Conscious"
+        );
+
+        // Check module detection
+        let modules: Vec<_> = entities
+            .iter()
+            .filter(|e| e.entity_type == EntityType::Module)
+            .collect();
+        assert!(
+            modules.iter().any(|e| e.text == "extraction"),
+            "should detect mod extraction"
+        );
+        assert!(
+            modules.iter().any(|e| e.text == "std"),
+            "should detect use std::"
+        );
+
+        // Confidence should be high (structural patterns)
+        for entity in &entities {
+            assert!(
+                entity.confidence >= 0.8,
+                "code entity confidence should be >= 0.8, got {} for '{}'",
+                entity.confidence,
+                entity.text
+            );
+        }
+    }
+
+    #[test]
+    fn test_extract_code_entities_python() {
+        let extractor = KnowledgeExtractor::new();
+        let code = r#"
+            def train_model(epochs: int) -> float:
+                pass
+            class NeuralNetwork:
+                pass
+            import torch
+            from numpy import array
+        "#;
+
+        let entities = extractor.extract_code_entities(code);
+
+        // Check function detection
+        let functions: Vec<_> = entities
+            .iter()
+            .filter(|e| e.entity_type == EntityType::Function)
+            .collect();
+        assert!(
+            functions.iter().any(|e| e.text == "train_model"),
+            "should detect def train_model"
+        );
+
+        // Check type detection
+        let types: Vec<_> = entities
+            .iter()
+            .filter(|e| e.entity_type == EntityType::Type)
+            .collect();
+        assert!(
+            types.iter().any(|e| e.text == "NeuralNetwork"),
+            "should detect class NeuralNetwork"
+        );
+
+        // Check module detection
+        let modules: Vec<_> = entities
+            .iter()
+            .filter(|e| e.entity_type == EntityType::Module)
+            .collect();
+        assert!(
+            modules.iter().any(|e| e.text == "torch"),
+            "should detect import torch"
+        );
+        assert!(
+            modules.iter().any(|e| e.text == "numpy"),
+            "should detect from numpy import"
+        );
+    }
+
+    #[test]
+    fn test_extract_code_relations() {
+        let extractor = KnowledgeExtractor::new();
+
+        // Calls pattern
+        let rels = extractor.extract_code_relations("process_gradients calls aggregate_weights");
+        assert!(
+            rels.iter().any(|r| r.object_role == SemanticRole::Calls),
+            "should detect 'calls' relation"
+        );
+
+        // Implements pattern (Rust syntax)
+        let rels = extractor.extract_code_relations("impl Display for CognitiveLoop");
+        assert!(
+            rels.iter()
+                .any(|r| r.object_role == SemanticRole::Implements),
+            "should detect 'impl Trait for Type' relation"
+        );
+        let impl_rel = rels
+            .iter()
+            .find(|r| r.object_role == SemanticRole::Implements)
+            .unwrap();
+        assert_eq!(impl_rel.subject, "CognitiveLoop");
+        assert_eq!(impl_rel.object, "Display");
+
+        // DependsOn pattern
+        let rels = extractor.extract_code_relations("extraction depends on std::collections");
+        assert!(
+            rels.iter()
+                .any(|r| r.object_role == SemanticRole::DependsOn),
+            "should detect 'depends on' relation"
+        );
+
+        // ReturnsType pattern
+        let rels = extractor.extract_code_relations("compute_phi returns f32");
+        assert!(
+            rels.iter()
+                .any(|r| r.object_role == SemanticRole::ReturnsType),
+            "should detect 'returns' relation"
+        );
+
+        // FixedBy pattern
+        let rels =
+            extractor.extract_code_relations("E0308 fixed by adding explicit type annotation");
+        assert!(
+            rels.iter().any(|r| r.object_role == SemanticRole::FixedBy),
+            "should detect 'fixed by' relation"
+        );
+        let fix_rel = rels
+            .iter()
+            .find(|r| r.object_role == SemanticRole::FixedBy)
+            .unwrap();
+        assert!(fix_rel.is_causal, "fix relations should be causal");
+    }
+
+    #[test]
+    fn test_extract_error_codes() {
+        let extractor = KnowledgeExtractor::new();
+        let text = "Compiler error E0308: mismatched types. Also see E0277 and E0382.";
+
+        let entities = extractor.extract_code_entities(text);
+        let errors: Vec<_> = entities
+            .iter()
+            .filter(|e| e.entity_type == EntityType::ErrorPattern)
+            .collect();
+
+        assert_eq!(errors.len(), 3, "should detect three error codes");
+        let codes: Vec<&str> = errors.iter().map(|e| e.text.as_str()).collect();
+        assert!(codes.contains(&"E0308"), "should detect E0308");
+        assert!(codes.contains(&"E0277"), "should detect E0277");
+        assert!(codes.contains(&"E0382"), "should detect E0382");
+
+        // Confidence should be high
+        for error in &errors {
+            assert!(
+                error.confidence >= 0.9,
+                "error code confidence should be >= 0.9"
+            );
+        }
+
+        // Should NOT match partial patterns
+        let text2 = "The variable EXTRA1234 is not an error code";
+        let entities2 = extractor.extract_code_entities(text2);
+        let false_errors: Vec<_> = entities2
+            .iter()
+            .filter(|e| e.entity_type == EntityType::ErrorPattern)
+            .collect();
+        assert!(
+            false_errors.is_empty(),
+            "should not match E within longer identifiers"
+        );
     }
 }

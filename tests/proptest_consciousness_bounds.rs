@@ -30,6 +30,7 @@ fn consciousness_service() -> CognitiveLoopService {
         async_training: false,
         ..Default::default()
     })
+    .expect("Failed to create CognitiveLoopService")
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

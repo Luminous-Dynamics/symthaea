@@ -217,10 +217,8 @@ fn baseline_for_benchmark<'a>(
         }
 
         // Creativity
-        name if name.contains("AlternateUses") => Some(("aut_originality", &bl.creativity)),
-        name if name.contains("RemoteAssociates") => {
-            Some(("rat_mean_solution_rank", &bl.creativity))
-        }
+        name if name.contains("AlternateUses") => Some(("aut_fluency", &bl.creativity)),
+        name if name.contains("RemoteAssociates") => Some(("rat_overall_accuracy", &bl.creativity)),
         name if name.contains("ConceptualBlending") => Some(("blend_coherence", &bl.creativity)),
         name if name.contains("DivergentThinking") => Some(("originality_score", &bl.creativity)),
 
@@ -275,7 +273,7 @@ fn baseline_for_benchmark<'a>(
             Some(("bayesian_posterior_accuracy", &bl.mathematics))
         }
         name if name.contains("LogicalDeduction") => {
-            Some(("logical_valid_accuracy", &bl.mathematics))
+            Some(("logical_overall_accuracy", &bl.mathematics))
         }
         name if name.contains("ConstraintPuzzle") => {
             Some(("constraint_queens_4_accuracy", &bl.mathematics))

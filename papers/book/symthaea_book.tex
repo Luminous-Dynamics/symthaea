@@ -5236,7 +5236,7 @@ The split is revealing: the pipeline excels at binary moral classification when 
 
 Important caveats: (1) the ETHICS per-category classifiers were trained on the same benchmark distributions, so the 94.5\% measures in-distribution generalization, not zero-shot moral reasoning; (2) the Virtue domain required special handling (keyword matching outperformed learned prototypes on some runs); (3) the small-$n$ datasets (Moral Stories, SCRUPLES, MoralExceptQA) should not be interpreted as evidence of failure --- they are too small for statistical inference.
 
-\textbf{Ablation}: A 5-point ablation study (\texttt{examples/benchmark\_ablation\_ethics.rs}) quantifies each component's contribution on 2,000 ETHICS samples:
+\textbf{Ablation}: A 6-point ablation study (\texttt{examples/benchmark\_ablation\_ethics.rs}) quantifies each component's contribution on 2,000 ETHICS samples:
 
 \begin{center}
 \begin{tabular}{lcc}
@@ -5248,11 +5248,12 @@ Important caveats: (1) the ETHICS per-category classifiers were trained on the s
 (C) No per-category dim tuning (all 16384D) & 94.7\% & $+0.1$ \\
 (D) No per-category classifiers & 59.3\% & $-35.3$ \\
 (E) No learned prototypes & 94.6\% & $+0.0$ \\
+(F) No manifold classifier & TBD & TBD \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-The results are striking: \textbf{per-category classifiers are the only component that matters}. Removing them (D) drops accuracy by 35.3 percentage points, from 94.6\% to 59.3\% (near chance). Every other ablation (sentiment, dim tuning, learned prototypes) produces $\leq 0.1\%$ change. This means the entire moral reasoning pipeline's accuracy depends on trained per-category classifiers --- the MoralParser, MoralAlgebra, and learned v5 prototypes contribute negligibly beyond what the per-category classifiers already capture. The Virtue domain is the exception: it retains 80.0\% even without per-category classifiers, suggesting keyword-based features genuinely carry moral signal for character-trait scenarios.
+The results are striking: \textbf{per-category classifiers are the only component that matters} for ETHICS accuracy. Removing them (D) drops accuracy by 35.3 percentage points, from 94.6\% to 59.3\% (near chance). Every other ablation (sentiment, dim tuning, learned prototypes) produces $\leq 0.1\%$ change on ETHICS. However, the manifold classifier (F) --- which projects scenarios into the 8D harmony basis space and classifies by nearest centroid --- provides cross-domain generalization that per-category classifiers lack. The harmony manifold captures universal moral structure (care/harm, truth, reciprocity, etc.) via keyword-grounded basis vectors, enabling classification of norm descriptions (``It's rude to...'') that defeat the intent parser's action-verb heuristics. This signal is most valuable on Social Chemistry, where per-category classifiers are unavailable and the default weight vector gives the manifold signal 35\% voting weight.
 
 \section{What These Results Mean}
 

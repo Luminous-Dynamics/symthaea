@@ -237,6 +237,7 @@ async fn run_acid_test(
         temperature: 0.2,
         max_tokens: 4096,
         system_prompt: Some(CODE_GENERATION_SYSTEM_PROMPT.to_string()),
+        consciousness_context: None,
     };
 
     // ── Step 3: THE SYNTHESIS ──────────────────────────────────────────

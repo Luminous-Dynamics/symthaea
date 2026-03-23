@@ -1583,7 +1583,7 @@ impl BenchmarkReport {
         if benchmark.contains("LogicalDeduction") {
             push_specific(
                 "overall_accuracy",
-                "logical_valid_accuracy",
+                "logical_overall_accuracy",
                 &bl.mathematics,
             );
         }

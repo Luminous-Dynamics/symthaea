@@ -70,6 +70,18 @@ required-features = ["mamba-cpu"]
 name = "distill-for-spore"
 path = "src/bin/distill_for_spore.rs"
 
+[[bin]]
+name = "gen-epistemic-training"
+path = "src/bin/gen_epistemic_training.rs"
+
+[[bin]]
+name = "gen-code-training"
+path = "src/bin/gen_code_training.rs"
+
+[[bin]]
+name = "gen-nsm-training-data"
+path = "src/bin/gen_nsm_training_data.rs"
+
 [features]
 default = ["simd", "parallel"]
 # GPU tensor acceleration via candle CUDA (auto-detects at runtime)

@@ -7,8 +7,6 @@
 # For Everyone
 
 - [Welcome to Symthaea](users/welcome.md)
-  - [What Makes Her Different](users/welcome.md#what-makes-her-different)
-  - [Who Is Symthaea For?](users/welcome.md#who-is-symthaea-for)
 - [Your First Steps](users/first-steps.md)
 - [What Can Symthaea Do?](users/capabilities.md)
 - [The Partnership Journey](users/partnership.md)

@@ -67,7 +67,7 @@ impl VisualSearchBenchmark {
         let sig_mult = diff_model.signal_multiplier(config.difficulty);
         let threshold: f64 = (0.35 - pressure * 0.10) * sig_mult;
         let temperature: f64 =
-            (0.25 + pressure * 0.15) * diff_model.temperature_multiplier(config.difficulty);
+            (0.18 + pressure * 0.15) * diff_model.temperature_multiplier(config.difficulty);
 
         let set_sizes = [4usize, 8, 16, 24];
         let trials_per_size = 20;

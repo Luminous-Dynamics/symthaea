@@ -274,6 +274,45 @@ pub fn thought_to_channels(thought: &StructuredThought, mood_temperature: f32) -
     // Channel 19: concept count (capped at 10)
     ch.channels[19] = (thought.activated_concepts.len() as f32).min(10.0);
 
+    // Channels 24-27: code channels — populated from CodeContext when present
+    if let Some(ref cc) = thought.code_context {
+        // syntax_complexity: estimate from plan step count + constraint count
+        let plan_depth = (cc.plan_steps.len() as f32 / 10.0).min(1.0);
+        let constraint_pressure = (cc.spec_constraints.len() as f32 / 5.0).min(1.0);
+        let syntax_complexity = (plan_depth * 0.6 + constraint_pressure * 0.4).clamp(0.0, 1.0);
+
+        // type_confidence: from phi_score + syntactic validity + intent similarity
+        let phi_contrib = cc.phi_score.unwrap_or(0.0);
+        let validity_contrib = if cc.syntactically_valid.unwrap_or(false) {
+            0.3
+        } else {
+            0.0
+        };
+        let similarity_contrib = cc.intent_similarity.unwrap_or(0.0) * 0.3;
+        let type_confidence =
+            (phi_contrib * 0.4 + validity_contrib + similarity_contrib).clamp(0.0, 1.0);
+
+        // algorithm_pattern: higher when plan_steps are non-empty (CfC sequencer detected patterns)
+        let algorithm_pattern = if cc.plan_steps.is_empty() {
+            0.0
+        } else {
+            (cc.plan_steps.len() as f32 / 5.0).min(1.0) * 0.8
+        };
+
+        // error_likelihood: higher when needs_llm_completion, notes present, or low phi
+        let unresolved = if cc.needs_llm_completion { 0.4 } else { 0.0 };
+        let note_pressure = (cc.notes.len() as f32 / 3.0).min(0.3);
+        let low_phi = (1.0 - cc.phi_score.unwrap_or(0.5)).max(0.0) * 0.3;
+        let error_likelihood = (unresolved + note_pressure + low_phi).clamp(0.0, 1.0);
+
+        ch.set_code(
+            syntax_complexity,
+            type_confidence,
+            algorithm_pattern,
+            error_likelihood,
+        );
+    }
+
     // Channels 28-42 (or 32-46 with therapeutic): Epistemic Cube from domain context
     if let Some(ref dc) = thought.domain_context {
         if let Some(ref cube) = dc.cube {
@@ -877,5 +916,133 @@ mod tests {
                 ch.channels[8]
             );
         }
+    }
+
+    #[test]
+    fn test_thought_to_channels_code_context_populated() {
+        use crate::mind::structured_thought::CodeContext;
+
+        let mut thought = make_test_thought();
+        thought.code_context = Some(CodeContext {
+            language: "rust".to_string(),
+            spec_purpose: Some("Sort a vector".to_string()),
+            spec_signature: Some("fn sort(v: &mut Vec<i32>)".to_string()),
+            spec_constraints: vec!["in-place".to_string(), "stable".to_string()],
+            spec_examples: vec![],
+            plan_steps: vec![
+                "DefineFunction".to_string(),
+                "ImplementSort".to_string(),
+                "AddTests".to_string(),
+            ],
+            generated_code: None,
+            phi_score: Some(0.7),
+            intent_similarity: Some(0.8),
+            syntactically_valid: Some(true),
+            notes: vec![],
+            needs_llm_completion: false,
+        });
+
+        let ch = thought_to_channels(&thought, 1.0);
+
+        // syntax_complexity: plan_depth=3/10=0.3, constraint=2/5=0.4 → 0.3*0.6+0.4*0.4=0.34
+        assert!(
+            ch.syntax_complexity() > 0.0,
+            "syntax_complexity should be populated"
+        );
+        assert!(
+            ch.syntax_complexity() < 1.0,
+            "syntax_complexity should be bounded"
+        );
+
+        // type_confidence: phi 0.7*0.4=0.28, validity 0.3, similarity 0.8*0.3=0.24 → 0.82
+        assert!(
+            ch.type_confidence() > 0.5,
+            "type_confidence should be high for valid code with good phi"
+        );
+
+        // algorithm_pattern: 3 steps, 3/5=0.6 * 0.8 = 0.48
+        assert!(
+            ch.algorithm_pattern() > 0.0,
+            "algorithm_pattern should be populated from plan_steps"
+        );
+
+        // error_likelihood: no completion, no notes, phi=0.7 → low_phi=(1-0.7)*0.3=0.09
+        assert!(
+            ch.error_likelihood() < 0.3,
+            "error_likelihood should be low for good code"
+        );
+    }
+
+    #[test]
+    fn test_thought_to_channels_code_context_high_error() {
+        use crate::mind::structured_thought::CodeContext;
+
+        let mut thought = make_test_thought();
+        thought.code_context = Some(CodeContext {
+            language: "rust".to_string(),
+            spec_purpose: None,
+            spec_signature: None,
+            spec_constraints: vec![],
+            spec_examples: vec![],
+            plan_steps: vec![],
+            generated_code: None,
+            phi_score: Some(0.1),
+            intent_similarity: None,
+            syntactically_valid: Some(false),
+            notes: vec![
+                "TODO".to_string(),
+                "uncertain types".to_string(),
+                "complex".to_string(),
+            ],
+            needs_llm_completion: true,
+        });
+
+        let ch = thought_to_channels(&thought, 1.0);
+
+        // High error likelihood: needs_llm=0.4, notes=3/3→1.0 clamped to 0.3, low_phi=(1-0.1)*0.3=0.27
+        assert!(
+            ch.error_likelihood() > 0.5,
+            "error_likelihood should be high for incomplete code"
+        );
+
+        // Low type_confidence: phi 0.1*0.4=0.04, no validity, no similarity
+        assert!(
+            ch.type_confidence() < 0.2,
+            "type_confidence should be low for unvalidated code"
+        );
+
+        // No algorithm pattern (empty plan_steps)
+        assert!(
+            (ch.algorithm_pattern() - 0.0).abs() < 0.01,
+            "algorithm_pattern should be 0 with no steps"
+        );
+    }
+
+    #[test]
+    fn test_thought_to_channels_no_code_context_defaults() {
+        let thought = make_test_thought();
+        let ch = thought_to_channels(&thought, 1.0);
+
+        // No code context → all code channels should be 0
+        assert_eq!(
+            ch.syntax_complexity(),
+            0.0,
+            "should default to 0 without code context"
+        );
+        assert_eq!(
+            ch.type_confidence(),
+            0.0,
+            "should default to 0 without code context"
+        );
+        assert_eq!(
+            ch.algorithm_pattern(),
+            0.0,
+            "should default to 0 without code context"
+        );
+        assert_eq!(
+            ch.error_likelihood(),
+            0.0,
+            "should default to 0 without code context"
+        );
     }
 }

@@ -1471,6 +1471,28 @@ pub fn creativity_baselines() -> BTreeMap<&'static str, Baseline> {
         },
     );
 
+    // Alternate Uses originality (semantic distance)
+    m.insert(
+        "aut_originality",
+        Baseline {
+            value: 0.45,
+            sd: Some(0.15),
+            source: "Silvia et al. (2008), mean semantic distance of alternative uses",
+            population: "human adults",
+        },
+    );
+
+    // Remote Associates mean solution rank
+    m.insert(
+        "rat_mean_solution_rank",
+        Baseline {
+            value: 0.50,
+            sd: Some(0.15),
+            source: "Bowden & Jung-Beeman (2003), Normative data for 144 compound remote associate problems",
+            population: "human adults",
+        },
+    );
+
     // Creativity RT baselines
     m.insert(
         "aut_rt_ticks",
@@ -4184,6 +4206,15 @@ pub fn mathematics_baselines() -> BaselineMap {
             value: 0.70,
             sd: Some(0.15),
             source: "Johnson-Laird (1983), mental models of deduction",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "logical_overall_accuracy",
+        Baseline {
+            value: 0.73,
+            sd: Some(0.11),
+            source: "Johnson-Laird (1983), combined valid+invalid accuracy",
             population: "human adults",
         },
     );

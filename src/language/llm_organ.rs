@@ -344,6 +344,7 @@ impl LLMOrgan {
                     .and_then(|p| p.max_length)
                     .unwrap_or(self.config.max_generation_length),
                 system_prompt: query.system_prompt.clone(),
+                consciousness_context: None,
             };
 
             match backend.generate(&query.content, &params).await {
@@ -416,6 +417,7 @@ impl LLMOrgan {
                     .and_then(|p| p.max_length)
                     .unwrap_or(self.config.max_generation_length),
                 system_prompt: query.system_prompt.clone(),
+                consciousness_context: None,
             };
 
             match backend
