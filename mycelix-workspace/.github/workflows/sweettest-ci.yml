@@ -203,3 +203,12 @@ jobs:
         continue-on-error: true
         env:
           RUST_LOG: warn
+
+  deny:
+    name: Dependency Audit (cargo-deny)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories licenses bans sources

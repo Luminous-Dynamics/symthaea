@@ -111,17 +111,13 @@ impl ConsciousnessProfile {
     /// - community:  30%
     /// - engagement: 20%
     pub fn combined_score(&self) -> f64 {
-        let raw = self.identity * 0.25
-            + self.reputation * 0.25
-            + self.community * 0.30
-            + self.engagement * 0.20;
-        // Guard: NaN/Infinity in any dimension propagates through arithmetic.
-        // Clamp to [0, 1] — non-finite inputs collapse to 0 (safest default).
-        if raw.is_finite() {
-            raw.clamp(0.0, 1.0)
-        } else {
-            0.0
-        }
+        // Sanitize inputs first — prevents NaN from entering arithmetic.
+        // Non-finite dimensions clamp to 0.0 (safest default: no contribution).
+        let i = if self.identity.is_finite() { self.identity.clamp(0.0, 1.0) } else { 0.0 };
+        let r = if self.reputation.is_finite() { self.reputation.clamp(0.0, 1.0) } else { 0.0 };
+        let c = if self.community.is_finite() { self.community.clamp(0.0, 1.0) } else { 0.0 };
+        let e = if self.engagement.is_finite() { self.engagement.clamp(0.0, 1.0) } else { 0.0 };
+        (i * 0.25 + r * 0.25 + c * 0.30 + e * 0.20).clamp(0.0, 1.0)
     }
 
     /// Derive the consciousness tier from this profile's combined score.

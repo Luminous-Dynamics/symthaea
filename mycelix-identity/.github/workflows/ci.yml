@@ -102,6 +102,15 @@ jobs:
             echo "Warning: Found .unwrap() in DID registry - potential panic vectors"
           fi
 
+  deny:
+    name: Dependency Audit (cargo-deny)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories licenses bans sources
+
   wasm-build:
     runs-on: ubuntu-latest
     needs: build
