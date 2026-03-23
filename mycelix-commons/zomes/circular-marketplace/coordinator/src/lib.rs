@@ -328,6 +328,112 @@ pub fn get_listing_orders(listing_hash: ActionHash) -> ExternResult<Vec<Record>>
 }
 
 // ============================================================================
+// CROSS-ZOME: FOOD PRODUCTION INTEGRATION
+// ============================================================================
+
+/// Result of querying food-production for plots that could use compost.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CompostDemandMatch {
+    /// Food-production plot action hash
+    pub plot_hash: String,
+    /// Listing that could supply this plot
+    pub listing_hash: ActionHash,
+    /// Material type (should be Compost/Vermicompost/Digestate)
+    pub material_type: String,
+    /// Available quantity (kg)
+    pub available_kg: f64,
+}
+
+/// Find food-production plots that could benefit from available compost listings.
+///
+/// Calls `food_production::get_all_plots` via `CallTargetCell::Local` to discover
+/// plots, then matches them against available Compost/Vermicompost listings.
+/// This enables the "back to farm" closed loop.
+#[hdk_extern]
+pub fn find_plots_needing_compost(_: ()) -> ExternResult<Vec<CompostDemandMatch>> {
+    let _eligibility =
+        require_consciousness(&requirement_for_basic(), "find_plots_needing_compost")?;
+
+    // Query food-production for all plots via cross-zome call
+    let plots_response = call(
+        CallTargetCell::Local,
+        ZomeName::from("food_production"),
+        FunctionName::from("get_all_plots"),
+        None,
+        ExternIO::encode(())
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Encode error: {}", e))))?,
+    );
+
+    let plot_hashes: Vec<String> = match plots_response {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            // Decode as Vec<Record> and extract action hashes
+            let records: Vec<serde_json::Value> = extern_io
+                .decode()
+                .unwrap_or_default();
+            records
+                .iter()
+                .filter_map(|r| {
+                    r.get("signed_action")
+                        .and_then(|sa| sa.get("hashed"))
+                        .and_then(|h| h.get("hash"))
+                        .and_then(|h| h.as_str())
+                        .map(|s| s.to_string())
+                })
+                .collect()
+        }
+        _ => {
+            // food_production zome not available — return empty
+            return Ok(vec![]);
+        }
+    };
+
+    if plot_hashes.is_empty() {
+        return Ok(vec![]);
+    }
+
+    // Get all compost-type listings
+    let compost_types = [
+        SecondaryMaterialType::Compost,
+        SecondaryMaterialType::Vermicompost,
+        SecondaryMaterialType::Digestate,
+    ];
+
+    let mut matches: Vec<CompostDemandMatch> = Vec::new();
+
+    for mat_type in &compost_types {
+        let type_anchor = format!("material_type:{:?}", mat_type);
+        let links = get_links(
+            LinkQuery::try_new(anchor_hash(&type_anchor)?, LinkTypes::TypeToListings)?,
+            GetStrategy::default(),
+        )?;
+        let records = records_from_links(links)?;
+
+        for record in &records {
+            let listing: SecondaryMaterialListing = match record.entry().to_app_option() {
+                Ok(Some(l)) => l,
+                _ => continue,
+            };
+
+            if listing.status != ListingStatus::Available {
+                continue;
+            }
+
+            // Match each plot with available listings
+            for plot_hash in &plot_hashes {
+                matches.push(CompostDemandMatch {
+                    plot_hash: plot_hash.clone(),
+                    listing_hash: record.action_address().clone(),
+                    material_type: format!("{:?}", mat_type),
+                    available_kg: listing.quantity_kg,
+                });
+            }
+        }
+    }
+
+    Ok(matches)
+}
+
+// ============================================================================
 // UNIT TESTS
 // ============================================================================
 

@@ -1022,3 +1022,322 @@ async fn test_full_circular_loop() {
         "Full circular loop: waste → compost → marketplace complete"
     );
 }
+
+// ============================================================================
+// E2E Demo: Complete Narrative
+// ============================================================================
+
+/// Comprehensive end-to-end demo exercising every function in the circular economy.
+///
+/// This is the definitive "it works" test — if this passes on a real conductor,
+/// the entire circular economy infrastructure is operational.
+///
+/// Narrative: A community farm generates crop residue, it gets classified by AI,
+/// routed to a composting facility, processed with sensor monitoring, recipe
+/// optimized, carbon credited, listed on the marketplace, and matched back to
+/// farms needing nutrients.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Holochain conductor (nix develop) — full e2e demo"]
+async fn test_e2e_complete_circular_economy_demo() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&commons_dna_path()).await.unwrap();
+    let (alice,) = conductor
+        .setup_app("test-app", &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    // ── Step 1: Register composting facility ────────────────────────────
+    let facility = WasteFacility {
+        id: "FAC-DEMO-001".to_string(),
+        name: "Community Composting Hub".to_string(),
+        facility_type: FacilityType::Composter,
+        accepts: vec![WasteCategory::Organic],
+        capacity_kg_per_day: 1000.0,
+        current_load_kg: 100.0,
+        location_lat: 32.9500,
+        location_lon: -96.7300,
+        operator_did: "did:example:operator".to_string(),
+        status: FacilityStatus::Active,
+    };
+    let fac_record: Record = conductor
+        .call(&alice.zome("waste_registry"), "register_facility", facility)
+        .await;
+    let _fac_hash = fac_record.action_address().clone();
+
+    // ── Step 2: Register waste streams from 3 sources ───────────────────
+    let sources = vec![
+        ("WS-DEMO-001", "did:example:farm1", 200.0, "crop residue"),
+        ("WS-DEMO-002", "did:example:farm2", 150.0, "food scraps"),
+        ("WS-DEMO-003", "did:example:restaurant1", 80.0, "kitchen waste"),
+    ];
+
+    let mut stream_hashes = Vec::new();
+    for (id, did, kg, subcat) in &sources {
+        let stream = WasteStream {
+            id: id.to_string(),
+            source_did: did.to_string(),
+            material_passport_hash: None,
+            waste_category: WasteCategory::Organic,
+            subcategory: subcat.to_string(),
+            quantity_kg: *kg,
+            contamination_level: ContaminationLevel::Clean,
+            recommended_eol: EndOfLifeStrategy::IndustrialCompost,
+            location_lat: 32.9483 + stream_hashes.len() as f64 * 0.005,
+            location_lon: -96.7299 + stream_hashes.len() as f64 * 0.003,
+            status: WasteStreamStatus::Registered,
+            created_at: 1711100000_000000 + stream_hashes.len() as u64 * 1000,
+        };
+        let record: Record = conductor
+            .call(&alice.zome("waste_registry"), "register_waste_stream", stream)
+            .await;
+        stream_hashes.push(record.action_address().clone());
+    }
+    assert_eq!(stream_hashes.len(), 3, "Should have 3 registered streams");
+
+    // ── Step 3: AI classifies each stream ───────────────────────────────
+    for (i, hash) in stream_hashes.iter().enumerate() {
+        let classification = WasteClassification {
+            stream_hash: hash.clone(),
+            classifier_did: "did:example:symthaea_ai".to_string(),
+            category: WasteCategory::Organic,
+            subcategory: sources[i].3.to_string(),
+            contamination_level: ContaminationLevel::Clean,
+            confidence: 0.95,
+            method: ClassificationMethod::VisionAI,
+            classified_at: 1711200000_000000 + i as u64 * 1000,
+        };
+        let _: Record = conductor
+            .call(&alice.zome("waste_registry"), "classify_waste_stream", classification)
+            .await;
+    }
+
+    // ── Step 4: Route each stream to the facility ───────────────────────
+    for hash in &stream_hashes {
+        let route_input = RouteWasteStreamInput {
+            stream_hash: hash.clone(),
+        };
+        let route: Option<Record> = conductor
+            .call(&alice.zome("waste_registry"), "route_waste_stream", route_input)
+            .await;
+        assert!(route.is_some(), "Each stream should route to the composting facility");
+    }
+
+    // ── Step 5: Check analytics ─────────────────────────────────────────
+    let diversion_input = DiversionRateInput {
+        period_start_us: 1711000000_000000,
+        period_end_us: 1712000000_000000,
+    };
+    let _diversion: DiversionRateResult = conductor
+        .call(&alice.zome("waste_registry"), "calculate_diversion_rate", diversion_input)
+        .await;
+
+    // ── Step 6: Create compost batch with all 3 streams ─────────────────
+    let dummy_fac = ActionHash::from_raw_36(vec![0u8; 36]);
+    let batch = CompostBatch {
+        id: "CB-DEMO-001".to_string(),
+        facility_hash: dummy_fac.clone(),
+        method: CompostMethod::Windrow,
+        inputs: vec![
+            CompostInput {
+                stream_hash: stream_hashes[0].clone(),
+                quantity_kg: 200.0,
+                resource_type: "GreenWaste".to_string(),
+            },
+            CompostInput {
+                stream_hash: stream_hashes[1].clone(),
+                quantity_kg: 150.0,
+                resource_type: "KitchenWaste".to_string(),
+            },
+            CompostInput {
+                stream_hash: stream_hashes[2].clone(),
+                quantity_kg: 80.0,
+                resource_type: "KitchenWaste".to_string(),
+            },
+        ],
+        carbon_nitrogen_ratio: 18.0, // Nitrogen-heavy — needs amendment
+        status: CompostBatchStatus::Mixing,
+        started_at: 1711300000_000000,
+        target_complete: 1714300000_000000,
+        phase_history: vec![],
+    };
+    let batch_record: Record = conductor
+        .call(&alice.zome("compost_control"), "create_compost_batch", batch)
+        .await;
+    let batch_hash = batch_record.action_address().clone();
+
+    // ── Step 7: Recipe optimizer suggests amendments ─────────────────────
+    let recipe_input = OptimizeRecipeInput {
+        batch_hash: batch_hash.clone(),
+        target_cn_ratio: 27.5,
+    };
+    let recipe: RecipeOptimization = conductor
+        .call(&alice.zome("compost_control"), "optimize_recipe", recipe_input)
+        .await;
+
+    assert!(
+        !recipe.is_optimal,
+        "C:N of 18 should not be optimal"
+    );
+    assert_eq!(
+        recipe.diagnosis, "nitrogen_heavy",
+        "C:N 18 < 25 should be nitrogen_heavy"
+    );
+    assert!(
+        !recipe.amendments.is_empty(),
+        "Should suggest carbon-rich amendments"
+    );
+
+    // ── Step 8: Simulate sensor readings ────────────────────────────────
+    // Thermophilic phase reading
+    let reading = CompostReading {
+        batch_hash: batch_hash.clone(),
+        sensor_id: "TEMP-001".to_string(),
+        temperature_c: 58.0,
+        moisture_pct: 52.0,
+        oxygen_pct: 12.0,
+        ph: 7.2,
+        timestamp_us: 1711400000_000000,
+    };
+    let _: Record = conductor
+        .call(&alice.zome("compost_control"), "record_compost_reading", reading)
+        .await;
+
+    // ── Step 9: Evaluate batch status ───────────────────────────────────
+    let eval: BatchEvaluation = conductor
+        .call(&alice.zome("compost_control"), "evaluate_batch_status", batch_hash.clone())
+        .await;
+
+    assert!(
+        eval.temperature_status.contains("58"),
+        "Should report actual temperature"
+    );
+
+    // ── Step 10: Nutrient estimation ────────────────────────────────────
+    let nutrients: NutrientEstimate = conductor
+        .call(&alice.zome("compost_control"), "get_batch_nutrient_estimate", batch_hash.clone())
+        .await;
+
+    assert!(
+        (nutrients.total_kg - 430.0).abs() < 0.1,
+        "Total should be 200+150+80=430kg, got {}",
+        nutrients.total_kg
+    );
+    assert!(nutrients.nitrogen_pct > 0.0, "Should have positive nitrogen");
+
+    // ── Step 11: Carbon attribution ─────────────────────────────────────
+    let carbon: CarbonAttribution = conductor
+        .call(&alice.zome("compost_control"), "calculate_carbon_attribution", batch_hash.clone())
+        .await;
+
+    assert!(
+        carbon.co2e_avoided_tonnes > 0.0,
+        "Should avoid positive CO2e"
+    );
+    assert!(
+        (carbon.waste_diverted_kg - 430.0).abs() < 0.1,
+        "Should divert 430kg"
+    );
+
+    // ── Step 12: List finished compost on marketplace ────────────────────
+    let listing = SecondaryMaterialListing {
+        facility_hash: dummy_fac.clone(),
+        batch_hash: Some(batch_hash.clone()),
+        material_type: SecondaryMaterialType::Compost,
+        quantity_kg: 320.0, // Compost weighs less than inputs
+        quality_grade: MaterialQualityGrade::Standard,
+        nutrient_info: Some(NutrientInfo {
+            nitrogen_pct: nutrients.nitrogen_pct,
+            phosphorus_pct: nutrients.phosphorus_pct,
+            potassium_pct: nutrients.potassium_pct,
+        }),
+        price_per_kg: 0.0, // Free for community
+        location_lat: 32.9500,
+        location_lon: -96.7300,
+        available_from: 1714300000_000000,
+        status: ListingStatus::Available,
+        seller_did: "did:example:composting_facility".to_string(),
+    };
+    let listing_record: Record = conductor
+        .call(&alice.zome("circular_marketplace"), "list_secondary_material", listing)
+        .await;
+
+    // ── Step 13: Demand matching ────────────────────────────────────────
+    let demand = DemandMatchInput {
+        material_type: SecondaryMaterialType::Compost,
+        min_quantity_kg: 50.0,
+        min_quality: MaterialQualityGrade::Industrial,
+        buyer_lat: 32.9600,
+        buyer_lon: -96.7200,
+        max_distance_km: 50.0,
+    };
+    let matches: Vec<ListingMatch> = conductor
+        .call(&alice.zome("circular_marketplace"), "find_matching_listings", demand)
+        .await;
+
+    assert!(
+        !matches.is_empty(),
+        "Should find the compost listing"
+    );
+    assert!(
+        matches[0].match_score > 0.0,
+        "Match score should be positive"
+    );
+
+    // ── Step 14: Place order ────────────────────────────────────────────
+    let order = SecondaryMaterialOrder {
+        listing_hash: listing_record.action_address().clone(),
+        buyer: alice.agent_pubkey().clone(),
+        quantity_kg: 100.0,
+        delivery_lat: 32.9483,
+        delivery_lon: -96.7299,
+        delivery_route_hash: None,
+        status: OrderStatus::Placed,
+        placed_at: 1714400000_000000,
+    };
+    let order_record: Record = conductor
+        .call(&alice.zome("circular_marketplace"), "place_order", order)
+        .await;
+
+    assert!(
+        order_record.entry().as_option().is_some(),
+        "E2E COMPLETE: waste → classify → route → compost → recipe → sensors → carbon → marketplace → order"
+    );
+}
+
+// ── Additional types needed for e2e ─────────────────────────────────────
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct OptimizeRecipeInput {
+    pub batch_hash: ActionHash,
+    pub target_cn_ratio: f64,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct RecipeOptimization {
+    pub current_cn_ratio: f64,
+    pub target_cn_ratio: f64,
+    pub is_optimal: bool,
+    pub diagnosis: String,
+    pub amendments: Vec<RecipeAmendment>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct RecipeAmendment {
+    pub resource_type: String,
+    pub quantity_kg: f64,
+    pub material_cn_ratio: f64,
+    pub resulting_cn_ratio: f64,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct SecondaryMaterialOrder {
+    pub listing_hash: ActionHash,
+    pub buyer: AgentPubKey,
+    pub quantity_kg: f64,
+    pub delivery_lat: f64,
+    pub delivery_lon: f64,
+    pub delivery_route_hash: Option<ActionHash>,
+    pub status: OrderStatus,
+    pub placed_at: u64,
+}

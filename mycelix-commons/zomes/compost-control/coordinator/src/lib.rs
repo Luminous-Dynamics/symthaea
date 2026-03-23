@@ -700,6 +700,53 @@ pub fn optimize_recipe(input: OptimizeRecipeInput) -> ExternResult<RecipeOptimiz
 // SENSOR BRIDGE (resource-mesh integration)
 // ============================================================================
 
+/// Query a single latest value from resource-mesh via `CallTargetCell::Local`.
+///
+/// Calls `resource_mesh::get_resource_status` and returns the most recent
+/// value for the given resource_type. Returns `None` if the call fails
+/// (e.g., resource-mesh zome not present in DNA, or no readings available).
+fn query_resource_mesh_sensor(resource_type: &str, sensor_id: Option<&str>) -> Option<f64> {
+    if sensor_id.is_none() {
+        return None;
+    }
+
+    // Build the input for resource_mesh::get_resource_status
+    // The resource-mesh expects: { resource_type: String, location: Option<String>, limit: usize }
+    let query_input = serde_json::json!({
+        "resource_type": resource_type,
+        "location": null,
+        "limit": 1
+    });
+
+    let payload = ExternIO::encode(query_input).ok()?;
+
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::from("resource_mesh"),
+        FunctionName::from("get_resource_status"),
+        None,
+        payload,
+    );
+
+    match response {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            // Decode response as Vec of SensorReading-like objects
+            // resource-mesh returns Vec<SensorReading> where each has a `value: f64`
+            let readings: Vec<serde_json::Value> =
+                extern_io.decode().ok()?;
+            readings
+                .first()
+                .and_then(|r| r.get("value"))
+                .and_then(|v| v.as_f64())
+                .filter(|v| v.is_finite())
+        }
+        _ => {
+            // Resource-mesh not available or call failed — graceful degradation
+            None
+        }
+    }
+}
+
 /// Input for syncing sensor readings from resource-mesh to compost-control.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SensorBridgeInput {
@@ -736,30 +783,26 @@ pub struct SensorBridgeResult {
 /// then evaluate the batch status and return recommendations.
 ///
 /// This closes the sensor → compost-control → action loop by:
-/// 1. Reading latest values from resource-mesh SensorReading entries
-/// 2. Creating a CompostReading entry with those values
-/// 3. Running evaluate_batch_status() to get recommendations
-///
-/// Note: In a real deployment, this would call resource-mesh via
-/// `call(CallTargetCell::Local, "resource_mesh", ...)`. For now, it accepts
-/// sensor values directly to avoid cross-zome call complexity in testing.
+/// 1. Calling `resource_mesh::get_resource_status` via `CallTargetCell::Local`
+///    for temperature, humidity, and air_quality readings
+/// 2. Mapping resource-mesh values to CompostReading fields
+/// 3. Creating a CompostReading entry
+/// 4. Running evaluate_batch_status() to get recommendations
 #[hdk_extern]
 pub fn record_sensor_bridge_reading(input: SensorBridgeInput) -> ExternResult<SensorBridgeResult> {
     let _eligibility =
         require_consciousness(&requirement_for_basic(), "record_sensor_bridge_reading")?;
 
-    // In a full deployment, we'd call resource_mesh::get_sensor_readings_by_location here.
-    // For now, accept the sensor IDs as documentation of the intended integration.
-
     // Verify the batch exists
     let _batch_record = get(input.batch_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Batch not found".into())))?;
 
-    // Use default values if sensors not specified
-    // (In production, these would come from resource-mesh SensorReading entries)
-    let temp = input.temp_sensor_id.as_ref().map(|_| 55.0); // Placeholder
-    let moisture = input.moisture_sensor_id.as_ref().map(|_| 55.0);
-    let oxygen = input.oxygen_sensor_id.as_ref().map(|_| 15.0);
+    // Query resource-mesh for latest sensor values via cross-zome Local call.
+    // Each sensor type maps: temperature → temperature_c, humidity → moisture_pct,
+    // air_quality (O2 %) → oxygen_pct.
+    let temp = query_resource_mesh_sensor("temperature", input.temp_sensor_id.as_deref());
+    let moisture = query_resource_mesh_sensor("humidity", input.moisture_sensor_id.as_deref());
+    let oxygen = query_resource_mesh_sensor("air_quality", input.oxygen_sensor_id.as_deref());
 
     if temp.is_none() && moisture.is_none() && oxygen.is_none() {
         return Ok(SensorBridgeResult {
@@ -772,7 +815,7 @@ pub fn record_sensor_bridge_reading(input: SensorBridgeInput) -> ExternResult<Se
         });
     }
 
-    // Create reading with available values
+    // Create reading with available values (defaults for missing sensors)
     let reading = CompostReading {
         batch_hash: input.batch_hash.clone(),
         sensor_id: "sensor_bridge".to_string(),
