@@ -767,6 +767,7 @@ impl CognitiveLoopService {
     /// to the neuromodulator bath. Called after fabrication processing.
     #[cfg(feature = "advanced-manufacturing")]
     pub(crate) fn apply_fabrication_neuromod(&mut self) {
+        use super::super::thresholds::{NEUROMOD_BASELINE_MAX, NEUROMOD_BASELINE_MIN};
         let injections = self.fabrication_manager.drain_injections();
         for inj in injections {
             self.neuromod
