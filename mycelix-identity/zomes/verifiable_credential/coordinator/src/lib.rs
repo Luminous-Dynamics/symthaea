@@ -1,4 +1,6 @@
-//! Verifiable Credential Coordinator Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Verifiable Credential Coordinator Zome
 //!
 //! W3C Verifiable Credentials Data Model 2.0 compliant implementation
 //! Handles credential issuance, verification, and presentation
@@ -446,7 +448,8 @@ pub fn verify_credential(credential_id: String) -> ExternResult<VerificationResu
             // Credential is active, no error
         }
         CredentialRevocationStatus::Unknown => {
-            // No revocation record found, assume active
+            // SECURITY: Fail-closed — unknown revocation status is not safe to assume active
+            errors.push("Revocation status could not be determined".to_string());
         }
     }
 
@@ -862,7 +865,10 @@ pub fn verify_presentation(
             CredentialRevocationStatus::Suspended(reason, _) => {
                 cred_errors.push(format!("Suspended: {}", reason));
             }
-            _ => {}
+            CredentialRevocationStatus::Active => {}
+            CredentialRevocationStatus::Unknown => {
+                cred_errors.push("Revocation status could not be determined".to_string());
+            }
         }
 
         // Check expiration (fail-closed)
@@ -1397,7 +1403,12 @@ pub fn verify_derived_credential(
         CredentialRevocationStatus::Suspended(reason, _) => {
             errors.push(format!("Original credential suspended: {}", reason));
         }
-        _ => {}
+        CredentialRevocationStatus::Active => {}
+        CredentialRevocationStatus::Unknown => {
+            errors.push(
+                "Original credential revocation status could not be determined".to_string(),
+            );
+        }
     }
 
     Ok(DerivedVerificationResult {
@@ -2287,7 +2298,10 @@ mod tests {
             CredentialRevocationStatus::Suspended(reason, until) => {
                 errors.push(format!("Credential suspended until {}: {}", until, reason));
             }
-            CredentialRevocationStatus::Active | CredentialRevocationStatus::Unknown => {}
+            CredentialRevocationStatus::Active => {}
+            CredentialRevocationStatus::Unknown => {
+                errors.push("Revocation status could not be determined".to_string());
+            }
         }
         assert!(
             errors.is_empty(),
@@ -2306,7 +2320,10 @@ mod tests {
             CredentialRevocationStatus::Suspended(reason, until) => {
                 errors.push(format!("Credential suspended until {}: {}", until, reason));
             }
-            CredentialRevocationStatus::Active | CredentialRevocationStatus::Unknown => {}
+            CredentialRevocationStatus::Active => {}
+            CredentialRevocationStatus::Unknown => {
+                errors.push("Revocation status could not be determined".to_string());
+            }
         }
         assert_eq!(errors.len(), 1);
         assert!(errors[0].contains("Fraud detected"));
@@ -2326,7 +2343,10 @@ mod tests {
             CredentialRevocationStatus::Suspended(reason, until) => {
                 errors.push(format!("Credential suspended until {}: {}", until, reason));
             }
-            CredentialRevocationStatus::Active | CredentialRevocationStatus::Unknown => {}
+            CredentialRevocationStatus::Active => {}
+            CredentialRevocationStatus::Unknown => {
+                errors.push("Revocation status could not be determined".to_string());
+            }
         }
         assert_eq!(errors.len(), 1);
         assert!(errors[0].contains("Under review"));
@@ -2334,8 +2354,9 @@ mod tests {
     }
 
     #[test]
-    fn revocation_status_unknown_treated_as_active() {
-        // Unknown status (revocation zome unavailable) should not block verification
+    fn revocation_status_unknown_treated_as_invalid() {
+        // SECURITY: Unknown status (revocation zome unavailable) must block verification
+        // (fail-closed). Previously this was fail-open — fixed March 2026.
         let mut errors = Vec::new();
         let status = CredentialRevocationStatus::Unknown;
         match status {
@@ -2345,12 +2366,17 @@ mod tests {
             CredentialRevocationStatus::Suspended(reason, until) => {
                 errors.push(format!("Credential suspended until {}: {}", until, reason));
             }
-            CredentialRevocationStatus::Active | CredentialRevocationStatus::Unknown => {}
+            CredentialRevocationStatus::Active => {}
+            CredentialRevocationStatus::Unknown => {
+                errors.push("Revocation status could not be determined".to_string());
+            }
         }
-        assert!(
-            errors.is_empty(),
-            "Unknown should be treated as active (fail-open)"
+        assert_eq!(
+            errors.len(),
+            1,
+            "Unknown must produce an error (fail-closed)"
         );
+        assert!(errors[0].contains("could not be determined"));
     }
 
     #[test]
@@ -2444,7 +2470,13 @@ mod tests {
                 "revoked",
                 Some("Expired cert"),
             ),
-            (CredentialRevocationStatus::Unknown, true, "unknown", None),
+            // SECURITY: Unknown is now fail-closed (invalid)
+            (
+                CredentialRevocationStatus::Unknown,
+                false,
+                "unknown",
+                Some("Revocation status could not be determined"),
+            ),
         ];
 
         for (status, expected_valid, expected_type, expected_reason) in statuses {
@@ -2454,7 +2486,12 @@ mod tests {
                 CredentialRevocationStatus::Suspended(r, until) => {
                     (false, format!("suspended_until_{}", until), Some(r))
                 }
-                CredentialRevocationStatus::Unknown => (true, "unknown".to_string(), None),
+                // SECURITY: Fail-closed — unknown revocation status treated as invalid
+        CredentialRevocationStatus::Unknown => (
+            false,
+            "unknown".to_string(),
+            Some("Revocation status could not be determined".to_string()),
+        ),
             };
             assert_eq!(is_valid, expected_valid, "valid for {}", status_type);
             assert_eq!(status_type, expected_type);
@@ -2472,13 +2509,15 @@ mod tests {
                 CredentialRevocationStatus::Suspended("test".into(), "2026".into()),
                 true,
             ),
-            (CredentialRevocationStatus::Unknown, false),
+            // SECURITY: Unknown is now fail-closed (treated as revoked)
+            (CredentialRevocationStatus::Unknown, true),
         ];
         for (status, expected) in cases {
             let result = matches!(
                 status,
                 CredentialRevocationStatus::Revoked(_)
                     | CredentialRevocationStatus::Suspended(_, _)
+                    | CredentialRevocationStatus::Unknown
             );
             assert_eq!(result, expected, "is_revoked for {:?}", status);
         }
@@ -2840,9 +2879,13 @@ fn check_credential_revocation_status(
         }
         ZomeCallResponse::Unauthorized(_, _, _, _)
         | ZomeCallResponse::AuthenticationFailed(_, _) => {
-            // Revocation zome not accessible — fail open with Unknown status
-            // so callers can decide how to handle
-            Ok(CredentialRevocationStatus::Unknown)
+            // SECURITY: Fail-closed — revocation zome unreachable means we cannot
+            // confirm the credential is unrevoked. Deny rather than assume active.
+            Err(wasm_error!(WasmErrorInner::Guest(
+                "Revocation check failed: revocation zome unreachable (fail-closed). \
+                 Cannot verify credential is unrevoked."
+                    .to_string()
+            )))
         }
         ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Network error calling revocation zome: {}",
@@ -2900,11 +2943,12 @@ fn batch_check_credential_revocation_status(
         }
         ZomeCallResponse::Unauthorized(_, _, _, _)
         | ZomeCallResponse::AuthenticationFailed(_, _) => {
-            // Revocation zome not accessible — return Unknown for all
-            Ok(credential_ids
-                .iter()
-                .map(|_| CredentialRevocationStatus::Unknown)
-                .collect())
+            // SECURITY: Fail-closed — cannot batch-verify revocation status
+            Err(wasm_error!(WasmErrorInner::Guest(
+                "Batch revocation check failed: revocation zome unreachable (fail-closed). \
+                 Cannot verify credentials are unrevoked."
+                    .to_string()
+            )))
         }
         ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Network error calling batch revocation: {}",
@@ -2921,9 +2965,12 @@ fn batch_check_credential_revocation_status(
 pub fn is_credential_revoked(credential_id: String) -> ExternResult<bool> {
     let status = check_credential_revocation_status(&credential_id)?;
     match status {
-        CredentialRevocationStatus::Revoked(_) => Ok(true),
-        CredentialRevocationStatus::Suspended(_, _) => Ok(true),
-        _ => Ok(false),
+        CredentialRevocationStatus::Revoked(_) | CredentialRevocationStatus::Suspended(_, _) => {
+            Ok(true)
+        }
+        CredentialRevocationStatus::Active => Ok(false),
+        // SECURITY: Fail-closed — unknown status treated as revoked
+        CredentialRevocationStatus::Unknown => Ok(true),
     }
 }
 
@@ -2939,7 +2986,12 @@ pub fn get_credential_status(credential_id: String) -> ExternResult<CredentialSt
         CredentialRevocationStatus::Suspended(r, until) => {
             (false, format!("suspended_until_{}", until), Some(r))
         }
-        CredentialRevocationStatus::Unknown => (true, "unknown".to_string(), None),
+        // SECURITY: Fail-closed — unknown revocation status treated as invalid
+        CredentialRevocationStatus::Unknown => (
+            false,
+            "unknown".to_string(),
+            Some("Revocation status could not be determined".to_string()),
+        ),
     };
 
     Ok(CredentialStatusResponse {

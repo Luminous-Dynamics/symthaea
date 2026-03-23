@@ -67,6 +67,7 @@ pub fn continuous_vote_weight(
         || !score.is_finite() || !threshold.is_finite()
         || !max_weight.is_finite() || max_weight < 0.0
     {
+        debug!("NaN/Inf fallback in continuous_vote_weight: score={}, threshold={}, temperature={}, max_weight={}", score, threshold, temperature, max_weight);
         return 0.0;
     }
     let exponent = -((score - threshold) / temperature);
@@ -113,10 +114,18 @@ impl ConsciousnessProfile {
     pub fn combined_score(&self) -> f64 {
         // Sanitize inputs first — prevents NaN from entering arithmetic.
         // Non-finite dimensions clamp to 0.0 (safest default: no contribution).
-        let i = if self.identity.is_finite() { self.identity.clamp(0.0, 1.0) } else { 0.0 };
-        let r = if self.reputation.is_finite() { self.reputation.clamp(0.0, 1.0) } else { 0.0 };
-        let c = if self.community.is_finite() { self.community.clamp(0.0, 1.0) } else { 0.0 };
-        let e = if self.engagement.is_finite() { self.engagement.clamp(0.0, 1.0) } else { 0.0 };
+        let i = if self.identity.is_finite() { self.identity.clamp(0.0, 1.0) } else {
+            debug!("NaN/Inf in combined_score: identity={}", self.identity); 0.0
+        };
+        let r = if self.reputation.is_finite() { self.reputation.clamp(0.0, 1.0) } else {
+            debug!("NaN/Inf in combined_score: reputation={}", self.reputation); 0.0
+        };
+        let c = if self.community.is_finite() { self.community.clamp(0.0, 1.0) } else {
+            debug!("NaN/Inf in combined_score: community={}", self.community); 0.0
+        };
+        let e = if self.engagement.is_finite() { self.engagement.clamp(0.0, 1.0) } else {
+            debug!("NaN/Inf in combined_score: engagement={}", self.engagement); 0.0
+        };
         (i * 0.25 + r * 0.25 + c * 0.30 + e * 0.20).clamp(0.0, 1.0)
     }
 
@@ -161,6 +170,7 @@ impl ConsciousnessProfile {
         if v.is_finite() {
             v.clamp(0.0, 1.0)
         } else {
+            debug!("NaN/Inf sanitized to 0.0: input={}", v);
             0.0
         }
     }
@@ -1121,6 +1131,7 @@ impl ReputationState {
         let sanitized = if initial_score.is_finite() {
             initial_score.clamp(0.0, 1.0)
         } else {
+            debug!("NaN/Inf in ReputationState::new: initial_score={}", initial_score);
             0.0
         };
         Self {
@@ -1143,6 +1154,9 @@ impl ReputationState {
         let elapsed_days = elapsed_us as f64 / 86_400_000_000.0;
 
         if !elapsed_days.is_finite() || elapsed_days <= 0.0 {
+            if !elapsed_days.is_finite() {
+                debug!("NaN/Inf in apply_decay: elapsed_days={}", elapsed_days);
+            }
             return;
         }
 
@@ -1150,6 +1164,7 @@ impl ReputationState {
         if decay_factor.is_finite() {
             self.score = (self.score * decay_factor).clamp(0.0, 1.0);
         } else {
+            debug!("NaN/Inf decay_factor in apply_decay: elapsed_days={}, decay_factor={}", elapsed_days, decay_factor);
             self.score = 0.0; // Extreme elapsed time -> full decay
         }
         self.last_updated_us = now_us;
@@ -1246,12 +1261,16 @@ impl ReputationState {
 /// Convenience function for use in credential issuance pipelines.
 pub fn decay_reputation(profile: &ConsciousnessProfile, elapsed_days: f64) -> ConsciousnessProfile {
     if !elapsed_days.is_finite() || elapsed_days <= 0.0 {
+        if !elapsed_days.is_finite() {
+            debug!("NaN/Inf in decay_reputation: elapsed_days={}", elapsed_days);
+        }
         return profile.clone();
     }
     let decay_factor = REPUTATION_DECAY_PER_DAY.powf(elapsed_days);
     let decayed_rep = if decay_factor.is_finite() {
         (profile.reputation * decay_factor).clamp(0.0, 1.0)
     } else {
+        debug!("NaN/Inf decay_factor in decay_reputation: elapsed_days={}, decay_factor={}", elapsed_days, decay_factor);
         0.0
     };
     ConsciousnessProfile {

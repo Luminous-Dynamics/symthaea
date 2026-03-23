@@ -228,7 +228,7 @@ fn verify_record_author(record: &Record) -> ExternResult<AgentPubKey> {
 /// If the proposals zome is unreachable, voting is REJECTED (fail-closed).
 /// This prevents manipulation during network partitions where an attacker
 /// could vote on expired proposals.
-fn verify_voting_period(proposal_id: &str) -> ExternResult<()> {
+fn verify_voting_period(proposal_id: &str) -> ExternResult<ProposalTypeMirror> {
     // Use call_local (not best_effort) so errors propagate with diagnostics
     let extern_io =
         governance_utils::call_local("proposals", "get_proposal", proposal_id.to_string())
@@ -278,7 +278,7 @@ fn verify_voting_period(proposal_id: &str) -> ExternResult<()> {
             "Voting period has ended for this proposal".into()
         )));
     }
-    Ok(())
+    Ok(proposal.proposal_type)
 }
 
 // ============================================================================
@@ -319,31 +319,58 @@ pub fn cast_vote(input: CastVoteInput) -> ExternResult<Record> {
     // Agent-level Sybil prevention: one agent, one vote per proposal
     let _caller = enforce_agent_vote_limit(&input.proposal_id, "agent_vote")?;
 
+    // Enforce voting period (also returns proposal type for tiered gating)
+    let proposal_type = verify_voting_period(&input.proposal_id)?;
+
     // Multi-agent Sybil defense: require a valid consciousness credential.
     // Puppet accounts without consciousness assessment cannot vote.
     // This gates on identity verification + consciousness profile (4D: identity/reputation/community/engagement).
-    if let Some(extern_io) = governance_utils::call_local_best_effort(
-        "governance_bridge",
-        "verify_consciousness_gate",
-        serde_json::json!({"action_type": "Voting", "action_id": input.proposal_id.clone()}),
-    )? {
-        if let Ok(result) = extern_io.decode::<serde_json::Value>() {
-            let passed = result
-                .get("passed")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
-            if !passed {
-                return Err(wasm_error!(WasmErrorInner::Guest(
-                    "Voting requires a valid consciousness credential. Complete identity verification first.".into()
-                )));
+    match proposal_type {
+        // SECURITY: Constitutional/Emergency votes REQUIRE consciousness gate (fail-closed).
+        // These are high-impact governance actions that must not be vulnerable to Sybil attacks
+        // during bridge unavailability.
+        ProposalTypeMirror::Constitutional | ProposalTypeMirror::Emergency => {
+            let extern_io = governance_utils::call_local(
+                "governance_bridge",
+                "verify_consciousness_gate",
+                serde_json::json!({"action_type": "Voting", "action_id": input.proposal_id.clone()}),
+            ).map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
+                "Consciousness gate required for {:?} votes but bridge unavailable: {:?}",
+                proposal_type, e
+            ))))?;
+            if let Ok(result) = extern_io.decode::<serde_json::Value>() {
+                let passed = result
+                    .get("passed")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                if !passed {
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Voting requires a valid consciousness credential. Complete identity verification first.".into()
+                    )));
+                }
+            }
+        }
+        // Standard/Parameter/Funding votes: best-effort consciousness gate (backward compatible)
+        _ => {
+            if let Some(extern_io) = governance_utils::call_local_best_effort(
+                "governance_bridge",
+                "verify_consciousness_gate",
+                serde_json::json!({"action_type": "Voting", "action_id": input.proposal_id.clone()}),
+            )? {
+                if let Ok(result) = extern_io.decode::<serde_json::Value>() {
+                    let passed = result
+                        .get("passed")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+                    if !passed {
+                        return Err(wasm_error!(WasmErrorInner::Guest(
+                            "Voting requires a valid consciousness credential. Complete identity verification first.".into()
+                        )));
+                    }
+                }
             }
         }
     }
-    // Note: if bridge is unavailable, consciousness gate is skipped for legacy votes.
-    // Φ-weighted votes (cast_phi_weighted_vote) have their own mandatory Φ check.
-
-    // Enforce voting period
-    verify_voting_period(&input.proposal_id)?;
 
     // Check for duplicate vote: same voter on same proposal
     let voter_anchor_check = format!("voter:{}", input.voter_did);
@@ -577,8 +604,8 @@ pub fn cast_phi_weighted_vote(input: CastPhiVoteInput) -> ExternResult<Record> {
     // Agent-level Sybil prevention: one agent, one phi vote per proposal
     let _caller = enforce_agent_vote_limit(&input.proposal_id, "agent_phi_vote")?;
 
-    // Enforce voting period
-    verify_voting_period(&input.proposal_id)?;
+    // Enforce voting period (Φ-weighted votes have their own mandatory Φ check)
+    let _proposal_type = verify_voting_period(&input.proposal_id)?;
 
     // Check for duplicate Φ vote: same voter on same proposal
     let phi_voter_check = format!("phi_voter:{}", input.voter_did);

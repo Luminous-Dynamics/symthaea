@@ -1,4 +1,6 @@
-//! DID Registry Coordinator Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! DID Registry Coordinator Zome
 //! Business logic for DID:mycelix operations
 //!
 //! Updated to use HDK 0.6 patterns
@@ -94,29 +96,33 @@ fn auto_create_mfa_state(did: &str, agent_pub_key: &AgentPubKey) -> ExternResult
             Ok(())
         }
         ZomeCallResponse::Unauthorized(_, _, _, _) => {
-            // MFA zome not accessible - warn and continue DID creation.
-            // This allows DID creation even if MFA zome is not installed,
-            // but the warning ensures operators notice MFA is missing.
-            warn!("MFA zome unauthorized - DID created WITHOUT MFA state (MFA enrollment will be required separately)");
-            Ok(())
+            // SECURITY: Fail-closed — MFA initialization is required for DID creation.
+            // Without MFA, the DID would lack multi-factor protection from creation.
+            Err(wasm_error!(WasmErrorInner::Guest(
+                "MFA initialization failed: MFA zome unauthorized. \
+                 DID creation requires MFA to be available."
+                    .to_string()
+            )))
         }
         ZomeCallResponse::NetworkError(err) => {
-            warn!(
-                "MFA zome network error: {} - DID created WITHOUT MFA state",
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "MFA initialization failed: network error ({}). \
+                 DID creation requires MFA to be available.",
                 err
-            );
-            Ok(())
+            ))))
         }
         ZomeCallResponse::CountersigningSession(err) => {
-            warn!(
-                "MFA zome countersigning error: {} - DID created WITHOUT MFA state",
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "MFA initialization failed: countersigning error ({}).",
                 err
-            );
-            Ok(())
+            ))))
         }
         ZomeCallResponse::AuthenticationFailed(_, _) => {
-            warn!("MFA zome authentication failed - DID created WITHOUT MFA state");
-            Ok(())
+            Err(wasm_error!(WasmErrorInner::Guest(
+                "MFA initialization failed: authentication failed. \
+                 DID creation requires MFA to be available."
+                    .to_string()
+            )))
         }
     }
 }
@@ -229,12 +235,9 @@ pub fn create_did() -> ExternResult<Record> {
         (),
     )?;
 
-    // Auto-create MFA state for the new DID
+    // Auto-create MFA state for the new DID (fail-closed: MFA is required)
     // This registers the primary key pair as the initial authentication factor
-    // Errors are logged but don't fail DID creation (MFA is optional)
-    if let Err(e) = auto_create_mfa_state(&did_id, &agent_pub_key) {
-        debug!("Failed to auto-create MFA state: {:?}", e);
-    }
+    auto_create_mfa_state(&did_id, &agent_pub_key)?;
 
     // Broadcast DidCreated event to bridge for ecosystem-wide awareness
     let payload = serde_json::json!({
@@ -1385,10 +1388,8 @@ pub fn claim_recovered_did(input: ClaimRecoveredDidInput) -> ExternResult<Record
         (),
     )?;
 
-    // Auto-create MFA state for the new agent's control of this DID
-    if let Err(e) = auto_create_mfa_state(&input.did, &new_agent) {
-        debug!("Failed to auto-create MFA state for recovered DID: {:?}", e);
-    }
+    // Auto-create MFA state for the new agent's control of this DID (fail-closed)
+    auto_create_mfa_state(&input.did, &new_agent)?;
 
     get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find recovered DID document".into()
