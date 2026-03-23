@@ -123,6 +123,7 @@ RSYNC_EXCLUDE=(
     --exclude='*.bin'
     --exclude='checkpoints/'
     --exclude='android/demo/build/'
+    --exclude='build/'
 )
 RSYNC_OPTS=(-a --delete "${RSYNC_EXCLUDE[@]}")
 if $DRY_RUN; then
@@ -144,6 +145,7 @@ SOURCE_DIRS=(
 # Directories that contain supporting files needed by CI or the project
 SUPPORT_DIRS=(
     .github
+    book
     papers
     scripts
     docs
@@ -190,7 +192,7 @@ done
 #   archive/          - historical, not needed in standalone
 #   audio_output/     - runtime artifacts (empty OK if present in standalone)
 #   benchmark_output/ - runtime artifacts
-#   book/             - mdbook build output
+#   book/build/       - mdbook build output (source in book/src/ IS synced)
 #   data/             - large local data files
 #   datasets/         - large datasets
 #   logs/             - runtime logs

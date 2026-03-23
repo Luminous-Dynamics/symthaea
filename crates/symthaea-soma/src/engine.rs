@@ -935,7 +935,10 @@ pub struct SomaEngineHandle {
 
 // Safety: SomaEngine is not Send/Sync by itself (mutable state),
 // but Mutex<SomaEngine> guarantees exclusive access.
+// SAFETY: The Arc<Mutex<>> wrapper serializes all access — no concurrent mutation possible.
+#[allow(unsafe_code)]
 unsafe impl Send for SomaEngineHandle {}
+#[allow(unsafe_code)]
 unsafe impl Sync for SomaEngineHandle {}
 
 impl SomaEngineHandle {
@@ -967,7 +970,8 @@ impl SomaEngineHandle {
         self.inner
             .lock()
             .expect("SomaEngine mutex poisoned")
-            .cycle_count()
+            .spore
+            .current_cycle()
     }
 
     /// Get wake state. Thread-safe.
@@ -1012,21 +1016,22 @@ impl SomaEngineHandle {
         self.inner
             .lock()
             .expect("SomaEngine mutex poisoned")
-            .set_thermal_level(level);
+            .thermal_level = level.min(4);
     }
 
     /// Set battery state. Thread-safe.
     pub fn set_battery_state(&self, percent: u8, charging: bool) {
-        self.inner
-            .lock()
-            .expect("SomaEngine mutex poisoned")
-            .set_battery_state(percent, charging);
+        let mut engine = self.inner.lock().expect("SomaEngine mutex poisoned");
+        engine.battery_percent = percent.min(100);
+        engine.battery_charging = charging;
     }
 
     /// Set night mode. Thread-safe.
     pub fn set_night_mode(&self, enabled: bool) {
-        let mut engine = self.inner.lock().expect("SomaEngine mutex poisoned");
-        engine.night_mode = enabled;
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .night_mode = enabled;
     }
 
     /// Drain haptic events as JSON. Thread-safe.

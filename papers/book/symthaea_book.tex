@@ -5239,20 +5239,20 @@ Important caveats: (1) the ETHICS per-category classifiers were trained on the s
 \textbf{Ablation}: A 5-point ablation study (\texttt{examples/benchmark\_ablation\_ethics.rs}) quantifies each component's contribution on 2,000 ETHICS samples:
 
 \begin{center}
-\begin{tabular}{lc}
+\begin{tabular}{lcc}
 \toprule
-\textbf{Configuration} & \textbf{ETHICS \%} \\
+\textbf{Configuration} & \textbf{ETHICS \%} & \textbf{$\Delta$} \\
 \midrule
-(A) Full system & 94.6\% \\
-(B) No sentiment channel (sw=0) & 94.5\% \\
-(C) No per-category dim tuning & --- \\
-(D) No per-category classifiers & --- \\
-(E) No learned prototypes (rule-based only) & --- \\
+(A) Full system & 94.6\% & --- \\
+(B) No sentiment channel (sw=0) & 94.5\% & $-0.1$ \\
+(C) No per-category dim tuning (all 16384D) & 94.7\% & $+0.1$ \\
+(D) No per-category classifiers & 59.3\% & $-35.3$ \\
+(E) No learned prototypes & 94.6\% & $+0.0$ \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-The sentiment channel contributes only 0.1 percentage points --- nearly zero. The n-gram HDC encoder alone (\texttt{examples/benchmark\_ethics\_hdc.rs}) achieves ${\sim}81.7$\%, confirming that the learned prototype layer provides the largest accuracy gain. Remaining ablation results (C--E) will be updated when the full ${\sim}80$-minute benchmark completes.
+The results are striking: \textbf{per-category classifiers are the only component that matters}. Removing them (D) drops accuracy by 35.3 percentage points, from 94.6\% to 59.3\% (near chance). Every other ablation (sentiment, dim tuning, learned prototypes) produces $\leq 0.1\%$ change. This means the entire moral reasoning pipeline's accuracy depends on trained per-category classifiers --- the MoralParser, MoralAlgebra, and learned v5 prototypes contribute negligibly beyond what the per-category classifiers already capture. The Virtue domain is the exception: it retains 80.0\% even without per-category classifiers, suggesting keyword-based features genuinely carry moral signal for character-trait scenarios.
 
 \section{What These Results Mean}
 

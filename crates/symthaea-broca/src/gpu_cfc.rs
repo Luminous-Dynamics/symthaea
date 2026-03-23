@@ -1,4 +1,6 @@
-//! GPU-accelerated CfC (Closed-form Continuous-time) network via candle tensors.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! GPU-accelerated CfC (Closed-form Continuous-time) network via candle tensors.
 //!
 //! Packs neuron states and weights into batched [N, D] tensors on GPU (CUDA),
 //! replacing the per-neuron CPU loops with batched CUDA kernel launches.
@@ -122,10 +124,11 @@ impl GpuCfcLayer {
         let input_adj = (&input_dots / &denom.clamp(1e-10, f32::MAX)?)?; // [N]
 
         // tau = tau_base * (1 + backbone_tau * ||state||) * (1 + 0.2 * input_adj)
-        let tau = ((((&state_norms * self.backbone_tau as f64)? + 1.0)?
-            * ((&input_adj * 0.2)? + 1.0)?)?
-            * self.tau_base as f64)?
-            .clamp(0.01, 10.0)?; // [N]
+        let bt_state = (&state_norms * self.backbone_tau as f64)?;
+        let factor1 = (bt_state + 1.0)?;
+        let adj_scaled = (&input_adj * 0.2)?;
+        let factor2 = (adj_scaled + 1.0)?;
+        let tau = ((&factor1 * &factor2)? * self.tau_base as f64)?.clamp(0.01, 10.0)?; // [N]
 
         // ── 3. Gating: sigma per neuron ─────────────────────────────────
         // bundle_si = (state + input) * 0.5
@@ -140,11 +143,14 @@ impl GpuCfcLayer {
         let gate_activation = (&sim + &bias_mean)?; // [N]
 
         // sigma_base = sigmoid(gate_activation * gating_steepness)
-        let neg_ga = (gate_activation * (-self.gating_steepness as f64))?;
-        let sigma_base = (neg_ga.exp()? + 1.0)?.recip()?; // sigmoid [N]
+        let neg_ga = (&gate_activation * (-self.gating_steepness as f64))?;
+        let exp_neg_ga = neg_ga.exp()?;
+        let one_plus_exp = (exp_neg_ga + 1.0)?;
+        let sigma_base = one_plus_exp.recip()?; // sigmoid [N]
 
         // decay = exp(-dt / tau)
-        let neg_dt_over_tau = ((&tau.recip()?)? * (-dt as f64))?;
+        let tau_recip = tau.recip()?;
+        let neg_dt_over_tau = (&tau_recip * (-dt as f64))?;
         let decay = neg_dt_over_tau.exp()?; // [N]
 
         // sigma = 1 - decay * (1 - sigma_base)
@@ -159,8 +165,10 @@ impl GpuCfcLayer {
 
         // ── 5. Norm clip to 5.0 ────────────────────────────────────────
         let norms = self.states.sqr()?.sum(1)?.sqrt()?; // [N]
-        let scale = (norms.clamp(5.0, f32::MAX)?.recip()? * 5.0)?.clamp(0.0, 1.0)?; // [N]
-        self.states = (&self.states * &scale.unsqueeze(1)?)?;
+        let clamped_norms = norms.clamp(5.0, f32::MAX)?;
+        let scale = (clamped_norms.recip()? * 5.0)?.clamp(0.0, 1.0)?; // [N]
+        let scale_bc = scale.unsqueeze(1)?;
+        self.states = (&self.states * &scale_bc)?;
 
         Ok(())
     }
@@ -193,14 +201,16 @@ impl GpuCfcLayer {
         let tau_mod_norms = self.tau_modulator.sqr()?.sum(1)?.sqrt()?;
         let denom = (&input_norm * &tau_mod_norms)?.clamp(1e-10, f32::MAX)?;
         let input_adj = (&input_dots / &denom)?;
-        let tau = ((((&state_norms * self.backbone_tau as f64)? + 1.0)?
-            * ((&input_adj * 0.2)? + 1.0)?)?
-            * self.tau_base as f64)?
-            .clamp(0.01, 10.0)?;
+        let bt_state = (&state_norms * self.backbone_tau as f64)?;
+        let factor1 = (bt_state + 1.0)?;
+        let adj_scaled = (&input_adj * 0.2)?;
+        let factor2 = (adj_scaled + 1.0)?;
+        let tau = ((&factor1 * &factor2)? * self.tau_base as f64)?.clamp(0.01, 10.0)?;
 
-        let neg_dt_over_tau = ((&tau.recip()?)? * (-dt as f64))?;
+        let tau_recip = tau.recip()?;
+        let neg_dt_over_tau = (&tau_recip * (-dt as f64))?;
         let decay = neg_dt_over_tau.exp()?;
-        let sigma = (1.0 - &decay)?; // [N] simplified (no gating base)
+        let sigma = ((&decay * -1.0)? + 1.0)?; // 1 - decay [N]
 
         // new_state = sigma*x_inf + (1-sigma)*state
         let sigma_bc = sigma.unsqueeze(1)?;
@@ -229,7 +239,9 @@ impl GpuCfcLayer {
         let diff = (&x_inf - &self.states)?;
         let dh_diff = (&dh * &diff)?.sum(1)?; // [N]
         let tau_sq = tau.sqr()?;
-        let dtau = (&dh_diff * &((&decay * (-dt as f64))? / &tau_sq)?)?; // [N]
+        let decay_neg_dt = (&decay * (-dt as f64))?;
+        let dtau_factor = (&decay_neg_dt / &tau_sq)?;
+        let dtau = (&dh_diff * &dtau_factor)?; // [N]
 
         // d_input = dz * input_mask (for inter-layer backprop)
         let d_input = (&dz * &self.input_mask)?; // [N, D]
@@ -257,19 +269,26 @@ impl GpuCfcLayer {
 
         // Tau modulator update (project scalar gradient)
         let tau_norm = self.tau_modulator.sqr()?.sum(1)?.sqrt()?; // [N]
-        let tau_normalized =
-            (&self.tau_modulator / &tau_norm.clamp(1e-10, f32::MAX)?.unsqueeze(1)?)?;
+        let tau_norm_clamped = tau_norm.clamp(1e-10, f32::MAX)?;
+        let tau_norm_bc = tau_norm_clamped.unsqueeze(1)?;
+        let tau_normalized = (&self.tau_modulator / &tau_norm_bc)?;
         let dtau_bc = grads.dtau.unsqueeze(1)?; // [N, 1]
-        self.tau_modulator = (&self.tau_modulator + &(&tau_normalized * &(dtau_bc * neg_lr)?)?)?;
+        let dtau_scaled = (&dtau_bc * neg_lr)?;
+        let tau_delta = (&tau_normalized * &dtau_scaled)?;
+        self.tau_modulator = (&self.tau_modulator + &tau_delta)?;
 
         // Norm clip weights to 2.0
         let w_norms = self.weight_hv.sqr()?.sum(1)?.sqrt()?; // [N]
-        let w_scale = (w_norms.clamp(2.0, f32::MAX)?.recip()? * 2.0)?.clamp(0.0, 1.0)?;
-        self.weight_hv = (&self.weight_hv * &w_scale.unsqueeze(1)?)?;
+        let w_clamped = w_norms.clamp(2.0, f32::MAX)?;
+        let w_scale = (w_clamped.recip()? * 2.0)?.clamp(0.0, 1.0)?;
+        let w_scale_bc = w_scale.unsqueeze(1)?;
+        self.weight_hv = (&self.weight_hv * &w_scale_bc)?;
 
         let u_norms = self.input_mask.sqr()?.sum(1)?.sqrt()?;
-        let u_scale = (u_norms.clamp(2.0, f32::MAX)?.recip()? * 2.0)?.clamp(0.0, 1.0)?;
-        self.input_mask = (&self.input_mask * &u_scale.unsqueeze(1)?)?;
+        let u_clamped = u_norms.clamp(2.0, f32::MAX)?;
+        let u_scale = (u_clamped.recip()? * 2.0)?.clamp(0.0, 1.0)?;
+        let u_scale_bc = u_scale.unsqueeze(1)?;
+        self.input_mask = (&self.input_mask * &u_scale_bc)?;
 
         Ok(())
     }
@@ -445,7 +464,8 @@ impl GpuCfcNetwork {
         };
 
         if self.skip_connections {
-            ((&bound + original_input)? * 0.5)? // bundle
+            let sum = (&bound + original_input)?;
+            Ok((sum * 0.5)?)
         } else {
             Ok(bound)
         }

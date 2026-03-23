@@ -770,11 +770,6 @@ impl BenchmarkReport {
                 "variance_estimation_accuracy",
                 &bl.mathematics,
             ),
-            (
-                "mean_estimation_error",
-                "mean_estimation_accuracy",
-                &bl.mathematics,
-            ),
             ("tautology_accuracy", "tautology_accuracy", &bl.mathematics),
             (
                 "derivation_accuracy",
@@ -1582,6 +1577,22 @@ impl BenchmarkReport {
         // CausalReasoning::InterventionEffect
         if benchmark.contains("InterventionEffect") && benchmark.contains("CausalReasoning") {
             push_specific("causal_score", "causal_score", &bl.causal_reasoning);
+        }
+
+        // Mathematics: benchmark-specific key metrics not in generic mappings
+        if benchmark.contains("LogicalDeduction") {
+            push_specific(
+                "overall_accuracy",
+                "logical_valid_accuracy",
+                &bl.mathematics,
+            );
+        }
+        if benchmark.contains("StatisticalInference") {
+            push_specific(
+                "distribution_classification_accuracy",
+                "mean_estimation_accuracy",
+                &bl.mathematics,
+            );
         }
 
         // Only return comparisons relevant to this benchmark

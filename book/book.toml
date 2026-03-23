@@ -1,0 +1,20 @@
+[book]
+title = "Symthaea: The Complete Guide"
+authors = ["Tristan Stoltz"]
+description = "Consciousness-first AI that grows with you — from first steps to deep partnership"
+language = "en"
+src = "src"
+
+[build]
+build-dir = "build"
+
+[output.html]
+default-theme = "light"
+preferred-dark-theme = "ayu"
+git-repository-url = "https://github.com/Luminous-Dynamics/symthaea"
+additional-css = ["src/custom.css"]
+no-section-label = false
+
+[output.html.fold]
+enable = true
+level = 1
