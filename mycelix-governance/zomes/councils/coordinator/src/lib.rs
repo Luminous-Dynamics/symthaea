@@ -1,4 +1,6 @@
-//! Councils Coordinator Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Councils Coordinator Zome
 //! Holonic governance with collective sensing
 //!
 //! Philosophy: Governance is nested - councils within councils,
@@ -1201,22 +1203,24 @@ pub fn record_decision(input: RecordDecisionInput) -> ExternResult<Record> {
         if let Some(ref committee_id) = council.signing_committee_id {
             let needs_signature = !matches!(input.decision_type, DecisionType::Operational);
             if needs_signature {
-                // Check for verified signature via cross-zome call
-                if let Some(extern_io) = governance_utils::call_local_best_effort(
+                // SECURITY: Fail-closed — threshold signature is REQUIRED for non-operational
+                // decisions. If signing zome is unavailable, the decision cannot proceed.
+                let extern_io = governance_utils::call_local(
                     "threshold_signing",
                     "get_proposal_signature",
                     input.proposal_id.clone().unwrap_or_default(),
-                )? {
-                    if let Ok(maybe_record) = extern_io.decode::<Option<Record>>() {
-                        if maybe_record.is_none() {
-                            return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                                "Council '{}' requires threshold signature from committee '{}' for {:?} decisions",
-                                council.id, committee_id, input.decision_type
-                            ))));
-                        }
+                ).map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
+                    "Threshold signing zome unavailable: cannot verify signature for {:?} decision in council '{}': {:?}",
+                    input.decision_type, council.id, e
+                ))))?;
+                if let Ok(maybe_record) = extern_io.decode::<Option<Record>>() {
+                    if maybe_record.is_none() {
+                        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                            "Council '{}' requires threshold signature from committee '{}' for {:?} decisions",
+                            council.id, committee_id, input.decision_type
+                        ))));
                     }
                 }
-                // If call_local_best_effort returned None, zome unavailable — graceful degradation
             }
         }
     }

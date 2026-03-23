@@ -1,4 +1,6 @@
-//! Execution Coordinator Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Execution Coordinator Zome
 //! Business logic for proposal execution
 //!
 //! Updated to use HDK 0.6 patterns
@@ -618,38 +620,38 @@ impl GovernanceAction {
     fn execute(&self) -> ExternResult<String> {
         match self {
             GovernanceAction::TransferCredits { from, to, amount } => {
+                // SECURITY: Fail-closed — credit transfers MUST execute or fail explicitly.
+                // Returning Ok without actual transfer creates phantom transactions.
                 let transfer_input = serde_json::json!({"from": from, "to": to, "amount": amount});
-                match governance_utils::call_local_best_effort(
+                governance_utils::call_local(
                     "governance_bridge",
                     "transfer_credits",
                     transfer_input,
-                )? {
-                    Some(_) => Ok(format!(
-                        "TransferCredits: {} -> {} ({} credits) [executed]",
-                        from, to, amount
-                    )),
-                    None => Ok(format!(
-                        "TransferCredits: {} -> {} ({} credits) [bridge unavailable]",
-                        from, to, amount
-                    )),
-                }
+                ).map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
+                    "TransferCredits failed: governance bridge unavailable — {} -> {} ({} credits): {:?}",
+                    from, to, amount, e
+                ))))?;
+                Ok(format!(
+                    "TransferCredits: {} -> {} ({} credits) [executed]",
+                    from, to, amount
+                ))
             }
             GovernanceAction::UpdateParameter { parameter, value } => {
+                // SECURITY: Fail-closed — parameter updates MUST persist or fail explicitly.
+                // Returning Ok without actual update creates phantom governance changes.
                 let update_input = serde_json::json!({"parameter": parameter, "value": value});
-                match governance_utils::call_local_best_effort(
+                governance_utils::call_local(
                     "constitution",
                     "update_parameter",
                     update_input,
-                )? {
-                    Some(_) => Ok(format!(
-                        "UpdateParameter: {} = {} [executed]",
-                        parameter, value
-                    )),
-                    None => Ok(format!(
-                        "UpdateParameter: {} = {} [constitution zome unavailable]",
-                        parameter, value
-                    )),
-                }
+                ).map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
+                    "UpdateParameter failed: constitution zome unavailable — {} = {}: {:?}",
+                    parameter, value, e
+                ))))?;
+                Ok(format!(
+                    "UpdateParameter: {} = {} [executed]",
+                    parameter, value
+                ))
             }
             GovernanceAction::EmitEvent { event, payload } => {
                 // Emit as a governance signal to connected clients
