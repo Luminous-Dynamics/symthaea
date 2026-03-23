@@ -800,6 +800,11 @@ impl BrocaGenerator {
     pub fn config(&self) -> &BrocaConfig {
         &self.config
     }
+
+    /// Get mutable reference to the config (for training-time adjustments).
+    pub fn config_mut(&mut self) -> &mut BrocaConfig {
+        &mut self.config
+    }
 }
 
 /// Apply frequency-scaled repetition penalty to logits for tokens already generated.

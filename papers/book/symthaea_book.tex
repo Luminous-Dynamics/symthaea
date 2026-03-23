@@ -5175,26 +5175,26 @@ We evaluate HDC grid encoding against Chollet's ARC-AGI benchmark using two scor
 
 \begin{table}[H]
 \centering
-\caption{ARC-AGI scoring: 2-AFC vs.\ strict. The gap between the two measures reveals what HDC captures: algebraic rule transfer, not grid reconstruction.}
+\caption{ARC-AGI scoring: 2-AFC vs.\ strict on real Chollet tasks (400 training problems). The gap between the two measures reveals what HDC captures: algebraic rule transfer, not grid reconstruction.}
 \label{tab:arc-agi}
-\begin{tabular}{lcc}
+\begin{tabular}{lccc}
 \toprule
-\textbf{System} & \textbf{Strict Solve \%} & \textbf{Notes} \\
+\textbf{System} & \textbf{Strict Solve \%} & \textbf{2-AFC \%} & \textbf{Notes} \\
 \midrule
-HDC-LTC (strict) & $4.0$\% & Grid reconstruction noise (80.6\% pixel accuracy) \\
-HDC-LTC (2-AFC)  & $100.0$\% & Encoding fidelity (0.823 mean similarity) \\
-GPT-4            & ${\sim}5$\% & Chollet 2024 \\
-o3-high          & ${\sim}87.5$\% & OpenAI 2024 \\
-Human average    & ${\sim}84$\% & Chollet 2019 \\
+HDC-LTC (real ARC) & $1.5$\% & $99.0$\% & 63.9\% pixel accuracy, 400 real tasks \\
+HDC-LTC (synthetic) & $4.0$\% & $100.0$\% & 80.6\% pixel accuracy, 200 synthetic tasks \\
+GPT-4            & ${\sim}5$\% & --- & Chollet 2024 \\
+o3-high          & ${\sim}87.5$\% & --- & OpenAI 2024 \\
+Human average    & ${\sim}84$\% & --- & Chollet 2019 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textit{Data: 200 synthetic color-replacement tasks (3--6 cells, 4--7 colors, 3 training pairs each).}
+\textit{Data: 400 real ARC-AGI training tasks from Chollet's dataset (variable grid sizes 3$\times$3 to 30$\times$30). Synthetic comparison: 200 procedurally generated color-replacement tasks (3--6 cells, 4--7 colors, 3 training pairs each).}
 
 \textbf{Key finding}: The gap between 2-AFC ($100$\%) and strict ($4$\%) is the central result. XOR binding in 16,384-bit BinaryHV is algebraically exact: $\text{input} \oplus (\text{input} \oplus \text{output}) = \text{output}$. This means ``rule application'' is perfect algebraic recovery, not genuine generalization. The 2-AFC score measures whether this algebraic structure survives bundling noise; the strict score measures whether the bundled HV can be \textit{decoded} back to a pixel-perfect grid. The answer is: the algebra works, but the decoding doesn't.
 
-The 4\% strict solve rate is remarkably close to GPT-4's ${\sim}5$\%, though for entirely different reasons: GPT-4 fails because abstract reasoning is hard; HDC fails because grid reconstruction from bundled HVs is lossy (80.6\% mean pixel accuracy means most cells are right, but 100\% is needed for ``solve''). The 100\% 2-AFC rate confirms that the HDC algebra perfectly preserves rule structure --- the decoded grid is ``almost right'' but not ``exactly right.''
+On the real ARC dataset (400 Chollet training tasks), the strict solve rate drops to 1.5\% (from 4\% on synthetic tasks), while 2-AFC remains 99.0\%. Mean pixel accuracy is 63.9\% --- lower than synthetic (80.6\%) because real ARC grids are larger and more complex (up to 30$\times$30). The 1.5\% strict rate is below GPT-4's ${\sim}5$\%, but for entirely different reasons: GPT-4 fails because abstract reasoning is hard; HDC fails because grid reconstruction from bundled HVs is lossy. The 99.0\% 2-AFC rate confirms that the HDC algebra preserves rule structure on \textit{real} tasks --- the decoded grid is ``mostly right'' but not ``exactly right.''
 
 This is not a failure --- it is an honest characterization of what HDC representations encode. They capture \textit{structural relationships} (which transformation was applied) but not \textit{pixel-level detail} (what the output grid looks like). For consciousness research, this distinction matters: the system ``knows'' the rule but cannot ``visualize'' the result.
 

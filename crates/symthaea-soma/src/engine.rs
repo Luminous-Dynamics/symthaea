@@ -900,3 +900,198 @@ mod tests {
         assert!(parsed.get("consciousness_level").is_some());
     }
 }
+
+// =============================================================================
+// SomaEngineHandle: thread-safe wrapper for async/concurrent mobile platforms
+// =============================================================================
+
+use std::sync::{Arc, Mutex};
+
+/// Thread-safe handle to a `SomaEngine`.
+///
+/// Wraps `SomaEngine` in `Arc<Mutex<>>` so it can be shared across threads
+/// (e.g., Android's JNI thread pool or iOS GCD queues) without requiring
+/// external synchronization.
+///
+/// All methods acquire the mutex internally and return owned values.
+///
+/// # Example
+///
+/// ```rust
+/// use symthaea_soma::engine::{SomaConfig, SomaEngineHandle};
+///
+/// let handle = SomaEngineHandle::new(SomaConfig::default());
+/// // Can be cloned and sent to another thread
+/// let handle2 = handle.clone();
+/// std::thread::spawn(move || {
+///     let result = handle2.cycle("hello from another thread");
+///     println!("consciousness: {}", result.consciousness_level);
+/// });
+/// ```
+#[derive(Clone)]
+pub struct SomaEngineHandle {
+    inner: Arc<Mutex<SomaEngine>>,
+}
+
+// Safety: SomaEngine is not Send/Sync by itself (mutable state),
+// but Mutex<SomaEngine> guarantees exclusive access.
+unsafe impl Send for SomaEngineHandle {}
+unsafe impl Sync for SomaEngineHandle {}
+
+impl SomaEngineHandle {
+    /// Create a new thread-safe handle wrapping a fresh SomaEngine.
+    pub fn new(config: SomaConfig) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(SomaEngine::new(config))),
+        }
+    }
+
+    /// Run a single consciousness cycle. Thread-safe.
+    pub fn cycle(&self, input: &str) -> CycleResult {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .cycle(input)
+    }
+
+    /// Get current consciousness level. Thread-safe.
+    pub fn consciousness_level(&self) -> f32 {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .consciousness_level()
+    }
+
+    /// Get cycle count. Thread-safe.
+    pub fn cycle_count(&self) -> u64 {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .cycle_count()
+    }
+
+    /// Get wake state. Thread-safe.
+    pub fn wake_state(&self) -> WakeState {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .wake_state()
+    }
+
+    /// Set sensor values. Thread-safe.
+    pub fn set_sensors(
+        &self,
+        accel_magnitude: f32,
+        light_lux: f32,
+        proximity_near: bool,
+        barometer_hpa: f32,
+        gps_novelty: f32,
+    ) {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .set_sensors(
+                accel_magnitude,
+                light_lux,
+                proximity_near,
+                barometer_hpa,
+                gps_novelty,
+            );
+    }
+
+    /// Send wake signal. Thread-safe.
+    pub fn wake_signal(&self, signal: WakeSignal) {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .wake_signal(signal);
+    }
+
+    /// Set thermal level. Thread-safe.
+    pub fn set_thermal_level(&self, level: u8) {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .set_thermal_level(level);
+    }
+
+    /// Set battery state. Thread-safe.
+    pub fn set_battery_state(&self, percent: u8, charging: bool) {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .set_battery_state(percent, charging);
+    }
+
+    /// Set night mode. Thread-safe.
+    pub fn set_night_mode(&self, enabled: bool) {
+        let mut engine = self.inner.lock().expect("SomaEngine mutex poisoned");
+        engine.night_mode = enabled;
+    }
+
+    /// Drain haptic events as JSON. Thread-safe.
+    pub fn haptic_drain_json(&self) -> String {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .haptic_drain_json()
+    }
+
+    /// Drain holon outbound messages as JSON. Thread-safe.
+    pub fn holon_drain_outbound_json(&self) -> String {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .holon_drain_outbound_json()
+    }
+
+    /// Receive holon inbound message. Thread-safe.
+    pub fn holon_receive_json(&self, json: &str) {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .holon_receive_json(json);
+    }
+
+    /// Get privacy mode status. Thread-safe.
+    pub fn privacy_mode(&self) -> bool {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .privacy_mode()
+    }
+
+    /// Get compass snapshot as JSON. Thread-safe.
+    pub fn compass_json(&self) -> String {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .compass_json()
+    }
+
+    /// Generate text with safety gating. Thread-safe.
+    pub fn generate_text(&self, max_tokens: usize) -> symthaea_spore::broca::GenerationResult {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .generate_text(max_tokens)
+    }
+
+    /// Dream consolidation. Thread-safe.
+    pub fn dream_consolidate(&self) -> bool {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .dream_consolidate()
+    }
+
+    /// Access the inner engine directly (for operations not covered by the handle API).
+    /// Caller holds the lock for the duration of the closure.
+    pub fn with_engine<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut SomaEngine) -> R,
+    {
+        let mut engine = self.inner.lock().expect("SomaEngine mutex poisoned");
+        f(&mut engine)
+    }
+}

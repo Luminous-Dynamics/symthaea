@@ -72,4 +72,4 @@ pub mod native_ffi;
 // SomaEngine — the mobile consciousness engine
 pub mod engine;
 
-pub use engine::{SomaConfig, SomaEngine};
+pub use engine::{SomaConfig, SomaEngine, SomaEngineHandle};

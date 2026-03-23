@@ -321,6 +321,24 @@ pub struct TrainingConfig {
     /// Recommended: 0.1.
     pub label_smoothing: f32,
 
+    // ── Adaptive Veto Warmup ──
+    /// Target veto threshold to ramp toward during training (0.0 = disabled).
+    /// When > 0, the generator's veto_threshold is linearly ramped from 0.0
+    /// to this value over the final `veto_warmup_epochs` of training.
+    /// This teaches the CfC network to produce coherent output that satisfies
+    /// the veto gate, rather than learning in a veto-free regime and then
+    /// failing when veto is enabled at inference.
+    ///
+    /// Recommended: 0.10-0.20 for initial training, increase if coherence improves.
+    pub adaptive_veto_target: f32,
+    /// Number of epochs over which to ramp veto threshold from 0.0 to target.
+    /// Ramp starts at `epochs - veto_warmup_epochs`. Default 10.
+    pub veto_warmup_epochs: usize,
+    /// Enable soft veto during training (partial CfC state restore on veto).
+    /// When true, veto during training interpolates toward a saved snapshot
+    /// rather than hard-resetting, producing smoother gradient flow.
+    pub enable_soft_veto_during_training: bool,
+
     // ── Best Checkpoint Saving ──
     /// Path to save best checkpoint during training (empty = disabled).
     /// When set, saves a checkpoint whenever validation loss improves.
@@ -377,6 +395,9 @@ impl Default for TrainingConfig {
             label_smoothing: 0.0,
             best_checkpoint_path: String::new(),
             hidden_dropout: 0.0,
+            adaptive_veto_target: 0.0, // disabled by default
+            veto_warmup_epochs: 10,
+            enable_soft_veto_during_training: false,
         }
     }
 }
@@ -908,6 +929,23 @@ pub fn train_with_adam(
             ctrl_config.enable_compositional_logits = fusion_active;
             ctrl_config.adaptive_compositional_alpha = fusion_active;
             ctrl_config.enable_adaptive_dt = fusion_active;
+        }
+
+        // Adaptive veto warmup: ramp veto_threshold from 0.0 to target over
+        // the final veto_warmup_epochs. This teaches the CfC to produce outputs
+        // that satisfy the veto coherence gate, rather than learning in a
+        // veto-free regime and failing when veto is enabled at inference.
+        if config.adaptive_veto_target > 0.0 && config.veto_warmup_epochs > 0 {
+            let ramp_start = config.epochs.saturating_sub(config.veto_warmup_epochs);
+            let effective_veto = if epoch >= ramp_start {
+                let progress = (epoch - ramp_start) as f32 / config.veto_warmup_epochs as f32;
+                config.adaptive_veto_target * progress.min(1.0)
+            } else {
+                0.0
+            };
+            generator.config_mut().gating.veto_threshold = effective_veto;
+            generator.config_mut().gating.enable_soft_veto =
+                config.enable_soft_veto_during_training;
         }
 
         // Reset CfC momentum between epochs to prevent accumulated directional

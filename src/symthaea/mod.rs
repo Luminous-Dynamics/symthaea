@@ -2938,6 +2938,34 @@ impl Symthaea {
             set_cognitive_stride(4);
         }
     }
+
+    // ── Holon Soma bridge stubs ──────────────────────────────────────────
+    // Placeholder methods for P2P device mesh communication.
+    // Full wiring deferred until HolonReceiver integration is complete.
+
+    /// Number of connected Soma peers (phones, tablets, IoT devices).
+    pub fn holon_soma_peer_count(&self) -> usize {
+        0
+    }
+
+    /// Enqueue an inbound SomaMessage from a connected device.
+    pub fn holon_enqueue_soma_message(
+        &mut self,
+        _device_id: String,
+        _msg: crate::consciousness::holon_receiver::SomaMessage,
+    ) {
+        // Stub — HolonReceiver wiring pending
+    }
+
+    /// Process all pending inbound messages through the HolonReceiver.
+    pub fn holon_process_pending(&mut self) {
+        // Stub — HolonReceiver wiring pending
+    }
+
+    /// Drain outbound responses for a specific device channel.
+    pub fn holon_drain_soma_outbound(&mut self, _channel: &str) -> Vec<String> {
+        Vec::new()
+    }
 }
 
 // ========================================================================
