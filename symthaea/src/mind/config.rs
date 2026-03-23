@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Configuration and data types for the Continuous Mind system.
 
 use crate::chronobiology::Biorhythm;
@@ -28,6 +31,10 @@ pub struct MindConfig {
     /// Used by `ContinuousMind::tick()` for timezone-aware biorhythm.
     #[serde(default)]
     pub timezone_offset_hours: f64,
+    /// Enable learned projection for social signals (512D→16384D).
+    /// Required for collective consciousness emergence under partial information.
+    #[serde(default)]
+    pub social_projection_enabled: bool,
 }
 
 impl Default for MindConfig {
@@ -42,6 +49,7 @@ impl Default for MindConfig {
             min_consciousness: 0.1,
             enable_social_coherence: false,
             timezone_offset_hours: 0.0,
+            social_projection_enabled: false,
         }
     }
 }

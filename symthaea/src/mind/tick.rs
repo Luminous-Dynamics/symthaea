@@ -502,19 +502,21 @@ impl ContinuousMind {
             }
         }
 
-        // Active knowledge bundling: blend peer thoughts directly into current_thought.
-        // This avoids WM dimension issues (CfC may expand internal dims) while
-        // enabling collective consciousness emergence under partial information.
-        // Blend weight: 20% social, 80% self (gentle integration, not thought replacement).
+        // Active knowledge bundling: project peer thoughts into cognitive space,
+        // then blend into current_thought. Uses LearnedProjection (Xavier init)
+        // to map 512D social signals to 16384D cognitive space meaningfully.
         if !peer_thoughts.is_empty() {
             let refs: Vec<&ContinuousHV> = peer_thoughts.iter().collect();
             let social_bundle = ContinuousHV::bundle(&refs);
 
             let target_dim = self.state.current_thought.dim();
-            let social_resized = if social_bundle.dim() == target_dim {
+            let projected = if let Some(ref proj) = self.social_projection {
+                // Learned projection: 512D → 16384D (Xavier-initialized, distance-preserving)
+                proj.forward(&social_bundle)
+            } else if social_bundle.dim() == target_dim {
                 social_bundle
             } else {
-                // Resize social bundle to match current_thought dimension
+                // Fallback: zero-pad
                 let mut resized = vec![0.0f32; target_dim];
                 let copy_len = social_bundle.dim().min(target_dim);
                 resized[..copy_len].copy_from_slice(&social_bundle.as_slice()[..copy_len]);
@@ -522,7 +524,7 @@ impl ContinuousMind {
             };
 
             self.state.current_thought = ContinuousHV::weighted_bundle(
-                &[&self.state.current_thought, &social_resized],
+                &[&self.state.current_thought, &projected],
                 &[0.8, 0.2],
             );
         }
