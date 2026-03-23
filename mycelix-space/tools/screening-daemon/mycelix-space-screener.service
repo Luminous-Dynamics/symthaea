@@ -1,0 +1,46 @@
+[Unit]
+Description=Mycelix Space Conjunction Screening Daemon
+Documentation=file:///srv/luminous-dynamics/mycelix-space/CLAUDE.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tstoltz
+Group=users
+WorkingDirectory=/srv/luminous-dynamics/mycelix-space
+
+# Binary location (release build)
+ExecStart=/srv/luminous-dynamics/mycelix-space/target-check/release/mycelix-space-screener \
+    --celestrak-url "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle" \
+    --protected-objects 25544,48274 \
+    --hours-ahead 72 \
+    --pc-threshold 1e-7 \
+    --miss-threshold-km 10.0 \
+    --interval-seconds 900 \
+    --refresh-cycles 4 \
+    --format json
+
+# Logging
+Environment=RUST_LOG=info
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mycelix-screener
+
+# Restart policy
+Restart=on-failure
+RestartSec=60
+
+# Resource limits
+MemoryMax=512M
+CPUQuota=50%
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadOnlyPaths=/srv/luminous-dynamics
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
