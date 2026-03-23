@@ -92,13 +92,14 @@ impl ExecutionResult {
     pub fn failure_constraints(&self) -> Vec<String> {
         self.test_failures
             .iter()
-            .map(|f| {
-                match (&f.expected, &f.actual) {
-                    (Some(exp), Some(act)) => {
-                        format!("CONSTRAINT: {} expected {} but got {}", f.test_name, exp, act)
-                    }
-                    _ => format!("CONSTRAINT: {} failed: {}", f.test_name, f.message),
+            .map(|f| match (&f.expected, &f.actual) {
+                (Some(exp), Some(act)) => {
+                    format!(
+                        "CONSTRAINT: {} expected {} but got {}",
+                        f.test_name, exp, act
+                    )
                 }
+                _ => format!("CONSTRAINT: {} failed: {}", f.test_name, f.message),
             })
             .collect()
     }
@@ -1402,12 +1403,18 @@ pub fn parse_test_failure_details(test_output: &str) -> Vec<TestFailure> {
                 // Extract "panicked at" message
                 if let Some(pos) = detail.find("panicked at") {
                     let msg_start = pos + "panicked at".len();
-                    let msg = detail[msg_start..].trim().trim_matches('\'').trim_matches('"');
+                    let msg = detail[msg_start..]
+                        .trim()
+                        .trim_matches('\'')
+                        .trim_matches('"');
                     message = msg.to_string();
                 }
 
                 // Extract assertion text
-                if detail.contains("assert_eq!") || detail.contains("assert_ne!") || detail.contains("assert!") {
+                if detail.contains("assert_eq!")
+                    || detail.contains("assert_ne!")
+                    || detail.contains("assert!")
+                {
                     assertion = Some(detail.to_string());
                 }
 
@@ -1445,7 +1452,11 @@ pub fn parse_test_failure_details(test_output: &str) -> Vec<TestFailure> {
                     assertion,
                     expected,
                     actual,
-                    message: if message.is_empty() { "test failed".to_string() } else { message },
+                    message: if message.is_empty() {
+                        "test failed".to_string()
+                    } else {
+                        message
+                    },
                 });
             }
 
