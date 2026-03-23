@@ -36,6 +36,7 @@ mod code_utils;
 pub mod error_knowledge;
 mod experience;
 mod generation;
+mod geodesic_gate;
 mod planning;
 mod prompts;
 
@@ -387,6 +388,16 @@ pub struct CodingAgent {
     /// Accumulates across the run, complementing the flat experience store
     /// with structured error→fix mappings and Bayesian success rates.
     error_knowledge: error_knowledge::CodeErrorKnowledge,
+    /// Geodesic Code Synthesis verifier for topological/oracle post-generation checks.
+    /// When enabled, generated code is verified for structural invariants (Betti numbers,
+    /// convergence prediction) and violations are fed back as hard constraints on the next prompt.
+    /// Geodesic Code Synthesis verifier for topological/oracle post-generation checks.
+    /// When enabled, generated code is verified for structural invariants (Betti numbers,
+    /// convergence prediction) and violations are fed back as hard constraints on the next prompt.
+    #[cfg(feature = "geodesic_synthesis")]
+    geodesic_verifier: Option<symthaea_geodesic::GeodesicSynthesizer>,
+    /// Cached GCS violations from the last verification pass, injected into the next prompt.
+    gcs_violations: Vec<String>,
 }
 
 impl CodingAgent {
@@ -487,6 +498,9 @@ impl CodingAgent {
             consciousness_deferrals: 0,
             stuck_detected: false,
             error_knowledge: error_knowledge::CodeErrorKnowledge::new(),
+            #[cfg(feature = "geodesic_synthesis")]
+            geodesic_verifier: None,
+            gcs_violations: Vec::new(),
         }
     }
 
@@ -545,6 +559,7 @@ impl CodingAgent {
         self.quality_rejections = 0;
         self.consciousness_deferrals = 0;
         self.stuck_detected = false;
+        self.gcs_violations.clear();
 
         // Auto-index the project if CodebaseMemory hasn't been populated yet.
         // This gives the agent codebase-aware context on every run without

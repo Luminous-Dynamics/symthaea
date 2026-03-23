@@ -512,20 +512,27 @@ if ! $DRY_RUN; then
     fi
     ok "cargo metadata succeeds"
 
-    # 2. Check for bare [workspace] lines in sub-crate Cargo.tomls
+    # 2. Auto-strip bare [workspace] lines in sub-crate Cargo.tomls
+    #    (e.g., RISC Zero crates use [workspace] for standalone builds,
+    #    but this conflicts when they're inside the main workspace)
     BARE_WORKSPACE=$(find "${STANDALONE_REPO}" -name "Cargo.toml" \
         -not -path "${STANDALONE_REPO}/Cargo.toml" \
         -not -path "*/target/*" \
         -not -path "*/stubs/*" \
         -exec grep -l '^[[:space:]]*\[workspace\][[:space:]]*$' {} + 2>/dev/null || true)
     if [ -n "$BARE_WORKSPACE" ]; then
-        printf "${RED}[error]${RESET} Sub-crate Cargo.toml(s) contain bare [workspace] (creates second workspace root):\n"
         echo "$BARE_WORKSPACE" | while read -r f; do
-            echo "  ${f#${STANDALONE_REPO}/}"
+            sed -i '/^[[:space:]]*\[workspace\][[:space:]]*$/d' "$f"
+            warn "Stripped bare [workspace] from ${f#${STANDALONE_REPO}/}"
         done
-        exit 1
+        # Re-validate after stripping
+        if ! cargo metadata --format-version 1 --manifest-path "${STANDALONE_REPO}/Cargo.toml" > /dev/null 2>&1; then
+            error "cargo metadata still fails after stripping [workspace] — investigate manually"
+        fi
+        ok "Stripped bare [workspace] from sub-crates"
+    else
+        ok "No bare [workspace] in sub-crates"
     fi
-    ok "No bare [workspace] in sub-crates"
     echo
 fi
 

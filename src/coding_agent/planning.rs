@@ -498,9 +498,32 @@ impl CodingAgent {
                 let check_passed = motor_result.as_ref().map_or(false, |r| r.success);
 
                 if code_written && check_passed {
-                    self.phase = TaskPhase::Testing;
-                    self.phase_failures = 0;
-                    tracing::info!(target: "symthaea::coding_agent", "-> Testing");
+                    // Run GCS verification on compiled code before advancing
+                    if let Some(ref code) = self.generated_code {
+                        let violations = self.verify_with_gcs(code, &self.task);
+                        if !violations.is_empty() {
+                            tracing::warn!(
+                                target: "symthaea::coding_agent::gcs",
+                                count = violations.len(),
+                                "GCS verification found violations — routing to Fixing"
+                            );
+                            for v in &violations {
+                                self.observations.push(format!("GCS: {}", v));
+                            }
+                            self.gcs_violations = violations;
+                            self.phase = TaskPhase::Fixing;
+                            self.phase_failures = 0;
+                        } else {
+                            self.gcs_violations.clear();
+                            self.phase = TaskPhase::Testing;
+                            self.phase_failures = 0;
+                            tracing::info!(target: "symthaea::coding_agent", "-> Testing");
+                        }
+                    } else {
+                        self.phase = TaskPhase::Testing;
+                        self.phase_failures = 0;
+                        tracing::info!(target: "symthaea::coding_agent", "-> Testing");
+                    }
                 } else if code_written {
                     self.phase = TaskPhase::Testing;
                     self.phase_failures = 0;

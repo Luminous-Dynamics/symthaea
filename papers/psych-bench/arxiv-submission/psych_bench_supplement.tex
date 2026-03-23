@@ -573,6 +573,103 @@ for profile in NeuromodProfile::standard_profiles() {
 
 \noindent All APIs are deterministic given a fixed seed, enabling exact replication. Full API documentation is generated via \texttt{cargo doc -p symthaea-psych-bench}.
 
+% ============================================================
+% Section S6: Neuromodulator Behavioral Dissociations
+% ============================================================
+
+\clearpage
+\section*{S6. Neuromodulator Behavioral Dissociations}
+
+Selective transmitter knockout in the \texttt{BehavioralKnockout} benchmark produces large, dissociable effects on distinct behavioral measures. Table~S3 summarizes the Cohen's $d$ effect sizes for each transmitter $\times$ behavioral measure combination. Each transmitter primarily disrupts one or two measures while leaving others largely unaffected, consistent with the functional specialization reported in the psychopharmacological literature \citep{schultz1997dopamine,yerkes1908relation}.
+
+\begin{table}[h]
+\centering
+\caption{Behavioral knockout effect sizes (Cohen's $d$). Bold values indicate the primary (largest magnitude) effect for each transmitter. Empty cells denote non-primary effects ($d < 0.5$).} \label{tab:s3}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Transmitter} & \textbf{Learning Rate} & \textbf{Exploration} & \textbf{Confidence} & \textbf{Attention} & \textbf{Gradient Tracking} \\
+\midrule
+DA  & 1.93 & --- & --- & --- & \textbf{2.14} \\
+NE  & --- & \textbf{7.25} & --- & --- & --- \\
+5-HT & --- & --- & \textbf{5.80} & --- & --- \\
+ACh & --- & --- & --- & \textbf{5.41} & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent The large effect sizes ($d > 1.9$ for all primary effects) confirm that each neuromodulator system has a distinct functional role within the architecture: dopamine gates reward-driven learning and gradient tracking, norepinephrine modulates exploration--exploitation balance, serotonin regulates prediction confidence, and acetylcholine controls attentional gain. The simultaneous knockout of all four transmitters produces a consciousness collapse ($d = 9.43$), indicating that neuromodulatory tone is necessary for maintaining integrated conscious processing.
+
+\subsection*{S6.1 Dose--Response and Tolerance Dynamics}
+
+Table~S4 summarizes dose--response monotonicity and tolerance/withdrawal sensitivity ratios across the four primary transmitter systems plus GABA. All transmitters exhibit perfect monotonicity (score $= 1.0$), confirming that behavioral effects scale smoothly with concentration. The sensitivity ratio (post-tolerance response / initial response) indicates the degree of adaptation under sustained exposure: lower ratios reflect stronger tolerance development.
+
+\begin{table}[h]
+\centering
+\caption{Dose--response monotonicity and tolerance/withdrawal sensitivity ratios. Data from \texttt{DoseResponse} and \texttt{ToleranceWithdrawal} benchmarks.} \label{tab:s4}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Transmitter} & \textbf{Monotonicity} & \textbf{Sensitivity Ratio} \\
+\midrule
+DA   & 1.0 & 0.48 \\
+NE   & 1.0 & 0.59 \\
+5-HT & 1.0 & 0.64 \\
+GABA & 1.0 & 0.73 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent Dopamine shows the strongest tolerance (ratio $= 0.48$), consistent with clinical observations of dopaminergic adaptation in reward circuits. GABA shows the weakest tolerance (ratio $= 0.73$), reflecting its role as a tonic inhibitory baseline. All four transmitters show detectable withdrawal effects upon cessation.
+
+\clearpage
+\section*{S5. Per-Domain Ablation Analysis}
+
+Table~S5 shows per-domain z-scores under six ablation presets. FullConsciousness is the baseline (all subsystems active). Each preset disables or degrades one subsystem, operationalized as increased encoding noise. Domains with identical scores across all presets (e.g., InstitutionalReasoning, Security) rely on structural HDC operations unaffected by encoding noise.
+
+\renewcommand{\arraystretch}{1.15}
+\begin{longtable}{@{}lrrrrrrr@{}}
+\caption{Per-domain z-scores under six ablation presets. \textbf{Bold} indicates $|\Delta| > 0.5$ from the FullConsciousness baseline. Max~$\Delta$ is the range (max $-$ min) across all six presets.} \label{tab:s5} \\
+\toprule
+\textbf{Domain} & \textbf{Full} & \textbf{CfCOnly} & \textbf{NoFEP} & \textbf{NoSocial} & \textbf{RedWM} & \textbf{HDCOnly} & \textbf{Max~$\Delta$} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Domain} & \textbf{Full} & \textbf{CfCOnly} & \textbf{NoFEP} & \textbf{NoSocial} & \textbf{RedWM} & \textbf{HDCOnly} & \textbf{Max~$\Delta$} \\
+\midrule
+\endhead
+\midrule
+\multicolumn{8}{r}{\emph{Continued on next page}} \\
+\endfoot
+\bottomrule
+\endlastfoot
+Affect & 1.20 & 1.22 & 1.22 & 1.22 & 0.77 & 0.76 & 0.46 \\
+Attention & 0.68 & 0.44 & 0.52 & 0.62 & 0.29 & \textbf{0.04} & 0.64 \\
+Binding & 0.62 & 0.62 & 0.61 & 0.61 & 0.62 & 0.62 & 0.01 \\
+Butlin & 0.67 & 0.67 & 0.67 & 0.67 & 0.67 & 0.67 & 0.00 \\
+CausalReasoning & 0.80 & 0.80 & 0.80 & 0.80 & 0.80 & 0.80 & 0.00 \\
+Clinical & 2.00 & 1.83 & 1.91 & 1.91 & 1.89 & 1.77 & 0.23 \\
+Coding & 1.86 & 1.98 & 1.95 & 1.90 & 1.97 & 2.00 & 0.15 \\
+CogBench & 0.58 & 0.58 & 0.58 & 0.58 & 0.58 & 0.58 & 0.00 \\
+Consciousness & 0.69 & 0.66 & 0.66 & 0.69 & 0.65 & 0.61 & 0.08 \\
+Creativity & 0.67 & 0.84 & 0.84 & 0.76 & 0.79 & 0.87 & 0.19 \\
+Executive & 0.72 & 0.36 & 0.49 & 0.68 & 0.50 & \textbf{0.13} & 0.59 \\
+Inhibition & 1.57 & \textbf{0.22} & \textbf{0.81} & 1.20 & \textbf{0.58} & \textbf{$-$0.53} & 2.10 \\
+InstitutionalReasoning & 2.25 & 2.25 & 2.25 & 2.25 & 2.25 & 2.25 & 0.00 \\
+Language & 1.75 & \textbf{0.26} & \textbf{1.24} & 1.75 & 1.73 & \textbf{$-$0.76} & 2.51 \\
+Mathematics & 1.25 & \textbf{0.49} & \textbf{0.47} & 0.92 & \textbf{0.45} & \textbf{$-$0.36} & 1.61 \\
+MemoryAgent & 1.00 & 1.00 & 1.00 & 1.00 & \textbf{0.22} & \textbf{0.22} & 0.78 \\
+Metacognition & 0.75 & 0.55 & 0.60 & 0.68 & 0.66 & 0.67 & 0.21 \\
+Motor & 2.32 & 2.15 & 2.20 & 2.25 & 2.18 & 2.07 & 0.25 \\
+Reasoning & 1.39 & 1.38 & 1.38 & 1.39 & 1.38 & 1.37 & 0.02 \\
+Security & 2.00 & 2.00 & 2.00 & 2.00 & 2.00 & 2.00 & 0.00 \\
+Social & 1.54 & \textbf{0.67} & 1.43 & \textbf{0.95} & 1.40 & \textbf{0.42} & 1.12 \\
+Spatial & 1.21 & 1.21 & 1.21 & 1.21 & 1.21 & 1.21 & 0.00 \\
+Speech & 2.13 & 1.96 & 2.14 & 2.13 & 2.20 & \textbf{0.30} & 1.90 \\
+Substrate & 0.88 & 0.96 & 0.94 & 0.92 & 0.95 & 0.99 & 0.11 \\
+SustainedAttention & 2.19 & 2.19 & 2.19 & 2.19 & 2.19 & 2.19 & 0.00 \\
+ToMBench & 1.08 & 1.08 & 1.08 & 1.08 & 1.08 & 1.08 & 0.00 \\
+WorM & 0.73 & 0.56 & 0.67 & 0.67 & \textbf{$-$2.36} & \textbf{$-$2.36} & 3.09 \\
+\end{longtable}
+
 \bibliographystyle{apalike}
 \bibliography{psych_bench_references}
 

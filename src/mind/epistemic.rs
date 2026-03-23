@@ -188,6 +188,11 @@ impl ContinuousMind {
             original_input: None,
             primitive_tiers: Vec::new(), // Populated by Symthaea facade from language grounding
             primitives: Vec::new(),      // Populated by Symthaea facade from language grounding
+            #[cfg(feature = "provenance")]
+            provenance: Some(crate::mind::provenance::ProvenanceTag::from_reasoning(
+                0, // cycle filled by caller
+                vec![crate::mind::provenance::InformationSource::CfCPrediction],
+            )),
         }
     }
 
@@ -395,6 +400,8 @@ impl ContinuousMind {
                     },
                     activation,
                     relevance: label.similarity.max(0.0) * activation,
+                    #[cfg(feature = "provenance")]
+                    source: None,
                 }
             })
             .collect()

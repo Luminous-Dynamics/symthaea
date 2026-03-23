@@ -27,17 +27,25 @@
 //! - O(1) complexity prediction via CfC convergence rate
 //! - Structural equivalence across syntactic variations
 
+pub mod ast_bridge;
 pub mod execution_oracle;
 pub mod manifold;
+pub mod manifold_bootstrap;
 pub mod pdg;
 pub mod sheaf;
+pub mod skeleton_synthesis;
 pub mod synthesis;
 pub mod topology;
 
 // Re-export key types for convenience.
 pub use execution_oracle::{ComplexityClass, ExecutionOracle, PredictionResult};
 pub use manifold::{Fiber, FiberPoint, ProgramManifold};
+pub use manifold_bootstrap::{bootstrap_from_encodings, bootstrap_with_topology, BootstrapResult};
 pub use pdg::ProgramDependenceGraph;
 pub use sheaf::{CodeSheaf, LocalSection, SheafDiagnostic};
+pub use skeleton_synthesis::{
+    active_inference_synthesize, build_skeleton_from_topology, fill_from_manifold,
+    ActiveInferenceResult, SkeletonCombinator, SkeletonSlot, TopologicalSignature,
+};
 pub use synthesis::{CodeSpec, GeodesicSynthesizer, SynthesisConfig, SynthesisResult};
 pub use topology::{BettiNumbers, TopologicalConstraint, TopologicalFingerprint};

@@ -705,11 +705,15 @@ mod tests {
                 name: "quantum".to_string(),
                 activation: 0.8,
                 relevance: 0.9,
+                #[cfg(feature = "provenance")]
+                source: None,
             },
             ActivatedConcept {
                 name: "physics".to_string(),
                 activation: 0.6,
                 relevance: 0.7,
+                #[cfg(feature = "provenance")]
+                source: None,
             },
         ];
         thought.emotional_tone = EmotionalTone {

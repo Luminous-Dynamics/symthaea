@@ -760,6 +760,8 @@ impl Default for StructuredThought {
             original_input: None,
             primitive_tiers: Vec::new(),
             primitives: Vec::new(),
+            #[cfg(feature = "provenance")]
+            provenance: None,
         }
     }
 }
@@ -811,6 +813,8 @@ mod tests {
                 name: "greeting".to_string(),
                 activation: 0.9,
                 relevance: 0.8,
+                #[cfg(feature = "provenance")]
+                source: None,
             }],
             ..Default::default()
         };

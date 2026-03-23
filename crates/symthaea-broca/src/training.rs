@@ -1171,11 +1171,13 @@ pub fn train_with_adam(
                         global_step += 1;
                     }
 
-                    // Sync GPU weights → CPU once per pair
-                    trainer.sync_to_cpu(generator.controller_mut())?;
-                    // (running loss is computed inline at report time)
-                    // Refresh GPU embeddings from CPU (embedding grads applied above)
-                    trainer.refresh_embeddings(generator.controller())?;
+                    // Periodic sync: CfC weights every 10 pairs, embeddings every 10 pairs
+                    // (avoids 256MB embedding transfer per pair while keeping logits fresh)
+                    let sync_interval = 10;
+                    if pair_idx % sync_interval == 0 || pair_idx == num_pairs - 1 {
+                        trainer.sync_to_cpu(generator.controller_mut())?;
+                        trainer.refresh_embeddings(generator.controller())?;
+                    }
 
                     Ok(())
                 })();

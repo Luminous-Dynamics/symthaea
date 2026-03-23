@@ -220,6 +220,9 @@ symthaea-physics-bridge = { path = "crates/symthaea-physics-bridge", optional = 
 # Symthaea Broca - SSM Language Center: CfC-HDC autoregressive thought-to-text generation
 symthaea-broca = { path = "crates/symthaea-broca", optional = true }
 
+# Symthaea Geodesic - Topology-aware code verification (PDG, Betti numbers, execution oracle)
+symthaea-geodesic = { path = "crates/symthaea-geodesic", optional = true }
+
 # Symthaea Canvas - Living topology UI: cognitive geometry → SVG
 symthaea-canvas = { path = "crates/symthaea-canvas", optional = true }
 
@@ -537,6 +540,7 @@ reasoning_engine = ["magi_loop", "symthaea-causal-reasoning/counterfactual"]
 # ── Code Understanding & Generation ─────────────────────────────────
 # Subsumes former code_understanding feature (tree-sitter parsers + code generation).
 code_generation = ["tree-sitter-rust", "tree-sitter-python"]
+geodesic_synthesis = ["dep:symthaea-geodesic"]  # GCS verification gate for CodingAgent (PDG topology + execution oracle)
 wasm-sandbox = ["dep:wasmtime"]
 
 # ── Example & module build gates ───────────────────────────────────

@@ -237,6 +237,8 @@ fn concepts_from_primitives(primitives: &[String], base: f32) -> Vec<ActivatedCo
             name: name.clone(),
             activation,
             relevance: activation,
+            #[cfg(feature = "provenance")]
+            source: None,
         })
         .collect()
 }

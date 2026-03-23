@@ -42,6 +42,21 @@ All LaTeX papers and the book manuscript are in `papers/latex/`:
 ### Data
 - `papers/data/psych_bench/` — 15 CSV files for psych-bench paper figures
 
+### The Sovereignty Papers (CC0-1.0)
+
+| Directory | Title | Format | Status |
+|-----------|-------|--------|--------|
+| `sovereignty-papers/` | **The Sovereignty Papers: 21 Essays on Consciousness-First Governance** | Markdown + PDF | **Complete** (~61,000 words) |
+
+- 21 essays in 7 sections: Crisis → Mind → Society → Capture → Honesty → Life → Invitation
+- Co-authored by Tristan Stoltz & Symthaea
+- Licensed CC0-1.0 (public domain) — separate from AGPL codebase
+- PDFs: `sovereignty-papers/pdf/` (21 individual + 1 combined book)
+- Reading guide: `sovereignty-papers/READING_GUIDE.md`
+- Build: `nix-shell -p texliveFull --run "./sovereignty-papers/build-pdfs.sh"`
+
+---
+
 ## Reference Documents (kept at top level)
 
 - `GLOSSARY.md` — Term definitions used across papers

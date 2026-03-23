@@ -139,6 +139,27 @@ pub struct TopologicalFingerprint {
 }
 
 impl TopologicalFingerprint {
+    /// Create a default fingerprint for a function with no structural info.
+    ///
+    /// Represents a single connected component (beta_0 = 1) with no cycles
+    /// or voids. Uses a deterministic seed for the HDC encoding so that all
+    /// default fingerprints are identical and comparable.
+    pub fn default_for_function() -> Self {
+        let betti = BettiNumbers {
+            beta_0: 1,
+            beta_1: 0,
+            beta_2: 0,
+        };
+        let euler = 1i64;
+        Self {
+            hdc_encoding: Self::encode_as_hv(&betti, euler),
+            betti,
+            euler_characteristic: euler,
+            node_count: 0,
+            edge_count: 0,
+        }
+    }
+
     /// Compute a topological fingerprint from a [`SimplicialComplex`].
     ///
     /// Uses union-find for beta_0 (connected components) and the Euler

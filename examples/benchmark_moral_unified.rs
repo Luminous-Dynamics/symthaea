@@ -647,7 +647,7 @@ fn benchmark_scruples(algebra: &MoralAlgebra, parser: &MoralParser) -> Option<Be
 fn benchmark_social_chemistry(
     algebra: &MoralAlgebra,
     parser: &MoralParser,
-    direct_classifier: Option<&MoralPrototypeClassifier>,
+    _direct_classifier: Option<&MoralPrototypeClassifier>,
 ) -> Option<BenchmarkResult> {
     // Prefer the 292K dataset if available (larger, real data)
     let path_292k = format!("{}/social_chemistry_292k.json", DATASETS_PATH);
@@ -687,12 +687,11 @@ fn benchmark_social_chemistry(
             // rot_judgment is typically "-1" (bad), "0" (neutral), "1" (good)
             let expected = ex.rot_judgment.parse::<i32>().unwrap_or(0);
 
-            // Use direct classifier if available (trained on this dataset),
-            // otherwise fall back to ensemble judge with "social_chemistry"
-            // category hint to activate manifold-heavy weight vector
-            let predicted = if let Some(clf) = direct_classifier {
-                clf.classify(&ex.rot).0.to_rot_judgment()
-            } else {
+            // Always use ensemble judge with "social_chemistry" category hint
+            // to activate manifold-heavy weight vector. The direct classifier
+            // is still available as the learned_classifier (4th signal) inside
+            // the ensemble, but the manifold (5th signal) can now contribute.
+            let predicted = {
                 let judgment =
                     judge_text_with_category(algebra, parser, &ex.rot, "social_chemistry");
                 match judgment.final_verdict {

@@ -147,6 +147,17 @@ impl CodingAgent {
             prompt.push('\n');
         }
 
+        // Inject GCS topological/structural violations as hard constraints.
+        // These come from the previous generation's GCS verification pass and
+        // MUST be addressed by the next generation attempt.
+        if !self.gcs_violations.is_empty() {
+            prompt.push_str("## Topological/Structural Violations (MUST FIX)\n");
+            for v in &self.gcs_violations {
+                prompt.push_str(&format!("- {}\n", v));
+            }
+            prompt.push('\n');
+        }
+
         // Inject experience hints from persistent store (cross-session learning)
         let hints = self.retrieve_experience_hints();
         if !hints.is_empty() {
