@@ -70,7 +70,7 @@ if [ -d "${STANDALONE_REPO}/.git" ]; then
     git -C "${STANDALONE_REPO}" reset --hard origin/main
 else
     info "Cloning standalone repo..."
-    git clone "${STANDALONE_REMOTE}" "${STANDALONE_REPO}"
+    GIT_LFS_SKIP_SMUDGE=1 git clone "${STANDALONE_REMOTE}" "${STANDALONE_REPO}"
 fi
 echo
 
@@ -120,6 +120,10 @@ RSYNC_EXCLUDE=(
     --exclude='__pyphi_cache__/'
     --exclude='.DS_Store'
     --exclude='broca-pipeline.bin'
+    --exclude='*.bin'
+    --exclude='checkpoints/'
+    --exclude='android/demo/build/'
+    --exclude='build/'
 )
 RSYNC_OPTS=(-a --delete "${RSYNC_EXCLUDE[@]}")
 if $DRY_RUN; then
@@ -141,6 +145,7 @@ SOURCE_DIRS=(
 # Directories that contain supporting files needed by CI or the project
 SUPPORT_DIRS=(
     .github
+    book
     papers
     scripts
     docs
@@ -155,7 +160,7 @@ SUPPORT_DIRS=(
     rust-sentinels
     static
     systemd
-    tla
+    # tla — excluded: 1.3GB of TLA+ model checker states, not needed for standalone CI
     tools
     validation
 )
@@ -187,7 +192,7 @@ done
 #   archive/          - historical, not needed in standalone
 #   audio_output/     - runtime artifacts (empty OK if present in standalone)
 #   benchmark_output/ - runtime artifacts
-#   book/             - mdbook build output
+#   book/build/       - mdbook build output (source in book/src/ IS synced)
 #   data/             - large local data files
 #   datasets/         - large datasets
 #   logs/             - runtime logs
@@ -215,6 +220,15 @@ INDIVIDUAL_FILES=(
     "CONTRIBUTING.md"
     "SECURITY.md"
     "SAFETY.md"
+    ".gitleaks.toml"
+    ".gitignore"
+)
+
+# Legal files from monorepo root (AGPL dual-license framework)
+MONOREPO_LEGAL_FILES=(
+    "COMMERCIAL_LICENSE.md"
+    "CLA.md"
+    "LICENSING_FAQ.md"
 )
 
 for f in "${INDIVIDUAL_FILES[@]}"; do
@@ -223,6 +237,18 @@ for f in "${INDIVIDUAL_FILES[@]}"; do
         if ! $DRY_RUN; then
             cp "${SYMTHAEA_DIR}/${f}" "${STANDALONE_REPO}/${f}"
         fi
+    fi
+done
+
+# Copy legal files from monorepo root (these don't live in symthaea/)
+for f in "${MONOREPO_LEGAL_FILES[@]}"; do
+    if [ -f "${MONOREPO_ROOT}/${f}" ]; then
+        info "Copying ${f} (from monorepo root)"
+        if ! $DRY_RUN; then
+            cp "${MONOREPO_ROOT}/${f}" "${STANDALONE_REPO}/${f}"
+        fi
+    else
+        warn "Missing ${f} in monorepo root"
     fi
 done
 
@@ -367,6 +393,17 @@ if $SUBCRATE_ISSUES; then
 else
     ok "All sub-crate Cargo.tomls OK"
 fi
+
+# --- Ensure broca defaults don't include GPU (requires nvcc/CUDA) -----------
+BROCA_TOML="${STANDALONE_REPO}/crates/symthaea-broca/Cargo.toml"
+if [ -f "$BROCA_TOML" ] && grep -q '^default.*"gpu"' "$BROCA_TOML"; then
+    sed -i 's/^default = \["\(.*\)", "gpu"\]/default = ["\1"]/' "$BROCA_TOML"
+    sed -i 's/^default = \["gpu", \(.*\)\]/default = [\1]/' "$BROCA_TOML"
+    # Handle middle position
+    sed -i 's/, "gpu"//' "$BROCA_TOML"
+    ok "Removed 'gpu' from symthaea-broca defaults (CUDA not available in CI)"
+fi
+
 echo
 
 # --- Post-sync cargo check ---------------------------------------------------
@@ -390,6 +427,34 @@ if ! $DRY_RUN && ! $SKIP_CHECK; then
         SYNC_CHECK_FAILED=true
     fi
 
+    # Run the same CI feature set to catch compilation errors before pushing.
+    # This mirrors the clippy job's CI_FEATURES in ci.yml.
+    info "Running cargo check --all CI features (catches cross-feature compilation errors)..."
+    CI_FEATURES="parallel,service,shell,demo,api_module,\
+voice-tts,voice-stt,audio,vocal-tract,neural-vocoder,\
+embeddings,vision,perception,vision-manifold,foveation,\
+integrity,semantic-encoder,neural-bridge,webcam,\
+mesh,mesh-encryption,mesh-key-exchange,swarm,notifications,\
+nix-mind,identity,physics,physics-bridge,\
+flight,humanoid,hal,ssm-power,ssm_language,\
+lancedb-backend,multi_agent,full_consciousness,full_perception,\
+full_language,magi_loop,reasoning_engine,code_generation,\
+wasm-sandbox,school_learning,benchmarks,all_benchmarks,\
+integration_module,observability_module,support,web_research_module,\
+genomics,cell-foundry,ectogenesis,nurture,population,genesis,\
+genesis-missions,fusion-twin,safety-agents,lab-controller,\
+materials,nuclear-forensics,water-prediction,physics-unification,\
+grid-scaling,fission-reactor,accelerator,threat-assessment,\
+datacenter,experiment-planner,strategic-materials,critical-minerals,\
+advanced-manufacturing,building-systems,design-production,\
+mycelix,unstable-examples"
+    if (cd "${STANDALONE_REPO}" && cargo check -p symthaea --features "$CI_FEATURES" 2>&1 | tail -10); then
+        ok "cargo check (CI features) passed"
+    else
+        warn "cargo check (CI features) failed — compilation errors will break CI"
+        SYNC_CHECK_FAILED=true
+    fi
+
     if $SYNC_CHECK_FAILED; then
         warn "Pre-push checks failed. Run with --skip-check to bypass, or investigate:"
         echo "  cd ${STANDALONE_REPO} && cargo fmt --check"
@@ -402,13 +467,8 @@ elif $SKIP_CHECK; then
 fi
 
 # --- Post-sync license fixups -------------------------------------------------
-# The monorepo uses AGPL-3.0-or-later for some crates that should be Apache-2.0
-# in the standalone repo (e.g. symthaea-mycelix-conductor).
-CONDUCTOR_TOML="${STANDALONE_REPO}/crates/symthaea-mycelix-conductor/Cargo.toml"
-if [ -f "$CONDUCTOR_TOML" ] && grep -q 'license = "AGPL-3.0-or-later"' "$CONDUCTOR_TOML"; then
-    sed -i 's/^license = "AGPL-3.0-or-later"/license = "Apache-2.0"/' "$CONDUCTOR_TOML"
-    info "Fixed symthaea-mycelix-conductor license → Apache-2.0"
-fi
+# All crates are now AGPL-3.0-or-later (unified March 2026).
+# No per-crate license overrides needed.
 
 # --- Format with CI toolchain -------------------------------------------------
 # CI uses dtolnay/rust-toolchain@1.93.0, so format with the same version
@@ -426,7 +486,10 @@ echo
 
 info "Changes in standalone repo:"
 echo
-git -C "${STANDALONE_REPO}" add -A
+# Stage all changes EXCEPT LFS-tracked binaries (avoid clean filter failures on /tmp)
+git -C "${STANDALONE_REPO}" add -A -- ':!*.bin'
+# Re-add .gitattributes in case it changed (LFS tracking config)
+git -C "${STANDALONE_REPO}" add .gitattributes 2>/dev/null || true
 git -C "${STANDALONE_REPO}" diff --cached --stat
 echo
 

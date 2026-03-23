@@ -1,9 +1,10 @@
-name: Deploy Architecture Docs
+name: Deploy Documentation
 
 on:
   push:
     branches: [main]
     paths:
+      - 'book/**'
       - 'docs/architecture/d2/rendered/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
@@ -26,86 +27,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build pages content
+      - name: Install mdBook
         run: |
-          mkdir -p _site/diagrams
-          cp docs/architecture/d2/rendered/*.svg _site/diagrams/
-          cat > _site/index.html << 'HTMLEOF'
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-            <meta charset="utf-8">
-            <title>Symthaea Architecture</title>
-            <style>
-              body { font-family: system-ui, sans-serif; max-width: 1200px; margin: 0 auto; padding: 2rem; background: #0d1117; color: #e6edf3; }
-              h1 { border-bottom: 1px solid #30363d; padding-bottom: 0.5rem; }
-              h2 { color: #7ee787; margin-top: 2rem; }
-              .diagram { margin: 1rem 0; background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 1rem; }
-              .diagram img { width: 100%; height: auto; }
-              a { color: #58a6ff; }
-            </style>
-          </head>
-          <body>
-            <h1>Symthaea: Architecture Diagrams</h1>
-            <p>Consciousness-first cognitive architecture. <a href="https://github.com/Luminous-Dynamics/symthaea">Source</a></p>
+          mkdir -p $HOME/.local/bin
+          curl -sSL https://github.com/rust-lang/mdBook/releases/download/v0.4.40/mdbook-v0.4.40-x86_64-unknown-linux-gnu.tar.gz | tar xz -C $HOME/.local/bin
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-            <h2>Cognitive Loop (50Hz Pipeline)</h2>
-            <div class="diagram"><img src="diagrams/symthaea-cognitive-loop.svg" alt="Cognitive Loop"></div>
+      - name: Build mdBook
+        run: mdbook build book
 
-            <h2>Consciousness Measurement</h2>
-            <div class="diagram"><img src="diagrams/symthaea-consciousness-measurement.svg" alt="Consciousness Measurement"></div>
+      - name: Add architecture diagrams
+        run: |
+          mkdir -p book/build/diagrams
+          cp docs/architecture/d2/rendered/*.svg book/build/diagrams/ 2>/dev/null || true
 
-            <h2>HDC Encoding Pipeline</h2>
-            <div class="diagram"><img src="diagrams/symthaea-hdc-encoding.svg" alt="HDC Encoding"></div>
-
-            <h2>Memory Architecture</h2>
-            <div class="diagram"><img src="diagrams/symthaea-memory-architecture.svg" alt="Memory Architecture"></div>
-
-            <h2>Broca Language Pipeline</h2>
-            <div class="diagram"><img src="diagrams/symthaea-broca-language.svg" alt="Broca Language"></div>
-
-            <h2>Reasoning Engine</h2>
-            <div class="diagram"><img src="diagrams/symthaea-reasoning-engine.svg" alt="Reasoning Engine"></div>
-
-            <h2>Neuromodulator Bath</h2>
-            <div class="diagram"><img src="diagrams/symthaea-neuromodulator-bath.svg" alt="Neuromodulator Bath"></div>
-
-            <h2>FEP / Active Inference</h2>
-            <div class="diagram"><img src="diagrams/symthaea-fep-active-inference.svg" alt="FEP Active Inference"></div>
-
-            <h2>Eight Harmonies</h2>
-            <div class="diagram"><img src="diagrams/symthaea-eight-harmonies.svg" alt="Eight Harmonies"></div>
-
-            <h2>Consciousness Thermodynamics</h2>
-            <div class="diagram"><img src="diagrams/symthaea-consciousness-thermodynamics.svg" alt="Consciousness Thermodynamics"></div>
-
-            <h2>Substrate Independence</h2>
-            <div class="diagram"><img src="diagrams/symthaea-substrate-independence.svg" alt="Substrate Independence"></div>
-
-            <h2>Integrity Framework</h2>
-            <div class="diagram"><img src="diagrams/symthaea-integrity-framework.svg" alt="Integrity Framework"></div>
-
-            <h2>Psych-Bench</h2>
-            <div class="diagram"><img src="diagrams/symthaea-psych-bench.svg" alt="Psych-Bench"></div>
-
-            <h2>WASM Spore Kernel</h2>
-            <div class="diagram"><img src="diagrams/symthaea-spore-wasm.svg" alt="WASM Spore"></div>
-
-            <h2>Ecosystem Overview</h2>
-            <div class="diagram"><img src="diagrams/ecosystem-overview.svg" alt="Ecosystem Overview"></div>
-
-            <h2>Mycelix Cluster Topology</h2>
-            <div class="diagram"><img src="diagrams/mycelix-cluster-topology.svg" alt="Mycelix Clusters"></div>
-
-            <h2>Mycelix Consciousness Gating</h2>
-            <div class="diagram"><img src="diagrams/mycelix-consciousness-gating.svg" alt="Mycelix Consciousness Gating"></div>
-          </body>
-          </html>
-          HTMLEOF
+      - name: Add CNAME for custom domain
+        run: echo "docs.symthaea.luminousdynamics.io" > book/build/CNAME
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: _site
+          path: book/build
       - id: deployment
         uses: actions/deploy-pages@v4
