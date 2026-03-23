@@ -32,6 +32,7 @@ pub struct DemoRunner {
 impl DemoRunner {
     /// Create a new demo runner with default configuration.
     pub fn new() -> anyhow::Result<Self> {
+        #[allow(unused_mut)]
         let mut config = CognitiveLoopConfig::default();
         #[cfg(feature = "vision-manifold")]
         {
@@ -331,6 +332,7 @@ impl DemoRunner {
 
     /// Reset the service to initial state.
     pub fn reset(&mut self) {
+        #[allow(unused_mut)]
         let mut config = CognitiveLoopConfig::default();
         #[cfg(feature = "vision-manifold")]
         {

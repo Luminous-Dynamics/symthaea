@@ -286,7 +286,7 @@ fn default_search_limit() -> usize {
 /// Response to client
 #[derive(Debug, Serialize)]
 #[serde(tag = "type")]
-#[allow(clippy::enum_variant_names)]
+#[allow(clippy::enum_variant_names, dead_code)]
 enum Response {
     /// Query response
     #[serde(rename = "response")]
@@ -1605,7 +1605,7 @@ async fn consciousness_loop_with_holon(
     state: Arc<RwLock<ServiceState>>,
     holon_http: Arc<symthaea::api::holon::HolonHttpState>,
     interval_ms: u64,
-    sleep_interval: u64,
+    _sleep_interval: u64,
 ) {
     let mut ticker = interval(Duration::from_millis(interval_ms));
 
@@ -1648,6 +1648,7 @@ async fn consciousness_loop_with_holon(
     }
 }
 
+#[cfg(not(feature = "api_module"))]
 async fn consciousness_loop(
     state: Arc<RwLock<ServiceState>>,
     #[allow(unused_variables)] holon_http: Option<()>, // placeholder — real holon state passed via consciousness_loop_with_holon
