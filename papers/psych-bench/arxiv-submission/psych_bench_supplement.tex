@@ -13,6 +13,9 @@
 \usepackage[utf8]{inputenc}
 \usepackage{microtype}
 \usepackage{amsmath}
+\usepackage{pgfplots}
+\usepackage{pgfplotstable}
+\pgfplotsset{compat=1.18}
 \usepackage[authoryear,round]{natbib}
 
 \newcommand{\psychbench}{\textsc{Psych-Bench}}
@@ -411,6 +414,98 @@ When \texttt{enable\_moral\_anomaly\_response} is active, detected anomalies tri
 \subsection*{S2.5 Substrate Interaction}
 
 The substrate $\times$ moral topology interaction study (\texttt{substrate\_moral\_topology\_study.rs}) compares moral topology metrics across 6 substrate types under identical input sequences.  The study protocol runs 200 warmup + 500 stable + 500 shifting cycles per substrate, where the shifting phase introduces value-conflicting inputs.  Key metrics compared: consciousness level, composite anomaly score, moral unity ($\beta_0$), moral free energy, and anomaly event counts.
+
+\clearpage
+\section*{S3. ICC Reliability Distribution}
+
+Figure~S1 shows the test-retest reliability (ICC) distribution across 20 evaluated benchmarks. Benchmarks are sorted by ICC value and color-coded by reliability class following \citet{cicchetti1994guidelines}: Excellent ($\geq 0.75$), Good ($0.60$--$0.74$), Moderate ($0.40$--$0.59$), Poor ($< 0.40$). The distribution reveals a bimodal pattern: benchmarks with genuine lapse-rate sensitivity (e.g., Stroop, Calibration, DigitSpan) achieve Excellent reliability, while structurally invariant benchmarks (e.g., ArcFluid, FeelingOfKnowing) cluster at Poor. This bimodality identifies which cognitive dimensions are architecturally fixed versus parameter-sensitive.
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    xbar,
+    width=0.85\textwidth,
+    height=14cm,
+    xlabel={ICC},
+    xmin=-0.1, xmax=1.05,
+    ytick=data,
+    y dir=reverse,
+    symbolic y coords={
+      FeelingOfKnowing,
+      ArcFluid,
+      FalseBelief,
+      TwoStep,
+      RewardLearning,
+      ChangeDetection,
+      SRTT,
+      LexicalDecision,
+      IGT,
+      YerkesDodson,
+      VisualSearch,
+      Flanker,
+      StopSignal,
+      N-back,
+      BART,
+      WCST,
+      Stroop,
+      Calibration,
+      ReversalLearning,
+      DigitSpan},
+    y tick label style={font=\scriptsize},
+    x tick label style={font=\scriptsize},
+    bar width=8pt,
+    nodes near coords,
+    nodes near coords style={font=\tiny, anchor=west},
+    every node near coord/.append style={xshift=2pt},
+    point meta=explicit symbolic,
+    enlarge y limits={abs=6pt},
+]
+% Poor (ICC < 0.40)
+\addplot[fill=red!60, draw=red!80] coordinates {
+  (-0.063,FeelingOfKnowing) [-.06]
+  (0.087,ArcFluid) [.09]
+  (0.252,FalseBelief) [.25]
+  (0.255,TwoStep) [.26]
+  (0.343,RewardLearning) [.34]
+  (0.352,ChangeDetection) [.35]
+};
+% Moderate (0.40-0.59)
+\addplot[fill=orange!60, draw=orange!80] coordinates {
+  (0.410,SRTT) [.41]
+  (0.420,LexicalDecision) [.42]
+  (0.468,IGT) [.47]
+  (0.516,YerkesDodson) [.52]
+};
+% Good (0.60-0.74)
+\addplot[fill=green!50, draw=green!70] coordinates {
+  (0.685,VisualSearch) [.69]
+};
+% Excellent (>= 0.75) -- split for color
+\addplot[fill=blue!40, draw=blue!60] coordinates {
+  (0.781,Flanker) [.78]
+  (0.812,StopSignal) [.81]
+  (0.837,N-back) [.84]
+  (0.879,BART) [.88]
+  (0.907,WCST) [.91]
+  (0.958,Stroop) [.96]
+  (0.960,Calibration) [.96]
+  (0.989,ReversalLearning) [.99]
+  (1.000,DigitSpan) [1.0]
+};
+% Threshold lines
+\draw[dashed, gray, thin] (axis cs:0.40,FeelingOfKnowing) -- (axis cs:0.40,DigitSpan);
+\draw[dashed, gray, thin] (axis cs:0.60,FeelingOfKnowing) -- (axis cs:0.60,DigitSpan);
+\draw[dashed, gray, thin] (axis cs:0.75,FeelingOfKnowing) -- (axis cs:0.75,DigitSpan);
+\node[font=\tiny, gray, anchor=south] at (axis cs:0.20,FeelingOfKnowing) {Poor};
+\node[font=\tiny, gray, anchor=south] at (axis cs:0.50,FeelingOfKnowing) {Moderate};
+\node[font=\tiny, gray, anchor=south] at (axis cs:0.675,FeelingOfKnowing) {Good};
+\node[font=\tiny, gray, anchor=south] at (axis cs:0.90,FeelingOfKnowing) {Excellent};
+\end{axis}
+\end{tikzpicture}
+\caption{Test-retest reliability (ICC) for 20 evaluated benchmarks. Colors: red = Poor ($< 0.40$, $n = 6$), orange = Moderate ($0.40$--$0.59$, $n = 4$), green = Good ($0.60$--$0.74$, $n = 1$), blue = Excellent ($\geq 0.75$, $n = 9$). Dashed lines indicate class boundaries. Data from \texttt{reliability.csv}.}
+\label{fig:icc}
+\end{figure}
 
 \bibliographystyle{apalike}
 \bibliography{psych_bench_references}
