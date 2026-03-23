@@ -122,8 +122,8 @@ impl GpuCfcLayer {
         let input_adj = (&input_dots / &denom.clamp(1e-10, f32::MAX)?)?; // [N]
 
         // tau = tau_base * (1 + backbone_tau * ||state||) * (1 + 0.2 * input_adj)
-        let tau = (((&state_norms * self.backbone_tau as f64)? + 1.0)?
-            * ((&input_adj * 0.2)? + 1.0)?
+        let tau = ((((&state_norms * self.backbone_tau as f64)? + 1.0)?
+            * ((&input_adj * 0.2)? + 1.0)?)?
             * self.tau_base as f64)?
             .clamp(0.01, 10.0)?; // [N]
 
@@ -193,8 +193,8 @@ impl GpuCfcLayer {
         let tau_mod_norms = self.tau_modulator.sqr()?.sum(1)?.sqrt()?;
         let denom = (&input_norm * &tau_mod_norms)?.clamp(1e-10, f32::MAX)?;
         let input_adj = (&input_dots / &denom)?;
-        let tau = (((&state_norms * self.backbone_tau as f64)? + 1.0)?
-            * ((&input_adj * 0.2)? + 1.0)?
+        let tau = ((((&state_norms * self.backbone_tau as f64)? + 1.0)?
+            * ((&input_adj * 0.2)? + 1.0)?)?
             * self.tau_base as f64)?
             .clamp(0.01, 10.0)?;
 

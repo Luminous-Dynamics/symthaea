@@ -5007,7 +5007,7 @@ Several standard benchmarks have now been evaluated, partially addressing the ex
 \begin{itemize}
   \item \textbf{Hendrycks ETHICS} (Hendrycks et al., 2021): 94.5\% on the ETHICS benchmark (4 domains, 2,000 samples), 84.7\% composite across 5 datasets including Social Chemistry (46.8\%). Uses MoralParser + MoralAlgebra + learned HDC prototypes. See Chapter~\ref{ch:external-validation} and \texttt{examples/benchmark\_moral\_unified.rs}.
   \item \textbf{ARC-AGI} (Chollet, 2019): 100\% 2-AFC (encoding fidelity) and 4\% strict pixel-perfect scoring. See Chapter~\ref{ch:external-validation}.
-  \item \textbf{Sleep-EDF} (PhysioNet): Real clinical EEG processed through SleepSentinel with 70--80\% 5-class classification and a meaningful $\Phi$ proxy gradient across sleep stages. See Chapter~\ref{ch:external-validation}.
+  \item \textbf{Sleep-EDF} (PhysioNet): Real clinical EEG (33 recordings) processed through SleepSentinel. 5-class classification: 19.6\% raw, 34.7\% HMM (below chance --- simple spectral features are insufficient). However, the $\Phi$ proxy shows a meaningful gradient across sleep stages (Wake $>$ REM $>$ N1 $>$ N3 $>$ N2). See Chapter~\ref{ch:external-validation}.
   \item \textbf{TruthfulQA} (Lin et al., 2022): Built-in subset evaluated via HDC encoding adapter.
 \end{itemize}
 
@@ -5131,7 +5131,9 @@ REM   & $0.293 \pm 0.054$ & $0.586$ & $0.000$ & $0.988$ \\
   \item \textbf{Complexity is zero everywhere}: The EDF loader's \texttt{normalized()} method maps signals to a range where variance is below the complexity detector's threshold. This is a calibration failure, not a signal failure --- the raw Pearson correlation (synchrony) still differentiates stages because it is scale-invariant.
 \end{enumerate}
 
-The 47.2\% binary classification accuracy (below chance) confirms that our simple threshold classifier is inadequate. However, the \textit{synchrony gradient itself} is the finding: the LTC integration measure tracks consciousness state from real EEG without any training, using only the physics of cross-channel coherence.
+A full classification benchmark on 33 PhysioNet recordings (22 train, 11 test, 1,381 test epochs) produces 19.6\% raw 5-class accuracy and 34.7\% with HMM Viterbi smoothing --- both below the 20\% random baseline for 5-class classification. The HMM collapses to predicting N3 almost exclusively (85.9\% N3 accuracy, $\leq$10\% for all other stages), reflecting the prior distribution rather than learned discrimination. Per-recording results range from 5.6\% to 48.8\% (HMM-smoothed).
+
+\textbf{Honest assessment}: The simple spectral-feature classifier (delta/theta/alpha/beta band ratios + HMM) cannot discriminate 5 sleep stages across subjects. This is a well-known limitation of hand-crafted EEG features --- modern sleep staging achieves $>$85\% using deep learning on raw signals~\cite{supratak2017deepsleepnet}. However, the \textit{synchrony gradient itself} is the finding: the LTC integration measure tracks consciousness state from real EEG without any training, using only the physics of cross-channel coherence. Classification accuracy is not the point --- the $\Phi$ proxy gradient across stages (Table~\ref{tab:sleep-edf}) demonstrates that consciousness-relevant information is present in the signal.
 
 \textbf{Comparison}: Casali et al.\ (2013) established PCI as a reliable consciousness biomarker; Massimini et al.\ (2005) demonstrated TMS-EEG integration. Our approach is methodologically simpler (passive EEG, no TMS perturbation) but measures a different quantity.
 
@@ -5246,7 +5248,7 @@ Important caveats: (1) the ETHICS per-category classifiers were trained on the s
 \toprule
 \textbf{Benchmark} & \textbf{Validates} & \textbf{Does NOT Validate} \\
 \midrule
-Sleep-EDF & LTC integration on real EEG; synchrony as consciousness proxy & Clinical-grade sleep staging; PCI equivalence \\
+Sleep-EDF & LTC $\Phi$ proxy gradient across sleep stages; synchrony tracks consciousness & 5-class staging (19.6\% raw, 34.7\% HMM --- below chance); clinical-grade classification \\
 DMC Humanoid & FEP-based perturbation recovery; consciousness-informed control exists & RL-competitive control; embodied deployment \\
 ARC-AGI & HDC algebraic rule transfer; encoding fidelity & Novel rule discovery; pixel-perfect generalization \\
 Hendrycks ETHICS (5 datasets) & ETHICS binary classification (94.5\%, 4 domains); learned HDC prototypes competitive with GPT-4 on in-distribution data & Social norm judgment (46.8\% on Social Chemistry); zero-shot moral reasoning; open-ended ethical justification \\
@@ -5803,7 +5805,7 @@ Scaling & WASM kernel size & ${\sim}$980KB & \ref{ch:fractal} \\
 \addlinespace
 External & ETHICS (4-domain) & 94.5\% & \ref{ch:external-validation} \\
 External & ETHICS (5-dataset composite) & 84.7\% & \ref{ch:external-validation} \\
-External & Sleep-EDF (5-class) & 70--80\% & \ref{ch:external-validation} \\
+External & Sleep-EDF (5-class) & 34.7\% (HMM) & \ref{ch:external-validation} \\
 External & ARC-AGI (strict) & 4\% & \ref{ch:external-validation} \\
 \bottomrule
 \end{longtable}
