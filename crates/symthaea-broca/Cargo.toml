@@ -27,8 +27,8 @@ uuid = { version = "1", features = ["rng-getrandom"] }
 # Distillation collection (optional)
 ureq = { version = "2.9", optional = true }
 
-# Mamba SSM integration (optional)
-candle-core = { workspace = true, optional = true }
+# Mamba SSM integration
+candle-core = { workspace = true }
 candle-nn = { workspace = true, optional = true }
 hf-hub = { version = "0.4", optional = true }
 tokenizers = { version = "0.21", optional = true }
@@ -74,11 +74,11 @@ path = "src/bin/distill_for_spore.rs"
 default = ["simd", "parallel"]
 parallel = ["dep:rayon"]
 # Mamba CPU-only: base Mamba SSM support without CUDA (for CI / non-GPU machines)
-mamba-cpu = ["dep:candle-core", "dep:candle-nn", "dep:hf-hub", "dep:tokenizers"]
+mamba-cpu = ["dep:candle-nn", "dep:hf-hub", "dep:tokenizers"]
 # Mamba with CUDA GPU acceleration (default for local dev)
 mamba = ["mamba-cpu", "candle-core/cuda"]
-# GPU-accelerated logit computation only (candle-core matmul, no Mamba model)
-gpu-logits = ["dep:candle-core"]
+# GPU-accelerated logit computation and training (candle-core matmul)
+gpu-logits = []
 # Legacy alias
 cuda = ["mamba"]
 hf-tokenizer = ["dep:tokenizers"]
