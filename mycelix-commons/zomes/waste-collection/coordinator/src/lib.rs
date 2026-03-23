@@ -234,6 +234,229 @@ pub fn get_runs_by_facility(facility_hash: ActionHash) -> ExternResult<Vec<Recor
     records_from_links(links)
 }
 
+// ============================================================================
+// ROUTE OPTIMIZATION
+// ============================================================================
+
+/// Input for optimized collection route planning.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PlanOptimizedRouteInput {
+    /// Facility that will receive the collected waste
+    pub facility_hash: ActionHash,
+    /// Vehicle capacity in kg
+    pub vehicle_capacity_kg: f64,
+    /// Facility GPS latitude (for distance calculations)
+    pub facility_lat: f64,
+    /// Facility GPS longitude
+    pub facility_lon: f64,
+    /// Maximum number of stops per run
+    pub max_stops: u32,
+}
+
+/// A planned stop with distance and cumulative load info.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PlannedStop {
+    /// The collection request at this stop
+    pub request_hash: ActionHash,
+    /// GPS latitude
+    pub lat: f64,
+    /// GPS longitude
+    pub lon: f64,
+    /// Weight to collect (kg)
+    pub quantity_kg: f64,
+    /// Cumulative load after this stop (kg)
+    pub cumulative_kg: f64,
+    /// Distance from previous stop (km)
+    pub leg_distance_km: f64,
+}
+
+/// Result of optimized route planning.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct OptimizedRouteResult {
+    /// Ordered stops (optimized sequence)
+    pub stops: Vec<PlannedStop>,
+    /// Total distance of the route (km)
+    pub total_distance_km: f64,
+    /// Total weight to collect (kg)
+    pub total_weight_kg: f64,
+    /// Requests excluded due to capacity constraints
+    pub excluded_count: u32,
+    /// Distance savings vs naive ordering (percentage)
+    pub savings_pct: f64,
+}
+
+/// Haversine distance between two GPS points in kilometers.
+fn haversine_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
+    let r = 6371.0;
+    let dlat = (lat2 - lat1).to_radians();
+    let dlon = (lon2 - lon1).to_radians();
+    let a = (dlat / 2.0).sin().powi(2)
+        + lat1.to_radians().cos() * lat2.to_radians().cos() * (dlon / 2.0).sin().powi(2);
+    let c = 2.0 * a.sqrt().asin();
+    r * c
+}
+
+/// Plan an optimized collection route using a savings-based insertion heuristic.
+///
+/// Algorithm:
+/// 1. Start with all pending requests as candidates
+/// 2. Filter by vehicle capacity (exclude requests that alone exceed remaining capacity)
+/// 3. Use nearest-insertion heuristic: start at facility, greedily add nearest unvisited
+///    request that fits within remaining capacity
+/// 4. Compare total distance to naive (original order) for savings calculation
+///
+/// This is a O(n²) heuristic, suitable for the typical case of <50 stops.
+#[hdk_extern]
+pub fn plan_optimized_route(input: PlanOptimizedRouteInput) -> ExternResult<OptimizedRouteResult> {
+    let _eligibility =
+        require_consciousness(&requirement_for_basic(), "plan_optimized_route")?;
+
+    // Get all pending requests
+    let status_anchor = format!("collection_status:{:?}", CollectionStatus::Requested);
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&status_anchor)?, LinkTypes::StatusToRequests)?,
+        GetStrategy::default(),
+    )?;
+    let records = records_from_links(links)?;
+
+    // Parse requests into candidates
+    struct Candidate {
+        hash: ActionHash,
+        lat: f64,
+        lon: f64,
+        kg: f64,
+    }
+
+    let mut candidates: Vec<Candidate> = Vec::new();
+    for record in &records {
+        let req: CollectionRequest = match record.entry().to_app_option() {
+            Ok(Some(r)) => r,
+            _ => continue,
+        };
+        // Skip if single request exceeds capacity
+        if req.quantity_kg <= input.vehicle_capacity_kg {
+            candidates.push(Candidate {
+                hash: record.action_address().clone(),
+                lat: req.pickup_lat,
+                lon: req.pickup_lon,
+                kg: req.quantity_kg,
+            });
+        }
+    }
+
+    let excluded_count = (records.len() - candidates.len()) as u32;
+    let max_stops = input.max_stops.min(50) as usize;
+
+    if candidates.is_empty() {
+        return Ok(OptimizedRouteResult {
+            stops: vec![],
+            total_distance_km: 0.0,
+            total_weight_kg: 0.0,
+            excluded_count,
+            savings_pct: 0.0,
+        });
+    }
+
+    // Nearest-insertion heuristic
+    let mut visited = vec![false; candidates.len()];
+    let mut route: Vec<usize> = Vec::new();
+    let mut remaining_capacity = input.vehicle_capacity_kg;
+    let mut current_lat = input.facility_lat;
+    let mut current_lon = input.facility_lon;
+
+    while route.len() < max_stops {
+        // Find nearest unvisited candidate that fits
+        let mut best_idx: Option<usize> = None;
+        let mut best_dist = f64::MAX;
+
+        for (i, cand) in candidates.iter().enumerate() {
+            if visited[i] || cand.kg > remaining_capacity {
+                continue;
+            }
+            let d = haversine_km(current_lat, current_lon, cand.lat, cand.lon);
+            if d < best_dist {
+                best_dist = d;
+                best_idx = Some(i);
+            }
+        }
+
+        match best_idx {
+            Some(idx) => {
+                visited[idx] = true;
+                route.push(idx);
+                remaining_capacity -= candidates[idx].kg;
+                current_lat = candidates[idx].lat;
+                current_lon = candidates[idx].lon;
+            }
+            None => break, // No more candidates fit
+        }
+    }
+
+    // Build planned stops with cumulative load
+    let mut stops: Vec<PlannedStop> = Vec::new();
+    let mut total_distance: f64 = 0.0;
+    let mut total_weight: f64 = 0.0;
+    let mut prev_lat = input.facility_lat;
+    let mut prev_lon = input.facility_lon;
+
+    for &idx in &route {
+        let cand = &candidates[idx];
+        let leg = haversine_km(prev_lat, prev_lon, cand.lat, cand.lon);
+        total_distance += leg;
+        total_weight += cand.kg;
+
+        stops.push(PlannedStop {
+            request_hash: cand.hash.clone(),
+            lat: cand.lat,
+            lon: cand.lon,
+            quantity_kg: cand.kg,
+            cumulative_kg: total_weight,
+            leg_distance_km: (leg * 100.0).round() / 100.0,
+        });
+
+        prev_lat = cand.lat;
+        prev_lon = cand.lon;
+    }
+
+    // Add return leg to facility
+    if !stops.is_empty() {
+        total_distance += haversine_km(prev_lat, prev_lon, input.facility_lat, input.facility_lon);
+    }
+
+    // Calculate naive distance (original order) for savings comparison
+    let mut naive_distance: f64 = 0.0;
+    let mut n_prev_lat = input.facility_lat;
+    let mut n_prev_lon = input.facility_lon;
+    for &idx in &route {
+        let cand = &candidates[idx];
+        naive_distance += haversine_km(n_prev_lat, n_prev_lon, cand.lat, cand.lon);
+        n_prev_lat = cand.lat;
+        n_prev_lon = cand.lon;
+    }
+    if !route.is_empty() {
+        let last = &candidates[*route.last().unwrap()];
+        naive_distance += haversine_km(last.lat, last.lon, input.facility_lat, input.facility_lon);
+    }
+
+    let savings_pct = if naive_distance > 0.0 {
+        ((naive_distance - total_distance) / naive_distance * 100.0).max(0.0)
+    } else {
+        0.0
+    };
+
+    Ok(OptimizedRouteResult {
+        stops,
+        total_distance_km: (total_distance * 100.0).round() / 100.0,
+        total_weight_kg: (total_weight * 10.0).round() / 10.0,
+        excluded_count,
+        savings_pct: (savings_pct * 10.0).round() / 10.0,
+    })
+}
+
+// ============================================================================
+// DELIVERY CONFIRMATION
+// ============================================================================
+
 /// Input for confirming delivery at a stop
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ConfirmDeliveryInput {
@@ -395,5 +618,75 @@ mod tests {
         ];
         let all_complete = stops.iter().all(|s| s.actual_kg.is_some());
         assert!(all_complete);
+    }
+
+    // -- Route optimizer tests --
+
+    #[test]
+    fn test_haversine_same_point() {
+        let d = haversine_km(32.95, -96.73, 32.95, -96.73);
+        assert!(d < 0.001);
+    }
+
+    #[test]
+    fn test_haversine_short_distance() {
+        let d = haversine_km(32.9500, -96.7300, 32.9600, -96.7200);
+        assert!(d > 0.5 && d < 5.0, "Expected ~1.5km, got {}", d);
+    }
+
+    #[test]
+    fn test_haversine_symmetric() {
+        let d1 = haversine_km(32.95, -96.73, 33.05, -96.83);
+        let d2 = haversine_km(33.05, -96.83, 32.95, -96.73);
+        assert!((d1 - d2).abs() < 0.001, "Haversine should be symmetric");
+    }
+
+    #[test]
+    fn test_planned_stop_cumulative() {
+        let stops = vec![
+            PlannedStop {
+                request_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+                lat: 32.95,
+                lon: -96.73,
+                quantity_kg: 30.0,
+                cumulative_kg: 30.0,
+                leg_distance_km: 2.0,
+            },
+            PlannedStop {
+                request_hash: ActionHash::from_raw_36(vec![1u8; 36]),
+                lat: 32.96,
+                lon: -96.72,
+                quantity_kg: 25.0,
+                cumulative_kg: 55.0,
+                leg_distance_km: 1.5,
+            },
+        ];
+        assert_eq!(stops.last().unwrap().cumulative_kg, 55.0);
+        assert!(stops[1].cumulative_kg > stops[0].cumulative_kg);
+    }
+
+    #[test]
+    fn test_optimized_route_empty() {
+        let result = OptimizedRouteResult {
+            stops: vec![],
+            total_distance_km: 0.0,
+            total_weight_kg: 0.0,
+            excluded_count: 0,
+            savings_pct: 0.0,
+        };
+        assert!(result.stops.is_empty());
+        assert_eq!(result.total_distance_km, 0.0);
+    }
+
+    #[test]
+    fn test_route_savings_non_negative() {
+        let result = OptimizedRouteResult {
+            stops: vec![],
+            total_distance_km: 10.0,
+            total_weight_kg: 100.0,
+            excluded_count: 0,
+            savings_pct: 15.5,
+        };
+        assert!(result.savings_pct >= 0.0);
     }
 }

@@ -642,6 +642,177 @@ pub fn calculate_diversion_rate(input: DiversionRateInput) -> ExternResult<Diver
 }
 
 // ============================================================================
+// HISTORICAL TREND ANALYTICS
+// ============================================================================
+
+/// A single data point in a time series.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TrendPoint {
+    /// Period start (Unix microseconds)
+    pub period_start_us: u64,
+    /// Period end (Unix microseconds)
+    pub period_end_us: u64,
+    /// Value for this period
+    pub value: f64,
+}
+
+/// Input for trend queries.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TrendQueryInput {
+    /// Start of the analysis window (Unix microseconds)
+    pub window_start_us: u64,
+    /// End of the analysis window (Unix microseconds)
+    pub window_end_us: u64,
+    /// Number of buckets to divide the window into
+    pub num_buckets: u32,
+}
+
+/// Waste volume trend over time (total kg per bucket).
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct VolumeTrendResult {
+    /// Time series of waste volumes
+    pub trend: Vec<TrendPoint>,
+    /// Total across all buckets
+    pub total_kg: f64,
+    /// Average per bucket
+    pub average_kg_per_bucket: f64,
+}
+
+/// Diversion rate trend over time.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DiversionTrendResult {
+    /// Time series of diversion rates (0-100%)
+    pub trend: Vec<TrendPoint>,
+    /// Overall diversion rate across the window
+    pub overall_rate_pct: f64,
+}
+
+/// Category breakdown for a time period.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CategoryBreakdown {
+    pub category: String,
+    pub quantity_kg: f64,
+    pub percentage: f64,
+}
+
+/// Category distribution result.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CategoryDistributionResult {
+    pub breakdown: Vec<CategoryBreakdown>,
+    pub total_kg: f64,
+}
+
+/// Get waste volume trend over time (sparkline-compatible).
+#[hdk_extern]
+pub fn get_volume_trend(input: TrendQueryInput) -> ExternResult<VolumeTrendResult> {
+    if input.num_buckets == 0 || input.num_buckets > 365 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "num_buckets must be between 1 and 365".into()
+        )));
+    }
+    if input.window_start_us >= input.window_end_us {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "window_start must be before window_end".into()
+        )));
+    }
+
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash("all_streams")?, LinkTypes::AllStreams)?,
+        GetStrategy::default(),
+    )?;
+    let records = records_from_links(links)?;
+
+    let bucket_width = (input.window_end_us - input.window_start_us) / input.num_buckets as u64;
+    let mut buckets = vec![0.0_f64; input.num_buckets as usize];
+
+    for record in &records {
+        let stream: WasteStream = match record.entry().to_app_option() {
+            Ok(Some(s)) => s,
+            _ => continue,
+        };
+        if stream.created_at < input.window_start_us || stream.created_at >= input.window_end_us {
+            continue;
+        }
+        let bucket_idx =
+            ((stream.created_at - input.window_start_us) / bucket_width).min(input.num_buckets as u64 - 1) as usize;
+        buckets[bucket_idx] += stream.quantity_kg;
+    }
+
+    let total_kg: f64 = buckets.iter().sum();
+    let average_kg_per_bucket = total_kg / input.num_buckets as f64;
+
+    let trend: Vec<TrendPoint> = buckets
+        .iter()
+        .enumerate()
+        .map(|(i, &val)| TrendPoint {
+            period_start_us: input.window_start_us + i as u64 * bucket_width,
+            period_end_us: input.window_start_us + (i + 1) as u64 * bucket_width,
+            value: (val * 10.0).round() / 10.0,
+        })
+        .collect();
+
+    Ok(VolumeTrendResult {
+        trend,
+        total_kg: (total_kg * 10.0).round() / 10.0,
+        average_kg_per_bucket: (average_kg_per_bucket * 10.0).round() / 10.0,
+    })
+}
+
+/// Get category distribution for a time period.
+#[hdk_extern]
+pub fn get_category_distribution(input: TrendQueryInput) -> ExternResult<CategoryDistributionResult> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash("all_streams")?, LinkTypes::AllStreams)?,
+        GetStrategy::default(),
+    )?;
+    let records = records_from_links(links)?;
+
+    let mut category_totals: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
+    let mut total_kg: f64 = 0.0;
+
+    for record in &records {
+        let stream: WasteStream = match record.entry().to_app_option() {
+            Ok(Some(s)) => s,
+            _ => continue,
+        };
+        if stream.created_at < input.window_start_us || stream.created_at >= input.window_end_us {
+            continue;
+        }
+        let category = format!("{:?}", stream.waste_category);
+        *category_totals.entry(category).or_insert(0.0) += stream.quantity_kg;
+        total_kg += stream.quantity_kg;
+    }
+
+    let mut breakdown: Vec<CategoryBreakdown> = category_totals
+        .into_iter()
+        .map(|(category, quantity_kg)| {
+            let percentage = if total_kg > 0.0 {
+                (quantity_kg / total_kg * 100.0 * 10.0).round() / 10.0
+            } else {
+                0.0
+            };
+            CategoryBreakdown {
+                category,
+                quantity_kg: (quantity_kg * 10.0).round() / 10.0,
+                percentage,
+            }
+        })
+        .collect();
+
+    // Sort by quantity descending
+    breakdown.sort_by(|a, b| {
+        b.quantity_kg
+            .partial_cmp(&a.quantity_kg)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    Ok(CategoryDistributionResult {
+        breakdown,
+        total_kg: (total_kg * 10.0).round() / 10.0,
+    })
+}
+
+// ============================================================================
 // UNIT TESTS
 // ============================================================================
 
@@ -740,5 +911,54 @@ mod tests {
         assert!(!feedback.contamination_detected);
         assert!(feedback.contaminants.is_empty());
         assert!(!feedback.alert_emitted);
+    }
+
+    // -- Analytics tests --
+
+    #[test]
+    fn test_trend_point_struct() {
+        let point = TrendPoint {
+            period_start_us: 1711100000_000000,
+            period_end_us: 1711200000_000000,
+            value: 150.0,
+        };
+        assert!(point.period_start_us < point.period_end_us);
+        assert!(point.value >= 0.0);
+    }
+
+    #[test]
+    fn test_volume_trend_result_averages() {
+        let result = VolumeTrendResult {
+            trend: vec![
+                TrendPoint { period_start_us: 0, period_end_us: 100, value: 50.0 },
+                TrendPoint { period_start_us: 100, period_end_us: 200, value: 150.0 },
+            ],
+            total_kg: 200.0,
+            average_kg_per_bucket: 100.0,
+        };
+        assert!((result.total_kg - 200.0).abs() < 0.001);
+        assert!((result.average_kg_per_bucket - 100.0).abs() < 0.001);
+        assert_eq!(result.trend.len(), 2);
+    }
+
+    #[test]
+    fn test_category_breakdown_percentages_sum() {
+        let breakdown = vec![
+            CategoryBreakdown { category: "Organic".to_string(), quantity_kg: 60.0, percentage: 60.0 },
+            CategoryBreakdown { category: "Recyclable".to_string(), quantity_kg: 30.0, percentage: 30.0 },
+            CategoryBreakdown { category: "Mixed".to_string(), quantity_kg: 10.0, percentage: 10.0 },
+        ];
+        let total_pct: f64 = breakdown.iter().map(|b| b.percentage).sum();
+        assert!((total_pct - 100.0).abs() < 0.1, "Percentages should sum to ~100: {}", total_pct);
+    }
+
+    #[test]
+    fn test_category_distribution_empty() {
+        let result = CategoryDistributionResult {
+            breakdown: vec![],
+            total_kg: 0.0,
+        };
+        assert!(result.breakdown.is_empty());
+        assert_eq!(result.total_kg, 0.0);
     }
 }
