@@ -290,6 +290,121 @@ pub enum FeedbackRole {
     Holder,
 }
 
+/// Regulatory permit tracking
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct Permit {
+    pub permit_id: String,
+    pub project_id: String,
+    pub permit_type: PermitType,
+    pub authority: String,
+    pub status: PermitStatus,
+    pub applied_at: Timestamp,
+    pub decision_at: Option<Timestamp>,
+    pub expires_at: Option<Timestamp>,
+    pub conditions: Vec<String>,
+    pub evidence_cid: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum PermitType {
+    FERC,
+    NRC,
+    StateUtility,
+    LocalZoning,
+    Environmental,
+    BuildingCode,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum PermitStatus {
+    Applied,
+    UnderReview,
+    Approved,
+    Denied,
+    Expired,
+    Revoked,
+}
+
+/// Compliance verification record
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ComplianceCheck {
+    pub id: String,
+    pub project_id: String,
+    pub checker_did: String,
+    pub rule_id: String,
+    pub rule_description: String,
+    pub compliant: bool,
+    pub evidence: String,
+    pub checked_at: Timestamp,
+}
+
+/// Immutable audit entry (BLAKE3-signed)
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct AuditEntry {
+    pub id: String,
+    pub project_id: String,
+    pub action: String,
+    pub actor_did: String,
+    pub details: String,
+    pub timestamp: Timestamp,
+    pub signature_hash: String,
+}
+
+/// Construction task with dependency tracking
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ConstructionTask {
+    pub task_id: String,
+    pub project_id: String,
+    pub name: String,
+    pub description: String,
+    pub predecessors: Vec<String>,
+    pub duration_days: u32,
+    pub assigned_to: Option<String>,
+    pub status: TaskStatus,
+    pub planned_start: Timestamp,
+    pub planned_end: Timestamp,
+    pub actual_start: Option<Timestamp>,
+    pub actual_end: Option<Timestamp>,
+    pub budget: u64,
+    pub actual_cost: u64,
+    pub percent_complete: f64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum TaskStatus {
+    NotStarted,
+    InProgress,
+    Completed,
+    Blocked,
+}
+
+/// Change order for construction scope modifications
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ChangeOrder {
+    pub change_id: String,
+    pub project_id: String,
+    pub description: String,
+    pub cost_impact: i64,
+    pub schedule_impact_days: i32,
+    pub requested_by: String,
+    pub approved_by: Option<String>,
+    pub status: ChangeStatus,
+    pub requested_at: Timestamp,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum ChangeStatus {
+    Requested,
+    Approved,
+    Rejected,
+    Implemented,
+}
+
 /// Pending sync record for bidirectional sync to Terra Atlas
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
@@ -360,6 +475,11 @@ pub enum EntryTypes {
     AllocationMatch(AllocationMatch),
     ImpactRecord(ImpactRecord),
     MatchFeedback(MatchFeedback),
+    Permit(Permit),
+    ComplianceCheck(ComplianceCheck),
+    AuditEntry(AuditEntry),
+    ConstructionTask(ConstructionTask),
+    ChangeOrder(ChangeOrder),
 }
 
 #[hdk_link_types]
@@ -381,6 +501,11 @@ pub enum LinkTypes {
     PledgeToMatch,
     AssetToImpacts,
     MatchToFeedback,
+    ProjectToPermits,
+    ProjectToCompliance,
+    ProjectToAudit,
+    ProjectToTasks,
+    ProjectToChangeOrders,
 }
 
 #[hdk_extern]
@@ -450,6 +575,57 @@ fn validate_entry(entry: &EntryTypes) -> ExternResult<ValidateCallbackResult> {
             }
             if !record.community_did.starts_with("did:mycelix:") {
                 return Ok(ValidateCallbackResult::Invalid("Community must have valid DID".into()));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        EntryTypes::Permit(p) => {
+            if p.project_id.is_empty() {
+                return Ok(ValidateCallbackResult::Invalid("Project ID required".into()));
+            }
+            if p.authority.is_empty() {
+                return Ok(ValidateCallbackResult::Invalid("Authority required".into()));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        EntryTypes::ComplianceCheck(c) => {
+            if !c.checker_did.starts_with("did:mycelix:") {
+                return Ok(ValidateCallbackResult::Invalid("Checker must have valid DID".into()));
+            }
+            if c.project_id.is_empty() || c.rule_id.is_empty() {
+                return Ok(ValidateCallbackResult::Invalid("Project ID and rule ID required".into()));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        EntryTypes::AuditEntry(a) => {
+            if !a.actor_did.starts_with("did:mycelix:") {
+                return Ok(ValidateCallbackResult::Invalid("Actor must have valid DID".into()));
+            }
+            if a.project_id.is_empty() || a.action.is_empty() {
+                return Ok(ValidateCallbackResult::Invalid("Project ID and action required".into()));
+            }
+            if a.signature_hash.is_empty() {
+                return Ok(ValidateCallbackResult::Invalid("Signature hash required".into()));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        EntryTypes::ConstructionTask(t) => {
+            if t.project_id.is_empty() || t.name.is_empty() {
+                return Ok(ValidateCallbackResult::Invalid("Project ID and task name required".into()));
+            }
+            if t.duration_days == 0 {
+                return Ok(ValidateCallbackResult::Invalid("Duration must be positive".into()));
+            }
+            if !t.percent_complete.is_finite() || t.percent_complete < 0.0 || t.percent_complete > 1.0 {
+                return Ok(ValidateCallbackResult::Invalid("Percent complete must be 0.0-1.0".into()));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        EntryTypes::ChangeOrder(c) => {
+            if c.project_id.is_empty() || c.description.is_empty() {
+                return Ok(ValidateCallbackResult::Invalid("Project ID and description required".into()));
+            }
+            if !c.requested_by.starts_with("did:mycelix:") {
+                return Ok(ValidateCallbackResult::Invalid("Requester must have valid DID".into()));
             }
             Ok(ValidateCallbackResult::Valid)
         }
