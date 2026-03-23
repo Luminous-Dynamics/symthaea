@@ -80,6 +80,8 @@ default-members = [
 ]
 
 [workspace.dependencies]
+candle-core = "0.8"
+candle-nn = "0.8"
 arrow-array = "56"
 arrow-schema = "56"
 ndarray = { version = "0.16", features = ["rayon", "serde"] }
@@ -265,8 +267,8 @@ tokenizers = { version = "0.21", optional = true }  # Tokenization for Qwen3/BGE
 # safetensors removed: referenced in neural-bridge feature but never imported in source
 
 # Neural Bridge v2: BGE-M3 via Candle (pure Rust ML)
-candle-core = { version = "0.8", optional = true }
-candle-nn = { version = "0.8", optional = true }
+candle-core = { workspace = true, optional = true }
+candle-nn = { workspace = true, optional = true }
 candle-transformers = { version = "0.8", optional = true }
 # half removed: referenced in neural-bridge feature but never imported in source
 

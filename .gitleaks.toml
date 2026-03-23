@@ -1,0 +1,19 @@
+# Gitleaks configuration — allowlist false positives in test/example code
+# https://github.com/gitleaks/gitleaks#configuration
+
+[allowlist]
+  description = "False positives in test fixtures and documentation"
+
+  # Test password in mycelix test code
+  regexTarget = "match"
+  [[allowlist.regexes]]
+    description = "Test password in test fixtures"
+    regex = '''myc3l1x-s0ver31gn'''
+
+  [[allowlist.regexes]]
+    description = "Test DID key in test fixtures"
+    regex = '''z6MkTestDrain'''
+
+  [[allowlist.regexes]]
+    description = "Example GitHub token in documentation"
+    regex = '''ghp_1234567890abcdefghijklmnopqrstuvwxyz'''
