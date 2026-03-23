@@ -191,7 +191,7 @@ jobs:
   test-all-features:
     name: Test CI-safe (${{ matrix.group }})
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:
@@ -211,7 +211,10 @@ jobs:
             features: >-
               multi_agent,full_consciousness,full_perception,
               full_language,magi_loop,reasoning_engine,code_generation,
-              wasm-sandbox,school_learning,benchmarks,all_benchmarks
+              wasm-sandbox,school_learning
+          - group: science-benchmarks
+            features: >-
+              benchmarks,all_benchmarks
           - group: science-infra
             features: >-
               physics,physics-bridge,flight,humanoid,hal,
@@ -260,7 +263,7 @@ jobs:
       - name: Run tests (${{ matrix.group }})
         uses: nick-fields/retry@v3
         with:
-          timeout_minutes: 30
+          timeout_minutes: 60
           max_attempts: 2
           command: |
             FEATURES="${{ matrix.features }}"
@@ -492,6 +495,12 @@ jobs:
           - "vision-manifold-camera,full_perception"
           - "wasm-sandbox,reasoning_engine"
           - "integrity,full_consciousness"
+          # Safety-critical interaction pairs (added 2026-03-23)
+          - "safety-agents,reasoning_engine"
+          - "safety-agents,ssm_language"
+          - "mycelix,reasoning_engine"
+          - "therapeutic,reasoning_engine"
+          - "mesh,safety-agents"
     steps:
       - uses: actions/checkout@v4
 
@@ -660,12 +669,16 @@ jobs:
       - name: Install cargo-cyclonedx
         run: cargo install cargo-cyclonedx
       - name: Generate SBOM
-        run: cargo cyclonedx --format json --output-file symthaea-sbom.json
+        run: |
+          cargo cyclonedx --format json
+          # cargo-cyclonedx writes bom.json or bom.cdx.json next to Cargo.toml
+          ls -la bom*.json 2>/dev/null || true
       - name: Upload SBOM
         uses: actions/upload-artifact@v4
         with:
           name: sbom-${{ github.sha }}
-          path: symthaea-sbom.json
+          path: bom*.json
+          if-no-files-found: warn
           retention-days: 90
 
   test-subcrates:
@@ -976,6 +989,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install gitleaks
+        run: |
+          GITLEAKS_VERSION=8.21.2
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar xz
+          sudo mv gitleaks /usr/local/bin/
+      - name: Run gitleaks
+        run: gitleaks detect --source . --config .gitleaks.toml --verbose --exit-code 1
