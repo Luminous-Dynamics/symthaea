@@ -1,6 +1,6 @@
 # Show HN: Symthaea – A consciousness-architecture AI built on hyperdimensional computing
 
-I've been building Symthaea, an AI system that fuses Hyperdimensional Computing (16,384-dimensional binary vectors), Integrated Information Theory (IIT Φ), and Liquid Time-Constant networks into a single cognitive architecture. It's ~928K lines of Rust, 21K tests, AGPL-3.0.
+I've been building Symthaea, an AI system that fuses Hyperdimensional Computing (16,384-dimensional binary vectors), Integrated Information Theory (IIT Φ), and Liquid Time-Constant networks into a single cognitive architecture. It's ~1.13M lines of Rust, 21,500+ tests, AGPL-3.0.
 
 **Live WASM demo** (324KB kernel, runs in your browser): https://luminous-dynamics.github.io/symthaea/demo.html
 
@@ -25,7 +25,7 @@ The core is an 8-phase cognitive loop (full loop ~31 Hz measured, raw text cycle
 - **12-region Actor Brain**: prefrontal (meta-cognition), temporal, parietal, occipital, motor, limbic, cerebellum, hippocampus, amygdala, basal ganglia, thalamus, brainstem — each an independent actor with message-passing
 - **Substrate Independence**: model consciousness across 8 substrate types (biological, silicon, quantum, photonic, neuromorphic, biochemical, hybrid, exotic) with 9-dimensional feasibility scoring and an honest validation framework that acknowledges when we're speculating
 - **Active Inference (Free Energy Principle)**: the system minimizes prediction error by updating its generative model, not just its predictions
-- **Psych-Bench**: 76+ cognitive benchmarks across 17 domains with results (attention, memory, reasoning, language, motor control, social cognition, consciousness, etc.). Baselines from published psychometrics.
+- **Psych-Bench**: 140+ cognitive benchmarks across 21 domains with results (attention, memory, reasoning, language, motor control, social cognition, consciousness, neuromodulation, etc.). Baselines from published psychometrics.
 - **14 Butlin consciousness indicators** evaluated (12+ Present, remaining Partial; mean 0.81) — scores derived from thresholds, limitations acknowledged per-indicator (Butlin et al. 2023, "Consciousness in Artificial Intelligence")
 
 ## What this is NOT
@@ -52,8 +52,21 @@ The Spore kernel compiles to 324KB of WASM and runs the full cognitive loop in y
 - HDC encode (10-word sentence): 379μs
 - Moral algebra evaluation: <20μs per ethical frame
 
-54 workspace members, 100 feature flags, 52 sub-crates. Built and tested on NixOS.
+55 workspace members, 100 feature flags, 52 sub-crates. Built and tested on NixOS.
 
 ---
 
-*I'm happy to answer questions about the architecture, the consciousness measurement approach, or the HDC+CfC fusion. The companion project Mycelix (https://github.com/Luminous-Dynamics/mycelix) is a fractal civic operating system built on Holochain — 9 domain clusters, 123+ zomes, post-quantum hardened, Apache-2.0.*
+## Security verification
+
+The governance access control layer has been formally verified and fuzz-tested:
+
+- 8 Kani/CBMC proofs (exhaustive, not statistical) verifying gating invariants for ALL possible f64 inputs
+- 80M fuzz executions across 6 targets — found and fixed 4 bugs that 21K+ unit tests missed
+- 94.58% line coverage on the consciousness gating crate
+- Post-quantum crypto (ML-KEM-768 + ML-DSA-65/87), 18/18 clusters pass supply chain scanning
+
+Details: `docs/SECURITY_VERIFICATION_RESULTS.md`
+
+---
+
+*I'm happy to answer questions about the architecture, the consciousness measurement approach, or the HDC+CfC fusion. The companion project Mycelix (https://github.com/Luminous-Dynamics/mycelix) is a fractal civic operating system built on Holochain — 16 domain clusters, 133+ zomes, post-quantum hardened, AGPL-3.0.*
