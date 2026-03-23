@@ -132,7 +132,7 @@ impl LayerOutput {
 #[cfg(feature = "neural-bridge")]
 pub fn activation_to_hv16(activation: &[f32]) -> BinaryHV {
     if activation.is_empty() {
-        return BinaryHV::random();
+        return BinaryHV::random(0);
     }
     let mut expanded = Vec::with_capacity(HDC_DIMENSION);
     let tiles = HDC_DIMENSION / activation.len();
