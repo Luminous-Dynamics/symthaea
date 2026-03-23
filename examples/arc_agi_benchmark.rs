@@ -80,16 +80,8 @@ fn run_synthetic_benchmark() {
     println!("\n┌────────────────────┬──────────┐");
     println!("│ System             │ Solve %  │");
     println!("├────────────────────┼──────────┤");
-    let strict = result
-        .metrics
-        .get("strict_solve_rate")
-        .map(|m| m.mean)
-        .unwrap_or(0.0);
-    let twoafc = result
-        .metrics
-        .get("twoafc_accuracy")
-        .map(|m| m.mean)
-        .unwrap_or(0.0);
+    let strict = result.metrics.get("strict_solve_rate").map(|m| m.mean).unwrap_or(0.0);
+    let twoafc = result.metrics.get("twoafc_accuracy").map(|m| m.mean).unwrap_or(0.0);
     println!("│ HDC-LTC (strict)   │ {:>6.1}%  │", strict * 100.0);
     println!("│ HDC-LTC (2-AFC)    │ {:>6.1}%  │", twoafc * 100.0);
     println!("│ GPT-4              │   ~5.0%  │");
@@ -102,9 +94,7 @@ fn run_synthetic_benchmark() {
 }
 
 fn run_real_arc_benchmark(dir: &str) {
-    use symthaea_psych_bench::benchmarks::reasoning::arc_dataset::{
-        evaluate_arc_tasks, load_arc_tasks,
-    };
+    use symthaea_psych_bench::benchmarks::reasoning::arc_dataset::{evaluate_arc_tasks, load_arc_tasks};
 
     println!("━━━ Real ARC Dataset (from {}) ━━━\n", dir);
 
@@ -117,42 +107,25 @@ fn run_real_arc_benchmark(dir: &str) {
             let result = evaluate_arc_tasks(&tasks, 16384, 42);
             println!("\n2-AFC Results:");
             println!("  Tasks: {}", result.tasks_loaded);
-            println!(
-                "  Correct: {} ({:.1}%)",
-                result.tasks_correct,
-                result.tasks_correct as f64 / result.tasks_loaded.max(1) as f64 * 100.0
-            );
+            println!("  Correct: {} ({:.1}%)", result.tasks_correct,
+                result.tasks_correct as f64 / result.tasks_loaded.max(1) as f64 * 100.0);
             println!("  Mean similarity: {:.4}", result.mean_similarity);
-            println!(
-                "  Mean rule consistency: {:.4}",
-                result.mean_rule_consistency
-            );
+            println!("  Mean rule consistency: {:.4}", result.mean_rule_consistency);
 
             // Run strict evaluation
             println!("\nStrict (pixel-perfect) Results:");
             let strict_result = evaluate_arc_strict(&tasks, 42);
             println!("  Tasks evaluated: {}", strict_result.total);
-            println!(
-                "  Pixel-perfect solves: {} ({:.1}%)",
+            println!("  Pixel-perfect solves: {} ({:.1}%)",
                 strict_result.exact_matches,
-                strict_result.exact_matches as f64 / strict_result.total.max(1) as f64 * 100.0
-            );
-            println!(
-                "  Mean pixel accuracy: {:.1}%",
-                strict_result.mean_pixel_accuracy * 100.0
-            );
+                strict_result.exact_matches as f64 / strict_result.total.max(1) as f64 * 100.0);
+            println!("  Mean pixel accuracy: {:.1}%", strict_result.mean_pixel_accuracy * 100.0);
 
             // Breakdown by grid size
             println!("\n  By grid size:");
             for (size, (total, correct, mean_acc)) in &strict_result.by_grid_size {
-                println!(
-                    "    {}×{}: {}/{} exact, {:.1}% pixel accuracy",
-                    size,
-                    size,
-                    correct,
-                    total,
-                    mean_acc * 100.0
-                );
+                println!("    {}×{}: {}/{} exact, {:.1}% pixel accuracy",
+                    size, size, correct, total, mean_acc * 100.0);
             }
         }
         Err(e) => {
@@ -169,10 +142,7 @@ struct StrictArcResult {
 }
 
 fn evaluate_arc_strict(
-    tasks: &std::collections::BTreeMap<
-        String,
-        symthaea_psych_bench::benchmarks::reasoning::arc_dataset::ArcTask,
-    >,
+    tasks: &std::collections::BTreeMap<String, symthaea_psych_bench::benchmarks::reasoning::arc_dataset::ArcTask>,
     seed: u64,
 ) -> StrictArcResult {
     use symthaea_core::hdc::binary_grid_encoder::BinaryGridEncoder;
@@ -189,38 +159,28 @@ fn evaluate_arc_strict(
         }
 
         let max_rows = task
-            .train
-            .iter()
-            .chain(task.test.iter())
+            .train.iter().chain(task.test.iter())
             .flat_map(|p| [p.input.len(), p.output.len()])
-            .max()
-            .unwrap_or(30);
+            .max().unwrap_or(30);
         let max_cols = task
-            .train
-            .iter()
-            .chain(task.test.iter())
+            .train.iter().chain(task.test.iter())
             .flat_map(|p| {
-                [
-                    p.input.iter().map(|r| r.len()).max().unwrap_or(0),
-                    p.output.iter().map(|r| r.len()).max().unwrap_or(0),
-                ]
+                [p.input.iter().map(|r| r.len()).max().unwrap_or(0),
+                 p.output.iter().map(|r| r.len()).max().unwrap_or(0)]
             })
-            .max()
-            .unwrap_or(30);
+            .max().unwrap_or(30);
 
-        let encoder =
-            BinaryGridEncoder::new(max_rows.max(1), max_cols.max(1), 10, seed ^ (idx as u64));
+        let encoder = BinaryGridEncoder::new(
+            max_rows.max(1), max_cols.max(1), 10,
+            seed ^ (idx as u64),
+        );
 
         // Build consensus rule
-        let rules: Vec<_> = task
-            .train
-            .iter()
-            .map(|pair| {
-                let hv_in = encoder.encode_grid(&pair.input);
-                let hv_out = encoder.encode_grid(&pair.output);
-                encoder.encode_rule(&hv_in, &hv_out)
-            })
-            .collect();
+        let rules: Vec<_> = task.train.iter().map(|pair| {
+            let hv_in = encoder.encode_grid(&pair.input);
+            let hv_out = encoder.encode_grid(&pair.output);
+            encoder.encode_rule(&hv_in, &hv_out)
+        }).collect();
         let consensus = encoder.bundle_rules(&rules);
 
         // Apply to test
@@ -244,9 +204,7 @@ fn evaluate_arc_strict(
         let grid_size = max_rows.max(max_cols);
         let entry = by_grid_size.entry(grid_size).or_insert((0, 0, 0.0));
         entry.0 += 1;
-        if exact {
-            entry.1 += 1;
-        }
+        if exact { entry.1 += 1; }
         entry.2 += pixel_acc;
     }
 
@@ -260,11 +218,7 @@ fn evaluate_arc_strict(
     StrictArcResult {
         total,
         exact_matches,
-        mean_pixel_accuracy: if total > 0 {
-            pixel_acc_sum / total as f64
-        } else {
-            0.0
-        },
+        mean_pixel_accuracy: if total > 0 { pixel_acc_sum / total as f64 } else { 0.0 },
         by_grid_size,
     }
 }
@@ -281,22 +235,15 @@ fn save_json(filename: &str, result: &symthaea_psych_bench::harness::report::Ben
     json.push_str("  \"metrics\": {\n");
     let mut first = true;
     for (name, value) in &result.metrics {
-        if !first {
-            json.push_str(",\n");
-        }
+        if !first { json.push_str(",\n"); }
         first = false;
-        json.push_str(&format!(
-            "    \"{}\": {{ \"mean\": {:.6}, \"sd\": {:.6} }}",
-            name, value.mean, value.std_dev
-        ));
+        json.push_str(&format!("    \"{}\": {{ \"mean\": {:.6}, \"sd\": {:.6} }}", name, value.mean, value.std_dev));
     }
     json.push_str("\n  },\n");
     json.push_str("  \"notes\": [\n");
     for (i, note) in result.notes.iter().enumerate() {
         json.push_str(&format!("    \"{}\"", note.replace('"', "\\\"")));
-        if i + 1 < result.notes.len() {
-            json.push(',');
-        }
+        if i + 1 < result.notes.len() { json.push(','); }
         json.push('\n');
     }
     json.push_str("  ]\n}\n");

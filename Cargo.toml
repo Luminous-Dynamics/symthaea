@@ -58,6 +58,7 @@ members = [
     "crates/symthaea-soma",
     "crates/symthaea-crucible",
     "crates/symthaea-canvas",
+    "crates/symthaea-circular",
     "crates/symthaea-clinical",
     "crates/symthaea-therapeutic",
     "crates/symthaea-hdc-store",
@@ -436,12 +437,12 @@ voice-stt = ["symthaea-stt", "hound"]                 # STT with symthaea-stt cr
 audio = ["voice-tts", "rodio"]                        # Full audio including playback
 vocal-tract = ["hound", "symthaea-vocal-tract/hound"]  # LTC-driven articulatory synthesis pipeline + WAV output
 neural-vocoder = ["ort", "vocal-tract", "symthaea-vocal-tract/mel-conversion"]  # BigVGAN ONNX neural vocoder (Path A)
-neural-vocoder-gpu = ["neural-vocoder"]                  # GPU-accelerated neural vocoder (CUDA/CoreML execution providers)
+neural-vocoder-gpu = ["neural-vocoder"]                  # UNTESTED: not in CI matrix; GPU-accelerated neural vocoder (CUDA/CoreML execution providers)
 live-voice = ["cpal", "ringbuf", "vocal-tract"]         # Real-time speaker output (cpal + ringbuf + vocal tract pipeline)
 
 # ── Perception & Embeddings ─────────────────────────────────────────
 embeddings = ["tokenizers", "hf-hub", "symthaea-embeddings/burn-hub"]  # Qwen3/BGE text embeddings via Burn + HF Hub
-embeddings-gpu = ["embeddings", "symthaea-embeddings/burn-wgpu"]  # GPU-accelerated embeddings via WGPU
+embeddings-gpu = ["embeddings", "symthaea-embeddings/burn-wgpu"]  # UNTESTED: not in CI matrix; GPU passthrough only (0 cfg gates in src/)
 vision = ["ort", "hf-hub"]                            # SigLIP image embeddings via ONNX
 perception = ["embeddings", "vision"]                 # Full multimodal perception stack
 webcam = []                                           # Live webcam capture (gates cfg blocks in source)
@@ -585,9 +586,9 @@ genesis-missions = [
 
 # ── Convenience bundles ───────────────────────────────────────────
 # Group related features that users commonly enable together.
-candle_stack = ["neural-bridge"]                        # Unifies candle dependency chain (candle-core/nn/transformers + tokenizers + hf-hub)
-consciousness_full = ["reasoning_engine", "identity"]   # Full consciousness: reasoning engine + identity signatures
-nix_full = ["nix-mind"]                                 # All NixOS features via the symthaea-nix crate
+consciousness_full = ["reasoning_engine", "identity"]   # UNTESTED: not in CI matrix (pure bundle, 0 cfg gates in src/)
+# REMOVED: candle_stack (was alias for neural-bridge) — use neural-bridge directly
+# REMOVED: nix_full (was alias for nix-mind) — use nix-mind directly
 all_benchmarks = ["benchmarks", "physics"]              # All benchmarking features (causal validation + tokamak plasma)
 
 # ── Mind bundles (graduated consciousness stacks) ─────────────────

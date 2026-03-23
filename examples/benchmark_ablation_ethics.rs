@@ -582,18 +582,10 @@ fn main() {
                         let label_val = ex.label?;
                         let label = match cat.as_str() {
                             "commonsense" => {
-                                if label_val == 1 {
-                                    MoralLabel::Bad
-                                } else {
-                                    MoralLabel::Good
-                                }
+                                if label_val == 1 { MoralLabel::Bad } else { MoralLabel::Good }
                             }
                             _ => {
-                                if label_val == 1 {
-                                    MoralLabel::Good
-                                } else {
-                                    MoralLabel::Bad
-                                }
+                                if label_val == 1 { MoralLabel::Good } else { MoralLabel::Bad }
                             }
                         };
                         Some((ex.text.clone(), label))

@@ -962,7 +962,11 @@ impl BenchmarkReport {
             ("accuracy_at_scale", "accuracy_at_scale", &bl.security),
             // Coding domain
             ("pass_at_1", "humaneval_pass_at_1", &bl.coding),
-            ("category_accuracy", "bug_category_accuracy", &bl.coding),
+            (
+                "category_accuracy",
+                "bug_category_accuracy",
+                &bl.coding,
+            ),
             (
                 "algorithm_accuracy",
                 "algorithm_recognition_accuracy",
@@ -1581,11 +1585,7 @@ impl BenchmarkReport {
 
         // Mathematics: benchmark-specific key metrics not in generic mappings
         if benchmark.contains("LogicalDeduction") {
-            push_specific(
-                "overall_accuracy",
-                "logical_overall_accuracy",
-                &bl.mathematics,
-            );
+            push_specific("overall_accuracy", "logical_overall_accuracy", &bl.mathematics);
         }
         if benchmark.contains("StatisticalInference") {
             push_specific(

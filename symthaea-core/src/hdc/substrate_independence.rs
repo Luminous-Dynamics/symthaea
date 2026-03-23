@@ -224,7 +224,7 @@ impl SubstrateType {
             SubstrateType::NeuromorphicChip => 1e-6,   // ~1 μs
             SubstrateType::BiochemicalComputer => 1.0, // ~1 s (very slow!)
             SubstrateType::HybridSystem => 1e-6,       // Depends on mix
-            SubstrateType::ExoticSubstrate => 0.01,    // Varies widely
+            SubstrateType::ExoticSubstrate => 0.01,       // Varies widely
             SubstrateType::SpacecraftComputer => 1e-7, // ~100 ns (rad-hard, ~10-200 MHz)
             _ => unreachable!("canonical covers aliases"),
         }
@@ -240,7 +240,7 @@ impl SubstrateType {
             SubstrateType::NeuromorphicChip => 1e-15,  // ~1 fJ
             SubstrateType::BiochemicalComputer => 1e-12, // ~1 pJ (inefficient)
             SubstrateType::HybridSystem => 1e-15,      // Varies
-            SubstrateType::ExoticSubstrate => 1e-10,   // Often inefficient
+            SubstrateType::ExoticSubstrate => 1e-10,       // Often inefficient
             SubstrateType::SpacecraftComputer => 1e-8, // ~10 nJ (rad-hard overhead + power-limited)
             _ => unreachable!("canonical covers aliases"),
         }
@@ -256,7 +256,7 @@ impl SubstrateType {
             SubstrateType::NeuromorphicChip => 1e-8,  // ~10 nm
             SubstrateType::BiochemicalComputer => 1e-9, // ~1 nm (DNA molecule)
             SubstrateType::HybridSystem => 1e-8,      // Varies
-            SubstrateType::ExoticSubstrate => 1e-3,   // Often macroscopic
+            SubstrateType::ExoticSubstrate => 1e-3,       // Often macroscopic
             SubstrateType::SpacecraftComputer => 1e-2, // ~10 mm (larger feature sizes for rad tolerance)
             _ => unreachable!("canonical covers aliases"),
         }
@@ -272,7 +272,7 @@ impl SubstrateType {
             SubstrateType::NeuromorphicChip => 1e9,   // ~1 billion
             SubstrateType::BiochemicalComputer => 1e15, // ~1 quadrillion (molecular)
             SubstrateType::HybridSystem => 1e12,      // Varies
-            SubstrateType::ExoticSubstrate => 1e6,    // Often limited
+            SubstrateType::ExoticSubstrate => 1e6,       // Often limited
             SubstrateType::SpacecraftComputer => 1e6, // Limited by power budget, not transistor count
             _ => unreachable!("canonical covers aliases"),
         }
@@ -478,15 +478,15 @@ impl SubstrateRequirements {
     /// - Samudrala et al. (2004): SEU mitigation in spacecraft FPGAs
     pub fn spacecraft_computer() -> Self {
         Self {
-            causality: 1.0,             // Deterministic real-time systems
-            integration_capacity: 0.65, // Bus-limited (SpaceWire/CAN ~100 Mbps)
-            temporal_dynamics: 0.85,    // Real-time OS (VxWorks/RTEMS) with precise timing
-            recurrence: 0.95,           // Strong feedback loops in GNC and FDIR
-            binding_capability: 0.50,   // Sequential task execution, limited parallelism
-            attention_capability: 0.90, // Excellent priority interrupt scheduling
-            workspace_capability: 0.70, // Shared memory model, limited by radiation scrubbing
-            hot_capability: 0.60,       // FDIR provides meta-monitoring, not full HOT
-            quantum_support: 0.0,       // Classical only
+            causality: 1.0,              // Deterministic real-time systems
+            integration_capacity: 0.65,  // Bus-limited (SpaceWire/CAN ~100 Mbps)
+            temporal_dynamics: 0.85,     // Real-time OS (VxWorks/RTEMS) with precise timing
+            recurrence: 0.95,            // Strong feedback loops in GNC and FDIR
+            binding_capability: 0.50,    // Sequential task execution, limited parallelism
+            attention_capability: 0.90,  // Excellent priority interrupt scheduling
+            workspace_capability: 0.70,  // Shared memory model, limited by radiation scrubbing
+            hot_capability: 0.60,        // FDIR provides meta-monitoring, not full HOT
+            quantum_support: 0.0,        // Classical only
         }
     }
 
@@ -997,20 +997,14 @@ impl SubstrateIndependence {
     /// - Integration (bus/middleware): SpacecraftComputer (SpaceWire hub)
     pub fn spacecraft_default_regions() -> HashMap<CorticalRegion, SubstrateType> {
         let mut map = HashMap::new();
-        map.insert(
-            CorticalRegion::Prefrontal,
-            SubstrateType::SpacecraftComputer,
-        );
+        map.insert(CorticalRegion::Prefrontal, SubstrateType::SpacecraftComputer);
         map.insert(CorticalRegion::Motor, SubstrateType::SpacecraftComputer);
         map.insert(CorticalRegion::Sensory, SubstrateType::NeuromorphicChip);
         map.insert(CorticalRegion::Visual, SubstrateType::SiliconDigital);
         map.insert(CorticalRegion::Language, SubstrateType::PhotonicProcessor);
         map.insert(CorticalRegion::Memory, SubstrateType::SiliconDigital);
         map.insert(CorticalRegion::Executive, SubstrateType::SpacecraftComputer);
-        map.insert(
-            CorticalRegion::Integration,
-            SubstrateType::SpacecraftComputer,
-        );
+        map.insert(CorticalRegion::Integration, SubstrateType::SpacecraftComputer);
         // Remaining regions (Auditory, Emotional, Social, Creative) use default substrate
         map
     }
@@ -1207,10 +1201,7 @@ mod tests {
         let req = SubstrateRequirements::spacecraft_computer();
         let f = req.consciousness_feasibility();
         // Should be lower than silicon (more constrained) but non-trivial
-        assert!(
-            f > 0.2,
-            "Spacecraft should be theoretically viable, got {f}"
-        );
+        assert!(f > 0.2, "Spacecraft should be theoretically viable, got {f}");
         assert!(f < 0.8, "Spacecraft has real constraints, got {f}");
     }
 

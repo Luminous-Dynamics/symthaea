@@ -380,7 +380,9 @@ impl MeshReceiver {
 
         if is_complete {
             // Extract the completed assembly
-            let assembly = self.pending.remove(&key).unwrap();
+            let Some(assembly) = self.pending.remove(&key) else {
+                return None; // Assembly entry missing despite is_complete — should not happen
+            };
             let used_fec = assembly.assembler.used_fec_recovery();
 
             // When fragment_encryption is active, fragments were already

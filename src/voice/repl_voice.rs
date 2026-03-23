@@ -2405,7 +2405,9 @@ impl ReplVoiceOutput {
             let mut phrase_starts: Vec<(usize, Intonation)> = vec![(0, Intonation::Statement)];
             for aw in &analyzed_words {
                 if aw.boundary_after == PhraseBoundary::Intonational {
-                    phrase_starts.last_mut().unwrap().1 = aw.intonation;
+                    if let Some(last) = phrase_starts.last_mut() {
+                        last.1 = aw.intonation;
+                    }
                     phrase_starts.push((phrase_starts.len(), Intonation::Statement));
                 }
             }

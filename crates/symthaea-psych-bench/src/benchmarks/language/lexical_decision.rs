@@ -132,9 +132,9 @@ impl LexicalDecisionBenchmark {
                     let lapse_seed = config.trial_seed("language", "ld_lapse", item);
                     if (lapse_seed % 10000) as f64 / 10000.0 < config.lapse_rate {
                         // Random guess: correct with probability 1/codebook_size
-                        let guess_correct = (lapse_seed.wrapping_mul(0x517CC1B727220A95)
-                            % codebook_size as u64)
-                            == word_idx as u64;
+                        let guess_correct =
+                            (lapse_seed.wrapping_mul(0x517CC1B727220A95) % codebook_size as u64)
+                                == word_idx as u64;
                         guess_correct
                     } else {
                         best_idx == word_idx
@@ -217,7 +217,8 @@ impl LexicalDecisionBenchmark {
                 let nonword_item_correct = if config.lapse_rate > 0.0 {
                     let lapse_seed = config.trial_seed("language", "ld_lapse", item);
                     if (lapse_seed % 10000) as f64 / 10000.0 < config.lapse_rate {
-                        let guess_correct = (lapse_seed.wrapping_mul(0x517CC1B727220A95) % 2) == 0;
+                        let guess_correct =
+                            (lapse_seed.wrapping_mul(0x517CC1B727220A95) % 2) == 0;
                         guess_correct
                     } else {
                         best_sim < rejection_threshold

@@ -97,10 +97,7 @@ fn main() {
 
     // Enable projection head if --projection-dim specified (works for both fresh and resume)
     if opts.projection_dim > 0 && generator.controller().projection_dim().is_none() {
-        tracing::info!(
-            dim = opts.projection_dim,
-            "Enabling learned projection head"
-        );
+        tracing::info!(dim = opts.projection_dim, "Enabling learned projection head");
         generator
             .controller_mut()
             .enable_projection(&genesis, opts.projection_dim);
@@ -786,9 +783,7 @@ fn print_usage() {
     eprintln!("  --hidden-dropout F   CfC hidden state dropout rate (default: 0.0 = off)");
     eprintln!("  --network-layers N   CfC network layers (default: 3, fresh train only)");
     eprintln!("  --neurons-per-layer N  CfC neurons per layer (default: 8, fresh train only)");
-    eprintln!(
-        "  --projection-dim N   Project to N dimensions for logits (default: 0 = off, try 256)"
-    );
+    eprintln!("  --projection-dim N   Project to N dimensions for logits (default: 0 = off, try 256)");
     eprintln!("  --adaptive-veto F    Ramp veto threshold to F over final --veto-warmup epochs (default: 0.0 = off)");
     eprintln!("  --veto-warmup N      Epochs over which to ramp veto threshold (default: 10)");
     eprintln!("  --soft-veto-training Enable soft veto (partial CfC restore) during training");

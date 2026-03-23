@@ -267,11 +267,7 @@ pub fn format_comparison_table(results: &[(HumanoidTask, DmcBenchmarkResult)]) -
         let baselines = BaselineScores::for_task(task);
         latex.push_str(&format!(
             "{:?} & {:.3} & {:.3} & {:.3} & {:.3} \\\\\n",
-            task,
-            result.mean_return,
-            baselines.sac_return,
-            baselines.td3_return,
-            baselines.d4pg_return,
+            task, result.mean_return, baselines.sac_return, baselines.td3_return, baselines.d4pg_return,
         ));
     }
 

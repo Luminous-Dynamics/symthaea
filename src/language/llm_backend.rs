@@ -65,19 +65,13 @@ impl ConsciousnessContext {
         }
 
         if self.error_likelihood > 0.5 {
-            parts.push(
-                "NOTE: High error likelihood — add extra error handling and validation."
-                    .to_string(),
-            );
+            parts.push("NOTE: High error likelihood — add extra error handling and validation.".to_string());
         }
         if self.type_confidence < 0.3 {
             parts.push("NOTE: Low type confidence — prefer explicit type annotations.".to_string());
         }
         if self.epistemic_status == "Uncertain" || self.epistemic_status == "Unknown" {
-            parts.push(
-                "NOTE: Low epistemic confidence — add TODO comments for uncertain logic."
-                    .to_string(),
-            );
+            parts.push("NOTE: Low epistemic confidence — add TODO comments for uncertain logic.".to_string());
         }
 
         parts.join("\n")
@@ -325,20 +319,16 @@ impl LLMBackend for OllamaBackend {
         let url = format!("{}/api/generate", self.base_url);
 
         // Merge consciousness context into system prompt if present
-        let effective_system: Option<String> =
-            match (&params.system_prompt, &params.consciousness_context) {
-                (Some(sys), Some(ctx)) => Some(format!(
-                    "{}\n\n# Consciousness Context\n{}",
-                    sys,
-                    ctx.to_system_supplement()
-                )),
-                (None, Some(ctx)) => Some(format!(
-                    "# Consciousness Context\n{}",
-                    ctx.to_system_supplement()
-                )),
-                (Some(sys), None) => Some(sys.clone()),
-                (None, None) => None,
-            };
+        let effective_system: Option<String> = match (&params.system_prompt, &params.consciousness_context) {
+            (Some(sys), Some(ctx)) => {
+                Some(format!("{}\n\n# Consciousness Context\n{}", sys, ctx.to_system_supplement()))
+            }
+            (None, Some(ctx)) => {
+                Some(format!("# Consciousness Context\n{}", ctx.to_system_supplement()))
+            }
+            (Some(sys), None) => Some(sys.clone()),
+            (None, None) => None,
+        };
 
         // Adjust temperature based on consciousness context
         let effective_temp = if let Some(ref ctx) = params.consciousness_context {

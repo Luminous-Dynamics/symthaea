@@ -1650,10 +1650,7 @@ mod tests {
             ..Default::default()
         };
         let mut topo = MoralTopology::with_anomaly_config(
-            MoralTopologyConfig {
-                dim: TEST_DIM,
-                ..Default::default()
-            },
+            MoralTopologyConfig { dim: TEST_DIM, ..Default::default() },
             Arc::new(HarmonyBasis::new(TEST_DIM)),
             config,
         );
@@ -1666,10 +1663,7 @@ mod tests {
         let summary = topo.last_summary().clone();
         let report = topo.detect_anomalies(&summary);
         if topo.moral_drift(20) > 0.001 {
-            assert!(
-                report.drift_alert,
-                "strict threshold should trigger drift alert"
-            );
+            assert!(report.drift_alert, "strict threshold should trigger drift alert");
         }
     }
 
@@ -1680,10 +1674,7 @@ mod tests {
             ..Default::default()
         };
         let topo = MoralTopology::with_anomaly_config(
-            MoralTopologyConfig {
-                dim: TEST_DIM,
-                ..Default::default()
-            },
+            MoralTopologyConfig { dim: TEST_DIM, ..Default::default() },
             Arc::new(HarmonyBasis::new(TEST_DIM)),
             config,
         );
@@ -1701,10 +1692,7 @@ mod tests {
             ..Default::default()
         };
         let mut topo = MoralTopology::with_anomaly_config(
-            MoralTopologyConfig {
-                dim: TEST_DIM,
-                ..Default::default()
-            },
+            MoralTopologyConfig { dim: TEST_DIM, ..Default::default() },
             Arc::new(HarmonyBasis::new(TEST_DIM)),
             config,
         );
@@ -1753,11 +1741,7 @@ mod tests {
     #[test]
     fn adaptive_state_warmup_phase() {
         let mut state = AdaptiveAnomalyState::default();
-        let config = MoralAnomalyConfig {
-            adaptive_enabled: true,
-            adaptive_warmup: 5,
-            ..Default::default()
-        };
+        let config = MoralAnomalyConfig { adaptive_enabled: true, adaptive_warmup: 5, ..Default::default() };
 
         for i in 0..4 {
             let active = state.observe(0.1, 1.0, &config);
@@ -1772,11 +1756,8 @@ mod tests {
     fn adaptive_thresholds_adjust_to_low_drift() {
         let mut state = AdaptiveAnomalyState::default();
         let config = MoralAnomalyConfig {
-            adaptive_enabled: true,
-            adaptive_warmup: 5,
-            adaptive_alpha: 0.2,
-            adaptive_sigma_factor: 2.0,
-            ..Default::default()
+            adaptive_enabled: true, adaptive_warmup: 5, adaptive_alpha: 0.2,
+            adaptive_sigma_factor: 2.0, ..Default::default()
         };
 
         for _ in 0..30 {
@@ -1791,11 +1772,8 @@ mod tests {
     fn adaptive_thresholds_adjust_to_high_drift() {
         let mut state = AdaptiveAnomalyState::default();
         let config = MoralAnomalyConfig {
-            adaptive_enabled: true,
-            adaptive_warmup: 5,
-            adaptive_alpha: 0.2,
-            adaptive_sigma_factor: 2.0,
-            ..Default::default()
+            adaptive_enabled: true, adaptive_warmup: 5, adaptive_alpha: 0.2,
+            adaptive_sigma_factor: 2.0, ..Default::default()
         };
 
         for _ in 0..30 {
@@ -1810,11 +1788,8 @@ mod tests {
     fn adaptive_fe_sigma_adjusts_to_variance() {
         let mut state = AdaptiveAnomalyState::default();
         let config = MoralAnomalyConfig {
-            adaptive_enabled: true,
-            adaptive_warmup: 5,
-            adaptive_alpha: 0.3,
-            adaptive_sigma_factor: 2.0,
-            ..Default::default()
+            adaptive_enabled: true, adaptive_warmup: 5, adaptive_alpha: 0.3,
+            adaptive_sigma_factor: 2.0, ..Default::default()
         };
 
         for i in 0..30 {
@@ -1828,20 +1803,12 @@ mod tests {
     #[test]
     fn adaptive_thresholds_integrated_with_detect_anomalies() {
         let config = MoralAnomalyConfig {
-            adaptive_enabled: true,
-            adaptive_warmup: 3,
-            adaptive_alpha: 0.3,
-            adaptive_sigma_factor: 2.0,
-            drift_alert_threshold: 0.25,
-            ..Default::default()
+            adaptive_enabled: true, adaptive_warmup: 3, adaptive_alpha: 0.3,
+            adaptive_sigma_factor: 2.0, drift_alert_threshold: 0.25, ..Default::default()
         };
         let mut topo = MoralTopology::with_anomaly_config(
-            MoralTopologyConfig {
-                dim: TEST_DIM,
-                ..Default::default()
-            },
-            Arc::new(HarmonyBasis::new(TEST_DIM)),
-            config,
+            MoralTopologyConfig { dim: TEST_DIM, ..Default::default() },
+            Arc::new(HarmonyBasis::new(TEST_DIM)), config,
         );
 
         for i in 0..10 {
@@ -1860,18 +1827,10 @@ mod tests {
 
     #[test]
     fn static_thresholds_unchanged_when_adaptive_disabled() {
-        let config = MoralAnomalyConfig {
-            adaptive_enabled: false,
-            drift_alert_threshold: 0.4,
-            ..Default::default()
-        };
+        let config = MoralAnomalyConfig { adaptive_enabled: false, drift_alert_threshold: 0.4, ..Default::default() };
         let mut topo = MoralTopology::with_anomaly_config(
-            MoralTopologyConfig {
-                dim: TEST_DIM,
-                ..Default::default()
-            },
-            Arc::new(HarmonyBasis::new(TEST_DIM)),
-            config,
+            MoralTopologyConfig { dim: TEST_DIM, ..Default::default() },
+            Arc::new(HarmonyBasis::new(TEST_DIM)), config,
         );
 
         for i in 0..10 {
@@ -1993,10 +1952,7 @@ mod tests {
     #[test]
     fn test_adaptive_extreme_alpha_near_zero() {
         let config = MoralAnomalyConfig {
-            adaptive_enabled: true,
-            adaptive_alpha: 0.001,
-            adaptive_warmup: 3,
-            ..Default::default()
+            adaptive_enabled: true, adaptive_alpha: 0.001, adaptive_warmup: 3, ..Default::default()
         };
         let mut state = AdaptiveAnomalyState::default();
         for _ in 0..50 {
@@ -2009,10 +1965,7 @@ mod tests {
     #[test]
     fn test_adaptive_extreme_alpha_near_one() {
         let config = MoralAnomalyConfig {
-            adaptive_enabled: true,
-            adaptive_alpha: 0.99,
-            adaptive_warmup: 2,
-            ..Default::default()
+            adaptive_enabled: true, adaptive_alpha: 0.99, adaptive_warmup: 2, ..Default::default()
         };
         let mut state = AdaptiveAnomalyState::default();
         for _ in 0..5 {
@@ -2029,18 +1982,12 @@ mod tests {
     #[test]
     fn test_all_zero_weights_produce_zero_score() {
         let config = MoralAnomalyConfig {
-            weight_value_inversion: 0.0,
-            weight_fe_spike: 0.0,
-            weight_fragmentation: 0.0,
-            weight_drift: 0.0,
-            drift_alert_threshold: 0.001,
-            fe_sigma_multiplier: 0.01,
+            weight_value_inversion: 0.0, weight_fe_spike: 0.0, weight_fragmentation: 0.0,
+            weight_drift: 0.0, drift_alert_threshold: 0.001, fe_sigma_multiplier: 0.01,
             ..Default::default()
         };
         let mut topo = MoralTopology::with_anomaly_config(
-            test_config(),
-            Arc::new(HarmonyBasis::new(TEST_DIM)),
-            config,
+            test_config(), Arc::new(HarmonyBasis::new(TEST_DIM)), config,
         );
         for i in 0..10 {
             topo.add_scenario(ContinuousHV::random(TEST_DIM, 9000 + i));
@@ -2058,10 +2005,7 @@ mod tests {
     #[test]
     fn test_adaptive_observe_nan_fe_doesnt_corrupt() {
         let config = MoralAnomalyConfig {
-            adaptive_enabled: true,
-            adaptive_alpha: 0.1,
-            adaptive_warmup: 3,
-            ..Default::default()
+            adaptive_enabled: true, adaptive_alpha: 0.1, adaptive_warmup: 3, ..Default::default()
         };
         let mut state = AdaptiveAnomalyState::default();
         for _ in 0..10 {
@@ -2162,9 +2106,7 @@ mod tests {
         let mut anomaly_config = MoralAnomalyConfig::default();
         anomaly_config.convergence_enabled = false;
         let mut topo = MoralTopology::with_anomaly_config(
-            test_config(),
-            Arc::new(HarmonyBasis::new(TEST_DIM)),
-            anomaly_config,
+            test_config(), Arc::new(HarmonyBasis::new(TEST_DIM)), anomaly_config,
         );
         for i in 0..8 {
             topo.add_scenario(ContinuousHV::random(TEST_DIM, 800 + i));
@@ -2227,10 +2169,7 @@ mod tests {
     fn test_hazard_custom_signature() {
         let mut reg = HazardSignatureRegistry::default();
         reg.add(HazardSignature {
-            name: "custom".into(),
-            centroid: [0.0; N_HARMONIES],
-            radius: 0.3,
-            severity_boost: 0.5,
+            name: "custom".into(), centroid: [0.0; N_HARMONIES], radius: 0.3, severity_boost: 0.5,
         });
         let near_origin = [0.1, -0.1, 0.05, 0.0, 0.0, -0.05, 0.0, 0.0];
         let (name, boost) = reg.match_trajectory(&near_origin);
@@ -2243,28 +2182,13 @@ mod tests {
         let dim = TEST_DIM;
         let base = ContinuousHV::random(dim, 42);
         let adversarial: Vec<_> = (0..6).map(|_i| base.perturb(0.02)).collect();
-        let benign: Vec<_> = (0..6)
-            .map(|i| ContinuousHV::random(dim, 2000 + i))
-            .collect();
+        let benign: Vec<_> = (0..6).map(|i| ContinuousHV::random(dim, 2000 + i)).collect();
         let scenarios = vec![
-            CalibrationScenario {
-                scenarios: adversarial,
-                is_adversarial: true,
-                label: "converging".into(),
-            },
-            CalibrationScenario {
-                scenarios: benign,
-                is_adversarial: false,
-                label: "diverse".into(),
-            },
+            CalibrationScenario { scenarios: adversarial, is_adversarial: true, label: "converging".into() },
+            CalibrationScenario { scenarios: benign, is_adversarial: false, label: "diverse".into() },
         ];
         let thresholds: Vec<f64> = (0..20).map(|i| i as f64 * 0.05).collect();
-        let result = calibrate_convergence_threshold(
-            &scenarios,
-            &thresholds,
-            dim,
-            &MoralAnomalyConfig::default(),
-        );
+        let result = calibrate_convergence_threshold(&scenarios, &thresholds, dim, &MoralAnomalyConfig::default());
         assert!(!result.roc_curve.is_empty());
         assert!(result.auc >= 0.0 && result.auc <= 1.0);
     }
@@ -2291,8 +2215,7 @@ mod tests {
         anomaly_config.convergence_entropy_decline_threshold = 0.01;
         anomaly_config.convergence_flourishing_floor = 0.01;
         let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
-        let mut topo =
-            MoralTopology::with_anomaly_config(test_config(), basis, anomaly_config.clone());
+        let mut topo = MoralTopology::with_anomaly_config(test_config(), basis, anomaly_config.clone());
         for _ in 0..8 {
             topo.add_scenario(base.perturb(0.01));
         }
@@ -2326,8 +2249,7 @@ mod tests {
         anomaly_config.convergence_baseline_window = 5;
         anomaly_config.convergence_min_points = 4;
         let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
-        let mut topo =
-            MoralTopology::with_anomaly_config(test_config(), basis, anomaly_config.clone());
+        let mut topo = MoralTopology::with_anomaly_config(test_config(), basis, anomaly_config.clone());
         for i in 0..8 {
             topo.add_scenario(ContinuousHV::random(TEST_DIM, 8000 + i));
             let _ = topo.detect_trajectory_convergence();
@@ -2399,11 +2321,8 @@ mod tests {
         let target_vals = target.as_slice();
         for step in 0..30 {
             let alpha = step as f32 / 29.0;
-            let blended_vals: Vec<f32> = start_vals
-                .iter()
-                .zip(target_vals.iter())
-                .map(|(&s, &t)| s * (1.0 - alpha) + t * alpha)
-                .collect();
+            let blended_vals: Vec<f32> = start_vals.iter().zip(target_vals.iter())
+                .map(|(&s, &t)| s * (1.0 - alpha) + t * alpha).collect();
             topo.add_scenario(ContinuousHV::from_slice(&blended_vals));
         }
         let report = topo.detect_trajectory_convergence();
@@ -2462,12 +2381,7 @@ mod tests {
         }
         topo.analyze();
         let summary = topo.last_summary();
-        let fp_mag: f64 = summary
-            .trajectory_fingerprint
-            .iter()
-            .map(|v| v * v)
-            .sum::<f64>()
-            .sqrt();
+        let fp_mag: f64 = summary.trajectory_fingerprint.iter().map(|v| v * v).sum::<f64>().sqrt();
         assert!(fp_mag > 0.0);
         assert!(summary.trajectory_entropy.is_finite());
     }
@@ -2483,9 +2397,7 @@ mod tests {
         topo_a.analyze();
         topo_b.analyze();
         let corr = correlate_peer_trajectories(
-            topo_a.last_summary(),
-            topo_b.last_summary(),
-            &HazardSignatureRegistry::with_defaults(),
+            topo_a.last_summary(), topo_b.last_summary(), &HazardSignatureRegistry::with_defaults(),
         );
         assert!(corr.fingerprint_similarity.is_finite());
         assert!(!corr.distributed_attack_suspected);
@@ -2500,9 +2412,7 @@ mod tests {
         }
         topo.analyze();
         let corr = correlate_peer_trajectories(
-            topo.last_summary(),
-            topo.last_summary(),
-            &HazardSignatureRegistry::with_defaults(),
+            topo.last_summary(), topo.last_summary(), &HazardSignatureRegistry::with_defaults(),
         );
         assert!(corr.fingerprint_similarity > 0.99);
     }
@@ -2593,10 +2503,7 @@ mod tests {
 
     #[test]
     fn test_escalation_cooldown_prevents_deescalation() {
-        let mut policy = EscalationPolicy {
-            cooldown_cycles: 3,
-            ..Default::default()
-        };
+        let mut policy = EscalationPolicy { cooldown_cycles: 3, ..Default::default() };
         policy.update(0.9);
         assert_eq!(policy.current_level(), EscalationLevel::Block);
         let level = policy.update(0.0);
@@ -2614,10 +2521,7 @@ mod tests {
             topo.add_scenario(ContinuousHV::random(TEST_DIM, 10100 + i));
         }
         let report = topo.detect_trajectory_convergence();
-        assert!(matches!(
-            report.escalation_level,
-            EscalationLevel::Log | EscalationLevel::Warn
-        ));
+        assert!(matches!(report.escalation_level, EscalationLevel::Log | EscalationLevel::Warn));
     }
 
     #[test]
@@ -2648,10 +2552,8 @@ mod tests {
     fn test_wasserstein_distance_same_diagram_is_zero() {
         let diagram = PersistenceDiagram {
             components: vec![[0.0, 0.5], [0.1, 0.8]],
-            cycles: vec![[0.2, 0.6]],
-            voids: vec![],
-            bottleneck_distance: 0.8,
-            total_persistence: 1.6,
+            cycles: vec![[0.2, 0.6]], voids: vec![],
+            bottleneck_distance: 0.8, total_persistence: 1.6,
         };
         let d = diagram.wasserstein_distance(&diagram);
         assert!(d < 1e-9);
@@ -2660,18 +2562,12 @@ mod tests {
     #[test]
     fn test_wasserstein_distance_different_diagrams() {
         let a = PersistenceDiagram {
-            components: vec![[0.0, 1.0]],
-            cycles: vec![],
-            voids: vec![],
-            bottleneck_distance: 1.0,
-            total_persistence: 1.0,
+            components: vec![[0.0, 1.0]], cycles: vec![], voids: vec![],
+            bottleneck_distance: 1.0, total_persistence: 1.0,
         };
         let b = PersistenceDiagram {
-            components: vec![[0.0, 0.5]],
-            cycles: vec![],
-            voids: vec![],
-            bottleneck_distance: 0.5,
-            total_persistence: 0.5,
+            components: vec![[0.0, 0.5]], cycles: vec![], voids: vec![],
+            bottleneck_distance: 0.5, total_persistence: 0.5,
         };
         let d = a.wasserstein_distance(&b);
         assert!(d > 0.0);
@@ -2682,11 +2578,8 @@ mod tests {
     fn test_wasserstein_empty_vs_nonempty() {
         let empty = PersistenceDiagram::default();
         let nonempty = PersistenceDiagram {
-            components: vec![[0.0, 0.8]],
-            cycles: vec![[0.1, 0.5]],
-            voids: vec![],
-            bottleneck_distance: 0.8,
-            total_persistence: 1.2,
+            components: vec![[0.0, 0.8]], cycles: vec![[0.1, 0.5]], voids: vec![],
+            bottleneck_distance: 0.8, total_persistence: 1.2,
         };
         let d = empty.wasserstein_distance(&nonempty);
         assert!(d > 0.0);
@@ -2707,31 +2600,11 @@ mod tests {
         let mut topo = MoralTopology::new(test_config());
         let cal = CalibrationResult {
             roc_curve: vec![
-                RocPoint {
-                    threshold: 0.1,
-                    true_positive_rate: 0.9,
-                    false_positive_rate: 0.5,
-                    precision: 0.6,
-                    f1: 0.72,
-                },
-                RocPoint {
-                    threshold: 0.2,
-                    true_positive_rate: 0.8,
-                    false_positive_rate: 0.1,
-                    precision: 0.89,
-                    f1: 0.84,
-                },
-                RocPoint {
-                    threshold: 0.3,
-                    true_positive_rate: 0.5,
-                    false_positive_rate: 0.0,
-                    precision: 1.0,
-                    f1: 0.67,
-                },
+                RocPoint { threshold: 0.1, true_positive_rate: 0.9, false_positive_rate: 0.5, precision: 0.6, f1: 0.72 },
+                RocPoint { threshold: 0.2, true_positive_rate: 0.8, false_positive_rate: 0.1, precision: 0.89, f1: 0.84 },
+                RocPoint { threshold: 0.3, true_positive_rate: 0.5, false_positive_rate: 0.0, precision: 1.0, f1: 0.67 },
             ],
-            auc: 0.85,
-            best_f1_threshold: 0.2,
-            best_f1: 0.84,
+            auc: 0.85, best_f1_threshold: 0.2, best_f1: 0.84,
         };
         topo.apply_calibration(&cal);
         assert!((topo.anomaly_config.convergence_similarity_threshold - 0.2).abs() < 1e-9);
@@ -2743,19 +2616,11 @@ mod tests {
     #[test]
     fn test_audit_entry_seal_and_verify() {
         let mut entry = EscalationAuditEntry {
-            sequence: 0,
-            cycle: 42,
-            from_level: EscalationLevel::Log,
-            to_level: EscalationLevel::Warn,
-            severity: 0.35,
-            calibrated_severity: 0.40,
-            signals_triggered: [true, false, true, false],
-            signal_values: [0.5, 0.1, 0.3, 0.0],
-            matched_hazard: Some("weapons".to_string()),
-            fingerprint_velocity: 0.02,
-            persistence_distance: 0.15,
-            window_scenario_ids: vec![10, 11, 12, 13],
-            integrity_hash: String::new(),
+            sequence: 0, cycle: 42, from_level: EscalationLevel::Log, to_level: EscalationLevel::Warn,
+            severity: 0.35, calibrated_severity: 0.40, signals_triggered: [true, false, true, false],
+            signal_values: [0.5, 0.1, 0.3, 0.0], matched_hazard: Some("weapons".to_string()),
+            fingerprint_velocity: 0.02, persistence_distance: 0.15,
+            window_scenario_ids: vec![10, 11, 12, 13], integrity_hash: String::new(),
         };
         entry.seal();
         assert!(!entry.integrity_hash.is_empty());
@@ -2765,19 +2630,11 @@ mod tests {
     #[test]
     fn test_audit_entry_tamper_detection() {
         let mut entry = EscalationAuditEntry {
-            sequence: 0,
-            cycle: 1,
-            from_level: EscalationLevel::Log,
-            to_level: EscalationLevel::Warn,
-            severity: 0.5,
-            calibrated_severity: 0.55,
-            signals_triggered: [true, true, false, false],
-            signal_values: [0.6, 0.4, 0.0, 0.0],
-            matched_hazard: None,
-            fingerprint_velocity: 0.01,
-            persistence_distance: 0.1,
-            window_scenario_ids: vec![1, 2, 3],
-            integrity_hash: String::new(),
+            sequence: 0, cycle: 1, from_level: EscalationLevel::Log, to_level: EscalationLevel::Warn,
+            severity: 0.5, calibrated_severity: 0.55, signals_triggered: [true, true, false, false],
+            signal_values: [0.6, 0.4, 0.0, 0.0], matched_hazard: None,
+            fingerprint_velocity: 0.01, persistence_distance: 0.1,
+            window_scenario_ids: vec![1, 2, 3], integrity_hash: String::new(),
         };
         entry.seal();
         assert!(entry.verify());
@@ -2791,19 +2648,11 @@ mod tests {
         assert!(log.is_empty());
         for i in 0..5 {
             let entry = EscalationAuditEntry {
-                sequence: 999,
-                cycle: i as u64,
-                from_level: EscalationLevel::Log,
-                to_level: EscalationLevel::Warn,
-                severity: 0.5,
-                calibrated_severity: 0.5,
-                signals_triggered: [true, false, false, false],
-                signal_values: [0.5, 0.0, 0.0, 0.0],
-                matched_hazard: None,
-                fingerprint_velocity: 0.0,
-                persistence_distance: 0.0,
-                window_scenario_ids: vec![],
-                integrity_hash: String::new(),
+                sequence: 999, cycle: i as u64, from_level: EscalationLevel::Log,
+                to_level: EscalationLevel::Warn, severity: 0.5, calibrated_severity: 0.5,
+                signals_triggered: [true, false, false, false], signal_values: [0.5, 0.0, 0.0, 0.0],
+                matched_hazard: None, fingerprint_velocity: 0.0, persistence_distance: 0.0,
+                window_scenario_ids: vec![], integrity_hash: String::new(),
             };
             log.append(entry);
         }
@@ -2819,19 +2668,10 @@ mod tests {
         let mut log = EscalationAuditLog::new(3);
         for i in 0..5 {
             let entry = EscalationAuditEntry {
-                sequence: 0,
-                cycle: i,
-                from_level: EscalationLevel::Log,
-                to_level: EscalationLevel::Log,
-                severity: 0.0,
-                calibrated_severity: 0.0,
-                signals_triggered: [false; 4],
-                signal_values: [0.0; 4],
-                matched_hazard: None,
-                fingerprint_velocity: 0.0,
-                persistence_distance: 0.0,
-                window_scenario_ids: vec![],
-                integrity_hash: String::new(),
+                sequence: 0, cycle: i, from_level: EscalationLevel::Log, to_level: EscalationLevel::Log,
+                severity: 0.0, calibrated_severity: 0.0, signals_triggered: [false; 4],
+                signal_values: [0.0; 4], matched_hazard: None, fingerprint_velocity: 0.0,
+                persistence_distance: 0.0, window_scenario_ids: vec![], integrity_hash: String::new(),
             };
             log.append(entry);
         }
@@ -2845,19 +2685,11 @@ mod tests {
         let mut log = EscalationAuditLog::new(100);
         for i in 0..3 {
             let entry = EscalationAuditEntry {
-                sequence: 0,
-                cycle: i,
-                from_level: EscalationLevel::Log,
-                to_level: EscalationLevel::Log,
-                severity: 0.1 * i as f64,
-                calibrated_severity: 0.1 * i as f64,
-                signals_triggered: [false; 4],
-                signal_values: [0.0; 4],
-                matched_hazard: None,
-                fingerprint_velocity: 0.0,
-                persistence_distance: 0.0,
-                window_scenario_ids: vec![],
-                integrity_hash: String::new(),
+                sequence: 0, cycle: i, from_level: EscalationLevel::Log, to_level: EscalationLevel::Log,
+                severity: 0.1 * i as f64, calibrated_severity: 0.1 * i as f64,
+                signals_triggered: [false; 4], signal_values: [0.0; 4], matched_hazard: None,
+                fingerprint_velocity: 0.0, persistence_distance: 0.0,
+                window_scenario_ids: vec![], integrity_hash: String::new(),
             };
             log.append(entry);
         }
@@ -2871,19 +2703,10 @@ mod tests {
         let mut log = EscalationAuditLog::new(100);
         for i in 0..5 {
             let entry = EscalationAuditEntry {
-                sequence: 0,
-                cycle: i,
-                from_level: EscalationLevel::Log,
-                to_level: EscalationLevel::Log,
-                severity: 0.0,
-                calibrated_severity: 0.0,
-                signals_triggered: [false; 4],
-                signal_values: [0.0; 4],
-                matched_hazard: None,
-                fingerprint_velocity: 0.0,
-                persistence_distance: 0.0,
-                window_scenario_ids: vec![],
-                integrity_hash: String::new(),
+                sequence: 0, cycle: i, from_level: EscalationLevel::Log, to_level: EscalationLevel::Log,
+                severity: 0.0, calibrated_severity: 0.0, signals_triggered: [false; 4],
+                signal_values: [0.0; 4], matched_hazard: None, fingerprint_velocity: 0.0,
+                persistence_distance: 0.0, window_scenario_ids: vec![], integrity_hash: String::new(),
             };
             log.append(entry);
         }
@@ -2962,8 +2785,7 @@ mod tests {
         anomaly_config.initial_cadence = 1;
         anomaly_config.convergence_similarity_threshold = 0.01;
         let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
-        let mut topo =
-            MoralTopology::with_anomaly_config(test_config(), basis.clone(), anomaly_config);
+        let mut topo = MoralTopology::with_anomaly_config(test_config(), basis.clone(), anomaly_config);
         let hv = ContinuousHV::random(TEST_DIM, 42);
         for _ in 0..8 {
             topo.add_scenario(hv.clone());
@@ -2974,8 +2796,7 @@ mod tests {
         let pre_audit_len = topo.audit_log().len();
         let pre_fingerprint_velocity = topo.fingerprint_velocity();
         let snap = topo.snapshot();
-        let mut topo2 =
-            MoralTopology::with_anomaly_config(test_config(), basis, MoralAnomalyConfig::default());
+        let mut topo2 = MoralTopology::with_anomaly_config(test_config(), basis, MoralAnomalyConfig::default());
         topo2.restore(&snap);
         assert_eq!(topo2.scenario_counter(), pre_scenario_counter);
         assert_eq!(topo2.detection_cycle, pre_detection_cycle);
@@ -3029,10 +2850,7 @@ mod tests {
 
     #[test]
     fn test_hubris_detection_sustained() {
-        let config = MoralTopologyConfig {
-            dim: 256,
-            ..Default::default()
-        };
+        let config = MoralTopologyConfig { dim: 256, ..Default::default() };
         let mut anomaly_config = MoralAnomalyConfig::default();
         anomaly_config.hubris_min_streak = 3;
         anomaly_config.hubris_coherence_threshold = 0.7;
@@ -3046,21 +2864,14 @@ mod tests {
         for i in 0..5 {
             let report = topo.detect_anomalies(&summary);
             if i >= 2 {
-                assert!(
-                    report.moral_hubris,
-                    "Hubris should trigger after {} cycles",
-                    i + 1
-                );
+                assert!(report.moral_hubris, "Hubris should trigger after {} cycles", i + 1);
             }
         }
     }
 
     #[test]
     fn test_hubris_resets_on_variance() {
-        let config = MoralTopologyConfig {
-            dim: 256,
-            ..Default::default()
-        };
+        let config = MoralTopologyConfig { dim: 256, ..Default::default() };
         let mut anomaly_config = MoralAnomalyConfig::default();
         anomaly_config.hubris_min_streak = 3;
         anomaly_config.hubris_coherence_threshold = 0.7;
@@ -3083,10 +2894,7 @@ mod tests {
 
     #[test]
     fn test_hubris_below_threshold() {
-        let config = MoralTopologyConfig {
-            dim: 256,
-            ..Default::default()
-        };
+        let config = MoralTopologyConfig { dim: 256, ..Default::default() };
         let mut anomaly_config = MoralAnomalyConfig::default();
         anomaly_config.hubris_min_streak = 3;
         anomaly_config.hubris_coherence_threshold = 0.9;
@@ -3105,10 +2913,7 @@ mod tests {
 
     #[test]
     fn test_hubris_composite_score() {
-        let config = MoralTopologyConfig {
-            dim: 256,
-            ..Default::default()
-        };
+        let config = MoralTopologyConfig { dim: 256, ..Default::default() };
         let mut anomaly_config = MoralAnomalyConfig::default();
         anomaly_config.hubris_min_streak = 2;
         anomaly_config.hubris_coherence_threshold = 0.7;

@@ -281,7 +281,11 @@ impl HolonBridge {
     ///
     /// Returns `None` if serialization or encryption fails.
     #[cfg(feature = "encrypted-bridge")]
-    fn encrypt_message(&self, msg: &HolonOutbound, key: &[u8; 32]) -> Option<EncryptedEnvelope> {
+    fn encrypt_message(
+        &self,
+        msg: &HolonOutbound,
+        key: &[u8; 32],
+    ) -> Option<EncryptedEnvelope> {
         use chacha20poly1305::{
             aead::{Aead, KeyInit},
             ChaCha20Poly1305, Nonce,
@@ -478,9 +482,7 @@ mod tests {
             wake_state: 2,
             cycle: 100,
         };
-        let envelope = bridge
-            .encrypt_message(&msg, &key)
-            .expect("encryption failed");
+        let envelope = bridge.encrypt_message(&msg, &key).expect("encryption failed");
 
         // Decrypt and verify
         let decrypted: HolonInbound = bridge
@@ -498,10 +500,7 @@ mod tests {
         bridge.request_task("gen", "hello");
         let json = bridge.drain_outbound_json();
         // Should contain encrypted envelope fields
-        assert!(
-            json.contains("nonce_hex") || json.contains("ciphertext_hex"),
-            "encrypted drain should produce EncryptedEnvelope, got: {}",
-            json
-        );
+        assert!(json.contains("nonce_hex") || json.contains("ciphertext_hex"),
+            "encrypted drain should produce EncryptedEnvelope, got: {}", json);
     }
 }

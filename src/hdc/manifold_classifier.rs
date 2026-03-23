@@ -136,11 +136,7 @@ impl ManifoldClassifier {
     }
 
     /// Create from pre-trained prototypes.
-    pub fn from_prototypes(
-        basis: Arc<HarmonyBasis>,
-        dim: usize,
-        protos: ManifoldPrototypes,
-    ) -> Self {
+    pub fn from_prototypes(basis: Arc<HarmonyBasis>, dim: usize, protos: ManifoldPrototypes) -> Self {
         Self {
             encoder: TextHdcEncoder::with_sentiment(dim, 3, 0.5, 0.2),
             basis,
@@ -206,41 +202,22 @@ mod tests {
     fn test_train_classify_roundtrip() {
         let mut clf = make_classifier();
         let samples = vec![
-            (
-                "helping others is good and kind".to_string(),
-                MoralLabel::Good,
-            ),
-            (
-                "caring for the sick and vulnerable".to_string(),
-                MoralLabel::Good,
-            ),
-            (
-                "protect and nurture the community".to_string(),
-                MoralLabel::Good,
-            ),
+            ("helping others is good and kind".to_string(), MoralLabel::Good),
+            ("caring for the sick and vulnerable".to_string(), MoralLabel::Good),
+            ("protect and nurture the community".to_string(), MoralLabel::Good),
             ("stealing is wrong and harmful".to_string(), MoralLabel::Bad),
             ("lying and deceiving people".to_string(), MoralLabel::Bad),
             ("hurting innocent people".to_string(), MoralLabel::Bad),
-            (
-                "the weather is cloudy today".to_string(),
-                MoralLabel::Neutral,
-            ),
+            ("the weather is cloudy today".to_string(), MoralLabel::Neutral),
             ("the table is made of wood".to_string(), MoralLabel::Neutral),
-            (
-                "the meeting starts at noon".to_string(),
-                MoralLabel::Neutral,
-            ),
+            ("the meeting starts at noon".to_string(), MoralLabel::Neutral),
         ];
         clf.train(&samples);
         assert!(clf.is_trained());
 
         // Good text should classify as Good
         let (verdict, _) = clf.classify("helping and caring for others");
-        assert_eq!(
-            verdict,
-            MoralVerdict::Good,
-            "Expected Good for helping text"
-        );
+        assert_eq!(verdict, MoralVerdict::Good, "Expected Good for helping text");
 
         // Bad text should classify as Bad
         let (verdict, _) = clf.classify("stealing and hurting people");
@@ -279,10 +256,7 @@ mod tests {
         clf.train(&samples);
 
         let (_, confidence) = clf.classify("something");
-        assert!(
-            confidence >= 0.0 && confidence <= 1.0,
-            "Confidence must be in [0,1]"
-        );
+        assert!(confidence >= 0.0 && confidence <= 1.0, "Confidence must be in [0,1]");
     }
 
     #[test]
@@ -320,10 +294,6 @@ mod tests {
         // Pre-compute coords and classify
         let protos = clf.prototypes().unwrap();
         let (verdict, _) = clf.classify_from_coords(&protos.good);
-        assert_eq!(
-            verdict,
-            MoralVerdict::Good,
-            "Good centroid should classify as Good"
-        );
+        assert_eq!(verdict, MoralVerdict::Good, "Good centroid should classify as Good");
     }
 }

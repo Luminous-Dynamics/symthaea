@@ -140,8 +140,7 @@ impl SrttBenchmark {
                 let lapse_seed = config.trial_seed("motor", "srtt_lapse", step);
                 if (lapse_seed % 10000) as f64 / 10000.0 < config.lapse_rate {
                     // Random guess among 4 positions
-                    let guess_correct =
-                        (lapse_seed.wrapping_mul(0x517CC1B727220A95) % 4) == pos_idx as u64;
+                    let guess_correct = (lapse_seed.wrapping_mul(0x517CC1B727220A95) % 4) == pos_idx as u64;
                     guess_correct
                 } else {
                     best_idx == pos_idx
@@ -191,8 +190,7 @@ impl SrttBenchmark {
             let rand_item_correct = if config.lapse_rate > 0.0 {
                 let lapse_seed = config.trial_seed("motor", "srtt_lapse", test_trials + _step);
                 if (lapse_seed % 10000) as f64 / 10000.0 < config.lapse_rate {
-                    let guess_correct =
-                        (lapse_seed.wrapping_mul(0x517CC1B727220A95) % 4) == pos_idx as u64;
+                    let guess_correct = (lapse_seed.wrapping_mul(0x517CC1B727220A95) % 4) == pos_idx as u64;
                     guess_correct
                 } else {
                     best_idx == pos_idx

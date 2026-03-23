@@ -2526,10 +2526,7 @@ impl crate::broca_backend::BrocaBackend for BrocaLite {
         true // BrocaLite is always ready (deterministic init)
     }
 
-    fn generate_from_context(
-        &mut self,
-        ctx: &crate::broca_backend::GenerationContext,
-    ) -> GenerationResult {
+    fn generate_from_context(&mut self, ctx: &crate::broca_backend::GenerationContext) -> GenerationResult {
         let channels = ThoughtChannels::from_cycle(
             ctx.consciousness_level,
             ctx.prediction_error,

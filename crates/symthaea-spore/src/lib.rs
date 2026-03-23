@@ -43,13 +43,13 @@
 pub mod boot_consciousness;
 pub mod broca;
 pub mod broca_backend;
+pub mod daily_ritual;
 #[cfg(feature = "broca-full")]
 pub mod broca_full;
 #[cfg(feature = "broca-pipeline")]
 pub mod broca_pipeline;
 pub mod compass;
 pub mod config;
-pub mod daily_ritual;
 pub mod dream;
 pub mod dream_journal;
 pub mod engine;

@@ -929,41 +929,22 @@ pub fn train_with_adam(
         Vec::new()
     };
 
-    // ── GPU CfC initialization ────────────────────────────────────────
-    // Create GPU network from CPU network, auto-detecting CUDA device.
-    // Falls back gracefully to CPU backward if CUDA unavailable.
+    // ── GPU Trainer initialization ─────────────────────────────────────
+    // Creates a GpuTrainer that keeps ALL state on device (CUDA or CPU tensors).
+    // The entire BPTT window runs on GPU; sync happens once per training pair.
+    // Automatically detects CUDA and falls back to CPU tensors if unavailable.
     #[cfg(feature = "gpu")]
-    let gpu_cfc_device = if config.use_gpu_cfc {
-        match candle_core::Device::cuda_if_available(0) {
-            Ok(dev) => {
-                tracing::info!("GPU CfC training: device={:?}", dev);
-                dev
-            }
-            Err(e) => {
-                tracing::warn!("GPU CfC init failed: {e}, using CPU backward");
-                candle_core::Device::Cpu
-            }
-        }
-    } else {
-        candle_core::Device::Cpu
-    };
-
-    #[cfg(feature = "gpu")]
-    let mut gpu_cfc_network: Option<crate::gpu_cfc::GpuCfcNetwork> = if config.use_gpu_cfc {
-        match crate::gpu_cfc::GpuCfcNetwork::from_cpu_network(
-            generator.controller().network(),
-            &gpu_cfc_device,
+    let mut gpu_trainer: Option<crate::gpu_cfc::GpuTrainer> = if config.use_gpu_cfc {
+        let device = crate::gpu_cfc::detect_device();
+        let max_pos = config.bptt_window + 4; // headroom for position cache
+        match crate::gpu_cfc::GpuTrainer::from_controller(
+            generator.controller(),
+            &device,
+            max_pos,
         ) {
-            Ok(net) => {
-                tracing::info!(
-                    "GPU CfC network created: {} layers on {:?}",
-                    net.layers.len(),
-                    gpu_cfc_device
-                );
-                Some(net)
-            }
+            Ok(trainer) => Some(trainer),
             Err(e) => {
-                tracing::warn!("GPU CfC network creation failed: {e}");
+                tracing::warn!("GpuTrainer creation failed: {e}, using CPU training");
                 None
             }
         }
@@ -1108,6 +1089,103 @@ pub fn train_with_adam(
 
             let window_end = pair.target_ids.len().min(config.bptt_window);
 
+            // ── GPU fast path: entire BPTT window on device ─────────────
+            #[cfg(feature = "gpu")]
+            let gpu_ran = if let Some(ref mut trainer) = gpu_trainer {
+                let train_network_this_epoch = (config.train_network
+                    && epoch >= config.network_warmup_epochs)
+                    || force_train_network;
+                let result: candle_core::Result<()> = (|| {
+                    // Transfer thought HV to GPU once per pair
+                    let thought_tensor = candle_core::Tensor::from_vec(
+                        thought_hv.as_slice().to_vec(),
+                        (1, thought_hv.as_slice().len()),
+                        &trainer.device,
+                    )?;
+
+                    // Reset + seed
+                    if !should_carry {
+                        trainer.reset_states()?;
+                        trainer.seed_from_thought(&thought_tensor)?;
+                    }
+
+                    let mut gpu_prev_token = prev_token;
+                    for (pos, &target_id) in pair.target_ids[..window_end].iter().enumerate() {
+                        let lr = warmup_lr(
+                            config.learning_rate * lr_multiplier,
+                            global_step,
+                            total_steps,
+                            config.warmup_fraction,
+                        );
+
+                        // Forward on GPU
+                        let logits = trainer.forward_step(&thought_tensor, gpu_prev_token, pos)?;
+
+                        // Loss computation (CPU — cheap)
+                        let loss = cross_entropy_loss_smooth(
+                            &logits, target_id as usize, config.label_smoothing,
+                        );
+                        total_loss += loss;
+                        total_tokens += 1;
+
+                        // Backward on GPU (CfC BPTT)
+                        if train_network_this_epoch {
+                            let network_lr = lr * config.network_lr_scale;
+                            trainer.backward_step(
+                                &logits,
+                                target_id as usize,
+                                &thought_tensor,
+                                gpu_prev_token,
+                                pos,
+                                network_lr,
+                            )?;
+                        }
+
+                        // Embedding gradient update on CPU (still uses generator.controller)
+                        // This is separate from CfC BPTT — updates token embeddings
+                        if !config.freeze_embeddings && config.use_adam {
+                            apply_weight_tied_gradient_adam(
+                                generator.controller_mut(),
+                                &logits,
+                                target_id as usize,
+                                lr,
+                                effective_grad_clip,
+                                adam_state.as_mut().expect("adam_state"),
+                            );
+                        }
+
+                        gpu_prev_token = target_id;
+                        global_step += 1;
+                    }
+
+                    // Sync GPU weights → CPU once per pair
+                    trainer.sync_to_cpu(generator.controller_mut())?;
+                    // Refresh GPU embeddings from CPU (embedding grads applied above)
+                    trainer.refresh_embeddings(generator.controller())?;
+
+                    Ok(())
+                })();
+
+                match result {
+                    Ok(()) => true,
+                    Err(e) => {
+                        tracing::warn!("GPU training failed: {e}, falling back to CPU for this pair");
+                        false
+                    }
+                }
+            } else {
+                false
+            };
+            #[cfg(not(feature = "gpu"))]
+            let gpu_ran = false;
+
+            // Skip CPU loop if GPU handled the pair
+            if gpu_ran {
+                prev_token = pair.target_ids[window_end - 1]; // update for contrastive loss
+                let _running_loss = total_loss / total_tokens.max(1) as f32;
+                continue; // skip to next pair (contrastive loss etc. handled below)
+            }
+
             for (pos, &target_id) in pair.target_ids[..window_end].iter().enumerate() {
                 let lr = warmup_lr(
                     config.learning_rate * lr_multiplier,
@@ -1246,7 +1324,10 @@ pub fn train_with_adam(
                         let n_embs = proj_embs.len().min(logits.len());
                         let scale = generator.controller().config().logit_scale;
 
-                        let max_logit = logits.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+                        let max_logit = logits
+                            .iter()
+                            .copied()
+                            .fold(f32::NEG_INFINITY, f32::max);
                         let exps: Vec<f32> =
                             logits.iter().map(|&l| (l - max_logit).exp()).collect();
                         let sum_exp: f32 = exps.iter().sum();
@@ -1285,8 +1366,7 @@ pub fn train_with_adam(
                                     }
                                     let row_start = r * dim;
                                     let update = -proj_lr * dp;
-                                    let update =
-                                        update.clamp(-effective_grad_clip, effective_grad_clip);
+                                    let update = update.clamp(-effective_grad_clip, effective_grad_clip);
                                     for j in 0..dim {
                                         w[row_start + j] += update * output_slice[j];
                                     }
@@ -1305,69 +1385,15 @@ pub fn train_with_adam(
                     let network_lr = lr * config.network_lr_scale;
                     let dt = generator.controller().config().dt_per_token;
 
-                    // GPU-accelerated BPTT when available.
-                    // The GPU network maintains its own state — we compose input on CPU,
-                    // send gradient + input to GPU for backward + gradient update,
-                    // then sync GPU weights back to CPU for the next forward pass.
-                    #[cfg(feature = "gpu")]
-                    let used_gpu = if config.use_gpu_cfc {
-                        if let Some(ref mut gpu_net) = gpu_cfc_network {
-                            let result: candle_core::Result<()> = (|| {
-                                // Sync CPU states → GPU (CPU forward mutated the network)
-                                gpu_net.sync_states_from_cpu(generator.controller().network())?;
-                                // Compose input on CPU, transfer to GPU
-                                let token_emb =
-                                    generator.controller().get_token_embedding(prev_token);
-                                let pos_emb =
-                                    generator.controller().position_base_ref().permute(pos);
-                                let input_hv = thought_hv.bind(&token_emb).bind(&pos_emb);
-                                let input_tensor = candle_core::Tensor::from_vec(
-                                    input_hv.as_slice().to_vec(),
-                                    (1, input_hv.as_slice().len()),
-                                    &gpu_cfc_device,
-                                )?;
-                                let d_out_tensor = candle_core::Tensor::from_vec(
-                                    d_out.as_slice().to_vec(),
-                                    (1, d_out.as_slice().len()),
-                                    &gpu_cfc_device,
-                                )?;
-                                let attenuation =
-                                    generator.controller().config().gradient_attenuation;
-                                gpu_net.backward_and_update(
-                                    &d_out_tensor,
-                                    &input_tensor,
-                                    dt,
-                                    network_lr,
-                                    attenuation,
-                                )?;
-                                // Sync GPU weights → CPU (for next forward pass + checkpointing)
-                                gpu_net.sync_to_cpu(generator.controller_mut().network_mut())
-                            })();
-                            if let Err(e) = result {
-                                tracing::warn!("GPU CfC backward failed: {e}, falling back to CPU");
-                                false
-                            } else {
-                                true
-                            }
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
-                    };
-                    #[cfg(not(feature = "gpu"))]
-                    let used_gpu = false;
-
-                    if !used_gpu {
-                        generator.controller_mut().backward_step(
-                            d_out,
-                            &thought_hv,
-                            prev_token,
-                            pos,
-                            dt,
-                            network_lr,
-                        );
-                    }
+                    // CPU BPTT (GPU training uses the fast path above)
+                    generator.controller_mut().backward_step(
+                        d_out,
+                        &thought_hv,
+                        prev_token,
+                        pos,
+                        dt,
+                        network_lr,
+                    );
                 }
 
                 if let Some(ref mut diag) = diagnostics {
@@ -1793,11 +1819,7 @@ fn compute_ce_gradient_wrt_output(
             if error.abs() < 1e-6 {
                 continue;
             }
-            let cos_i = if scale.abs() > 1e-6 {
-                logits[i] / scale
-            } else {
-                0.0
-            };
+            let cos_i = if scale.abs() > 1e-6 { logits[i] / scale } else { 0.0 };
             let scaled_error = scale * error;
             for (j, &pe) in proj_embs[i].iter().enumerate() {
                 d_proj[j] += scaled_error * (pe - cos_i * proj_output[j]);
@@ -1831,9 +1853,9 @@ fn compute_ce_gradient_wrt_output(
     //   cos[i] = logits[i] / scale
     // candle-core is always available (non-optional dep)
     if let Some(cache) = controller.gpu_embedding_cache() {
-        if let Ok(grad) =
-            compute_ce_gradient_gpu(&exps, sum_exp, target, scale, logits, controller, cache)
-        {
+        if let Ok(grad) = compute_ce_gradient_gpu(
+            &exps, sum_exp, target, scale, logits, controller, cache,
+        ) {
             return grad;
         }
         // Fall through to CPU on error
@@ -1868,11 +1890,7 @@ fn compute_ce_gradient_cpu(
         }
         let emb_vals = embeddings[i].as_slice();
         let emb_norm: f32 = emb_vals.iter().map(|v| v * v).sum::<f32>().sqrt().max(1e-8);
-        let cos_i = if scale.abs() > 1e-6 {
-            logits[i] / scale
-        } else {
-            0.0
-        };
+        let cos_i = if scale.abs() > 1e-6 { logits[i] / scale } else { 0.0 };
         let scaled_error = scale * error;
         for (j, &ev) in emb_vals.iter().enumerate() {
             if j < d_output.len() {
@@ -1924,19 +1942,18 @@ fn compute_ce_gradient_gpu(
     // Compute scalar: Σ(error_i × cos_i) for output-projection term
     let cos_sum: f32 = (0..n)
         .map(|i| {
-            let cos_i = if scale.abs() > 1e-6 {
-                logits[i] / scale
-            } else {
-                0.0
-            };
+            let cos_i = if scale.abs() > 1e-6 { logits[i] / scale } else { 0.0 };
             errors[i] * cos_i
         })
         .sum();
 
     // d_output = grad_from_emb - cos_sum × output
     let output_hv = controller.output_hv();
-    let output_tensor =
-        Tensor::from_vec(output_hv.as_slice().to_vec(), (1, HDC_DIMENSION), device)?;
+    let output_tensor = Tensor::from_vec(
+        output_hv.as_slice().to_vec(),
+        (1, HDC_DIMENSION),
+        device,
+    )?;
     let cos_sum_tensor = Tensor::from_vec(vec![cos_sum], (1, 1), device)?;
     let output_term = output_tensor.broadcast_mul(&cos_sum_tensor)?;
     let d_output_tensor = (grad_from_emb - output_term)?;

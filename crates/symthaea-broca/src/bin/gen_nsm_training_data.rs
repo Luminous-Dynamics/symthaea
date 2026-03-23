@@ -44,11 +44,7 @@ impl Rng {
         (self.next_u64() % 10000) as f32 / 10000.0
     }
     fn range(&mut self, lo: usize, hi: usize) -> usize {
-        if hi <= lo {
-            lo
-        } else {
-            lo + (self.next_u64() as usize % (hi - lo))
-        }
+        if hi <= lo { lo } else { lo + (self.next_u64() as usize % (hi - lo)) }
     }
     fn pick<'a>(&mut self, items: &'a [&str]) -> &'a str {
         items[self.range(0, items.len())]
@@ -117,14 +113,8 @@ const DESCRIPTOR_PRIMES: &[&str] = &["BIG", "SMALL", "VERY", "MORE", "LIKE"];
 // ============================================================================
 
 const INTENTS: &[&str] = &[
-    "Acknowledge",
-    "Answer",
-    "Clarify",
-    "Continue",
-    "Propose",
-    "Reflect",
-    "Uncertainty",
-    "Unknown",
+    "Acknowledge", "Answer", "Clarify", "Continue",
+    "Propose", "Reflect", "Uncertainty", "Unknown",
 ];
 
 // ============================================================================
@@ -338,9 +328,8 @@ fn main() {
     let data_dir = std::path::Path::new("crates/symthaea-broca/data");
     std::fs::create_dir_all(data_dir).expect("create data dir");
 
-    let mut train_file = std::io::BufWriter::new(
-        std::fs::File::create(data_dir.join("train-nsm-v1.jsonl")).unwrap(),
-    );
+    let mut train_file =
+        std::io::BufWriter::new(std::fs::File::create(data_dir.join("train-nsm-v1.jsonl")).unwrap());
     let mut eval_file =
         std::io::BufWriter::new(std::fs::File::create(data_dir.join("eval-nsm-v1.jsonl")).unwrap());
 
@@ -417,8 +406,7 @@ fn main() {
             let pe = rng.next_f32() * 0.5;
             let text = gen_fn(&mut rng);
             let intent_idx = rng.range(0, 8);
-            let channels =
-                generate_channels(&mut rng, intent_idx, EpistemicStatus::Probable, phi, pe);
+            let channels = generate_channels(&mut rng, intent_idx, EpistemicStatus::Probable, phi, pe);
             let active_primes = extract_active_primes(&text);
 
             let json = serde_json::json!({
@@ -451,45 +439,21 @@ fn extract_active_primes(text: &str) -> Vec<String> {
     let mut primes = Vec::new();
 
     let prime_words: &[(&str, &str)] = &[
-        ("i ", "I"),
-        ("i'", "I"),
-        ("you", "YOU"),
-        ("someone", "SOMEONE"),
-        ("something", "SOMETHING"),
-        ("people", "PEOPLE"),
-        ("body", "BODY"),
-        ("think", "THINK"),
-        ("know", "KNOW"),
-        ("want", "WANT"),
-        ("feel", "FEEL"),
-        ("see", "SEE"),
-        ("hear", "HEAR"),
-        ("say", "SAY"),
-        ("word", "WORDS"),
-        ("true", "TRUE"),
-        ("do ", "DO"),
-        ("happen", "HAPPEN"),
-        ("move", "MOVE"),
-        ("good", "GOOD"),
-        ("bad", "BAD"),
-        ("not ", "NOT"),
-        ("maybe", "MAYBE"),
-        ("can ", "CAN"),
-        ("because", "BECAUSE"),
-        ("if ", "IF"),
-        ("now", "NOW"),
-        ("before", "BEFORE"),
-        ("after", "AFTER"),
-        ("here", "HERE"),
-        ("inside", "INSIDE"),
-        ("big", "BIG"),
-        ("small", "SMALL"),
-        ("very", "VERY"),
-        ("more", "MORE"),
-        ("some", "SOME"),
-        ("all ", "ALL"),
-        ("live", "LIVE"),
-        ("alive", "LIVE"),
+        ("i ", "I"), ("i'", "I"),
+        ("you", "YOU"), ("someone", "SOMEONE"), ("something", "SOMETHING"),
+        ("people", "PEOPLE"), ("body", "BODY"),
+        ("think", "THINK"), ("know", "KNOW"), ("want", "WANT"),
+        ("feel", "FEEL"), ("see", "SEE"), ("hear", "HEAR"),
+        ("say", "SAY"), ("word", "WORDS"), ("true", "TRUE"),
+        ("do ", "DO"), ("happen", "HAPPEN"), ("move", "MOVE"),
+        ("good", "GOOD"), ("bad", "BAD"),
+        ("not ", "NOT"), ("maybe", "MAYBE"), ("can ", "CAN"),
+        ("because", "BECAUSE"), ("if ", "IF"),
+        ("now", "NOW"), ("before", "BEFORE"), ("after", "AFTER"),
+        ("here", "HERE"), ("inside", "INSIDE"),
+        ("big", "BIG"), ("small", "SMALL"), ("very", "VERY"), ("more", "MORE"),
+        ("some", "SOME"), ("all ", "ALL"),
+        ("live", "LIVE"), ("alive", "LIVE"),
     ];
 
     for &(word, prime) in prime_words {

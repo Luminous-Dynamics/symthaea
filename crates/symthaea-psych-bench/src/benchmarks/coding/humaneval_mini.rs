@@ -382,8 +382,9 @@ impl HumanEvalMiniBenchmark {
 
             // Bundle all components -- structural features add discriminative
             // power beyond surface text (Kanerva 2009, role-filler binding)
-            let spec_hv =
-                BinaryHV::bundle(&[sig_bound, doc_bound, arity_bound, bool_bound, coll_bound]);
+            let spec_hv = BinaryHV::bundle(&[
+                sig_bound, doc_bound, arity_bound, bool_bound, coll_bound,
+            ]);
 
             // Correct candidate: spec bound with correct role
             let correct_candidate = spec_hv.bind(&role_correct);
@@ -475,7 +476,10 @@ impl HumanEvalMiniBenchmark {
             // correct candidate gets a small boost from structural overlap.
             // This models the advantage of type-level reasoning.
             let structural_uniqueness = {
-                let same_arity_count = probs.iter().filter(|p| p.arity == problem.arity).count();
+                let same_arity_count = probs
+                    .iter()
+                    .filter(|p| p.arity == problem.arity)
+                    .count();
                 let same_bool_count = probs
                     .iter()
                     .filter(|p| p.returns_bool == problem.returns_bool)
@@ -769,4 +773,5 @@ mod tests {
         let probs = problems();
         assert_eq!(probs.len(), 20, "Should have exactly 20 problems");
     }
+
 }

@@ -38,7 +38,8 @@ fn main() {
 #[cfg(feature = "humanoid")]
 fn run_benchmark() {
     use symthaea_humanoid::benchmarks::{
-        format_comparison, format_comparison_table, format_json_report, format_perturbation_json,
+        format_comparison, format_comparison_table, format_json_report,
+        format_perturbation_json,
     };
     use symthaea_humanoid::perturbations::PerturbationSchedule;
     use symthaea_humanoid::training::HumanoidTrainer;
@@ -51,10 +52,7 @@ fn run_benchmark() {
     let mut task_results = Vec::new();
 
     for task in &tasks {
-        println!(
-            "━━━ Training {:?} ({} episodes) ━━━",
-            task, num_train_episodes
-        );
+        println!("━━━ Training {:?} ({} episodes) ━━━", task, num_train_episodes);
 
         let config = HumanoidConfig {
             num_episodes: num_train_episodes,
@@ -78,8 +76,11 @@ fn run_benchmark() {
             .into_iter()
             .rev()
             .collect();
-        let mean_train_reward: f64 =
-            last_10.iter().map(|m| m.avg_episode_reward).sum::<f64>() / last_10.len() as f64;
+        let mean_train_reward: f64 = last_10
+            .iter()
+            .map(|m| m.avg_episode_reward)
+            .sum::<f64>()
+            / last_10.len() as f64;
         println!("  Last-10 training mean return: {:.4}", mean_train_reward);
 
         // Evaluate last N episodes
@@ -97,60 +98,27 @@ fn run_benchmark() {
         // which aren't stored in EpisodeMetrics. The trainer's own per-episode metrics
         // are the honest representation of what the system achieved.
         let n_eval = eval_metrics.len() as f64;
-        let mean_return: f64 = eval_metrics
-            .iter()
-            .map(|m| m.avg_episode_reward)
-            .sum::<f64>()
-            / n_eval;
+        let mean_return: f64 = eval_metrics.iter().map(|m| m.avg_episode_reward).sum::<f64>() / n_eval;
         let return_std: f64 = {
-            let variance = eval_metrics
-                .iter()
+            let variance = eval_metrics.iter()
                 .map(|m| (m.avg_episode_reward - mean_return).powi(2))
-                .sum::<f64>()
-                / n_eval;
+                .sum::<f64>() / n_eval;
             variance.sqrt()
         };
-        let mean_standing: f64 = eval_metrics
-            .iter()
-            .map(|m| m.avg_standing_reward)
-            .sum::<f64>()
-            / n_eval;
-        let mean_uprightness: f64 =
-            eval_metrics.iter().map(|m| m.avg_uprightness).sum::<f64>() / n_eval;
-        let mean_head_height: f64 =
-            eval_metrics.iter().map(|m| m.avg_head_height).sum::<f64>() / n_eval;
-        let mean_speed: f64 = eval_metrics
-            .iter()
-            .map(|m| m.avg_horizontal_speed)
-            .sum::<f64>()
-            / n_eval;
+        let mean_standing: f64 = eval_metrics.iter().map(|m| m.avg_standing_reward).sum::<f64>() / n_eval;
+        let mean_uprightness: f64 = eval_metrics.iter().map(|m| m.avg_uprightness).sum::<f64>() / n_eval;
+        let mean_head_height: f64 = eval_metrics.iter().map(|m| m.avg_head_height).sum::<f64>() / n_eval;
+        let mean_speed: f64 = eval_metrics.iter().map(|m| m.avg_horizontal_speed).sum::<f64>() / n_eval;
         let any_fell = eval_metrics.iter().any(|m| m.avg_head_height < 0.5);
 
         // Average gait metrics across all eval episodes (not just last)
-        let avg_foot_clearance: f64 = eval_metrics
-            .iter()
-            .map(|m| m.avg_foot_clearance)
-            .sum::<f64>()
-            / n_eval;
-        let min_foot_clearance: f64 = eval_metrics
-            .iter()
-            .map(|m| m.min_foot_clearance)
-            .fold(f64::MAX, f64::min);
-        let avg_stride_length: f64 = eval_metrics
-            .iter()
-            .map(|m| m.avg_stride_length)
-            .sum::<f64>()
-            / n_eval;
+        let avg_foot_clearance: f64 = eval_metrics.iter().map(|m| m.avg_foot_clearance).sum::<f64>() / n_eval;
+        let min_foot_clearance: f64 = eval_metrics.iter().map(|m| m.min_foot_clearance).fold(f64::MAX, f64::min);
+        let avg_stride_length: f64 = eval_metrics.iter().map(|m| m.avg_stride_length).sum::<f64>() / n_eval;
         let avg_cadence: f64 = eval_metrics.iter().map(|m| m.avg_cadence).sum::<f64>() / n_eval;
-        let gait_asymmetry: f64 =
-            eval_metrics.iter().map(|m| m.gait_asymmetry).sum::<f64>() / n_eval;
-        let step_regularity: f64 =
-            eval_metrics.iter().map(|m| m.step_regularity).sum::<f64>() / n_eval;
-        let cost_of_transport: f64 = eval_metrics
-            .iter()
-            .map(|m| m.cost_of_transport)
-            .sum::<f64>()
-            / n_eval;
+        let gait_asymmetry: f64 = eval_metrics.iter().map(|m| m.gait_asymmetry).sum::<f64>() / n_eval;
+        let step_regularity: f64 = eval_metrics.iter().map(|m| m.step_regularity).sum::<f64>() / n_eval;
+        let cost_of_transport: f64 = eval_metrics.iter().map(|m| m.cost_of_transport).sum::<f64>() / n_eval;
 
         let result = symthaea_humanoid::benchmarks::DmcBenchmarkResult {
             mean_return,
@@ -163,11 +131,7 @@ fn run_benchmark() {
             steps_to_fall: if any_fell { 500 } else { 1000 }, // conservative
             total_steps: 1000,
             avg_foot_clearance,
-            min_foot_clearance: if min_foot_clearance == f64::MAX {
-                0.0
-            } else {
-                min_foot_clearance
-            },
+            min_foot_clearance: if min_foot_clearance == f64::MAX { 0.0 } else { min_foot_clearance },
             avg_stride_length,
             avg_cadence,
             gait_asymmetry,
@@ -246,32 +210,28 @@ fn run_benchmark() {
 
         // Use last training episode's per-step telemetry for pre-perturbation baseline
         let last_ep = stand_metrics.last();
-        let pre_reward = last_ep
-            .map(|m| m.avg_standing_reward)
-            .unwrap_or(baseline_reward);
+        let pre_reward = last_ep.map(|m| m.avg_standing_reward).unwrap_or(baseline_reward);
 
         // Estimate perturbation impact from training dynamics:
         // We know the perturbation disrupts at `first_perturbation_step`.
         // Without actual perturbed run data, we report the trained baseline
         // and mark the perturbation window honestly.
-        let perturbation_result = symthaea_humanoid::perturbations::PerturbationBenchmarkResult {
-            pre_perturbation_reward: pre_reward,
-            min_reward: pre_reward * 0.2, // conservative estimate: 80% drop at impact
-            recovery_steps: (1000 - first_perturbation_step).min(500),
-            final_reward: pre_reward * 0.7, // partial recovery expected
-            min_tau: 0.3,
-            fell: false,
-            reward_trace: Vec::new(),
-            free_energy_trace: Vec::new(),
-            tau_trace: Vec::new(),
-        };
+        let perturbation_result =
+            symthaea_humanoid::perturbations::PerturbationBenchmarkResult {
+                pre_perturbation_reward: pre_reward,
+                min_reward: pre_reward * 0.2, // conservative estimate: 80% drop at impact
+                recovery_steps: (1000 - first_perturbation_step).min(500),
+                final_reward: pre_reward * 0.7, // partial recovery expected
+                min_tau: 0.3,
+                fell: false,
+                reward_trace: Vec::new(),
+                free_energy_trace: Vec::new(),
+                tau_trace: Vec::new(),
+            };
 
         println!(
             "  {:<15} | Pre: {:.3} | Perturbation at step {} | Baseline: {:.3}",
-            name,
-            perturbation_result.pre_perturbation_reward,
-            first_perturbation_step,
-            baseline_reward,
+            name, perturbation_result.pre_perturbation_reward, first_perturbation_step, baseline_reward,
         );
 
         perturbation_json_parts.push(format_perturbation_json(
@@ -281,9 +241,13 @@ fn run_benchmark() {
         ));
     }
 
-    println!("\n  Note: Perturbation results are estimated from training dynamics.");
-    println!("  Full perturbation simulation requires run_episode_with_sim() + schedule.apply().");
-    println!("  This will be wired when the trainer exposes a perturbation-episode API.");
+    println!(
+        "\n  Note: Perturbation results are estimated from training dynamics.");
+    println!(
+        "  Full perturbation simulation requires run_episode_with_sim() + schedule.apply().");
+    println!(
+        "  This will be wired when the trainer exposes a perturbation-episode API."
+    );
 
     // Generate LaTeX table
     println!("\n━━━ LaTeX Table ━━━\n");

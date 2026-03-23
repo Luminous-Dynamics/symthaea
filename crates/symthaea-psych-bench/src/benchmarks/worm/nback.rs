@@ -104,8 +104,7 @@ impl NBackBenchmark {
                     }
                 }
 
-                let mut responded_match =
-                    nback_retained && (match_sim > match_threshold || lure_match);
+                let mut responded_match = nback_retained && (match_sim > match_threshold || lure_match);
 
                 // Lapse rate: on a fraction of trials, randomly override the response
                 if config.lapse_rate > 0.0 {

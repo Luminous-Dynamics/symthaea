@@ -118,7 +118,9 @@ fn baseline_for_benchmark<'a>(
         // Binding domain — route to binding baselines, not worm
         name if name.contains("TemporalOrder") => Some(("discrimination_slope", &bl.binding)),
         name if name.contains("CrossModal") => Some(("cross_modal_binding_accuracy", &bl.binding)),
-        name if name.contains("FeatureConjunction") => Some(("conjunction_accuracy", &bl.binding)),
+        name if name.contains("FeatureConjunction") => {
+            Some(("conjunction_accuracy", &bl.binding))
+        }
         name if name.contains("Binding") => Some(("binding_accuracy", &bl.worm)),
         name if name.contains("DigitSpan") => Some(("digit_span_forward", &bl.worm)),
 
@@ -155,9 +157,7 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("StopSignal") => Some(("ssrt_ticks", &bl.inhibition)),
 
         // Attention
-        name if name.contains("VisualSearch") => {
-            Some(("conjunction_search_accuracy", &bl.attention))
-        }
+        name if name.contains("VisualSearch") => Some(("conjunction_search_accuracy", &bl.attention)),
         name if name.contains("AttentionalBlink") => Some(("lag3_t2_accuracy", &bl.attention)),
 
         // Motor
@@ -218,7 +218,9 @@ fn baseline_for_benchmark<'a>(
 
         // Creativity
         name if name.contains("AlternateUses") => Some(("aut_fluency", &bl.creativity)),
-        name if name.contains("RemoteAssociates") => Some(("rat_overall_accuracy", &bl.creativity)),
+        name if name.contains("RemoteAssociates") => {
+            Some(("rat_overall_accuracy", &bl.creativity))
+        }
         name if name.contains("ConceptualBlending") => Some(("blend_coherence", &bl.creativity)),
         name if name.contains("DivergentThinking") => Some(("originality_score", &bl.creativity)),
 
@@ -278,14 +280,18 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("ConstraintPuzzle") => {
             Some(("constraint_queens_4_accuracy", &bl.mathematics))
         }
-        name if name.contains("ProofConstruction") => Some(("tautology_accuracy", &bl.mathematics)),
+        name if name.contains("ProofConstruction") => {
+            Some(("tautology_accuracy", &bl.mathematics))
+        }
         name if name.contains("OptimizationProblem") => {
             Some(("optimization_sphere_accuracy", &bl.mathematics))
         }
 
         // Coding
         name if name.contains("HumanEvalMini") => Some(("humaneval_pass_at_1", &bl.coding)),
-        name if name.contains("BugDetection") => Some(("bug_category_accuracy", &bl.coding)),
+        name if name.contains("BugDetection") => {
+            Some(("bug_category_accuracy", &bl.coding))
+        }
         name if name.contains("AlgorithmRecognition") => {
             Some(("algorithm_recognition_accuracy", &bl.coding))
         }

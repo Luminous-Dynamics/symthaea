@@ -92,35 +92,26 @@ pub const CANONICAL_SOFTENING_WORDS: &[&str] = &["unfortunately", "sorry", "howe
 
 /// Canonical Rust structural keywords boosted when syntax_complexity is high.
 pub const CANONICAL_RUST_STRUCTURAL_WORDS: &[&str] = &[
-    "fn", "struct", "enum", "impl", "trait", "pub", "mod", "use", "where", "for", "match", "if",
-    "let", "mut", "ref", "async", "unsafe", "type", "const", "static",
+    "fn", "struct", "enum", "impl", "trait", "pub", "mod", "use", "where", "for",
+    "match", "if", "let", "mut", "ref", "async", "unsafe", "type", "const", "static",
 ];
 
 /// Canonical Rust type words suppressed when type_confidence is low.
 pub const CANONICAL_TYPE_WORDS: &[&str] = &[
-    "i32", "i64", "u32", "u64", "f32", "f64", "usize", "bool", "String", "Vec", "Option", "Result",
-    "Box", "Arc", "HashMap", "str",
+    "i32", "i64", "u32", "u64", "f32", "f64", "usize", "bool", "String", "Vec",
+    "Option", "Result", "Box", "Arc", "HashMap", "str",
 ];
 
 /// Canonical error handling words boosted when error_likelihood is high.
 pub const CANONICAL_ERROR_HANDLING_WORDS: &[&str] = &[
-    "Result",
-    "Option",
-    "unwrap",
-    "expect",
-    "ok",
-    "err",
-    "Some",
-    "None",
-    "match",
-    "if let",
-    "while let",
+    "Result", "Option", "unwrap", "expect", "ok", "err", "Some", "None", "match",
+    "if let", "while let",
 ];
 
 /// Canonical algorithm scaffold words boosted when algorithm_pattern is active.
 pub const CANONICAL_ALGORITHM_SCAFFOLD_WORDS: &[&str] = &[
-    "for", "while", "loop", "iter", "map", "filter", "fold", "collect", "sort", "push", "pop",
-    "len", "is_empty", "contains",
+    "for", "while", "loop", "iter", "map", "filter", "fold", "collect", "sort",
+    "push", "pop", "len", "is_empty", "contains",
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -915,29 +906,13 @@ impl EpistemicGate {
 
 /// Per-axis token words for E-axis (assertion control).
 const E_AXIS_HEDGING: &[&str] = &[
-    "maybe",
-    "perhaps",
-    "possibly",
-    "might",
-    "could",
-    "uncertain",
-    "guess",
+    "maybe", "perhaps", "possibly", "might", "could", "uncertain", "guess",
 ];
 const E_AXIS_ASSERTION: &[&str] = &[
-    "definitely",
-    "certainly",
-    "always",
-    "proven",
-    "verified",
-    "true",
+    "definitely", "certainly", "always", "proven", "verified", "true",
 ];
 const E_AXIS_TESTIMONIAL: &[&str] = &[
-    "heard",
-    "told",
-    "said",
-    "someone",
-    "reportedly",
-    "apparently",
+    "heard", "told", "said", "someone", "reportedly", "apparently",
 ];
 
 /// Per-axis token words for N-axis (social framing).

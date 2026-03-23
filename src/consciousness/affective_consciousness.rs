@@ -777,16 +777,8 @@ impl AffectiveConsciousnessAnalyzer {
             / divisor;
 
         // Guard: if any affect values were NaN/Inf, return neutral trend
-        let valence_trend = if valence_trend.is_finite() {
-            valence_trend
-        } else {
-            0.0
-        };
-        let arousal_trend = if arousal_trend.is_finite() {
-            arousal_trend
-        } else {
-            0.0
-        };
+        let valence_trend = if valence_trend.is_finite() { valence_trend } else { 0.0 };
+        let arousal_trend = if arousal_trend.is_finite() { arousal_trend } else { 0.0 };
 
         (valence_trend, arousal_trend)
     }

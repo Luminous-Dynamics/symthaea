@@ -284,7 +284,8 @@ impl WasteManager {
                     let conf = Self::sanitize_f32(confidence).clamp(0.0, 1.0);
                     // EMA update: α * new + (1 - α) * old
                     self.classification_confidence = Self::CLASSIFICATION_EMA_ALPHA * conf
-                        + (1.0 - Self::CLASSIFICATION_EMA_ALPHA) * self.classification_confidence;
+                        + (1.0 - Self::CLASSIFICATION_EMA_ALPHA)
+                            * self.classification_confidence;
                 }
 
                 WasteEvent::ContaminationDetected {
@@ -326,7 +327,8 @@ impl WasteManager {
 
                     // Running average of circularity
                     let n = self.circularity_count as f32;
-                    self.mean_circularity = self.mean_circularity * ((n - 1.0) / n) + circ / n;
+                    self.mean_circularity =
+                        self.mean_circularity * ((n - 1.0) / n) + circ / n;
                 }
             }
         }
@@ -399,7 +401,8 @@ impl CognitiveSubsystem for WasteManager {
         // Arnsten (2009): moderate NE enhances PFC function; acute stress
         // shifts processing to habitual/reflexive pathways.
         if self.contamination_detected {
-            output.arousal_delta += Self::CONTAMINATION_AROUSAL_SCALE * self.contamination_severity;
+            output.arousal_delta +=
+                Self::CONTAMINATION_AROUSAL_SCALE * self.contamination_severity;
         }
 
         // ── 4. Safety level escalation → NE/DA modulation ──────────────
@@ -423,7 +426,9 @@ impl CognitiveSubsystem for WasteManager {
         // cognitive resources toward processing them.
         if self.decomposition_urgency > Self::DECOMPOSITION_URGENCY_THRESHOLD {
             output.exploration_delta += Self::DECOMPOSITION_EXPLORATION_SCALE
-                * f64::from(self.decomposition_urgency - Self::DECOMPOSITION_URGENCY_THRESHOLD);
+                * f64::from(
+                    self.decomposition_urgency - Self::DECOMPOSITION_URGENCY_THRESHOLD,
+                );
         }
 
         // Decay decomposition urgency over time (EMA toward 0)
@@ -908,12 +913,20 @@ mod tests {
         let mut wm2 = WasteManager::default();
         wm2.restore(&data).unwrap();
 
-        assert!((wm2.classification_confidence - wm.classification_confidence).abs() < 1e-6);
+        assert!(
+            (wm2.classification_confidence - wm.classification_confidence).abs() < 1e-6
+        );
         assert_eq!(wm2.contamination_detected, wm.contamination_detected);
-        assert!((wm2.contamination_severity - wm.contamination_severity).abs() < 1e-6);
+        assert!(
+            (wm2.contamination_severity - wm.contamination_severity).abs() < 1e-6
+        );
         assert_eq!(wm2.safety_level, wm.safety_level);
-        assert!((wm2.total_waste_kg - wm.total_waste_kg).abs() < 1e-6);
-        assert!((wm2.mean_circularity - wm.mean_circularity).abs() < 1e-6);
+        assert!(
+            (wm2.total_waste_kg - wm.total_waste_kg).abs() < 1e-6
+        );
+        assert!(
+            (wm2.mean_circularity - wm.mean_circularity).abs() < 1e-6
+        );
     }
 
     // ── 19. Telemetry updated after process ─────────────────────────────

@@ -659,7 +659,9 @@ impl SentinelManager {
             self.agent_activity
                 .insert(agent_id.to_string(), AgentActivity::default());
         }
-        self.agent_activity.get_mut(agent_id).unwrap()
+        self.agent_activity
+            .get_mut(agent_id)
+            .expect("agent_activity entry was just inserted")
     }
 }
 

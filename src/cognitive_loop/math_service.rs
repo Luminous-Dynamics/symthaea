@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -1615,7 +1616,11 @@ impl MathService {
                 self.find_root_phi_guided(&f, *a, *b)
             }
 
-            MathQuery::Integrate { a, b, coefficients } => {
+            MathQuery::Integrate {
+                a,
+                b,
+                coefficients,
+            } => {
                 let coeffs = coefficients.clone();
                 let f = move |x: f64| {
                     coeffs
@@ -1637,6 +1642,7 @@ impl MathService {
 
             // NOTE: CSP dispatch is via `solve_csp(&csp)` directly, because CSP
             // contains function pointers (Constraint::Binary) that prevent Clone/Debug.
+
             MathQuery::Optimize {
                 initial,
                 coefficients,
@@ -1670,8 +1676,10 @@ impl MathService {
                 if rows == cols {
                     self.matrix_determinant(data, *rows)
                 } else {
-                    let encoding =
-                        BinaryHV::random(seed_from_name(&format!("MATINFO_{}x{}", rows, cols)));
+                    let encoding = BinaryHV::random(seed_from_name(&format!(
+                        "MATINFO_{}x{}",
+                        rows, cols
+                    )));
                     MathResponse {
                         answer: format!("Matrix shape: {}x{}", rows, cols),
                         numerical_result: None,
@@ -2444,11 +2452,7 @@ mod tests {
         assert_eq!(query.problem_type(), MathProblemType::RootFinding);
         let response = service.dispatch(&query);
         let root = response.numerical_result.unwrap();
-        assert!(
-            (root - 2.0).abs() < 1e-6,
-            "Root should be 2.0, got {}",
-            root
-        );
+        assert!((root - 2.0).abs() < 1e-6, "Root should be 2.0, got {}", root);
     }
 
     #[test]
@@ -2595,10 +2599,7 @@ mod tests {
         let mut service = MathService::new();
         let response = service.dispatch_from_text("solve the linear system Ax=b");
         assert!(response.is_some());
-        assert_eq!(
-            response.unwrap().problem_type,
-            MathProblemType::LinearSystem
-        );
+        assert_eq!(response.unwrap().problem_type, MathProblemType::LinearSystem);
     }
 
     #[test]
@@ -2610,12 +2611,8 @@ mod tests {
     #[test]
     fn test_dispatch_telemetry_across_domains() {
         let mut service = MathService::new();
-        service.dispatch(&MathQuery::Statistics {
-            data: vec![1.0, 2.0, 3.0],
-        });
-        service.dispatch(&MathQuery::Arithmetic {
-            expression: "2 + 2".to_string(),
-        });
+        service.dispatch(&MathQuery::Statistics { data: vec![1.0, 2.0, 3.0] });
+        service.dispatch(&MathQuery::Arithmetic { expression: "2 + 2".to_string() });
         service.dispatch(&MathQuery::MatrixDeterminant {
             data: vec![2.0, 0.0, 0.0, 3.0],
             n: 2,
@@ -2644,75 +2641,33 @@ mod tests {
         let cases: Vec<(MathQuery, MathProblemType)> = vec![
             (
                 MathQuery::LinearSystem {
-                    a_data: vec![1.0],
-                    rows: 1,
-                    cols: 1,
-                    b_data: vec![1.0],
+                    a_data: vec![1.0], rows: 1, cols: 1, b_data: vec![1.0],
                 },
                 MathProblemType::LinearSystem,
             ),
+            (MathQuery::FindRoot { a: 0.0, b: 1.0 }, MathProblemType::RootFinding),
             (
-                MathQuery::FindRoot { a: 0.0, b: 1.0 },
+                MathQuery::FindRootFn { a: 0.0, b: 1.0, coefficients: vec![1.0] },
                 MathProblemType::RootFinding,
             ),
             (
-                MathQuery::FindRootFn {
-                    a: 0.0,
-                    b: 1.0,
-                    coefficients: vec![1.0],
-                },
-                MathProblemType::RootFinding,
-            ),
-            (
-                MathQuery::Integrate {
-                    a: 0.0,
-                    b: 1.0,
-                    coefficients: vec![1.0],
-                },
+                MathQuery::Integrate { a: 0.0, b: 1.0, coefficients: vec![1.0] },
                 MathProblemType::Integration,
             ),
+            (MathQuery::Statistics { data: vec![1.0] }, MathProblemType::Statistics),
+            (MathQuery::Regression { x: vec![1.0], y: vec![1.0] }, MathProblemType::Statistics),
+            (MathQuery::Fft { signal: vec![1.0, 0.0] }, MathProblemType::SignalAnalysis),
+            (MathQuery::ConvexHull { points: vec![(0.0, 0.0)] }, MathProblemType::Geometry),
             (
-                MathQuery::Statistics { data: vec![1.0] },
-                MathProblemType::Statistics,
-            ),
-            (
-                MathQuery::Regression {
-                    x: vec![1.0],
-                    y: vec![1.0],
-                },
-                MathProblemType::Statistics,
-            ),
-            (
-                MathQuery::Fft {
-                    signal: vec![1.0, 0.0],
-                },
-                MathProblemType::SignalAnalysis,
-            ),
-            (
-                MathQuery::ConvexHull {
-                    points: vec![(0.0, 0.0)],
-                },
-                MathProblemType::Geometry,
-            ),
-            (
-                MathQuery::ShortestPath {
-                    n_nodes: 1,
-                    edges: vec![],
-                    source: 0,
-                },
+                MathQuery::ShortestPath { n_nodes: 1, edges: vec![], source: 0 },
                 MathProblemType::GraphTheory,
             ),
             (
-                MathQuery::MatrixDeterminant {
-                    data: vec![1.0],
-                    n: 1,
-                },
+                MathQuery::MatrixDeterminant { data: vec![1.0], n: 1 },
                 MathProblemType::MatrixAnalysis,
             ),
             (
-                MathQuery::Arithmetic {
-                    expression: "1 + 1".into(),
-                },
+                MathQuery::Arithmetic { expression: "1 + 1".into() },
                 MathProblemType::Arithmetic,
             ),
         ];

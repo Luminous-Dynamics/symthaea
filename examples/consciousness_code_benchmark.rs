@@ -19,10 +19,10 @@ use symthaea::cognitive_loop::CognitiveLoopConfig;
 
 /// Phi levels to test (clamped via warm-up cycle count).
 const PHI_LEVELS: &[(&str, usize)] = &[
-    ("minimal", 0), // ~0.06 Phi (cold start, no warm-up)
-    ("low", 2),     // ~0.15 Phi (2 warm-up cycles)
-    ("medium", 5),  // ~0.35 Phi (5 warm-up cycles)
-    ("high", 15),   // ~0.60 Phi (15 warm-up cycles)
+    ("minimal", 0),   // ~0.06 Phi (cold start, no warm-up)
+    ("low", 2),       // ~0.15 Phi (2 warm-up cycles)
+    ("medium", 5),    // ~0.35 Phi (5 warm-up cycles)
+    ("high", 15),     // ~0.60 Phi (15 warm-up cycles)
 ];
 
 /// Task definitions — same tasks run at each Phi level.
@@ -56,20 +56,12 @@ struct TrialResult {
 
 fn main() {
     println!("=== Consciousness-Code Interaction Benchmark ===");
-    println!(
-        "Testing {} tasks x {} Phi levels = {} trials\n",
-        TASKS.len(),
-        PHI_LEVELS.len(),
-        TASKS.len() * PHI_LEVELS.len()
-    );
+    println!("Testing {} tasks x {} Phi levels = {} trials\n", TASKS.len(), PHI_LEVELS.len(), TASKS.len() * PHI_LEVELS.len());
 
     let mut results: Vec<TrialResult> = Vec::new();
 
     for &(phi_name, warm_up) in PHI_LEVELS {
-        println!(
-            "--- Phi Level: {} (warm-up: {} cycles) ---",
-            phi_name, warm_up
-        );
+        println!("--- Phi Level: {} (warm-up: {} cycles) ---", phi_name, warm_up);
 
         for &(task_desc, expected_fn) in TASKS {
             let start = Instant::now();
@@ -144,8 +136,7 @@ fn main() {
 
     // Per-level aggregation
     for &(phi_name, _) in PHI_LEVELS {
-        let level_results: Vec<&TrialResult> =
-            results.iter().filter(|r| r.phi_level == phi_name).collect();
+        let level_results: Vec<&TrialResult> = results.iter().filter(|r| r.phi_level == phi_name).collect();
         let total = level_results.len();
         if total == 0 {
             continue;
@@ -153,16 +144,8 @@ fn main() {
         let generated = level_results.iter().filter(|r| r.code_generated).count();
         let compiled = level_results.iter().filter(|r| r.compiled).count();
         let mean_phi: f32 = level_results.iter().map(|r| r.phi_mean).sum::<f32>() / total as f32;
-        let mean_iter: f32 = level_results
-            .iter()
-            .map(|r| r.iterations as f32)
-            .sum::<f32>()
-            / total as f32;
-        let mean_ms: f32 = level_results
-            .iter()
-            .map(|r| r.elapsed_ms as f32)
-            .sum::<f32>()
-            / total as f32;
+        let mean_iter: f32 = level_results.iter().map(|r| r.iterations as f32).sum::<f32>() / total as f32;
+        let mean_ms: f32 = level_results.iter().map(|r| r.elapsed_ms as f32).sum::<f32>() / total as f32;
 
         println!(
             "Phi={:>7}: generated={}/{} compiled={}/{} mean_phi={:.3} mean_iter={:.1} mean_ms={:.0}",
@@ -173,10 +156,7 @@ fn main() {
     // Correlation analysis (simple Pearson r between Phi and compilation success)
     println!("\n--- Correlation: Phi vs Compilation ---");
     let phi_values: Vec<f32> = results.iter().map(|r| r.phi_mean).collect();
-    let compile_values: Vec<f32> = results
-        .iter()
-        .map(|r| if r.compiled { 1.0 } else { 0.0 })
-        .collect();
+    let compile_values: Vec<f32> = results.iter().map(|r| if r.compiled { 1.0 } else { 0.0 }).collect();
 
     if phi_values.len() > 2 {
         let r = pearson_r(&phi_values, &compile_values);
@@ -186,29 +166,17 @@ fn main() {
         } else if r < -0.3 {
             println!("FINDING: Negative correlation — surprising! Higher Phi hurts compilation");
         } else {
-            println!(
-                "FINDING: No significant correlation — Phi may not directly affect code quality"
-            );
+            println!("FINDING: No significant correlation — Phi may not directly affect code quality");
         }
     }
 
     // Tier distribution per Phi level
     println!("\n--- Backend Tier Distribution ---");
     for &(phi_name, _) in PHI_LEVELS {
-        let level_results: Vec<&TrialResult> =
-            results.iter().filter(|r| r.phi_level == phi_name).collect();
-        let native = level_results
-            .iter()
-            .filter(|r| r.tier.contains("Native"))
-            .count();
-        let local = level_results
-            .iter()
-            .filter(|r| r.tier.contains("Local"))
-            .count();
-        let cloud = level_results
-            .iter()
-            .filter(|r| r.tier.contains("Cloud"))
-            .count();
+        let level_results: Vec<&TrialResult> = results.iter().filter(|r| r.phi_level == phi_name).collect();
+        let native = level_results.iter().filter(|r| r.tier.contains("Native")).count();
+        let local = level_results.iter().filter(|r| r.tier.contains("Local")).count();
+        let cloud = level_results.iter().filter(|r| r.tier.contains("Cloud")).count();
         let none = level_results.iter().filter(|r| r.tier == "None").count();
         println!(
             "Phi={:>7}: Native={} LocalLLM={} CloudLLM={} None={}",

@@ -57,8 +57,9 @@ fn soma_sensors_reach_spore_neuromods() {
     let sensory = engine.cycle("sensory");
 
     // Neuromod state should differ (sensors → nudges → bath → Spore)
-    let changed =
-        (0..4).any(|i| (sensory.neuromodulators[i] - baseline.neuromodulators[i]).abs() > 0.0001);
+    let changed = (0..4).any(|i| {
+        (sensory.neuromodulators[i] - baseline.neuromodulators[i]).abs() > 0.0001
+    });
     assert!(
         changed,
         "Soma sensor nudges should propagate to Spore neuromods"
@@ -100,9 +101,7 @@ fn holon_bridge_emits_heartbeat() {
 fn holon_bridge_receives_language() {
     let mut bridge = HolonBridge::new(HolonSyncMode::PresenceOnly);
 
-    bridge.receive(HolonInbound::LanguageOutput(
-        "Hello from desktop".to_string(),
-    ));
+    bridge.receive(HolonInbound::LanguageOutput("Hello from desktop".to_string()));
 
     let output = bridge.take_language_output();
     assert_eq!(output, Some("Hello from desktop".to_string()));
@@ -153,9 +152,7 @@ fn holon_bridge_resuscitation() {
         memory_fragment: vec![1.0, 2.0, 3.0, 4.0],
     });
 
-    let (neuromods, fragment) = bridge
-        .take_resuscitation()
-        .expect("resuscitation should exist");
+    let (neuromods, fragment) = bridge.take_resuscitation().expect("resuscitation should exist");
     assert_eq!(neuromods, [0.8, 0.5, 0.7, 0.6]);
     assert_eq!(fragment.len(), 4);
 }
@@ -201,11 +198,7 @@ fn full_soma_to_holon_pipeline() {
 
     // BLE should have advertise payload
     let payload = engine.ble_advertise_payload();
-    assert_eq!(
-        payload.len(),
-        12,
-        "BLE CV payload should be 12 bytes (3×f32)"
-    );
+    assert_eq!(payload.len(), 12, "BLE CV payload should be 12 bytes (3×f32)");
 
     // Compass should reflect embodied state
     let compass: serde_json::Value =

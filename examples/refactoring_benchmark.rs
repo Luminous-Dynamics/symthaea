@@ -122,6 +122,7 @@ fn test_sort_tasks() {
 }
 "#,
         },
+
         // === Rename Symbol ===
         RefactorTask {
             description: "Rename function 'calc' to 'calculate_total' across all call sites",
@@ -141,12 +142,7 @@ pub fn receipt(items: &[f64], rate: f64) -> f64 {
     calc(items, rate)
 }
 "#,
-            expected_patterns: &[
-                "fn calculate_total",
-                "calculate_total(items",
-                "calculate_total(items, 0.08)",
-                "calculate_total(items, rate)",
-            ],
+            expected_patterns: &["fn calculate_total", "calculate_total(items", "calculate_total(items, 0.08)", "calculate_total(items, rate)"],
             forbidden_patterns: &["fn calc(", "calc(items"],
             test_source: r#"
 #[test]
@@ -186,12 +182,7 @@ pub fn average(readings: &[Data]) -> f64 {
     readings.iter().map(|d| d.value).sum::<f64>() / readings.len() as f64
 }
 "#,
-            expected_patterns: &[
-                "struct SensorReading",
-                "SensorReading {",
-                "SensorReading::new",
-                "&[SensorReading]",
-            ],
+            expected_patterns: &["struct SensorReading", "SensorReading {", "SensorReading::new", "&[SensorReading]"],
             forbidden_patterns: &["struct Data", "Data {", "Data::new"],
             test_source: r#"
 #[test]
@@ -210,10 +201,10 @@ fn test_average() {
 }
 "#,
         },
+
         // === Change Signature ===
         RefactorTask {
-            description:
-                "Change process() to return Result<String, ProcessError> instead of String",
+            description: "Change process() to return Result<String, ProcessError> instead of String",
             category: RefactorCategory::ChangeSignature,
             before_source: r#"
 pub fn process(input: &str) -> String {
@@ -240,10 +231,10 @@ fn test_process_empty_err() {
 }
 "#,
         },
+
         // === Add Error Handling ===
         RefactorTask {
-            description:
-                "Add proper error handling to divide() — return Result instead of panicking",
+            description: "Add proper error handling to divide() — return Result instead of panicking",
             category: RefactorCategory::AddErrorHandling,
             before_source: r#"
 pub fn divide(a: f64, b: f64) -> f64 {
@@ -289,6 +280,7 @@ fn test_get_element_oob() {
 }
 "#,
         },
+
         // === Simplify Logic ===
         RefactorTask {
             description: "Simplify nested if-else chain into a match expression",
@@ -382,8 +374,8 @@ fn main() {
 
         // Check that before_source compiles (baseline validity)
         // For now just validate the task is well-formed
-        let would_compile =
-            task.before_source.contains("fn ") && task.test_source.contains("#[test]");
+        let would_compile = task.before_source.contains("fn ")
+            && task.test_source.contains("#[test]");
 
         let result = TaskResult {
             description: task.description.to_string(),
@@ -413,10 +405,7 @@ fn main() {
 
     // Summary
     println!("\n=== SUMMARY ===");
-    let ready = results
-        .iter()
-        .filter(|r| r.would_compile && r.has_expected)
-        .count();
+    let ready = results.iter().filter(|r| r.would_compile && r.has_expected).count();
     println!("Tasks ready: {}/{}", ready, results.len());
 
     // Category breakdown

@@ -561,24 +561,16 @@ impl CognitiveLoopService {
                         let peer_updates: Vec<_> = self
                             .holon_receiver
                             .peers()
-                            .map(|p| {
-                                (
-                                    p.device_id.clone(),
-                                    p.phi as f64,
-                                    p.valence as f64,
-                                    p.arousal as f64,
-                                )
-                            })
+                            .map(|p| (p.device_id.clone(), p.phi as f64, p.valence as f64, p.arousal as f64))
                             .collect();
                         for (peer_id, phi, valence, arousal) in peer_updates {
                             use super::managers::swarm_manager::SwarmEvent;
-                            self.swarm_manager
-                                .inject_event(SwarmEvent::ConsciousnessUpdate {
-                                    peer_id,
-                                    phi,
-                                    valence,
-                                    arousal,
-                                });
+                            self.swarm_manager.inject_event(SwarmEvent::ConsciousnessUpdate {
+                                peer_id,
+                                phi,
+                                valence,
+                                arousal,
+                            });
                         }
                     }
                     self.holon_receiver.evict_stale(cycle_num as u64, 500);

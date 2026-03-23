@@ -62,7 +62,6 @@ Symthaea uses ~120 Cargo feature flags with **all defaults disabled**. This enab
 | `consciousness_full` | reasoning_engine + identity + glyph_codex + multi_agent |
 | `sovereign-mind` | consciousness_full + ssm_language + safety-agents + sentinel + mesh |
 | `all_benchmarks` | Complete psych-bench suite (141 benchmarks) |
-| `nix_full` | All Nix integration features |
 | `genesis-missions` | Genesis pipeline features |
 
 ## Checking Active Features

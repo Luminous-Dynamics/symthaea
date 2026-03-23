@@ -23,9 +23,7 @@
 //!   data/eval-code-v1.jsonl   (20%)
 
 use std::io::Write;
-use symthaea_broca::encoder::{
-    ThoughtChannels, EPISTEMIC_CUBE_BASE, EPISTEMIC_CUBE_CHANNELS, NUM_CHANNELS,
-};
+use symthaea_broca::encoder::{ThoughtChannels, EPISTEMIC_CUBE_BASE, EPISTEMIC_CUBE_CHANNELS, NUM_CHANNELS};
 
 // ============================================================================
 // Deterministic RNG (matches gen_epistemic_training.rs)
@@ -92,8 +90,11 @@ enum Complexity {
     Complex, // 0.8
 }
 
-const ALL_COMPLEXITIES: [Complexity; 3] =
-    [Complexity::Simple, Complexity::Medium, Complexity::Complex];
+const ALL_COMPLEXITIES: [Complexity; 3] = [
+    Complexity::Simple,
+    Complexity::Medium,
+    Complexity::Complex,
+];
 
 impl Complexity {
     fn value(self) -> f32 {
@@ -109,17 +110,9 @@ impl Complexity {
 // Variable name pools
 // ============================================================================
 
-const VAR_NAMES: &[&str] = &[
-    "x", "v", "n", "val", "item", "acc", "tmp", "buf", "key", "out",
-];
+const VAR_NAMES: &[&str] = &["x", "v", "n", "val", "item", "acc", "tmp", "buf", "key", "out"];
 const TYPE_NAMES: &[&str] = &["i32", "i64", "u32", "u64", "usize", "f64"];
-const GENERIC_BOUNDS: &[&str] = &[
-    "Ord",
-    "PartialOrd",
-    "Clone",
-    "Copy + Ord",
-    "PartialOrd + Clone",
-];
+const GENERIC_BOUNDS: &[&str] = &["Ord", "PartialOrd", "Clone", "Copy + Ord", "PartialOrd + Clone"];
 
 // ============================================================================
 // Sorting family
@@ -284,12 +277,10 @@ fn gen_searching(rng: &mut Rng, cx: Complexity) -> String {
                      \x20       }\n\
                      \x20   }\n\
                      \x20   None\n\
-                     }"
-                .to_string(),
+                     }".to_string(),
                 _ => "fn find_first<T: PartialEq>(arr: &[T], target: &T) -> Option<usize> {\n\
                      \x20   arr.iter().position(|x| x == target)\n\
-                     }"
-                .to_string(),
+                     }".to_string(),
             }
         }
         Complexity::Complex => {
@@ -309,12 +300,10 @@ fn gen_searching(rng: &mut Rng, cx: Complexity) -> String {
                      \x20       }\n\
                      \x20   }\n\
                      \x20   None\n\
-                     }"
-                .to_string(),
+                     }".to_string(),
                 _ => "fn find_all<'a, T: PartialEq>(arr: &'a [T], target: &T) -> Vec<&'a T> {\n\
                      \x20   arr.iter().filter(|x| *x == target).collect()\n\
-                     }"
-                .to_string(),
+                     }".to_string(),
             }
         }
     }
@@ -369,12 +358,10 @@ fn gen_iteration(rng: &mut Rng, cx: Complexity) -> String {
                      \x20       .enumerate()\n\
                      \x20       .map(|(i, v)| (i as f64 + 1.0) * v)\n\
                      \x20       .sum()\n\
-                     }"
-                .to_string(),
+                     }".to_string(),
                 _ => "fn chain_example(a: &[i32], b: &[i32]) -> Vec<i32> {\n\
                      \x20   a.iter().chain(b.iter()).copied().collect()\n\
-                     }"
-                .to_string(),
+                     }".to_string(),
             }
         }
         Complexity::Complex => {
@@ -463,8 +450,7 @@ fn gen_data_structures(rng: &mut Rng, cx: Complexity) -> String {
                      \x20       out.entry(v.clone()).or_insert_with(Vec::new).push(k.clone());\n\
                      \x20   }\n\
                      \x20   out\n\
-                     }"
-                .to_string(),
+                     }".to_string(),
                 _ => "fn lru_insert<K: Eq + std::hash::Hash + Clone, V>(\n\
                      \x20   cache: &mut std::collections::HashMap<K, V>,\n\
                      \x20   order: &mut std::collections::VecDeque<K>,\n\
@@ -477,8 +463,7 @@ fn gen_data_structures(rng: &mut Rng, cx: Complexity) -> String {
                      \x20   }\n\
                      \x20   order.push_back(key.clone());\n\
                      \x20   cache.insert(key, value);\n\
-                     }"
-                .to_string(),
+                     }".to_string(),
             }
         }
     }
@@ -495,16 +480,13 @@ fn gen_error_handling(rng: &mut Rng, cx: Complexity) -> String {
             match variant {
                 0 => "fn safe_div(a: f64, b: f64) -> Option<f64> {\n\
                      \x20   if b == 0.0 { None } else { Some(a / b) }\n\
-                     }"
-                .to_string(),
+                     }".to_string(),
                 1 => "fn unwrap_or_default(val: Option<i32>) -> i32 {\n\
                      \x20   val.unwrap_or(0)\n\
-                     }"
-                .to_string(),
+                     }".to_string(),
                 _ => "fn parse_int(s: &str) -> Result<i32, std::num::ParseIntError> {\n\
                      \x20   s.trim().parse()\n\
-                     }"
-                .to_string(),
+                     }".to_string(),
             }
         }
         Complexity::Medium => {
@@ -514,23 +496,20 @@ fn gen_error_handling(rng: &mut Rng, cx: Complexity) -> String {
                      \x20   s.split(',')\n\
                      \x20       .map(|p| p.trim().parse::<i32>().map_err(|e| e.to_string()))\n\
                      \x20       .collect()\n\
-                     }"
-                .to_string(),
+                     }".to_string(),
                 1 => "fn first_even(arr: &[i32]) -> Result<i32, &'static str> {\n\
                      \x20   arr.iter()\n\
                      \x20       .find(|x| *x % 2 == 0)\n\
                      \x20       .copied()\n\
                      \x20       .ok_or(\"no even number found\")\n\
-                     }"
-                .to_string(),
+                     }".to_string(),
                 _ => "fn try_both(a: Option<i32>, b: Option<i32>) -> Option<i32> {\n\
                      \x20   match (a, b) {\n\
                      \x20       (Some(x), Some(y)) => Some(x + y),\n\
                      \x20       (Some(x), None) | (None, Some(x)) => Some(x),\n\
                      \x20       _ => None,\n\
                      \x20   }\n\
-                     }"
-                .to_string(),
+                     }".to_string(),
             }
         }
         Complexity::Complex => {
@@ -543,8 +522,7 @@ fn gen_error_handling(rng: &mut Rng, cx: Complexity) -> String {
                      \x20       .ok_or(\"missing 0x prefix\")?;\n\
                      \x20   let value = u64::from_str_radix(without_prefix, 16)?;\n\
                      \x20   Ok(value)\n\
-                     }"
-                .to_string(),
+                     }".to_string(),
                 _ => "#[derive(Debug)]\n\
                      enum AppError {\n\
                      \x20   NotFound(String),\n\
@@ -558,8 +536,7 @@ fn gen_error_handling(rng: &mut Rng, cx: Complexity) -> String {
                      \x20       }\n\
                      \x20   }\n\
                      }\n\
-                     impl std::error::Error for AppError {}"
-                    .to_string(),
+                     impl std::error::Error for AppError {}".to_string(),
             }
         }
     }
@@ -576,20 +553,16 @@ fn gen_string_processing(rng: &mut Rng, cx: Complexity) -> String {
             match variant {
                 0 => "fn greet(name: &str) -> String {\n\
                      \x20   format!(\"Hello, {}!\", name)\n\
-                     }"
-                .to_string(),
+                     }".to_string(),
                 1 => "fn is_blank(s: &str) -> bool {\n\
                      \x20   s.trim().is_empty()\n\
-                     }"
-                .to_string(),
+                     }".to_string(),
                 2 => "fn first_word(s: &str) -> &str {\n\
                      \x20   s.split_whitespace().next().unwrap_or(\"\")\n\
-                     }"
-                .to_string(),
+                     }".to_string(),
                 _ => "fn shout(s: &str) -> String {\n\
                      \x20   s.to_uppercase()\n\
-                     }"
-                .to_string(),
+                     }".to_string(),
             }
         }
         Complexity::Medium => {
@@ -609,19 +582,16 @@ fn gen_string_processing(rng: &mut Rng, cx: Complexity) -> String {
                      \x20           }\n\
                      \x20       })\n\
                      \x20       .collect()\n\
-                     }"
-                .to_string(),
+                     }".to_string(),
                 1 => "fn truncate(s: &str, max_len: usize) -> String {\n\
                      \x20   if s.len() <= max_len { s.to_string() }\n\
                      \x20   else { format!(\"{}...\", &s[..max_len]) }\n\
-                     }"
-                .to_string(),
+                     }".to_string(),
                 _ => "fn csv_fields(line: &str) -> Vec<String> {\n\
                      \x20   line.split(',')\n\
                      \x20       .map(|f| f.trim().to_string())\n\
                      \x20       .collect()\n\
-                     }"
-                .to_string(),
+                     }".to_string(),
             }
         }
         Complexity::Complex => {
@@ -665,16 +635,13 @@ fn gen_io(rng: &mut Rng, cx: Complexity) -> String {
             match variant {
                 0 => "fn read_file(path: &str) -> std::io::Result<String> {\n\
                      \x20   std::fs::read_to_string(path)\n\
-                     }"
-                .to_string(),
+                     }".to_string(),
                 1 => "fn write_file(path: &str, data: &str) -> std::io::Result<()> {\n\
                      \x20   std::fs::write(path, data)\n\
-                     }"
-                .to_string(),
+                     }".to_string(),
                 _ => "fn file_exists(path: &str) -> bool {\n\
                      \x20   std::path::Path::new(path).exists()\n\
-                     }"
-                .to_string(),
+                     }".to_string(),
             }
         }
         Complexity::Medium => {
@@ -685,15 +652,13 @@ fn gen_io(rng: &mut Rng, cx: Complexity) -> String {
                      \x20   let file = std::fs::File::open(path)?;\n\
                      \x20   let reader = std::io::BufReader::new(file);\n\
                      \x20   reader.lines().collect()\n\
-                     }"
-                .to_string(),
+                     }".to_string(),
                 _ => "fn append_line(path: &str, line: &str) -> std::io::Result<()> {\n\
                      \x20   use std::io::Write;\n\
                      \x20   let mut f = std::fs::OpenOptions::new()\n\
                      \x20       .append(true).create(true).open(path)?;\n\
                      \x20   writeln!(f, \"{}\", line)\n\
-                     }"
-                .to_string(),
+                     }".to_string(),
             }
         }
         Complexity::Complex => {
@@ -766,7 +731,11 @@ fn family_pattern(family: Family) -> f32 {
 // Channel construction
 // ============================================================================
 
-fn build_channels(rng: &mut Rng, family: Family, cx: Complexity) -> ThoughtChannels {
+fn build_channels(
+    rng: &mut Rng,
+    family: Family,
+    cx: Complexity,
+) -> ThoughtChannels {
     let mut ch = ThoughtChannels::default();
 
     let complexity = cx.value();
@@ -786,14 +755,14 @@ fn build_channels(rng: &mut Rng, family: Family, cx: Complexity) -> ThoughtChann
 
     // Neutral emotion (code is emotionally flat)
     let valence = (rng.next_f32() - 0.5) * 0.2; // -0.1..0.1
-    let arousal = 0.2 + rng.next_f32() * 0.2; // 0.2..0.4
-    let dominance = 0.4 + rng.next_f32() * 0.2; // 0.4..0.6
+    let arousal = 0.2 + rng.next_f32() * 0.2;   // 0.2..0.4
+    let dominance = 0.4 + rng.next_f32() * 0.2;  // 0.4..0.6
     ch.set_emotion(valence, arousal, dominance);
 
     // Consciousness: moderate and stable for code generation
-    let phi = 0.5 + rng.next_f32() * 0.2; // 0.5..0.7
-    let coherence = 0.4 + rng.next_f32() * 0.2; // 0.4..0.6
-    let depth = 0.6 + rng.next_f32() * 0.2; // 0.6..0.8
+    let phi = 0.5 + rng.next_f32() * 0.2;        // 0.5..0.7
+    let coherence = 0.4 + rng.next_f32() * 0.2;  // 0.4..0.6
+    let depth = 0.6 + rng.next_f32() * 0.2;      // 0.6..0.8
     ch.set_consciousness(phi, coherence, depth);
 
     // Mood temperature: cool/analytical
@@ -818,19 +787,14 @@ fn build_channels(rng: &mut Rng, family: Family, cx: Complexity) -> ThoughtChann
         Complexity::Medium => 0.05 + rng.next_f32() * 0.15,
         Complexity::Complex => 0.1 + rng.next_f32() * 0.2,
     };
-    ch.set_code(
-        syntax_complexity,
-        type_confidence,
-        algorithm_pattern,
-        error_likelihood,
-    );
+    ch.set_code(syntax_complexity, type_confidence, algorithm_pattern, error_likelihood);
 
     // Epistemic cube: E3 (proven), N2 (network), M2 (persistent), H ~0.5 for verified code
     // Vary slightly per complexity
     let e_tier: u8 = match cx {
-        Complexity::Simple => 4,  // reproducible
-        Complexity::Medium => 3,  // proven
-        Complexity::Complex => 3, // proven (still correct, just complex)
+        Complexity::Simple => 4,   // reproducible
+        Complexity::Medium => 3,   // proven
+        Complexity::Complex => 3,  // proven (still correct, just complex)
     };
     let n_tier: u8 = 2; // network — code is widely shared knowledge
     let m_tier: u8 = 2; // persistent — algorithms don't change
@@ -874,13 +838,7 @@ fn generate_pairs(rng: &mut Rng, count: usize) -> Vec<TrainingPair> {
 
     for &family in &ALL_FAMILIES {
         for &cx in &ALL_COMPLEXITIES {
-            let n = per_cell
-                + if remainder > 0 {
-                    remainder -= 1;
-                    1
-                } else {
-                    0
-                };
+            let n = per_cell + if remainder > 0 { remainder -= 1; 1 } else { 0 };
             for _ in 0..n {
                 let snippet = generate_snippet(rng, family, cx);
                 let channels = build_channels(rng, family, cx);
@@ -963,16 +921,10 @@ fn main() {
     let mut complexity_counts = std::collections::HashMap::new();
     for p in &pairs {
         *family_counts.entry(p.family.as_str()).or_insert(0usize) += 1;
-        *complexity_counts
-            .entry(p.complexity.as_str())
-            .or_insert(0usize) += 1;
+        *complexity_counts.entry(p.complexity.as_str()).or_insert(0usize) += 1;
     }
 
-    eprintln!(
-        "\nGenerated {} training pairs, {} eval pairs",
-        train.len(),
-        eval.len()
-    );
+    eprintln!("\nGenerated {} training pairs, {} eval pairs", train.len(), eval.len());
     eprintln!("\nFamily coverage:");
     let mut fam_sorted: Vec<_> = family_counts.iter().collect();
     fam_sorted.sort_by_key(|(k, _)| *k);
@@ -987,9 +939,5 @@ fn main() {
     }
     eprintln!("\nTotal:  {} pairs ({} channels each)", total, NUM_CHANNELS);
     eprintln!("Code channels at indices 24-27");
-    eprintln!(
-        "Epistemic cube at indices {}-{}",
-        EPISTEMIC_CUBE_BASE,
-        EPISTEMIC_CUBE_BASE + EPISTEMIC_CUBE_CHANNELS - 1
-    );
+    eprintln!("Epistemic cube at indices {}-{}", EPISTEMIC_CUBE_BASE, EPISTEMIC_CUBE_BASE + EPISTEMIC_CUBE_CHANNELS - 1);
 }

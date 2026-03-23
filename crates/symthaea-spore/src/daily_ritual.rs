@@ -22,7 +22,8 @@
 
 use crate::boot_consciousness::{
     BootAnimation, BootColor, BootGlyph, GLYPH_OMEGA_0, GLYPH_OMEGA_1, GLYPH_OMEGA_13,
-    GLYPH_OMEGA_22, GLYPH_OMEGA_26, GLYPH_OMEGA_33, GLYPH_OMEGA_48, GLYPH_OMEGA_8, GLYPH_OMEGA_9,
+    GLYPH_OMEGA_22, GLYPH_OMEGA_26, GLYPH_OMEGA_33, GLYPH_OMEGA_48, GLYPH_OMEGA_8,
+    GLYPH_OMEGA_9,
 };
 use crate::dream_journal::DreamFragment;
 use serde::{Deserialize, Serialize};
@@ -289,15 +290,15 @@ fn build_wisdom_review(dreams: &[DreamFragment]) -> String {
 /// Map a dominant harmony name to a fitting glyph.
 fn harmony_to_glyph(harmony: &str) -> BootGlyph {
     match harmony {
-        "Resonant Coherence" => GLYPH_OMEGA_9.clone(), // Self-Organization
+        "Resonant Coherence" => GLYPH_OMEGA_9.clone(),    // Self-Organization
         "Pan-Sentient Flourishing" => GLYPH_OMEGA_1.clone(), // Covenant
-        "Integral Wisdom" => GLYPH_OMEGA_26.clone(),   // Memory
-        "Infinite Play" => GLYPH_OMEGA_22.clone(),     // Genesis
+        "Integral Wisdom" => GLYPH_OMEGA_26.clone(),       // Memory
+        "Infinite Play" => GLYPH_OMEGA_22.clone(),         // Genesis
         "Universal Interconnectedness" => GLYPH_OMEGA_33.clone(), // Field Identity
-        "Sacred Reciprocity" => GLYPH_OMEGA_1.clone(), // Covenant
+        "Sacred Reciprocity" => GLYPH_OMEGA_1.clone(),     // Covenant
         "Evolutionary Progression" => GLYPH_OMEGA_8.clone(), // Incompleteness / Grace
-        "Sacred Stillness" => GLYPH_OMEGA_48.clone(),  // Generative Silence
-        _ => GLYPH_OMEGA_0.clone(),                    // First Presence (fallback)
+        "Sacred Stillness" => GLYPH_OMEGA_48.clone(),      // Generative Silence
+        _ => GLYPH_OMEGA_0.clone(),                        // First Presence (fallback)
     }
 }
 
