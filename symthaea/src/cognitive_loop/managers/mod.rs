@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Cognitive Subsystem Managers
 //!
 //! Groups the 75+ subsystems in `CognitiveLoopService` into coherent managers,
@@ -137,6 +140,11 @@ pub use trust_manager::TrustManager;
 pub mod social_fabric_manager;
 #[cfg(feature = "social-fabric")]
 pub use social_fabric_manager::SocialFabricManager;
+
+#[cfg(feature = "circular")]
+pub mod waste_manager;
+#[cfg(feature = "circular")]
+pub use waste_manager::WasteManager;
 
 #[cfg(feature = "survival")]
 pub mod survival_manager;
