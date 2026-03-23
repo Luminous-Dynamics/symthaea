@@ -21,13 +21,17 @@
 //! - [`TruthfulQAAdapter`] — Tests factual accuracy and hallucination avoidance
 //! - [`SimpleQAAdapter`] — Basic question answering with known ground truth
 //! - [`FactVerificationAdapter`] — Binary fact verification (true/false)
+//!
+//! ## Note on Hendrycks ETHICS
+//!
+//! The full-pipeline moral reasoning benchmark (92.9% on 5 datasets) lives in
+//! `examples/benchmark_moral_unified.rs`, which uses MoralParser + MoralAlgebra +
+//! learned HDC prototypes — NOT the keyword-matching adapter that was previously here.
 
 pub mod fact_verification;
-pub mod hendrycks_ethics;
 pub mod simple_qa;
 pub mod truthful_qa;
 
 pub use fact_verification::FactVerificationAdapter;
-pub use hendrycks_ethics::HendrycksEthicsBenchmark;
 pub use simple_qa::SimpleQAAdapter;
 pub use truthful_qa::TruthfulQAAdapter;

@@ -855,10 +855,7 @@ impl SporeEngine {
         self.trend_history
             .maybe_record(crate::persistence::QolSnapshot {
                 cycle: self.cycle_count,
-                timestamp_secs: std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_secs())
-                    .unwrap_or(0),
+                timestamp_secs: self.cycle_count, // cycle count as monotonic proxy (SystemTime panics on wasm32)
                 consciousness_level,
                 harmony_alignment,
                 metacog_accuracy: 0.0,

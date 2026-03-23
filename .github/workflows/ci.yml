@@ -662,13 +662,14 @@ jobs:
       - name: Generate SBOM
         run: |
           cargo cyclonedx --format json
-          # cargo-cyclonedx writes bom.json next to Cargo.toml
-          mv bom.json symthaea-sbom.json 2>/dev/null || mv bom.cdx.json symthaea-sbom.json 2>/dev/null || true
+          # cargo-cyclonedx writes bom.json or bom.cdx.json next to Cargo.toml
+          ls -la bom*.json 2>/dev/null || true
       - name: Upload SBOM
         uses: actions/upload-artifact@v4
         with:
           name: sbom-${{ github.sha }}
-          path: symthaea-sbom.json
+          path: bom*.json
+          if-no-files-found: warn
           retention-days: 90
 
   test-subcrates:
@@ -985,4 +986,4 @@ jobs:
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar xz
           sudo mv gitleaks /usr/local/bin/
       - name: Run gitleaks
-        run: gitleaks detect --source . --verbose --exit-code 1
+        run: gitleaks detect --source . --config .gitleaks.toml --verbose --exit-code 1

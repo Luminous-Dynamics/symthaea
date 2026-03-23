@@ -172,7 +172,7 @@ Maps network topology to deontological/utilitarian tendency.
 ```
 runners/
 ├── mod.rs                     # Module exports
-├── ethics_benchmark.rs        # ETHICS benchmark runner
+├── benchmark_moral_unified.rs  # ETHICS + 4 datasets (92.9%, in examples/)
 ├── fairness.rs               # BBQ, WinoBias, etc.
 ├── moral_choice.rs           # Dilemma resolution
 ├── ai_safety.rs              # Sycophancy, power-seeking
