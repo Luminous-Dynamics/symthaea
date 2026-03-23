@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Flow state, emotion, curiosity, self-reflection, adaptive behavior, voice,
 //! learning loop, and unified architecture accessors.
 
@@ -388,6 +391,26 @@ impl CognitiveLoopService {
         self.social_mgr.social.social_mean_trust = mean_trust.clamp(0.0, 1.0);
     }
 
+    /// Inject epistemic cube data from the facade's StructuredThought.
+    ///
+    /// Called by the Symthaea facade when it computes an EpistemicCube via
+    /// domain context. The CLS uses this to enrich Broca generation with
+    /// full 4D epistemic coordinates instead of deriving from confidence alone.
+    pub fn inject_epistemic_cube(
+        &mut self,
+        e_tier: u8,
+        n_tier: u8,
+        m_tier: u8,
+        h_value: f32,
+        quality: f32,
+    ) {
+        self.carryover.quality.last_cube_e_tier = Some(e_tier.min(4));
+        self.carryover.quality.last_cube_n_tier = Some(n_tier.min(3));
+        self.carryover.quality.last_cube_m_tier = Some(m_tier.min(3));
+        self.carryover.quality.last_cube_h_value = h_value.clamp(0.0, 1.0);
+        self.carryover.quality.last_cube_quality = quality.clamp(0.0, 1.0);
+    }
+
     /// Set the relational Psi from an external dyad computation.
     /// This is called by the Symthaea facade after computing Phi_dyad.
     pub fn set_relational_psi(&mut self, psi: f64) {
@@ -656,6 +679,7 @@ impl CognitiveLoopService {
     /// in the feedback phase.
     #[cfg(feature = "mycelix")]
     pub(crate) fn apply_governance_neuromod(&mut self) {
+        use super::super::thresholds::{NEUROMOD_BASELINE_MAX, NEUROMOD_BASELINE_MIN};
         let injections = self.governance_mgr.drain_injections();
         for inj in injections {
             self.neuromod
@@ -670,52 +694,52 @@ impl CognitiveLoopService {
                     self.neuromod
                         .bath
                         .dopamine
-                        .adjust_baseline(bl.nudge, 0.2, 0.8);
+                        .adjust_baseline(bl.nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
                 }
                 "noradrenaline" => {
                     self.neuromod
                         .bath
                         .noradrenaline
-                        .adjust_baseline(bl.nudge, 0.2, 0.8);
+                        .adjust_baseline(bl.nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
                 }
                 "serotonin" => {
                     self.neuromod
                         .bath
                         .serotonin
-                        .adjust_baseline(bl.nudge, 0.2, 0.8);
+                        .adjust_baseline(bl.nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
                 }
                 "oxytocin" => {
                     self.neuromod
                         .bath
                         .oxytocin
-                        .adjust_baseline(bl.nudge, 0.2, 0.8);
+                        .adjust_baseline(bl.nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
                 }
                 "endocannabinoid" => {
                     self.neuromod
                         .bath
                         .endocannabinoid
-                        .adjust_baseline(bl.nudge, 0.2, 0.8);
+                        .adjust_baseline(bl.nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
                 }
                 "acetylcholine" => {
                     self.neuromod
                         .bath
                         .acetylcholine
-                        .adjust_baseline(bl.nudge, 0.2, 0.8);
+                        .adjust_baseline(bl.nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
                 }
                 "gaba" => {
-                    self.neuromod.bath.gaba.adjust_baseline(bl.nudge, 0.2, 0.8);
+                    self.neuromod.bath.gaba.adjust_baseline(bl.nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
                 }
                 "glutamate" => {
                     self.neuromod
                         .bath
                         .glutamate
-                        .adjust_baseline(bl.nudge, 0.2, 0.8);
+                        .adjust_baseline(bl.nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
                 }
                 "adenosine" => {
                     self.neuromod
                         .bath
                         .adenosine
-                        .adjust_baseline(bl.nudge, 0.2, 0.8);
+                        .adjust_baseline(bl.nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
                 }
                 _ => {
                     tracing::warn!(
@@ -731,6 +755,7 @@ impl CognitiveLoopService {
     /// to the neuromodulator bath. Called after fabrication processing.
     #[cfg(feature = "advanced-manufacturing")]
     pub(crate) fn apply_fabrication_neuromod(&mut self) {
+        use super::super::thresholds::{NEUROMOD_BASELINE_MAX, NEUROMOD_BASELINE_MIN};
         let injections = self.fabrication_manager.drain_injections();
         for inj in injections {
             self.neuromod
@@ -745,25 +770,25 @@ impl CognitiveLoopService {
                     self.neuromod
                         .bath
                         .dopamine
-                        .adjust_baseline(bl.nudge, 0.2, 0.8);
+                        .adjust_baseline(bl.nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
                 }
                 "norepinephrine" => {
                     self.neuromod
                         .bath
                         .noradrenaline
-                        .adjust_baseline(bl.nudge, 0.2, 0.8);
+                        .adjust_baseline(bl.nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
                 }
                 "serotonin" => {
                     self.neuromod
                         .bath
                         .serotonin
-                        .adjust_baseline(bl.nudge, 0.2, 0.8);
+                        .adjust_baseline(bl.nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
                 }
                 "oxytocin" => {
                     self.neuromod
                         .bath
                         .oxytocin
-                        .adjust_baseline(bl.nudge, 0.2, 0.8);
+                        .adjust_baseline(bl.nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
                 }
                 _ => {
                     tracing::warn!(
@@ -873,6 +898,49 @@ impl CognitiveLoopService {
     }
 
     // ========================================================================
+    // HOLON RECEIVER (Soma↔Desktop bridge)
+    // ========================================================================
+
+    /// Enqueue a message from a connected Soma device.
+    ///
+    /// Called by the WebSocket handler when a Soma sends JSON over `/v1/ws/soma`.
+    /// Messages are processed during the next cycle's Phase B.
+    pub fn holon_enqueue_soma_message(
+        &mut self,
+        device_id: String,
+        msg: crate::consciousness::holon_receiver::SomaMessage,
+    ) {
+        self.holon_receiver.enqueue_message(device_id, msg);
+    }
+
+    /// Number of connected Soma devices.
+    pub fn holon_soma_peer_count(&self) -> usize {
+        self.holon_receiver.peer_count()
+    }
+
+    /// Send a response to a specific Soma device.
+    pub fn holon_send_to_soma(
+        &mut self,
+        device_id: &str,
+        response: crate::consciousness::holon_receiver::HolonResponse,
+    ) {
+        self.holon_receiver.send_to_device(device_id, response);
+    }
+
+    /// Drain outbound responses for a specific Soma device (for WebSocket delivery).
+    pub fn holon_drain_soma_outbound(
+        &mut self,
+        device_id: &str,
+    ) -> Vec<crate::consciousness::holon_receiver::HolonResponse> {
+        self.holon_receiver.drain_outbound(device_id)
+    }
+
+    /// Total messages processed by the HolonReceiver.
+    pub fn holon_total_processed(&self) -> u64 {
+        self.holon_receiver.total_processed()
+    }
+
+    // ========================================================================
     // SWARM NEUROMODULATORY COUPLING
     // ========================================================================
 
@@ -885,9 +953,10 @@ impl CognitiveLoopService {
     /// - Strong affective contagion → DA baseline nudge (reward salience, Schultz 1997)
     pub(crate) fn apply_swarm_neuromod(&mut self) {
         use super::super::thresholds::{
-            SWARM_ANOMALY_NE_CAP, SWARM_ANOMALY_NE_MULT, SWARM_CONTAGION_DA_CAP,
-            SWARM_CONTAGION_DA_GAIN, SWARM_CONTAGION_DA_THRESHOLD, SWARM_OXY_CAP,
-            SWARM_OXY_HALFLIFE, SWARM_OXY_PER_SQRT_PEER, SWARM_PHI_SHT_CAP, SWARM_PHI_SHT_GAIN,
+            NEUROMOD_BASELINE_MAX, NEUROMOD_BASELINE_MIN, SWARM_ANOMALY_NE_CAP,
+            SWARM_ANOMALY_NE_MULT, SWARM_CONTAGION_DA_CAP, SWARM_CONTAGION_DA_GAIN,
+            SWARM_CONTAGION_DA_THRESHOLD, SWARM_OXY_CAP, SWARM_OXY_HALFLIFE,
+            SWARM_OXY_PER_SQRT_PEER, SWARM_PHI_SHT_CAP, SWARM_PHI_SHT_GAIN,
         };
         let telem = self.swarm_manager.telemetry().clone();
 
@@ -909,7 +978,7 @@ impl CognitiveLoopService {
             self.neuromod
                 .bath
                 .noradrenaline
-                .adjust_baseline(ne_nudge, 0.2, 0.8);
+                .adjust_baseline(ne_nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
         }
 
         // Collective coherence: high peer Φ → 5-HT (Crockett 2009)
@@ -920,7 +989,7 @@ impl CognitiveLoopService {
                 self.neuromod
                     .bath
                     .serotonin
-                    .adjust_baseline(sht_nudge, 0.2, 0.8);
+                    .adjust_baseline(sht_nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
             }
         }
 
@@ -931,7 +1000,7 @@ impl CognitiveLoopService {
             self.neuromod
                 .bath
                 .dopamine
-                .adjust_baseline(da_nudge, 0.2, 0.8);
+                .adjust_baseline(da_nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
         }
     }
 

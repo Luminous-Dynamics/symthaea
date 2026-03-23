@@ -1331,6 +1331,15 @@ pub struct RecipeAmendment {
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum OrderStatus {
+    Placed,
+    Confirmed,
+    InTransit,
+    Delivered,
+    Cancelled,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct SecondaryMaterialOrder {
     pub listing_hash: ActionHash,
     pub buyer: AgentPubKey,

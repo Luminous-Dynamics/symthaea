@@ -24,6 +24,7 @@
 //! 4. Update any existing `const` in cycle.rs to reference this module
 
 mod consciousness;
+mod drives;
 mod dynamics;
 mod fabrication;
 mod feedback;
@@ -37,6 +38,7 @@ mod safety;
 mod substrate;
 
 pub use consciousness::*;
+pub use drives::*;
 pub use dynamics::*;
 pub use fabrication::*;
 pub use feedback::*;
@@ -270,6 +272,73 @@ pub fn validate() {
         "BROCA_QUALITY_CADENCE_THRESHOLD ({}) must be < BROCA_QUALITY_HIGH_THRESHOLD ({})",
         BROCA_QUALITY_CADENCE_THRESHOLD,
         BROCA_QUALITY_HIGH_THRESHOLD
+    );
+
+    // 24. Drive thresholds: frustration ordering
+    assert!(
+        FRUSTRATION_NE_NUDGE_THRESHOLD < FRUSTRATION_DAMPEN_THRESHOLD as f32,
+        "FRUSTRATION_NE_NUDGE_THRESHOLD ({}) must be < FRUSTRATION_DAMPEN_THRESHOLD ({})",
+        FRUSTRATION_NE_NUDGE_THRESHOLD,
+        FRUSTRATION_DAMPEN_THRESHOLD
+    );
+
+    // 25. Neuromod baseline bounds: min < max
+    assert!(
+        NEUROMOD_BASELINE_MIN < NEUROMOD_BASELINE_MAX,
+        "NEUROMOD_BASELINE_MIN ({}) must be < NEUROMOD_BASELINE_MAX ({})",
+        NEUROMOD_BASELINE_MIN,
+        NEUROMOD_BASELINE_MAX
+    );
+    assert!(
+        NEUROMOD_BASELINE_MIN > 0.0,
+        "NEUROMOD_BASELINE_MIN must be positive: {}",
+        NEUROMOD_BASELINE_MIN
+    );
+    assert!(
+        NEUROMOD_BASELINE_MAX <= 1.0,
+        "NEUROMOD_BASELINE_MAX must be <= 1.0: {}",
+        NEUROMOD_BASELINE_MAX
+    );
+
+    // 26. Coherence threshold ordering
+    assert!(
+        COHERENCE_VERY_LOW < COHERENCE_LOW,
+        "COHERENCE_VERY_LOW ({}) must be < COHERENCE_LOW ({})",
+        COHERENCE_VERY_LOW,
+        COHERENCE_LOW
+    );
+    assert!(
+        COHERENCE_LOW < COHERENCE_MODERATE,
+        "COHERENCE_LOW ({}) must be < COHERENCE_MODERATE ({})",
+        COHERENCE_LOW,
+        COHERENCE_MODERATE
+    );
+    assert!(
+        COHERENCE_MODERATE < COHERENCE_HIGH,
+        "COHERENCE_MODERATE ({}) must be < COHERENCE_HIGH ({})",
+        COHERENCE_MODERATE,
+        COHERENCE_HIGH
+    );
+
+    // 27. EMA alpha bounds (must be in (0, 1))
+    assert!(
+        EMA_ALPHA_FLOW > 0.0 && EMA_ALPHA_FLOW < 1.0,
+        "EMA_ALPHA_FLOW must be in (0, 1): {}",
+        EMA_ALPHA_FLOW
+    );
+
+    // 28. Joint scale ordering: elbow < shoulder < knee
+    assert!(
+        JOINT_ELBOW_SCALE < JOINT_SHOULDER_SCALE,
+        "JOINT_ELBOW_SCALE ({}) must be < JOINT_SHOULDER_SCALE ({})",
+        JOINT_ELBOW_SCALE,
+        JOINT_SHOULDER_SCALE
+    );
+    assert!(
+        JOINT_SHOULDER_SCALE < JOINT_KNEE_SCALE,
+        "JOINT_SHOULDER_SCALE ({}) must be < JOINT_KNEE_SCALE ({})",
+        JOINT_SHOULDER_SCALE,
+        JOINT_KNEE_SCALE
     );
 }
 
@@ -2046,5 +2115,46 @@ mod tests {
     fn test_knowledge_alert_params() {
         assert!(KNOWLEDGE_ALERT_EXPLORE_CAP > 0.0 && KNOWLEDGE_ALERT_EXPLORE_CAP < 1.0);
         assert!(KNOWLEDGE_CONTRADICTION_FLOOR > 0.0 && KNOWLEDGE_CONTRADICTION_FLOOR < 1.0);
+    }
+
+    #[test]
+    fn test_drive_threshold_params() {
+        assert!(FRUSTRATION_DAMPEN_THRESHOLD > 0.0 && FRUSTRATION_DAMPEN_THRESHOLD < 1.0);
+        assert!(FRUSTRATION_DAMPEN_GAIN > 0.0 && FRUSTRATION_DAMPEN_GAIN < 1.0);
+        assert!(FRUSTRATION_NE_NUDGE_THRESHOLD > 0.0 && FRUSTRATION_NE_NUDGE_THRESHOLD < 1.0);
+        assert!(FRUSTRATION_NE_NUDGE_SCALE > 0.0 && FRUSTRATION_NE_NUDGE_SCALE < 0.5);
+        assert!(ENGAGEMENT_LOW_THRESHOLD > 0.0 && ENGAGEMENT_LOW_THRESHOLD < 1.0);
+        assert!(FLOW_DA_NUDGE > 0.0 && FLOW_DA_NUDGE < 0.5);
+        assert!(DISENGAGEMENT_DA_NUDGE > 0.0 && DISENGAGEMENT_DA_NUDGE < 0.5);
+        assert!(FLOW_EXPLORATION_INCREMENT > 0.0 && FLOW_EXPLORATION_INCREMENT < 0.5);
+    }
+
+    #[test]
+    fn test_neuromod_baseline_bounds() {
+        assert!(NEUROMOD_BASELINE_MIN > 0.0);
+        assert!(NEUROMOD_BASELINE_MAX <= 1.0);
+        assert!(NEUROMOD_BASELINE_MIN < NEUROMOD_BASELINE_MAX);
+    }
+
+    #[test]
+    fn test_coherence_threshold_ordering() {
+        assert!(COHERENCE_VERY_LOW < COHERENCE_LOW);
+        assert!(COHERENCE_LOW < COHERENCE_MODERATE);
+        assert!(COHERENCE_MODERATE < COHERENCE_HIGH);
+        assert!(COHERENCE_HIGH <= 1.0);
+    }
+
+    #[test]
+    fn test_ema_alpha_bounds() {
+        assert!(EMA_ALPHA_FLOW > 0.0 && EMA_ALPHA_FLOW < 1.0);
+    }
+
+    #[test]
+    fn test_joint_scale_ordering() {
+        assert!(JOINT_ELBOW_SCALE > 0.0 && JOINT_ELBOW_SCALE < 1.0);
+        assert!(JOINT_SHOULDER_SCALE > 0.0 && JOINT_SHOULDER_SCALE < 1.0);
+        assert!(JOINT_KNEE_SCALE > 0.0 && JOINT_KNEE_SCALE < 1.0);
+        assert!(JOINT_ELBOW_SCALE < JOINT_SHOULDER_SCALE);
+        assert!(JOINT_SHOULDER_SCALE < JOINT_KNEE_SCALE);
     }
 }

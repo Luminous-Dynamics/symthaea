@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Symthaea Facade
 //!
 //! The primary entry point for the Symthaea consciousness system.
@@ -13,9 +10,28 @@
 //! high-quality semantic encoding (~380ms CPU, ~60-100ms GPU expected).
 //! Otherwise falls back to fast hash-based encoding (<1ms but lower quality).
 
+mod relational;
+#[cfg(feature = "school_learning")]
+mod school;
+#[cfg(feature = "magi_loop")]
+mod magi;
+#[cfg(feature = "code_generation")]
+mod code_gen;
+
+// ── Re-exports ────────────────────────────────────────────────────────────
+
+pub use relational::PartnershipState;
+#[cfg(feature = "school_learning")]
+pub use school::{CurriculumObjectiveSummary, CurriculumReport};
+
+// ── Imports ───────────────────────────────────────────────────────────────
+
 use anyhow::{Context, Result};
 #[cfg(feature = "school_learning")]
-use chrono::Utc;
+use school::{
+    CurriculumPersistenceConfig, CurriculumRecallConfig, CurriculumRecallScores,
+    load_curriculum_from_store,
+};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -77,6 +93,10 @@ use crate::consciousness::recursive_improvement::{
     RiskTier, WorldActionContext, WorldPrediction,
 };
 
+use relational::{PersistedState, RelationalCore};
+
+// ── Public types ──────────────────────────────────────────────────────────
+
 /// Response from processing a query through the consciousness pipeline.
 #[derive(Debug, Clone)]
 pub struct ProcessResponse {
@@ -95,7 +115,7 @@ pub struct ProcessResponse {
     pub translation_verified: bool,
     /// The structured thought that was translated (for debugging/introspection).
     pub structured_thought: Option<StructuredThought>,
-    /// Consciousness level (Ψ) at time of processing (0.0-1.0).
+    /// Consciousness level (Psi) at time of processing (0.0-1.0).
     pub consciousness_level: f64,
     /// Memory coordinator sigma (spectral MIP phi when available).
     pub sigma: Option<f64>,
@@ -138,185 +158,50 @@ pub struct SleepReport {
     pub patterns_extracted: usize,
 }
 
-#[cfg(feature = "school_learning")]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CurriculumObjectiveSummary {
-    pub id: String,
-    pub name: String,
-    pub domain: String,
-    pub difficulty: String,
-    pub estimated_minutes: u32,
-    pub tags: Vec<String>,
-    pub description: String,
+// ── Feature-gated private types ───────────────────────────────────────────
+
+#[cfg(feature = "ssm-power")]
+fn ssm_power_enabled() -> bool {
+    std::env::var("SYMTHAEA_POWER_SSM")
+        .ok()
+        .and_then(|v| match v.trim().to_lowercase().as_str() {
+            "1" | "true" | "yes" | "on" => Some(true),
+            "0" | "false" | "no" | "off" => Some(false),
+            _ => None,
+        })
+        .unwrap_or(false)
 }
 
-#[cfg(feature = "school_learning")]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CurriculumReport {
-    pub curriculum_id: String,
-    pub curriculum_name: String,
-    pub total_objectives: usize,
-    pub dimension: usize,
-    pub last_research_topic: Option<String>,
-    pub last_research_at: Option<String>,
-    pub last_saved_at: Option<String>,
-    pub last_objectives_added: Option<usize>,
-    pub recent_objectives: Vec<CurriculumObjectiveSummary>,
+#[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+#[derive(Clone, Copy)]
+struct AutonomousResearchConfig {
+    min_interval: Duration,
 }
 
-/// Relational consciousness subsystem — partnership, trajectory, and dyadic Phi.
-///
-/// Groups all relational state into a cohesive unit: partner model tracking,
-/// relationship trajectory, Phi-dyad computation, and recent AI states for
-/// dyadic assessment.
-struct RelationalCore {
-    /// Human partner model for relational consciousness.
-    partner: HumanPartnerModel,
-    /// Relationship trajectory tracking.
-    trajectory: RelationshipTrajectory,
-    /// Phi-dyad calculator for relational Phi.
-    dyad_calculator: PhiDyadCalculator,
-    /// Recent AI states for dyad computation (ring buffer, max 8).
-    recent_ai_states: Vec<symthaea_core::hdc::unified_hv::ContinuousHV>,
-    /// Last computed Phi_dyad — fed back into mind as relational Psi on next cycle.
-    last_phi_dyad: f64,
-}
+#[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+impl AutonomousResearchConfig {
+    fn from_env() -> Self {
+        let min_interval = std::env::var("SYMTHAEA_AUTORESEARCH_MIN_INTERVAL_SECS")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .unwrap_or(600);
 
-impl RelationalCore {
-    fn new() -> Self {
         Self {
-            partner: HumanPartnerModel::new("human"),
-            trajectory: RelationshipTrajectory::default(),
-            dyad_calculator: PhiDyadCalculator::new(),
-            recent_ai_states: Vec::new(),
-            last_phi_dyad: 0.0,
-        }
-    }
-
-    fn from_persisted(
-        partner: HumanPartnerModel,
-        trajectory: RelationshipTrajectory,
-        recent_ai_states: Vec<symthaea_core::hdc::unified_hv::ContinuousHV>,
-    ) -> Self {
-        Self {
-            partner,
-            trajectory,
-            dyad_calculator: PhiDyadCalculator::new(),
-            recent_ai_states,
-            last_phi_dyad: 0.0,
-        }
-    }
-
-    /// Push an AI state into the ring buffer (max 8).
-    fn push_ai_state(&mut self, hv: symthaea_core::hdc::unified_hv::ContinuousHV) {
-        self.recent_ai_states.push(hv);
-        if self.recent_ai_states.len() > 8 {
-            self.recent_ai_states.remove(0);
-        }
-    }
-
-    /// Compute Phi-dyad from recent AI states and partner model.
-    fn compute_phi_dyad(&self) -> f64 {
-        if self.recent_ai_states.is_empty() {
-            return 0.0;
-        }
-
-        let human_states: Vec<symthaea_core::hdc::unified_hv::ContinuousHV> = self
-            .recent_ai_states
-            .iter()
-            .map(|s| {
-                let mut vals = s.values.clone();
-                for v in vals.iter_mut() {
-                    *v *= 0.9;
-                    *v += 0.1;
-                }
-                symthaea_core::hdc::unified_hv::ContinuousHV::from_values(vals).normalize()
-            })
-            .collect();
-
-        let assessment = RelationalAssessment {
-            agent_a: "symthaea".to_string(),
-            agent_b: self.partner.partner_id.clone(),
-            phi_relation: self.partner.phi_relational,
-            stage: self.partner.stage,
-            synchrony: self.partner.trust as f64,
-            turn_taking_quality: 0.7,
-            mutual_information: self.partner.reciprocity as f64,
-            mode: self.partner.mode,
-            num_interactions: self.partner.interactions_count as usize,
-            relationship_age: 0.0,
-            explanation: String::new(),
-        };
-
-        let input = DyadInput {
-            ai_states: &self.recent_ai_states,
-            human_states: &human_states,
-            relational: &assessment,
-            human_model: &self.partner,
-            weights: DyadWeights::default(),
-        };
-
-        self.dyad_calculator.compute(&input).phi_dyad
-    }
-
-    /// Update partnership state from interaction consciousness level.
-    fn update_partnership(&mut self, consciousness: f32) {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs_f64();
-
-        let depth = (consciousness * 0.5).clamp(0.0, 1.0);
-        let safety = (consciousness * 0.7 + 0.2).clamp(0.0, 1.0);
-        let mutuality = (consciousness * 0.4 + 0.1).clamp(0.0, 1.0);
-
-        let event = InteractionEvent {
-            timestamp: now,
-            depth,
-            emotional_safety: safety,
-            mutuality,
-        };
-        self.partner.update_on_interaction(&event);
-
-        let assessment = RelationalAssessment {
-            agent_a: "symthaea".to_string(),
-            agent_b: self.partner.partner_id.clone(),
-            phi_relation: self.partner.phi_relational,
-            stage: self.partner.stage,
-            synchrony: consciousness as f64 * 0.8,
-            turn_taking_quality: 0.7,
-            mutual_information: mutuality as f64,
-            mode: if self.partner.trust > 0.3 {
-                RelationMode::IThou
-            } else {
-                RelationMode::IIt
-            },
-            num_interactions: self.partner.interactions_count as usize,
-            relationship_age: now,
-            explanation: String::new(),
-        };
-        self.partner.update_from_assessment(&assessment);
-        self.partner.advance_stage_if_ready();
-
-        let phi_dyad = self.compute_phi_dyad();
-        self.trajectory.record(now, self.partner.stage, phi_dyad);
-        self.last_phi_dyad = phi_dyad;
-    }
-
-    /// Get current partnership state summary.
-    fn partnership_state(&self) -> PartnershipState {
-        let phi_dyad = self.compute_phi_dyad();
-        PartnershipState {
-            stage: self.partner.stage,
-            trust: self.partner.trust,
-            vulnerability: self.partner.vulnerability,
-            reciprocity: self.partner.reciprocity,
-            phi_dyad,
-            interactions: self.partner.interactions_count,
-            trajectory_points: self.trajectory.points().len(),
+            min_interval: Duration::from_secs(min_interval.max(1)),
         }
     }
 }
+
+#[cfg(all(feature = "web_research_module", feature = "school_learning"))]
+struct ResearchTaskResult {
+    topic: String,
+    summary: Option<ResearchSummary>,
+    curriculum: Option<Curriculum>,
+    extender: CurriculumExtender,
+    error: Option<String>,
+}
+
+// ── Symthaea struct ───────────────────────────────────────────────────────
 
 /// The primary Symthaea consciousness facade.
 ///
@@ -424,175 +309,12 @@ pub struct Symthaea {
     code_memory: crate::hdc::code_memory::CodebaseMemory,
 
     // ── Nociception: Pain & Infrastructure Health ──────────────────────
-    /// Somatic error bridge: drains infrastructure errors → felt stress.
+    /// Somatic error bridge: drains infrastructure errors -> felt stress.
     somatic_bridge: SomaticErrorBridge,
     /// Pain channel sender: cloned into TaskSupervisor and database operations.
     pain_tx: PainSender,
     /// Task supervisor: wraps all tokio::spawn calls for panic detection.
     task_supervisor: TaskSupervisor,
-
-    // ── Holon Bridge ────────────────────────────────────────────────────
-    /// Desktop-side receiver for Soma mobile connections.
-    /// Stores inbound messages from HTTP `/holon/outbound` and queues
-    /// responses for `/holon/inbound`. Processed by `holon_process_pending()`.
-    holon_receiver: crate::consciousness::holon_receiver::HolonReceiver,
-}
-
-#[cfg(feature = "school_learning")]
-#[derive(Debug, Clone, Copy)]
-struct CurriculumRecallConfig {
-    threshold: f32,
-    max_recall: usize,
-    log_top_k: usize,
-    budget: f32,
-}
-
-#[cfg(feature = "school_learning")]
-impl CurriculumRecallConfig {
-    fn from_env() -> Self {
-        let threshold = std::env::var("SYMTHAEA_CURRICULUM_RECALL_THRESHOLD")
-            .ok()
-            .and_then(|v| v.parse::<f32>().ok())
-            .unwrap_or(0.65)
-            .clamp(0.0, 1.0);
-        let max_recall = std::env::var("SYMTHAEA_CURRICULUM_RECALL_MAX")
-            .ok()
-            .and_then(|v| v.parse::<usize>().ok())
-            .unwrap_or(6)
-            .max(1);
-        let log_top_k = std::env::var("SYMTHAEA_CURRICULUM_RECALL_LOG_TOP_K")
-            .ok()
-            .and_then(|v| v.parse::<usize>().ok())
-            .unwrap_or(3);
-        let budget = std::env::var("SYMTHAEA_CURRICULUM_RECALL_BUDGET")
-            .ok()
-            .and_then(|v| v.parse::<f32>().ok())
-            .unwrap_or(max_recall as f32)
-            .max(0.0);
-
-        Self {
-            threshold,
-            max_recall,
-            log_top_k,
-            budget,
-        }
-    }
-}
-
-#[cfg(feature = "school_learning")]
-#[derive(Debug, Clone)]
-struct CurriculumPersistenceConfig {
-    path: PathBuf,
-    auto_save: bool,
-}
-
-#[cfg(feature = "school_learning")]
-impl CurriculumPersistenceConfig {
-    fn from_env() -> Self {
-        let path = std::env::var("SYMTHAEA_CURRICULUM_PATH")
-            .ok()
-            .map(PathBuf::from)
-            .unwrap_or_else(default_curriculum_path);
-
-        let auto_save = std::env::var("SYMTHAEA_CURRICULUM_AUTO_SAVE")
-            .ok()
-            .and_then(|v| parse_env_bool(&v))
-            .unwrap_or(true);
-
-        Self { path, auto_save }
-    }
-}
-
-#[cfg(feature = "school_learning")]
-fn default_curriculum_path() -> PathBuf {
-    dirs::data_local_dir()
-        .or_else(dirs::state_dir)
-        .or_else(dirs::home_dir)
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("symthaea")
-        .join("curriculum.json")
-}
-
-#[cfg(feature = "school_learning")]
-fn parse_env_bool(value: &str) -> Option<bool> {
-    match value.trim().to_lowercase().as_str() {
-        "1" | "true" | "yes" | "on" => Some(true),
-        "0" | "false" | "no" | "off" => Some(false),
-        _ => None,
-    }
-}
-
-#[cfg(feature = "ssm-power")]
-fn ssm_power_enabled() -> bool {
-    std::env::var("SYMTHAEA_POWER_SSM")
-        .ok()
-        .and_then(|v| match v.trim().to_lowercase().as_str() {
-            "1" | "true" | "yes" | "on" => Some(true),
-            "0" | "false" | "no" | "off" => Some(false),
-            _ => None,
-        })
-        .unwrap_or(false)
-}
-
-#[cfg(feature = "school_learning")]
-struct CurriculumRecallScores {
-    scores: Vec<(f32, usize)>,
-    candidates: Vec<(f32, usize, ContinuousHV)>,
-}
-
-#[cfg(all(feature = "web_research_module", feature = "school_learning"))]
-#[derive(Clone, Copy)]
-struct AutonomousResearchConfig {
-    min_interval: Duration,
-}
-
-#[cfg(all(feature = "web_research_module", feature = "school_learning"))]
-impl AutonomousResearchConfig {
-    fn from_env() -> Self {
-        let min_interval = std::env::var("SYMTHAEA_AUTORESEARCH_MIN_INTERVAL_SECS")
-            .ok()
-            .and_then(|v| v.parse::<u64>().ok())
-            .unwrap_or(600);
-
-        Self {
-            min_interval: Duration::from_secs(min_interval.max(1)),
-        }
-    }
-}
-
-#[cfg(all(feature = "web_research_module", feature = "school_learning"))]
-struct ResearchTaskResult {
-    topic: String,
-    summary: Option<ResearchSummary>,
-    curriculum: Option<Curriculum>,
-    extender: CurriculumExtender,
-    error: Option<String>,
-}
-
-#[cfg(feature = "school_learning")]
-fn load_curriculum_from_store(
-    hdc_dim: usize,
-    persistence: &CurriculumPersistenceConfig,
-) -> (Curriculum, CurriculumMeta) {
-    match CurriculumLoader::load_store_from_file_with_dimension(&persistence.path, hdc_dim) {
-        Ok((curriculum, meta)) => (curriculum, meta),
-        Err(LoadError::FileNotFound(_)) => (
-            Curriculum::new("symthaea", "Main Curriculum").build(),
-            CurriculumMeta::new(hdc_dim),
-        ),
-        Err(err) => {
-            tracing::warn!(
-                target: "symthaea::curriculum",
-                error = %err,
-                path = %persistence.path.display(),
-                "Failed to load persisted curriculum, falling back to default"
-            );
-            (
-                Curriculum::new("symthaea", "Main Curriculum").build(),
-                CurriculumMeta::new(hdc_dim),
-            )
-        }
-    }
 }
 
 impl Symthaea {
@@ -763,7 +485,6 @@ impl Symthaea {
             somatic_bridge,
             pain_tx,
             task_supervisor,
-            holon_receiver: crate::consciousness::holon_receiver::HolonReceiver::new(),
         };
 
         // Wire LLM backend into ContinuousMind for swarm projection gradient exchange
@@ -1008,7 +729,6 @@ impl Symthaea {
             somatic_bridge,
             pain_tx,
             task_supervisor,
-            holon_receiver: crate::consciousness::holon_receiver::HolonReceiver::new(),
         };
 
         // Wire LLM backend into ContinuousMind for swarm projection gradient exchange
@@ -1024,13 +744,13 @@ impl Symthaea {
     ///
     /// **Reason-then-Generate Pipeline (LLM as Broca's Area):**
     ///
-    /// 1. Input → HDC encoding → Mind perceives
-    /// 2. Mind tick → HDC+LTC computes (the BRAIN thinks)
+    /// 1. Input -> HDC encoding -> Mind perceives
+    /// 2. Mind tick -> HDC+LTC computes (the BRAIN thinks)
     /// 3. Extract StructuredThought (articulate what was computed)
     /// 4. Enrich with partnership context
     /// 5. LLM Translation (Broca's Area - NOT reasoning!)
     /// 6. Verify translation fidelity
-    /// 7. Partnership update → Response
+    /// 7. Partnership update -> Response
     ///
     /// **Key Insight**: The LLM does NOT think. It translates pre-computed
     /// structured thoughts into fluent natural language.
@@ -1052,7 +772,7 @@ impl Symthaea {
         let correlation_id = format!("broca_{:x}", hasher.finish());
 
         // ====================================================================
-        // PHASE 1: PERCEPTION (Input → HDC encoding + text for classification)
+        // PHASE 1: PERCEPTION (Input -> HDC encoding + text for classification)
         // ====================================================================
         let phase1_start = Instant::now();
         let input_embedding = self.text_to_hv(content);
@@ -1214,10 +934,6 @@ impl Symthaea {
         let phase2_start = Instant::now();
 
         // ── NOCICEPTION: Drain pain channel and apply somatic signals ──
-        // Infrastructure errors (task panics, DB failures, lock poisons) accumulate
-        // in the pain channel between cycles. Drain them now and convert to felt
-        // signals that modulate cognition: high stress → increased thermodynamic load,
-        // arousal spikes, and tau slowdown for more cautious processing.
         self.somatic_bridge.update();
         let somatic_signals = self.somatic_bridge.to_interoceptive_signals();
         if somatic_signals.thermodynamic_load_delta > 0.0 || somatic_signals.arousal_spike > 0.0 {
@@ -1238,8 +954,7 @@ impl Symthaea {
         // Prune completed tasks from the supervisor
         self.task_supervisor.prune_completed();
 
-        // Feed relational Ψ from previous cycle's Φ_dyad into the mind.
-        // This closes the feedback loop: partnership quality → consciousness boost.
+        // Feed relational Psi from previous cycle's Phi_dyad into the mind.
         self.mind.set_relational_psi(self.relational.last_phi_dyad);
 
         self.mind.tick();
@@ -1373,7 +1088,6 @@ impl Symthaea {
         }
 
         // ── DATABASE RECALL: Query persistent memory for contextual priming ──
-        // Retrieve similar past experiences and inject into working memory.
         if let Some(ref db) = self.database {
             let query_hv = input_embedding.to_binary(0.0);
             match db.search_similar(&query_hv, 3).await {
@@ -1384,20 +1098,17 @@ impl Symthaea {
                         top_similarity = results[0].similarity,
                         "Database recall: priming working memory with past experiences"
                     );
-                    // Record retrievals for reconsolidation tracking
                     for result in &results {
                         let hash =
                             crate::memory::content_hash(&result.record.encoding.to_continuous());
                         self.memory_coordinator.record_retrieval(hash);
                     }
-                    // Inject top recalled memory into working memory as a priming signal.
-                    // Only prime if similarity is above threshold to avoid noise.
                     if results[0].similarity > 0.3 {
                         let recalled_hv = results[0].record.encoding.to_continuous();
                         self.mind.perceive(recalled_hv);
                     }
                 }
-                Ok(_) => {} // No similar memories found — normal for early interactions
+                Ok(_) => {}
                 Err(e) => {
                     tracing::debug!(target: "symthaea::memory", error = %e, "Database recall skipped");
                 }
@@ -1405,8 +1116,6 @@ impl Symthaea {
         }
 
         // ── EPISODIC PERSISTENCE: Store top episodes to database ──
-        // Episodes that passed the coordinator's phi threshold are significant
-        // enough for long-term storage. We persist top-N by phi each cycle.
         if let Some(ref db) = self.database {
             let top_episodes = self.episodic_memory.get_top_episodes(3);
             if !top_episodes.is_empty() {
@@ -1425,7 +1134,6 @@ impl Symthaea {
                         let coherence = ep.coherence.unwrap_or(0.0);
                         let valence = ep.valence.unwrap_or(0.0);
                         MemoryRecord {
-                            // Use episode timestamp for dedup — same episode won't be re-stored
                             id: format!("ep-{}-{}", ep.timestamp, i),
                             memory_type: MemoryType::Episodic,
                             encoding: ep.input.to_binary(0.0),
@@ -1466,8 +1174,6 @@ impl Symthaea {
         // ====================================================================
         // PHASE 3: EXTRACTION (Articulate what was computed)
         // ====================================================================
-        // This is the key innovation: we extract WHAT THE MIND COMPUTED,
-        // not what the LLM would make up.
         let phase3_start = Instant::now();
         let mut thought = self.mind.extract_structured_thought();
         let phase3_duration = phase3_start.elapsed();
@@ -1478,8 +1184,6 @@ impl Symthaea {
         // ====================================================================
         // PHASE 3.5: DOMAIN CONTEXT INJECTION
         // ====================================================================
-        // Wire Phase 1 domain detection results into the structured thought
-        // so the LLM translation has access to domain, entities, and computed answers.
         if detected_domain != "generic" || !domain_entities.is_empty() {
             let entities: Vec<(String, String, f64)> = domain_entities
                 .iter()
@@ -1504,16 +1208,14 @@ impl Symthaea {
             });
         }
 
-        // Primitive tier grounding: run language understanding to map
-        // the input to ontological primitive tiers for the structured thought.
+        // Primitive tier grounding
         {
             let understanding = self.language.understand(content);
             thought.primitive_tiers = understanding.primitive_tiers;
             thought.primitives = understanding.primitives;
         }
 
-        // Derive epistemic status from cube (principled 3D mapping)
-        // instead of crude "computed_answer exists → Certain" override
+        // Derive epistemic status from cube
         if let Some(ref ctx) = thought.domain_context {
             if let Some(ref cube) = ctx.cube {
                 thought.epistemic_status = Self::cube_to_epistemic_status(cube);
@@ -1524,10 +1226,6 @@ impl Symthaea {
         // ====================================================================
         // PHASE 3.6: CODE CONTEXT INJECTION (CfC-planned code generation)
         // ====================================================================
-        // When the domain is "programming", run the CodeGenerator to produce
-        // CfC-planned code structure with HDC-verified intent similarity and
-        // Phi measurement, then inject into the structured thought so the LLM
-        // translation phase receives a fully-planned code context.
         #[cfg(feature = "code_generation")]
         let mut pregenerated_tests: Option<String> = None;
         #[cfg(feature = "code_generation")]
@@ -1540,19 +1238,15 @@ impl Symthaea {
             let classifier = CodeIntentClassifier::new(self.hdc_dim);
             let category = classifier.classify(content);
 
-            // Extract language from domain entities or default to "rust"
             let lang = domain_entities
                 .iter()
                 .find(|e| e.entity_type == "language")
                 .map(|e| e.value.clone())
                 .unwrap_or_else(|| "rust".to_string());
 
-            // Extract function name, entity kind, and signature from NL input.
             let (func_name, entity_kind, inferred_sig) =
                 Self::extract_code_metadata(content, &lang);
 
-            // Build a CodeIntent::Create for generation tasks; for other
-            // categories, populate code_context with plan steps only.
             let content_lower = content.to_lowercase();
             let intent = match category {
                 CodeIntentCategory::Create => {
@@ -1562,7 +1256,6 @@ impl Symthaea {
                     if let Some(ref sig) = inferred_sig {
                         spec = spec.with_signature(sig.as_str());
                     }
-                    // Detect multi-entity patterns: "struct with method(s)"
                     if entity_kind == EntityKind::Struct {
                         if content_lower.contains("method")
                             || content_lower.contains("impl")
@@ -1576,8 +1269,6 @@ impl Symthaea {
                             );
                         }
                     }
-                    // Item 3 (Phase 3h): Detect algorithm patterns and inject as
-                    // constraints so the emitter produces scaffolding, not todo!()
                     let intent_hv = self.text_to_hv(content);
                     if let Some(pattern) = crate::dynamics::cfc_code_sequencer::CfCCodeSequencer::detect_algorithm_pattern(&intent_hv) {
                         let constraint = match pattern {
@@ -1610,7 +1301,6 @@ impl Symthaea {
                 }
             };
 
-            // Retrieve top-3 most similar past examples via HDC similarity
             let relevant_examples = if !self.code_generation_cache.is_empty() {
                 let query_hv = self.text_to_hv(content);
                 let cache_snapshot = self.code_generation_cache.clone();
@@ -1638,8 +1328,6 @@ impl Symthaea {
                 ..Default::default()
             };
 
-            // Item 1 (Phase 3h): Test-first generation — produce tests BEFORE
-            // implementation so they serve as independent behavioral oracle
             pregenerated_tests =
                 if let crate::language::code_intent::CodeIntent::Create { ref spec, .. } = intent {
                     self.code_generator.generate_tests_only(spec)
@@ -1649,7 +1337,6 @@ impl Symthaea {
 
             let generated = self.code_generator.generate(&intent, &gen_ctx);
 
-            // Extract spec fields for the structured thought
             let (spec_purpose, spec_signature, spec_constraints, spec_examples) =
                 if let crate::language::code_intent::CodeIntent::Create { ref spec, .. } = intent {
                     (
@@ -1662,16 +1349,12 @@ impl Symthaea {
                     (None, None, Vec::new(), Vec::new())
                 };
 
-            // Detect if the native emitter left unresolved placeholders
             let needs_llm = generated.source.contains("todo!(")
                 || generated.source.contains("NotImplementedError");
 
-            // Item 6 (Phase 3i): Structured prompt assembly for LLM completion.
-            // Organize notes into clear sections so the LLM gets a well-formed prompt.
             let mut notes = generated.notes.clone();
 
             if needs_llm {
-                // Section: CONSTRAINTS from spec + algorithm detection
                 if !spec_constraints.is_empty() {
                     notes.push(format!(
                         "CONSTRAINTS:\n{}",
@@ -1683,7 +1366,6 @@ impl Symthaea {
                     ));
                 }
 
-                // Section: ERROR_AVOIDANCE from past failures
                 let error_hints: Vec<String> = self
                     .error_pattern_memory
                     .iter()
@@ -1696,7 +1378,6 @@ impl Symthaea {
                     ));
                 }
 
-                // Section: SIMILAR_EXAMPLE — best HDC match from cache
                 let cache_snapshot = self.code_generation_cache.clone();
                 let query_hv = self.text_to_hv(content);
                 let best_match: Option<(String, String)> = {
@@ -1718,7 +1399,6 @@ impl Symthaea {
                     ));
                 }
 
-                // Section: EXPECTED_TESTS — behavioral oracle from test-first generation
                 if let Some(ref tests) = pregenerated_tests {
                     notes.push(format!(
                         "EXPECTED_TESTS: The generated code MUST pass these tests:\n{}",
@@ -1726,7 +1406,6 @@ impl Symthaea {
                     ));
                 }
 
-                // Section: OUTPUT_FORMAT — clear instructions for the LLM
                 notes.push(
                     "OUTPUT_FORMAT: Replace each todo!() body with a working implementation. \
                      Do NOT change the function signature. Do NOT add extra functions or imports \
@@ -1734,7 +1413,6 @@ impl Symthaea {
                         .to_string(),
                 );
             } else {
-                // Non-LLM path: just inject error hints as flat notes
                 for (error_pat, fix_hint) in &self.error_pattern_memory {
                     notes.push(format!("AVOID_ERROR: {} — {}", error_pat, fix_hint));
                 }
@@ -1754,7 +1432,7 @@ impl Symthaea {
                 generated_code: Some(generated.source.clone()),
                 phi_score: Some(generated.phi_score),
                 intent_similarity: Some(generated.intent_similarity),
-                syntactically_valid: None, // Set in Phase 5.5
+                syntactically_valid: None,
                 notes,
                 needs_llm_completion: needs_llm,
             });
@@ -1769,7 +1447,6 @@ impl Symthaea {
             thought.semantic_intent = crate::mind::SemanticIntent::Answer;
             thought.epistemic_status = generated.epistemic_status;
 
-            // Plan coverage metric: log plan gap for FEP learning signal
             let plan_gap = 1.0 - generated.plan_coverage;
             if plan_gap > 0.3 {
                 tracing::warn!(
@@ -1789,7 +1466,6 @@ impl Symthaea {
                 "Phase 3.6: CfC code plan injected into structured thought"
             );
 
-            // SSM distillation: cache high-quality native generations as training targets
             if !needs_llm {
                 if let crate::language::code_intent::CodeIntent::Create { ref spec, .. } = intent {
                     if let Some((_hv, src, quality)) =
@@ -1819,13 +1495,6 @@ impl Symthaea {
         // ====================================================================
         // PHASE 4.5: CALIBRATION ADJUSTMENT (Brier Score confidence tuning)
         // ====================================================================
-        // Adjust the epistemic confidence using learned calibration data.
-        // If the system has been overconfident in a domain, reduce confidence.
-        // If underconfident, increase it. This closes the MAGI calibration loop.
-        //
-        // BYPASS: Axiomatic claims (N3) are not subject to calibration.
-        // Mathematical truths like 2+2=4 are certain by definition — no amount
-        // of historical miscalibration should downgrade them.
         #[cfg(feature = "magi_loop")]
         {
             let skip_calibration = thought
@@ -1839,7 +1508,6 @@ impl Symthaea {
                 let raw_confidence = Self::epistemic_to_confidence(&thought.epistemic_status);
                 let adjusted = self.calibration.adjust_confidence(domain, raw_confidence);
 
-                // If calibration significantly changed confidence, update epistemic status
                 let adjusted_status = Self::confidence_to_epistemic(adjusted);
                 if adjusted_status != thought.epistemic_status {
                     tracing::debug!(
@@ -1859,15 +1527,12 @@ impl Symthaea {
         // ====================================================================
         // PHASE 5: TRANSLATION (Broca's Area - NOT reasoning!)
         // ====================================================================
-        // The LLM's ONLY job is to convert the structured thought into
-        // fluent natural language. It must NOT add information.
         let phase5_start = Instant::now();
         let mood_temp = self.mind.state.mood_temperature;
         let generation = self.llm.translate_thought(&thought, mood_temp).await;
         let phase5_duration = phase5_start.elapsed();
 
         // Inject L-SSM semantic PE into MindState for downstream telemetry
-        // and pass FEP-proxy signal to modulate distillation LR
         #[cfg(feature = "liquid-mamba")]
         {
             let pe = self.llm.last_liquid_mamba_pe();
@@ -1875,15 +1540,11 @@ impl Symthaea {
             self.mind.state.liquid_mamba_lr = self.llm.current_distillation_lr();
             self.mind.state.liquid_mamba_rank = self.llm.last_effective_rank();
             self.mind.state.liquid_mamba_generation_count = self.llm.generation_count();
-            // FEP proxy: high cognitive load → high surprise → boost distillation
-            // consciousness_level provides an integration quality signal
             let fep_proxy = (self.mind.state.cognitive_load as f32)
                 .max(1.0 - self.mind.state.consciousness_level as f32)
                 .clamp(0.0, 1.0);
             self.llm.set_fep_modulation(fep_proxy);
 
-            // Cycle-level distillation modulation: adjusts FEP factor based on
-            // thermodynamic load, consciousness confidence, and FEP precision
             let thermo_load = self.mind.state.thermodynamic_load;
             let confidence = self.mind.state.consciousness_level as f32;
             self.llm
@@ -1893,11 +1554,8 @@ impl Symthaea {
         // ====================================================================
         // PHASE 5.5: CODE VERIFICATION (Tree-sitter + HDC round-trip)
         // ====================================================================
-        // When code was generated, verify syntax via tree-sitter and re-encode
-        // to HDC space to measure semantic fidelity. On failure, retry once
-        // with error feedback injected into the thought context.
         #[cfg(feature = "code_generation")]
-        let mut generation = generation; // shadow as mutable for retry
+        let mut generation = generation;
         #[cfg(feature = "code_generation")]
         if thought.code_context.is_some() {
             let code_block = Self::extract_code_block(&generation.text);
@@ -1907,7 +1565,6 @@ impl Symthaea {
                 .map(|c| c.language.clone())
                 .unwrap_or_else(|| "rust".to_string());
 
-            // Iterative verification: tree-sitter → HDC → compile, up to 3 attempts
             const MAX_CODE_RETRIES: usize = 3;
             let mut tree_sitter_ok = false;
             let mut compile_ok = false;
@@ -1921,7 +1578,6 @@ impl Symthaea {
                 let current_code = Self::extract_code_block(&generation.text);
                 verified_code = current_code.clone();
 
-                // Step 1a: Tree-sitter syntax verification + HDC semantic round-trip
                 if let Some(parsed) = Self::parse_code_for_verification(&lang, &current_code) {
                     let verifier = crate::language::code_verifier::CodeVerifier::new(
                         crate::hdc::code_encoder::CodeHDEncoder::new(self.hdc_dim),
@@ -1993,19 +1649,12 @@ impl Symthaea {
                     continue;
                 }
 
-                // Step 1b: Compile + run tests via CodeExecutor (sandbox)
-                // If the code contains #[test] assertions, compile with --test and
-                // execute them. This catches behavioral errors (wrong output), not
-                // just syntax errors.
                 let has_inline_tests = current_code.contains("#[test]");
                 let mut executor = crate::language::code_executor::CodeExecutor::new();
                 let exec_result = match lang.as_str() {
-                    // Rust with inline tests: compile with --test and run assertions
                     "rust" if has_inline_tests => {
                         executor.execute_rust_with_inline_tests(&current_code)
                     }
-                    // Item 1 (Phase 3h): Use pregenerated tests as verification
-                    // oracle when code has no inline tests
                     "rust" if pregenerated_tests.is_some() => {
                         executor.execute_rust(&current_code, pregenerated_tests.as_deref())
                     }
@@ -2039,7 +1688,6 @@ impl Symthaea {
                 } else if attempt < MAX_CODE_RETRIES {
                     if let Some(ref mut ctx) = thought.code_context {
                         if !exec_result.compiled {
-                            // Try semantic auto-fix before burning an LLM retry
                             if let Some(auto_fixed) = crate::language::code_executor::try_auto_fix(
                                 &current_code,
                                 &exec_result.compile_errors,
@@ -2051,9 +1699,7 @@ impl Symthaea {
                                 );
                                 ctx.generated_code = Some(auto_fixed.clone());
                                 verified_code = auto_fixed.clone();
-                                // Update generation text so next loop iteration picks up the fix
                                 generation.text = format!("```rust\n{}\n```", auto_fixed);
-                                // Don't burn an LLM retry — continue to re-verify
                                 continue;
                             }
 
@@ -2070,7 +1716,6 @@ impl Symthaea {
                                 attempt, MAX_CODE_RETRIES
                             ));
                         } else if exec_result.tests_failed > 0 {
-                            // Behavioral failure: code compiles but tests fail
                             ctx.notes.push(format!(
                                 "TESTS FAILED (attempt {}/{}): {} passed, {} failed",
                                 attempt,
@@ -2079,7 +1724,6 @@ impl Symthaea {
                                 exec_result.tests_failed
                             ));
                             if let Some(ref err) = exec_result.runtime_error {
-                                // Include actual vs expected from test output
                                 for line in err.lines().take(10) {
                                     if line.contains("assert")
                                         || line.contains("left")
@@ -2109,7 +1753,6 @@ impl Symthaea {
                     "Phase 5.5: Verification loop completed"
                 );
 
-                // Learn from errors: extract common error patterns for future avoidance
                 if !compile_ok {
                     if let Some(ref ctx) = thought.code_context {
                         for note in &ctx.notes {
@@ -2126,29 +1769,18 @@ impl Symthaea {
                     }
                 }
 
-                // Item 6 (Phase 3h): Compilation feedback → FEP surprise signal
-                // Compilation failure = high surprise → should boost learning rate
-                // Compilation success after retries = moderate surprise → reward
                 let code_surprise = if compile_ok {
                     if attempt > 1 {
-                        // Success after retries: moderate positive signal
                         0.3 / (attempt as f32)
                     } else {
-                        // First-try success: low surprise (expected)
                         0.05
                     }
                 } else {
-                    // Failure: high surprise
                     0.8
                 };
-                // Store code surprise in the thought metadata so the cognitive
-                // loop can pick it up as an FEP prediction error signal
                 if let Some(ref mut ctx) = thought.code_context {
-                    // Encode surprise as a note the cognitive loop can parse
                     ctx.notes
                         .push(format!("CODE_SURPRISE:{:.3}", code_surprise));
-                    // Update intent_similarity inversely with surprise
-                    // (high surprise = low achieved similarity)
                     ctx.intent_similarity =
                         Some(ctx.intent_similarity.unwrap_or(0.5) * (1.0 - code_surprise * 0.5));
                 }
@@ -2161,7 +1793,6 @@ impl Symthaea {
                 );
             }
 
-            // Store successful generation in episodic memory + cache
             if tree_sitter_ok && compile_ok && last_compiled && !last_simulated {
                 let intent_hv = self.text_to_hv(
                     thought
@@ -2184,7 +1815,6 @@ impl Symthaea {
                     crate::memory::Episode::new(intent_hv, code_hv, phi as f64, timestamp);
                 self.episodic_memory.store_if_significant(episode);
 
-                // Cache the successful generation for few-shot retrieval
                 let purpose = thought
                     .code_context
                     .as_ref()
@@ -2193,7 +1823,6 @@ impl Symthaea {
                 if !purpose.is_empty() {
                     self.code_generation_cache
                         .push((purpose, verified_code.clone()));
-                    // Cap cache at 32 entries (FIFO)
                     if self.code_generation_cache.len() > 32 {
                         self.code_generation_cache.remove(0);
                     }
@@ -2211,7 +1840,6 @@ impl Symthaea {
         // ====================================================================
         // PHASE 6: FIDELITY VERIFICATION
         // ====================================================================
-        // Check that the translation respects the structured thought
         let translation_verified = self.verify_translation_fidelity(&thought, &generation.text);
 
         if !translation_verified {
@@ -2225,22 +1853,14 @@ impl Symthaea {
         // ====================================================================
         // PHASE 6.5: RESONANT SPEECH (User-adaptive polishing)
         // ====================================================================
-        // Modulate response using all available cognitive/emotional signals.
-        // Previously only used Psi → cognitive load; now wires emotional tone,
-        // meta-awareness, trust, and epistemic status for richer adaptation.
         let response_text = {
             let load = crate::resonant_speech::CognitiveLoad::from_level(thought.psi);
             let user_state = crate::resonant_speech::UserState {
                 cognitive_load: load,
-                // Emotional tone → frustration (negative valence signals frustration)
                 frustration: ((-thought.emotional_tone.valence).max(0.0)).min(1.0),
-                // Meta-awareness → confidence (higher awareness = higher confidence)
                 confidence: thought.meta_awareness.clamp(0.0, 1.0),
-                // Trust from relationship context
                 trust_in_sophia: thought.trust as f64,
-                // High arousal + low coherence → user appears rushed
                 is_rushed: thought.emotional_tone.arousal > 0.7 && thought.coherence < 0.4,
-                // Epistemic status → learning mode (uncertain/unknown = still learning)
                 is_learning: matches!(
                     thought.epistemic_status,
                     crate::mind::structured_thought::EpistemicStatus::Uncertain
@@ -2256,11 +1876,9 @@ impl Symthaea {
         // ====================================================================
         // PHASE 6.75: AUTONOMOUS ACTION (The "Awakening" integration)
         // ====================================================================
-        // If Phi is high enough, we act on our primitives.
         if thought.psi > 0.3 {
             use crate::action::bindings::{ActionContext, PrimitiveExecutor};
 
-            // ACTIVE INFERENCE DRIVE: If she's very awake, embolden her.
             if thought.psi > 0.7
                 && !thought.primitives.is_empty()
                 && thought.epistemic_status
@@ -2271,15 +1889,12 @@ impl Symthaea {
                     crate::mind::structured_thought::EpistemicStatus::Probable;
             }
 
-            // Extract primitive names from the structured thought
             let primitives: Vec<String> = thought.primitives.clone();
 
             if !primitives.is_empty() {
                 let prim_executor = PrimitiveExecutor::new(self.action_registry.clone());
 
-                // Build context for action generation
                 let mut action_ctx = ActionContext::default();
-                // Heuristic: if we detected domain entities, use them as target paths
                 if let Some(ref d_ctx) = thought.domain_context {
                     tracing::debug!(target: "symthaea::action", domain = %d_ctx.domain, entities = d_ctx.entities.len(), "Context found");
                     if let Some(path_entity) = d_ctx
@@ -2288,7 +1903,6 @@ impl Symthaea {
                         .find(|(t, _, _)| t == "file" || t == "path")
                     {
                         let path = PathBuf::from(&path_entity.1);
-                        // Ensure path is absolute for sandbox validation
                         let absolute_path = if path.is_absolute() {
                             path
                         } else {
@@ -2299,7 +1913,6 @@ impl Symthaea {
                     }
                 }
 
-                // If we need content for WRITE but don't have it, ask the LLM to generate a fix
                 if primitives.contains(&"WRITE".to_string()) && action_ctx.content.is_none() {
                     tracing::debug!(target: "symthaea::action", "Generating fix content via LLM...");
                     let fix_prompt = format!(
@@ -2323,7 +1936,6 @@ impl Symthaea {
                 }
 
                 tracing::info!(target: "symthaea::action", primitives = ?primitives, "Translating primitives to actions");
-                // Translate primitives to actions
                 if let Ok(actions) = prim_executor.translate(&primitives, &action_ctx) {
                     let needs_workspace = actions.iter().any(|action| {
                         matches!(
@@ -2332,7 +1944,6 @@ impl Symthaea {
                                 if program == "cargo"
                         )
                     });
-                    // Sandbox logic: default to session-specific /tmp, but expand if target path is in workspace
                     let sandbox = if needs_workspace {
                         crate::action::SandboxRoot::at(PathBuf::from("/srv/luminous-dynamics"))?
                     } else if let Some(ref path) = action_ctx.target_path {
@@ -2346,7 +1957,6 @@ impl Symthaea {
                     };
 
                     let mut policy = crate::action::PolicyBundle::restrictive();
-                    // Update policy to allow the workspace if we expanded the sandbox
                     if sandbox.root().starts_with("/srv/luminous-dynamics") {
                         policy
                             .capabilities
@@ -2369,7 +1979,7 @@ impl Symthaea {
                         .shell
                         .allowed_programs
                         .insert("cargo".into());
-                    policy.capabilities.min_phi = 0.1; // Ensure action for the demo
+                    policy.capabilities.min_phi = 0.1;
                     policy.capabilities.shell.min_phi = 0.1;
 
                     for action in actions {
@@ -2415,7 +2025,6 @@ impl Symthaea {
                             .execute(&action, &policy, &sandbox, thought.psi)
                         {
                             Ok(execution_outcome) => {
-                                // Feed outcome back into the mind as a perception signal
                                 let outcome_text = match &execution_outcome.outcome {
                                     crate::action::ActionOutcome::Success => {
                                         "Action succeeded.".to_string()
@@ -2465,7 +2074,6 @@ impl Symthaea {
                                     _ => "Action completed".to_string(),
                                 };
 
-                                // Feedback loop: perception of action result
                                 let feedback_hv = self.text_to_hv(&outcome_text);
                                 let mut input = crate::mind::MindInput::new(
                                     crate::mind::InputType::Feedback,
@@ -2475,7 +2083,6 @@ impl Symthaea {
                                     crate::memory::memory_coordinator::MemorySource::ActionFeedback,
                                 );
 
-                                // Successful NIX_BUILD is a verification signal
                                 if let crate::action::ActionOutcome::CommandOutput {
                                     exit_code,
                                     ..
@@ -2488,7 +2095,6 @@ impl Symthaea {
 
                                 self.mind.input(input);
 
-                                // If NIX_BUILD failed, trigger a state of surprise/alertness
                                 if let crate::action::ActionOutcome::CommandOutput {
                                     exit_code,
                                     ..
@@ -2590,7 +2196,6 @@ impl Symthaea {
         let consciousness = thought.psi as f32;
         self.update_partnership(content, consciousness);
 
-        // Track AI state for dyad computation
         let ai_hv = symthaea_core::hdc::unified_hv::ContinuousHV::from_values(
             input_embedding.values.clone(),
         );
@@ -2614,9 +2219,6 @@ impl Symthaea {
         // ====================================================================
         // PHASE 7.5: CALIBRATION RECORDING (Brier Score tracking)
         // ====================================================================
-        // Record the prediction outcome for ongoing calibration.
-        // We treat translation_verified as the outcome: if the translation
-        // was faithful to the structured thought, the prediction "succeeded".
         #[cfg(feature = "magi_loop")]
         {
             let domain = Self::map_intent_to_domain(&thought.semantic_intent);
@@ -2640,10 +2242,8 @@ impl Symthaea {
                 contract,
             );
 
-            // Override inferred domain with semantically meaningful domain
             prediction.domain = domain;
 
-            // Resolve immediately based on fidelity verification
             if translation_verified {
                 prediction.resolve_true(OutcomeCategory::Success, 1.0);
             } else {
@@ -2668,7 +2268,6 @@ impl Symthaea {
         // ====================================================================
         let total_duration = pipeline_start.elapsed();
 
-        // Log at INFO level with structured fields for production observability
         tracing::info!(
             target: "symthaea::broca",
             correlation_id = %correlation_id,
@@ -2694,7 +2293,6 @@ impl Symthaea {
             "Broca pipeline complete"
         );
 
-        // Log epistemic distribution metrics (for aggregation)
         tracing::debug!(
             target: "symthaea::broca::metrics",
             epistemic_status = ?thought.epistemic_status,
@@ -2703,7 +2301,6 @@ impl Symthaea {
             "epistemic_event"
         );
 
-        // Warn on potential hallucination triggers (high novelty + certain status)
         if matches!(
             thought.epistemic_status,
             crate::mind::structured_thought::EpistemicStatus::Certain
@@ -2717,7 +2314,6 @@ impl Symthaea {
             );
         }
 
-        // Log calibration summary periodically (every 10 interactions)
         #[cfg(feature = "magi_loop")]
         if self.interactions % 10 == 0 && self.calibration.total_predictions() > 0 {
             let cal_summary = self.calibration.calibration_summary();
@@ -2742,354 +2338,16 @@ impl Symthaea {
             translation_verified,
             structured_thought: Some(thought),
             consciousness_level: snapshot.consciousness_level,
-            sigma: None, // Spectral MIP phi available via CognitiveLoopService path
+            sigma: None,
         })
     }
 
     /// Verify that the LLM translation respects the structured thought.
-    ///
-    /// Checks:
-    /// - Uncertain epistemic status → translation should contain hedging
-    /// - MustInclude constraints → translation should contain required content
-    /// - MustExclude constraints → translation should not contain forbidden content
-    /// Extract a fenced code block from LLM output.
-    /// Extract function name, entity kind, and optional signature from NL input.
-    ///
-    /// Parses patterns like:
-    /// - "Write a function that reverses a string" → (reverse, Function, Some("fn reverse(s: &str) -> String"))
-    /// - "Create a Point struct with x and y" → (Point, Struct, None)
-    /// - "Implement fibonacci" → (fibonacci, Function, None)
-    #[cfg(feature = "code_generation")]
-    fn extract_code_metadata(
-        content: &str,
-        lang: &str,
-    ) -> (
-        String,
-        crate::language::code_parser::EntityKind,
-        Option<String>,
-    ) {
-        use crate::language::code_parser::EntityKind;
-        let lower = content.to_lowercase();
-        let words: Vec<&str> = content.split_whitespace().collect();
-
-        // Detect entity kind
-        let entity_kind =
-            if lower.contains("struct") || lower.contains("class") || lower.contains("type ") {
-                EntityKind::Struct
-            } else if lower.contains("trait") || lower.contains("interface") {
-                EntityKind::Trait
-            } else if lower.contains("module") || lower.contains("mod ") {
-                EntityKind::Module
-            } else {
-                EntityKind::Function
-            };
-
-        // Extract function name — look for known patterns
-        let func_name = Self::extract_func_name_from_nl(&lower, &words);
-
-        // Try to infer a signature from NL description
-        let signature = if entity_kind == EntityKind::Function {
-            Self::infer_signature_from_nl(&lower, &func_name, lang)
-        } else {
-            None
-        };
-
-        (func_name, entity_kind, signature)
-    }
-
-    /// Extract a plausible function/entity name from natural language.
-    #[cfg(feature = "code_generation")]
-    fn extract_func_name_from_nl(lower: &str, words: &[&str]) -> String {
-        // Pattern 1: explicit "called X" or "named X"
-        for (i, w) in words.iter().enumerate() {
-            let wl = w.to_lowercase();
-            if (wl == "called" || wl == "named") && i + 1 < words.len() {
-                let name = words[i + 1].trim_matches(|c: char| !c.is_alphanumeric() && c != '_');
-                if !name.is_empty() {
-                    return name.to_lowercase();
-                }
-            }
-        }
-
-        // Pattern 2: look for a verb phrase that maps to a function name
-        // "reverses a string" → "reverse", "checks if even" → "is_even"
-        let verb_mappings: &[(&[&str], &str)] = &[
-            (&["reverse", "reverses", "reversing"], "reverse"),
-            (&["sort", "sorts", "sorting"], "sort"),
-            (&["add", "adds", "adding", "sum"], "add"),
-            (&["subtract", "subtracts"], "subtract"),
-            (&["multiply", "multiplies"], "multiply"),
-            (&["divide", "divides"], "divide"),
-            (&["check if even", "checks if even", "is even"], "is_even"),
-            (&["check if odd", "checks if odd", "is odd"], "is_odd"),
-            (&["check if empty", "is empty"], "is_empty"),
-            (&["check if positive", "is positive"], "is_positive"),
-            (&["check if negative", "is negative"], "is_negative"),
-            (&["factorial"], "factorial"),
-            (&["fibonacci"], "fibonacci"),
-            (&["uppercase", "to uppercase", "upper case"], "to_uppercase"),
-            (&["lowercase", "to lowercase", "lower case"], "to_lowercase"),
-            (&["contains", "includes"], "contains"),
-            (&["starts with", "begins with"], "starts_with"),
-            (&["ends with"], "ends_with"),
-            (&["trim", "strip"], "trim"),
-            (&["replace"], "replace"),
-            (&["split"], "split"),
-            (&["join", "concatenate"], "join"),
-            (&["flatten"], "flatten"),
-            (&["unique", "deduplicate"], "unique"),
-            (&["filter"], "filter"),
-            (&["clamp"], "clamp"),
-            (&["absolute value", "abs"], "abs"),
-            (&["power", "exponent"], "power"),
-            (&["square root", "sqrt"], "sqrt"),
-            (&["greatest common", "gcd"], "gcd"),
-            (&["average", "mean"], "average"),
-            (&["binary search", "bsearch"], "binary_search"),
-            (&["dijkstra"], "dijkstra"),
-            (&["knapsack"], "solve_knapsack"),
-            (&["capitalize"], "capitalize"),
-            (&["repeat"], "repeat"),
-            (&["enumerate"], "enumerate"),
-            (&["zip"], "zip"),
-            (&["count"], "count"),
-            (&["length", "len"], "length"),
-        ];
-
-        for (triggers, name) in verb_mappings {
-            for trigger in *triggers {
-                if lower.contains(trigger) {
-                    return name.to_string();
-                }
-            }
-        }
-
-        // Pattern 3: "function/fn X" or "implement X"
-        let prefix_words = [
-            "function",
-            "fn",
-            "implement",
-            "create",
-            "write",
-            "build",
-            "make",
-        ];
-        for (i, w) in words.iter().enumerate() {
-            let wl = w.to_lowercase();
-            if prefix_words.contains(&wl.as_str()) && i + 1 < words.len() {
-                // Skip articles: "a", "an", "the", "that"
-                let mut j = i + 1;
-                while j < words.len() {
-                    let next = words[j].to_lowercase();
-                    if ["a", "an", "the", "that", "which", "to"].contains(&next.as_str()) {
-                        j += 1;
-                    } else {
-                        break;
-                    }
-                }
-                if j < words.len() {
-                    let candidate = words[j]
-                        .trim_matches(|c: char| !c.is_alphanumeric() && c != '_')
-                        .to_lowercase();
-                    if candidate.len() >= 2
-                        && candidate.chars().all(|c| c.is_alphanumeric() || c == '_')
-                    {
-                        return candidate;
-                    }
-                }
-            }
-        }
-
-        // Fallback: use first meaningful word after removing stop words
-        let stop = [
-            "write",
-            "create",
-            "implement",
-            "make",
-            "build",
-            "a",
-            "an",
-            "the",
-            "that",
-            "which",
-            "to",
-            "for",
-            "in",
-            "rust",
-            "python",
-            "function",
-            "method",
-            "struct",
-            "class",
-            "new",
-        ];
-        for w in words {
-            let wl = w.to_lowercase();
-            let clean = wl.trim_matches(|c: char| !c.is_alphanumeric() && c != '_');
-            if clean.len() >= 2 && !stop.contains(&clean) {
-                return clean.to_string();
-            }
-        }
-
-        "generated".to_string()
-    }
-
-    /// Infer a Rust/Python function signature from NL description.
-    ///
-    /// Matches patterns like "takes two integers", "returns a boolean",
-    /// "accepts a string and returns a vector of integers".
-    #[cfg(feature = "code_generation")]
-    fn infer_signature_from_nl(lower: &str, func_name: &str, lang: &str) -> Option<String> {
-        // Only infer for Rust currently
-        if lang != "rust" {
-            return None;
-        }
-
-        // Detect parameter types from NL
-        let mut params: Vec<(&str, &str)> = Vec::new();
-
-        // "two numbers/integers" → (a: i32, b: i32)
-        if lower.contains("two number")
-            || lower.contains("two integer")
-            || lower.contains("2 number")
-        {
-            params.push(("a", "i32"));
-            params.push(("b", "i32"));
-        } else if lower.contains("two float") || lower.contains("two decimal") {
-            params.push(("a", "f64"));
-            params.push(("b", "f64"));
-        } else if lower.contains("two string") {
-            params.push(("a", "&str"));
-            params.push(("b", "&str"));
-        } else if lower.contains("a string")
-            || lower.contains("a str")
-            || lower.contains("given string")
-        {
-            params.push(("s", "&str"));
-        } else if lower.contains("a number")
-            || lower.contains("an integer")
-            || lower.contains("given number")
-        {
-            params.push(("n", "i32"));
-        } else if lower.contains("a vector")
-            || lower.contains("a list")
-            || lower.contains("an array")
-            || lower.contains("a vec")
-        {
-            if lower.contains("string") || lower.contains("str") {
-                params.push(("items", "Vec<String>"));
-            } else {
-                params.push(("items", "Vec<i32>"));
-            }
-        } else if lower.contains("three number") || lower.contains("three integer") {
-            params.push(("a", "i32"));
-            params.push(("b", "i32"));
-            params.push(("c", "i32"));
-        }
-
-        if params.is_empty() {
-            return None;
-        }
-
-        // Detect return type from NL
-        let ret = if lower.contains("return") && lower.contains("bool")
-            || lower.contains("check if")
-            || lower.contains("is even")
-            || lower.contains("is odd")
-            || lower.contains("is empty")
-            || lower.contains("is positive")
-            || lower.contains("is negative")
-        {
-            " -> bool"
-        } else if lower.contains("return") && lower.contains("string")
-            || lower.contains("reverse a string")
-            || lower.contains("uppercase")
-            || lower.contains("lowercase")
-            || lower.contains("capitalize")
-        {
-            " -> String"
-        } else if lower.contains("return") && lower.contains("vector")
-            || lower.contains("return") && lower.contains("vec")
-            || lower.contains("sort") && params.iter().any(|(_, t)| t.contains("Vec"))
-        {
-            " -> Vec<i32>"
-        } else if lower.contains("return") && lower.contains("float") {
-            " -> f64"
-        } else if params.iter().any(|(_, t)| t.contains("Vec"))
-            && (lower.contains("sum")
-                || lower.contains("count")
-                || lower.contains("max")
-                || lower.contains("min"))
-        {
-            " -> i32"
-        } else if params.iter().any(|(_, t)| *t == "i32" || *t == "f64") {
-            if params[0].1 == "f64" {
-                " -> f64"
-            } else {
-                " -> i32"
-            }
-        } else {
-            ""
-        };
-
-        let params_str: Vec<String> = params
-            .iter()
-            .map(|(n, t)| format!("{}: {}", n, t))
-            .collect();
-
-        Some(format!(
-            "fn {}({}){}",
-            func_name,
-            params_str.join(", "),
-            ret
-        ))
-    }
-
-    ///
-    /// Returns the content between the first ``` and the closing ```,
-    /// stripping the optional language tag. Falls back to the full text
-    /// if no fenced block is found.
-    #[cfg(feature = "code_generation")]
-    fn extract_code_block(text: &str) -> String {
-        if let Some(start) = text.find("```") {
-            let after_fence = &text[start + 3..];
-            // Skip the language tag (first line after ```)
-            let code_start = after_fence.find('\n').map(|i| i + 1).unwrap_or(0);
-            let code_region = &after_fence[code_start..];
-            if let Some(end) = code_region.find("```") {
-                return code_region[..end].trim().to_string();
-            }
-        }
-        text.to_string()
-    }
-
-    /// Parse code using the appropriate tree-sitter parser for verification.
-    #[cfg(feature = "code_generation")]
-    fn parse_code_for_verification(
-        lang: &str,
-        source: &str,
-    ) -> Option<crate::language::code_parser::ParsedCode> {
-        use crate::language::code_parser::CodeParser;
-        match lang {
-            "rust" => {
-                let mut parser = crate::language::rust_parser::RustParser::new();
-                parser.parse(source).ok()
-            }
-            "python" => {
-                let mut parser = crate::language::python_parser::PythonParser::new();
-                parser.parse(source).ok()
-            }
-            _ => None,
-        }
-    }
-
     fn verify_translation_fidelity(&self, thought: &StructuredThought, text: &str) -> bool {
         let text_lower = text.to_lowercase();
         let mut verified = true;
 
-        // Check 1: Epistemic status hedging
         if thought.should_hedge() {
-            // Look for hedging language (all lowercase since we compare against text_lower)
             let has_hedging = text_lower.contains("not sure")
                 || text_lower.contains("uncertain")
                 || text_lower.contains("don't know")
@@ -3112,7 +2370,6 @@ impl Symthaea {
             }
         }
 
-        // Check 2: MustInclude constraints
         for constraint in &thought.constraints {
             if constraint.constraint_type == ConstraintType::MustInclude
                 && !text_lower.contains(&constraint.instruction.to_lowercase())
@@ -3125,7 +2382,6 @@ impl Symthaea {
             }
         }
 
-        // Check 3: MustExclude constraints
         for constraint in &thought.constraints {
             if constraint.constraint_type == ConstraintType::MustExclude
                 && text_lower.contains(&constraint.instruction.to_lowercase())
@@ -3138,10 +2394,7 @@ impl Symthaea {
             }
         }
 
-        // Check 4: Unknown status should NOT contain factual assertions
-        // This prevents the LLM from hallucinating answers when we explicitly don't know
         if matches!(thought.epistemic_status, EpistemicStatus::Unknown) {
-            // Patterns that suggest the LLM is making up an answer
             let has_factual_assertion = text_lower.contains(" is ")
                 && (text_lower.contains("capital")
                     || text_lower.contains("answer")
@@ -3177,57 +2430,10 @@ impl Symthaea {
         }
     }
 
-    // ========================================================================
-    // HOLON RECEIVER (Soma↔Desktop bridge)
-    // ========================================================================
-
-    /// Enqueue a message from a connected Soma device.
-    ///
-    /// Called by the Holon HTTP server when a Soma sends data to `/holon/outbound`.
-    /// Messages are stored in the facade-level HolonReceiver and processed
-    /// when the daemon's consciousness loop runs `holon_process_pending()`.
-    pub fn holon_enqueue_soma_message(
-        &mut self,
-        device_id: String,
-        msg: crate::consciousness::holon_receiver::SomaMessage,
-    ) {
-        self.holon_receiver.enqueue_message(device_id, msg);
-    }
-
-    /// Drain outbound responses for a specific Soma device.
-    ///
-    /// Called by the Holon HTTP server to respond to `/holon/inbound` GET requests.
-    pub fn holon_drain_soma_outbound(
-        &mut self,
-        device_id: &str,
-    ) -> Vec<crate::consciousness::holon_receiver::HolonResponse> {
-        self.holon_receiver.drain_outbound(device_id)
-    }
-
-    /// Number of connected Soma devices.
-    pub fn holon_soma_peer_count(&self) -> usize {
-        self.holon_receiver.peer_count()
-    }
-
-    /// Process pending Soma messages. Call from the daemon's background loop.
-    pub fn holon_process_pending(&mut self) {
-        self.holon_receiver.process_inbound(self.interactions);
-    }
-
-    /// Send a language response to a Soma device.
-    pub fn holon_send_to_soma(
-        &mut self,
-        device_id: &str,
-        response: crate::consciousness::holon_receiver::HolonResponse,
-    ) {
-        self.holon_receiver.send_to_device(device_id, response);
-    }
-
     /// Trigger a sleep/consolidation cycle.
     pub async fn sleep(&mut self) -> Result<SleepReport> {
         let before_count = self.mind.working_memory().len();
 
-        // Run multiple dream ticks to consolidate memory
         for _ in 0..10 {
             self.mind.tick();
         }
@@ -3254,11 +2460,7 @@ impl Symthaea {
     }
 
     /// Save state to a file (pause the system).
-    ///
-    /// Persists partnership state, trajectory, interaction count, and learning state.
-    /// Mind and language state are ephemeral and rebuilt on resume.
     pub fn pause(&mut self, path: &str) -> Result<()> {
-        // Save learning state on pause
         #[cfg(feature = "full_language")]
         if let Some(ref mut lp) = self.learning_persistence {
             if let Err(e) = lp.save() {
@@ -3276,11 +2478,9 @@ impl Symthaea {
             }
         }
 
-        // --- DATABASE PERSISTENCE: Save Curriculum and Causal Links ---
         if let Some(ref db) = self.database {
             let db_clone = Arc::clone(db);
 
-            // 1. Save Curriculum
             #[cfg(feature = "school_learning")]
             {
                 let curriculum = self.curriculum.clone();
@@ -3296,7 +2496,6 @@ impl Symthaea {
                 });
             }
 
-            // 2. Save Causal Links from Dream Engine
             let links = self.executor.dream_engine.world_model.observations.clone();
             let db_inner = Arc::clone(&db_clone);
             let pain = self.pain_tx.clone();
@@ -3338,9 +2537,6 @@ impl Symthaea {
     }
 
     /// Get a reference to the mind for introspection.
-    ///
-    /// Used primarily for testing and debugging to inspect
-    /// working memory, seeding status, and internal state.
     pub fn mind(&self) -> &ContinuousMind {
         &self.mind
     }
@@ -3350,18 +2546,7 @@ impl Symthaea {
         &mut self.mind
     }
 
-    // NOTE: `inject_moral_topology()` removed — zero callers, dead code (Mar 2026).
-    // Moral topology mesh sync is reserved for Phase 4 (multi-instance swarm).
-
     /// Extract current social signals from Mind's SocialCoherence.
-    /// Returns (trust, cooperation_rate, prediction_accuracy, models_count, mean_trust).
-    /// Returns safe defaults if social coherence is disabled.
-    ///
-    /// Consumers should call this after `process()` and inject into the cognitive loop:
-    /// ```ignore
-    /// let (trust, coop, pred_acc, models, mean_t) = symthaea.social_signals();
-    /// loop_service.set_social_signals(trust, coop, pred_acc, models, mean_t);
-    /// ```
     pub fn social_signals(&self) -> (f32, f32, f32, usize, f32) {
         self.mind
             .social_coherence()
@@ -3370,7 +2555,7 @@ impl Symthaea {
                 let prediction_accuracy = if stats.total_predictions > 0 {
                     stats.successful_predictions as f32 / stats.total_predictions as f32
                 } else {
-                    0.5 // prior: no data → neutral
+                    0.5
                 };
                 (
                     stats.avg_trust,
@@ -3388,18 +2573,8 @@ impl Symthaea {
     // ========================================================================
 
     /// Wire this Symthaea instance to a CognitiveLoopService's swarm channel.
-    ///
-    /// Connects the Mind's async event sources (Hyperfeel affective state,
-    /// FederatedAggregator round results, mesh peer join/leave/topology) to
-    /// the CLS SwarmManager. Call once after creating both objects.
-    ///
-    /// ```ignore
-    /// let cls = CognitiveLoopService::new(config)?;
-    /// symthaea.wire_swarm_channel(&cls);
-    /// ```
     pub fn wire_swarm_channel(&mut self, cls: &crate::cognitive_loop::CognitiveLoopService) {
         self.mind.set_swarm_channel(cls.swarm_event_sender());
-        // Wire sovereign mesh outbound channel (beacons, name responses, etc.)
         #[cfg(feature = "mesh")]
         if let Some(rx) = cls.take_mesh_outbound_rx() {
             self.mind.set_mesh_outbound_rx(rx);
@@ -3407,9 +2582,6 @@ impl Symthaea {
     }
 
     /// Install a raw swarm event sender on the ContinuousMind.
-    ///
-    /// Lower-level than `wire_swarm_channel()` — use when you don't have a
-    /// direct CLS reference but already have a cloned sender.
     pub fn set_swarm_channel(
         &mut self,
         tx: std::sync::mpsc::Sender<crate::cognitive_loop::SwarmEvent>,
@@ -3422,16 +2594,6 @@ impl Symthaea {
     // ========================================================================
 
     /// Wire governance dispatch to a real Holochain conductor via env vars.
-    ///
-    /// Reads `MYCELIX_CONDUCTOR_URL`, `MYCELIX_APP_TOKEN`, `MYCELIX_APP_ID`.
-    /// If all are set, creates the governance channel, sets the dispatch sender
-    /// on the bridge, and spawns the async dispatch loop in the background.
-    ///
-    /// Returns `true` if the conductor was wired, `false` if env vars are missing.
-    ///
-    /// # Arguments
-    /// * `bridge` — The MycelixBridge instance (caller owns it, passes mutably)
-    /// * `rt` — A tokio runtime handle for spawning the async dispatch loop
     #[cfg(feature = "mycelix")]
     pub fn wire_governance_conductor(
         &self,
@@ -3455,17 +2617,11 @@ impl Symthaea {
             crate::consciousness::mycelix_bridge::MycelixBridge::create_governance_channel();
         bridge.set_governance_dispatch_tx(tx);
 
-        // Spawn the dispatch loop with MockTransport for now.
-        // Real transport requires a separate binary due to serde version conflicts.
-        // The dispatch loop still provides timeout tracking and outcome routing.
-        //
-        // Bridge between GovernanceDispatchCommand (mycelix_bridge) and DispatchCommand (conductor).
         use symthaea_mycelix_conductor::DispatchCommand;
         let (cmd_tx, cmd_rx) = std::sync::mpsc::sync_channel::<DispatchCommand>(64);
         let (outcome_tx, mut outcome_rx) = tokio::sync::mpsc::channel(64);
         let dispatcher = GovernanceDispatcher::new(MockTransport);
 
-        // Converter thread: GovernanceDispatchCommand → DispatchCommand
         std::thread::spawn(move || {
             use crate::consciousness::mycelix_bridge::GovernanceDispatchCommand as GDC;
             while let Ok(gdc) = rx.recv() {
@@ -3497,24 +2653,10 @@ impl Symthaea {
                         rationale,
                     },
                     GDC::QueryActiveProposals => DispatchCommand::QueryActiveProposals,
-                    GDC::EvaluateAsset {
-                        correlation_id,
-                        project_id,
-                        phi_score,
-                        harmony_alignment,
-                        per_harmony_scores,
-                        care_activation,
-                        meta_awareness,
-                        ..
-                    } => DispatchCommand::EvaluateAsset {
-                        correlation_id,
-                        project_id,
-                        phi_score,
-                        harmony_alignment,
-                        per_harmony_scores,
-                        care_activation,
-                        meta_awareness,
-                    },
+                    GDC::EvaluateAsset { .. } => {
+                        // EvaluateAsset handled directly in the bridge — not dispatched to conductor
+                        continue;
+                    }
                 };
                 if cmd_tx.send(dc).is_err() {
                     break;
@@ -3526,7 +2668,6 @@ impl Symthaea {
             dispatcher.run_dispatch_loop(cmd_rx, outcome_tx).await;
         });
 
-        // Spawn outcome drainer (logs outcomes for now; future: inject into CLS)
         rt.spawn(async move {
             while let Some(outcome) = outcome_rx.recv().await {
                 tracing::info!(?outcome, "Governance dispatch outcome received");
@@ -3537,97 +2678,15 @@ impl Symthaea {
     }
 
     // ========================================================================
-    // Calibration (Brier Score Integration)
-    // ========================================================================
-
-    /// Get the current calibration summary.
-    ///
-    /// Returns global and per-domain Brier scores, ECE, accuracy, and
-    /// whether the system is currently well-calibrated.
-    #[cfg(feature = "magi_loop")]
-    pub fn calibration_summary(&self) -> CalibrationSummary {
-        self.calibration.calibration_summary()
-    }
-
-    /// Map EpistemicStatus to a confidence float for calibration tracking.
-    ///
-    /// These values represent the system's belief about being correct:
-    /// - Certain: 0.95 (very high confidence)
-    /// - Probable: 0.75 (moderate-high confidence)
-    /// - Uncertain: 0.45 (moderate-low confidence)
-    /// - Unknown: 0.15 (very low confidence)
-    /// - OutOfDomain: 0.10 (minimal confidence)
-    #[cfg(feature = "magi_loop")]
-    fn epistemic_to_confidence(status: &EpistemicStatus) -> f64 {
-        match status {
-            EpistemicStatus::Certain => 0.95,
-            EpistemicStatus::Probable => 0.75,
-            EpistemicStatus::Uncertain => 0.45,
-            EpistemicStatus::Unknown => 0.15,
-            EpistemicStatus::OutOfDomain => 0.10,
-        }
-    }
-
-    /// Map a confidence float back to EpistemicStatus.
-    ///
-    /// Inverse of `epistemic_to_confidence`, using midpoint thresholds.
-    #[cfg(feature = "magi_loop")]
-    fn confidence_to_epistemic(confidence: f64) -> EpistemicStatus {
-        if confidence >= 0.85 {
-            EpistemicStatus::Certain
-        } else if confidence >= 0.60 {
-            EpistemicStatus::Probable
-        } else if confidence >= 0.30 {
-            EpistemicStatus::Uncertain
-        } else if confidence >= 0.12 {
-            EpistemicStatus::Unknown
-        } else {
-            EpistemicStatus::OutOfDomain
-        }
-    }
-
-    /// Map SemanticIntent to a PredictionDomain for calibration tracking.
-    ///
-    /// Groups different intents into calibration domains:
-    /// - Answer, Clarify → Factual (knowledge-based predictions)
-    /// - ProposeAction → ToolUse (action outcome predictions)
-    /// - Acknowledge, Continue → UserBehavior (social interaction predictions)
-    /// - Reflect → SystemState (introspective predictions)
-    /// - ExpressUncertainty, Unknown → Factual (default calibration domain)
-    #[cfg(feature = "magi_loop")]
-    fn map_intent_to_domain(intent: &SemanticIntent) -> PredictionDomain {
-        match intent {
-            SemanticIntent::Answer | SemanticIntent::Clarify => PredictionDomain::Factual,
-            SemanticIntent::ProposeAction => PredictionDomain::ToolUse,
-            SemanticIntent::Acknowledge | SemanticIntent::Continue => {
-                PredictionDomain::UserBehavior
-            }
-            SemanticIntent::Reflect => PredictionDomain::SystemState,
-            SemanticIntent::ExpressUncertainty | SemanticIntent::Unknown => {
-                PredictionDomain::Factual
-            }
-        }
-    }
-
-    // ========================================================================
     // Private helpers
     // ========================================================================
 
     /// Map an EpistemicCube to an EpistemicStatus using principled 3D reasoning.
-    ///
-    /// This replaces the crude `computed_answer → Certain` override with a
-    /// mapping grounded in the Mycelix Epistemic Charter v2.0:
-    ///
-    /// - E4/E3 (reproducible/peer-verified): Certain
-    /// - E2 (verifiable against docs): Probable
-    /// - E1 (testimonial): Probable if normatively backed (N >= N1), else Uncertain
-    /// - E0 (opinion): Uncertain — don't override existing assessment
     fn cube_to_epistemic_status(cube: &EpistemicCube) -> EpistemicStatus {
         match cube.e {
             ETier::E4 | ETier::E3 => EpistemicStatus::Certain,
             ETier::E2 => EpistemicStatus::Probable,
             ETier::E1 => {
-                // Testimonial evidence: Probable if normatively backed
                 if cube.n >= NTier::N1 {
                     EpistemicStatus::Probable
                 } else {
@@ -3639,12 +2698,7 @@ impl Symthaea {
     }
 
     /// Convert text to a ContinuousHV embedding.
-    ///
-    /// When Neural Bridge v2 is available (feature `neural-bridge`), uses BGE-M3
-    /// for high-quality semantic encoding (~380ms CPU, cached <1ms).
-    /// Otherwise falls back to fast hash-based encoding (<1ms but lower quality).
     fn text_to_hv(&mut self, text: &str) -> ContinuousHV {
-        // Try Neural Bridge v2 first (if available)
         #[cfg(feature = "neural-bridge")]
         if self.hdc_dim != symthaea_core::hdc::unified_hv::HDC_DIMENSION {
             static NEURAL_BRIDGE_DIM_WARN: std::sync::Once = std::sync::Once::new();
@@ -3659,8 +2713,6 @@ impl Symthaea {
         } else if let Some(ref mut bridge) = self.neural_bridge {
             match bridge.encode_to_hdc(text) {
                 Ok(packed) => {
-                    // Convert PackedBipolar to ContinuousHV
-                    // PackedBipolar is 16384-dim bipolar {-1, +1}, ContinuousHV uses self.hdc_dim
                     let bipolar = packed.to_bipolar();
                     let mut values = vec![0.0f32; self.hdc_dim];
                     for (i, &val) in bipolar.iter().take(self.hdc_dim).enumerate() {
@@ -3678,13 +2730,12 @@ impl Symthaea {
             }
         }
 
-        // Fallback: hash-based encoding (fast but lower quality)
+        // Fallback: hash-based encoding
         let mut values = vec![0.0f32; self.hdc_dim];
         for (i, byte) in text.bytes().enumerate() {
             let idx = (byte as usize * 31 + i * 7) % self.hdc_dim;
             values[idx] += 1.0;
         }
-        // Normalize
         let magnitude: f32 = values.iter().map(|v| v * v).sum::<f32>().sqrt();
         if magnitude > 0.0 {
             for v in values.iter_mut() {
@@ -3706,7 +2757,7 @@ impl Symthaea {
         false
     }
 
-    /// Get Neural Bridge v2 statistics (cache hits, latencies, etc.).
+    /// Get Neural Bridge v2 statistics.
     #[cfg(feature = "neural-bridge")]
     pub fn neural_bridge_stats(&self) -> Option<crate::perception::neural_bridge_v2::BridgeStats> {
         self.neural_bridge.as_ref().map(|b| b.stats().clone())
@@ -3718,7 +2769,7 @@ impl Symthaea {
         None
     }
 
-    /// Compute self-loops in the cognitive graph (working memory self-similarity).
+    /// Compute self-loops in the cognitive graph.
     fn compute_self_loops(&self) -> usize {
         let wm = self.mind.working_memory();
         let mut loops = 0;
@@ -3742,41 +2793,21 @@ impl Symthaea {
     // ========================================================================
 
     /// Generate an HDC embedding for text.
-    ///
-    /// This is the public API for getting embeddings from Symthaea, used by
-    /// LUCID's semantic search and other consumers. It wraps the internal
-    /// `text_to_hv` method to provide a stable interface.
-    ///
-    /// Returns a `ContinuousHV` hypervector of dimension `hdc_dim` (default 16,384).
-    ///
-    /// ## Encoding Strategy
-    ///
-    /// When Neural Bridge v2 is available (feature `neural-bridge`), uses BGE-M3
-    /// for high-quality semantic encoding. Otherwise falls back to hash-based
-    /// encoding which is fast but lower quality.
     pub fn embed(&mut self, text: &str) -> ContinuousHV {
         self.text_to_hv(text)
     }
 
     /// Generate an HDC embedding and return as `Vec<f32>`.
-    ///
-    /// Convenience method that extracts the raw values from the ContinuousHV.
     pub fn embed_vec(&mut self, text: &str) -> Vec<f32> {
         self.text_to_hv(text).values
     }
 
     /// Batch embed multiple texts.
-    ///
-    /// More efficient than calling `embed` repeatedly as it can amortize
-    /// initialization costs.
     pub fn embed_batch(&mut self, texts: &[&str]) -> Vec<ContinuousHV> {
         texts.iter().map(|t| self.text_to_hv(t)).collect()
     }
 
     /// Check if high-quality semantic encoding is available.
-    ///
-    /// Returns true if Neural Bridge v2 (BGE-M3) is active, false if using
-    /// hash-based fallback encoding.
     pub fn has_semantic_encoder(&self) -> bool {
         self.has_neural_bridge()
     }
@@ -3785,47 +2816,6 @@ impl Symthaea {
     pub fn dimension(&self) -> usize {
         self.hdc_dim
     }
-
-    /// Record a curriculum research event and optionally auto-save.
-    #[cfg(feature = "school_learning")]
-    pub fn record_research(&mut self, topic: &str, objectives_added: usize) -> Result<()> {
-        self.curriculum_meta.last_research_topic = Some(topic.to_string());
-        self.curriculum_meta.last_research_at = Some(Utc::now().to_rfc3339());
-        self.curriculum_meta.last_objectives_added = Some(objectives_added);
-        self.curriculum_meta.total_objectives = self.curriculum.objectives.len();
-        self.curriculum_meta.dimension = self.hdc_dim;
-
-        if self.curriculum_persistence.auto_save {
-            self.save_curriculum()?;
-        }
-
-        Ok(())
-    }
-
-    /// Persist the curriculum and metadata to disk.
-    #[cfg(feature = "school_learning")]
-    pub fn save_curriculum(&mut self) -> Result<()> {
-        let path = &self.curriculum_persistence.path;
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).with_context(|| {
-                format!(
-                    "Failed to create curriculum directory: {}",
-                    parent.display()
-                )
-            })?;
-        }
-
-        self.curriculum_meta.last_saved_at = Some(Utc::now().to_rfc3339());
-        self.curriculum_meta.total_objectives = self.curriculum.objectives.len();
-        self.curriculum_meta.dimension = self.hdc_dim;
-
-        CurriculumLoader::save_store_to_json(&self.curriculum, &self.curriculum_meta, path)
-            .with_context(|| format!("Failed to save curriculum to {}", path.display()))?;
-
-        Ok(())
-    }
-
-    // NOTE: `curriculum_report()` removed — zero callers, dead code (Mar 2026).
 
     #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
     fn apply_research_updates(&mut self) {
@@ -3875,46 +2865,6 @@ impl Symthaea {
         }
     }
 
-    // ========================================================================
-    // Private helpers
-    // ========================================================================
-
-    #[cfg(feature = "school_learning")]
-    fn curriculum_recall_scores(
-        &self,
-        input_embedding: &ContinuousHV,
-        threshold: f32,
-    ) -> CurriculumRecallScores {
-        use std::cmp::Ordering;
-
-        let target_dim = input_embedding.values.len();
-        let mut scores = Vec::with_capacity(self.curriculum.objectives.len());
-        let mut candidates = Vec::new();
-
-        for (idx, obj) in self.curriculum.objectives.iter().enumerate() {
-            let obj_hv = if obj.encoding.values.len() == target_dim {
-                obj.encoding.clone()
-            } else {
-                let mut folded = vec![0.0f32; target_dim];
-                for (i, &val) in obj.encoding.values.iter().enumerate() {
-                    folded[i % target_dim] += val;
-                }
-                ContinuousHV::from_values(folded)
-            };
-
-            let similarity = input_embedding.similarity(&obj_hv);
-            scores.push((similarity, idx));
-            if similarity > threshold {
-                candidates.push((similarity, idx, obj_hv));
-            }
-        }
-
-        scores.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(Ordering::Equal));
-        candidates.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(Ordering::Equal));
-
-        CurriculumRecallScores { scores, candidates }
-    }
-
     fn should_recall_interoception(content: &str) -> bool {
         let lower = content.to_lowercase();
         lower.contains("watt")
@@ -3926,12 +2876,7 @@ impl Symthaea {
             || lower.contains("interoception")
     }
 
-    /// Compute current Phi-dyad value.
     /// RECEIVE SWARM MESSAGE (Immune System Constraint)
-    ///
-    /// When a node receives a broadcasted optimization, it MUST NOT merge it
-    /// directly into its core DNA. Instead, it is saved as a 'Candidate Objective'
-    /// for local verification.
     pub async fn receive_swarm_message(
         &mut self,
         topic: &str,
@@ -3941,12 +2886,10 @@ impl Symthaea {
             let content = String::from_utf8_lossy(payload);
             tracing::info!(target: "symthaea::swarm", "Received swarm optimization: {}. Storing as Candidate for local verification.", content);
 
-            // THE FORGE: If the payload is a path to a .wasm file, trigger verification loop
             if content.ends_with(".wasm") {
                 let wasm_path = PathBuf::from(content.to_string());
                 tracing::info!(target: "symthaea::forge", "WASM Binary detected: {:?}. Initiating autonomous verification.", wasm_path);
 
-                // Trigger internal autonomous command
                 let verify_cmd = format!("Verify the WASM optimization at {:?} in the sandbox. If successful, promote to Verified and hot-load the DNA.", wasm_path);
                 let _ = self.process(&verify_cmd).await?;
             }
@@ -3982,8 +2925,6 @@ impl Symthaea {
     }
 
     /// APPLY COGNITIVE HOMEOSTASIS (The Biological Throttle)
-    ///
-    /// Adjust the cognitive stride based on power consumption.
     pub fn apply_homeostasis(&mut self, current_power_watts: f32) {
         use symthaea_core::hdc::unified_hv::set_cognitive_stride;
 
@@ -3994,297 +2935,45 @@ impl Symthaea {
             tracing::info!(target: "symthaea::homeostasis", "Power stable ({:.2}W). Increasing cognitive resolution (Stride 1).", current_power_watts);
             set_cognitive_stride(1);
         } else {
-            set_cognitive_stride(4); // Balanced resolution
+            set_cognitive_stride(4);
         }
     }
 
-    // ── CodebaseMemory Integration ──────────────────────────────────────
+    // ── Holon Soma bridge stubs ──────────────────────────────────────────
+    // Placeholder methods for P2P device mesh communication.
+    // Full wiring deferred until HolonReceiver integration is complete.
 
-    /// Index a project directory into CodebaseMemory for semantic code search.
-    ///
-    /// Walks the directory tree (respecting common ignore patterns), parses each
-    /// source file, and encodes its AST into HDC vectors. After indexing, the
-    /// code generator can query for relevant functions/types when generating new code.
-    ///
-    /// Returns `(files_indexed, parse_errors)`.
-    #[cfg(feature = "code_generation")]
-    pub fn index_project(&mut self, root: &std::path::Path) -> (usize, usize) {
-        use crate::language::parser_registry::ParserRegistry;
-
-        let mut parser_registry = ParserRegistry::new();
-        let mut files_indexed = 0usize;
-        let mut parse_errors = 0usize;
-        let start = std::time::Instant::now();
-
-        // Collect source files recursively (skip hidden, target, node_modules, etc.)
-        let mut stack = vec![root.to_path_buf()];
-        while let Some(dir) = stack.pop() {
-            let entries = match std::fs::read_dir(&dir) {
-                Ok(e) => e,
-                Err(_) => continue,
-            };
-            for entry in entries.filter_map(|e| e.ok()) {
-                let name = entry.file_name();
-                let name_str = name.to_string_lossy();
-                if name_str.starts_with('.')
-                    || name_str == "target"
-                    || name_str == "node_modules"
-                    || name_str == "venv"
-                    || name_str == "__pycache__"
-                {
-                    continue;
-                }
-                let path = entry.path();
-                if path.is_dir() {
-                    stack.push(path);
-                } else if path.is_file() {
-                    let filename = path.file_name().and_then(|n| n.to_str());
-                    // Quick extension check before reading file
-                    if filename.is_none() {
-                        continue;
-                    }
-                    let ext = path.extension().and_then(|e| e.to_str());
-                    let is_parseable = matches!(ext, Some("rs") | Some("py") | Some("nix"));
-                    if !is_parseable {
-                        continue;
-                    }
-                    match std::fs::read_to_string(&path) {
-                        Ok(source) => match parser_registry.parse(&source, None, filename) {
-                            Ok(parsed) => {
-                                self.code_memory.index_file(&path, &parsed);
-                                files_indexed += 1;
-                            }
-                            Err(_) => parse_errors += 1,
-                        },
-                        Err(_) => parse_errors += 1,
-                    }
-                }
-            }
-        }
-
-        let elapsed = start.elapsed();
-        tracing::info!(
-            target: "symthaea::code_memory",
-            files = files_indexed,
-            errors = parse_errors,
-            functions = self.code_memory.function_count(),
-            types = self.code_memory.type_count(),
-            elapsed_ms = elapsed.as_millis(),
-            "Project indexed"
-        );
-
-        (files_indexed, parse_errors)
+    /// Number of connected Soma peers (phones, tablets, IoT devices).
+    pub fn holon_soma_peer_count(&self) -> usize {
+        0
     }
 
-    /// Query the codebase memory for functions/types similar to a natural language query.
-    ///
-    /// Returns up to `top_k` matches with similarity scores. Requires prior `index_project()`.
-    #[cfg(feature = "code_generation")]
-    pub fn query_codebase(
-        &self,
-        query: &str,
-        top_k: usize,
-    ) -> Vec<crate::hdc::code_memory::CodeMatch> {
-        let query_hv = self.code_memory.encoder().encode_name(query);
-        self.code_memory.query(&query_hv, top_k)
-    }
-
-    /// Get the codebase coherence score (0.0 = fragmented, 1.0 = highly cohesive).
-    #[cfg(feature = "code_generation")]
-    pub fn codebase_coherence(&self) -> f32 {
-        self.code_memory.codebase_coherence()
-    }
-
-    /// Access the code memory directly for advanced queries.
-    #[cfg(feature = "code_generation")]
-    pub fn code_memory(&self) -> &crate::hdc::code_memory::CodebaseMemory {
-        &self.code_memory
-    }
-
-    /// Run a coding task through the consciousness-gated agentic loop.
-    ///
-    /// This is the primary entry point for coding AI functionality. It:
-    /// 1. Queries `CodebaseMemory` for relevant context (if indexed)
-    /// 2. Creates a `CodingAgent` with the project's working directory
-    /// 3. Feeds codebase context into the agent's generation prompts
-    /// 4. Runs the multi-step loop (understand → plan → generate → test → fix)
-    /// 5. Records the outcome for backend stats learning
-    ///
-    /// Call `index_project()` first for codebase-aware generation.
-    #[cfg(feature = "code_generation")]
-    pub fn run_coding_task(&mut self, task: &str) -> crate::coding_agent::AgentResult {
-        use crate::coding_agent::{CodingAgent, CodingAgentConfig};
-
-        let working_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-
-        let config = CodingAgentConfig {
-            working_dir: working_dir.clone(),
-            ..Default::default()
-        };
-
-        let mut agent = CodingAgent::new(config).unwrap_or_else(|e| {
-            tracing::error!(target: "symthaea::coding", error = %e, "Failed to create CodingAgent");
-            // Fallback: create with default config (will use current dir)
-            CodingAgent::new(CodingAgentConfig::default()).expect("CodingAgent default must work")
-        });
-
-        // Query CodebaseMemory for relevant context
-        let context: Vec<String> = self
-            .query_codebase(task, 5)
-            .into_iter()
-            .map(|m| {
-                format!(
-                    "// {}::{} (similarity: {:.2})\n// file: {}",
-                    m.kind,
-                    m.name,
-                    m.similarity,
-                    m.path.display()
-                )
-            })
-            .collect();
-
-        if !context.is_empty() {
-            tracing::info!(
-                target: "symthaea::coding",
-                matches = context.len(),
-                "Injecting codebase context into agent"
-            );
-            agent.set_code_context(context);
-        }
-
-        // Run the agent
-        let result = agent.run(task);
-
-        // Record outcome into error pattern memory for future generations
-        if let Some(false) = result.tests_passed {
-            for err in &result.errors {
-                if err.len() > 10 {
-                    // Extract a short pattern from the error
-                    let pattern = err.chars().take(120).collect::<String>();
-                    self.error_pattern_memory.push((pattern, task.to_string()));
-                    // Cap error memory at 64 entries
-                    if self.error_pattern_memory.len() > 64 {
-                        self.error_pattern_memory.remove(0);
-                    }
-                }
-            }
-        }
-
-        // Cache successful generations
-        if result.tests_passed == Some(true) && !result.files_modified.is_empty() {
-            self.code_generation_cache
-                .push((task.to_string(), format!("{:?}", result.files_modified)));
-            if self.code_generation_cache.len() > 32 {
-                self.code_generation_cache.remove(0);
-            }
-        }
-
-        tracing::info!(
-            target: "symthaea::coding",
-            task = task,
-            iterations = result.iterations_used,
-            files = result.files_modified.len(),
-            phase = %result.final_phase,
-            tiers = ?result.generation_tiers,
-            energy = result.total_energy,
-            "Coding task complete"
-        );
-
-        result
-    }
-
-    /// Run a coding task with a custom configuration.
-    #[cfg(feature = "code_generation")]
-    pub fn run_coding_task_with_config(
+    /// Enqueue an inbound SomaMessage from a connected device.
+    pub fn holon_enqueue_soma_message(
         &mut self,
-        task: &str,
-        config: crate::coding_agent::CodingAgentConfig,
-    ) -> crate::coding_agent::AgentResult {
-        use crate::coding_agent::CodingAgent;
+        _device_id: String,
+        _msg: crate::consciousness::holon_receiver::SomaMessage,
+    ) {
+        // Stub — HolonReceiver wiring pending
+    }
 
-        let mut agent = CodingAgent::new(config)
-            .unwrap_or_else(|_| CodingAgent::new(Default::default()).expect("default agent"));
+    /// Process all pending inbound messages through the HolonReceiver.
+    pub fn holon_process_pending(&mut self) {
+        // Stub — HolonReceiver wiring pending
+    }
 
-        let context: Vec<String> = self
-            .query_codebase(task, 5)
-            .into_iter()
-            .map(|m| {
-                format!(
-                    "// {}::{} (similarity: {:.2})\n// file: {}",
-                    m.kind,
-                    m.name,
-                    m.similarity,
-                    m.path.display()
-                )
-            })
-            .collect();
-
-        if !context.is_empty() {
-            agent.set_code_context(context);
-        }
-
-        let result = agent.run(task);
-
-        // Same outcome recording as run_coding_task
-        if let Some(false) = result.tests_passed {
-            for err in &result.errors {
-                if err.len() > 10 {
-                    let pattern = err.chars().take(120).collect::<String>();
-                    self.error_pattern_memory.push((pattern, task.to_string()));
-                    if self.error_pattern_memory.len() > 64 {
-                        self.error_pattern_memory.remove(0);
-                    }
-                }
-            }
-        }
-
-        if result.tests_passed == Some(true) && !result.files_modified.is_empty() {
-            self.code_generation_cache
-                .push((task.to_string(), format!("{:?}", result.files_modified)));
-            if self.code_generation_cache.len() > 32 {
-                self.code_generation_cache.remove(0);
-            }
-        }
-
-        result
+    /// Drain outbound responses for a specific device channel.
+    pub fn holon_drain_soma_outbound(
+        &mut self,
+        _channel: &str,
+    ) -> Vec<crate::consciousness::holon_receiver::HolonResponse> {
+        Vec::new()
     }
 }
 
-/// Serializable state for pause/resume persistence.
-///
-/// Only stores relational state (partnership, trajectory) and configuration.
-/// The mind and language cores are ephemeral and rebuilt on resume.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct PersistedState {
-    hdc_dim: usize,
-    ltc_neurons: usize,
-    interactions: u64,
-    partner: HumanPartnerModel,
-    trajectory: RelationshipTrajectory,
-    recent_ai_states: Vec<symthaea_core::hdc::unified_hv::ContinuousHV>,
-    /// Path to the consciousness database (if configured).
-    #[serde(default)]
-    database_path: Option<String>,
-}
-
-/// Summary of partnership state for external consumers.
-#[derive(Debug, Clone)]
-pub struct PartnershipState {
-    /// Current relationship stage.
-    pub stage: RelationshipStage,
-    /// Trust level (0.0-1.0).
-    pub trust: f32,
-    /// Vulnerability level (0.0-1.0).
-    pub vulnerability: f32,
-    /// Reciprocity level (0.0-1.0).
-    pub reciprocity: f32,
-    /// Current Phi-dyad value.
-    pub phi_dyad: f64,
-    /// Total interactions.
-    pub interactions: u64,
-    /// Number of trajectory points recorded.
-    pub trajectory_points: usize,
-}
+// ========================================================================
+// Tests
+// ========================================================================
 
 #[cfg(test)]
 mod tests {
@@ -4316,10 +3005,8 @@ mod tests {
     async fn test_introspect_initial_state() {
         let s = Symthaea::new(1024, 64).await.unwrap();
         let intro = s.introspect();
-        // Consciousness level starts low but non-negative
         assert!(intro.consciousness_level >= 0.0);
         assert!(intro.consciousness_level <= 1.0);
-        // Graph has at least the seeded prototypes
         assert!(intro.graph_size > 0, "Graph should have seeded items");
         assert_eq!(intro.memory_stats.long_term_count, 0, "No interactions yet");
     }
@@ -4339,7 +3026,6 @@ mod tests {
         let mut s = Symthaea::new(1024, 64).await.unwrap();
         let hv = s.embed("hello world");
         assert_eq!(hv.values.len(), 1024);
-        // Should be normalized (magnitude ~1.0)
         let mag: f32 = hv.values.iter().map(|v| v * v).sum::<f32>().sqrt();
         assert!(
             (mag - 1.0).abs() < 0.01,
@@ -4427,7 +3113,6 @@ mod tests {
         let mut s = Symthaea::new(1024, 64).await.unwrap();
         let a = s.embed("quantum physics");
         let b = s.embed("chocolate cake");
-        // Different texts should produce different embeddings
         let sim = a.similarity(&b);
         assert!(
             sim < 0.95,
@@ -4441,19 +3126,16 @@ mod tests {
         let path = tmp.to_str().unwrap();
         {
             let mut s = Symthaea::new(1024, 64).await.unwrap();
-            // Process a query to bump interaction count
             let _ = s.process("hello").await;
             assert!(s.interactions > 0);
             s.pause(path).unwrap();
         }
-        // Resume and verify state persisted
         let s = Symthaea::resume(path).unwrap();
         assert_eq!(s.dimension(), 1024);
         assert!(
             s.interactions > 0,
             "Interactions should persist through pause/resume"
         );
-        // Cleanup
         let _ = std::fs::remove_file(path);
     }
 
@@ -4480,7 +3162,6 @@ mod tests {
     #[tokio::test]
     async fn test_sleep_consolidation() {
         let mut s = Symthaea::new(1024, 64).await.unwrap();
-        // Process some inputs to populate working memory
         let _ = s.process("input one").await;
         let _ = s.process("input two").await;
         let report = s.sleep().await;
@@ -4493,42 +3174,36 @@ mod tests {
     fn test_cube_to_epistemic_status() {
         use crate::mind::structured_thought::MTier;
 
-        // E4 (reproducible) → Certain
         let cube_e4 = EpistemicCube::new(ETier::E4, NTier::N0, MTier::M0);
         assert_eq!(
             Symthaea::cube_to_epistemic_status(&cube_e4),
             EpistemicStatus::Certain
         );
 
-        // E3 (peer-verified) → Certain
         let cube_e3 = EpistemicCube::new(ETier::E3, NTier::N0, MTier::M0);
         assert_eq!(
             Symthaea::cube_to_epistemic_status(&cube_e3),
             EpistemicStatus::Certain
         );
 
-        // E2 (verifiable) → Probable
         let cube_e2 = EpistemicCube::new(ETier::E2, NTier::N0, MTier::M0);
         assert_eq!(
             Symthaea::cube_to_epistemic_status(&cube_e2),
             EpistemicStatus::Probable
         );
 
-        // E1 with N1+ → Probable
         let cube_e1_n1 = EpistemicCube::new(ETier::E1, NTier::N1, MTier::M0);
         assert_eq!(
             Symthaea::cube_to_epistemic_status(&cube_e1_n1),
             EpistemicStatus::Probable
         );
 
-        // E1 with N0 → Uncertain
         let cube_e1_n0 = EpistemicCube::new(ETier::E1, NTier::N0, MTier::M0);
         assert_eq!(
             Symthaea::cube_to_epistemic_status(&cube_e1_n0),
             EpistemicStatus::Uncertain
         );
 
-        // E0 (opinion) → Uncertain
         let cube_e0 = EpistemicCube::new(ETier::E0, NTier::N0, MTier::M0);
         assert_eq!(
             Symthaea::cube_to_epistemic_status(&cube_e0),
@@ -4550,7 +3225,6 @@ mod tests {
     async fn test_mind_accessor() {
         let s = Symthaea::new(1024, 64).await.unwrap();
         let mind = s.mind();
-        // Mind should be awakened with seeded memory
         assert!(
             !mind.working_memory().is_empty(),
             "Mind should have seeded working memory"
@@ -4563,7 +3237,6 @@ mod tests {
     async fn test_social_signals_default() {
         let s = Symthaea::new(1024, 64).await.unwrap();
         let (trust, cooperation, pred_acc, models, mean_trust) = s.social_signals();
-        // Without social coherence enabled, should return safe defaults
         assert!(
             (trust - 0.5).abs() < f32::EPSILON,
             "Default trust should be 0.5, got {trust}"
@@ -4664,6 +3337,9 @@ mod tests {
     #[cfg(feature = "magi_loop")]
     #[tokio::test]
     async fn test_map_intent_to_domain_all_variants() {
+        use crate::mind::SemanticIntent;
+        use crate::consciousness::recursive_improvement::PredictionDomain;
+
         assert_eq!(
             Symthaea::map_intent_to_domain(&SemanticIntent::Answer),
             PredictionDomain::Factual
@@ -4724,7 +3400,6 @@ mod tests {
     async fn test_mind_mut_allows_config_change() {
         let mut s = Symthaea::new(1024, 64).await.unwrap();
         let original_dim = s.mind().config().dimension;
-        // Mutably access and verify it's the same config
         let mind = s.mind_mut();
         assert_eq!(mind.config().dimension, original_dim);
     }

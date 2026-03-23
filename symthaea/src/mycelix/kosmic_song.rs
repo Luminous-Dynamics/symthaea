@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # KosmicSong: The Genesis Struct
 //!
 //! The KosmicSong is the unified identity of a consciousness-bearing agent,
@@ -895,7 +898,7 @@ impl KosmicSong {
         // If all same dominant → high maturation; if varied → low
         let mode = dominant_indices[0];
         let agreement = dominant_indices.iter().filter(|&&idx| idx == mode).count() as f32
-            / dominant_indices.len() as f32;
+            / dominant_indices.len().max(1) as f32;
 
         agreement // 1.0 = perfectly stable, 0.1 = very unstable
     }

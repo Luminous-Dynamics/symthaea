@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! LoRa Radio Fragmentation Protocol for HDC Payloads
 //!
 //! Deterministic fragmentation of binary hypervectors for transmission over
@@ -458,9 +461,13 @@ impl FragmentAssembler {
         let mut payload = Vec::with_capacity(self.expected_payload_size);
         for i in 0..data_count {
             let frag_data = if Some(i) == missing_idx {
-                recovered.as_ref().unwrap()
+                recovered
+                    .as_ref()
+                    .expect("FEC recovery must produce data for missing fragment")
             } else {
-                self.fragments[i].as_ref().unwrap()
+                self.fragments[i]
+                    .as_ref()
+                    .expect("non-missing fragment must be present")
             };
 
             let len = if Some(i) == missing_idx {

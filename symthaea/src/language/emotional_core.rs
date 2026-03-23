@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Emotional Core: Affective Language Processing
 //!
 //! Provides emotional understanding and generation capabilities for language,
@@ -359,7 +362,7 @@ impl EmotionalCore {
                 .iter()
                 .map(|kw| if text_lower.contains(kw) { 1.0 } else { 0.0 })
                 .sum::<f32>()
-                / keywords.len() as f32;
+                / keywords.len().max(1) as f32;
             emotion_scores.insert(emotion.to_string(), score);
         }
 

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Modern Embedding Models - Unified Interface
 //!
 //! Provides a unified interface for modern embedding models, replacing the
@@ -128,6 +131,9 @@ impl LayerOutput {
 /// Convert an activation vector to BinaryHV
 #[cfg(feature = "neural-bridge")]
 pub fn activation_to_hv16(activation: &[f32]) -> BinaryHV {
+    if activation.is_empty() {
+        return BinaryHV::random(0);
+    }
     let mut expanded = Vec::with_capacity(HDC_DIMENSION);
     let tiles = HDC_DIMENSION / activation.len();
     let remainder = HDC_DIMENSION % activation.len();

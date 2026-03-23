@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Flow state detection and management for the cognitive loop.
 //!
 //! Detects optimal cognitive engagement (flow state) based on sustained focus,
@@ -102,7 +105,7 @@ impl FlowState {
             && prediction_confidence > Self::FLOW_CONFIDENCE_THRESHOLD;
 
         // Update running averages (EMA)
-        let alpha = 0.2;
+        let alpha = super::thresholds::EMA_ALPHA_FLOW;
         self.avg_error = self.avg_error * (1.0 - alpha) + prediction_error * alpha;
         self.avg_coherence = self.avg_coherence * (1.0 - alpha) + coherence * alpha;
 
@@ -164,7 +167,7 @@ impl FlowState {
             && prediction_confidence > Self::FLOW_CONFIDENCE_THRESHOLD;
 
         // Update running averages (EMA)
-        let alpha = 0.2;
+        let alpha = super::thresholds::EMA_ALPHA_FLOW;
         self.avg_error = self.avg_error * (1.0 - alpha) + prediction_error * alpha;
         self.avg_coherence = self.avg_coherence * (1.0 - alpha) + coherence * alpha;
 

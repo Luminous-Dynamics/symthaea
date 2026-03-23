@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Phenomenal Content Detector
 //!
 //! A practical tool for detecting phenomenal content in text using the
@@ -944,6 +947,9 @@ impl PhenomenalDetector {
     }
 
     fn activation_to_hv16(&self, activation: &[f32]) -> BinaryHV {
+        if activation.is_empty() {
+            return BinaryHV::random(0);
+        }
         let mut expanded = Vec::with_capacity(HDC_DIMENSION);
         let tiles = HDC_DIMENSION / activation.len();
         let remainder = HDC_DIMENSION % activation.len();

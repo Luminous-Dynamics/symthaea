@@ -14,6 +14,14 @@
 //! - **PythonEmitter**: Generates Python code following PEP 8/black conventions
 //! - **NixEmitter**: Generates Nix expressions following nixfmt conventions
 
+mod nix;
+mod python;
+mod rust;
+
+pub use nix::NixEmitter;
+pub use python::PythonEmitter;
+pub use rust::RustEmitter;
+
 use super::code_intent::CodeSpec;
 use crate::dynamics::cfc_code_sequencer::{CodePlanStep, PlanAction};
 
@@ -167,10 +175,7 @@ fn extract_fields_from_text(text: &str) -> Vec<(String, String)> {
 
             // Type is in same word (e.g. "x:f64")
             if !after_colon.is_empty() {
-                if !name.is_empty()
-                    && name.chars().next().map_or(false, |c| c.is_lowercase())
-                    && looks_like_rust_type(after_colon)
-                {
+                if !name.is_empty() && name.chars().next().map_or(false, |c| c.is_lowercase()) {
                     fields.push((name.to_string(), after_colon.to_string()));
                 }
             } else if !name.is_empty() && i + 1 < words.len() {
@@ -178,10 +183,7 @@ fn extract_fields_from_text(text: &str) -> Vec<(String, String)> {
                 let typ = words[i + 1].trim_matches(|c: char| {
                     !c.is_alphanumeric() && c != '_' && c != '<' && c != '>'
                 });
-                if !typ.is_empty()
-                    && name.chars().next().map_or(false, |c| c.is_lowercase())
-                    && looks_like_rust_type(typ)
-                {
+                if !typ.is_empty() && name.chars().next().map_or(false, |c| c.is_lowercase()) {
                     fields.push((name.to_string(), typ.to_string()));
                     i += 1; // skip the type word
                 }
@@ -190,99 +192,6 @@ fn extract_fields_from_text(text: &str) -> Vec<(String, String)> {
         i += 1;
     }
     fields
-}
-
-/// Check if a string looks like a valid Rust type name.
-/// Rejects things like "f(f(x" which are code expressions, not types.
-fn looks_like_rust_type(s: &str) -> bool {
-    if s.is_empty() {
-        return false;
-    }
-    // Must start with uppercase (type name) or be a primitive
-    let first = s.chars().next().unwrap();
-    let is_type_start = first.is_uppercase()
-        || matches!(
-            s,
-            "i8" | "i16" | "i32" | "i64" | "i128" | "isize" | "u8" | "u16" | "u32" | "u64"
-                | "u128" | "usize" | "f32" | "f64" | "bool" | "str" | "char"
-        )
-        || s.starts_with('&');
-
-    // Must not contain parentheses (those are function calls, not types)
-    let no_parens = !s.contains('(') || s.contains("Fn("); // Fn(...) is a valid type
-
-    is_type_start && no_parens
-}
-
-/// Extract fields from a struct signature like "struct Foo { x: i32, y: f64 }".
-fn extract_fields_from_struct_sig(sig: &str) -> Vec<(String, String)> {
-    let mut fields = Vec::new();
-    // Find content between { and }
-    if let Some(brace_start) = sig.find('{') {
-        if let Some(brace_end) = sig.rfind('}') {
-            let body = &sig[brace_start + 1..brace_end];
-            for field_str in body.split(',') {
-                let field_str = field_str.trim();
-                if let Some(colon) = field_str.find(':') {
-                    let name = field_str[..colon].trim().trim_start_matches("pub ");
-                    let typ = field_str[colon + 1..].trim();
-                    if !name.is_empty() && !typ.is_empty() {
-                        fields.push((name.to_string(), typ.to_string()));
-                    }
-                }
-            }
-        }
-    }
-    fields
-}
-
-/// Generate impl methods for a struct based on purpose keywords.
-///
-/// Recognizes patterns like "increment/decrement/get" for counter-like types,
-/// "push/pop/peek" for stack-like types, etc.
-fn generate_purpose_methods(
-    struct_name: &str,
-    fields: &[(String, String)],
-    purpose: &str,
-) -> Vec<String> {
-    let mut methods = Vec::new();
-    let purpose_lower = purpose.to_lowercase();
-
-    // Counter pattern: increment/decrement/get on a numeric field
-    if purpose_lower.contains("increment") || purpose_lower.contains("counter") {
-        if let Some((field_name, field_type)) = fields.first() {
-            if field_type.contains("i32")
-                || field_type.contains("i64")
-                || field_type.contains("u32")
-                || field_type.contains("usize")
-            {
-                methods.push(format!(
-                    "    pub fn increment(&mut self) {{\n        self.{} += 1;\n    }}",
-                    field_name
-                ));
-                if purpose_lower.contains("decrement") {
-                    methods.push(format!(
-                        "    pub fn decrement(&mut self) {{\n        self.{} -= 1;\n    }}",
-                        field_name
-                    ));
-                }
-                if purpose_lower.contains("get") || purpose_lower.contains("value") {
-                    methods.push(format!(
-                        "    pub fn get(&self) -> {} {{\n        self.{}\n    }}",
-                        field_type, field_name
-                    ));
-                }
-                if purpose_lower.contains("reset") {
-                    methods.push(format!(
-                        "    pub fn reset(&mut self) {{\n        self.{} = 0;\n    }}",
-                        field_name
-                    ));
-                }
-            }
-        }
-    }
-
-    methods
 }
 
 /// Infer a reasonable function body from the purpose, params, and return type.
@@ -356,49 +265,6 @@ fn infer_rust_body(
     {
         if params.len() == 1 && (params[0].1.contains("str") || params[0].1.contains("String")) {
             return format!("{}.chars().collect()", params[0].0);
-        }
-    }
-
-    // sum of squares (before generic "sum")
-    if purpose_lower.contains("sum") && purpose_lower.contains("square") {
-        if params.len() == 1 {
-            return format!(
-                "{}.iter().map(|x| x * x).sum()",
-                params[0].0
-            );
-        }
-    }
-    // parse string to integer/number → Result
-    if purpose_lower.contains("parse")
-        && (purpose_lower.contains("integer")
-            || purpose_lower.contains("number")
-            || purpose_lower.contains("int"))
-    {
-        if params.len() == 1 {
-            let ret = return_type.unwrap_or("");
-            if ret.contains("Result") {
-                return format!(
-                    "{}.parse::<i32>().map_err(|e| e.to_string())",
-                    params[0].0
-                );
-            } else {
-                return format!("{}.parse::<i32>().unwrap_or(0)", params[0].0);
-            }
-        }
-    }
-    // apply function twice: f(f(x))
-    if purpose_lower.contains("apply") && purpose_lower.contains("twice") {
-        if params.len() == 2 {
-            return format!("{}({}({}))", params[0].0, params[0].0, params[1].0);
-        }
-    }
-    // apply function N times
-    if purpose_lower.contains("apply") && purpose_lower.contains("times") {
-        if params.len() == 3 {
-            return format!(
-                "(0..{}).fold({}, |acc, _| {}(acc))",
-                params[2].0, params[1].0, params[0].0
-            );
         }
     }
 
@@ -478,11 +344,7 @@ fn infer_rust_body(
     }
     if purpose_lower.contains("length")
         || purpose_lower.contains("len")
-        || (purpose_lower.contains("count")
-            && !purpose_lower.contains("vowel")
-            && !purpose_lower.contains("digit")
-            && !purpose_lower.contains("char")
-            && !purpose_lower.contains("word"))
+        || purpose_lower.contains("count")
     {
         if params.len() == 1 {
             return format!("{}.len()", params[0].0);
@@ -569,12 +431,8 @@ fn infer_rust_body(
         }
     }
 
-    // Collection operations (skip bubble/insertion/selection sort — those have dedicated patterns)
-    if purpose_lower.contains("sort")
-        && !purpose_lower.contains("bubble")
-        && !purpose_lower.contains("insertion")
-        && !purpose_lower.contains("selection")
-    {
+    // Collection operations
+    if purpose_lower.contains("sort") {
         if params.len() == 1 && params[0].1.contains("Vec") {
             if purpose_lower.contains("descending") || purpose_lower.contains("reverse") {
                 return format!("let mut result = {}.to_vec();\n    result.sort();\n    result.reverse();\n    result", params[0].0);
@@ -619,41 +477,32 @@ fn infer_rust_body(
             return format!("let mut result = {}.to_vec();\n    result.sort();\n    result.dedup();\n    result", params[0].0);
         }
     }
-    // Bubble sort (in-place)
-    if purpose_lower.contains("bubble sort") {
-        if params.len() == 1 {
-            return format!(
-                "let n = {}.len();\n    for i in 0..n {{\n        for j in 0..n - 1 - i {{\n            if {}[j] > {}[j + 1] {{\n                {}.swap(j, j + 1);\n            }}\n        }}\n    }}",
-                params[0].0, params[0].0, params[0].0, params[0].0
-            );
-        }
-    }
     // Binary search
     if purpose_lower.contains("binary search") || purpose_lower.contains("bsearch") {
         if params.len() == 2 {
             return format!("{}.binary_search(&{}).ok()", params[0].0, params[1].0);
         }
     }
-    // Sum of collection (Vec or slice)
+    // Sum of collection
     if (purpose_lower.contains("sum") || purpose_lower.contains("total"))
         && params.len() == 1
-        && (params[0].1.contains("Vec") || params[0].1.contains("&["))
+        && params[0].1.contains("Vec")
     {
         return format!("{}.iter().sum()", params[0].0);
     }
-    // Max of collection (Vec or slice)
+    // Max of collection
     if (purpose_lower.contains("max")
         || purpose_lower.contains("largest")
         || purpose_lower.contains("biggest"))
         && params.len() == 1
-        && (params[0].1.contains("Vec") || params[0].1.contains("&["))
+        && params[0].1.contains("Vec")
     {
         return format!("{}.iter().max().copied()", params[0].0);
     }
-    // Min of collection (Vec or slice)
+    // Min of collection
     if (purpose_lower.contains("min") || purpose_lower.contains("smallest"))
         && params.len() == 1
-        && (params[0].1.contains("Vec") || params[0].1.contains("&["))
+        && params[0].1.contains("Vec")
     {
         return format!("{}.iter().min().copied()", params[0].0);
     }
@@ -704,23 +553,6 @@ fn infer_rust_body(
     if purpose_lower.contains("is empty") || purpose_lower.contains("empty") {
         if params.len() == 1 {
             return format!("{}.is_empty()", params[0].0);
-        }
-    }
-    // Count characters matching a predicate
-    if purpose_lower.contains("count") && purpose_lower.contains("vowel") {
-        if params.len() == 1 {
-            return format!(
-                "{}.chars().filter(|c| \"aeiouAEIOU\".contains(*c)).count()",
-                params[0].0
-            );
-        }
-    }
-    if purpose_lower.contains("count") && purpose_lower.contains("digit") {
-        if params.len() == 1 {
-            return format!(
-                "{}.chars().filter(|c| c.is_ascii_digit()).count()",
-                params[0].0
-            );
         }
     }
     if purpose_lower.contains("is even") {
@@ -1773,696 +1605,10 @@ fn generate_auto_tests(
         }
     }
 
+    // Suppress unused variable warnings
+    let _ = returns_string;
+
     tests
-}
-
-// ============================================================================
-// Rust Emitter
-// ============================================================================
-
-/// Emitter for Rust source code
-pub struct RustEmitter;
-
-impl CodeEmitter for RustEmitter {
-    fn emit_from_spec(&self, spec: &CodeSpec, plan: &[CodePlanStep]) -> String {
-        let mut parts = Vec::new();
-
-        // Collect plan actions
-        let mut has_struct = false;
-        let mut has_function = false;
-        let mut has_trait = false;
-        let mut has_impl = false;
-        let mut has_error_handling = false;
-        let mut has_doc = false;
-        let mut field_steps = 0usize;
-        let mut method_steps = 0usize;
-        let mut _param_steps = 0usize;
-
-        for step in plan {
-            match step.action {
-                PlanAction::DefineStruct => has_struct = true,
-                PlanAction::DefineFunction => has_function = true,
-                PlanAction::DefineTrait => has_trait = true,
-                PlanAction::ImplTrait => has_impl = true,
-                PlanAction::AddField => field_steps += 1,
-                PlanAction::AddMethod => method_steps += 1,
-                PlanAction::AddParameter => _param_steps += 1,
-                PlanAction::AddErrorHandling => has_error_handling = true,
-                PlanAction::AddDocumentation => has_doc = true,
-                PlanAction::AddImport => {
-                    if spec.purpose.contains("error") || spec.purpose.contains("Result") {
-                        parts.push("use std::error::Error;".to_string());
-                    }
-                    if spec.purpose.contains("HashMap") || spec.purpose.contains("hash map") {
-                        parts.push("use std::collections::HashMap;".to_string());
-                    }
-                    if spec.purpose.contains("File")
-                        || spec.purpose.contains("read")
-                        || spec.purpose.contains("write")
-                    {
-                        parts.push("use std::fs;".to_string());
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        // Try to parse the provided signature
-        let parsed_sig = spec.signature.as_deref().and_then(parse_rust_signature);
-
-        // If we have a parsed function signature, ensure function emission regardless
-        // of what actions the CfC planner produced. The planner sometimes emits
-        // DefineStruct for simple function tasks (e.g., parse_integer).
-        //
-        // CRITICAL FIX: When we have a function signature and no explicit struct
-        // fields are needed (no MULTI_ENTITY constraint, no extractable fields),
-        // suppress the struct emission entirely. Otherwise we get duplicate name
-        // errors (E0428) — e.g., `pub struct add_numbers` AND `pub fn add_numbers`.
-        // Also detect unparseable but obviously function signatures (e.g., those with
-        // `impl Fn(...)` trait bounds that confuse the signature parser).
-        let looks_like_fn = parsed_sig.is_some()
-            || spec
-                .signature
-                .as_deref()
-                .map_or(false, |s| s.trim_start().starts_with("fn "));
-        if looks_like_fn {
-            has_function = true;
-            // Suppress struct if it was only inferred by the CfC planner
-            // and there's no real need for a struct (no fields, no multi-entity)
-            let is_multi_entity = spec
-                .constraints
-                .iter()
-                .any(|c| c.starts_with("MULTI_ENTITY"));
-            let has_real_fields = !extract_fields_from_text(&spec.purpose).is_empty();
-            if has_struct && !is_multi_entity && !has_real_fields && field_steps == 0 {
-                has_struct = false;
-            }
-        }
-
-        // Emit struct
-        if has_struct {
-            if has_doc || !spec.purpose.is_empty() {
-                parts.push(format!("/// {}", spec.purpose));
-            }
-
-            // Try to extract fields from the signature first (e.g., "struct Foo { x: i32, y: f64 }")
-            // then fall back to purpose-based extraction.
-            let fields = if let Some(ref sig) = spec.signature {
-                let sig_fields = extract_fields_from_struct_sig(sig);
-                if sig_fields.is_empty() {
-                    extract_fields_from_text(&spec.purpose)
-                } else {
-                    sig_fields
-                }
-            } else {
-                extract_fields_from_text(&spec.purpose)
-            };
-            if fields.is_empty() && field_steps > 0 {
-                // Generate placeholder fields from field_steps count
-                parts.push(format!("#[derive(Debug, Clone)]"));
-                parts.push(format!("pub struct {} {{", spec.name));
-                for i in 0..field_steps.min(5) {
-                    parts.push(format!("    pub field_{}: String,", i));
-                }
-                parts.push("}".to_string());
-            } else if !fields.is_empty() {
-                parts.push(format!("#[derive(Debug, Clone)]"));
-                parts.push(format!("pub struct {} {{", spec.name));
-                for (name, typ) in &fields {
-                    parts.push(format!("    pub {}: {},", name, typ));
-                }
-                parts.push("}".to_string());
-            } else {
-                parts.push(format!("#[derive(Debug, Clone)]"));
-                parts.push(format!("pub struct {} {{", spec.name));
-                parts.push("}".to_string());
-            }
-            parts.push(String::new());
-
-            // Emit constructor + methods if we have impl steps or MULTI_ENTITY constraint
-            let is_multi_entity = spec
-                .constraints
-                .iter()
-                .any(|c| c.starts_with("MULTI_ENTITY"));
-            // Also generate impl block when purpose mentions method-like words
-            let has_method_keywords = {
-                let p = spec.purpose.to_lowercase();
-                p.contains("increment") || p.contains("decrement") || p.contains("push")
-                    || p.contains("pop") || p.contains("enqueue") || p.contains("dequeue")
-                    || p.contains("method")
-            };
-            if has_impl || method_steps > 0 || is_multi_entity || has_method_keywords {
-                parts.push(format!("impl {} {{", spec.name));
-                // Use signature-extracted fields if available, otherwise purpose-based
-                let impl_fields = if let Some(ref sig) = spec.signature {
-                    let sf = extract_fields_from_struct_sig(sig);
-                    if sf.is_empty() { extract_fields_from_text(&spec.purpose) } else { sf }
-                } else {
-                    extract_fields_from_text(&spec.purpose)
-                };
-                let fields = impl_fields;
-                if !fields.is_empty() {
-                    let params: Vec<String> = fields
-                        .iter()
-                        .map(|(n, t)| format!("{}: {}", n, t))
-                        .collect();
-                    let assigns: Vec<String> = fields
-                        .iter()
-                        .map(|(n, _)| format!("            {}", n))
-                        .collect();
-                    parts.push(format!("    pub fn new({}) -> Self {{", params.join(", ")));
-                    parts.push("        Self {".to_string());
-                    for a in &assigns {
-                        parts.push(format!("{},", a));
-                    }
-                    parts.push("        }".to_string());
-                    parts.push("    }".to_string());
-                } else {
-                    parts.push("    pub fn new() -> Self {".to_string());
-                    parts.push("        Self {}".to_string());
-                    parts.push("    }".to_string());
-                }
-
-                // Auto-generate methods from purpose keywords (counter, stack, etc.)
-                let purpose_methods = generate_purpose_methods(&spec.name, &fields, &spec.purpose);
-                for method in &purpose_methods {
-                    parts.push(String::new());
-                    parts.push(method.clone());
-                }
-
-                // Auto-generate methods from purpose when MULTI_ENTITY
-                if is_multi_entity {
-                    let purpose_lower = spec.purpose.to_lowercase();
-                    if purpose_lower.contains("distance") && fields.len() >= 2 {
-                        let f0 = &fields[0].0;
-                        let f1 = &fields[1].0;
-                        parts.push(String::new());
-                        parts.push("    pub fn distance(&self, other: &Self) -> f64 {".to_string());
-                        parts.push(format!(
-                            "        (((self.{f0} - other.{f0}).powi(2) + (self.{f1} - other.{f1}).powi(2)) as f64).sqrt()"
-                        ));
-                        parts.push("    }".to_string());
-                    }
-                    if purpose_lower.contains("area") && fields.len() >= 2 {
-                        let f0 = &fields[0].0;
-                        let f1 = &fields[1].0;
-                        parts.push(String::new());
-                        parts.push("    pub fn area(&self) -> f64 {".to_string());
-                        parts.push(format!("        (self.{f0} * self.{f1}) as f64"));
-                        parts.push("    }".to_string());
-                    }
-                    if purpose_lower.contains("display")
-                        || purpose_lower.contains("to_string")
-                        || purpose_lower.contains("format")
-                    {
-                        parts.push(String::new());
-                        let field_fmts: Vec<String> =
-                            fields.iter().map(|(n, _)| format!("{}: {{}}", n)).collect();
-                        let field_refs: Vec<String> =
-                            fields.iter().map(|(n, _)| format!("self.{}", n)).collect();
-                        if !fields.is_empty() {
-                            parts.push("    pub fn display(&self) -> String {".to_string());
-                            parts.push(format!(
-                                "        format!(\"{}({})\", {})",
-                                spec.name,
-                                field_fmts.join(", "),
-                                field_refs.join(", ")
-                            ));
-                            parts.push("    }".to_string());
-                        }
-                    }
-                }
-
-                parts.push("}".to_string());
-            }
-        }
-
-        // Emit trait
-        if has_trait {
-            if has_doc || !spec.purpose.is_empty() {
-                parts.push(format!("/// {}", spec.purpose));
-            }
-            parts.push(format!("pub trait {} {{", spec.name));
-            for i in 0..method_steps.max(1).min(5) {
-                parts.push(format!("    fn method_{}(&self);", i));
-            }
-            parts.push("}".to_string());
-            parts.push(String::new());
-        }
-
-        // Emit function
-        if has_function || (!has_struct && !has_trait) {
-            if let Some(ref sig) = parsed_sig {
-                // Use the parsed signature to generate a real function
-                let params_str: Vec<String> = sig
-                    .params
-                    .iter()
-                    .map(|(n, t)| format!("{}: {}", n, t))
-                    .collect();
-
-                let ret_str = sig
-                    .return_type
-                    .as_deref()
-                    .map(|r| format!(" -> {}", r))
-                    .unwrap_or_default();
-
-                let body = infer_rust_body(
-                    &spec.purpose,
-                    &sig.params,
-                    sig.return_type.as_deref(),
-                    &spec.constraints,
-                    &spec.examples,
-                );
-
-                if has_doc || !spec.purpose.is_empty() {
-                    parts.push(format!("/// {}", spec.purpose));
-                }
-
-                if has_error_handling && !ret_str.contains("Result") {
-                    // Wrap in Result if error handling was planned
-                    parts.push(format!(
-                        "pub fn {}({}){} {{",
-                        sig.name,
-                        params_str.join(", "),
-                        ret_str
-                    ));
-                } else {
-                    parts.push(format!(
-                        "pub fn {}({}){} {{",
-                        sig.name,
-                        params_str.join(", "),
-                        ret_str
-                    ));
-                }
-                parts.push(format!("    {}", body));
-                parts.push("}".to_string());
-            } else if let Some(ref raw_sig) = spec.signature {
-                // Signature exists but didn't parse (e.g., `impl Fn` trait bounds).
-                // Emit the raw signature and try to infer the body from purpose.
-                if has_doc || !spec.purpose.is_empty() {
-                    parts.push(format!("/// {}", spec.purpose));
-                }
-                // Ensure it starts with "pub fn" for visibility
-                let sig_str = if raw_sig.starts_with("pub fn") {
-                    raw_sig.to_string()
-                } else if raw_sig.starts_with("fn ") {
-                    format!("pub {}", raw_sig)
-                } else {
-                    format!("pub fn {}", raw_sig)
-                };
-                parts.push(format!("{} {{", sig_str));
-                let body =
-                    infer_rust_body(&spec.purpose, &[], None, &spec.constraints, &spec.examples);
-                parts.push(format!("    {}", body));
-                parts.push("}".to_string());
-            } else {
-                // No signature at all — generate stub
-                if has_doc || !spec.purpose.is_empty() {
-                    parts.push(format!("/// {}", spec.purpose));
-                }
-                parts.push(format!("pub fn {}() {{", spec.name));
-                let body =
-                    infer_rust_body(&spec.purpose, &[], None, &spec.constraints, &spec.examples);
-                parts.push(format!("    {}", body));
-                parts.push("}".to_string());
-            }
-        }
-
-        // Emit tests: from explicit examples first, then auto-generate from purpose
-        let func_name = parsed_sig
-            .as_ref()
-            .map(|s| s.name.as_str())
-            .unwrap_or(&spec.name);
-
-        let auto_tests = if spec.examples.is_empty() {
-            generate_auto_tests(func_name, &spec.purpose, parsed_sig.as_ref())
-        } else {
-            Vec::new()
-        };
-
-        if !spec.examples.is_empty() || !auto_tests.is_empty() {
-            parts.push(String::new());
-            parts.push("#[cfg(test)]".to_string());
-            parts.push("mod tests {".to_string());
-            parts.push("    use super::*;".to_string());
-            parts.push(String::new());
-
-            // Explicit examples
-            for (i, (input, output)) in spec.examples.iter().enumerate() {
-                parts.push("    #[test]".to_string());
-                parts.push(format!("    fn test_example_{}() {{", i));
-                parts.push(format!("        assert_eq!({}, {});", input, output));
-                parts.push("    }".to_string());
-                if i + 1 < spec.examples.len() || !auto_tests.is_empty() {
-                    parts.push(String::new());
-                }
-            }
-
-            // Auto-generated tests
-            for (i, test_line) in auto_tests.iter().enumerate() {
-                parts.push("    #[test]".to_string());
-                parts.push(format!("    fn test_auto_{}() {{", i));
-                parts.push(format!("        {}", test_line));
-                parts.push("    }".to_string());
-                if i + 1 < auto_tests.len() {
-                    parts.push(String::new());
-                }
-            }
-            parts.push("}".to_string());
-        }
-
-        // Apply import inference — scan generated code for stdlib types and prepend imports
-        let raw = parts.join("\n");
-        infer_rust_imports(&raw)
-    }
-
-    fn emit_function(&self, name: &str, params: &str, return_type: &str, body: &str) -> String {
-        let ret = if return_type.is_empty() {
-            String::new()
-        } else {
-            format!(" -> {}", return_type)
-        };
-
-        format!("pub fn {}({}){} {{\n    {}\n}}", name, params, ret, body)
-    }
-
-    fn emit_struct(&self, name: &str, fields: &[(String, String)]) -> String {
-        let field_lines: Vec<String> = fields
-            .iter()
-            .map(|(n, t)| format!("    pub {}: {},", n, t))
-            .collect();
-
-        format!(
-            "#[derive(Debug, Clone)]\npub struct {} {{\n{}\n}}",
-            name,
-            field_lines.join("\n")
-        )
-    }
-
-    fn emit_import(&self, module: &str) -> String {
-        format!("use {};", module)
-    }
-
-    fn language(&self) -> &str {
-        "rust"
-    }
-}
-
-// ============================================================================
-// Python Emitter
-// ============================================================================
-
-/// Emitter for Python source code
-pub struct PythonEmitter;
-
-impl CodeEmitter for PythonEmitter {
-    fn emit_from_spec(&self, spec: &CodeSpec, plan: &[CodePlanStep]) -> String {
-        let mut parts = Vec::new();
-
-        let mut has_class = false;
-        let mut has_function = false;
-
-        for step in plan {
-            match step.action {
-                PlanAction::DefineStruct | PlanAction::DefineTrait => has_class = true,
-                PlanAction::DefineFunction | PlanAction::AddMethod => has_function = true,
-                PlanAction::AddImport => {
-                    parts.push("from typing import Optional, List".to_string());
-                }
-                _ => {}
-            }
-        }
-
-        if has_class {
-            parts.push(format!("class {}:", spec.name));
-            parts.push(format!("    \"\"\"{}\"\"\"", spec.purpose));
-            parts.push(String::new());
-
-            let fields = extract_fields_from_text(&spec.purpose);
-            if !fields.is_empty() {
-                let params: Vec<String> = fields
-                    .iter()
-                    .map(|(n, t)| format!("{}: {}", n, t))
-                    .collect();
-                parts.push(format!("    def __init__(self, {}):", params.join(", ")));
-                for (n, _) in &fields {
-                    parts.push(format!("        self.{} = {}", n, n));
-                }
-            } else {
-                parts.push("    def __init__(self):".to_string());
-                parts.push("        pass".to_string());
-            }
-            parts.push(String::new());
-        }
-
-        if has_function || !has_class {
-            let sig = spec.signature.as_deref().unwrap_or("");
-            if sig.is_empty() {
-                parts.push(format!("def {}():", spec.name));
-            } else {
-                // Ensure it ends with ':'
-                let sig_str = if sig.ends_with(':') {
-                    sig.to_string()
-                } else {
-                    format!("{}:", sig)
-                };
-                parts.push(sig_str);
-            }
-
-            parts.push(format!("    \"\"\"{}\"\"\"", spec.purpose));
-
-            let purpose_lower = spec.purpose.to_lowercase();
-            // Try to generate a real body
-            if purpose_lower.contains("reverse") {
-                parts.push("    return s[::-1]".to_string());
-            } else if purpose_lower.contains("add") || purpose_lower.contains("sum") {
-                parts.push("    return a + b".to_string());
-            } else if purpose_lower.contains("length") || purpose_lower.contains("len") {
-                parts.push("    return len(s)".to_string());
-            } else if purpose_lower.contains("sort") {
-                parts.push("    return sorted(items)".to_string());
-            } else if purpose_lower.contains("uppercase") {
-                parts.push("    return s.upper()".to_string());
-            } else if purpose_lower.contains("lowercase") {
-                parts.push("    return s.lower()".to_string());
-            } else if purpose_lower.contains("factorial") {
-                parts.push("    import math".to_string());
-                parts.push("    return math.factorial(n)".to_string());
-            } else if purpose_lower.contains("subtract") || purpose_lower.contains("difference") {
-                parts.push("    return a - b".to_string());
-            } else if purpose_lower.contains("multiply") || purpose_lower.contains("product") {
-                parts.push("    return a * b".to_string());
-            } else if purpose_lower.contains("divide") || purpose_lower.contains("quotient") {
-                parts.push("    return a / b".to_string());
-            } else if purpose_lower.contains("maximum")
-                || purpose_lower.contains("max of")
-                || purpose_lower.contains("larger")
-            {
-                parts.push("    return max(a, b)".to_string());
-            } else if purpose_lower.contains("minimum")
-                || purpose_lower.contains("min of")
-                || purpose_lower.contains("smaller")
-            {
-                parts.push("    return min(a, b)".to_string());
-            } else if purpose_lower.contains("absolute") || purpose_lower.contains("abs") {
-                parts.push("    return abs(n)".to_string());
-            } else if purpose_lower.contains("clamp") {
-                parts.push("    return max(min_val, min(max_val, n))".to_string());
-            } else if purpose_lower.contains("contains") || purpose_lower.contains("has") {
-                parts.push("    return needle in haystack".to_string());
-            } else if purpose_lower.contains("concatenate") || purpose_lower.contains("join") {
-                parts.push("    return a + b".to_string());
-            } else if purpose_lower.contains("split") {
-                parts.push("    return s.split(sep)".to_string());
-            } else if purpose_lower.contains("trim") || purpose_lower.contains("strip") {
-                parts.push("    return s.strip()".to_string());
-            } else if purpose_lower.contains("replace") {
-                parts.push("    return s.replace(old, new)".to_string());
-            } else if purpose_lower.contains("starts_with") || purpose_lower.contains("prefix") {
-                parts.push("    return s.startswith(prefix)".to_string());
-            } else if purpose_lower.contains("ends_with") || purpose_lower.contains("suffix") {
-                parts.push("    return s.endswith(suffix)".to_string());
-            } else if purpose_lower.contains("filter") && purpose_lower.contains("even") {
-                parts.push("    return [x for x in items if x % 2 == 0]".to_string());
-            } else if purpose_lower.contains("filter") && purpose_lower.contains("odd") {
-                parts.push("    return [x for x in items if x % 2 != 0]".to_string());
-            } else if purpose_lower.contains("is_empty") {
-                parts.push("    return len(s) == 0".to_string());
-            } else if purpose_lower.contains("is_even") {
-                parts.push("    return n % 2 == 0".to_string());
-            } else if purpose_lower.contains("is_odd") {
-                parts.push("    return n % 2 != 0".to_string());
-            } else if purpose_lower.contains("is_positive") {
-                parts.push("    return n > 0".to_string());
-            } else if purpose_lower.contains("is_negative") {
-                parts.push("    return n < 0".to_string());
-            } else if purpose_lower.contains("fibonacci") {
-                parts.push("    a, b = 0, 1".to_string());
-                parts.push("    for _ in range(n):".to_string());
-                parts.push("        a, b = b, a + b".to_string());
-                parts.push("    return a".to_string());
-            } else if purpose_lower.contains("power") || purpose_lower.contains("pow") {
-                parts.push("    return a ** b".to_string());
-            } else if purpose_lower.contains("sqrt") || purpose_lower.contains("square root") {
-                parts.push("    import math".to_string());
-                parts.push("    return math.sqrt(n)".to_string());
-            } else if purpose_lower.contains("flatten") {
-                parts.push("    return [x for sub in items for x in sub]".to_string());
-            } else if purpose_lower.contains("unique") || purpose_lower.contains("deduplicate") {
-                parts.push("    return list(set(items))".to_string());
-            } else if !spec.constraints.is_empty() {
-                for c in &spec.constraints {
-                    parts.push(format!("    # {}", c));
-                }
-                parts.push(format!(
-                    "    raise NotImplementedError(\"{}\")",
-                    spec.purpose
-                ));
-            } else {
-                parts.push(format!(
-                    "    raise NotImplementedError(\"{}\")",
-                    spec.purpose
-                ));
-            }
-        }
-
-        // Generate real tests from examples
-        if !spec.examples.is_empty() {
-            parts.push(String::new());
-            parts.push(String::new());
-            for (i, (input, output)) in spec.examples.iter().enumerate() {
-                parts.push(format!("def test_example_{}():", i));
-                parts.push(format!("    assert {} == {}", input, output));
-                parts.push(String::new());
-            }
-        }
-
-        parts.join("\n")
-    }
-
-    fn emit_function(&self, name: &str, params: &str, return_type: &str, body: &str) -> String {
-        let ret = if return_type.is_empty() {
-            String::new()
-        } else {
-            format!(" -> {}", return_type)
-        };
-
-        format!("def {}({}){}:\n    {}", name, params, ret, body)
-    }
-
-    fn emit_struct(&self, name: &str, fields: &[(String, String)]) -> String {
-        let mut lines = vec![format!("class {}:", name)];
-        if fields.is_empty() {
-            lines.push("    pass".to_string());
-        } else {
-            let params: Vec<String> = fields
-                .iter()
-                .map(|(n, t)| format!("{}: {}", n, t))
-                .collect();
-            lines.push(format!("    def __init__(self, {}):", params.join(", ")));
-            for (n, _) in fields {
-                lines.push(format!("        self.{} = {}", n, n));
-            }
-        }
-        lines.join("\n")
-    }
-
-    fn emit_import(&self, module: &str) -> String {
-        format!("import {}", module)
-    }
-
-    fn language(&self) -> &str {
-        "python"
-    }
-}
-
-// ============================================================================
-// Nix Emitter
-// ============================================================================
-
-/// Emitter for Nix expressions
-pub struct NixEmitter;
-
-impl CodeEmitter for NixEmitter {
-    fn emit_from_spec(&self, spec: &CodeSpec, _plan: &[CodePlanStep]) -> String {
-        let mut parts = Vec::new();
-
-        parts.push(format!("# {}", spec.purpose));
-
-        if spec.name.contains("derivation") || spec.name.contains("package") {
-            parts.push("{ lib, stdenv, ... }:".to_string());
-            parts.push(String::new());
-            parts.push("stdenv.mkDerivation {".to_string());
-            parts.push(format!("  pname = \"{}\";", spec.name));
-            parts.push("  version = \"0.1.0\";".to_string());
-            parts.push(String::new());
-            parts.push("  src = ./.;".to_string());
-            parts.push(String::new());
-            parts.push("  meta = with lib; {".to_string());
-            parts.push(format!("    description = \"{}\";", spec.purpose));
-            parts.push("    license = licenses.mit;".to_string());
-            parts.push("  };".to_string());
-            parts.push("}".to_string());
-        } else if spec.name.contains("module") || spec.name.contains("config") {
-            parts.push("{ config, lib, pkgs, ... }:".to_string());
-            parts.push(String::new());
-            parts.push("{".to_string());
-            parts.push(format!("  # {}", spec.purpose));
-            if !spec.constraints.is_empty() {
-                for c in &spec.constraints {
-                    parts.push(format!("  # Constraint: {}", c));
-                }
-            }
-            parts.push("}".to_string());
-        } else if spec.name.contains("overlay") {
-            parts.push("final: prev: {".to_string());
-            parts.push(format!("  # {}", spec.purpose));
-            parts.push("}".to_string());
-        } else if spec.name.contains("shell") || spec.name.contains("devShell") {
-            parts.push("{ pkgs ? import <nixpkgs> {} }:".to_string());
-            parts.push(String::new());
-            parts.push("pkgs.mkShell {".to_string());
-            parts.push("  buildInputs = with pkgs; [".to_string());
-            parts.push("  ];".to_string());
-            parts.push("}".to_string());
-        } else {
-            // Default: function or let binding
-            parts.push(format!("{} =", spec.name));
-            if !spec.constraints.is_empty() {
-                for c in &spec.constraints {
-                    parts.push(format!("  # {}", c));
-                }
-            }
-            parts.push("  null;".to_string());
-        }
-
-        parts.join("\n")
-    }
-
-    fn emit_function(&self, name: &str, params: &str, _return_type: &str, body: &str) -> String {
-        if params.is_empty() {
-            format!("{} = {};", name, body)
-        } else {
-            format!("{} = {}: {};", name, params, body)
-        }
-    }
-
-    fn emit_struct(&self, name: &str, fields: &[(String, String)]) -> String {
-        let field_lines: Vec<String> = fields
-            .iter()
-            .map(|(n, _t)| format!("  {} = null;", n))
-            .collect();
-
-        format!("{} = {{\n{}\n}};", name, field_lines.join("\n"))
-    }
-
-    fn emit_import(&self, module: &str) -> String {
-        format!("imports = [ {} ];", module)
-    }
-
-    fn language(&self) -> &str {
-        "nix"
-    }
 }
 
 // ============================================================================
@@ -2735,6 +1881,7 @@ fn generate_property_tests(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dynamics::cfc_code_sequencer::{CodePlanStep, PlanAction};
 
     #[test]
     fn test_rust_emit_function() {
@@ -3612,8 +2759,8 @@ mod tests {
         let result = emitter.emit_from_spec(&spec, &make_plan());
         assert!(result.contains(".parse"), "Should use parse: {}", result);
         assert!(
-            result.contains("unwrap_or") || result.contains("unwrap_or_default"),
-            "Should have error handling: {}",
+            result.contains("unwrap_or_default"),
+            "Should have default: {}",
             result
         );
         assert!(
