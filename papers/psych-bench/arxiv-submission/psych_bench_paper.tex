@@ -1001,65 +1001,7 @@ Effect sizes (Cohen's $d$, computed across 27 domains) reveal a gradient of abla
 \label{fig:ablation}
 \end{figure}
 
-\paragraph{Neuromodulator Dissociations.} The neuromodulator evaluation framework tests whether transmitter manipulations produce behaviorally specific effects consistent with neuroscience predictions. The \texttt{BehavioralKnockout} benchmark reveals large, selective effects: DA knockout reduces learning rate (Cohen's $d = 1.93$) and gradient tracking ($d = 2.14$); NE knockout increases exploration ($d = 7.25$); 5-HT knockout reduces confidence ($d = 5.80$); ACh knockout impairs attention ($d = 5.41$). These effect sizes confirm that each transmitter system produces distinct behavioral signatures. The \texttt{DoseResponse} benchmark shows perfect monotonicity (score $= 1.0$) for all five transmitter systems (DA, NE, 5-HT, ACh, GABA), and \texttt{ToleranceWithdrawal} detects tolerance and withdrawal for all four tested transmitters (DA sensitivity ratio $= 0.48$, NE $= 0.59$, 5-HT $= 0.64$, GABA $= 0.73$). The theoretical prediction of four double dissociations---DA enhancing flexibility while impairing sustained attention, NE enhancing alerting while impairing fine motor control, 5-HT enhancing inhibition while slowing working memory, ACh enhancing focused attention while impairing flexibility---remains to be tested with a full profile $\times$ benchmark cross-tabulation in future work.
-
-% ============================================================
-% 9. USAGE AND API
-% ============================================================
-\section{Usage and API}
-\label{sec:usage}
-
-\psychbench{} is distributed as a Rust crate (\texttt{symthaea-psych-bench}) and can be integrated into any project via Cargo. The API provides four levels of usage, from single-benchmark evaluation to full HTML reporting.
-
-\paragraph{Single benchmark evaluation.} Running an individual benchmark requires constructing a configuration and calling \texttt{run()}:
-
-\begin{lstlisting}
-use symthaea_psych_bench::benchmarks::executive::StroopBenchmark;
-use symthaea_psych_bench::harness::{BenchmarkConfig, PsychBenchmark};
-
-let config = BenchmarkConfig::default(); // seed=42, dim=512
-let result = StroopBenchmark.run(&config);
-println!("Stroop effect: {:.3}", result.metrics["stroop_effect"].mean);
-\end{lstlisting}
-
-\paragraph{Full battery with cognitive profile.} The harness aggregates results into an 8-domain cognitive profile:
-
-\begin{lstlisting}
-use symthaea_psych_bench::harness::{BenchmarkReport, CognitiveProfile};
-
-let mut report = BenchmarkReport::new();
-for bench in &all_benchmarks {
-    report.add(bench.run(&config));
-}
-let profile = CognitiveProfile::from_report(&report);
-for d in &profile.domains {
-    println!("{}: {:.3} ({})", d.domain, d.score, d.interpretation);
-}
-\end{lstlisting}
-
-\paragraph{HTML report generation.} Self-contained HTML reports with embedded SVG visualizations:
-
-\begin{lstlisting}
-use symthaea_psych_bench::harness::html::HtmlReport;
-
-let html = HtmlReport::from_report(&report);
-std::fs::write("report.html", html.render()).unwrap();
-\end{lstlisting}
-
-\paragraph{Neuromodulator sweep.} Pharmacological profiles can be applied to any benchmark subset. The dissociation matrix identifies transmitter-behavior double dissociations:
-
-\begin{lstlisting}
-use symthaea_psych_bench::harness::neuromod_profiles::NeuromodProfile;
-
-for profile in NeuromodProfile::standard_profiles() {
-    let mut config = BenchmarkConfig::default();
-    config.label = Some(profile.name.clone());
-    // Apply clamp levels to architecture under test
-    let result = StroopBenchmark.run(&config);
-}
-\end{lstlisting}
-
-All APIs are deterministic given a fixed seed, enabling exact replication. The full API documentation is generated via \texttt{cargo doc -p symthaea-psych-bench}.
+\paragraph{Neuromodulator Dissociations.} The neuromodulator evaluation framework confirms behaviorally specific transmitter effects: DA knockout reduces learning rate (Cohen's $d = 1.93$), NE knockout increases exploration ($d = 7.25$), 5-HT knockout reduces confidence ($d = 5.80$), ACh knockout impairs attention ($d = 5.41$). Dose-response monotonicity is perfect ($= 1.0$) for all five transmitters, and tolerance/withdrawal dynamics are detected for all four tested transmitters. Full dissociation details and API usage examples appear in Supplementary Section~S4.
 
 % ============================================================
 % 10. DISCUSSION
