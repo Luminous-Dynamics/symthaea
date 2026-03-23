@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 /*!
 # Hyperdimensional Computing (HDC) Semantic Space
 
@@ -369,6 +372,7 @@ pub mod native_similarity; // O(1) XOR+popcount similarity search (consciousness
 pub mod number_theory;
 pub mod numeric_tower; // Unified numeric tower (N -> Z -> Q -> R) with auto-promotion
 pub mod optimization; // Optimization: gradient descent, Nelder-Mead, L-BFGS
+pub mod power_flow; // DC Optimal Power Flow: B·θ=P solver, OPF, N-1 contingency, PTDF
 #[cfg(feature = "parallel")]
 pub mod parallel_hv; // Rayon parallel batch operations (7x faster on 8 cores)
 #[cfg(test)]

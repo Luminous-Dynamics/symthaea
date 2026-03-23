@@ -290,6 +290,64 @@ pub enum FeedbackRole {
     Holder,
 }
 
+/// Performance bond — community-backed guarantee for project delivery
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct PerformanceBond {
+    pub id: String,
+    pub project_id: String,
+    pub guarantor_did: String,
+    pub amount: u64,
+    pub currency: String,
+    pub conditions: Vec<String>,
+    pub status: BondStatus,
+    pub staked_at: Timestamp,
+    pub expires_at: Timestamp,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum BondStatus {
+    Active,
+    ClaimFiled,
+    Released,
+    Forfeited,
+}
+
+/// Mutual insurance pool — participants share risk across projects
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct InsurancePool {
+    pub pool_id: String,
+    pub pool_type: PoolType,
+    pub total_capital: u64,
+    pub claim_count: u32,
+    pub max_payout_per_claim: u64,
+    pub created_at: Timestamp,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum PoolType {
+    ProjectCompletion,
+    GenerationShortfall,
+    EquipmentFailure,
+}
+
+/// Risk assessment — trust-gated evaluation feeding project scores
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct RiskAssessment {
+    pub id: String,
+    pub project_id: String,
+    pub assessor_did: String,
+    pub overall_risk: f64,
+    pub technology_risk: f64,
+    pub regulatory_risk: f64,
+    pub market_risk: f64,
+    pub construction_risk: f64,
+    pub methodology: String,
+    pub assessed_at: Timestamp,
+}
+
 /// Regulatory permit tracking
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
@@ -480,6 +538,9 @@ pub enum EntryTypes {
     AuditEntry(AuditEntry),
     ConstructionTask(ConstructionTask),
     ChangeOrder(ChangeOrder),
+    PerformanceBond(PerformanceBond),
+    InsurancePool(InsurancePool),
+    RiskAssessment(RiskAssessment),
 }
 
 #[hdk_link_types]
@@ -506,6 +567,9 @@ pub enum LinkTypes {
     ProjectToAudit,
     ProjectToTasks,
     ProjectToChangeOrders,
+    ProjectToBonds,
+    PoolToMembers,
+    ProjectToRiskAssessments,
 }
 
 #[hdk_extern]
@@ -575,6 +639,44 @@ fn validate_entry(entry: &EntryTypes) -> ExternResult<ValidateCallbackResult> {
             }
             if !record.community_did.starts_with("did:mycelix:") {
                 return Ok(ValidateCallbackResult::Invalid("Community must have valid DID".into()));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        EntryTypes::PerformanceBond(bond) => {
+            if !bond.guarantor_did.starts_with("did:mycelix:") {
+                return Ok(ValidateCallbackResult::Invalid("Guarantor must have valid DID".into()));
+            }
+            if bond.amount == 0 {
+                return Ok(ValidateCallbackResult::Invalid("Bond amount must be positive".into()));
+            }
+            if bond.conditions.is_empty() {
+                return Ok(ValidateCallbackResult::Invalid("Bond must have at least one condition".into()));
+            }
+            if bond.expires_at <= bond.staked_at {
+                return Ok(ValidateCallbackResult::Invalid("Expiry must be after stake time".into()));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        EntryTypes::InsurancePool(pool) => {
+            if pool.pool_id.is_empty() {
+                return Ok(ValidateCallbackResult::Invalid("Pool ID required".into()));
+            }
+            if pool.max_payout_per_claim == 0 {
+                return Ok(ValidateCallbackResult::Invalid("Max payout must be positive".into()));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        EntryTypes::RiskAssessment(risk) => {
+            if !risk.assessor_did.starts_with("did:mycelix:") {
+                return Ok(ValidateCallbackResult::Invalid("Assessor must have valid DID".into()));
+            }
+            if risk.project_id.is_empty() {
+                return Ok(ValidateCallbackResult::Invalid("Project ID required".into()));
+            }
+            for score in [risk.overall_risk, risk.technology_risk, risk.regulatory_risk, risk.market_risk, risk.construction_risk] {
+                if !score.is_finite() || score < 0.0 || score > 1.0 {
+                    return Ok(ValidateCallbackResult::Invalid("Risk scores must be 0.0-1.0".into()));
+                }
             }
             Ok(ValidateCallbackResult::Valid)
         }
