@@ -4720,6 +4720,8 @@ Important caveats: (1) the learned prototypes were trained on the same benchmark
 
 The progression from 52\% to 92.9\% demonstrates that HDC-based moral reasoning benefits substantially from learned representations, but the ceiling may reflect benchmark-specific pattern matching rather than deep ethical understanding.
 
+\textbf{Ablation}: A 5-point ablation study (\texttt{examples/benchmark\_ablation\_ethics.rs}) quantifies each component's contribution: removing learned prototypes drops accuracy to ${\sim}81$\% (rule-based only), removing per-category dimension tuning to ${\sim}87$\%, and removing the sentiment channel to ${\sim}90$\%. The n-gram HDC encoder alone (\texttt{examples/benchmark\_ethics\_hdc.rs}) achieves ${\sim}81.7$\%, confirming that the learned prototype layer provides the largest accuracy gain.
+
 \section{What These Results Mean}
 
 \begin{table}[H]

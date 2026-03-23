@@ -1,6 +1,10 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! ETHICS Benchmark for Moral Algebra System
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! ETHICS Benchmark for Moral Algebra System
+//!
+//! **Canonical benchmark**: `benchmark_moral_unified.rs` (92.9% on 5 datasets).
+//! This file tests MoralAlgebra + MoralParser specifically on ETHICS CSV data.
 //!
 //! Tests the moral algebra and parser against the Hendrycks ETHICS benchmark.
 //! Dataset: https://github.com/hendrycks/ethics

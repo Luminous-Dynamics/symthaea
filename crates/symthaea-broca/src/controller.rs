@@ -26,7 +26,7 @@ use symthaea_core::hdc::{
 /// GPU-resident pre-normalized embedding matrix for accelerated logit computation.
 /// Converts 4,096 × 16,384 individual cosine similarities into a single matrix-vector
 /// multiply on GPU (or optimized CPU tensor ops via candle).
-#[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+// candle-core is always available (non-optional dep)
 pub struct GpuEmbeddingCache {
     /// Pre-normalized embedding matrix [vocab_size, HDC_DIMENSION] on device.
     embeddings: candle_core::Tensor,
@@ -35,7 +35,7 @@ pub struct GpuEmbeddingCache {
     device: candle_core::Device,
 }
 
-#[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+// candle-core is always available (non-optional dep)
 impl std::fmt::Debug for GpuEmbeddingCache {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("GpuEmbeddingCache")
@@ -45,7 +45,7 @@ impl std::fmt::Debug for GpuEmbeddingCache {
     }
 }
 
-#[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+// candle-core is always available (non-optional dep)
 impl Clone for GpuEmbeddingCache {
     fn clone(&self) -> Self {
         Self {
@@ -55,7 +55,7 @@ impl Clone for GpuEmbeddingCache {
     }
 }
 
-#[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+// candle-core is always available (non-optional dep)
 impl GpuEmbeddingCache {
     /// Access the pre-normalized embedding tensor [vocab_size, HDC_DIMENSION].
     pub fn embeddings(&self) -> &candle_core::Tensor {
@@ -277,7 +277,7 @@ pub struct LanguageController {
     last_logit_hv: Option<ContinuousHV>,
     /// GPU-resident embedding matrix for accelerated logit computation.
     /// Shape: [vocab_size, HDC_DIMENSION]. Pre-normalized rows.
-    #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+    // candle-core is always available (non-optional dep)
     gpu_embeddings: Option<GpuEmbeddingCache>,
     /// Learned projection matrix: [projection_dim × HDC_DIMENSION], row-major.
     /// Projects 16,384D CfC output to a lower-dimensional space for logit computation.
@@ -329,7 +329,7 @@ impl LanguageController {
             None
         };
 
-        #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+        // candle-core is always available (non-optional dep)
         let gpu_embeddings = Self::build_gpu_cache(&token_embeddings);
 
         // Initialize learned projection head if configured
@@ -353,7 +353,7 @@ impl LanguageController {
             coherence_for_dt: 1.0,
             last_effective_dt: config.dt_per_token,
             last_logit_hv: None,
-            #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+            // candle-core is always available (non-optional dep)
             gpu_embeddings,
             projection_weights,
             projected_embeddings,
@@ -362,7 +362,7 @@ impl LanguageController {
 
     /// Build GPU/candle embedding cache from token embeddings.
     /// Falls back to None if device initialization fails.
-    #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+    // candle-core is always available (non-optional dep)
     fn build_gpu_cache(token_embeddings: &[ContinuousHV]) -> Option<GpuEmbeddingCache> {
         use candle_core::{Device, Tensor};
 
@@ -547,7 +547,7 @@ impl LanguageController {
         // Full-dimension path (backward compatible)
 
         // Try GPU/candle accelerated path
-        #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+        // candle-core is always available (non-optional dep)
         if let Some(ref cache) = self.gpu_embeddings {
             if let Ok(logits) = self.compute_logits_candle(output_hv, cache, scale) {
                 return logits;
@@ -572,7 +572,7 @@ impl LanguageController {
     /// Candle-accelerated logit computation via batched matrix-vector multiply.
     /// Embeddings are pre-normalized, so: cosine_sim = dot(emb_normalized, query_normalized).
     /// Result: logits = scale * (E_norm @ q_norm), single BLAS gemv.
-    #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+    // candle-core is always available (non-optional dep)
     fn compute_logits_candle(
         &self,
         output_hv: &ContinuousHV,
@@ -883,7 +883,7 @@ impl LanguageController {
         };
         self.token_embeddings.push(emb);
         // Invalidate GPU cache — will be rebuilt on next compute_logits if needed
-        #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+        // candle-core is always available (non-optional dep)
         {
             self.gpu_embeddings = Self::build_gpu_cache(&self.token_embeddings);
         }
@@ -1038,14 +1038,14 @@ impl LanguageController {
     }
 
     /// Access the GPU embedding cache (for GPU-accelerated gradient computation).
-    #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+    // candle-core is always available (non-optional dep)
     pub fn gpu_embedding_cache(&self) -> Option<&GpuEmbeddingCache> {
         self.gpu_embeddings.as_ref()
     }
 
     /// Rebuild the GPU embedding cache after training updates.
     /// Call after modifying embeddings (e.g., after gradient updates or normalization).
-    #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+    // candle-core is always available (non-optional dep)
     pub fn rebuild_gpu_cache(&mut self) {
         self.gpu_embeddings = Self::build_gpu_cache(&self.token_embeddings);
     }
@@ -1066,7 +1066,7 @@ impl LanguageController {
             }
         }
         // Rebuild GPU cache with updated norms
-        #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+        // candle-core is always available (non-optional dep)
         self.rebuild_gpu_cache();
     }
 

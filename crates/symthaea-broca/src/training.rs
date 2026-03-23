@@ -1683,7 +1683,7 @@ fn compute_ce_gradient_wrt_output(
     //   where error[i] = softmax[i] - 1{i=target}
     //   E_hat[i] = E[i] / ||E[i]|| (row-normalized embeddings, already in cache)
     //   cos[i] = logits[i] / scale
-    #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+    // candle-core is always available (non-optional dep)
     if let Some(cache) = controller.gpu_embedding_cache() {
         if let Ok(grad) =
             compute_ce_gradient_gpu(&exps, sum_exp, target, scale, logits, controller, cache)
@@ -1745,7 +1745,7 @@ fn compute_ce_gradient_cpu(
 /// This replaces the O(V×D) double loop with two GPU operations:
 /// 1. error @ E_hat: [1, V] × [V, D] → [1, D] (matmul)
 /// 2. Subtract the output-projection term
-#[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+// candle-core is always available (non-optional dep)
 fn compute_ce_gradient_gpu(
     exps: &[f32],
     sum_exp: f32,

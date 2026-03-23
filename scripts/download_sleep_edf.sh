@@ -18,9 +18,9 @@ set -euo pipefail
 
 # Configuration
 PHYSIONET_BASE="https://physionet.org/files/sleep-edfx/1.0.0"
-DATA_DIR="${PWD}/datasets/sleep-edf"
-CASSETTE_DIR="${DATA_DIR}/sleep-cassette"
-TELEMETRY_DIR="${DATA_DIR}/sleep-telemetry"
+DATA_DIR="${PWD}/data/benchmarks/sleep-edf"
+CASSETTE_DIR="${DATA_DIR}"
+TELEMETRY_DIR="${DATA_DIR}"
 
 # Color output
 RED='\033[0;31m'

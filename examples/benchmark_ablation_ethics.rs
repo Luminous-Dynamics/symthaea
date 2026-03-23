@@ -1,6 +1,10 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! ETHICS Ablation Study
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! ETHICS Ablation Study
+//!
+//! **Canonical benchmark**: `benchmark_moral_unified.rs` (92.9% on 5 datasets).
+//! This file ablates individual components from that pipeline.
 //!
 //! Systematically disables each component to measure its contribution:
 //!   (A) Full system (baseline): 92.9% ETHICS
