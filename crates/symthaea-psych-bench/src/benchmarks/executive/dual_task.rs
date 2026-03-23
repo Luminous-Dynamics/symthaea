@@ -100,9 +100,11 @@ impl DualTaskBenchmark {
         let load_fraction = 1.0 - (effective_capacity as f64 / wm_capacity as f64);
         // Base temperature calibrated for 4-AFC: association/temp ≈ 4.0 → ~95% single.
         // Linear load scaling: high-load temp ≈ 1.43× base → ~85% (Baddeley & Hitch 1974).
+        // Scale factor 0.50 per unit load_fraction: single (0.20) → high (0.30).
+        // Logit 0.80/0.30 = 2.67 → P(correct) = 0.85 at high load.
         // Heitz (2014): time pressure compounds with load.
         let base_temp = 0.20 + config.time_pressure * 0.12;
-        let temperature = base_temp * (1.0 + 0.10 * load_fraction);
+        let temperature = base_temp * (1.0 + 0.50 * load_fraction);
 
         // Association strength: learned S-R mapping adds this to the correct
         // response's activation. At base_temp=0.20, this yields softmax logit
@@ -166,8 +168,9 @@ impl DualTaskBenchmark {
 
             // WM load adds stochastic noise to decision process.
             // Baddeley & Hitch (1974): concurrent maintenance disrupts choice processing.
+            // Noise scale 0.20 per unit load_fraction compounds with temperature scaling.
             if load_hv.is_some() {
-                let noise_scale = load_fraction * 0.12;
+                let noise_scale = load_fraction * 0.20;
                 for act in activations.iter_mut() {
                     xor_shift(&mut rng);
                     let noise = ((rng % 1000) as f64 / 1000.0 - 0.5) * noise_scale;

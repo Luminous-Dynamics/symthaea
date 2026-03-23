@@ -90,13 +90,21 @@ impl NBackBenchmark {
                 // Encoding noise degrades similarity signal (top-down refinement absent)
                 let match_sim = hv.similarity(nback_hv) * (1.0 - noise as f32 * 0.4);
 
+                // Lure detection: items at positions N±1 can confuse the agent.
+                // Stricter lure threshold (1.15× match_threshold) models the
+                // human ability to partially suppress lure interference via
+                // inhibitory control (Jonides et al. 1998). The lure must be
+                // MORE similar than the match threshold to override, reflecting
+                // that WM monitoring can distinguish exact-match from near-match
+                // with moderate success.
                 let mut lure_match = false;
                 if !is_target && nback_retained {
+                    let lure_threshold = match_threshold * 1.15;
                     for offset in [1i32, -1] {
                         let lure_pos = i as i32 - n as i32 + offset;
                         if lure_pos >= 0 && (lure_pos as usize) < i {
                             let lure_sim = hv.similarity(&perceived_history[lure_pos as usize]);
-                            if lure_sim > match_threshold {
+                            if lure_sim > lure_threshold {
                                 lure_match = true;
                                 break;
                             }

@@ -66,7 +66,11 @@ impl TwoStepBenchmark {
                                             // (β3) because the model-based value difference between actions becomes
                                             // more distinct when state rewards are tracked accurately. Behrens et al.
                                             // (2007): optimal reward LR increases with reward volatility.
-        let reward_lr = 0.60;
+                                            // Reward LR 0.45 (was 0.60): slower reward learning preserves reward
+                                            // uncertainty, producing a stronger transition×reward interaction signal.
+                                            // With high LR, the reward model converges too fast, collapsing the
+                                            // interaction variance needed for the β3 measure.
+        let reward_lr = 0.45;
         let mut rt_ticks = Vec::new();
 
         for ep in 0..num_episodes {
@@ -113,10 +117,11 @@ impl TwoStepBenchmark {
             let mb_sum: f64 = mb_exp.iter().sum();
             let mb_probs: Vec<f64> = mb_exp.iter().map(|e| e / mb_sum).collect();
 
-            // Blend: ramp model-based weight gradually, saturating by episode 40.
-            // Slower ramp gives the agent more episodes to build accurate transition
-            // and reward models before going fully model-based.
-            let progress = (ep as f64 / 40.0).min(1.0);
+            // Blend: ramp model-based weight gradually, saturating by episode 80
+            // (was 40). Slower ramp allows the transition model to stabilize before
+            // MB dominates, producing cleaner transition×reward interaction. Daw et al.
+            // (2011) analyzed 200-trial sessions where MB emerged late.
+            let progress = (ep as f64 / 80.0).min(1.0);
             let mb_weight = 0.3 + 0.65 * progress;
             let blended_probs: Vec<f64> = (0..2)
                 .map(|a| (1.0 - mb_weight) * fep_probs[a] + mb_weight * mb_probs[a])

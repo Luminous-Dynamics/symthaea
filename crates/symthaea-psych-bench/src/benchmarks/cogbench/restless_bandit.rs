@@ -53,10 +53,16 @@ impl RestlessBanditBenchmark {
         // Dual-horizon EMA: fast tracks drift, slow provides stability.
         // Blending catches non-stationary shifts faster while reducing
         // noisy overreaction (cf. Behrens et al. 2007 volatility estimation).
-        let mut arm_ema_fast: Vec<f64> = vec![0.5; num_arms];
-        let mut arm_ema_slow: Vec<f64> = vec![0.5; num_arms];
-        let ema_alpha_fast = 0.8;
-        let ema_alpha_slow = 0.45;
+        // Initialize EMAs to match arm starting values (0.3-0.75 range),
+        // avoiding cold-start mismatch that delays learning.
+        let mut arm_ema_fast: Vec<f64> = arm_values.clone();
+        let mut arm_ema_slow: Vec<f64> = arm_values.clone();
+        // Fast alpha 0.70 (was 0.80): less overreaction to single noisy samples
+        // while still tracking drift. Slow alpha 0.50 (was 0.45): slightly more
+        // weight on recent observations for non-stationary environments
+        // (Speekenbrink & Konstantinidis 2015).
+        let ema_alpha_fast = 0.70;
+        let ema_alpha_slow = 0.50;
         // Track last-pull time per arm (recency-aware exploration)
         let mut arm_pulls: Vec<u64> = vec![0; num_arms];
         let mut arm_last_pull: Vec<usize> = vec![0; num_arms];
@@ -94,7 +100,10 @@ impl RestlessBanditBenchmark {
                         } else {
                             f64::MAX
                         };
-                        // Recency: arms not pulled recently get extra bonus (stale estimates)
+                        // Recency: arms not pulled recently get extra bonus (stale estimates).
+                        // In restless bandits, stale estimates are unreliable and must be
+                        // refreshed (Speekenbrink & Konstantinidis 2015). Weight 0.20 (was 0.10)
+                        // makes staleness a meaningful exploration driver.
                         let staleness = (trial - arm_last_pull[i]) as f64;
                         let recency_bonus = (staleness / 10.0).min(0.5);
                         // Time pressure: base UCB scale 0.12 (Daw et al., 2006 restless bandit).
@@ -103,7 +112,7 @@ impl RestlessBanditBenchmark {
                         // causes stale estimates and worse long-run accuracy.
                         // +0.10/unit inflates under deadline.
                         let ucb_scale = 0.12 + config.time_pressure * 0.10;
-                        (i, ema + count_bonus * ucb_scale + recency_bonus * 0.1)
+                        (i, ema + count_bonus * ucb_scale + recency_bonus * 0.20)
                     })
                     .max_by(|(_, a), (_, b)| a.total_cmp(b))
                     .map(|(i, _)| i)

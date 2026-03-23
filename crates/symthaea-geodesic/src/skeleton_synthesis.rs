@@ -40,9 +40,9 @@
 
 use symthaea_core::hdc::binary_hv::BinaryHV;
 
-use crate::execution_oracle::{ComplexityClass, ExecutionOracle, OperationType, PredictionResult};
+use crate::execution_oracle::{ExecutionOracle, OperationType, PredictionResult};
 use crate::manifold::ProgramManifold;
-use crate::topology::{BettiNumbers, TopologicalConstraint, TopologicalFingerprint};
+use crate::topology::BettiNumbers;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TOPOLOGICAL SIGNATURES OF COMBINATORS
@@ -691,7 +691,7 @@ pub fn active_inference_synthesize(
 
     // Step 4: Compute free energy and refine
     let mut refinements = 0;
-    if let (Some(ref pred), Some(expected)) = (&prediction, expected_output) {
+    if let (Some(ref pred), Some(_expected)) = (&prediction, expected_output) {
         let _free_energy = 1.0 - pred.output_similarity;
         // Future: refine slots that contribute most to free energy
         // For now, report the prediction error

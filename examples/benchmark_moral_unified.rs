@@ -307,7 +307,9 @@ fn main() {
     };
 
     // Train manifold classifier (5th ensemble signal: 8D harmony space)
-    if Path::new(&ethics_path).exists() {
+    // Prefer Social Chemistry 292K (norm descriptions = the domain where manifold helps most)
+    // Fall back to ETHICS if 292K not available
+    {
         use std::sync::Arc;
         use symthaea::hdc::harmony_basis::HarmonyBasis;
         use symthaea::hdc::manifold_classifier::ManifoldClassifier;
@@ -316,41 +318,72 @@ fn main() {
         let basis = Arc::new(HarmonyBasis::new(MORAL_PROTO_DIM));
         let mut manifold_clf = ManifoldClassifier::new(basis, MORAL_PROTO_DIM);
 
-        // Collect labeled samples from ETHICS for manifold training
-        if let Ok(file) = File::open(&ethics_path) {
-            let reader = BufReader::new(file);
-            if let Ok(data) = serde_json::from_reader::<_, DatasetFile<EthicsExample>>(reader) {
-                let samples: Vec<(String, MoralLabel)> = data
-                    .examples
-                    .iter()
-                    .filter_map(|ex| {
-                        let label_val = ex.label?;
-                        let label = match ex.category.as_str() {
-                            "commonsense" => {
-                                if label_val == 1 {
-                                    MoralLabel::Bad
-                                } else {
-                                    MoralLabel::Good
+        if dataset_292k_path.exists() {
+            // Train on Social Chemistry 292K — same distribution as evaluation
+            if let Ok(file) = File::open(&dataset_292k_path) {
+                let reader = BufReader::new(file);
+                if let Ok(data) = serde_json::from_reader::<_, SocialChem292kFile>(reader) {
+                    let samples: Vec<(String, MoralLabel)> = data
+                        .examples
+                        .iter()
+                        .filter_map(|ex| {
+                            let text = if !ex.rot.is_empty() {
+                                ex.rot.clone()
+                            } else if !ex.action.is_empty() {
+                                ex.action.clone()
+                            } else {
+                                return None;
+                            };
+                            let judgment: i32 = ex.rot_judgment.parse().unwrap_or(0);
+                            Some((text, MoralLabel::from_rot_judgment(judgment)))
+                        })
+                        .collect();
+                    manifold_clf.train(&samples);
+                    algebra.set_manifold_classifier(manifold_clf);
+                    println!(
+                        "  Manifold classifier trained on {} Social Chemistry 292K samples in {:.1}s (5th ensemble signal active)\n",
+                        samples.len(),
+                        train_start.elapsed().as_secs_f64()
+                    );
+                }
+            }
+        } else if Path::new(&ethics_path).exists() {
+            // Fall back to ETHICS
+            if let Ok(file) = File::open(&ethics_path) {
+                let reader = BufReader::new(file);
+                if let Ok(data) = serde_json::from_reader::<_, DatasetFile<EthicsExample>>(reader) {
+                    let samples: Vec<(String, MoralLabel)> = data
+                        .examples
+                        .iter()
+                        .filter_map(|ex| {
+                            let label_val = ex.label?;
+                            let label = match ex.category.as_str() {
+                                "commonsense" => {
+                                    if label_val == 1 {
+                                        MoralLabel::Bad
+                                    } else {
+                                        MoralLabel::Good
+                                    }
                                 }
-                            }
-                            _ => {
-                                if label_val == 1 {
-                                    MoralLabel::Good
-                                } else {
-                                    MoralLabel::Bad
+                                _ => {
+                                    if label_val == 1 {
+                                        MoralLabel::Good
+                                    } else {
+                                        MoralLabel::Bad
+                                    }
                                 }
-                            }
-                        };
-                        Some((ex.text.clone(), label))
-                    })
-                    .collect();
-                manifold_clf.train(&samples);
-                algebra.set_manifold_classifier(manifold_clf);
-                println!(
-                    "  Manifold classifier trained on {} ETHICS samples in {:.1}s (5th ensemble signal active)\n",
-                    samples.len(),
-                    train_start.elapsed().as_secs_f64()
-                );
+                            };
+                            Some((ex.text.clone(), label))
+                        })
+                        .collect();
+                    manifold_clf.train(&samples);
+                    algebra.set_manifold_classifier(manifold_clf);
+                    println!(
+                        "  Manifold classifier trained on {} ETHICS samples in {:.1}s (5th ensemble signal active)\n",
+                        samples.len(),
+                        train_start.elapsed().as_secs_f64()
+                    );
+                }
             }
         }
     }

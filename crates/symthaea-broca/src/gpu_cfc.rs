@@ -869,4 +869,68 @@ impl GpuTrainer {
         self.embeddings = Tensor::from_vec(flat, (vocab, self.dim), &self.device)?;
         Ok(())
     }
+
+    /// Sync GPU embeddings back to CPU controller (for checkpointing).
+    pub fn sync_embeddings_to_cpu(
+        &self,
+        ctrl: &mut crate::controller::LanguageController,
+    ) -> Result<()> {
+        let gpu_embs: Vec<Vec<f32>> = self.embeddings.to_vec2()?;
+        let cpu_embs = ctrl.token_embeddings_mut();
+        for (i, row) in gpu_embs.into_iter().enumerate() {
+            if i < cpu_embs.len() {
+                cpu_embs[i].values.copy_from_slice(&row);
+            }
+        }
+        // Rebuild GPU embedding cache on controller (for non-GPU paths)
+        ctrl.rebuild_gpu_cache();
+        Ok(())
+    }
+
+    /// Apply embedding gradient on GPU via outer product.
+    ///
+    /// Computes: emb -= lr × (error_scaled ⊗ output_hv) where error_scaled is [V, 1]
+    /// and output_hv is [1, D]. The outer product gives the full [V, D] gradient.
+    /// This is a single GPU matmul: [V, 1] × [1, D] → [V, D].
+    pub fn gpu_embedding_gradient(
+        &mut self,
+        logits: &[f32],
+        target: usize,
+        lr: f32,
+        grad_clip: f32,
+    ) -> Result<()> {
+        let n = logits.len();
+        let max_logit = logits.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        let exps: Vec<f32> = logits.iter().map(|&l| (l - max_logit).exp()).collect();
+        let sum_exp: f32 = exps.iter().sum();
+        if sum_exp < 1e-10 {
+            return Ok(());
+        }
+
+        let scale = self.logit_scale;
+
+        // Compute error vector (CPU — cheap, just V floats)
+        let errors: Vec<f32> = (0..n)
+            .map(|i| {
+                let prob = exps[i] / sum_exp;
+                let error = if i == target { prob - 1.0 } else { prob };
+                (scale * error * lr).clamp(-grad_clip, grad_clip)
+            })
+            .collect();
+
+        // Get normalized output on GPU
+        let raw_output = self.network.output()?;
+        let raw_norm = raw_output.sqr()?.sum(1)?.sqrt()?.clamp(1e-8, f32::MAX)?;
+        let norm_bc = raw_norm.unsqueeze(1)?.broadcast_as(raw_output.shape())?;
+        let output_hat = (&raw_output / &norm_bc)?; // [1, D]
+
+        // Outer product gradient: [V, 1] × [1, D] → [V, D] (single GPU matmul)
+        let error_tensor = Tensor::from_vec(errors, (n, 1), &self.device)?;
+        let grad_matrix = error_tensor.matmul(&output_hat)?; // [V, D]
+
+        // emb -= grad (in-place on GPU)
+        self.embeddings = (&self.embeddings - &grad_matrix)?;
+
+        Ok(())
+    }
 }
