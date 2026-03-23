@@ -71,7 +71,7 @@ name = "distill-for-spore"
 path = "src/bin/distill_for_spore.rs"
 
 [features]
-default = ["simd", "parallel", "gpu"]
+default = ["simd", "parallel"]
 # GPU tensor acceleration via candle CUDA (auto-detects at runtime)
 gpu = ["candle-core/cuda"]
 parallel = ["dep:rayon"]
