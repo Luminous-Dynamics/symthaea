@@ -1,4 +1,6 @@
-//! # Symthaea Facade
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Symthaea Facade
 //!
 //! The primary entry point for the Symthaea consciousness system.
 //! Wraps [`ContinuousMind`] and [`ConsciousnessLanguageCore`] into a
