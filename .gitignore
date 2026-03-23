@@ -58,6 +58,7 @@ archive/
 **/data/**
 !**/data/
 !crates/symthaea-broca/data/broca-vocab-*.json
+!crates/symthaea-spore/data/broca-pipeline-distilled.bin
 !crates/symthaea-stt/data/mini_cmudict.txt
 !src/voice/data/cmudict.dict
 models/
@@ -120,6 +121,4 @@ MUJOCO_LOG.TXT
 pulse.html
 benchmarks/external/**/helm-repo/
 benchmarks/external/**/.git/
-symthaea/
-crates/symthaea-spore/www/broca-pipeline.bin
-crates/symthaea-spore/www/broca-pipeline.bin
+/symthaea/

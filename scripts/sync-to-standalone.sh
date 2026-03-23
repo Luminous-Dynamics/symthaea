@@ -219,6 +219,7 @@ INDIVIDUAL_FILES=(
     "SECURITY.md"
     "SAFETY.md"
     ".gitleaks.toml"
+    ".gitignore"
 )
 
 # Legal files from monorepo root (AGPL dual-license framework)

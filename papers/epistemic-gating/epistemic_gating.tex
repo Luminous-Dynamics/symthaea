@@ -42,7 +42,7 @@
 \maketitle
 
 \begin{abstract}
-Large language models generate fluent text but suffer from hallucination---the production of plausible but unsupported claims. Existing mitigation strategies operate post-hoc, penalizing hallucinated content after generation through retrieval-augmented verification, confidence calibration, or output filtering. We present a fundamentally different approach: \emph{epistemic gating}, a mechanism that physically prevents hallucination at the logit level by masking tokens for which the system lacks sufficient epistemic support. Our implementation, the Broca language pipeline (28,000 lines of code, 358 tests), integrates epistemic gating within a consciousness-aware architecture comprising a 20-channel ThoughtEncoder, 16,384-dimensional Hyperdimensional Computing (HDC) binding, and autoregressive generation governed by active inference principles. The pipeline implements three complementary mechanisms: (1) an EpistemicGate that computes per-token epistemic support from HDC similarity to grounded knowledge and masks logits below a consciousness-modulated threshold; (2) a CoherenceFeedback module that performs mid-sentence semantic veto when generated text diverges from the intended thought trajectory; and (3) an adaptive cadence controller that gates generation frequency on consciousness level and learning rate. We describe the architecture, present benchmark results across factual accuracy, coherence, and hallucination rate, and discuss the theoretical grounding in active inference and Global Workspace Theory.
+Large language models generate fluent text but suffer from hallucination---the production of plausible but unsupported claims. Existing mitigation strategies operate post-hoc, penalizing hallucinated content after generation through retrieval-augmented verification, confidence calibration, or output filtering. We present a fundamentally different approach: \emph{epistemic gating}, a mechanism that physically prevents hallucination at the logit level by masking tokens for which the system lacks sufficient epistemic support. Our implementation, the Broca language pipeline (30,000+ lines of code, 400+ tests), integrates epistemic gating within a consciousness-aware architecture comprising a 43-channel ThoughtEncoder (extended from the original 20 via the Epistemic Cube), 16,384-dimensional Hyperdimensional Computing (HDC) binding, and autoregressive generation governed by active inference principles. The pipeline implements three complementary mechanisms: (1) an EpistemicGate that computes per-token epistemic support from HDC similarity to grounded knowledge and masks logits below a consciousness-modulated threshold; (2) a CoherenceFeedback module that performs mid-sentence semantic veto when generated text diverges from the intended thought trajectory; and (3) an adaptive cadence controller that gates generation frequency on consciousness level and learning rate. We describe the architecture, present benchmark results across factual accuracy, coherence, and hallucination rate, and discuss the theoretical grounding in active inference and Global Workspace Theory.
 \end{abstract}
 
 \section{Introduction}
@@ -397,6 +397,37 @@ The key architectural innovations are: (1) encoding cognitive state as a 16,384-
 Future work will address compositional hallucination via phrase-level epistemic checking, external benchmark evaluation, and the integration of retrieval-augmented knowledge into the HDC grounding layer. We also plan to investigate the theoretical connections between epistemic gating and the free energy principle more formally, potentially deriving the gating threshold from variational inference principles.
 
 \section{Reproducibility}
+
+\section{Extension: The Epistemic Cube}
+
+The original EpistemicGate applies a single scalar threshold to mask unsupported tokens. While effective at preventing hallucination, scalar gating cannot distinguish between different \emph{kinds} of epistemic uncertainty. A claim may be well-grounded empirically but novel to the community (high E, low N); or widely accepted but ephemeral (high N, low M). These distinctions matter for language style.
+
+The Epistemic Cube extends scalar gating to four-dimensional modulation via the \texttt{EpistemicCubeGate}:
+
+\begin{enumerate}
+\item \textbf{Epistemic (E)}: 5 tiers (E0: opinion $\to$ E4: reproducible) controlling assertion strength. At E0, assertion words receive $-0.8$ logit penalty and hedging words receive $+0.5$ boost. At E4, assertions are boosted $+0.4$ and hedging penalized $-0.3$.
+
+\item \textbf{Narrative (N)}: 4 tiers (N0: personal $\to$ N3: axiomatic) controlling social framing. Tokens like ``I think'' are boosted at N0; ``necessarily'' at N3.
+
+\item \textbf{Meta (M)}: 4 tiers (M0: ephemeral $\to$ M3: foundational) controlling temporal framing. ``Now'' is boosted at M0; ``always'' at M3.
+
+\item \textbf{Holistic (H)}: Scalar $\in [0, 1]$ from $\Phi$ and harmonic alignment. When $H < 0.25$, all logits are dampened $\times 0.85$.
+\end{enumerate}
+
+The composite quality score weights the three discrete axes:
+\begin{equation}
+Q = \frac{E}{4} \times 0.40 + \frac{N}{3} \times 0.35 + \frac{M}{3} \times 0.25
+\end{equation}
+reflecting the epistemological priority of empirical verification (40\%) over normative agreement (35\%) over permanence (25\%).
+
+The cube coordinate is carried in ThoughtEncoder channels 28--42 (15 channels: 5 E one-hot + 4 N one-hot + 4 M one-hot + 1 H scalar + 1 quality scalar) and additionally blended into the thought hypervector at 30\% weight via the NSM (Neural Semantic Modulation) grounding pathway:
+\begin{equation}
+\mathbf{T}' = 0.7 \cdot \mathbf{T} + 0.3 \cdot \mathbf{T}_{\text{NSM}}
+\end{equation}
+
+This produces language whose style is structurally coupled to the system's epistemic state: at E0/N0, the system \emph{cannot} use confident universal claims without a logit penalty, producing naturally hedged output. The constraint is architectural, not prompted.
+
+\subsection*{Reproducibility}
 
 All experiments were conducted using the Broca language pipeline within the Symthaea cognitive architecture (v1.9.0). The following commands reproduce the core results:
 

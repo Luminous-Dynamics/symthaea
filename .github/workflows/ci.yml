@@ -211,7 +211,10 @@ jobs:
             features: >-
               multi_agent,full_consciousness,full_perception,
               full_language,magi_loop,reasoning_engine,code_generation,
-              wasm-sandbox,school_learning,benchmarks,all_benchmarks
+              wasm-sandbox,school_learning
+          - group: science-benchmarks
+            features: >-
+              benchmarks,all_benchmarks
           - group: science-infra
             features: >-
               physics,physics-bridge,flight,humanoid,hal,
