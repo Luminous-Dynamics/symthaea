@@ -1,4 +1,6 @@
-//! Currency lifecycle management: creation, activation, suspension, retirement, discovery, amendment.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Currency lifecycle management: creation, activation, suspension, retirement, discovery, amendment.
 
 use currency_mint_integrity::*;
 use hdk::prelude::*;
@@ -31,7 +33,7 @@ pub fn create_currency(input: CreateCurrencyInput) -> ExternResult<CurrencyDefin
     }
 
     // Governance gate: communities above threshold require a governance proposal
-    let community_size = fetch_community_size(&input.dao_did);
+    let community_size = fetch_community_size(&input.dao_did)?;
     if community_size > COMMUNITY_GOVERNANCE_THRESHOLD {
         if input.governance_proposal_id.is_none() {
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
@@ -417,7 +419,7 @@ pub fn amend_currency_params(input: AmendCurrencyParamsInput) -> ExternResult<Cu
     }
 
     // Governance gate
-    let community_size = fetch_community_size(&def.creator_dao_did);
+    let community_size = fetch_community_size(&def.creator_dao_did)?;
     if community_size > COMMUNITY_GOVERNANCE_THRESHOLD {
         if input.governance_proposal_id.is_none() {
             return Err(wasm_error!(WasmErrorInner::Guest(format!(

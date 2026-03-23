@@ -953,6 +953,16 @@ pub fn gate_consciousness(
     let now_us = sys_time()?.as_micros() as u64;
     let eligibility = evaluate_governance(&credential, requirement, now_us);
 
+    // Record consciousness gate metrics
+    let tier_index = match eligibility.tier {
+        ConsciousnessTier::Observer => 0,
+        ConsciousnessTier::Participant => 1,
+        ConsciousnessTier::Citizen => 2,
+        ConsciousnessTier::Steward => 3,
+        ConsciousnessTier::Guardian => 4,
+    };
+    crate::metrics::record_gate_check(eligibility.eligible, tier_index, 0);
+
     // Fire audit log (best-effort, rate-limited via should_audit)
     if should_audit(
         requirement,

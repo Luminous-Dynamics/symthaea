@@ -1,4 +1,6 @@
-//! Dispute opening, resolution, and queries.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Dispute opening, resolution, and queries.
 
 use currency_mint_integrity::*;
 use hdk::prelude::*;
@@ -97,7 +99,7 @@ pub fn resolve_minted_dispute(input: ResolveDisputeInput) -> ExternResult<Minted
 
     // Governance gate: communities above threshold require authorization
     let (_, def) = get_currency_inner(&exchange.currency_id)?;
-    let community_size = fetch_community_size(&def.creator_dao_did);
+    let community_size = fetch_community_size(&def.creator_dao_did)?;
     if community_size > COMMUNITY_GOVERNANCE_THRESHOLD {
         match call(
             CallTargetCell::Local,

@@ -1,4 +1,6 @@
-//! Internal helper functions shared across coordinator modules.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Internal helper functions shared across coordinator modules.
 
 use currency_mint_integrity::*;
 use hdk::prelude::*;
@@ -164,12 +166,12 @@ pub(crate) fn get_or_create_minted_balance(
 }
 
 /// Fetch community member count via cross-zome call to governance/identity.
-/// Falls back to 0 (permissive) if the cross-zome call is unreachable.
 ///
-/// SECURITY NOTE: Returning 0 is PERMISSIVE — it bypasses the governance proposal
-/// requirement for communities >10 members. This is deliberate for bootstrap/standalone
-/// mode. The integrity zome still enforces zero-sum and constitutional limits.
-pub(crate) fn fetch_community_size(dao_did: &str) -> u32 {
+/// SECURITY: Fail-closed — returns error if the finance bridge is unreachable.
+/// This is consistent with STRICT_GOVERNANCE_MODE=true in the finance bridge.
+/// Previously returned 0 (permissive), which bypassed the governance proposal
+/// requirement for communities >10 members.
+pub(crate) fn fetch_community_size(dao_did: &str) -> ExternResult<u32> {
     match call(
         CallTargetCell::Local,
         ZomeName::from("finance_bridge"),
@@ -177,15 +179,18 @@ pub(crate) fn fetch_community_size(dao_did: &str) -> u32 {
         None,
         dao_did.to_string(),
     ) {
-        Ok(ZomeCallResponse::Ok(result)) => result.decode::<u32>().unwrap_or(0),
-        Ok(other) => {
-            debug!("fetch_community_size: finance_bridge returned {:?} for {}, defaulting to 0 (permissive)", other, dao_did);
-            0
+        Ok(ZomeCallResponse::Ok(result)) => {
+            let count = result.decode::<u32>().unwrap_or(0);
+            Ok(count)
         }
-        Err(e) => {
-            debug!("fetch_community_size: finance_bridge unreachable for {}: {:?}, defaulting to 0 (permissive)", dao_did, e);
-            0
-        }
+        Ok(other) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "fetch_community_size: finance_bridge returned unexpected response for {}: {:?}",
+            dao_did, other
+        )))),
+        Err(e) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "fetch_community_size: finance_bridge unreachable for {}: {:?}",
+            dao_did, e
+        )))),
     }
 }
 

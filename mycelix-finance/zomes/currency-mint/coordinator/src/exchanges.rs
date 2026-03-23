@@ -1,4 +1,6 @@
-//! Exchange recording, confirmation, cancellation, and queries.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Exchange recording, confirmation, cancellation, and queries.
 
 use currency_mint_integrity::*;
 use hdk::prelude::*;
@@ -622,7 +624,7 @@ pub fn recover_incomplete_minted_confirmations(currency_id: String) -> ExternRes
 
     // Governance gate: communities above threshold require authorization
     let (_, def) = get_currency_inner(&currency_id)?;
-    let community_size = fetch_community_size(&def.creator_dao_did);
+    let community_size = fetch_community_size(&def.creator_dao_did)?;
     if community_size > COMMUNITY_GOVERNANCE_THRESHOLD {
         match call(
             CallTargetCell::Local,

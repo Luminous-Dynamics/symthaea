@@ -1,4 +1,6 @@
-//! # Mycelix Energy - Sweettest Integration Tests
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Mycelix Energy - Sweettest Integration Tests
 //!
 //! Comprehensive integration tests using Holochain's sweettest framework.
 //! Tests cover energy projects, grid trading, investments, regenerative transitions,
@@ -864,5 +866,214 @@ mod lifecycle_tests {
             .await;
 
         assert!(final_project.is_some(), "Project should still exist");
+    }
+}
+
+// ============================================================================
+// Cross-Zome Consistency Tests
+// ============================================================================
+
+#[cfg(test)]
+mod cross_zome_tests {
+    use super::*;
+
+    /// Verify that investments reference valid projects
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_investment_references_valid_project() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Register a project first
+        let proj_input = make_test_project("cross-zome-proj", "Solar", 10.0);
+        let proj_record: Record = conductor
+            .call(&cell.zome("projects"), "register_project", proj_input)
+            .await;
+        let project: EnergyProject = decode_entry(&proj_record).expect("decode project");
+
+        // Invest in the project
+        let pledge_input = PledgeInput {
+            project_id: project.id.clone(),
+            investor_did: "did:mycelix:cross-investor".to_string(),
+            amount: 50000.0,
+            currency: "USD".to_string(),
+            shares: 500.0,
+            share_percentage: 5.0,
+            investment_type: InvestmentType::Equity,
+        };
+
+        let inv_record: Record = conductor
+            .call(&cell.zome("investments"), "pledge_investment", pledge_input)
+            .await;
+        let investment: Investment = decode_entry(&inv_record).expect("decode investment");
+        assert_eq!(investment.project_id, project.id, "Investment must reference the correct project");
+
+        // Verify via query
+        let project_investments: Vec<Record> = conductor
+            .call(&cell.zome("investments"), "get_project_investments", project.id.clone())
+            .await;
+        assert_eq!(project_investments.len(), 1, "Project should have exactly 1 investment");
+    }
+
+    /// Verify grid production references valid projects
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_production_references_valid_project() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        let proj_input = make_test_project("prod-ref-proj", "Wind", 20.0);
+        let proj_record: Record = conductor
+            .call(&cell.zome("projects"), "register_project", proj_input)
+            .await;
+        let project: EnergyProject = decode_entry(&proj_record).expect("decode project");
+
+        // Record production
+        let prod_input = RecordProductionInput {
+            producer_did: "did:mycelix:prod-ref-dev".to_string(),
+            project_id: project.id.clone(),
+            amount_kwh: 5000.0,
+            period_hours: 12.0,
+            meter_reading: Some(12345.0),
+        };
+
+        let prod_record: Record = conductor
+            .call(&cell.zome("grid"), "record_production", prod_input)
+            .await;
+        let production: EnergyProduction = decode_entry(&prod_record).expect("decode production");
+        assert_eq!(production.project_id, project.id);
+        assert_eq!(production.amount_kwh, 5000.0);
+        assert!(production.meter_reading == Some(12345.0));
+    }
+
+    /// Multi-investor portfolio summary
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_multi_investor_portfolio_consistency() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Register 2 projects
+        let proj1_input = make_test_project("portfolio-proj-1", "Solar", 10.0);
+        let proj1: EnergyProject = decode_entry(
+            &conductor.call::<_, Record>(&cell.zome("projects"), "register_project", proj1_input).await
+        ).unwrap();
+
+        let proj2_input = make_test_project("portfolio-proj-2", "Wind", 20.0);
+        let proj2: EnergyProject = decode_entry(
+            &conductor.call::<_, Record>(&cell.zome("projects"), "register_project", proj2_input).await
+        ).unwrap();
+
+        // Same investor pledges to both
+        let investor_did = "did:mycelix:multi-investor".to_string();
+
+        let _: Record = conductor.call(&cell.zome("investments"), "pledge_investment", PledgeInput {
+            project_id: proj1.id.clone(),
+            investor_did: investor_did.clone(),
+            amount: 25000.0, currency: "USD".into(), shares: 250.0,
+            share_percentage: 5.0, investment_type: InvestmentType::Equity,
+        }).await;
+
+        let _: Record = conductor.call(&cell.zome("investments"), "pledge_investment", PledgeInput {
+            project_id: proj2.id.clone(),
+            investor_did: investor_did.clone(),
+            amount: 75000.0, currency: "USD".into(), shares: 750.0,
+            share_percentage: 7.5, investment_type: InvestmentType::CommunityShare,
+        }).await;
+
+        // Verify portfolio summary
+        let summary: PortfolioSummary = conductor
+            .call(&cell.zome("investments"), "get_portfolio_summary", investor_did)
+            .await;
+        assert_eq!(summary.total_invested, 100000.0, "Total should be 25k + 75k");
+        assert_eq!(summary.unique_projects, 2, "Should span 2 projects");
+    }
+
+    /// Trade offer lifecycle: create → partial fill → query
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_trade_offer_partial_fill() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create offer
+        let now = Timestamp::now();
+        let later = Timestamp::from_micros(now.as_micros() + 86_400_000_000); // +24h
+
+        let offer_input = CreateOfferInput {
+            seller_did: "did:mycelix:seller".to_string(),
+            project_id: None,
+            amount_kwh: 1000.0,
+            price_per_kwh: 0.12,
+            currency: "USD".to_string(),
+            available_from: now,
+            available_until: later,
+        };
+
+        let offer_record: Record = conductor
+            .call(&cell.zome("grid"), "create_trade_offer", offer_input)
+            .await;
+        let offer: TradeOffer = decode_entry(&offer_record).expect("decode offer");
+        assert!(matches!(offer.status, OfferStatus::Active));
+
+        // Partial fill (buy 400 of 1000 kWh)
+        let trade_input = ExecuteTradeInput {
+            offer_id: offer.id.clone(),
+            buyer_did: "did:mycelix:buyer-1".to_string(),
+            amount_kwh: 400.0,
+        };
+
+        let _: Record = conductor
+            .call(&cell.zome("grid"), "execute_trade", trade_input)
+            .await;
+
+        // Query active offers — should still show (partially filled)
+        let active: Vec<Record> = conductor
+            .call(&cell.zome("grid"), "get_active_offers", ())
+            .await;
+        assert!(!active.is_empty(), "Partially filled offer should still be listed");
+    }
+}
+
+// ============================================================================
+// Test helpers
+// ============================================================================
+
+fn make_test_project(name_suffix: &str, project_type: &str, capacity: f64) -> RegisterProjectInput {
+    RegisterProjectInput {
+        terra_atlas_id: Some(format!("terra:{}", name_suffix)),
+        name: format!("Test {}", name_suffix),
+        description: format!("Test project {}", name_suffix),
+        project_type: match project_type {
+            "Wind" => ProjectType::Wind,
+            "Hydro" => ProjectType::Hydro,
+            _ => ProjectType::Solar,
+        },
+        location: ProjectLocation {
+            latitude: 32.0,
+            longitude: -97.0,
+            country: "US".to_string(),
+            region: "Test Region".to_string(),
+            address: None,
+        },
+        capacity_mw: capacity,
+        developer_did: format!("did:mycelix:{}-dev", name_suffix),
+        community_did: Some(format!("did:mycelix:{}-comm", name_suffix)),
+        financials: ProjectFinancials {
+            total_cost: capacity * 1_000_000.0,
+            funded_amount: 0.0,
+            currency: "USD".to_string(),
+            target_irr: 0.10,
+            payback_years: 10.0,
+            annual_revenue_estimate: capacity * 100_000.0,
+        },
     }
 }
