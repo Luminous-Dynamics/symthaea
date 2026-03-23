@@ -81,8 +81,14 @@ impl IowaGamblingBenchmark {
         // Loss aversion 2.7 above K&T's 2.25 reflects the principled asymmetry
         // in HDC magnitude encoding where loss signals have greater
         // representational fidelity (Yechiam & Hochman, 2013).
-        let somatic_alpha = 0.18 * fep_lr_multiplier;
-        let loss_aversion = 2.7f32;
+        // Person-specific somatic learning: higher lapse_rate subjects have noisier
+        // somatic marker acquisition (Damasio, 1994; individual differences in
+        // ventromedial PFC function modulate somatic marker fidelity).
+        let somatic_alpha = 0.18 * fep_lr_multiplier * (1.0 + config.lapse_rate * 0.4);
+        // Person-specific loss aversion: lapse-prone subjects are less loss-averse
+        // (Damasio, 1994 — somatic marker hypothesis; higher lapse_rate reflects
+        // weaker affective signals that normally amplify loss salience).
+        let loss_aversion = 2.7f32 * (1.0 - config.lapse_rate as f32 * 0.2);
 
         let mut deck_draw_count = [0u32; 4];
         let mut block_net_scores = [0i32; 5]; // (C+D) - (A+B) per block

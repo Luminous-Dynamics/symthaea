@@ -103,6 +103,9 @@ pub struct ContinuousMind {
     /// When enabled, the mind models other agents' mental states and
     /// uses social reasoning to inform cooperation decisions.
     pub(crate) social_coherence: Option<crate::brain::SocialCoherence>,
+    /// Learned projection for social signals (perception dim → cognitive dim).
+    /// Bridges the 512D→16384D gap for collective consciousness emergence.
+    pub(crate) social_projection: Option<symthaea_core::hdc::projection::LearnedProjection>,
     /// Incoming social messages from network peers.
     pub(crate) social_inbox: Vec<SocialMessage>,
     /// Outgoing social messages to broadcast to peers.
@@ -234,6 +237,8 @@ impl ContinuousMind {
     /// For reproducible behavior across runs, use [`Self::from_genesis()`] instead.
     pub fn new(config: MindConfig) -> Self {
         let dim = config.dimension;
+        let perception_dim = config.dimension;
+        let social_projection_enabled = config.social_projection_enabled;
         let social = if config.enable_social_coherence {
             Some(crate::brain::SocialCoherence::new(
                 crate::brain::SocialCoherenceConfig {
@@ -269,6 +274,14 @@ impl ContinuousMind {
             evicted_items: Vec::new(),
             relational_psi: 0.0,
             social_coherence: social,
+            social_projection: if social_projection_enabled {
+                Some(symthaea_core::hdc::projection::LearnedProjection::new(
+                    perception_dim,
+                    16384,
+                ))
+            } else {
+                None
+            },
             social_inbox: Vec::new(),
             social_outbox: Vec::new(),
             iroh_bridge: None,

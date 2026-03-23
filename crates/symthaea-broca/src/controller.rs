@@ -55,6 +55,19 @@ impl Clone for GpuEmbeddingCache {
     }
 }
 
+#[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+impl GpuEmbeddingCache {
+    /// Access the pre-normalized embedding tensor [vocab_size, HDC_DIMENSION].
+    pub fn embeddings(&self) -> &candle_core::Tensor {
+        &self.embeddings
+    }
+
+    /// Access the device (CUDA or CPU).
+    pub fn device(&self) -> &candle_core::Device {
+        &self.device
+    }
+}
+
 /// Configuration for the language controller.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LanguageControllerConfig {
@@ -1022,6 +1035,12 @@ impl LanguageController {
     /// Get mutable reference to token embeddings (for training).
     pub fn token_embeddings_mut(&mut self) -> &mut Vec<ContinuousHV> {
         &mut self.token_embeddings
+    }
+
+    /// Access the GPU embedding cache (for GPU-accelerated gradient computation).
+    #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+    pub fn gpu_embedding_cache(&self) -> Option<&GpuEmbeddingCache> {
+        self.gpu_embeddings.as_ref()
     }
 
     /// Rebuild the GPU embedding cache after training updates.

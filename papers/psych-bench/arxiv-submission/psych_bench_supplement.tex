@@ -289,15 +289,71 @@ The following CSV data files are included in the repository under \texttt{papers
 \begin{itemize}
 \item \texttt{normative\_zscores.csv} --- Per-benchmark normative z-scores comparing agent performance against published human baselines (Figure~5 forest plot). Columns: benchmark, metric, agent value, human mean, human SD, z-score (sign-corrected), percentile, clinical band.
 \item \texttt{cognitive\_profile.csv} --- Domain-level cognitive profile scores (Figures~5--6). 27 domains with score, benchmark count, and qualitative interpretation.
-\item \texttt{reliability.csv} --- Test-retest reliability (ICC) for each benchmark across 3 sessions $\times$ 10 seed families (Table~2).
+\item \texttt{reliability.csv} --- Test-retest reliability (ICC(3,1)) for 20 benchmarks across 5 sessions $\times$ 30 seed families (Table~2). Columns: benchmark, metric, ICC, Pearson $r$, SEM, practice direction, practice change \%, reliability class.
 \item \texttt{correlations.csv} --- Cross-domain correlation matrix for 10 key mechanism pairs (Table~3).
-\item \texttt{ablation\_domains.csv} --- Domain scores under 6 ablation presets (Figure~7 grouped bar chart).
+\item \texttt{ablation\_domains.csv} --- Domain scores under 6 ablation presets (Figure~7 grouped bar chart). 27 domains $\times$ 6 presets.
 \item \texttt{sat\_*.csv} --- Speed-accuracy tradeoff curves for individual benchmarks (Figure~8).
 \item \texttt{neuromod\_profiles.csv} --- Neuromodulator benchmark results including behavioral knockout effect sizes, dose-response monotonicity, tolerance/withdrawal dynamics, and consciousness pharmacology.
+\item \texttt{normative\_forest.csv} --- Forest plot data for all 123 benchmarks with baselines. Columns: benchmark, domain, metric, agent value, human mean, human SD, z-score, z-clamped, percentile, interpretation.
+\item \texttt{cross\_seed\_stability.csv} --- Cross-seed stability analysis across 5 seeds (42, 123, 789, 1337, 2718). 27 domains with per-seed z-scores, mean, and SD. Mean domain SD $= 0.071$; most stable domains (SD $< 0.01$): InstitutionalReasoning, Clinical, Motor, Security, SustainedAttention.
 \end{itemize}
 
 % ============================================================
-% Section S2: Moral Topology Analysis
+% Section S2: Cross-Seed Stability
+% ============================================================
+
+\newpage
+\section*{Section S2: Cross-Seed Stability Analysis}
+
+To assess robustness to random initialization, the full battery was run at 5 seeds (42, 123, 789, 1337, 2718). Table~S2 reports per-domain z-scores at each seed, with mean and standard deviation.
+
+\begin{longtable}{@{}lrrrrrrr@{}}
+\caption{Cross-seed stability: domain z-scores across 5 seeds. Domains with SD $< 0.01$ are ablation-invariant; high-SD domains (Creativity, Executive, Mathematics) reflect genuine seed sensitivity in HDC encoding.} \label{tab:s2} \\
+\toprule
+\textbf{Domain} & \textbf{Seed 42} & \textbf{Seed 123} & \textbf{Seed 789} & \textbf{Seed 1337} & \textbf{Seed 2718} & \textbf{Mean} & \textbf{SD} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Domain} & \textbf{Seed 42} & \textbf{Seed 123} & \textbf{Seed 789} & \textbf{Seed 1337} & \textbf{Seed 2718} & \textbf{Mean} & \textbf{SD} \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+Affect & 1.20 & 1.16 & 1.25 & 1.18 & 1.31 & 1.22 & 0.052 \\
+Attention & 0.34 & 0.36 & 0.23 & 0.17 & 0.33 & 0.29 & 0.073 \\
+Binding & 0.62 & 0.71 & 0.73 & 0.69 & 0.67 & 0.68 & 0.039 \\
+Butlin & 0.67 & 0.67 & 0.67 & 0.67 & 0.67 & 0.67 & 0.000 \\
+CausalReasoning & 0.80 & 0.80 & 0.80 & 0.80 & 0.80 & 0.80 & 0.001 \\
+Clinical & 2.00 & 2.00 & 2.00 & 2.00 & 2.00 & 2.00 & 0.000 \\
+Coding & 1.79 & 1.84 & 1.73 & 1.74 & 1.63 & 1.75 & 0.069 \\
+CogBench & 0.58 & 0.51 & 0.58 & 0.56 & 0.47 & 0.54 & 0.045 \\
+Consciousness & 0.69 & 0.71 & 0.73 & 0.61 & 0.64 & 0.68 & 0.045 \\
+\textbf{Creativity} & \textbf{0.80} & \textbf{0.52} & \textbf{0.34} & \textbf{1.21} & \textbf{$-$0.27} & \textbf{0.52} & \textbf{0.491} \\
+Executive & 0.72 & 1.10 & 1.19 & 0.95 & 1.15 & 1.02 & 0.172 \\
+Inhibition & 1.57 & 1.54 & 1.50 & 1.48 & 1.54 & 1.52 & 0.031 \\
+InstitReasoning & 2.25 & 2.25 & 2.25 & 2.25 & 2.25 & 2.25 & 0.000 \\
+Language & 1.75 & 1.53 & 1.69 & 1.77 & 1.81 & 1.71 & 0.098 \\
+Mathematics & 1.15 & 0.65 & 1.03 & 0.83 & 0.73 & 0.88 & 0.187 \\
+MemoryAgent & 1.00 & 0.82 & 0.43 & 0.55 & 0.72 & 0.70 & 0.199 \\
+Metacognition & 0.75 & 0.80 & 0.67 & 0.69 & 0.89 & 0.76 & 0.080 \\
+Motor & 2.32 & 2.33 & 2.32 & 2.34 & 2.31 & 2.33 & 0.009 \\
+Reasoning & 1.39 & 1.37 & 1.42 & 1.37 & 1.36 & 1.38 & 0.023 \\
+Security & 2.00 & 2.00 & 2.00 & 2.00 & 2.00 & 2.00 & 0.003 \\
+Social & 1.54 & 1.49 & 1.56 & 1.51 & 1.58 & 1.53 & 0.032 \\
+Spatial & 1.21 & 1.23 & 1.22 & 1.24 & 1.21 & 1.22 & 0.011 \\
+Speech & 2.13 & 1.93 & 2.04 & 2.04 & 1.81 & 1.99 & 0.111 \\
+Substrate & 0.88 & 0.91 & 0.97 & 0.85 & 0.94 & 0.91 & 0.043 \\
+SustainedAttention & 2.19 & 2.20 & 2.20 & 2.19 & 2.19 & 2.19 & 0.004 \\
+ToMBench & 1.08 & 1.02 & 1.02 & 0.95 & 0.95 & 1.00 & 0.050 \\
+WorM & 0.73 & 0.77 & 0.86 & 0.73 & 0.68 & 0.75 & 0.058 \\
+\midrule
+\multicolumn{6}{l}{\emph{Grand mean (unweighted domain)}} & 1.27 & 0.024 \\
+\end{longtable}
+
+\noindent The Creativity domain shows anomalously high cross-seed variance (SD $= 0.491$), primarily driven by the RemoteAssociates benchmark whose semantic associations are seed-dependent (see Discussion). Mathematics (SD $= 0.187$), MemoryAgent (SD $= 0.199$), and Executive (SD $= 0.172$) show moderate variance reflecting genuine sensitivity to stimulus configuration. The remaining 23 domains have SD $< 0.12$, with 8 domains showing SD $< 0.01$ (effectively deterministic).
+
+% ============================================================
+% Section S3: Moral Topology Analysis
 % ============================================================
 
 \newpage

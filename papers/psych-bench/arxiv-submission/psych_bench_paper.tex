@@ -675,7 +675,7 @@ Neuromod      & Reward Learning    &  $0.34$ &  $0.33$ & 0.822 & Stable      & P
 
 Table~\ref{tab:psychometrics} reveals a median ICC of $0.60$ (Moderate). Five benchmarks achieve Excellent reliability: Stroop incongruent accuracy ($0.96$), WCST ($0.91$), Digit Span ($1.00$, deterministic for a given subject), Reversal Learning ($0.99$), and Calibration ($0.96$). Four reach Good: Flanker ($0.78$), N-back ($0.84$), BART ($0.88$), and Stop Signal ($0.81$). Two are Moderate: Visual Search ($0.69$) and Yerkes-Dodson ($0.52$). The remaining 9 benchmarks are Poor ($\text{ICC} \leq 0.50$), including two with negative values (Lexical Decision $-0.03$, Feeling of Knowing $-0.06$). In total: 5 Excellent, 4 Good, 2 Moderate, 9 Poor across 20 evaluated benchmarks.
 
-The remaining Poor benchmarks reflect a fundamental property of the deterministic HDC architecture: some benchmarks produce near-identical scores across subjects because lapse-rate and encoding-noise variation does not meaningfully modulate the underlying computations. When between-subject variance collapses, ICC becomes undefined or negative~\citep{shrout1979intraclass}. This is scientifically informative: it reveals which cognitive dimensions in the architecture are genuinely sensitive to individual differences (executive control, inhibition, metacognition, decision-making) versus which are structurally invariant (language processing, reasoning). The improvement from 3 Excellent to 5 Excellent was achieved by adding lapse-rate sensitivity to benchmarks that previously lacked it (N-back, BART, Change Detection, Iowa Gambling Task, Reversal Learning, ARC-Fluid) and by switching key metrics from difference scores (e.g., flanker effect) to raw accuracy measures. Difference scores have inherently lower ICC because both conditions degrade equally with noise, canceling individual differences~\citep{cronbach1970essentials}.
+The remaining Poor benchmarks reflect a fundamental property of the deterministic HDC architecture: some benchmarks produce near-identical scores across subjects because lapse-rate and encoding-noise variation does not meaningfully modulate the underlying computations. When between-subject variance collapses, ICC becomes undefined or negative~\citep{shrout1979intraclass}. This is scientifically informative: it reveals which cognitive dimensions in the architecture are genuinely sensitive to individual differences (executive control, inhibition, metacognition, decision-making) versus which are structurally invariant (language processing, reasoning). The improvement from 3 Excellent to 5 Excellent was achieved by adding lapse-rate sensitivity to benchmarks that previously lacked it (N-back, BART, Change Detection, Iowa Gambling Task, Reversal Learning, ARC-Fluid) and by switching key metrics from difference scores (e.g., flanker effect) to raw accuracy measures. Difference scores have inherently lower ICC because both conditions degrade equally with noise, canceling individual differences~\citep{cronbach1970essentials}. As a complementary measure, the harness computes odd-even split-half reliability (Spearman rank correlation between even-indexed and odd-indexed seed runs), which assesses internal consistency without requiring the between-subject variance that ICC demands. Benchmarks with Poor ICC but high split-half reliability are structurally consistent but insensitive to individual-differences parameters.
 
 \subsection{Construct Validity}
 
@@ -752,7 +752,7 @@ where $\lambda$ is the accuracy asymptote, $\beta$ is the approach rate (how qui
 
 \subsection{Adaptive Staircase Procedures}
 
-For benchmarks supporting difficulty manipulation, the harness implements Levitt's~\citep{levitt1971transformed} transformed up-down method with configurable convergence rules. The \texttt{StaircaseConfig} specifies: target performance level (e.g., 75\% for 2-down/1-up), step sizes (initial and reduced after first reversal), minimum reversals for convergence, and maximum trials. The threshold estimate is the mean of the last $n$ reversal points. This enables precise measurement of perceptual and cognitive thresholds without exhaustive fixed-trial testing.
+For benchmarks supporting difficulty manipulation, the harness implements Levitt's~\citep{levitt1971transformed} transformed up-down method with configurable convergence rules. The \texttt{StaircaseConfig} specifies: target performance level (e.g., 75\% for 2-down/1-up), step sizes (initial and reduced after first reversal), minimum reversals for convergence, and maximum trials. The threshold estimate is the mean of the last $n$ reversal points. This enables precise measurement of perceptual and cognitive thresholds without exhaustive fixed-trial testing. The \texttt{ArcStaircase} benchmark demonstrates the procedure: starting at grid size 5, the staircase converges to a capacity threshold of ${\sim}11$ grid cells at $D = 512$ (the maximum complexity at which the HDC encoder maintains ${\geq}75\%$ accuracy), with trajectory data capturing each step's difficulty, accuracy, and reversal status for convergence analysis.
 
 % ============================================================
 % 7. CONSCIOUSNESS INDICATORS
@@ -910,7 +910,7 @@ We demonstrate \psychbench{} on the \symthaea{} Holographic Liquid Brain, a cogn
 
 \paragraph{Cognitive Profile.} Figure~\ref{fig:signature} shows the complete 27-domain signature profile, while Figure~\ref{fig:radar} shows the 8-domain cognitive profile generated from the full battery. The \hlb{} achieves a grand mean z-score of $+1.27$ across 27 cognitive domains, with all 27 domains above the human mean. Cross-seed stability analysis (5 seeds: 42, 123, 789, 1337, 2718) confirms robustness: grand mean SD~$= 0.024$. The top six domains are Motor ($z = +2.32$), InstitutionalReasoning ($z = +2.25$), SustainedAttention ($z = +2.19$), Speech ($z = +2.13$), Clinical ($z = +2.00$), and Security ($z = +2.00$). Social cognition ($z = +1.54$) and Language ($z = +1.75$) form a strong middle tier, driven by HDC binding/unbinding operations that naturally model Theory-of-Mind and semantic processing. Mathematics ($z = +1.15$) benefits from HDC-based pattern matching on arithmetic, linear algebra, and Bayesian reasoning tasks. Affect ($z = +1.20$), Coding ($z = +1.79$), and Inhibition ($z = +1.57$) demonstrate above-average performance. Among the lower-scoring domains, Executive ($z = +0.72$), Creativity ($z = +0.80$), Binding ($z = +0.62$), and CogBench ($z = +0.58$) fall within the human-average band.
 
-\paragraph{Normative Standing.} Figure~\ref{fig:forest} shows the forest plot of normative z-scores against published human baselines (z-scores clipped to $\pm 3$ for visual clarity; unclipped values in supplementary CSV). The z-score is equivalent to Cohen's $d$ (standardized mean difference from the human population mean), so values within $\pm 1$ indicate human-typical performance. The distribution spans four of the five clinical-interpretation bands (no benchmarks fall in the Impaired range), reflecting genuine architectural strengths and weaknesses rather than uniform performance. Four benchmarks produce z-scores exceeding $|z| > 3$, primarily in sustained attention and social cognition domains where the architecture's pattern-matching strengths amplify differences from human norms; these should be interpreted as ordinal indicators of atypical performance rather than precise psychometric distances (see Limitations).
+\paragraph{Normative Standing.} Figure~\ref{fig:forest} shows the forest plot of normative z-scores against published human baselines (z-scores clipped to $\pm 3$ for visual clarity; unclipped values in supplementary CSV). Of the 141 benchmarks, 85 have published human baselines enabling normative comparison; the normative grand mean across these 85 benchmarks is $z = +0.99$. The domain-level composite ($z = +1.27$, above) includes all 123 benchmarks with any baseline (published or internally derived). The z-score is equivalent to Cohen's $d$ (standardized mean difference from the human population mean), so values within $\pm 1$ indicate human-typical performance. The distribution spans four of the five clinical-interpretation bands (no benchmarks fall in the Impaired range), reflecting genuine architectural strengths and weaknesses rather than uniform performance. Four benchmarks produce z-scores exceeding $|z| > 3$, primarily in sustained attention and social cognition domains where the architecture's pattern-matching strengths amplify differences from human norms; these should be interpreted as ordinal indicators of atypical performance rather than precise psychometric distances (see Limitations).
 
 % --- Figure 7: Forest Plot (loaded from CSV) ---
 \begin{figure}[p]
@@ -921,7 +921,7 @@ We demonstrate \psychbench{} on the \symthaea{} Holographic Liquid Brain, a cogn
     width=0.85\textwidth, height=18cm,
     xlabel={Normative $z$-score (clamped to $\pm 3$)},
     xmin=-3.5, xmax=3.5,
-    ymin=0, ymax=85,
+    ymin=0, ymax=86,
     y tick label style={font=\scriptsize},
     x tick label style={font=\scriptsize},
     label style={font=\small},
@@ -932,14 +932,14 @@ We demonstrate \psychbench{} on the \symthaea{} Holographic Liquid Brain, a cogn
     ytick=\empty,
 ]
 % Shaded bands
-\fill[hlbgreen!10] (axis cs:-1,0) rectangle (axis cs:1,85);
-\fill[hlbyellow!10] (axis cs:1,0) rectangle (axis cs:2,85);
-\fill[hlbyellow!10] (axis cs:-2,0) rectangle (axis cs:-1,85);
-\fill[hlbred!10] (axis cs:2,0) rectangle (axis cs:3.5,85);
-\fill[hlbred!10] (axis cs:-3.5,0) rectangle (axis cs:-2,85);
+\fill[hlbgreen!10] (axis cs:-1,0) rectangle (axis cs:1,86);
+\fill[hlbyellow!10] (axis cs:1,0) rectangle (axis cs:2,86);
+\fill[hlbyellow!10] (axis cs:-2,0) rectangle (axis cs:-1,86);
+\fill[hlbred!10] (axis cs:2,0) rectangle (axis cs:3.5,86);
+\fill[hlbred!10] (axis cs:-3.5,0) rectangle (axis cs:-2,86);
 
 % Zero line
-\draw[gray, dashed] (axis cs:0,0) -- (axis cs:0,85);
+\draw[gray, dashed] (axis cs:0,0) -- (axis cs:0,86);
 
 % Plot clamped z-scores from CSV
 \addplot[only marks, mark=*, mark size=2pt, hlbblue]
@@ -953,18 +953,20 @@ We demonstrate \psychbench{} on the \symthaea{} Holographic Liquid Brain, a cogn
 \node[font=\tiny, gray] at (axis cs:2.75,0.5) {Superior};
 
 % Summary counts in each band
-\node[font=\scriptsize, hlbred, anchor=south] at (axis cs:-2.75,85) {$n=0$};
-\node[font=\scriptsize, hlbyellow!80!black, anchor=south] at (axis cs:-1.5,85) {$n=4$};
-\node[font=\scriptsize, hlbgreen!80!black, anchor=south] at (axis cs:0,85) {$n=46$};
-\node[font=\scriptsize, hlbyellow!80!black, anchor=south] at (axis cs:1.5,85) {$n=16$};
-\node[font=\scriptsize, hlbred, anchor=south] at (axis cs:2.75,85) {$n=18$};
+\node[font=\scriptsize, hlbred, anchor=south] at (axis cs:-2.75,86) {$n=0$};
+\node[font=\scriptsize, hlbyellow!80!black, anchor=south] at (axis cs:-1.5,86) {$n=4$};
+\node[font=\scriptsize, hlbgreen!80!black, anchor=south] at (axis cs:0,86) {$n=42$};
+\node[font=\scriptsize, hlbyellow!80!black, anchor=south] at (axis cs:1.5,86) {$n=24$};
+\node[font=\scriptsize, hlbred, anchor=south] at (axis cs:2.75,86) {$n=15$};
 \end{axis}
 \end{tikzpicture}
-\caption{Forest plot of normative z-scores for 84 benchmarks with matched human baselines (z-scores clamped to $\pm 3$ for readability). Background shading indicates clinical interpretation bands \citep{cicchetti1994guidelines}. Band counts: 46 Average ($|z| \leq 1$), 16 Above Average, 4 Below Average, 18 Superior ($z > 2$), 0 Impaired ($z < -2$). Data loaded from \texttt{normative\_zscores.csv}.}
+\caption{Forest plot of normative z-scores for 85 benchmarks with matched human baselines (z-scores clamped to $\pm 3$ for readability). Background shading indicates clinical interpretation bands \citep{cicchetti1994guidelines}. Band counts: 42 Average ($|z| \leq 1$), 24 Above Average, 4 Below Average, 15 Superior ($z > 2$), 0 Impaired ($z < -2$). Data loaded from \texttt{normative\_zscores.csv}.}
 \label{fig:forest}
 \end{figure}
 
-\paragraph{Ablation Analysis.} Figure~\ref{fig:ablation} shows the ablation comparison across six presets. Each ablation condition models the removal of a cognitive subsystem as increased encoding noise in HDC representations, operationalizing the hypothesis that top-down predictions refine perceptual encoding (see Limitations for discussion). Ablation presets additionally disable social bonuses (NoSocial, CfC~Only, HDC~Only) and halve somatic learning rates when FEP is disabled (NoFep, CfC~Only, HDC~Only). Overall, ablation preset explains $\eta^2 \approx 0.004$ of total score variance, while domain explains $\eta^2 \approx 0.986$---the architecture's cognitive profile is overwhelmingly determined by domain rather than configuration. Within this small preset effect, the clearest differentiation appears in Memory, where \texttt{ReducedWm} and \texttt{HdcOnly} both drop from 0.779 to 0.648 ($\Delta = 0.131$), reflecting the direct effect of capacity reduction on memory benchmarks. Language shows meaningful sensitivity when FEP top-down prediction is removed: \texttt{HDCOnly} drops from 0.255 to 0.178 ($\Delta = 0.078$), consistent with the FEP module's role in predictive lexical processing. Attention shows sensitivity to encoding noise ($\Delta = 0.037$), Executive shows moderate sensitivity ($\Delta = 0.021$), and Metacognition shows comparable sensitivity ($\Delta = 0.020$). Motor produces identical scores across all presets ($\eta^2 = 0.000$), because motor benchmarks report relative metrics (learning effects, coordination indices) where uniform noise scaling cancels out. The small overall effect size reflects that HDC representations at 512 dimensions are sufficiently robust that encoding noise degrades decision outcomes only in benchmarks with narrow similarity margins. Actual subsystem removal (disabling CfC dynamics, removing the FEP module) would likely produce larger deficits and is a priority for future work.
+\paragraph{Ablation Analysis.} Figure~\ref{fig:ablation} shows the ablation comparison across six presets and 27 domains. Each ablation condition models the removal of a cognitive subsystem as increased encoding noise in HDC representations, operationalizing the hypothesis that top-down predictions refine perceptual encoding (see Limitations for discussion). Ablation presets additionally disable social bonuses (NoSocial, CfC~Only, HDC~Only) and halve somatic learning rates when FEP is disabled (NoFep, CfC~Only, HDC~Only).
+
+Effect sizes (Cohen's $d$, computed across 27 domains) reveal a gradient of ablation severity: \texttt{HDCOnly} produces the largest deficit ($d = 0.64$, $\eta^2 = 0.097$, mean $\Delta = +0.55$, 9 domains dropping $> 0.5$ SD), followed by \texttt{ReducedWM} ($d = 0.31$, $\eta^2 = 0.025$, 4 domains affected) and \texttt{CfCOnly} ($d = 0.31$, $\eta^2 = 0.025$, 4 domains affected). \texttt{NoFEP} ($d = 0.15$) and \texttt{NoSocial} ($d = 0.09$) produce smaller effects. The largest domain-specific drops occur in WorM under \texttt{ReducedWM} ($\Delta = 3.09$, from $+0.73$ to $-2.36$), Language under \texttt{HDCOnly} ($\Delta = 2.51$, from $+1.75$ to $-0.76$), and Inhibition under \texttt{HDCOnly} ($\Delta = 2.10$, from $+1.57$ to $-0.53$). Several domains are ablation-invariant: InstitutionalReasoning, CausalReasoning, Security, SustainedAttention, and ToMBench produce identical scores across all presets ($\eta^2 = 0.000$), because their benchmarks rely on structural HDC operations (binding, permutation) that are unaffected by encoding noise manipulation. The moderate overall effect sizes reflect that HDC representations at 512 dimensions are sufficiently robust that encoding noise degrades decision outcomes only in benchmarks with narrow similarity margins.
 
 % --- Figure 8: Ablation Results (loaded from CSV) ---
 \begin{figure}[t]
@@ -975,9 +977,9 @@ We demonstrate \psychbench{} on the \symthaea{} Holographic Liquid Brain, a cogn
     width=\textwidth, height=7cm,
     ybar=1pt,
     bar width=4pt,
-    ylabel={Domain Score (0--1)},
-    ymin=0, ymax=1.05,
-    symbolic x coords={Affect,Attention,Binding,Butlin,CausalReasoning,Clinical,CogBench,Consciousness,Creativity,Executive,Inhibition,InstitutionalReasoning,Language,Mathematics,MemoryAgent,Metacognition,Motor,Reasoning,Security,Social,Spatial,Speech,Substrate,SustainedAttention,ToMBench,WorM},
+    ylabel={Domain z-score},
+    ymin=-3, ymax=3,
+    symbolic x coords={Affect,Attention,Binding,Butlin,CausalReasoning,Clinical,Coding,CogBench,Consciousness,Creativity,Executive,Inhibition,InstitutionalReasoning,Language,Mathematics,MemoryAgent,Metacognition,Motor,Reasoning,Security,Social,Spatial,Speech,Substrate,SustainedAttention,ToMBench,WorM},
     xtick=data,
     x tick label style={rotate=30, anchor=east, font=\scriptsize},
     y tick label style={font=\scriptsize},
@@ -995,7 +997,7 @@ We demonstrate \psychbench{} on the \symthaea{} Holographic Liquid Brain, a cogn
 \legend{FullConsciousness, CfcOnly, NoFep, NoSocial, ReducedWm, HdcOnly}
 \end{axis}
 \end{tikzpicture}
-\caption{Ablation comparison across six presets and eight cognitive domains. Memory shows the clearest differentiation: \texttt{ReducedWm} and \texttt{HdcOnly} both drop from 0.779 to 0.648 ($\Delta = 0.131$). Language shows meaningful FEP sensitivity ($\Delta = 0.078$ for \texttt{HdcOnly}). Attention ($\Delta = 0.037$), Executive ($\Delta = 0.021$), and Metacognition ($\Delta = 0.020$) show moderate sensitivity. Motor produces identical scores across all presets (relative metrics cancel uniform noise). Reasoning ($\Delta = 0.004$) and Social ($\Delta = 0.003$) show negligible differentiation. These small effects reflect the encoding-noise ablation model (Section~\ref{sec:discussion}): actual subsystem removal would likely produce larger, more domain-specific deficits. Data loaded from \texttt{ablation\_domains.csv}.}
+\caption{Ablation comparison across six presets and 27 cognitive domains. \texttt{HDCOnly} (Cohen's $d = 0.64$) produces the largest overall deficit, with WorM ($\Delta = 3.09$), Language ($\Delta = 2.51$), and Inhibition ($\Delta = 2.10$) most affected. \texttt{ReducedWM} selectively devastates WorM ($\Delta = 3.09$) while leaving other domains largely intact. Several domains (InstitutionalReasoning, CausalReasoning, Security, SustainedAttention, ToMBench) are ablation-invariant ($\eta^2 = 0.000$), reflecting reliance on structural HDC operations unaffected by encoding noise. Data loaded from \texttt{ablation\_domains.csv}.}
 \label{fig:ablation}
 \end{figure}
 
@@ -1101,9 +1103,11 @@ PsychBench~\citep{hagendorff2023machine} & Partial & --- & --- & --- & 5 & Pytho
 
 \emph{Domain-specific strengths and weaknesses.} The cognitive profile reveals a broadly above-human profile (grand mean $z = +1.27$, 27/27 domains above human mean), with cross-seed stability SD~$= 0.024$ (5 seeds) confirming robustness. The top-performing domains---Motor ($z = +2.32$), InstitutionalReasoning ($z = +2.25$), SustainedAttention ($z = +2.19$), Speech ($z = +2.13$), Clinical ($z = +2.00$), and Security ($z = +2.00$)---reflect that these benchmarks rely on pattern-matching and signal-processing tasks that map naturally to HDC operations. Among the lower-scoring domains, Attention ($z = +0.34$), CogBench ($z = +0.58$), Binding ($z = +0.62$), and Executive ($z = +0.72$) are closest to the human mean. These asymmetries are informative---they demonstrate that the profile genuinely captures architectural biases---but they warrant caution when comparing across domains with different measurement characteristics.
 
+\emph{Cross-seed stability.} While the grand mean z-score is stable across seeds (SD~$= 0.024$), individual domains show heterogeneous variance. The Creativity domain exhibits anomalously high cross-seed variance (SD~$= 0.49$; Table~S2 in Supplement), primarily driven by the RemoteAssociates benchmark whose semantic association structure depends on the random seed. Mathematics (SD~$= 0.19$), MemoryAgent (SD~$= 0.20$), and Executive (SD~$= 0.17$) also show moderate variance reflecting genuine sensitivity to stimulus configuration. Researchers using \psychbench{} should report multi-seed averages for high-variance domains.
+
 \emph{Normative z-score interpretation.} Four benchmarks produce normative z-scores exceeding $|z| > 3$, primarily reflecting genuinely large deviations from human norms rather than scale mismatches (e.g., agent CPT $d' {=} 4.65$ vs.\ human $d' {=} 2.80$). The forest plot (Figure~\ref{fig:forest}) clips to $[\text{-}3, \text{+}3]$; unclipped values appear in the supplementary CSV data. Z-scores exceeding $\pm 3$ should be treated as ordinal indicators of atypical performance rather than precise quantitative distances, as the Gaussian assumption weakens at distribution tails.
 
-\emph{Multiple comparisons.} We report uncorrected z-scores across all 84 benchmarks with human baselines. Because each benchmark targets a distinct cognitive construct with an independently derived human baseline, the z-scores are not repeated tests of a single null hypothesis, and Bonferroni or FDR correction is not appropriate. The domain-level grand mean ($z = +1.27$ across 27 domains) aggregates scores that are largely independent by design (cross-domain correlations are modest; Table~\ref{tab:correlations}). Readers should interpret individual benchmark z-scores as descriptive comparisons rather than simultaneous hypothesis tests.
+\emph{Multiple comparisons.} We report uncorrected z-scores across all 85 benchmarks with human baselines. Because each benchmark targets a distinct cognitive construct with an independently derived human baseline, the z-scores are not repeated tests of a single null hypothesis, and Bonferroni or FDR correction is not appropriate. The domain-level grand mean ($z = +1.27$ across 27 domains) aggregates scores that are largely independent by design (cross-domain correlations are modest; Table~\ref{tab:correlations}). Readers should interpret individual benchmark z-scores as descriptive comparisons rather than simultaneous hypothesis tests.
 
 \emph{Neuromodulatory sensitivity as validation.} Four neuromodulator benchmarks---Pharma\-cological\-Challenge ($z {=} {-}1.76$), Pharma\-cological\-Ablation ($z {=} {-}1.20$), Injection\-Challenge ($z {=} {-}1.12$), and Allostatic\-Stress ($z {=} {-}0.72$)---produce Below Average normative z-scores. We argue these scores are scientifically informative rather than deficient. Human baselines for pharmacological challenge studies derive from biological systems with evolved receptor dynamics, allostatic regulation, and pharmacokinetic metabolism; a silicon architecture \emph{should not} perfectly replicate these substrate-dependent effects. The Below Average scores confirm that the neuromodulator framework distinguishes biologically grounded dynamics from computational approximations---if the architecture scored uniformly above human norms on pharmacological manipulation, this would indicate calibration failure rather than architectural strength. The neuromod Below Average cluster thus serves as a built-in negative control, demonstrating that the normative framework can identify genuine substrate-dependent limitations alongside computational strengths.
 

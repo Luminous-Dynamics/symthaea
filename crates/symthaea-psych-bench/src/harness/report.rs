@@ -658,6 +658,10 @@ impl BenchmarkReport {
             ("originality_score", "originality_score", &bl.creativity),
             ("flexibility_score", "flexibility_score", &bl.creativity),
             ("elaboration_score", "elaboration_score", &bl.creativity),
+            // Conceptual Blending (Creativity)
+            ("blend_coherence", "blend_coherence", &bl.creativity),
+            ("novelty_score", "novelty_score", &bl.creativity),
+            ("integration_score", "integration_score", &bl.creativity),
             // Flanker Inhibition (Inhibition)
             (
                 "congruent_accuracy",
@@ -2072,6 +2076,7 @@ pub fn calibration_class_of(benchmark: &str) -> &'static str {
         "RemoteAssociates",
         "AlternateUses",
         "DivergentThinking",
+        "ConceptualBlending",
         "FlankerInhibition",
         "CategoricalPerception",
         "PerceptualCrowding",
@@ -2173,6 +2178,7 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("RemoteAssociates") => "overall_accuracy",
         b if b.contains("AlternateUses") => "fluency",
         b if b.contains("DivergentThinking") => "originality_score",
+        b if b.contains("ConceptualBlending") => "blend_coherence",
         b if b.contains("GoNoGo") => "nogo_accuracy",
         b if b.contains("AttentionalBlink") => "lag3_t2_accuracy",
         b if b.contains("ProspectiveMemory") => "pm_hit_rate",
@@ -3183,6 +3189,7 @@ mod tests {
             Box::new(AlternateUsesBenchmark),
             Box::new(RemoteAssociatesBenchmark),
             Box::new(DivergentThinkingBenchmark),
+            Box::new(ConceptualBlendingBenchmark),
             // Butlin
             Box::new(ButlinIndicatorSuite),
             // Inhibition

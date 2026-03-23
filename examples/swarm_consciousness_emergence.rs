@@ -155,6 +155,7 @@ async fn run_experiment(n_agents: usize, n_ticks: usize, byzantine_fraction: f64
     let config = MindConfig {
         dimension: dim,
         enable_social_coherence: true,
+        social_projection_enabled: true,
         tick_rate: 10.0,
         ..Default::default()
     };
@@ -412,6 +413,7 @@ async fn run_partial_experiment(n_agents: usize, n_ticks: usize, seed: u64) -> (
     let config = MindConfig {
         dimension: dim,
         enable_social_coherence: true,
+        social_projection_enabled: true,
         tick_rate: 10.0,
         ..Default::default()
     };

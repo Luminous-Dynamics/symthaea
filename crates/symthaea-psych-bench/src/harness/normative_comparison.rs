@@ -219,6 +219,8 @@ fn baseline_for_benchmark<'a>(
         // Creativity
         name if name.contains("AlternateUses") => Some(("aut_fluency", &bl.creativity)),
         name if name.contains("RemoteAssociates") => Some(("rat_overall_accuracy", &bl.creativity)),
+        name if name.contains("ConceptualBlending") => Some(("blend_coherence", &bl.creativity)),
+        name if name.contains("DivergentThinking") => Some(("originality_score", &bl.creativity)),
 
         // Butlin
         name if name.contains("Butlin") => Some(("mean_quality_score", &bl.butlin)),

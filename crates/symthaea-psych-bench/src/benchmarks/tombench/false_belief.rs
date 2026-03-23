@@ -151,6 +151,14 @@ impl FalseBeliefBenchmark {
         let original_location = extract_location(&setup_text);
         let moved_location = extract_location(&change_text);
 
+        // Structural signal noise: lapse_rate-dependent location extraction failure
+        // models individual differences in attending to scenario details
+        // (Leslie et al., 2004 — ToM demands on executive resources).
+        let struct_noise_seed = config.trial_seed("tombench", "fb_struct_noise", trial_idx);
+        let struct_fail = (struct_noise_seed % 10000) as f64 / 10000.0 < config.lapse_rate * 0.3;
+        let original_location = if struct_fail { None } else { original_location };
+        let moved_location = if struct_fail { None } else { moved_location };
+
         let structural_score = match (&original_location, &moved_location) {
             (Some(orig), Some(moved)) => {
                 // Belief answer should reference the original location
@@ -208,13 +216,20 @@ impl FalseBeliefBenchmark {
             let ns = noise_seed.wrapping_add(8001);
             ((ns.wrapping_mul(0x9E3779B97F4A7C15) >> 33) as f32 / (1u64 << 31) as f32) - 0.5
         };
-        let belief_sim = agent.similarity(&belief_hv) + belief_noise_val * enc_noise * 0.35;
-        let reality_sim = agent.similarity(&reality_hv) + reality_noise_val * enc_noise * 0.35;
+        // Encoding noise coupling increased to 0.55 to model individual differences
+        // in mentalizing precision (Apperly, 2012 — ToM individual differences).
+        let belief_sim = agent.similarity(&belief_hv) + belief_noise_val * enc_noise * 0.55;
+        let reality_sim = agent.similarity(&reality_hv) + reality_noise_val * enc_noise * 0.55;
         // Time pressure: 0.15/unit attenuates belief-reality discrimination, modeling reality bias
         // under cognitive load (Birch & Bloom, 2007 curse of knowledge; Wickelgren, 1977 SAT).
         let pressure_noise =
             config.time_pressure * 0.15 * diff_model.interference_multiplier(config.difficulty);
-        let geo_signal = (belief_sim - reality_sim) as f64 * (1.0 - pressure_noise);
+        // Person-specific mentalizing precision: higher lapse_rate subjects have
+        // less precise perspective-taking, attenuating the belief-reality geometric
+        // signal (Apperly & Butterfill, 2009 — individual differences in ToM efficiency).
+        let mentalizing_precision = 1.0 - config.lapse_rate * 0.25;
+        let geo_signal =
+            (belief_sim - reality_sim) as f64 * (1.0 - pressure_noise) * mentalizing_precision;
 
         // --- Combined: structural + HDC geometry equally weighted ---
         let combined = structural_score * 0.4 + geo_signal * 0.6;

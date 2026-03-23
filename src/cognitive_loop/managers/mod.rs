@@ -141,6 +141,11 @@ pub mod social_fabric_manager;
 #[cfg(feature = "social-fabric")]
 pub use social_fabric_manager::SocialFabricManager;
 
+#[cfg(feature = "circular")]
+pub mod waste_manager;
+#[cfg(feature = "circular")]
+pub use waste_manager::WasteManager;
+
 #[cfg(feature = "survival")]
 pub mod survival_manager;
 #[cfg(feature = "survival")]

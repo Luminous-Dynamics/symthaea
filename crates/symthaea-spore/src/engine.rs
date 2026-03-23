@@ -2166,6 +2166,16 @@ impl SporeEngine {
             .unwrap_or("Harmony")
     }
 
+    /// All eight harmony scores as a JSON array.
+    pub fn harmony_scores_json(&self) -> String {
+        let c = self.last_consciousness;
+        let scores: Vec<f32> = Harmony::all()
+            .iter()
+            .map(|h| self.harmony_score(h, c))
+            .collect();
+        serde_json::to_string(&scores).unwrap_or_else(|_| "[]".to_string())
+    }
+
     /// Evaluate alignment with the Eight Harmonies ethical framework.
     fn evaluate_harmony_alignment(&self, consciousness_level: f32) -> f32 {
         let scores: Vec<f32> = Harmony::all()

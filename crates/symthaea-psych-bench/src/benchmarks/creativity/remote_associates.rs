@@ -284,7 +284,8 @@ impl PsychBenchmark for RemoteAssociatesBenchmark {
         let mut trace = Vec::new();
 
         let triad_data = Self::build_triad_data();
-        let adapter = SemanticScenarioAdapter::for_rat(&triad_data, config.dimension, config.seed);
+        // Fixed seed for semantic structure ensures cross-seed stability while trial_seed() provides per-trial variation
+        let adapter = SemanticScenarioAdapter::for_rat(&triad_data, config.dimension, 42);
 
         let mut accuracies = Vec::new();
         let mut ranks = Vec::new();

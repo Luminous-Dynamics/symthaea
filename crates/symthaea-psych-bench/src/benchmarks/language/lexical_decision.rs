@@ -107,8 +107,9 @@ impl LexicalDecisionBenchmark {
 
                 // Match against codebook with frequency weighting:
                 // High-frequency words get a recognition boost (Balota & Chumbley 1984).
-                // This models the word frequency effect in lexical access.
-                let freq_boost = config.language_frequency_boost as f32;
+                // Attention lapses degrade lexical access speed (Ratcliff et al., 2004).
+                let freq_boost =
+                    config.language_frequency_boost as f32 * (1.0 - config.lapse_rate as f32 * 0.3);
                 let mut best_sim = f32::NEG_INFINITY;
                 let mut best_idx = 0;
                 for (i, w) in words.iter().enumerate() {
@@ -126,8 +127,22 @@ impl LexicalDecisionBenchmark {
                     }
                 }
 
-                // Correct if matched to the right word
-                if best_idx == word_idx {
+                // Attention lapses cause random guessing (Ratcliff et al., 2004)
+                let word_item_correct = if config.lapse_rate > 0.0 {
+                    let lapse_seed = config.trial_seed("language", "ld_lapse", item);
+                    if (lapse_seed % 10000) as f64 / 10000.0 < config.lapse_rate {
+                        // Random guess: correct with probability 1/codebook_size
+                        let guess_correct = (lapse_seed.wrapping_mul(0x517CC1B727220A95)
+                            % codebook_size as u64)
+                            == word_idx as u64;
+                        guess_correct
+                    } else {
+                        best_idx == word_idx
+                    }
+                } else {
+                    best_idx == word_idx
+                };
+                if word_item_correct {
                     word_correct += 1;
                     if is_high_freq {
                         high_freq_correct += 1;
@@ -158,7 +173,7 @@ impl LexicalDecisionBenchmark {
                     item_trace.push(TrialOutcome {
                         trial_idx: global_item_idx,
                         condition: cond.to_string(),
-                        correct: best_idx == word_idx,
+                        correct: word_item_correct,
                         rt_ticks: item_rt,
                         similarity: best_sim as f64,
                         confidence: best_sim as f64,
@@ -198,7 +213,19 @@ impl LexicalDecisionBenchmark {
                 // Correct rejection: best match similarity below threshold
                 // Non-words should be less similar to any single prototype
                 let rejection_threshold = 0.55;
-                if best_sim < rejection_threshold {
+                // Attention lapses cause random word/nonword guessing (Ratcliff et al., 2004)
+                let nonword_item_correct = if config.lapse_rate > 0.0 {
+                    let lapse_seed = config.trial_seed("language", "ld_lapse", item);
+                    if (lapse_seed % 10000) as f64 / 10000.0 < config.lapse_rate {
+                        let guess_correct = (lapse_seed.wrapping_mul(0x517CC1B727220A95) % 2) == 0;
+                        guess_correct
+                    } else {
+                        best_sim < rejection_threshold
+                    }
+                } else {
+                    best_sim < rejection_threshold
+                };
+                if nonword_item_correct {
                     nonword_correct += 1;
                 }
                 nonword_total += 1;
@@ -211,7 +238,7 @@ impl LexicalDecisionBenchmark {
 
                 // Per-item trial trace
                 if config.trial_trace {
-                    let item_correct = best_sim < rejection_threshold;
+                    let item_correct = nonword_item_correct;
                     item_trace.push(TrialOutcome {
                         trial_idx: global_item_idx,
                         condition: "nonword".to_string(),

@@ -1675,43 +1675,129 @@ fn compute_ce_gradient_wrt_output(
         return ContinuousHV::from_slice(&d_output);
     }
 
-    // Full-dimension path (no projection)
+    // ── GPU-accelerated path ────────────────────────────────────────────
+    // When a GpuEmbeddingCache is available (CUDA or CPU tensor ops),
+    // compute the gradient via matrix multiply instead of the O(V×D) loop.
+    //
+    // Math: d_output = scale × error @ E_hat  -  scale × (error·cos) × o
+    //   where error[i] = softmax[i] - 1{i=target}
+    //   E_hat[i] = E[i] / ||E[i]|| (row-normalized embeddings, already in cache)
+    //   cos[i] = logits[i] / scale
+    #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+    if let Some(cache) = controller.gpu_embedding_cache() {
+        if let Ok(grad) =
+            compute_ce_gradient_gpu(&exps, sum_exp, target, scale, logits, controller, cache)
+        {
+            return grad;
+        }
+        // Fall through to CPU on error
+    }
+
+    // Full-dimension CPU path (no projection, no GPU)
+    compute_ce_gradient_cpu(&exps, sum_exp, target, scale, logits, controller)
+}
+
+/// CPU fallback: O(vocab × HDC_DIMENSION) double loop
+fn compute_ce_gradient_cpu(
+    exps: &[f32],
+    sum_exp: f32,
+    target: usize,
+    scale: f32,
+    logits: &[f32],
+    controller: &crate::controller::LanguageController,
+) -> symthaea_core::hdc::ContinuousHV {
+    use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
+
     let embeddings = controller.token_embeddings();
     let output_hv = controller.output_hv();
     let output_slice = output_hv.as_slice();
     let n = embeddings.len().min(logits.len());
 
-    // Accumulate: d_output = scale × Σ_i error_i × (e_hat_i - cos_i × o)
-    // where e_hat_i = e_i / ||e_i||, cos_i = similarity(o, e_i)
     let mut d_output = vec![0.0f32; HDC_DIMENSION];
     for i in 0..n {
         let prob = exps[i] / sum_exp;
         let error = if i == target { prob - 1.0 } else { prob };
-
         if error.abs() < 1e-6 {
             continue;
         }
-
         let emb_vals = embeddings[i].as_slice();
-        // Compute ||e_i|| for normalization
         let emb_norm: f32 = emb_vals.iter().map(|v| v * v).sum::<f32>().sqrt().max(1e-8);
-        // cos_i = similarity(output, emb[i]) — recover from scaled logit
         let cos_i = if scale.abs() > 1e-6 {
             logits[i] / scale
         } else {
             0.0
         };
-
         let scaled_error = scale * error;
         for (j, &ev) in emb_vals.iter().enumerate() {
             if j < d_output.len() {
-                // d cos(o,e)/do = (e/||e|| - cos*o) / ||o|| — but ||o||=1 (normalized)
                 d_output[j] += scaled_error * (ev / emb_norm - cos_i * output_slice[j]);
             }
         }
     }
-
     ContinuousHV::from_slice(&d_output)
+}
+
+/// GPU-accelerated CE gradient via candle tensor matmul.
+///
+/// Computes: d_output = scale × (error @ E_hat) - (scale × Σ(error_i × cos_i)) × o
+/// where E_hat is the row-normalized embedding matrix (already in GpuEmbeddingCache).
+///
+/// This replaces the O(V×D) double loop with two GPU operations:
+/// 1. error @ E_hat: [1, V] × [V, D] → [1, D] (matmul)
+/// 2. Subtract the output-projection term
+#[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+fn compute_ce_gradient_gpu(
+    exps: &[f32],
+    sum_exp: f32,
+    target: usize,
+    scale: f32,
+    logits: &[f32],
+    controller: &crate::controller::LanguageController,
+    cache: &crate::controller::GpuEmbeddingCache,
+) -> Result<symthaea_core::hdc::ContinuousHV, candle_core::Error> {
+    use candle_core::Tensor;
+    use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
+
+    let n = logits.len();
+    let device = cache.device();
+
+    // Compute error vector: error[i] = scale × (softmax[i] - 1{i=target})
+    let errors: Vec<f32> = (0..n)
+        .map(|i| {
+            let prob = exps[i] / sum_exp;
+            let error = if i == target { prob - 1.0 } else { prob };
+            scale * error
+        })
+        .collect();
+
+    // error @ E_hat: [1, V] × [V, D] → [1, D]
+    // GpuEmbeddingCache stores E_hat (pre-normalized rows)
+    let error_tensor = Tensor::from_vec(errors.clone(), (1, n), device)?;
+    let grad_from_emb = error_tensor.matmul(cache.embeddings())?; // [1, D]
+
+    // Compute scalar: Σ(error_i × cos_i) for output-projection term
+    let cos_sum: f32 = (0..n)
+        .map(|i| {
+            let cos_i = if scale.abs() > 1e-6 {
+                logits[i] / scale
+            } else {
+                0.0
+            };
+            errors[i] * cos_i
+        })
+        .sum();
+
+    // d_output = grad_from_emb - cos_sum × output
+    let output_hv = controller.output_hv();
+    let output_tensor =
+        Tensor::from_vec(output_hv.as_slice().to_vec(), (1, HDC_DIMENSION), device)?;
+    let cos_sum_tensor = Tensor::from_vec(vec![cos_sum], (1, 1), device)?;
+    let output_term = output_tensor.broadcast_mul(&cos_sum_tensor)?;
+    let d_output_tensor = (grad_from_emb - output_term)?;
+
+    // Move back to CPU
+    let d_output: Vec<f32> = d_output_tensor.squeeze(0)?.to_vec1()?;
+    Ok(ContinuousHV::from_slice(&d_output))
 }
 
 /// Apply gradient through weight-tied output (SGD).
