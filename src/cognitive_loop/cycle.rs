@@ -105,9 +105,10 @@ impl CognitiveLoopService {
             // Flow → boost exploration (user engaged, safe to explore)
             // Science: Yerkes-Dodson (1908) — moderate arousal optimal for learning
             if state.frustration > super::thresholds::FRUSTRATION_DAMPEN_THRESHOLD {
-                self.carryover.quality.last_exploration_bonus *=
-                    1.0 - super::thresholds::FRUSTRATION_DAMPEN_GAIN
-                        * (state.frustration - super::thresholds::FRUSTRATION_DAMPEN_THRESHOLD) as f32;
+                self.carryover.quality.last_exploration_bonus *= 1.0
+                    - super::thresholds::FRUSTRATION_DAMPEN_GAIN
+                        * (state.frustration - super::thresholds::FRUSTRATION_DAMPEN_THRESHOLD)
+                            as f32;
             }
             if state.is_in_flow() {
                 self.carryover.quality.last_exploration_bonus +=

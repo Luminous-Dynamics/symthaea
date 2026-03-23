@@ -621,11 +621,7 @@ impl EpistemicNSMGrounding {
     }
 
     /// Query empirical tiers by semantic similarity.
-    pub fn query_empirical(
-        &self,
-        query: &BinaryHV,
-        threshold: f32,
-    ) -> Vec<(&EmpiricalTier, f32)> {
+    pub fn query_empirical(&self, query: &BinaryHV, threshold: f32) -> Vec<(&EmpiricalTier, f32)> {
         let mut results: Vec<_> = self
             .empirical_tiers
             .iter()
@@ -637,11 +633,7 @@ impl EpistemicNSMGrounding {
     }
 
     /// Query normative tiers by semantic similarity.
-    pub fn query_normative(
-        &self,
-        query: &BinaryHV,
-        threshold: f32,
-    ) -> Vec<(&NormativeTier, f32)> {
+    pub fn query_normative(&self, query: &BinaryHV, threshold: f32) -> Vec<(&NormativeTier, f32)> {
         let mut results: Vec<_> = self
             .normative_tiers
             .iter()

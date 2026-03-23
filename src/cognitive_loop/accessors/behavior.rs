@@ -691,55 +691,67 @@ impl CognitiveLoopService {
         for bl in baselines {
             match bl.target {
                 "dopamine" => {
-                    self.neuromod
-                        .bath
-                        .dopamine
-                        .adjust_baseline(bl.nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
+                    self.neuromod.bath.dopamine.adjust_baseline(
+                        bl.nudge,
+                        NEUROMOD_BASELINE_MIN,
+                        NEUROMOD_BASELINE_MAX,
+                    );
                 }
                 "noradrenaline" => {
-                    self.neuromod
-                        .bath
-                        .noradrenaline
-                        .adjust_baseline(bl.nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
+                    self.neuromod.bath.noradrenaline.adjust_baseline(
+                        bl.nudge,
+                        NEUROMOD_BASELINE_MIN,
+                        NEUROMOD_BASELINE_MAX,
+                    );
                 }
                 "serotonin" => {
-                    self.neuromod
-                        .bath
-                        .serotonin
-                        .adjust_baseline(bl.nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
+                    self.neuromod.bath.serotonin.adjust_baseline(
+                        bl.nudge,
+                        NEUROMOD_BASELINE_MIN,
+                        NEUROMOD_BASELINE_MAX,
+                    );
                 }
                 "oxytocin" => {
-                    self.neuromod
-                        .bath
-                        .oxytocin
-                        .adjust_baseline(bl.nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
+                    self.neuromod.bath.oxytocin.adjust_baseline(
+                        bl.nudge,
+                        NEUROMOD_BASELINE_MIN,
+                        NEUROMOD_BASELINE_MAX,
+                    );
                 }
                 "endocannabinoid" => {
-                    self.neuromod
-                        .bath
-                        .endocannabinoid
-                        .adjust_baseline(bl.nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
+                    self.neuromod.bath.endocannabinoid.adjust_baseline(
+                        bl.nudge,
+                        NEUROMOD_BASELINE_MIN,
+                        NEUROMOD_BASELINE_MAX,
+                    );
                 }
                 "acetylcholine" => {
-                    self.neuromod
-                        .bath
-                        .acetylcholine
-                        .adjust_baseline(bl.nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
+                    self.neuromod.bath.acetylcholine.adjust_baseline(
+                        bl.nudge,
+                        NEUROMOD_BASELINE_MIN,
+                        NEUROMOD_BASELINE_MAX,
+                    );
                 }
                 "gaba" => {
-                    self.neuromod.bath.gaba.adjust_baseline(bl.nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
+                    self.neuromod.bath.gaba.adjust_baseline(
+                        bl.nudge,
+                        NEUROMOD_BASELINE_MIN,
+                        NEUROMOD_BASELINE_MAX,
+                    );
                 }
                 "glutamate" => {
-                    self.neuromod
-                        .bath
-                        .glutamate
-                        .adjust_baseline(bl.nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
+                    self.neuromod.bath.glutamate.adjust_baseline(
+                        bl.nudge,
+                        NEUROMOD_BASELINE_MIN,
+                        NEUROMOD_BASELINE_MAX,
+                    );
                 }
                 "adenosine" => {
-                    self.neuromod
-                        .bath
-                        .adenosine
-                        .adjust_baseline(bl.nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
+                    self.neuromod.bath.adenosine.adjust_baseline(
+                        bl.nudge,
+                        NEUROMOD_BASELINE_MIN,
+                        NEUROMOD_BASELINE_MAX,
+                    );
                 }
                 _ => {
                     tracing::warn!(
@@ -767,28 +779,32 @@ impl CognitiveLoopService {
         for bl in baselines {
             match bl.target {
                 "dopamine" => {
-                    self.neuromod
-                        .bath
-                        .dopamine
-                        .adjust_baseline(bl.nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
+                    self.neuromod.bath.dopamine.adjust_baseline(
+                        bl.nudge,
+                        NEUROMOD_BASELINE_MIN,
+                        NEUROMOD_BASELINE_MAX,
+                    );
                 }
                 "norepinephrine" => {
-                    self.neuromod
-                        .bath
-                        .noradrenaline
-                        .adjust_baseline(bl.nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
+                    self.neuromod.bath.noradrenaline.adjust_baseline(
+                        bl.nudge,
+                        NEUROMOD_BASELINE_MIN,
+                        NEUROMOD_BASELINE_MAX,
+                    );
                 }
                 "serotonin" => {
-                    self.neuromod
-                        .bath
-                        .serotonin
-                        .adjust_baseline(bl.nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
+                    self.neuromod.bath.serotonin.adjust_baseline(
+                        bl.nudge,
+                        NEUROMOD_BASELINE_MIN,
+                        NEUROMOD_BASELINE_MAX,
+                    );
                 }
                 "oxytocin" => {
-                    self.neuromod
-                        .bath
-                        .oxytocin
-                        .adjust_baseline(bl.nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
+                    self.neuromod.bath.oxytocin.adjust_baseline(
+                        bl.nudge,
+                        NEUROMOD_BASELINE_MIN,
+                        NEUROMOD_BASELINE_MAX,
+                    );
                 }
                 _ => {
                     tracing::warn!(
@@ -975,10 +991,11 @@ impl CognitiveLoopService {
         if telem.anomaly_count > 0 {
             let ne_nudge = (SWARM_ANOMALY_NE_MULT * telem.anomaly_count.min(3) as f32)
                 .min(SWARM_ANOMALY_NE_CAP);
-            self.neuromod
-                .bath
-                .noradrenaline
-                .adjust_baseline(ne_nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
+            self.neuromod.bath.noradrenaline.adjust_baseline(
+                ne_nudge,
+                NEUROMOD_BASELINE_MIN,
+                NEUROMOD_BASELINE_MAX,
+            );
         }
 
         // Collective coherence: high peer Φ → 5-HT (Crockett 2009)
@@ -986,10 +1003,11 @@ impl CognitiveLoopService {
             let sht_nudge = ((telem.mean_peer_phi - 0.5) * SWARM_PHI_SHT_GAIN as f64)
                 .min(SWARM_PHI_SHT_CAP as f64) as f32;
             if sht_nudge > super::super::thresholds::GOV_NEUROMOD_FLOOR {
-                self.neuromod
-                    .bath
-                    .serotonin
-                    .adjust_baseline(sht_nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
+                self.neuromod.bath.serotonin.adjust_baseline(
+                    sht_nudge,
+                    NEUROMOD_BASELINE_MIN,
+                    NEUROMOD_BASELINE_MAX,
+                );
             }
         }
 
@@ -997,10 +1015,11 @@ impl CognitiveLoopService {
         if telem.affective_contagion > SWARM_CONTAGION_DA_THRESHOLD {
             let da_nudge = (telem.affective_contagion * SWARM_CONTAGION_DA_GAIN as f64)
                 .min(SWARM_CONTAGION_DA_CAP as f64) as f32;
-            self.neuromod
-                .bath
-                .dopamine
-                .adjust_baseline(da_nudge, NEUROMOD_BASELINE_MIN, NEUROMOD_BASELINE_MAX);
+            self.neuromod.bath.dopamine.adjust_baseline(
+                da_nudge,
+                NEUROMOD_BASELINE_MIN,
+                NEUROMOD_BASELINE_MAX,
+            );
         }
     }
 

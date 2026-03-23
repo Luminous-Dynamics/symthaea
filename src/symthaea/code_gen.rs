@@ -444,8 +444,7 @@ impl Symthaea {
     pub fn run_coding_task(&mut self, task: &str) -> crate::coding_agent::AgentResult {
         use crate::coding_agent::{CodingAgent, CodingAgentConfig};
 
-        let working_dir =
-            std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+        let working_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
 
         let config = CodingAgentConfig {
             working_dir: working_dir.clone(),

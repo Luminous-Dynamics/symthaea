@@ -10,13 +10,13 @@
 //! high-quality semantic encoding (~380ms CPU, ~60-100ms GPU expected).
 //! Otherwise falls back to fast hash-based encoding (<1ms but lower quality).
 
+#[cfg(feature = "code_generation")]
+mod code_gen;
+#[cfg(feature = "magi_loop")]
+mod magi;
 mod relational;
 #[cfg(feature = "school_learning")]
 mod school;
-#[cfg(feature = "magi_loop")]
-mod magi;
-#[cfg(feature = "code_generation")]
-mod code_gen;
 
 // ── Re-exports ────────────────────────────────────────────────────────────
 
@@ -29,8 +29,8 @@ pub use school::{CurriculumObjectiveSummary, CurriculumReport};
 use anyhow::{Context, Result};
 #[cfg(feature = "school_learning")]
 use school::{
-    CurriculumPersistenceConfig, CurriculumRecallConfig, CurriculumRecallScores,
-    load_curriculum_from_store,
+    load_curriculum_from_store, CurriculumPersistenceConfig, CurriculumRecallConfig,
+    CurriculumRecallScores,
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -3337,8 +3337,8 @@ mod tests {
     #[cfg(feature = "magi_loop")]
     #[tokio::test]
     async fn test_map_intent_to_domain_all_variants() {
-        use crate::mind::SemanticIntent;
         use crate::consciousness::recursive_improvement::PredictionDomain;
+        use crate::mind::SemanticIntent;
 
         assert_eq!(
             Symthaea::map_intent_to_domain(&SemanticIntent::Answer),
