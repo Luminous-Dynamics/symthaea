@@ -1056,7 +1056,8 @@ pub fn train_with_adam(
                 use std::io::Write;
                 let _ = writeln!(
                     std::io::stderr(),
-                    "  [epoch {epoch}] pair {pair_idx}/{num_pairs} loss={running_loss:.4} elapsed={elapsed_s:.1}s rate={pairs_per_sec:.1}pairs/s"
+                    "  [epoch {epoch}] pair {pair_idx}/{num_pairs} loss={:.4} elapsed={elapsed_s:.1}s rate={pairs_per_sec:.1}pairs/s",
+                    total_loss / total_tokens.max(1) as f32
                 );
                 std::io::stderr().flush().ok();
             }
@@ -1093,7 +1094,8 @@ pub fn train_with_adam(
                 use std::io::Write;
                 let _ = writeln!(
                     std::io::stderr(),
-                    "  [epoch {epoch}] pair {pair_idx}/{num_pairs} loss={running_loss:.4} elapsed={elapsed_s:.1}s rate={pairs_per_sec:.1}pairs/s"
+                    "  [epoch {epoch}] pair {pair_idx}/{num_pairs} loss={:.4} elapsed={elapsed_s:.1}s rate={pairs_per_sec:.1}pairs/s",
+                    total_loss / total_tokens.max(1) as f32
                 );
                 std::io::stderr().flush().ok();
             }
@@ -1171,8 +1173,7 @@ pub fn train_with_adam(
 
                     // Sync GPU weights → CPU once per pair
                     trainer.sync_to_cpu(generator.controller_mut())?;
-                    // Update running loss for progress reporting
-                    running_loss = total_loss / total_tokens.max(1) as f32;
+                    // (running loss is computed inline at report time)
                     // Refresh GPU embeddings from CPU (embedding grads applied above)
                     trainer.refresh_embeddings(generator.controller())?;
 
@@ -1196,7 +1197,6 @@ pub fn train_with_adam(
 
             // Skip CPU loop if GPU handled the pair
             if gpu_ran {
-                prev_token = pair.target_ids[window_end - 1]; // update for contrastive loss
                 let _running_loss = total_loss / total_tokens.max(1) as f32;
                 continue; // skip to next pair (contrastive loss etc. handled below)
             }
