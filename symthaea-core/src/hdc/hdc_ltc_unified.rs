@@ -833,6 +833,8 @@ impl HdcLtcUnifiedNeuron {
                 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
                 {
                     if crate::hdc::simd_detect::has_avx2() && crate::hdc::simd_detect::has_fma() {
+                        // SAFETY: AVX2+FMA availability verified by runtime feature detection above.
+                        // All slice arguments are the same length (ContinuousHV dimension).
                         unsafe {
                             fused_tanh_avx2(
                                 &mut self.state.values,
@@ -852,6 +854,8 @@ impl HdcLtcUnifiedNeuron {
                 // NEON fast path (AArch64)
                 #[cfg(all(target_arch = "aarch64", feature = "simd"))]
                 {
+                    // SAFETY: NEON availability verified by compile-time target_arch check.
+                    // All slice arguments are the same length (ContinuousHV dimension).
                     unsafe {
                         fused_tanh_neon(
                             &mut self.state.values,
@@ -903,6 +907,8 @@ impl HdcLtcUnifiedNeuron {
                 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
                 {
                     if crate::hdc::simd_detect::has_avx2() && crate::hdc::simd_detect::has_fma() {
+                        // SAFETY: AVX2+FMA availability verified by runtime feature detection.
+                        // All slice arguments are the same length (ContinuousHV dimension).
                         unsafe {
                             fused_identity_avx2(
                                 &mut self.state.values,
@@ -921,6 +927,8 @@ impl HdcLtcUnifiedNeuron {
                 // NEON fast path (AArch64)
                 #[cfg(all(target_arch = "aarch64", feature = "simd"))]
                 {
+                    // SAFETY: NEON availability verified by compile-time target_arch check.
+                    // All slice arguments are the same length (ContinuousHV dimension).
                     unsafe {
                         fused_identity_neon(
                             &mut self.state.values,
@@ -949,6 +957,8 @@ impl HdcLtcUnifiedNeuron {
                 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
                 {
                     if crate::hdc::simd_detect::has_avx2() && crate::hdc::simd_detect::has_fma() {
+                        // SAFETY: AVX2+FMA availability verified by runtime feature detection above.
+                        // All slice arguments are the same length (ContinuousHV dimension).
                         unsafe {
                             fused_tanh_avx2(
                                 &mut self.state.values,
@@ -968,6 +978,8 @@ impl HdcLtcUnifiedNeuron {
                 // NEON fast path (AArch64)
                 #[cfg(all(target_arch = "aarch64", feature = "simd"))]
                 {
+                    // SAFETY: NEON availability verified by compile-time target_arch check.
+                    // All slice arguments are the same length (ContinuousHV dimension).
                     unsafe {
                         fused_tanh_neon(
                             &mut self.state.values,

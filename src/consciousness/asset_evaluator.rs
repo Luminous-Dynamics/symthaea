@@ -114,11 +114,15 @@ impl AssetEvaluator {
             .collect();
 
         // Determine recommendation
-        let recommendation =
-            self.score_to_recommendation(eval.harmony_alignment.overall_score, eval.authenticity, !violations.is_empty());
+        let recommendation = self.score_to_recommendation(
+            eval.harmony_alignment.overall_score,
+            eval.authenticity,
+            !violations.is_empty(),
+        );
 
         // Map harmony alignment to [0,1] range (it's natively [-1,+1])
-        let harmony_alignment = ((eval.harmony_alignment.overall_score + 1.0) / 2.0).clamp(0.0, 1.0);
+        let harmony_alignment =
+            ((eval.harmony_alignment.overall_score + 1.0) / 2.0).clamp(0.0, 1.0);
 
         AssetConsciousnessScore {
             phi_score: snapshot.phi.clamp(0.0, 1.0),
@@ -248,7 +252,10 @@ mod tests {
         let score = evaluator.evaluate(&test_metadata(), &test_snapshot());
 
         // With a valid consciousness snapshot, should produce a real recommendation
-        assert_ne!(score.recommendation, GovernanceRecommendation::CannotEvaluate);
+        assert_ne!(
+            score.recommendation,
+            GovernanceRecommendation::CannotEvaluate
+        );
     }
 
     #[test]

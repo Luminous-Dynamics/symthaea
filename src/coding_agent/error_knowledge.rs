@@ -119,8 +119,7 @@ impl FixStrategyStats {
             self.test_successes += 1;
         }
         // Bayesian: (successes + 1) / (attempts + 2)
-        self.success_rate =
-            (self.compile_successes as f32 + 1.0) / (self.attempts as f32 + 2.0);
+        self.success_rate = (self.compile_successes as f32 + 1.0) / (self.attempts as f32 + 2.0);
     }
 }
 
@@ -187,14 +186,22 @@ impl CodeErrorKnowledge {
             strategies.push(stats);
         }
         // Sort by success rate descending
-        strategies.sort_by(|a, b| b.success_rate.partial_cmp(&a.success_rate).unwrap_or(std::cmp::Ordering::Equal));
+        strategies.sort_by(|a, b| {
+            b.success_rate
+                .partial_cmp(&a.success_rate)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
     }
 
     /// Suggest fix strategies for an error code, ranked by success rate.
     ///
     /// Returns strategies from both exact code match and category fallback,
     /// with exact matches ranked higher.
-    pub fn suggest_fixes(&self, error_code: &str, category: ErrorCategory) -> Vec<&FixStrategyStats> {
+    pub fn suggest_fixes(
+        &self,
+        error_code: &str,
+        category: ErrorCategory,
+    ) -> Vec<&FixStrategyStats> {
         let mut suggestions: Vec<&FixStrategyStats> = Vec::new();
 
         // Exact code match (highest priority)
@@ -345,7 +352,9 @@ mod tests {
         });
 
         // best_fix requires >= 2 attempts
-        assert!(knowledge.best_fix("E0308", ErrorCategory::TypeMismatch).is_none());
+        assert!(knowledge
+            .best_fix("E0308", ErrorCategory::TypeMismatch)
+            .is_none());
 
         // Second attempt
         knowledge.record_fix(CodeErrorFact {
@@ -366,11 +375,26 @@ mod tests {
 
     #[test]
     fn test_error_category_from_code() {
-        assert_eq!(ErrorCategory::from_error_code("E0308"), ErrorCategory::TypeMismatch);
-        assert_eq!(ErrorCategory::from_error_code("E0382"), ErrorCategory::BorrowError);
-        assert_eq!(ErrorCategory::from_error_code("E0106"), ErrorCategory::LifetimeError);
-        assert_eq!(ErrorCategory::from_error_code("E0433"), ErrorCategory::MissingImport);
-        assert_eq!(ErrorCategory::from_error_code("E9999"), ErrorCategory::Other);
+        assert_eq!(
+            ErrorCategory::from_error_code("E0308"),
+            ErrorCategory::TypeMismatch
+        );
+        assert_eq!(
+            ErrorCategory::from_error_code("E0382"),
+            ErrorCategory::BorrowError
+        );
+        assert_eq!(
+            ErrorCategory::from_error_code("E0106"),
+            ErrorCategory::LifetimeError
+        );
+        assert_eq!(
+            ErrorCategory::from_error_code("E0433"),
+            ErrorCategory::MissingImport
+        );
+        assert_eq!(
+            ErrorCategory::from_error_code("E9999"),
+            ErrorCategory::Other
+        );
     }
 
     #[test]

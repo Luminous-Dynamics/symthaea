@@ -74,9 +74,26 @@ impl Rng {
 
 /// Objects for alternate uses / divergent thinking
 const OBJECTS: &[&str] = &[
-    "brick", "paperclip", "shoe", "blanket", "bottle", "tire", "newspaper",
-    "key", "spoon", "rope", "candle", "mirror", "umbrella", "ladder",
-    "bucket", "pencil", "glass", "stone", "feather", "leaf",
+    "brick",
+    "paperclip",
+    "shoe",
+    "blanket",
+    "bottle",
+    "tire",
+    "newspaper",
+    "key",
+    "spoon",
+    "rope",
+    "candle",
+    "mirror",
+    "umbrella",
+    "ladder",
+    "bucket",
+    "pencil",
+    "glass",
+    "stone",
+    "feather",
+    "leaf",
 ];
 
 /// Remote associates triads (cue1, cue2, cue3, answer)
@@ -105,21 +122,73 @@ const RAT_TRIADS: &[(&str, &str, &str, &str)] = &[
 
 /// Conceptual blending pairs (concept_a, concept_b, blend_description)
 const BLENDS: &[(&str, &str, &str)] = &[
-    ("river", "time", "time flows like water, carrying moments downstream"),
-    ("tree", "knowledge", "branches of understanding growing from roots of experience"),
-    ("fire", "passion", "burning desire that consumes and transforms"),
-    ("ocean", "mind", "depths of thought with surface waves of attention"),
-    ("garden", "community", "nurturing connections that grow with care"),
-    ("bridge", "conversation", "spanning the gap between two worlds of meaning"),
+    (
+        "river",
+        "time",
+        "time flows like water, carrying moments downstream",
+    ),
+    (
+        "tree",
+        "knowledge",
+        "branches of understanding growing from roots of experience",
+    ),
+    (
+        "fire",
+        "passion",
+        "burning desire that consumes and transforms",
+    ),
+    (
+        "ocean",
+        "mind",
+        "depths of thought with surface waves of attention",
+    ),
+    (
+        "garden",
+        "community",
+        "nurturing connections that grow with care",
+    ),
+    (
+        "bridge",
+        "conversation",
+        "spanning the gap between two worlds of meaning",
+    ),
     ("storm", "emotion", "turbulent feelings that clear the air"),
     ("mirror", "self", "reflecting back what we show the world"),
-    ("seed", "idea", "small beginning that contains entire futures"),
-    ("web", "connection", "intricate links that catch meaning passing by"),
-    ("mountain", "challenge", "something to climb that changes the view"),
-    ("music", "mathematics", "patterns that resonate with hidden structure"),
-    ("light", "understanding", "illumination that reveals what was always there"),
-    ("dance", "negotiation", "two parties moving together finding rhythm"),
-    ("forest", "complexity", "many individual parts creating emergent wholeness"),
+    (
+        "seed",
+        "idea",
+        "small beginning that contains entire futures",
+    ),
+    (
+        "web",
+        "connection",
+        "intricate links that catch meaning passing by",
+    ),
+    (
+        "mountain",
+        "challenge",
+        "something to climb that changes the view",
+    ),
+    (
+        "music",
+        "mathematics",
+        "patterns that resonate with hidden structure",
+    ),
+    (
+        "light",
+        "understanding",
+        "illumination that reveals what was always there",
+    ),
+    (
+        "dance",
+        "negotiation",
+        "two parties moving together finding rhythm",
+    ),
+    (
+        "forest",
+        "complexity",
+        "many individual parts creating emergent wholeness",
+    ),
 ];
 
 /// Insight problem reframings (problem, obvious_frame, creative_reframe)
@@ -168,8 +237,18 @@ const INSIGHTS: &[(&str, &str, &str)] = &[
 
 /// Divergent use categories for scoring flexibility
 const USE_CATEGORIES: &[&str] = &[
-    "tool", "weapon", "shelter", "art", "music", "container",
-    "weight", "decoration", "game", "science", "cooking", "clothing",
+    "tool",
+    "weapon",
+    "shelter",
+    "art",
+    "music",
+    "container",
+    "weight",
+    "decoration",
+    "game",
+    "science",
+    "cooking",
+    "clothing",
 ];
 
 // ============================================================================
@@ -249,9 +328,9 @@ fn build_creative_channels(
 
     // Epistemic cube: E0-E1 (opinion/testimonial), low N (personal), varied M
     let e_tier = match originality {
-        Originality::Common => 1u8,   // testimonial (known creative output)
-        Originality::Uncommon => 0,   // opinion (novel)
-        Originality::Rare => 0,       // opinion (highly novel)
+        Originality::Common => 1u8, // testimonial (known creative output)
+        Originality::Uncommon => 0, // opinion (novel)
+        Originality::Rare => 0,     // opinion (highly novel)
     };
     let n_tier = rng.range(0, 2) as u8; // personal or communal
     let m_tier = rng.range(1, 4) as u8; // temporal to foundational
@@ -322,12 +401,7 @@ fn compose_blend_text(rng: &mut Rng, a: &str, b: &str, blend: &str) -> String {
     frames[rng.range(0, frames.len())].clone()
 }
 
-fn compose_insight_text(
-    rng: &mut Rng,
-    problem: &str,
-    obvious: &str,
-    reframe: &str,
-) -> String {
+fn compose_insight_text(rng: &mut Rng, problem: &str, obvious: &str, reframe: &str) -> String {
     let frames = [
         format!("the problem of {problem} — the first thought is to {obvious}. but step sideways: {reframe}. the constraint was in the framing, not the world"),
         format!("to solve {problem}, most try to {obvious}. the insight: {reframe}. the answer was hiding in a different question"),
@@ -410,12 +484,8 @@ fn generate_pairs(rng: &mut Rng, count: usize) -> Vec<TrainingPair> {
     let blend_count = count / 5;
     for i in 0..blend_count {
         let blend = &BLENDS[i % BLENDS.len()];
-        let channels = build_creative_channels(
-            rng,
-            Divergence::Radical,
-            Originality::Uncommon,
-            0.3,
-        );
+        let channels =
+            build_creative_channels(rng, Divergence::Radical, Originality::Uncommon, 0.3);
         let text = compose_blend_text(rng, blend.0, blend.1, blend.2);
         pairs.push(TrainingPair {
             channels: channels.channels.to_vec(),
@@ -431,12 +501,8 @@ fn generate_pairs(rng: &mut Rng, count: usize) -> Vec<TrainingPair> {
     let insight_count = count - pairs.len();
     for i in 0..insight_count {
         let insight = &INSIGHTS[i % INSIGHTS.len()];
-        let channels = build_creative_channels(
-            rng,
-            Divergence::Constrained,
-            Originality::Rare,
-            0.4,
-        );
+        let channels =
+            build_creative_channels(rng, Divergence::Constrained, Originality::Rare, 0.4);
         let text = compose_insight_text(rng, insight.0, insight.1, insight.2);
         pairs.push(TrainingPair {
             channels: channels.channels.to_vec(),
@@ -487,13 +553,15 @@ fn main() {
     println!("\nBreakdown:");
     let mut counts: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
     for p in &pairs {
-        *counts.entry(match p.creativity_type.as_str() {
-            "remote_associates" => "Remote Associates (convergent)",
-            "divergent_thinking" => "Divergent Thinking (open-ended)",
-            "conceptual_blending" => "Conceptual Blending (radical)",
-            "insight_problem" => "Insight Problems (restructuring)",
-            _ => "other",
-        }).or_insert(0) += 1;
+        *counts
+            .entry(match p.creativity_type.as_str() {
+                "remote_associates" => "Remote Associates (convergent)",
+                "divergent_thinking" => "Divergent Thinking (open-ended)",
+                "conceptual_blending" => "Conceptual Blending (radical)",
+                "insight_problem" => "Insight Problems (restructuring)",
+                _ => "other",
+            })
+            .or_insert(0) += 1;
     }
     for (k, v) in counts {
         println!("  {k}: {v}");

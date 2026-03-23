@@ -455,10 +455,24 @@ mycelix,unstable-examples"
         SYNC_CHECK_FAILED=true
     fi
 
+    # Run clippy with CI features if available (catches lint errors that -D warnings triggers)
+    if command -v rustup >/dev/null 2>&1 && rustup run 1.93.0 cargo clippy --version >/dev/null 2>&1; then
+        info "Running cargo clippy (CI features, -D warnings)..."
+        if (cd "${STANDALONE_REPO}" && rustup run 1.93.0 cargo clippy -p symthaea --lib --bins --features "$CI_FEATURES" -- -D warnings 2>&1 | tail -10); then
+            ok "cargo clippy passed"
+        else
+            warn "cargo clippy failed — lint errors will break CI"
+            SYNC_CHECK_FAILED=true
+        fi
+    else
+        info "Skipping clippy (1.93.0 toolchain clippy not available locally)"
+    fi
+
     if $SYNC_CHECK_FAILED; then
         warn "Pre-push checks failed. Run with --skip-check to bypass, or investigate:"
         echo "  cd ${STANDALONE_REPO} && cargo fmt --check"
         echo "  cd ${STANDALONE_REPO} && cargo check"
+        echo "  cd ${STANDALONE_REPO} && cargo clippy -p symthaea --lib --bins --features \"\$CI_FEATURES\" -- -D warnings"
     fi
     echo
 elif $SKIP_CHECK; then

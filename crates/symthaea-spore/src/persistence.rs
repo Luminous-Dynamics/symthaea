@@ -211,10 +211,18 @@ impl TrendHistory {
         let consciousness_delta = last.consciousness_level - first.consciousness_level;
         let harmony_delta = last.harmony_alignment - first.harmony_alignment;
 
-        let consciousness_mean: f32 =
-            self.snapshots.iter().map(|s| s.consciousness_level).sum::<f32>() / n;
-        let harmony_mean: f32 =
-            self.snapshots.iter().map(|s| s.harmony_alignment).sum::<f32>() / n;
+        let consciousness_mean: f32 = self
+            .snapshots
+            .iter()
+            .map(|s| s.consciousness_level)
+            .sum::<f32>()
+            / n;
+        let harmony_mean: f32 = self
+            .snapshots
+            .iter()
+            .map(|s| s.harmony_alignment)
+            .sum::<f32>()
+            / n;
 
         // Variance for stability assessment
         let consciousness_var: f32 = self
@@ -237,8 +245,8 @@ impl TrendHistory {
 
     /// Serialize trend snapshots to bytes for checkpoint embedding.
     pub fn to_bytes(&self) -> Vec<u8> {
-        let json = serde_json::to_vec(&self.snapshots.iter().collect::<Vec<_>>())
-            .unwrap_or_default();
+        let json =
+            serde_json::to_vec(&self.snapshots.iter().collect::<Vec<_>>()).unwrap_or_default();
         let mut buf = Vec::with_capacity(12 + json.len());
         buf.extend_from_slice(&(json.len() as u32).to_le_bytes());
         buf.extend_from_slice(&self.last_sample_cycle.to_le_bytes());
@@ -256,8 +264,7 @@ impl TrendHistory {
         if data.len() < 12 + json_len {
             return None;
         }
-        let snapshots: Vec<QolSnapshot> =
-            serde_json::from_slice(&data[12..12 + json_len]).ok()?;
+        let snapshots: Vec<QolSnapshot> = serde_json::from_slice(&data[12..12 + json_len]).ok()?;
         let mut deque = VecDeque::with_capacity(TREND_HISTORY_CAP);
         for s in snapshots.into_iter().rev().take(TREND_HISTORY_CAP) {
             deque.push_front(s);

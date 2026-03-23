@@ -9,7 +9,6 @@ use symthaea_psych_bench::benchmarks::{
     affect::{
         EmotionalStroopBenchmark, MoodCongruentRecallBenchmark, ValenceClassificationBenchmark,
     },
-    coding::{AlgorithmRecognitionBenchmark, BugDetectionBenchmark, HumanEvalMiniBenchmark},
     attention::{AttentionalBlinkBenchmark, MismatchNegativityBenchmark, VisualSearchBenchmark},
     binding::{CrossModalBindingBenchmark, FeatureConjunctionBenchmark, TemporalOrderBenchmark},
     butlin::ButlinIndicatorSuite,
@@ -18,6 +17,7 @@ use symthaea_psych_bench::benchmarks::{
         AllianceMaintenanceBenchmark, CognitiveDistortionBenchmark, CrisisDetectionBenchmark,
         EmpathicAccuracyBenchmark, MotivationalInterviewingBenchmark, TherapeuticResponseBenchmark,
     },
+    coding::{AlgorithmRecognitionBenchmark, BugDetectionBenchmark, HumanEvalMiniBenchmark},
     cogbench::{
         BartBenchmark, HorizonBenchmark, InstrumentalLearningBenchmark,
         ProbabilisticReasoningBenchmark, RestlessBanditBenchmark, ReversalLearningBenchmark,

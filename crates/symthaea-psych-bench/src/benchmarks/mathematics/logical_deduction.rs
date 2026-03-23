@@ -208,7 +208,8 @@ fn classify_argument(
     // Valid forms (MP, MT, HS) pass structural check with high probability.
     // Invalid forms (AC, DA, Circular) fail structural check.
     let structural_valid = match arg_type {
-        ArgumentType::ModusPonens | ArgumentType::ModusTollens
+        ArgumentType::ModusPonens
+        | ArgumentType::ModusTollens
         | ArgumentType::HypotheticalSyllogism => {
             // Valid inference rule — structural check confirms derivability.
             // Small chance of structural error (failing to recognize valid form).

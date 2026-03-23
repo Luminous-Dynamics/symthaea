@@ -53,9 +53,9 @@ pub mod controller;
 pub mod encoder;
 pub mod evaluation;
 pub mod gating;
+pub mod generator;
 #[cfg(feature = "gpu")]
 pub mod gpu_cfc;
-pub mod generator;
 pub mod tokenizer;
 pub mod training;
 

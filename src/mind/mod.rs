@@ -16,6 +16,8 @@ pub mod intent;
 pub mod knowledge;
 #[cfg(feature = "mesh")]
 mod mesh;
+#[cfg(feature = "provenance")]
+pub mod provenance;
 mod social;
 pub mod structured_thought;
 mod swarm;
@@ -276,7 +278,8 @@ impl ContinuousMind {
             social_coherence: social,
             social_projection: if social_projection_enabled {
                 Some(symthaea_core::hdc::projection::LearnedProjection::new(
-                    perception_dim, 16384,
+                    perception_dim,
+                    16384,
                 ))
             } else {
                 None

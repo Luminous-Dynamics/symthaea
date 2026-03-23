@@ -50,12 +50,15 @@ impl DesktopHolon {
                     cycle,
                     ..
                 } => {
-                    let peer = self.peers.entry(device_id.to_string()).or_insert(PeerState {
-                        consciousness: 0.0,
-                        phi: 0.0,
-                        valence: 0.0,
-                        cycle: 0,
-                    });
+                    let peer = self
+                        .peers
+                        .entry(device_id.to_string())
+                        .or_insert(PeerState {
+                            consciousness: 0.0,
+                            phi: 0.0,
+                            valence: 0.0,
+                            cycle: 0,
+                        });
                     peer.consciousness = *consciousness_level;
                     peer.cycle = *cycle;
                     println!(

@@ -15329,6 +15329,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-circular"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "symthaea-clinical"
 version = "0.1.0"
 dependencies = [
@@ -15541,6 +15548,14 @@ dependencies = [
  "serde_json",
  "symthaea-core",
  "symthaea-fep",
+]
+
+[[package]]
+name = "symthaea-geodesic"
+version = "0.1.0"
+dependencies = [
+ "symthaea-core",
+ "symthaea-hodge",
 ]
 
 [[package]]

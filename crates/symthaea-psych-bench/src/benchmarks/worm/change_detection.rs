@@ -64,7 +64,8 @@ impl ChangeDetectionBenchmark {
             // Lapse_rate scales encoding noise: attention-dependent encoding quality
             // varies across individuals (Vogel & Machizawa, 2004 — WM capacity and
             // attentional control predict encoding fidelity).
-            let noise_frac = (0.03 * set_size as f32 + config.time_pressure as f32 * 0.10
+            let noise_frac = (0.03 * set_size as f32
+                + config.time_pressure as f32 * 0.10
                 + config.lapse_rate as f32 * 0.02)
                 * diff_model.interference_multiplier(config.difficulty) as f32;
             let encoding_noise_seed = rng_state.wrapping_add(700 + pos as u64);
@@ -168,7 +169,11 @@ impl ChangeDetectionBenchmark {
             if (lapse_seed % 10000) as f64 / 10000.0 < config.lapse_rate {
                 // Random 50/50 guess
                 let guess_correct = (lapse_seed.wrapping_mul(0x517CC1B727220A95) % 2) == 0;
-                if guess_correct { 1.0 } else { 0.0 }
+                if guess_correct {
+                    1.0
+                } else {
+                    0.0
+                }
             } else if correct {
                 1.0
             } else {

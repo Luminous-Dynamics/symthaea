@@ -138,9 +138,8 @@ impl OptimizationProblemsBenchmark {
             let offset_y = ((rng % 60) as f64 - 30.0) / 10.0;
 
             // Shifted bowl: minimum at (offset_x, offset_y).
-            let f = move |x: &[f64]| -> f64 {
-                (x[0] - offset_x).powi(2) + (x[1] - offset_y).powi(2)
-            };
+            let f =
+                move |x: &[f64]| -> f64 { (x[0] - offset_x).powi(2) + (x[1] - offset_y).powi(2) };
 
             let result = OptimizationEngine::nelder_mead(&f, &[0.0, 0.0], 2.0, 1e-6);
 

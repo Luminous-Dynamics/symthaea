@@ -251,7 +251,7 @@ fn consciousness_never_nan() {
 
     // Feed extreme sensor values
     let extremes: &[(f32, f32, bool, f32, f32)] = &[
-        (0.0, 0.0, false, 0.0, 0.0),       // all zeros
+        (0.0, 0.0, false, 0.0, 0.0),        // all zeros
         (100.0, 100000.0, false, 0.0, 1.0), // extreme highs
         (0.001, 0.001, true, 1200.0, 0.0),  // near-zero with privacy
         (50.0, 50.0, false, 800.0, 0.5),    // mid-range
@@ -263,7 +263,11 @@ fn consciousness_never_nan() {
         assert!(
             result.consciousness_level.is_finite(),
             "Consciousness is NaN/Inf for sensors: accel={}, light={}, prox={}, baro={}, gps={}",
-            accel, light, prox, baro, gps
+            accel,
+            light,
+            prox,
+            baro,
+            gps
         );
         assert!(
             result.consciousness_level >= 0.0 && result.consciousness_level <= 1.0,
@@ -336,7 +340,8 @@ fn checkpoint_roundtrip() {
     assert!(
         (pre_save_level - post_load_level).abs() < 0.1,
         "Consciousness should be approximately preserved after checkpoint: pre={}, post={}",
-        pre_save_level, post_load_level
+        pre_save_level,
+        post_load_level
     );
 
     // Cleanup

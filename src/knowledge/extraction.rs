@@ -352,7 +352,9 @@ impl KnowledgeExtractor {
             while let Some(pos) = text[search_from..].find(keyword) {
                 let abs_pos = search_from + pos;
                 let after = &text[abs_pos + keyword.len()..];
-                if let Some(name) = after.split(|c: char| !c.is_alphanumeric() && c != '_').next()
+                if let Some(name) = after
+                    .split(|c: char| !c.is_alphanumeric() && c != '_')
+                    .next()
                 {
                     let name = name.trim();
                     if !name.is_empty() && name.chars().next().map_or(false, |c| c.is_uppercase()) {
@@ -375,8 +377,9 @@ impl KnowledgeExtractor {
             while let Some(pos) = text[search_from..].find("mod ") {
                 let abs_pos = search_from + pos;
                 let after = &text[abs_pos + 4..];
-                if let Some(name) =
-                    after.split(|c: char| !c.is_alphanumeric() && c != '_').next()
+                if let Some(name) = after
+                    .split(|c: char| !c.is_alphanumeric() && c != '_')
+                    .next()
                 {
                     let name = name.trim();
                     if !name.is_empty() {
@@ -415,8 +418,9 @@ impl KnowledgeExtractor {
             while let Some(pos) = text[search_from..].find("import ") {
                 let abs_pos = search_from + pos;
                 let after = &text[abs_pos + 7..];
-                if let Some(name) =
-                    after.split(|c: char| !c.is_alphanumeric() && c != '_').next()
+                if let Some(name) = after
+                    .split(|c: char| !c.is_alphanumeric() && c != '_')
+                    .next()
                 {
                     let name = name.trim();
                     if !name.is_empty() {
@@ -437,8 +441,9 @@ impl KnowledgeExtractor {
                 let abs_pos = search_from + pos;
                 let after = &text[abs_pos + 5..];
                 if after.contains(" import") {
-                    if let Some(name) =
-                        after.split(|c: char| !c.is_alphanumeric() && c != '_').next()
+                    if let Some(name) = after
+                        .split(|c: char| !c.is_alphanumeric() && c != '_')
+                        .next()
                     {
                         let name = name.trim();
                         if !name.is_empty() {
@@ -485,8 +490,9 @@ impl KnowledgeExtractor {
             while let Some(pos) = text[search_from..].find("crate::") {
                 let abs_pos = search_from + pos;
                 let after = &text[abs_pos + 7..];
-                if let Some(name) =
-                    after.split(|c: char| !c.is_alphanumeric() && c != '_').next()
+                if let Some(name) = after
+                    .split(|c: char| !c.is_alphanumeric() && c != '_')
+                    .next()
                 {
                     let name = name.trim();
                     if !name.is_empty() {

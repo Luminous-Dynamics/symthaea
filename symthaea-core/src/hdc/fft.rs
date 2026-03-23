@@ -474,7 +474,11 @@ mod tests {
         let a = 2.0;
         let b = 3.0;
 
-        let combined: Vec<f64> = x.iter().zip(y.iter()).map(|(xi, yi)| a * xi + b * yi).collect();
+        let combined: Vec<f64> = x
+            .iter()
+            .zip(y.iter())
+            .map(|(xi, yi)| a * xi + b * yi)
+            .collect();
         let fft_combined = FftEngine::fft(&combined);
 
         let fft_x = FftEngine::fft(&x);
@@ -515,7 +519,9 @@ mod tests {
     fn test_fft_large_signal() {
         // Verify FFT/IFFT roundtrip on a 256-point signal
         let n = 256;
-        let signal: Vec<f64> = (0..n).map(|i| (i as f64 * 0.1).sin() + 0.5 * (i as f64 * 0.3).cos()).collect();
+        let signal: Vec<f64> = (0..n)
+            .map(|i| (i as f64 * 0.1).sin() + 0.5 * (i as f64 * 0.3).cos())
+            .collect();
         let spectrum = FftEngine::fft(&signal);
         let recovered = FftEngine::ifft(&spectrum.spectrum);
         for (i, (&orig, rec)) in signal.iter().zip(recovered.spectrum.iter()).enumerate() {
@@ -570,8 +576,12 @@ mod tests {
 
         let fa = FftEngine::fft(&ap);
         let fb = FftEngine::fft(&bp);
-        let product: Vec<Complex> = fa.spectrum.iter().zip(fb.spectrum.iter())
-            .map(|(&a, &b)| a * b).collect();
+        let product: Vec<Complex> = fa
+            .spectrum
+            .iter()
+            .zip(fb.spectrum.iter())
+            .map(|(&a, &b)| a * b)
+            .collect();
         let conv_fft = FftEngine::ifft(&product);
 
         let result_len = a.len() + b.len() - 1;

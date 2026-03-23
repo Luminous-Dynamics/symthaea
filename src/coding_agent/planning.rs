@@ -59,16 +59,12 @@ impl CodingAgent {
                     None
                 }
             }
-            TaskPhase::Testing => {
-                Some(Molecule::atom(Atom::cargo_check(working_dir)))
-            }
+            TaskPhase::Testing => Some(Molecule::atom(Atom::cargo_check(working_dir))),
             TaskPhase::Fixing => {
                 if let Some(ref code) = self.generated_code {
                     let write_check =
                         crate::action::primitives::recipes::write_and_check(target, code);
-                    Some(write_check.recover(|_| {
-                        Molecule::atom(Atom::Noop)
-                    }))
+                    Some(write_check.recover(|_| Molecule::atom(Atom::Noop)))
                 } else {
                     None
                 }
@@ -208,9 +204,7 @@ impl CodingAgent {
         let selected_idx = if let Some(ref store) = self.experience_store {
             let recipe_keys: Vec<&str> = candidates
                 .iter()
-                .map(|c| {
-                    c.profile.atom_names.first().copied().unwrap_or("Unknown")
-                })
+                .map(|c| c.profile.atom_names.first().copied().unwrap_or("Unknown"))
                 .collect();
             let rates = store.recipe_success_rates(&recipe_keys);
             select_best_plan_with_history(&candidates, current_phi, self.energy_budget, &rates)
@@ -288,15 +282,11 @@ impl CodingAgent {
 
     pub(super) fn build_motor_request(&self) -> MotorActionRequest {
         match self.phase {
-            TaskPhase::Understanding => {
-                MotorActionRequest {
-                    target_path: Some(self.config.working_dir.clone()),
-                    ..Default::default()
-                }
-            }
-            TaskPhase::Planning => {
-                MotorActionRequest::default()
-            }
+            TaskPhase::Understanding => MotorActionRequest {
+                target_path: Some(self.config.working_dir.clone()),
+                ..Default::default()
+            },
+            TaskPhase::Planning => MotorActionRequest::default(),
             TaskPhase::Generating => {
                 if self.generated_code.is_some() {
                     MotorActionRequest {
@@ -312,14 +302,12 @@ impl CodingAgent {
                     }
                 }
             }
-            TaskPhase::Testing => {
-                MotorActionRequest {
-                    target_path: Some(self.config.working_dir.clone()),
-                    program: Some("cargo".into()),
-                    args: vec!["check".into()],
-                    ..Default::default()
-                }
-            }
+            TaskPhase::Testing => MotorActionRequest {
+                target_path: Some(self.config.working_dir.clone()),
+                program: Some("cargo".into()),
+                args: vec!["check".into()],
+                ..Default::default()
+            },
             TaskPhase::Fixing => {
                 if self.generated_code.is_some() {
                     MotorActionRequest {

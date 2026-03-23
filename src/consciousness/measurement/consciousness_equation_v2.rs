@@ -596,10 +596,7 @@ impl ConsciousnessEquationV2 {
         // Guard: tau must be positive to avoid division by zero or sign flip
         let tau = self.config.tau.max(f64::MIN_POSITIVE);
 
-        let sum_exp: f64 = values
-            .iter()
-            .map(|&x| (-(x - max_val) / tau).exp())
-            .sum();
+        let sum_exp: f64 = values.iter().map(|&x| (-(x - max_val) / tau).exp()).sum();
 
         // Guard: sum_exp should always be >= 1.0 (the max_val term contributes exp(0)=1),
         // but protect against NaN/Inf propagation from upstream values

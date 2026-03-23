@@ -77,7 +77,10 @@ impl GpuCfcLayer {
         let config = neurons[0].config();
 
         // Pack each neuron's HVs into rows of [N, D] tensors
-        let pack = |extract: &dyn Fn(&symthaea_core::hdc::hdc_ltc_unified::HdcLtcUnifiedNeuron) -> &[f32]| -> Result<Tensor> {
+        let pack = |extract: &dyn Fn(
+            &symthaea_core::hdc::hdc_ltc_unified::HdcLtcUnifiedNeuron,
+        ) -> &[f32]|
+         -> Result<Tensor> {
             let mut flat = Vec::with_capacity(n * dim);
             for neuron in neurons {
                 flat.extend_from_slice(extract(neuron));
@@ -134,13 +137,12 @@ impl GpuCfcLayer {
         let factor1 = (bt_state + 1.0)?;
         let adj_scaled = (&input_adj * 0.2)?;
         let factor2 = (adj_scaled + 1.0)?;
-        let tau = ((&factor1 * &factor2)? * self.tau_base as f64)?
-            .clamp(0.01, 10.0)?; // [N]
+        let tau = ((&factor1 * &factor2)? * self.tau_base as f64)?.clamp(0.01, 10.0)?; // [N]
 
         // ── 3. Gating: sigma per neuron ─────────────────────────────────
         // bundle_si = (state + input) * 0.5
         let bundle_si = ((&self.states + &input_bc)? * 0.5)?; // [N, D]
-        // gate_activation = cosine_sim(bundle_si, gate_weight) + mean(gate_bias)
+                                                              // gate_activation = cosine_sim(bundle_si, gate_weight) + mean(gate_bias)
         let dot_sg = (&bundle_si * &self.gate_weight)?.sum(1)?; // [N]
         let bundle_norms = bundle_si.sqr()?.sum(1)?.sqrt()?; // [N]
         let gw_norms = self.gate_weight.sqr()?.sum(1)?.sqrt()?; // [N]
@@ -162,8 +164,7 @@ impl GpuCfcLayer {
 
         // sigma = 1 - decay * (1 - sigma_base)
         let one_minus_sb = (1.0 - &sigma_base)?;
-        let sigma = (1.0 - (&decay * &one_minus_sb)?)?
-            .clamp(0.0, 1.0)?; // [N]
+        let sigma = (1.0 - (&decay * &one_minus_sb)?)?.clamp(0.0, 1.0)?; // [N]
 
         // ── 4. Interpolation: state = (1-sigma)*state + sigma*x_inf ─────
         // Reshape sigma to [N, 1] for broadcast with [N, D]
@@ -193,12 +194,7 @@ impl GpuCfcLayer {
     /// - du: [N, D] — gradient w.r.t. input_mask
     /// - dtau: [N] — scalar tau gradient per neuron
     /// - d_input: [N, D] — gradient w.r.t. input (for inter-layer backprop)
-    pub fn backward(
-        &self,
-        input: &Tensor,
-        target: &Tensor,
-        dt: f32,
-    ) -> Result<GpuCfcGradients> {
+    pub fn backward(&self, input: &Tensor, target: &Tensor, dt: f32) -> Result<GpuCfcGradients> {
         // Broadcast input [1, D] → [N, D]
         let input_bc = input.broadcast_as(self.states.shape())?;
         let dim_f = self.dim as f64;
@@ -220,8 +216,7 @@ impl GpuCfcLayer {
         let factor1 = (bt_state + 1.0)?;
         let adj_scaled = (&input_adj * 0.2)?;
         let factor2 = (adj_scaled + 1.0)?;
-        let tau = ((&factor1 * &factor2)? * self.tau_base as f64)?
-            .clamp(0.01, 10.0)?;
+        let tau = ((&factor1 * &factor2)? * self.tau_base as f64)?.clamp(0.01, 10.0)?;
 
         let tau_recip = tau.recip()?;
         let neg_dt_over_tau = (&tau_recip * (-dt as f64))?;
@@ -314,28 +309,70 @@ impl GpuCfcLayer {
         &self,
         neurons: &mut [symthaea_core::hdc::hdc_ltc_unified::HdcLtcUnifiedNeuron],
     ) -> Result<()> {
-        let states: Vec<f32> = self.states.to_vec2::<f32>()?
-            .into_iter().flatten().collect();
-        let weights: Vec<f32> = self.weight_hv.to_vec2::<f32>()?
-            .into_iter().flatten().collect();
-        let masks: Vec<f32> = self.input_mask.to_vec2::<f32>()?
-            .into_iter().flatten().collect();
-        let tau_mods: Vec<f32> = self.tau_modulator.to_vec2::<f32>()?
-            .into_iter().flatten().collect();
-        let w_mom: Vec<f32> = self.weight_momentum.to_vec2::<f32>()?
-            .into_iter().flatten().collect();
-        let i_mom: Vec<f32> = self.input_momentum.to_vec2::<f32>()?
-            .into_iter().flatten().collect();
+        let states: Vec<f32> = self
+            .states
+            .to_vec2::<f32>()?
+            .into_iter()
+            .flatten()
+            .collect();
+        let weights: Vec<f32> = self
+            .weight_hv
+            .to_vec2::<f32>()?
+            .into_iter()
+            .flatten()
+            .collect();
+        let masks: Vec<f32> = self
+            .input_mask
+            .to_vec2::<f32>()?
+            .into_iter()
+            .flatten()
+            .collect();
+        let tau_mods: Vec<f32> = self
+            .tau_modulator
+            .to_vec2::<f32>()?
+            .into_iter()
+            .flatten()
+            .collect();
+        let w_mom: Vec<f32> = self
+            .weight_momentum
+            .to_vec2::<f32>()?
+            .into_iter()
+            .flatten()
+            .collect();
+        let i_mom: Vec<f32> = self
+            .input_momentum
+            .to_vec2::<f32>()?
+            .into_iter()
+            .flatten()
+            .collect();
 
         for (i, neuron) in neurons.iter_mut().enumerate() {
             let start = i * self.dim;
             let end = start + self.dim;
-            neuron.state_mut().values.copy_from_slice(&states[start..end]);
-            neuron.weight_hv_mut().values.copy_from_slice(&weights[start..end]);
-            neuron.input_mask_mut().values.copy_from_slice(&masks[start..end]);
-            neuron.tau_modulator_mut().values.copy_from_slice(&tau_mods[start..end]);
-            neuron.weight_momentum_mut().values.copy_from_slice(&w_mom[start..end]);
-            neuron.input_momentum_mut().values.copy_from_slice(&i_mom[start..end]);
+            neuron
+                .state_mut()
+                .values
+                .copy_from_slice(&states[start..end]);
+            neuron
+                .weight_hv_mut()
+                .values
+                .copy_from_slice(&weights[start..end]);
+            neuron
+                .input_mask_mut()
+                .values
+                .copy_from_slice(&masks[start..end]);
+            neuron
+                .tau_modulator_mut()
+                .values
+                .copy_from_slice(&tau_mods[start..end]);
+            neuron
+                .weight_momentum_mut()
+                .values
+                .copy_from_slice(&w_mom[start..end]);
+            neuron
+                .input_momentum_mut()
+                .values
+                .copy_from_slice(&i_mom[start..end]);
         }
         Ok(())
     }
@@ -627,7 +664,13 @@ impl GpuTrainer {
         let mut flat_embs = Vec::with_capacity(vocab * dim);
         for emb in embs {
             // Normalize each embedding row (matches GpuEmbeddingCache behavior)
-            let norm: f32 = emb.as_slice().iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-10);
+            let norm: f32 = emb
+                .as_slice()
+                .iter()
+                .map(|x| x * x)
+                .sum::<f32>()
+                .sqrt()
+                .max(1e-10);
             for &v in emb.as_slice() {
                 flat_embs.push(v / norm);
             }
@@ -648,7 +691,10 @@ impl GpuTrainer {
 
         tracing::info!(
             "GpuTrainer created: {} layers, {} embeddings, {} positions on {:?}",
-            network.layers.len(), vocab, max_positions, device,
+            network.layers.len(),
+            vocab,
+            max_positions,
+            device,
         );
 
         Ok(Self {
@@ -673,7 +719,10 @@ impl GpuTrainer {
         // 1. Compose input: thought ⊗ token_emb ⊗ pos_emb (element-wise mul = HDC bind)
         let token_emb = self.embeddings.get(prev_token as usize)?.unsqueeze(0)?;
         let max_pos = self.position_cache.dim(0)?;
-        let pos_emb = self.position_cache.get(pos.min(max_pos - 1))?.unsqueeze(0)?;
+        let pos_emb = self
+            .position_cache
+            .get(pos.min(max_pos - 1))?
+            .unsqueeze(0)?;
         let input = (thought_gpu * &token_emb)?.mul(&pos_emb)?; // [1, D]
 
         // 2. CfC forward (all on GPU)
@@ -706,15 +755,19 @@ impl GpuTrainer {
         let max_logit = logits.iter().copied().fold(f32::NEG_INFINITY, f32::max);
         let exps: Vec<f32> = logits.iter().map(|&l| (l - max_logit).exp()).collect();
         let sum_exp: f32 = exps.iter().sum();
-        if sum_exp < 1e-10 { return Ok(()); }
+        if sum_exp < 1e-10 {
+            return Ok(());
+        }
 
         let scale = self.logit_scale;
 
         // error vector
-        let errors: Vec<f32> = (0..n).map(|i| {
-            let prob = exps[i] / sum_exp;
-            scale * (if i == target { prob - 1.0 } else { prob })
-        }).collect();
+        let errors: Vec<f32> = (0..n)
+            .map(|i| {
+                let prob = exps[i] / sum_exp;
+                scale * (if i == target { prob - 1.0 } else { prob })
+            })
+            .collect();
 
         // d_output = error @ E_hat - cos_sum × output_hat (all on GPU)
         let error_t = Tensor::from_vec(errors.clone(), (1, n), &self.device)?;
@@ -725,10 +778,16 @@ impl GpuTrainer {
         let norm_bc = raw_norm.unsqueeze(1)?.broadcast_as(raw_output.shape())?;
         let output_hat = (&raw_output / &norm_bc)?;
 
-        let cos_sum: f32 = (0..n).map(|i| {
-            let cos_i = if scale.abs() > 1e-6 { logits[i] / scale } else { 0.0 };
-            errors[i] * cos_i
-        }).sum();
+        let cos_sum: f32 = (0..n)
+            .map(|i| {
+                let cos_i = if scale.abs() > 1e-6 {
+                    logits[i] / scale
+                } else {
+                    0.0
+                };
+                errors[i] * cos_i
+            })
+            .sum();
 
         let d_output = if cos_sum.abs() > 1e-10 {
             let cs = Tensor::from_vec(vec![cos_sum], (1, 1), &self.device)?;
@@ -741,21 +800,27 @@ impl GpuTrainer {
         // Reconstruct input on GPU (same composition as forward_step)
         let token_emb = self.embeddings.get(prev_token as usize)?.unsqueeze(0)?;
         let max_pos = self.position_cache.dim(0)?;
-        let pos_emb = self.position_cache.get(pos.min(max_pos - 1))?.unsqueeze(0)?;
+        let pos_emb = self
+            .position_cache
+            .get(pos.min(max_pos - 1))?
+            .unsqueeze(0)?;
         let input = (thought_gpu * &token_emb)?.mul(&pos_emb)?;
 
         // Full BPTT on GPU (no CPU sync)
         self.network.backward_and_update(
-            &d_output, &input, self.dt_per_token, lr, self.gradient_attenuation,
+            &d_output,
+            &input,
+            self.dt_per_token,
+            lr,
+            self.gradient_attenuation,
         )
     }
 
     /// Reset CfC states (between training pairs).
     pub fn reset_states(&mut self) -> Result<()> {
         for layer in &mut self.network.layers {
-            layer.states = Tensor::zeros(
-                layer.states.shape(), candle_core::DType::F32, &self.device,
-            )?;
+            layer.states =
+                Tensor::zeros(layer.states.shape(), candle_core::DType::F32, &self.device)?;
         }
         for out in &mut self.network.layer_outputs {
             *out = Tensor::zeros(out.shape(), candle_core::DType::F32, &self.device)?;
@@ -782,12 +847,21 @@ impl GpuTrainer {
     }
 
     /// Refresh GPU embeddings from CPU (after CPU embedding updates).
-    pub fn refresh_embeddings(&mut self, ctrl: &crate::controller::LanguageController) -> Result<()> {
+    pub fn refresh_embeddings(
+        &mut self,
+        ctrl: &crate::controller::LanguageController,
+    ) -> Result<()> {
         let embs = ctrl.token_embeddings();
         let vocab = embs.len();
         let mut flat = Vec::with_capacity(vocab * self.dim);
         for emb in embs {
-            let norm: f32 = emb.as_slice().iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-10);
+            let norm: f32 = emb
+                .as_slice()
+                .iter()
+                .map(|x| x * x)
+                .sum::<f32>()
+                .sqrt()
+                .max(1e-10);
             for &v in emb.as_slice() {
                 flat.push(v / norm);
             }

@@ -638,11 +638,24 @@ impl MeditationSentinel {
         let window = window.min(self.history.len());
         let skip = self.history.len() - window;
 
-        let avg_focus = self.history.iter().skip(skip).map(|s| s.focus).sum::<f64>() / window as f64;
+        let avg_focus =
+            self.history.iter().skip(skip).map(|s| s.focus).sum::<f64>() / window as f64;
         let avg_calm = self.history.iter().skip(skip).map(|s| s.calm).sum::<f64>() / window as f64;
         let avg_flow = self.history.iter().skip(skip).map(|s| s.flow).sum::<f64>() / window as f64;
-        let avg_presence = self.history.iter().skip(skip).map(|s| s.presence).sum::<f64>() / window as f64;
-        let avg_confidence = self.history.iter().skip(skip).map(|s| s.confidence).sum::<f64>() / window as f64;
+        let avg_presence = self
+            .history
+            .iter()
+            .skip(skip)
+            .map(|s| s.presence)
+            .sum::<f64>()
+            / window as f64;
+        let avg_confidence = self
+            .history
+            .iter()
+            .skip(skip)
+            .map(|s| s.confidence)
+            .sum::<f64>()
+            / window as f64;
 
         MeditationState::new(avg_focus, avg_calm, avg_flow, avg_presence, avg_confidence)
     }

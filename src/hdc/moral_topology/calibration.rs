@@ -191,7 +191,10 @@ impl MoralTopology {
         }
         // Binary search for interpolation bracket
         match cdf.binary_search_by(|probe| {
-            probe.0.partial_cmp(&raw).unwrap_or(std::cmp::Ordering::Equal)
+            probe
+                .0
+                .partial_cmp(&raw)
+                .unwrap_or(std::cmp::Ordering::Equal)
         }) {
             Ok(idx) => cdf[idx].1,
             Err(0) => cdf[0].1,

@@ -251,7 +251,9 @@ impl BrocaCheckpoint {
                 // Legacy MessagePack (without logit_projection_weights)
                 match rmp_serde::from_slice::<BrocaCheckpointLegacy>(&buffer) {
                     Ok(legacy) => {
-                        tracing::info!("Loaded legacy Broca checkpoint (pre-projection) — upgrading");
+                        tracing::info!(
+                            "Loaded legacy Broca checkpoint (pre-projection) — upgrading"
+                        );
                         legacy.into()
                     }
                     Err(e2) => {
@@ -387,8 +389,7 @@ impl BrocaGenerator {
             let proj_dim = total / dim;
             if proj_dim > 0 && proj_dim * dim == total {
                 // Enable projection on the controller, then overwrite with trained weights
-                gen.controller_mut()
-                    .enable_projection(genesis, proj_dim);
+                gen.controller_mut().enable_projection(genesis, proj_dim);
                 if let Some(w) = gen.controller_mut().projection_weights_mut() {
                     *w = proj_weights;
                 }

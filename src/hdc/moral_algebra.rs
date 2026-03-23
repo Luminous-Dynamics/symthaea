@@ -1419,50 +1419,49 @@ impl MoralAlgebra {
         };
 
         // 5. Manifold signal (8D harmony space, if classifier is available)
-        let (manifold_verdict, manifold_confidence) = if let Some(ref clf) = self.manifold_classifier
-        {
-            let (verdict, conf) = clf.classify(text);
-            (Some(verdict), Some(conf))
-        } else {
-            (None, None)
-        };
+        let (manifold_verdict, manifold_confidence) =
+            if let Some(ref clf) = self.manifold_classifier {
+                let (verdict, conf) = clf.classify(text);
+                (Some(verdict), Some(conf))
+            } else {
+                (None, None)
+            };
 
         let has_learned = learned_verdict.is_some();
         let has_manifold = manifold_verdict.is_some();
 
         // Voting: per-category weight tuning (5-tuple: hdc, intent, deonto, learned, manifold)
         // Different ETHICS categories benefit from different signal balance.
-        let (w_hdc, w_intent, w_deonto, w_learned, w_manifold) =
-            if has_learned && has_manifold {
-                match category_hint {
-                    // Commonsense: intent + learned strongest, manifold adds cross-domain signal
-                    Some("commonsense") => (0.10, 0.25, 0.10, 0.30, 0.25),
-                    // Justice: deontological rules + learned dominant
-                    Some("justice") => (0.10, 0.15, 0.25, 0.30, 0.20),
-                    // Deontology: rule-based + learned dominant
-                    Some("deontology") => (0.10, 0.15, 0.25, 0.30, 0.20),
-                    // Virtue: keyword matching works, manifold adds harmony projection
-                    Some("virtue") => (0.25, 0.30, 0.25, 0.00, 0.20),
-                    // Default (Social Chemistry): manifold dominant because intent parser
-                    // fails on norm descriptions ("It's rude to...") lacking action verbs
-                    _ => (0.10, 0.10, 0.15, 0.30, 0.35),
-                }
-            } else if has_learned {
-                match category_hint {
-                    Some("commonsense") => (0.15, 0.35, 0.15, 0.35, 0.0),
-                    Some("justice") => (0.15, 0.20, 0.30, 0.35, 0.0),
-                    Some("deontology") => (0.15, 0.20, 0.30, 0.35, 0.0),
-                    Some("virtue") => (0.3, 0.4, 0.3, 0.0, 0.0),
-                    _ => (0.15, 0.25, 0.20, 0.40, 0.0),
-                }
-            } else if has_manifold {
-                match category_hint {
-                    Some("virtue") => (0.25, 0.30, 0.25, 0.0, 0.20),
-                    _ => (0.15, 0.20, 0.20, 0.0, 0.45),
-                }
-            } else {
-                (0.3, 0.4, 0.3, 0.0, 0.0)
-            };
+        let (w_hdc, w_intent, w_deonto, w_learned, w_manifold) = if has_learned && has_manifold {
+            match category_hint {
+                // Commonsense: intent + learned strongest, manifold adds cross-domain signal
+                Some("commonsense") => (0.10, 0.25, 0.10, 0.30, 0.25),
+                // Justice: deontological rules + learned dominant
+                Some("justice") => (0.10, 0.15, 0.25, 0.30, 0.20),
+                // Deontology: rule-based + learned dominant
+                Some("deontology") => (0.10, 0.15, 0.25, 0.30, 0.20),
+                // Virtue: keyword matching works, manifold adds harmony projection
+                Some("virtue") => (0.25, 0.30, 0.25, 0.00, 0.20),
+                // Default (Social Chemistry): manifold dominant because intent parser
+                // fails on norm descriptions ("It's rude to...") lacking action verbs
+                _ => (0.10, 0.10, 0.15, 0.30, 0.35),
+            }
+        } else if has_learned {
+            match category_hint {
+                Some("commonsense") => (0.15, 0.35, 0.15, 0.35, 0.0),
+                Some("justice") => (0.15, 0.20, 0.30, 0.35, 0.0),
+                Some("deontology") => (0.15, 0.20, 0.30, 0.35, 0.0),
+                Some("virtue") => (0.3, 0.4, 0.3, 0.0, 0.0),
+                _ => (0.15, 0.25, 0.20, 0.40, 0.0),
+            }
+        } else if has_manifold {
+            match category_hint {
+                Some("virtue") => (0.25, 0.30, 0.25, 0.0, 0.20),
+                _ => (0.15, 0.20, 0.20, 0.0, 0.45),
+            }
+        } else {
+            (0.3, 0.4, 0.3, 0.0, 0.0)
+        };
 
         let mut votes: std::collections::HashMap<&str, f32> = std::collections::HashMap::new();
 

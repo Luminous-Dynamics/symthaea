@@ -72,7 +72,9 @@ impl CodingAgent {
                 phi: current_phi,
                 type_confidence: 0.0, // TODO: feed from CodeReasoningContext when available
                 algorithm_pattern: 0.0,
-                error_likelihood: if self.failure_patterns.is_empty() { 0.2 } else {
+                error_likelihood: if self.failure_patterns.is_empty() {
+                    0.2
+                } else {
                     (self.failure_patterns.len() as f32 / 5.0).min(0.9)
                 },
                 syntax_complexity: 0.0,
@@ -667,15 +669,16 @@ impl CodingAgent {
                 .take(200)
                 .collect();
 
-            self.error_knowledge.record_fix(super::error_knowledge::CodeErrorFact {
-                error_code,
-                category,
-                pattern_signature: sig,
-                fix_strategy: strategy_desc,
-                compiled: true, // we're recording a fix that was applied
-                tests_passed: None, // not yet known — will be updated after testing
-                context_snippet: context,
-            });
+            self.error_knowledge
+                .record_fix(super::error_knowledge::CodeErrorFact {
+                    error_code,
+                    category,
+                    pattern_signature: sig,
+                    fix_strategy: strategy_desc,
+                    compiled: true,     // we're recording a fix that was applied
+                    tests_passed: None, // not yet known — will be updated after testing
+                    context_snippet: context,
+                });
         }
     }
 

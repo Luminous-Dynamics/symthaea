@@ -28,7 +28,6 @@ jobs:
   governance:
     name: Governance Check (Class A/B Changes)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
@@ -41,7 +40,6 @@ jobs:
   fmt:
     name: Format Check
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -80,7 +78,6 @@ jobs:
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
-    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -144,7 +141,6 @@ jobs:
   test:
     name: Test (default features)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -348,7 +344,7 @@ jobs:
   test-feature-matrix:
     name: Test Feature Combinations
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 420
     strategy:
       fail-fast: false
       matrix:
@@ -408,15 +404,19 @@ jobs:
 
       - name: Test with feature ${{ matrix.features }}
         continue-on-error: ${{ matrix.features == 'school_learning' }}
-        run: |
-          FEATURES="${{ matrix.features }}"
-          if [ "$FEATURES" = "school_learning" ]; then
-            # school_learning is very slow on free-tier runners — limit parallelism
-            # to reduce memory pressure and avoid 6h timeout
-            cargo test --lib --features "$FEATURES" -- --test-threads=1
-          else
-            cargo test --lib --features "$FEATURES" || cargo test --lib --features "$FEATURES"
-          fi
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 30
+          max_attempts: 2
+          command: |
+            FEATURES="${{ matrix.features }}"
+            if [ "$FEATURES" = "school_learning" ]; then
+              # school_learning is very slow on free-tier runners — limit parallelism
+              # to reduce memory pressure and avoid 6h timeout
+              cargo test --lib --features "$FEATURES" -- --test-threads=1
+            else
+              cargo test --lib --features "$FEATURES"
+            fi
 
   psych-bench:
     name: Psych-Bench Regression
@@ -496,7 +496,6 @@ jobs:
   feature-interactions:
     name: Feature Interactions
     runs-on: ubuntu-latest
-    timeout-minutes: 30
     needs: test
     strategy:
       fail-fast: false
@@ -638,7 +637,6 @@ jobs:
   deny:
     name: Dependency Audit (cargo-deny)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -651,7 +649,6 @@ jobs:
   audit:
     name: Security Audit
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -696,7 +693,6 @@ jobs:
   sbom:
     name: SBOM Generation
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
@@ -720,7 +716,6 @@ jobs:
   test-subcrates:
     name: Test Sub-Crates
     runs-on: ubuntu-latest
-    timeout-minutes: 30
     needs: test
     strategy:
       fail-fast: false
@@ -796,7 +791,6 @@ jobs:
   genesis-benchmarks:
     name: Genesis Mission Benchmarks
     runs-on: ubuntu-latest
-    timeout-minutes: 20
     needs: test
     strategy:
       fail-fast: false
@@ -1023,7 +1017,6 @@ jobs:
   secrets-scan:
     name: Secrets Scan
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:

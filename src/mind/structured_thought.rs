@@ -316,6 +316,10 @@ pub struct ActivatedConcept {
     pub activation: f32,
     /// Relevance to current context (0.0-1.0)
     pub relevance: f32,
+    /// Where this concept was activated from.
+    #[cfg(feature = "provenance")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<crate::mind::provenance::InformationSource>,
 }
 
 /// Constraints for the translation process.
@@ -469,6 +473,15 @@ pub struct StructuredThought {
     /// executed by the ActionRegistry (e.g. "WRITE", "NIX_BUILD").
     #[serde(default)]
     pub primitives: Vec<String>,
+
+    // ========================================================================
+    // PROVENANCE (Where From)
+    // ========================================================================
+    /// Provenance tag tracking which subsystem(s) produced this thought.
+    /// Enables reality monitoring (PRM) and source-aware epistemic gating.
+    #[cfg(feature = "provenance")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provenance: Option<crate::mind::provenance::ProvenanceTag>,
 }
 
 /// Context for code understanding and generation within StructuredThought.

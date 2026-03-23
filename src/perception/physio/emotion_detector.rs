@@ -707,10 +707,34 @@ impl EmotionSentinel {
         let window = window.min(self.history.len());
         let skip = self.history.len() - window;
 
-        let avg_valence = self.history.iter().skip(skip).map(|s| s.valence).sum::<f64>() / window as f64;
-        let avg_arousal = self.history.iter().skip(skip).map(|s| s.arousal).sum::<f64>() / window as f64;
-        let avg_dominance = self.history.iter().skip(skip).map(|s| s.dominance).sum::<f64>() / window as f64;
-        let avg_confidence = self.history.iter().skip(skip).map(|s| s.confidence).sum::<f64>() / window as f64;
+        let avg_valence = self
+            .history
+            .iter()
+            .skip(skip)
+            .map(|s| s.valence)
+            .sum::<f64>()
+            / window as f64;
+        let avg_arousal = self
+            .history
+            .iter()
+            .skip(skip)
+            .map(|s| s.arousal)
+            .sum::<f64>()
+            / window as f64;
+        let avg_dominance = self
+            .history
+            .iter()
+            .skip(skip)
+            .map(|s| s.dominance)
+            .sum::<f64>()
+            / window as f64;
+        let avg_confidence = self
+            .history
+            .iter()
+            .skip(skip)
+            .map(|s| s.confidence)
+            .sum::<f64>()
+            / window as f64;
 
         EmotionalState::new(avg_valence, avg_arousal, avg_dominance, avg_confidence)
     }

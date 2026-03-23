@@ -590,11 +590,18 @@ impl OptimizationEngine {
     ///
     /// Selects the method based on `method`. Uses the trait's `gradient()`
     /// (which may be analytic or finite-difference).
-    pub fn minimize(obj: &dyn ObjectiveFunction, x0: &[f64], method: OptMethod, tol: f64) -> OptResult {
+    pub fn minimize(
+        obj: &dyn ObjectiveFunction,
+        x0: &[f64],
+        method: OptMethod,
+        tol: f64,
+    ) -> OptResult {
         let f = |x: &[f64]| obj.evaluate(x);
         let g = |x: &[f64]| obj.gradient(x);
         match method {
-            OptMethod::GradientDescent => Self::gradient_descent(&f, &g, x0, DEFAULT_LEARNING_RATE, 0.9, tol),
+            OptMethod::GradientDescent => {
+                Self::gradient_descent(&f, &g, x0, DEFAULT_LEARNING_RATE, 0.9, tol)
+            }
             OptMethod::NelderMead => Self::nelder_mead(&f, x0, 1.0, tol),
             OptMethod::LBFGS => Self::lbfgs(&f, &g, x0, tol),
         }
@@ -879,7 +886,8 @@ mod tests {
     #[test]
     fn test_objective_function_trait_lbfgs() {
         let sphere = Sphere { dim: 3 };
-        let result = OptimizationEngine::minimize(&sphere, &[1.0, 2.0, 3.0], OptMethod::LBFGS, 1e-10);
+        let result =
+            OptimizationEngine::minimize(&sphere, &[1.0, 2.0, 3.0], OptMethod::LBFGS, 1e-10);
         assert!(result.converged);
         for xi in &result.x {
             assert!(xi.abs() < TOL);
@@ -889,7 +897,8 @@ mod tests {
     #[test]
     fn test_objective_function_trait_nelder_mead() {
         let sphere = Sphere { dim: 2 };
-        let result = OptimizationEngine::minimize(&sphere, &[3.0, 4.0], OptMethod::NelderMead, 1e-8);
+        let result =
+            OptimizationEngine::minimize(&sphere, &[3.0, 4.0], OptMethod::NelderMead, 1e-8);
         assert!(result.converged);
         for xi in &result.x {
             assert!(xi.abs() < TOL);
@@ -978,8 +987,16 @@ mod tests {
             &[0.0, 0.0],
             1e-4,
         );
-        assert!(result.x[0] >= 0.45, "x[0] = {} should be >= 0.5", result.x[0]);
-        assert!(result.x[1] >= 0.25, "x[1] = {} should be >= 0.3", result.x[1]);
+        assert!(
+            result.x[0] >= 0.45,
+            "x[0] = {} should be >= 0.5",
+            result.x[0]
+        );
+        assert!(
+            result.x[1] >= 0.25,
+            "x[1] = {} should be >= 0.3",
+            result.x[1]
+        );
     }
 
     // ── Phi is in [0, 1] ────────────────────────────────────────────────
@@ -992,6 +1009,10 @@ mod tests {
             &[5.0],
             1e-10,
         );
-        assert!(result.phi >= 0.0 && result.phi <= 1.0, "phi = {}", result.phi);
+        assert!(
+            result.phi >= 0.0 && result.phi <= 1.0,
+            "phi = {}",
+            result.phi
+        );
     }
 }

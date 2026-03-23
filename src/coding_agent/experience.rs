@@ -289,7 +289,10 @@ impl CodingAgent {
     }
 
     /// Extract consciousness signals from a cycle result for decision-making.
-    pub(super) fn extract_consciousness_signals(&self, cycle_result: &CycleResult) -> ConsciousnessSignals {
+    pub(super) fn extract_consciousness_signals(
+        &self,
+        cycle_result: &CycleResult,
+    ) -> ConsciousnessSignals {
         let prediction_error = 1.0 - self.cognitive_loop.prediction_confidence();
         let confidence_velocity = if self.prediction_error_history.len() >= 2 {
             let prev = self.prediction_error_history[self.prediction_error_history.len() - 1];
@@ -332,15 +335,16 @@ impl CodingAgent {
             .collect();
 
         for (error_code, category, fix_strategy) in facts_to_update {
-            self.error_knowledge.record_fix(super::error_knowledge::CodeErrorFact {
-                error_code,
-                category,
-                pattern_signature: String::new(), // already indexed by code
-                fix_strategy,
-                compiled: true,
-                tests_passed: Some(true),
-                context_snippet: String::new(),
-            });
+            self.error_knowledge
+                .record_fix(super::error_knowledge::CodeErrorFact {
+                    error_code,
+                    category,
+                    pattern_signature: String::new(), // already indexed by code
+                    fix_strategy,
+                    compiled: true,
+                    tests_passed: Some(true),
+                    context_snippet: String::new(),
+                });
         }
 
         if !self.error_knowledge.recent_facts().is_empty() {

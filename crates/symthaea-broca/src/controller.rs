@@ -436,7 +436,12 @@ impl LanguageController {
             projected[r] = sum;
         }
         // L2 normalize
-        let norm = projected.iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-10);
+        let norm = projected
+            .iter()
+            .map(|x| x * x)
+            .sum::<f32>()
+            .sqrt()
+            .max(1e-10);
         for v in &mut projected {
             *v /= norm;
         }
@@ -448,8 +453,11 @@ impl LanguageController {
         if let (Some(ref weights), Some(proj_dim)) =
             (&self.projection_weights, self.config.projection_dim)
         {
-            self.projected_embeddings =
-                Some(Self::project_all_embeddings(&self.token_embeddings, weights, proj_dim));
+            self.projected_embeddings = Some(Self::project_all_embeddings(
+                &self.token_embeddings,
+                weights,
+                proj_dim,
+            ));
         }
     }
 
@@ -948,8 +956,7 @@ impl LanguageController {
             &self.projected_embeddings,
             self.config.projection_dim,
         ) {
-            let proj_output =
-                Self::project_and_normalize(logit_hv.as_slice(), weights, proj_dim);
+            let proj_output = Self::project_and_normalize(logit_hv.as_slice(), weights, proj_dim);
             for &i in active_indices {
                 if i < proj_embs.len() {
                     let dot: f32 = proj_output
@@ -967,8 +974,7 @@ impl LanguageController {
         } else {
             for &i in active_indices {
                 if i < self.token_embeddings.len() {
-                    let mut s =
-                        scale * logit_hv.similarity(&self.token_embeddings[i]) * inv_temp;
+                    let mut s = scale * logit_hv.similarity(&self.token_embeddings[i]) * inv_temp;
                     if !s.is_finite() {
                         s = 0.0;
                     }

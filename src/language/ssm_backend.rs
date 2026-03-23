@@ -283,9 +283,14 @@ pub fn thought_to_channels(thought: &StructuredThought, mood_temperature: f32) -
 
         // type_confidence: from phi_score + syntactic validity + intent similarity
         let phi_contrib = cc.phi_score.unwrap_or(0.0);
-        let validity_contrib = if cc.syntactically_valid.unwrap_or(false) { 0.3 } else { 0.0 };
+        let validity_contrib = if cc.syntactically_valid.unwrap_or(false) {
+            0.3
+        } else {
+            0.0
+        };
         let similarity_contrib = cc.intent_similarity.unwrap_or(0.0) * 0.3;
-        let type_confidence = (phi_contrib * 0.4 + validity_contrib + similarity_contrib).clamp(0.0, 1.0);
+        let type_confidence =
+            (phi_contrib * 0.4 + validity_contrib + similarity_contrib).clamp(0.0, 1.0);
 
         // algorithm_pattern: higher when plan_steps are non-empty (CfC sequencer detected patterns)
         let algorithm_pattern = if cc.plan_steps.is_empty() {
@@ -300,7 +305,12 @@ pub fn thought_to_channels(thought: &StructuredThought, mood_temperature: f32) -
         let low_phi = (1.0 - cc.phi_score.unwrap_or(0.5)).max(0.0) * 0.3;
         let error_likelihood = (unresolved + note_pressure + low_phi).clamp(0.0, 1.0);
 
-        ch.set_code(syntax_complexity, type_confidence, algorithm_pattern, error_likelihood);
+        ch.set_code(
+            syntax_complexity,
+            type_confidence,
+            algorithm_pattern,
+            error_likelihood,
+        );
     }
 
     // Channels 28-42 (or 32-46 with therapeutic): Epistemic Cube from domain context
@@ -803,7 +813,9 @@ mod tests {
 
     #[test]
     fn test_thought_to_channels_epistemic_cube() {
-        use crate::mind::structured_thought::{DomainContext, EpistemicCube, ETier, NTier, MTier, HTier};
+        use crate::mind::structured_thought::{
+            DomainContext, ETier, EpistemicCube, HTier, MTier, NTier,
+        };
         use symthaea_broca::encoder::EPISTEMIC_CUBE_BASE;
 
         let mut thought = make_test_thought();
@@ -823,22 +835,44 @@ mod tests {
         let ch = thought_to_channels(&thought, 1.0);
 
         // E4 → one-hot at index 4
-        assert_eq!(ch.channels[EPISTEMIC_CUBE_BASE + 4], 1.0, "E4 should be active");
+        assert_eq!(
+            ch.channels[EPISTEMIC_CUBE_BASE + 4],
+            1.0,
+            "E4 should be active"
+        );
         for i in 0..4 {
-            assert_eq!(ch.channels[EPISTEMIC_CUBE_BASE + i], 0.0, "E{i} should be inactive");
+            assert_eq!(
+                ch.channels[EPISTEMIC_CUBE_BASE + i],
+                0.0,
+                "E{i} should be inactive"
+            );
         }
 
         // N3 → one-hot at index 3
-        assert_eq!(ch.channels[EPISTEMIC_CUBE_BASE + 5 + 3], 1.0, "N3 should be active");
+        assert_eq!(
+            ch.channels[EPISTEMIC_CUBE_BASE + 5 + 3],
+            1.0,
+            "N3 should be active"
+        );
 
         // M3 → one-hot at index 3
-        assert_eq!(ch.channels[EPISTEMIC_CUBE_BASE + 9 + 3], 1.0, "M3 should be active");
+        assert_eq!(
+            ch.channels[EPISTEMIC_CUBE_BASE + 9 + 3],
+            1.0,
+            "M3 should be active"
+        );
 
         // H4 → 1.0
-        assert!((ch.channels[EPISTEMIC_CUBE_BASE + 13] - 1.0).abs() < 0.01, "H4 should be 1.0");
+        assert!(
+            (ch.channels[EPISTEMIC_CUBE_BASE + 13] - 1.0).abs() < 0.01,
+            "H4 should be 1.0"
+        );
 
         // Quality = (4/4)*0.4 + (3/3)*0.35 + (3/3)*0.25 = 0.4 + 0.35 + 0.25 = 1.0
-        assert!((ch.channels[EPISTEMIC_CUBE_BASE + 14] - 1.0).abs() < 0.01, "quality should be 1.0");
+        assert!(
+            (ch.channels[EPISTEMIC_CUBE_BASE + 14] - 1.0).abs() < 0.01,
+            "quality should be 1.0"
+        );
 
         // has_epistemic_cube should be true
         assert!(ch.has_epistemic_cube());
@@ -855,7 +889,10 @@ mod tests {
         assert!(!ch.has_epistemic_cube());
 
         // H-tier defaults to 0.25 (H1 neutral)
-        assert!((ch.h_tier() - 0.25).abs() < 0.01, "default h_tier should be 0.25");
+        assert!(
+            (ch.h_tier() - 0.25).abs() < 0.01,
+            "default h_tier should be 0.25"
+        );
     }
 
     #[test]
@@ -908,17 +945,32 @@ mod tests {
         let ch = thought_to_channels(&thought, 1.0);
 
         // syntax_complexity: plan_depth=3/10=0.3, constraint=2/5=0.4 → 0.3*0.6+0.4*0.4=0.34
-        assert!(ch.syntax_complexity() > 0.0, "syntax_complexity should be populated");
-        assert!(ch.syntax_complexity() < 1.0, "syntax_complexity should be bounded");
+        assert!(
+            ch.syntax_complexity() > 0.0,
+            "syntax_complexity should be populated"
+        );
+        assert!(
+            ch.syntax_complexity() < 1.0,
+            "syntax_complexity should be bounded"
+        );
 
         // type_confidence: phi 0.7*0.4=0.28, validity 0.3, similarity 0.8*0.3=0.24 → 0.82
-        assert!(ch.type_confidence() > 0.5, "type_confidence should be high for valid code with good phi");
+        assert!(
+            ch.type_confidence() > 0.5,
+            "type_confidence should be high for valid code with good phi"
+        );
 
         // algorithm_pattern: 3 steps, 3/5=0.6 * 0.8 = 0.48
-        assert!(ch.algorithm_pattern() > 0.0, "algorithm_pattern should be populated from plan_steps");
+        assert!(
+            ch.algorithm_pattern() > 0.0,
+            "algorithm_pattern should be populated from plan_steps"
+        );
 
         // error_likelihood: no completion, no notes, phi=0.7 → low_phi=(1-0.7)*0.3=0.09
-        assert!(ch.error_likelihood() < 0.3, "error_likelihood should be low for good code");
+        assert!(
+            ch.error_likelihood() < 0.3,
+            "error_likelihood should be low for good code"
+        );
     }
 
     #[test]
@@ -937,20 +989,33 @@ mod tests {
             phi_score: Some(0.1),
             intent_similarity: None,
             syntactically_valid: Some(false),
-            notes: vec!["TODO".to_string(), "uncertain types".to_string(), "complex".to_string()],
+            notes: vec![
+                "TODO".to_string(),
+                "uncertain types".to_string(),
+                "complex".to_string(),
+            ],
             needs_llm_completion: true,
         });
 
         let ch = thought_to_channels(&thought, 1.0);
 
         // High error likelihood: needs_llm=0.4, notes=3/3→1.0 clamped to 0.3, low_phi=(1-0.1)*0.3=0.27
-        assert!(ch.error_likelihood() > 0.5, "error_likelihood should be high for incomplete code");
+        assert!(
+            ch.error_likelihood() > 0.5,
+            "error_likelihood should be high for incomplete code"
+        );
 
         // Low type_confidence: phi 0.1*0.4=0.04, no validity, no similarity
-        assert!(ch.type_confidence() < 0.2, "type_confidence should be low for unvalidated code");
+        assert!(
+            ch.type_confidence() < 0.2,
+            "type_confidence should be low for unvalidated code"
+        );
 
         // No algorithm pattern (empty plan_steps)
-        assert!((ch.algorithm_pattern() - 0.0).abs() < 0.01, "algorithm_pattern should be 0 with no steps");
+        assert!(
+            (ch.algorithm_pattern() - 0.0).abs() < 0.01,
+            "algorithm_pattern should be 0 with no steps"
+        );
     }
 
     #[test]
@@ -959,9 +1024,25 @@ mod tests {
         let ch = thought_to_channels(&thought, 1.0);
 
         // No code context → all code channels should be 0
-        assert_eq!(ch.syntax_complexity(), 0.0, "should default to 0 without code context");
-        assert_eq!(ch.type_confidence(), 0.0, "should default to 0 without code context");
-        assert_eq!(ch.algorithm_pattern(), 0.0, "should default to 0 without code context");
-        assert_eq!(ch.error_likelihood(), 0.0, "should default to 0 without code context");
+        assert_eq!(
+            ch.syntax_complexity(),
+            0.0,
+            "should default to 0 without code context"
+        );
+        assert_eq!(
+            ch.type_confidence(),
+            0.0,
+            "should default to 0 without code context"
+        );
+        assert_eq!(
+            ch.algorithm_pattern(),
+            0.0,
+            "should default to 0 without code context"
+        );
+        assert_eq!(
+            ch.error_likelihood(),
+            0.0,
+            "should default to 0 without code context"
+        );
     }
 }

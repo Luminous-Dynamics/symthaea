@@ -233,8 +233,9 @@ impl FactcheckEpistemicFeedback {
         let h_value = (verdict_confidence * 0.7 + credibility * 0.3).clamp(0.0, 1.0) as f32;
 
         // Quality: same formula as the cube encoder
-        let quality =
-            (e_tier as f32 / 4.0) * 0.40 + (n_tier as f32 / 3.0) * 0.35 + (m_tier as f32 / 3.0) * 0.25;
+        let quality = (e_tier as f32 / 4.0) * 0.40
+            + (n_tier as f32 / 3.0) * 0.35
+            + (m_tier as f32 / 3.0) * 0.25;
 
         Self {
             e_tier,
@@ -727,13 +728,9 @@ impl MycelixBridge {
     }
 
     /// Submit a factcheck by verdict string (convenience method).
-    pub fn submit_factcheck_verdict(
-        &mut self,
-        statement: &str,
-        verdict: &str,
-        confidence: f64,
-    ) {
-        let feedback = FactcheckEpistemicFeedback::from_verdict_string(statement, verdict, confidence);
+    pub fn submit_factcheck_verdict(&mut self, statement: &str, verdict: &str, confidence: f64) {
+        let feedback =
+            FactcheckEpistemicFeedback::from_verdict_string(statement, verdict, confidence);
         self.submit_factcheck_feedback(feedback);
     }
 
@@ -1146,8 +1143,8 @@ impl MycelixBridge {
         let score = self.evaluate_asset(metadata, consciousness);
 
         // Serialize per-harmony scores for on-chain storage
-        let per_harmony_json = serde_json::to_string(&score.per_harmony)
-            .unwrap_or_else(|_| "{}".to_string());
+        let per_harmony_json =
+            serde_json::to_string(&score.per_harmony).unwrap_or_else(|_| "{}".to_string());
 
         // Dispatch to conductor
         let mut disconnected = false;

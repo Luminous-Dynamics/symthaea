@@ -137,7 +137,13 @@ impl CallGraph {
         for caller in self.callers_of(name) {
             if visited.insert(caller.clone()) {
                 result.push(caller.clone());
-                self.collect_transitive_callers(caller, max_depth, current_depth + 1, visited, result);
+                self.collect_transitive_callers(
+                    caller,
+                    max_depth,
+                    current_depth + 1,
+                    visited,
+                    result,
+                );
             }
         }
     }

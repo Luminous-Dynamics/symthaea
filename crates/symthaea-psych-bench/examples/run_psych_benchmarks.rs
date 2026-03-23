@@ -49,6 +49,9 @@ use symthaea_psych_bench::benchmarks::attention::{
 };
 use symthaea_psych_bench::benchmarks::binding::TemporalOrderBenchmark;
 use symthaea_psych_bench::benchmarks::butlin::ButlinIndicatorSuite;
+use symthaea_psych_bench::benchmarks::coding::{
+    AlgorithmRecognitionBenchmark, BugDetectionBenchmark, HumanEvalMiniBenchmark,
+};
 use symthaea_psych_bench::benchmarks::cogbench::{
     BartBenchmark, HorizonBenchmark, InstrumentalLearningBenchmark,
     ProbabilisticReasoningBenchmark, RestlessBanditBenchmark, ReversalLearningBenchmark,
@@ -97,9 +100,6 @@ use symthaea_psych_bench::benchmarks::reasoning::{
 use symthaea_psych_bench::benchmarks::social::{
     DictatorGameBenchmark, MachiavelliBenchmark, PrisonersDilemmaBenchmark, PublicGoodsBenchmark,
     RmeBenchmark, SocialNormBenchmark, UltimatumGameBenchmark,
-};
-use symthaea_psych_bench::benchmarks::coding::{
-    AlgorithmRecognitionBenchmark, BugDetectionBenchmark, HumanEvalMiniBenchmark,
 };
 use symthaea_psych_bench::benchmarks::speech::PhonemeDiscriminationBenchmark;
 use symthaea_psych_bench::benchmarks::substrate::SubstrateTransferBenchmark;

@@ -809,23 +809,19 @@ impl SwarmManager {
                             // Debris → threat response (fight-or-flight analogue)
                             self.space_arousal_acc +=
                                 thresholds::SPACE_DEBRIS_AROUSAL * sev * urgency;
-                            self.space_valence_acc +=
-                                thresholds::SPACE_DEBRIS_VALENCE * sev;
-                            self.space_confidence_acc +=
-                                thresholds::SPACE_DEBRIS_CONFIDENCE * sev;
+                            self.space_valence_acc += thresholds::SPACE_DEBRIS_VALENCE * sev;
+                            self.space_confidence_acc += thresholds::SPACE_DEBRIS_CONFIDENCE * sev;
                         }
                         SpaceAlertType::CommWindow => {
                             // Communication window → opportunity, boost learning
-                            self.space_confidence_acc +=
-                                thresholds::SPACE_COMM_CONFIDENCE * conf;
+                            self.space_confidence_acc += thresholds::SPACE_COMM_CONFIDENCE * conf;
                             self.space_lr_acc +=
                                 thresholds::SPACE_COMM_LR_BOOST as f64 * conf as f64;
                         }
                         SpaceAlertType::OrbitalAnomaly => {
                             // Anomaly → suspicious, elevate vigilance
                             self.anomaly_streak = self.anomaly_streak.saturating_add(1);
-                            self.space_arousal_acc +=
-                                thresholds::SPACE_ANOMALY_AROUSAL * sev;
+                            self.space_arousal_acc += thresholds::SPACE_ANOMALY_AROUSAL * sev;
                         }
                         SpaceAlertType::ManeuverAnnounced => {
                             // Maneuver announced → neutral information update
@@ -843,7 +839,11 @@ impl SwarmManager {
                     confidence,
                     ..
                 } => {
-                    let qty = if quantity_kg.is_finite() { quantity_kg.max(0.0) } else { 0.0 };
+                    let qty = if quantity_kg.is_finite() {
+                        quantity_kg.max(0.0)
+                    } else {
+                        0.0
+                    };
                     let circ = if circularity_potential.is_finite() {
                         circularity_potential.clamp(0.0, 1.0)
                     } else {
@@ -860,8 +860,7 @@ impl SwarmManager {
                     let n = self.waste_events_processed as f32;
                     self.waste_mean_circularity += (circ - self.waste_mean_circularity) / n;
                     // Confidence EMA (alpha = 0.1)
-                    self.waste_confidence_ema =
-                        self.waste_confidence_ema * 0.9 + conf as f64 * 0.1;
+                    self.waste_confidence_ema = self.waste_confidence_ema * 0.9 + conf as f64 * 0.1;
                 }
             }
         }
@@ -1754,7 +1753,7 @@ mod tests {
         // Inject with out-of-range values
         sm.inject_event(SwarmEvent::SpaceAlert {
             alert_type: SpaceAlertType::DebrisProximity,
-            severity: 5.0, // Over max
+            severity: 5.0,        // Over max
             confidence: f32::NAN, // NaN
             time_to_event_seconds: f64::INFINITY,
             description: "Bad data".into(),

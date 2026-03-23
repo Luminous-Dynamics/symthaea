@@ -28,10 +28,10 @@
 //! `examples/benchmark_moral_unified.rs`, which uses MoralParser + MoralAlgebra +
 //! learned HDC prototypes — NOT the keyword-matching adapter that was previously here.
 
-pub mod truthful_qa;
-pub mod simple_qa;
 pub mod fact_verification;
+pub mod simple_qa;
+pub mod truthful_qa;
 
-pub use truthful_qa::TruthfulQAAdapter;
-pub use simple_qa::SimpleQAAdapter;
 pub use fact_verification::FactVerificationAdapter;
+pub use simple_qa::SimpleQAAdapter;
+pub use truthful_qa::TruthfulQAAdapter;

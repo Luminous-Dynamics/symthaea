@@ -629,12 +629,15 @@ struct ServiceState {
     /// Channel for Holon HTTP bridge → consciousness loop.
     /// HTTP handlers enqueue (device_id, SomaMessage); the consciousness loop
     /// drains them into Symthaea.holon_enqueue_soma_message() each tick.
-    holon_inbound_rx: std::sync::Mutex<std::sync::mpsc::Receiver<(String, symthaea::consciousness::holon_receiver::SomaMessage)>>,
+    holon_inbound_rx: std::sync::Mutex<
+        std::sync::mpsc::Receiver<(String, symthaea::consciousness::holon_receiver::SomaMessage)>,
+    >,
 }
 
 /// Sender half for Holon HTTP bridge → consciousness loop.
 #[allow(dead_code)]
-type HolonSender = std::sync::mpsc::Sender<(String, symthaea::consciousness::holon_receiver::SomaMessage)>;
+type HolonSender =
+    std::sync::mpsc::Sender<(String, symthaea::consciousness::holon_receiver::SomaMessage)>;
 
 /// Drain the Holon inbound channel into Symthaea's HolonReceiver.
 ///
@@ -659,7 +662,10 @@ fn drain_holon_channel(state: &mut ServiceState) {
 impl ServiceState {
     async fn new(
         state_file: Option<PathBuf>,
-        holon_rx: std::sync::mpsc::Receiver<(String, symthaea::consciousness::holon_receiver::SomaMessage)>,
+        holon_rx: std::sync::mpsc::Receiver<(
+            String,
+            symthaea::consciousness::holon_receiver::SomaMessage,
+        )>,
         #[cfg(feature = "voice-tts")] voice_enabled: bool,
         #[cfg(feature = "voice-tts")] voice_id: u8,
     ) -> Result<Self> {
@@ -1645,8 +1651,7 @@ async fn consciousness_loop_with_holon(
 #[cfg(not(feature = "api_module"))]
 async fn consciousness_loop(
     state: Arc<RwLock<ServiceState>>,
-    #[allow(unused_variables)]
-    holon_http: Option<()>, // placeholder — real holon state passed via consciousness_loop_with_holon
+    #[allow(unused_variables)] holon_http: Option<()>, // placeholder — real holon state passed via consciousness_loop_with_holon
     interval_ms: u64,
     sleep_interval: u64,
 ) {
@@ -1789,7 +1794,13 @@ async fn main() -> Result<()> {
         let loop_state = Arc::clone(&state);
         let loop_holon = Arc::clone(&holon_http_state);
         tokio::spawn(async move {
-            consciousness_loop_with_holon(loop_state, loop_holon, args.loop_interval, args.sleep_interval).await;
+            consciousness_loop_with_holon(
+                loop_state,
+                loop_holon,
+                args.loop_interval,
+                args.sleep_interval,
+            )
+            .await;
         });
 
         let http_state = Arc::clone(&holon_http_state);
@@ -1804,7 +1815,10 @@ async fn main() -> Result<()> {
                     }
                 }
                 Err(e) => {
-                    warn!("Failed to bind Holon bridge on port 5492: {} (bridge disabled)", e);
+                    warn!(
+                        "Failed to bind Holon bridge on port 5492: {} (bridge disabled)",
+                        e
+                    );
                 }
             }
         });

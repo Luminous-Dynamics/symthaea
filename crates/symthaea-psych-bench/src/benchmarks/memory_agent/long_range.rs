@@ -163,8 +163,7 @@ impl LongRangeBenchmark {
         // Time pressure: base 0.2 threshold for long-range retrieval; +0.10/unit raises criterion,
         // modeling truncated memory search under deadline (Ratcliff & McKoon, 2008 DDM).
         // Difficulty raises retrieval threshold via interference multiplier.
-        let threshold = 0.2 * interference_mult as f32
-            + config.time_pressure as f32 * 0.10;
+        let threshold = 0.2 * interference_mult as f32 + config.time_pressure as f32 * 0.10;
         let accuracy = if max_sim > threshold { 1.0 } else { 0.0 };
 
         // RT proxy: delay ticks add retention interval cost, retrieval
