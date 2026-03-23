@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Structured Thought: The Language of Mind
 //!
 //! This module defines `StructuredThought` - the intermediate representation (IR)
@@ -313,6 +316,10 @@ pub struct ActivatedConcept {
     pub activation: f32,
     /// Relevance to current context (0.0-1.0)
     pub relevance: f32,
+    /// Where this concept was activated from.
+    #[cfg(feature = "provenance")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<crate::mind::provenance::InformationSource>,
 }
 
 /// Constraints for the translation process.
@@ -466,6 +473,15 @@ pub struct StructuredThought {
     /// executed by the ActionRegistry (e.g. "WRITE", "NIX_BUILD").
     #[serde(default)]
     pub primitives: Vec<String>,
+
+    // ========================================================================
+    // PROVENANCE (Where From)
+    // ========================================================================
+    /// Provenance tag tracking which subsystem(s) produced this thought.
+    /// Enables reality monitoring (PRM) and source-aware epistemic gating.
+    #[cfg(feature = "provenance")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provenance: Option<crate::mind::provenance::ProvenanceTag>,
 }
 
 /// Context for code understanding and generation within StructuredThought.
@@ -744,6 +760,8 @@ impl Default for StructuredThought {
             original_input: None,
             primitive_tiers: Vec::new(),
             primitives: Vec::new(),
+            #[cfg(feature = "provenance")]
+            provenance: None,
         }
     }
 }
@@ -795,6 +813,8 @@ mod tests {
                 name: "greeting".to_string(),
                 activation: 0.9,
                 relevance: 0.8,
+                #[cfg(feature = "provenance")]
+                source: None,
             }],
             ..Default::default()
         };

@@ -17,6 +17,8 @@ pub mod knowledge;
 #[cfg(feature = "mesh")]
 mod mesh;
 mod social;
+#[cfg(feature = "provenance")]
+pub mod provenance;
 pub mod structured_thought;
 mod swarm;
 mod tick;

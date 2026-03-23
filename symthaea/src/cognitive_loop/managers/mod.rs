@@ -146,6 +146,11 @@ pub mod waste_manager;
 #[cfg(feature = "circular")]
 pub use waste_manager::WasteManager;
 
+#[cfg(feature = "digital_metabolism")]
+pub mod metabolism_manager;
+#[cfg(feature = "digital_metabolism")]
+pub use metabolism_manager::MetabolicState;
+
 #[cfg(feature = "survival")]
 pub mod survival_manager;
 #[cfg(feature = "survival")]

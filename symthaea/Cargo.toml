@@ -38,6 +38,7 @@ members = [
     "crates/symthaea-zkproof",
     "crates/symthaea-zkproof/core",
     "crates/symthaea-broca",
+    "crates/symthaea-geodesic",
     "crates/symthaea-consciousness-equation",
     "crates/symthaea-neuromodulators",
     "crates/symthaea-cell-foundry",
@@ -58,6 +59,7 @@ members = [
     "crates/symthaea-soma",
     "crates/symthaea-crucible",
     "crates/symthaea-canvas",
+    "crates/symthaea-circular",
     "crates/symthaea-clinical",
     "crates/symthaea-therapeutic",
     "crates/symthaea-hdc-store",
@@ -96,6 +98,8 @@ nonsensical_open_options = "deny"
 unused_io_amount = "deny"
 
 [workspace.dependencies]
+candle-core = { version = "0.8", default-features = false }
+candle-nn = "0.8"
 arrow-array = "56"
 arrow-schema = "56"
 ndarray = { version = "0.16", features = ["rayon", "serde"] }
@@ -283,8 +287,8 @@ tokenizers = { version = "0.21", optional = true }  # Tokenization for Qwen3/BGE
 # safetensors removed: referenced in neural-bridge feature but never imported in source
 
 # Neural Bridge v2: BGE-M3 via Candle (pure Rust ML)
-candle-core = { version = "0.8", optional = true }
-candle-nn = { version = "0.8", optional = true }
+candle-core = { workspace = true, optional = true }
+candle-nn = { workspace = true, optional = true }
 candle-transformers = { version = "0.8", optional = true }
 # half removed: referenced in neural-bridge feature but never imported in source
 
@@ -452,19 +456,19 @@ voice-stt = ["symthaea-stt", "hound"]                 # STT with symthaea-stt cr
 audio = ["voice-tts", "rodio"]                        # Full audio including playback
 vocal-tract = ["hound", "symthaea-vocal-tract/hound"]  # LTC-driven articulatory synthesis pipeline + WAV output
 neural-vocoder = ["ort", "vocal-tract", "symthaea-vocal-tract/mel-conversion"]  # BigVGAN ONNX neural vocoder (Path A)
-neural-vocoder-gpu = ["neural-vocoder"]                  # GPU-accelerated neural vocoder (CUDA/CoreML execution providers)
+neural-vocoder-gpu = ["neural-vocoder"]                  # UNTESTED: not in CI matrix; GPU-accelerated neural vocoder (CUDA/CoreML execution providers)
 live-voice = ["cpal", "ringbuf", "vocal-tract"]         # Real-time speaker output (cpal + ringbuf + vocal tract pipeline)
 
 # ── Perception & Embeddings ─────────────────────────────────────────
 embeddings = ["tokenizers", "hf-hub", "symthaea-embeddings/burn-hub"]  # Qwen3/BGE text embeddings via Burn + HF Hub
-embeddings-gpu = ["embeddings", "symthaea-embeddings/burn-wgpu"]  # GPU-accelerated embeddings via WGPU
+embeddings-gpu = ["embeddings", "symthaea-embeddings/burn-wgpu"]  # UNTESTED: not in CI matrix; GPU passthrough only (0 cfg gates in src/)
 vision = ["ort", "hf-hub"]                            # SigLIP image embeddings via ONNX
 perception = ["embeddings", "vision"]                 # Full multimodal perception stack
 webcam = []                                           # Live webcam capture (gates cfg blocks in source)
 vision-manifold = ["dep:symthaea-vision-manifold"]    # Patch-based HDC video encoding + CfC temporal manifold
-vision-manifold-camera = ["vision-manifold", "symthaea-vision-manifold/camera"]  # Vision manifold with real camera capture via V4L2
+vision-manifold-camera = ["vision-manifold", "symthaea-vision-manifold/camera"]  # UNTESTED: not in CI (requires V4L2 hardware); passthrough only (0 cfg gates in src/)
 foveation = ["dep:symthaea-foveation", "vision-manifold"]  # Foveation bridge for active vision (dorsal→ventral dispatch)
-foveation-perception = ["foveation", "symthaea-foveation/perception"]  # Foveation with real SigLIP/OCR/Moondream models
+foveation-perception = ["foveation", "symthaea-foveation/perception"]  # UNTESTED: not in CI (requires GPU models); passthrough only (0 cfg gates in src/)
 integrity = []  # Hardware integrity / tamper detection framework (attestation, temporal checks, canaries)
 glyph_codex = []  # Glyph Codex: symbolic consciousness field (70 glyphs, 11 Field Modality basis vectors)
 semantic-encoder = ["symthaea-embeddings/embed-channel"]  # Background Qwen3 embedding channel for cognitive loop telemetry
@@ -480,23 +484,28 @@ spectral_state = []                         # Spectral twin: frequency-domain Cf
 # ── Defense / Immune System ────────────────────────────────────────
 sentinel = []                                # Distributed immune system: governance anomaly detection, threat memory, collective immunity
 
+# ── Consciousness Deepening ───────────────────────────────────────
+provenance = []                              # Source tracking on StructuredThought (Goldman 1986: reliabilism)
+self_schema = []                             # Autobiographical self-model in knowledge graph (Northoff 2011)
+digital_metabolism = []                      # Real hardware constraints as embodiment (Sterling 2012: allostasis)
+
 # ── Distributed / Network ──────────────────────────────────────────
 mesh = []                                   # Physical mesh radio (LoRa + B.A.T.M.A.N. + Yggdrasil)
 lz4_compression = ["mesh", "dep:lz4_flex"]  # LZ4 packet compression for mesh radio
 mesh-encryption = ["mesh", "dep:chacha20poly1305", "dep:zeroize"]  # ChaCha20-Poly1305 AEAD encryption for mesh packets
 mesh-key-exchange = ["mesh-encryption", "dep:x25519-dalek", "dep:hkdf", "dep:sha2"]  # X25519 Diffie-Hellman per-peer key agreement
 swarm = ["iroh"]                            # Real-time P2P tensor streaming via Iroh 0.95+
-secure-mesh = ["identity", "mesh-key-exchange", "swarm"]  # Full crypto stack: Ed25519 + ChaCha20-Poly1305 + X25519 DH + HKDF
+secure-mesh = ["identity", "mesh-key-exchange", "swarm"]  # UNTESTED: not in CI matrix; pure bundle (0 cfg gates in src/)
 pqc-handshake = ["identity", "mesh-key-exchange", "dep:mycelix-crypto"]  # Hybrid Ed25519 + ML-KEM-768 post-quantum handshake
 mycelix = ["mycelix-fl-core", "sha3", "dep:symthaea-mycelix-conductor"]       # Mycelix FL algorithms + hashing + conductor bridge
 mycelix_sdk = ["mycelix", "dep:mycelix-sdk"]                  # Enabled Mycelix SDK integration
 
 # ── Sovereign Inoculation ──────────────────────────────────────────
 mesh-trust = ["mesh", "identity"]              # Post-quantum web-of-trust over mesh
-mesh-naming = ["mesh"]                         # Decentralized name resolution (sovereign DNS)
+mesh-naming = ["mesh"]                         # DORMANT: no active code references (0 cfg gates in src/)
 social-fabric = ["mesh"]                       # Resonance-based content routing (sovereign social)
 survival = ["mesh"]                            # Infrastructure monitoring + demand forecasting
-survival-mqtt = ["survival"]                   # MQTT sensor bridge (requires external rumqttc)
+survival-mqtt = ["survival"]                   # DORMANT: no active code references (0 cfg gates in src/); MQTT sensor bridge placeholder
 
 # ── Desktop & System Integration ────────────────────────────────────
 notifications = ["zbus"]                    # D-Bus desktop notifications
@@ -558,7 +567,7 @@ integration_module = []         # Integration module (cfg-gated in lib.rs)
 observability_module = ["dep:symthaea-observability"]  # Observability (cfg-gated in gwt_integration + lib.rs)
 support = ["dep:symthaea-support"]                     # IT support intelligence (triage, diagnostics, knowledge, privacy, actions, prediction)
 web_research_module = []        # Web research epistemic verification (cfg-gated in lib.rs)
-unstable-examples = []          # Quarantine gate for examples with stale APIs (never enabled by default)
+unstable-examples = []          # UNTESTED: quarantine gate for examples with stale APIs (never enabled by default, gates test files only)
 
 # ── Genesis Pipeline (DNA-to-Human species stewardship) ───────────
 genomics = ["dep:symthaea-genomics"]                    # DNA assembly, damage modeling, repair
@@ -601,9 +610,9 @@ genesis-missions = [
 
 # ── Convenience bundles ───────────────────────────────────────────
 # Group related features that users commonly enable together.
-candle_stack = ["neural-bridge"]                        # Unifies candle dependency chain (candle-core/nn/transformers + tokenizers + hf-hub)
-consciousness_full = ["reasoning_engine", "identity"]   # Full consciousness: reasoning engine + identity signatures
-nix_full = ["nix-mind"]                                 # All NixOS features via the symthaea-nix crate
+consciousness_full = ["reasoning_engine", "identity"]   # UNTESTED: not in CI matrix (pure bundle, 0 cfg gates in src/)
+# REMOVED: candle_stack (was alias for neural-bridge) — use neural-bridge directly
+# REMOVED: nix_full (was alias for nix-mind) — use nix-mind directly
 all_benchmarks = ["benchmarks", "physics"]              # All benchmarking features (causal validation + tokamak plasma)
 
 # ── Mind bundles (graduated consciousness stacks) ─────────────────
@@ -616,18 +625,18 @@ default-mind = [
     "cpg",
     "spectral_state",
 ]
-networked-mind = [
+networked-mind = [  # UNTESTED: not in CI matrix (pure bundle)
     "default-mind",
     "mycelix",
     "mesh",
     "multi_agent",
 ]
-embodied-mind = [
+embodied-mind = [  # UNTESTED: not in CI matrix (pure bundle)
     "default-mind",
     "flight",
     "humanoid",
 ]
-sovereign-mind = [
+sovereign-mind = [  # UNTESTED: not in CI matrix (pure bundle)
     "networked-mind",
     "secure-mesh",
     "ssm_language",
@@ -638,8 +647,10 @@ sovereign-mind = [
 criterion = "0.5"
 proptest = "1.4"
 serial_test = "3.2"
-symthaea-broca = { path = "crates/symthaea-broca" }
+symthaea-broca = { path = "crates/symthaea-broca", default-features = false }
 symthaea-crucible = { path = "crates/symthaea-crucible" }
+symthaea-psych-bench = { path = "crates/symthaea-psych-bench", features = ["external-benchmarks"] }
+symthaea-humanoid = { path = "crates/symthaea-humanoid" }
 symthaea-mycelix-conductor = { path = "crates/symthaea-mycelix-conductor" }
 mycelix-bridge-common = { path = "../crates/mycelix-bridge-common" }
 tempfile = "3.8"  # For perception tests

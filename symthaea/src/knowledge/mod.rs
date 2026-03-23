@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Knowledge Engine — General-Purpose Reasoning Infrastructure
 //!
 //! Bridges Symthaea's HDC ontology, causal reasoning, and epistemic verification
@@ -35,6 +38,8 @@ pub mod llm_extraction;
 pub mod manager;
 pub mod persistence;
 pub mod reasoning_context;
+#[cfg(feature = "self_schema")]
+pub mod self_schema;
 
 pub use adaptive_ontology::{AdaptiveOntology, PrimitiveUsage};
 pub use causal_bridge::CausalKnowledgeBridge;
