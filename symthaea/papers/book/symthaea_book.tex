@@ -2170,9 +2170,74 @@ WasteManager       & --- & Metabolic processing \\
 \end{tabular}
 \end{table}
 
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[xscale=0.08, yscale=0.35]
+% Time axis
+\draw[-{Stealth[length=4pt]}, thick] (0, -0.5) -- (70, -0.5) node[right, font=\tiny] {cycle};
+\foreach \x in {0,7,14,21,28,35,42,49,56,63} {
+  \draw (\x, -0.7) -- (\x, -0.3);
+  \node[font=\tiny, below] at (\x, -0.7) {\x};
+}
+
+% Manager activations (filled circles at their interval multiples)
+\newcommand{\mgrticks}[4]{
+  \node[font=\tiny\sffamily, anchor=east] at (-1, #2) {#1};
+  \foreach \i in {1,...,9} {
+    \pgfmathtruncatemacro{\tick}{\i * #3}
+    \ifnum\tick<70
+      \fill[#4] (\tick, #2) circle (2pt);
+    \fi
+  }
+}
+\mgrticks{Drive (7)}{0}{7}{blue!70}
+\mgrticks{Memory (11)}{1}{11}{green!60!black}
+\mgrticks{Learning (13)}{2}{13}{orange!80}
+\mgrticks{Perception (19)}{3}{19}{red!70}
+\mgrticks{Governance (37)}{4}{37}{purple!70}
+\mgrticks{Swarm (41)}{5}{41}{cyan!70}
+\mgrticks{Glyph (43)}{6}{43}{teal!70}
+\mgrticks{Spectrum (53)}{7}{53}{brown!70}
+\mgrticks{CPG (61)}{8}{61}{violet!70}
+\mgrticks{Sentinel (67)}{9}{67}{red!50!black}
+\end{tikzpicture}
+\caption{Co-prime manager activation timeline over 70 cognitive cycles. Each dot marks a cycle where that manager activates. The co-prime intervals ensure no two managers with intervals $p$ and $q$ coincide more frequently than every $p \cdot q$ cycles, preventing phase-locking and distributing computational load.}
+\label{fig:manager-timeline}
+\end{figure}
+
 \subsection{Cross-Manager Couplings}
 
-The managers do not operate in isolation. Six active couplings create a richly interconnected network, each parameterized by named constants with scientific citations and bounded by NaN/Inf guards on all feedback pathways.
+The managers do not operate in isolation. Six active couplings create a richly interconnected network (Figure~\ref{fig:cross-coupling}), each parameterized by named constants with scientific citations and bounded by NaN/Inf guards on all feedback pathways.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  mgr/.style={draw, rounded corners=3pt, minimum width=1.8cm, minimum height=0.6cm, font=\small\sffamily, thick, fill=#1},
+  coupling/.style={-{Stealth[length=4pt]}, thick, #1},
+  every node/.style={align=center}
+]
+% Manager nodes
+\node[mgr=blue!15]   (drive)  at (0, 2)    {Drive};
+\node[mgr=green!15]  (learn)  at (3.5, 2)  {Learning};
+\node[mgr=orange!15] (percep) at (0, 0)    {Perception};
+\node[mgr=yellow!15] (memory) at (3.5, 0)  {Memory};
+\node[mgr=red!10]    (know)   at (7, 2)    {Knowledge};
+\node[mgr=purple!10] (ethics) at (7, 0)    {Ethics};
+\node[mgr=cyan!15]   (swarm)  at (0, -2)   {Swarm};
+\node[mgr=teal!15]   (gov)    at (3.5, -2) {Governance};
+\node[mgr=brown!15]  (neuro)  at (7, -2)   {Neuromod};
+
+% Coupling arrows with labels
+\draw[coupling=blue!70] (drive) -- node[above, font=\tiny] {flow/boredom} (learn);
+\draw[coupling=green!50!black] (memory) -- node[right, font=\tiny, xshift=2pt] {pressure} (learn);
+\draw[coupling=orange!70] (percep) -- node[left, font=\tiny, xshift=-2pt] {coherence} (drive);
+\draw[coupling=red!70] (know) -- node[right, font=\tiny, xshift=2pt] {depth} (ethics);
+\draw[coupling=cyan!70] (swarm) -- node[above, font=\tiny] {OT/NE/5-HT/DA} (neuro);
+\draw[coupling=teal!70, <->] (swarm) -- node[above, font=\tiny] {$\Phi$/trust} (gov);
+\end{tikzpicture}
+\caption{Cross-manager coupling network. Arrows show information flow; bidirectional arrow indicates mutual coupling. Each coupling is parameterized by named constants with scientific citations.}
+\label{fig:cross-coupling}
+\end{figure}
 
 \textbf{Drive $\to$ Learning} \citep{friston2010free}: Boredom above threshold ($b > 0.5$) boosts the learning rate multiplicatively:
 \begin{equation}
@@ -2513,7 +2578,51 @@ The quality score combines epistemic support coverage (fraction of generated tok
 \section{The Epistemic Cube}
 \label{sec:epistemic-cube}
 
-The original epistemic gate (Equation~\ref{eq:epistemic-gate}) applies a single scalar threshold. The Epistemic Cube extends this to a four-dimensional modulation of generation, reflecting the multi-faceted nature of epistemic status. The cube coordinate $(E, N, M, H)$ is derived from the cognitive state at each cycle and carried in ThoughtEncoder channels 28--42.
+The original epistemic gate (Equation~\ref{eq:epistemic-gate}) applies a single scalar threshold. The Epistemic Cube extends this to a four-dimensional modulation of generation (Figure~\ref{fig:epistemic-cube}), reflecting the multi-faceted nature of epistemic status. The cube coordinate $(E, N, M, H)$ is derived from the cognitive state at each cycle and carried in ThoughtEncoder channels 28--42.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.9,
+  axis/.style={-{Stealth[length=5pt]}, thick},
+  tier/.style={font=\tiny\sffamily, fill=white, inner sep=1pt},
+]
+% E axis (vertical)
+\draw[axis, blue!70] (0,0) -- (0,4.5) node[above, font=\small\sffamily\bfseries] {E (Epistemic)};
+\foreach \y/\label in {0/E0: Opinion, 1/E1: Testimonial, 2/E2: Verifiable, 3/E3: Proven, 4/E4: Reproducible} {
+  \draw[blue!40] (-0.1, \y) -- (0.1, \y);
+  \node[tier, anchor=east] at (-0.2, \y) {\label};
+}
+
+% N axis (horizontal right)
+\draw[axis, green!50!black] (0,0) -- (5,0) node[right, font=\small\sffamily\bfseries] {N (Narrative)};
+\foreach \x/\label in {0/N0, 1.5/N1, 3/N2, 4.5/N3} {
+  \draw[green!40] (\x, -0.1) -- (\x, 0.1);
+  \node[tier, anchor=north] at (\x, -0.3) {\label};
+}
+\node[tier, anchor=north] at (0, -0.6) {\tiny Personal};
+\node[tier, anchor=north] at (4.5, -0.6) {\tiny Axiomatic};
+
+% M axis (diagonal)
+\draw[axis, orange!70] (0,0) -- (-2.5,-2.5) node[below left, font=\small\sffamily\bfseries] {M (Meta)};
+\foreach \d/\label in {0/M0, 0.8/M1, 1.6/M2, 2.4/M3} {
+  \node[tier, anchor=north east] at ({-\d-0.2}, {-\d-0.2}) {\label};
+}
+
+% H annotation
+\node[font=\small\sffamily, text=purple, anchor=west] at (5.3, 3.5) {$H$: Coherence};
+\node[font=\tiny\sffamily, text=purple, anchor=west] at (5.3, 3.0) {$H < 0.25$: dampen $\times 0.85$};
+
+% Quality formula
+\node[font=\small, anchor=west, text=black!70] at (5.3, 1.5) {$Q = \frac{E}{4}\!\times\!0.4 + \frac{N}{3}\!\times\!0.35 + \frac{M}{3}\!\times\!0.25$};
+
+% Example point
+\fill[red] (1.5, 2) circle (3pt);
+\node[font=\tiny\sffamily, anchor=west, red!70!black] at (1.7, 2.3) {E2, N1, M1};
+\node[font=\tiny\sffamily, anchor=west, red!70!black] at (1.7, 1.8) {``I believe this is verifiable''};
+\end{tikzpicture}
+\caption{The Epistemic Cube: a 3+1 dimensional coordinate system for language generation. The three discrete axes (E, N, M) control assertion strength, social framing, and temporal framing respectively. The holistic axis $H$ (not shown spatially) provides a global coherence dampen. The red dot shows an example coordinate with its natural language implication.}
+\label{fig:epistemic-cube}
+\end{figure}
 
 \subsection{Cube Axes and Tier Definitions}
 
