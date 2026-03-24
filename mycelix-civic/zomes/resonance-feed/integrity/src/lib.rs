@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use hdi::prelude::*;
 use mycelix_bridge_entry_types::{check_author_match, check_link_author_match};
 
@@ -88,9 +91,12 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                         Ok(ValidateCallbackResult::Valid)
                     }
                     EntryTypes::ResonanceVote(vote) => {
-                        if vote.resonance < -1.0 || vote.resonance > 1.0 {
+                        if !vote.resonance.is_finite()
+                            || vote.resonance < -1.0
+                            || vote.resonance > 1.0
+                        {
                             return Ok(ValidateCallbackResult::Invalid(
-                                "Resonance must be in [-1.0, 1.0]".to_string(),
+                                "Resonance must be a finite number in [-1.0, 1.0]".to_string(),
                             ));
                         }
                         Ok(ValidateCallbackResult::Valid)

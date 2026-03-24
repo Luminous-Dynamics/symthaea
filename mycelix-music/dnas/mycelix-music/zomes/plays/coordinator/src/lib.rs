@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Plays Coordinator Zome
 //!
 //! ZERO-COST STREAMING: The Heart of Mycelix Music
@@ -250,8 +253,13 @@ pub fn create_settlement_batch(artist: AgentPubKey) -> ExternResult<ActionHash> 
     Ok(batch_hash)
 }
 
-/// Compute a simple merkle root from action hashes
+/// Compute a BLAKE2b-256 merkle root from action hashes.
+///
+/// Uses proper cryptographic hashing (BLAKE2b) instead of XOR folding.
+/// XOR is commutative and self-inverse, making it trivially forgeable.
 fn compute_merkle_root(hashes: &[ActionHash]) -> Vec<u8> {
+    use hdk::prelude::holo_hash::blake2b_256;
+
     if hashes.is_empty() {
         return vec![0u8; 32];
     }
@@ -267,14 +275,10 @@ fn compute_merkle_root(hashes: &[ActionHash]) -> Vec<u8> {
             let combined = if chunk.len() == 2 {
                 [chunk[0].as_slice(), chunk[1].as_slice()].concat()
             } else {
+                // Odd leaf: duplicate it
                 [chunk[0].as_slice(), chunk[0].as_slice()].concat()
             };
-            // Use simple XOR-based hash for merkle tree (sufficient for batch identification)
-            let mut hash = vec![0u8; 32];
-            for (i, byte) in combined.iter().enumerate() {
-                hash[i % 32] ^= byte;
-            }
-            next.push(hash);
+            next.push(blake2b_256(&combined).to_vec());
         }
         current = next;
     }

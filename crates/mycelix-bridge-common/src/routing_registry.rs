@@ -113,6 +113,14 @@ pub const CIVIC_LOCAL_ZOMES: &[&str] = &[
     "resonance_feed",
 ];
 
+/// Zomes allowed for local dispatch within the Music cluster.
+pub const MUSIC_LOCAL_ZOMES: &[&str] = &[
+    "catalog",
+    "plays",
+    "balances",
+    "trust",
+];
+
 /// Zomes allowed for local dispatch within the Hearth cluster.
 pub const HEARTH_LOCAL_ZOMES: &[&str] = &[
     "hearth_kinship",
@@ -396,6 +404,7 @@ pub const fn get_local_zomes(cluster: CrossClusterRole) -> Option<&'static [&'st
         CrossClusterRole::Civic => Some(CIVIC_LOCAL_ZOMES),
         CrossClusterRole::Hearth => Some(HEARTH_LOCAL_ZOMES),
         CrossClusterRole::Personal => Some(PERSONAL_LOCAL_ZOMES),
+        CrossClusterRole::Music => Some(MUSIC_LOCAL_ZOMES),
         _ => None,
     }
 }
@@ -662,6 +671,7 @@ mod tests {
         assert_eq!(role_name(CrossClusterRole::Identity), "identity");
         assert_eq!(role_name(CrossClusterRole::Hearth), "hearth");
         assert_eq!(role_name(CrossClusterRole::Personal), "personal");
+        assert_eq!(role_name(CrossClusterRole::Music), "music");
         assert_eq!(role_name(CrossClusterRole::Finance), "finance");
         assert_eq!(role_name(CrossClusterRole::Governance), "governance");
     }
@@ -743,6 +753,7 @@ mod tests {
         assert_eq!(get_local_zomes(CrossClusterRole::Civic).unwrap().len(), 16);
         assert_eq!(get_local_zomes(CrossClusterRole::Hearth).unwrap().len(), 10);
         assert_eq!(get_local_zomes(CrossClusterRole::Personal).unwrap().len(), 3);
+        assert_eq!(get_local_zomes(CrossClusterRole::Music).unwrap().len(), 4);
         assert!(get_local_zomes(CrossClusterRole::Identity).is_none());
         assert!(get_local_zomes(CrossClusterRole::Finance).is_none());
         assert!(get_local_zomes(CrossClusterRole::Governance).is_none());

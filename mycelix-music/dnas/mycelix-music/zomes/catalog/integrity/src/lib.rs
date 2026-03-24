@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Catalog Integrity Zome
 //!
 //! Defines the entry types and validation rules for the music catalog.
@@ -141,16 +144,16 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 
 fn validate_create_song(song: Song, action: Create) -> ExternResult<ValidateCallbackResult> {
     // Song must have a title
-    if song.title.is_empty() {
+    if song.title.is_empty() || song.title.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Song title cannot be empty".to_string(),
+            "Song title must be 1-256 chars".to_string(),
         ));
     }
 
     // Song must have an IPFS CID
-    if song.ipfs_cid.is_empty() {
+    if song.ipfs_cid.is_empty() || song.ipfs_cid.len() > 128 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Song must have an IPFS CID".to_string(),
+            "Song IPFS CID must be 1-128 chars".to_string(),
         ));
     }
 
@@ -168,14 +171,35 @@ fn validate_create_song(song: Song, action: Create) -> ExternResult<ValidateCall
         ));
     }
 
+    // Genres bounded
+    if song.genres.len() > 10 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Song may have at most 10 genres".to_string(),
+        ));
+    }
+    for genre in &song.genres {
+        if genre.len() > 64 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Genre tag must be <= 64 chars".to_string(),
+            ));
+        }
+    }
+
+    // Metadata bounded
+    if song.metadata.len() > 65536 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Metadata must be <= 64KB".to_string(),
+        ));
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_create_album(album: Album, action: Create) -> ExternResult<ValidateCallbackResult> {
     // Album must have a title
-    if album.title.is_empty() {
+    if album.title.is_empty() || album.title.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Album title cannot be empty".to_string(),
+            "Album title must be 1-256 chars".to_string(),
         ));
     }
 
@@ -186,14 +210,44 @@ fn validate_create_album(album: Album, action: Create) -> ExternResult<ValidateC
         ));
     }
 
+    // Song count bounded
+    if album.song_hashes.len() > 100 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Album may contain at most 100 songs".to_string(),
+        ));
+    }
+
+    // Metadata bounded
+    if album.metadata.len() > 65536 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Metadata must be <= 64KB".to_string(),
+        ));
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_create_profile(
-    _profile: ArtistProfile,
+    profile: ArtistProfile,
     _action: Create,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Profiles can be created by anyone for themselves
+    if profile.name.is_empty() || profile.name.len() > 128 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Artist name must be 1-128 chars".to_string(),
+        ));
+    }
+    if profile.bio.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Bio must be <= 4KB".to_string(),
+        ));
+    }
+    if !profile.payment_address.is_empty()
+        && (!profile.payment_address.starts_with("0x") || profile.payment_address.len() != 42)
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Invalid Ethereum payment address format".to_string(),
+        ));
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 

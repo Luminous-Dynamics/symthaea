@@ -9,6 +9,8 @@ members = [
     "zomes/balances/coordinator",
     "zomes/trust/integrity",
     "zomes/trust/coordinator",
+    "zomes/music-bridge/integrity",
+    "zomes/music-bridge/coordinator",
 ]
 
 [workspace.dependencies]

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Trust Integrity Zome
 //!
 //! Implements Multi-Agent Trust Logic (MATL) for Mycelix Music.
@@ -253,6 +256,15 @@ fn validate_trust_claim(claim: TrustClaim, action: Create) -> ExternResult<Valid
         ));
     }
 
+    // Evidence bounded
+    if let Some(ref evidence) = claim.evidence {
+        if evidence.len() > 4096 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Evidence must be <= 4KB".to_string(),
+            ));
+        }
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -271,6 +283,13 @@ fn validate_cdn_reputation(
     if !rep.eth_address.starts_with("0x") || rep.eth_address.len() != 42 {
         return Ok(ValidateCallbackResult::Invalid(
             "Invalid Ethereum address format".to_string(),
+        ));
+    }
+
+    // PoGQ score must be finite
+    if !rep.pogq_score.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "PoGQ score must be a finite number".to_string(),
         ));
     }
 
@@ -316,10 +335,10 @@ fn validate_byzantine_report(
         ));
     }
 
-    // Must have evidence
-    if report.evidence.is_empty() {
+    // Must have evidence, bounded
+    if report.evidence.is_empty() || report.evidence.len() > 8192 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Byzantine report must include evidence".to_string(),
+            "Byzantine report evidence must be 1-8192 chars".to_string(),
         ));
     }
 

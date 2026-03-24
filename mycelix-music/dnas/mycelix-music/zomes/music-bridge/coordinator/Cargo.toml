@@ -1,18 +1,19 @@
 [package]
-name = "balances"
+name = "music_bridge"
 version = "0.1.0"
 edition = "2021"
+license = "AGPL-3.0-or-later"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
-name = "balances"
+name = "music_bridge"
 
 [dependencies]
 hdk = "0.6"
 serde = { version = "1.0", features = ["derive"] }
-getrandom_02 = { package = "getrandom", version = "0.2", features = ["js"] }
-getrandom = { version = "0.3", features = ["wasm_js"] }
-balances_integrity = { path = "../integrity" }
+serde_json = "1.0"
+holochain_serialized_bytes = "0.0.56"
+music_bridge_integrity = { path = "../integrity" }
 mycelix-bridge-common = { path = "../../../../../../crates/mycelix-bridge-common" }
 
 [profile.release]

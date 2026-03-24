@@ -1,8 +1,11 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Publication Coordinator Zome
 use hdk::prelude::*;
 use media_publication_integrity::*;
 use mycelix_bridge_common::{
-    requirement_for_proposal, GovernanceEligibility, GovernanceRequirement,
+    requirement_for_basic, requirement_for_proposal, GovernanceEligibility, GovernanceRequirement,
 };
 use mycelix_zome_helpers::get_latest_record;
 
@@ -76,6 +79,8 @@ pub struct PublishInput {
 
 #[hdk_extern]
 pub fn add_content_block(input: AddBlockInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "add_content_block")?;
+
     let block = ContentBlock {
         publication_id: input.publication_id.clone(),
         block_index: input.block_index,

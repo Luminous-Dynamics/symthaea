@@ -447,6 +447,7 @@ pub enum CrossClusterRole {
     Personal,
     Finance,
     Governance,
+    Music,
 }
 
 impl CrossClusterRole {
@@ -460,6 +461,7 @@ impl CrossClusterRole {
             Self::Personal => "personal",
             Self::Finance => "finance",
             Self::Governance => "governance",
+            Self::Music => "music",
         }
     }
 
@@ -472,6 +474,7 @@ impl CrossClusterRole {
         Self::Personal,
         Self::Finance,
         Self::Governance,
+        Self::Music,
     ];
 }
 

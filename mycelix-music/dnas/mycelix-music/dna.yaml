@@ -21,6 +21,8 @@ integrity:
       path: target/wasm32-unknown-unknown/release/balances_integrity.wasm
     - name: trust_integrity
       path: target/wasm32-unknown-unknown/release/trust_integrity.wasm
+    - name: music_bridge_integrity
+      path: target/wasm32-unknown-unknown/release/music_bridge_integrity.wasm
 
 coordinator:
   zomes:
@@ -41,3 +43,7 @@ coordinator:
       path: target/wasm32-unknown-unknown/release/trust.wasm
       dependencies:
         - name: trust_integrity
+    - name: music_bridge
+      path: target/wasm32-unknown-unknown/release/music_bridge.wasm
+      dependencies:
+        - name: music_bridge_integrity
