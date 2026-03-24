@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 /// MATL Score Caching System
 ///
 /// This module provides intelligent caching for MATL scores to achieve
@@ -172,20 +175,25 @@ pub struct CacheStats {
     pub fill_percentage: f64,
 }
 
-/// Global cache instance management
+/// Thread-local cache instance for WASM (single-threaded, no unsafe needed).
 ///
-/// In production, this would use atomic reference counting
-/// For now, we'll use a simpler approach
-static mut GLOBAL_MATL_CACHE: Option<MatlCache> = None;
+/// Uses RefCell for interior mutability, matching the pattern used by
+/// mycelix-bridge-common::metrics for WASM-safe global state.
+use core::cell::RefCell;
 
-/// Get or initialize global cache
-pub fn get_cache() -> &'static mut MatlCache {
-    unsafe {
-        if GLOBAL_MATL_CACHE.is_none() {
-            GLOBAL_MATL_CACHE = Some(MatlCache::default());
-        }
-        GLOBAL_MATL_CACHE.as_mut().unwrap()
-    }
+thread_local! {
+    static GLOBAL_MATL_CACHE: RefCell<MatlCache> = RefCell::new(MatlCache::default());
+}
+
+/// Access the cache via closure (avoids returning references to thread-local).
+pub fn with_cache<F, R>(f: F) -> R
+where
+    F: FnOnce(&mut MatlCache) -> R,
+{
+    GLOBAL_MATL_CACHE.with(|cell| {
+        let mut cache = cell.borrow_mut();
+        f(&mut cache)
+    })
 }
 
 /// Cached MATL score lookup
@@ -195,39 +203,37 @@ pub fn get_cache() -> &'static mut MatlCache {
 pub fn get_agent_matl_score_cached(
     agent: AgentPubKey,
 ) -> ExternResult<MatlScore> {
-    let cache = get_cache();
+    with_cache(|cache| {
+        cache.get_or_compute(agent.clone(), || {
+            // This closure fetches from DHT if cache miss
+            let path = agent.clone();
+            // Use shared utility for get_links
+            let links = link_queries::get_links_local(path, LinkTypes::AgentToScore)?;
 
-    cache.get_or_compute(agent.clone(), || {
-        // This closure fetches from DHT if cache miss
-        let path = agent.clone();
-        // Use shared utility for get_links
-        let links = link_queries::get_links_local(path, LinkTypes::AgentToScore)?;
-
-        if let Some(link) = links.first() {
-            if let Some(action_hash) = link.target.clone().into_action_hash() {
-                let record = get(action_hash, GetOptions::default())?;
-                if let Some(record) = record {
-                    // Use shared utility for deserialization
-                    let score: MatlScore = error_handling::deserialize_entry(&record)?;
-                    return Ok(Some(score));
+            if let Some(link) = links.first() {
+                if let Some(action_hash) = link.target.clone().into_action_hash() {
+                    let record = get(action_hash, GetOptions::default())?;
+                    if let Some(record) = record {
+                        // Use shared utility for deserialization
+                        let score: MatlScore = error_handling::deserialize_entry(&record)?;
+                        return Ok(Some(score));
+                    }
                 }
             }
-        }
 
-        Ok(None)
+            Ok(None)
+        })
     })
 }
 
 /// Invalidate cache after MATL update
 pub fn invalidate_matl_cache(agent: &AgentPubKey) {
-    let cache = get_cache();
-    cache.invalidate(agent);
+    with_cache(|cache| cache.invalidate(agent));
 }
 
 /// Get cache statistics for monitoring
 pub fn get_cache_stats() -> CacheStats {
-    let cache = get_cache();
-    cache.stats()
+    with_cache(|cache| cache.stats())
 }
 
 #[cfg(test)]
