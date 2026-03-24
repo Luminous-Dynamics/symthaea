@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Narrative Prompt Compiler (Ghost Signal → LLM writing instructions)
 //!
 //! Translates the continuous `NarrativeSignal` from `StoryArcDynamics` into a
@@ -350,6 +353,7 @@ pub async fn generate_narrative(
         temperature: 0.4,
         max_tokens,
         system_prompt: Some(NARRATIVE_SYSTEM_PROMPT.to_string()),
+        consciousness_context: None,
     };
 
     match backend.generate(&prompt, &params).await {

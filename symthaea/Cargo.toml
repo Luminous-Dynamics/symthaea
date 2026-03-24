@@ -60,6 +60,8 @@ members = [
     "crates/symthaea-crucible",
     "crates/symthaea-canvas",
     "crates/symthaea-aesthetic",
+    "crates/symthaea-atelier",
+    "crates/symthaea-muse",
     "crates/symthaea-circular",
     "crates/symthaea-clinical",
     "crates/symthaea-therapeutic",

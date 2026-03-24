@@ -1,4 +1,6 @@
-//! HumanEval Benchmark — 164 Python coding problems
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! HumanEval Benchmark — 164 Python coding problems
 //!
 //! Measures pass@1 on OpenAI's HumanEval dataset.
 //!
@@ -96,6 +98,7 @@ fn generate_direct(problem: &HumanEvalProblem) -> String {
              No markdown, no explanation, no tests."
                 .into(),
         ),
+        consciousness_context: None,
     };
 
     // Send the HumanEval prompt directly — it already has signature + docstring

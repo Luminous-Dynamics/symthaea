@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Code Executor — Sandboxed compilation and test execution
 //!
 //! Closes the code generation feedback loop: generate → compile → test → learn.
@@ -20,6 +23,24 @@ use std::time::Duration;
 
 use crate::infrastructure::sandbox::{Sandbox, SandboxError};
 
+/// A parsed test failure with assertion details.
+///
+/// Enables semantic understanding of *why* a test failed, not just *that* it failed.
+/// Used by the coding agent to feed failure constraints back into the next generation.
+#[derive(Debug, Clone)]
+pub struct TestFailure {
+    /// Test name (e.g., "tests::test_add")
+    pub test_name: String,
+    /// Assertion text if extractable (e.g., "assert_eq!(add(2,3), 5)")
+    pub assertion: Option<String>,
+    /// Expected value if extractable (e.g., "5")
+    pub expected: Option<String>,
+    /// Actual value if extractable (e.g., "4")
+    pub actual: Option<String>,
+    /// Raw failure message
+    pub message: String,
+}
+
 /// Result of executing generated code
 #[derive(Debug, Clone)]
 pub struct ExecutionResult {
@@ -39,12 +60,48 @@ pub struct ExecutionResult {
     pub elapsed: Duration,
     /// Whether this was a simulation (no real execution)
     pub simulated: bool,
+    /// Parsed test failures with semantic details (assertion, expected, actual).
+    /// Populated by `parse_test_failures()` after test execution.
+    pub test_failures: Vec<TestFailure>,
 }
 
 impl ExecutionResult {
     /// Whether the code is fully successful (compiled + all tests passed)
     pub fn is_success(&self) -> bool {
         self.compiled && self.tests_failed == 0
+    }
+
+    /// Parse test failures from the raw test output, populating `test_failures`.
+    ///
+    /// Call this after construction to extract semantic details from rustc/cargo test output.
+    /// Extracts test names, assertion text, expected/actual values from format:
+    /// ```text
+    /// ---- tests::test_add stdout ----
+    /// thread 'tests::test_add' panicked at 'assertion `left == right` failed
+    ///   left: 4
+    ///  right: 5'
+    /// ```
+    pub fn parse_test_failures(&mut self) {
+        self.test_failures = parse_test_failure_details(&self.test_output);
+    }
+
+    /// Get formatted constraint strings from test failures.
+    ///
+    /// Returns strings like "test_add: expected 5 but got 4" that can be
+    /// injected into the next generation prompt as constraints.
+    pub fn failure_constraints(&self) -> Vec<String> {
+        self.test_failures
+            .iter()
+            .map(|f| match (&f.expected, &f.actual) {
+                (Some(exp), Some(act)) => {
+                    format!(
+                        "CONSTRAINT: {} expected {} but got {}",
+                        f.test_name, exp, act
+                    )
+                }
+                _ => format!("CONSTRAINT: {} failed: {}", f.test_name, f.message),
+            })
+            .collect()
     }
 
     /// Convert to an FEP surprise signal in [0.0, 1.0].
@@ -79,6 +136,7 @@ impl ExecutionResult {
             runtime_error: None,
             elapsed: Duration::from_millis(50),
             simulated: true,
+            test_failures: Vec::new(),
         }
     }
 }
@@ -141,6 +199,7 @@ impl CodeExecutor {
                 runtime_error: None,
                 elapsed: start.elapsed(),
                 simulated: false,
+                test_failures: Vec::new(),
             };
         }
 
@@ -165,6 +224,7 @@ impl CodeExecutor {
                 runtime_error: None,
                 elapsed: start.elapsed(),
                 simulated: false,
+                test_failures: Vec::new(),
             };
         }
 
@@ -209,6 +269,7 @@ impl CodeExecutor {
                         runtime_error: None,
                         elapsed: start.elapsed(),
                         simulated: result.simulated,
+                        test_failures: Vec::new(),
                     };
                 }
 
@@ -237,6 +298,7 @@ impl CodeExecutor {
                                 },
                                 elapsed: start.elapsed(),
                                 simulated: test_result.simulated,
+                                test_failures: Vec::new(),
                             }
                         }
                         Err(e) => ExecutionResult {
@@ -248,6 +310,7 @@ impl CodeExecutor {
                             runtime_error: Some(format!("Test execution failed: {e}")),
                             elapsed: start.elapsed(),
                             simulated: false,
+                            test_failures: Vec::new(),
                         },
                     }
                 } else {
@@ -260,6 +323,7 @@ impl CodeExecutor {
                         runtime_error: None,
                         elapsed: start.elapsed(),
                         simulated: result.simulated,
+                        test_failures: Vec::new(),
                     }
                 }
             }
@@ -276,6 +340,7 @@ impl CodeExecutor {
                 runtime_error: None,
                 elapsed: start.elapsed(),
                 simulated: false,
+                test_failures: Vec::new(),
             },
         }
     }
@@ -298,6 +363,7 @@ impl CodeExecutor {
                 runtime_error: None,
                 elapsed: start.elapsed(),
                 simulated: false,
+                test_failures: Vec::new(),
             };
         }
 
@@ -312,6 +378,7 @@ impl CodeExecutor {
                 runtime_error: None,
                 elapsed: start.elapsed(),
                 simulated: false,
+                test_failures: Vec::new(),
             };
         }
 
@@ -342,6 +409,7 @@ impl CodeExecutor {
                         runtime_error: None,
                         elapsed: start.elapsed(),
                         simulated: result.simulated,
+                        test_failures: Vec::new(),
                     };
                 }
 
@@ -365,6 +433,7 @@ impl CodeExecutor {
                             },
                             elapsed: start.elapsed(),
                             simulated: test_result.simulated,
+                            test_failures: Vec::new(),
                         }
                     }
                     Err(e) => ExecutionResult {
@@ -376,6 +445,7 @@ impl CodeExecutor {
                         runtime_error: Some(format!("Test execution failed: {e}")),
                         elapsed: start.elapsed(),
                         simulated: false,
+                        test_failures: Vec::new(),
                     },
                 }
             }
@@ -391,6 +461,7 @@ impl CodeExecutor {
                 runtime_error: None,
                 elapsed: start.elapsed(),
                 simulated: false,
+                test_failures: Vec::new(),
             },
         }
     }
@@ -409,6 +480,7 @@ impl CodeExecutor {
                 runtime_error: None,
                 elapsed: start.elapsed(),
                 simulated: false,
+                test_failures: Vec::new(),
             };
         }
 
@@ -423,6 +495,7 @@ impl CodeExecutor {
                 runtime_error: None,
                 elapsed: start.elapsed(),
                 simulated: false,
+                test_failures: Vec::new(),
             };
         }
 
@@ -443,6 +516,7 @@ impl CodeExecutor {
                         runtime_error: None,
                         elapsed: start.elapsed(),
                         simulated: result.simulated,
+                        test_failures: Vec::new(),
                     };
                 }
 
@@ -462,6 +536,7 @@ impl CodeExecutor {
                         },
                         elapsed: start.elapsed(),
                         simulated: run_result.simulated,
+                        test_failures: Vec::new(),
                     },
                     Err(e) => ExecutionResult {
                         compiled: true,
@@ -472,6 +547,7 @@ impl CodeExecutor {
                         runtime_error: Some(format!("Execution failed: {e}")),
                         elapsed: start.elapsed(),
                         simulated: false,
+                        test_failures: Vec::new(),
                     },
                 }
             }
@@ -487,6 +563,7 @@ impl CodeExecutor {
                 runtime_error: None,
                 elapsed: start.elapsed(),
                 simulated: false,
+                test_failures: Vec::new(),
             },
         }
     }
@@ -509,6 +586,7 @@ impl CodeExecutor {
                 runtime_error: None,
                 elapsed: start.elapsed(),
                 simulated: result.simulated,
+                test_failures: Vec::new(),
             },
             Err(SandboxError::CommandNotAllowed(_)) | Err(SandboxError::RealExecutionDisabled) => {
                 ExecutionResult::simulated_success()
@@ -522,6 +600,7 @@ impl CodeExecutor {
                 runtime_error: None,
                 elapsed: start.elapsed(),
                 simulated: false,
+                test_failures: Vec::new(),
             },
         }
     }
@@ -1274,6 +1353,169 @@ fn parse_test_output(stdout: &str) -> (usize, usize) {
     (0, 0)
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Test Failure Parsing — Semantic extraction from test output
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Parse semantic test failure details from rustc/cargo test output.
+///
+/// Extracts test names, assertion text, and expected/actual values from
+/// the standard Rust test runner format.
+///
+/// # Recognized patterns
+///
+/// - `---- test_name stdout ----` → test name
+/// - `assertion \`left == right\` failed` → assertion type
+/// - `left: VALUE` / `right: VALUE` → expected/actual
+/// - `panicked at 'MESSAGE'` → raw failure message
+/// - `assert_eq!(A, B)` → assertion text
+pub fn parse_test_failure_details(test_output: &str) -> Vec<TestFailure> {
+    let mut failures: Vec<TestFailure> = Vec::new();
+    let lines: Vec<&str> = test_output.lines().collect();
+    let mut i = 0;
+
+    while i < lines.len() {
+        let line = lines[i].trim();
+
+        // Detect test name from "---- test_name stdout ----"
+        if line.starts_with("---- ") && line.ends_with(" stdout ----") {
+            let test_name = line
+                .strip_prefix("---- ")
+                .and_then(|s| s.strip_suffix(" stdout ----"))
+                .unwrap_or("unknown")
+                .to_string();
+
+            // Scan ahead for failure details
+            let mut message = String::new();
+            let mut assertion = None;
+            let mut expected = None;
+            let mut actual = None;
+            let mut j = i + 1;
+
+            while j < lines.len() {
+                let detail = lines[j].trim();
+
+                // Stop at next test section or "failures:" summary
+                if detail.starts_with("---- ") || detail == "failures:" {
+                    break;
+                }
+
+                // Extract "panicked at" message
+                if let Some(pos) = detail.find("panicked at") {
+                    let msg_start = pos + "panicked at".len();
+                    let msg = detail[msg_start..]
+                        .trim()
+                        .trim_matches('\'')
+                        .trim_matches('"');
+                    message = msg.to_string();
+                }
+
+                // Extract assertion text
+                if detail.contains("assert_eq!")
+                    || detail.contains("assert_ne!")
+                    || detail.contains("assert!")
+                {
+                    assertion = Some(detail.to_string());
+                }
+
+                // Extract left/right values from Rust assertion output.
+                // Values may have trailing artifacts from the panic message:
+                // - `5', src/lib.rs:5:5` — strip `', <location>` suffix
+                // - `"world"'` — strip trailing single quote from `panicked at '...'` wrapper
+                let strip_trailing_artifacts = |s: &str| -> String {
+                    let mut trimmed = s.trim().to_string();
+                    // Strip `', <location>` suffix (e.g., `5', src/lib.rs:5:5`)
+                    if let Some(pos) = trimmed.rfind("', ") {
+                        let candidate = &trimmed[pos + 3..];
+                        if candidate.contains(':') || candidate.contains('/') {
+                            trimmed = trimmed[..pos].to_string();
+                        }
+                    }
+                    // Strip trailing `'` from `panicked at '...'` wrapper
+                    if trimmed.ends_with('\'') && !trimmed.starts_with('\'') {
+                        trimmed.pop();
+                    }
+                    trimmed
+                };
+                if detail.starts_with("left:") || detail.starts_with("left =") {
+                    let val = detail
+                        .split_once(':')
+                        .map(|x| x.1)
+                        .or_else(|| detail.split_once('=').map(|x| x.1))
+                        .map(|s| strip_trailing_artifacts(s));
+                    actual = val;
+                }
+                if detail.starts_with("right:") || detail.starts_with("right =") {
+                    let val = detail
+                        .split_once(':')
+                        .map(|x| x.1)
+                        .or_else(|| detail.split_once('=').map(|x| x.1))
+                        .map(|s| strip_trailing_artifacts(s));
+                    expected = val;
+                }
+
+                // Detect "assertion `left == right` failed"
+                if detail.contains("left == right") && detail.contains("failed") {
+                    if message.is_empty() {
+                        message = "assertion `left == right` failed".to_string();
+                    }
+                }
+
+                j += 1;
+            }
+
+            if !message.is_empty() || assertion.is_some() || expected.is_some() {
+                let detail_entry = TestFailure {
+                    test_name: test_name.clone(),
+                    assertion,
+                    expected,
+                    actual,
+                    message: if message.is_empty() {
+                        "test failed".to_string()
+                    } else {
+                        message
+                    },
+                };
+                // Replace any existing skeleton entry (from "test ... FAILED" line)
+                // with the detailed version from the stdout section
+                if let Some(pos) = failures.iter().position(|f| f.test_name == test_name) {
+                    failures[pos] = detail_entry;
+                } else {
+                    failures.push(detail_entry);
+                }
+            }
+
+            i = j;
+            continue;
+        }
+
+        // Also detect "test result: FAILED" summary for test names
+        // Format: "test tests::test_name ... FAILED"
+        if line.starts_with("test ") && line.ends_with("... FAILED") {
+            let test_name = line
+                .strip_prefix("test ")
+                .and_then(|s| s.strip_suffix("... FAILED"))
+                .map(|s| s.trim().to_string())
+                .unwrap_or_default();
+
+            // Only add if not already captured from stdout section
+            if !test_name.is_empty() && !failures.iter().any(|f| f.test_name == test_name) {
+                failures.push(TestFailure {
+                    test_name,
+                    assertion: None,
+                    expected: None,
+                    actual: None,
+                    message: "test failed (details not captured)".to_string(),
+                });
+            }
+        }
+
+        i += 1;
+    }
+
+    failures
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1289,6 +1531,7 @@ mod tests {
             runtime_error: None,
             elapsed: Duration::from_millis(100),
             simulated: false,
+            test_failures: Vec::new(),
         };
         let surprise = result.to_surprise();
         assert!(
@@ -1309,6 +1552,7 @@ mod tests {
             runtime_error: None,
             elapsed: Duration::from_millis(100),
             simulated: false,
+            test_failures: Vec::new(),
         };
         let surprise = result.to_surprise();
         assert!(
@@ -1328,6 +1572,7 @@ mod tests {
             runtime_error: None,
             elapsed: Duration::from_millis(100),
             simulated: false,
+            test_failures: Vec::new(),
         };
         assert_eq!(result.to_surprise(), 0.0);
     }
@@ -1343,6 +1588,7 @@ mod tests {
             runtime_error: None,
             elapsed: Duration::from_millis(10),
             simulated: false,
+            test_failures: Vec::new(),
         };
         assert!(success.is_success());
 
@@ -1355,6 +1601,7 @@ mod tests {
             runtime_error: None,
             elapsed: Duration::from_millis(10),
             simulated: false,
+            test_failures: Vec::new(),
         };
         assert!(!failure.is_success());
     }
@@ -1699,5 +1946,91 @@ mod tests {
             errors[0].suggested_replacement.as_deref(),
             Some("use std::collections::HashMap;\n")
         );
+    }
+
+    // =========================================================================
+    // Test Failure Parsing Tests
+    // =========================================================================
+
+    #[test]
+    fn test_parse_test_failures_basic() {
+        let output = r#"
+running 2 tests
+test tests::test_add ... FAILED
+test tests::test_sub ... ok
+
+---- tests::test_add stdout ----
+thread 'tests::test_add' panicked at 'assertion `left == right` failed
+  left: 4
+ right: 5', src/lib.rs:5:5
+
+failures:
+    tests::test_add
+"#;
+        let failures = parse_test_failure_details(output);
+        assert_eq!(failures.len(), 1);
+        assert_eq!(failures[0].test_name, "tests::test_add");
+        assert_eq!(failures[0].actual.as_deref(), Some("4"));
+        assert_eq!(failures[0].expected.as_deref(), Some("5"));
+        assert!(failures[0].message.contains("left == right"));
+    }
+
+    #[test]
+    fn test_parse_test_failures_multiple() {
+        let output = r#"
+---- tests::test_a stdout ----
+thread 'tests::test_a' panicked at 'assertion failed: x > 0'
+---- tests::test_b stdout ----
+thread 'tests::test_b' panicked at 'assertion `left == right` failed
+  left: "hello"
+ right: "world"'
+"#;
+        let failures = parse_test_failure_details(output);
+        assert_eq!(failures.len(), 2);
+        assert_eq!(failures[0].test_name, "tests::test_a");
+        assert!(failures[0].message.contains("assertion failed"));
+        assert_eq!(failures[1].test_name, "tests::test_b");
+        assert_eq!(failures[1].actual.as_deref(), Some("\"hello\""));
+        assert_eq!(failures[1].expected.as_deref(), Some("\"world\""));
+    }
+
+    #[test]
+    fn test_parse_test_failures_empty() {
+        let output = "running 3 tests\ntest a ... ok\ntest b ... ok\ntest c ... ok\n";
+        let failures = parse_test_failure_details(output);
+        assert!(failures.is_empty());
+    }
+
+    #[test]
+    fn test_parse_test_failures_summary_only() {
+        let output = "test tests::test_foo ... FAILED\ntest tests::test_bar ... FAILED\n";
+        let failures = parse_test_failure_details(output);
+        assert_eq!(failures.len(), 2);
+        assert_eq!(failures[0].test_name, "tests::test_foo");
+        assert_eq!(failures[1].test_name, "tests::test_bar");
+    }
+
+    #[test]
+    fn test_failure_constraints() {
+        let result = ExecutionResult {
+            compiled: true,
+            compile_errors: vec![],
+            tests_passed: 1,
+            tests_failed: 1,
+            test_output: String::new(),
+            runtime_error: None,
+            elapsed: Duration::from_millis(100),
+            simulated: false,
+            test_failures: vec![TestFailure {
+                test_name: "test_add".to_string(),
+                assertion: Some("assert_eq!(add(2,3), 5)".to_string()),
+                expected: Some("5".to_string()),
+                actual: Some("4".to_string()),
+                message: "assertion failed".to_string(),
+            }],
+        };
+        let constraints = result.failure_constraints();
+        assert_eq!(constraints.len(), 1);
+        assert!(constraints[0].contains("expected 5 but got 4"));
     }
 }

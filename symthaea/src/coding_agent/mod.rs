@@ -33,8 +33,10 @@
 
 mod accessors;
 mod code_utils;
+pub mod error_knowledge;
 mod experience;
 mod generation;
+mod geodesic_gate;
 mod planning;
 mod prompts;
 
@@ -382,6 +384,20 @@ pub struct CodingAgent {
     consciousness_deferrals: usize,
     /// Whether stuck detection triggered during this run.
     stuck_detected: bool,
+    /// Semantic knowledge graph of error patterns → fix strategies.
+    /// Accumulates across the run, complementing the flat experience store
+    /// with structured error→fix mappings and Bayesian success rates.
+    error_knowledge: error_knowledge::CodeErrorKnowledge,
+    /// Geodesic Code Synthesis verifier for topological/oracle post-generation checks.
+    /// When enabled, generated code is verified for structural invariants (Betti numbers,
+    /// convergence prediction) and violations are fed back as hard constraints on the next prompt.
+    /// Geodesic Code Synthesis verifier for topological/oracle post-generation checks.
+    /// When enabled, generated code is verified for structural invariants (Betti numbers,
+    /// convergence prediction) and violations are fed back as hard constraints on the next prompt.
+    #[cfg(feature = "geodesic_synthesis")]
+    geodesic_verifier: Option<symthaea_geodesic::GeodesicSynthesizer>,
+    /// Cached GCS violations from the last verification pass, injected into the next prompt.
+    gcs_violations: Vec<String>,
 }
 
 impl CodingAgent {
@@ -481,6 +497,10 @@ impl CodingAgent {
             quality_rejections: 0,
             consciousness_deferrals: 0,
             stuck_detected: false,
+            error_knowledge: error_knowledge::CodeErrorKnowledge::new(),
+            #[cfg(feature = "geodesic_synthesis")]
+            geodesic_verifier: None,
+            gcs_violations: Vec::new(),
         }
     }
 
@@ -539,6 +559,7 @@ impl CodingAgent {
         self.quality_rejections = 0;
         self.consciousness_deferrals = 0;
         self.stuck_detected = false;
+        self.gcs_violations.clear();
 
         // Auto-index the project if CodebaseMemory hasn't been populated yet.
         // This gives the agent codebase-aware context on every run without
@@ -791,241 +812,5 @@ impl CodingAgent {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_task_phase_display() {
-        assert_eq!(format!("{}", TaskPhase::Understanding), "Understanding");
-        assert_eq!(format!("{}", TaskPhase::Done), "Done");
-    }
-
-    #[test]
-    fn test_confidence_to_epistemic() {
-        assert_eq!(
-            CodingAgent::confidence_to_epistemic(0.95),
-            EpistemicStatus::Certain
-        );
-        assert_eq!(
-            CodingAgent::confidence_to_epistemic(0.8),
-            EpistemicStatus::Probable
-        );
-        assert_eq!(
-            CodingAgent::confidence_to_epistemic(0.5),
-            EpistemicStatus::Uncertain
-        );
-        assert_eq!(
-            CodingAgent::confidence_to_epistemic(0.2),
-            EpistemicStatus::Unknown
-        );
-    }
-
-    #[test]
-    fn test_coding_agent_creation() {
-        let config = CodingAgentConfig::default();
-        let agent = CodingAgent::new(config);
-        assert!(agent.is_ok(), "CodingAgent should create successfully");
-        let agent = agent.unwrap();
-        assert_eq!(*agent.phase(), TaskPhase::Understanding);
-        assert_eq!(agent.iteration(), 0);
-    }
-
-    #[test]
-    fn test_coding_agent_runs_and_generates() {
-        let dir = tempfile::tempdir().unwrap();
-        let config = CodingAgentConfig {
-            max_iterations: 5,
-            working_dir: dir.path().to_path_buf(),
-            target_file: Some(PathBuf::from("generated.rs")),
-            ..Default::default()
-        };
-        let mut agent = CodingAgent::new(config).unwrap();
-
-        let result = agent.run("add a hello() function");
-
-        // Agent should have run through iterations
-        assert!(result.iterations_used > 0);
-        assert!(!result.phi_trace.is_empty());
-
-        // Code should have been generated and written
-        assert!(
-            !result.files_modified.is_empty(),
-            "Should have written at least one file"
-        );
-        let target = dir.path().join("generated.rs");
-        assert!(target.exists(), "Target file should exist on disk");
-
-        let content = std::fs::read_to_string(&target).unwrap();
-        assert!(
-            content.contains("fn"),
-            "Generated file should contain a function"
-        );
-
-        // Should have used at least one generation tier
-        assert!(
-            !result.generation_tiers.is_empty(),
-            "Should have recorded generation tiers"
-        );
-    }
-
-    // -- Hardening: property tests & stress tests --
-
-    #[test]
-    fn test_confidence_to_epistemic_full_range() {
-        // Sweep the full [0,1] range — no panic, always valid
-        for i in 0..=100 {
-            let c = i as f32 / 100.0;
-            let _ = CodingAgent::confidence_to_epistemic(c);
-        }
-        // Boundary: negative and >1 should not panic
-        let _ = CodingAgent::confidence_to_epistemic(-0.1_f32);
-        let _ = CodingAgent::confidence_to_epistemic(1.5_f32);
-        let _ = CodingAgent::confidence_to_epistemic(0.0_f32);
-        let _ = CodingAgent::confidence_to_epistemic(1.0_f32);
-    }
-
-    #[test]
-    fn test_telemetry_json_fields_finite() {
-        let dir = tempfile::tempdir().unwrap();
-        let config = CodingAgentConfig {
-            max_iterations: 3,
-            working_dir: dir.path().to_path_buf(),
-            target_file: Some(PathBuf::from("gen.rs")),
-            ..Default::default()
-        };
-        let mut agent = CodingAgent::new(config).unwrap();
-        let result = agent.run("add a function");
-
-        let json = result.to_telemetry_json();
-        // All phi values should be finite
-        if let Some(trace) = json["consciousness"]["phi_trace"].as_array() {
-            for v in trace {
-                let f = v.as_f64().unwrap();
-                assert!(f.is_finite(), "phi value must be finite, got {f}");
-            }
-        }
-        // iterations_used should be non-negative
-        assert!(json["iterations_used"].as_u64().unwrap() > 0);
-        // total_energy should be finite
-        let energy = json["generation"]["total_energy"].as_f64().unwrap();
-        assert!(energy.is_finite(), "total_energy must be finite");
-    }
-
-    #[test]
-    fn test_agent_result_phi_trace_bounded() {
-        let dir = tempfile::tempdir().unwrap();
-        let config = CodingAgentConfig {
-            max_iterations: 10,
-            working_dir: dir.path().to_path_buf(),
-            target_file: Some(PathBuf::from("gen.rs")),
-            ..Default::default()
-        };
-        let mut agent = CodingAgent::new(config).unwrap();
-        let result = agent.run("write a sorting function");
-
-        // Phi trace should have entries and all be in [0, 1]
-        assert!(!result.phi_trace.is_empty());
-        for phi in &result.phi_trace {
-            assert!(phi.is_finite(), "phi must be finite");
-            assert!(
-                *phi >= 0.0 && *phi <= 1.0,
-                "phi must be in [0,1], got {phi}"
-            );
-        }
-        // iterations_used should match phi_trace length
-        assert_eq!(result.iterations_used, result.phi_trace.len());
-    }
-
-    #[test]
-    fn test_100_cycle_stress() {
-        let dir = tempfile::tempdir().unwrap();
-        let config = CodingAgentConfig {
-            max_iterations: 100,
-            working_dir: dir.path().to_path_buf(),
-            target_file: Some(PathBuf::from("stress.rs")),
-            ..Default::default()
-        };
-        let mut agent = CodingAgent::new(config).unwrap();
-        let result = agent.run("implement a fibonacci function");
-
-        // Should complete without panic
-        assert!(result.iterations_used > 0);
-        // Phi trace length == iterations
-        assert_eq!(result.phi_trace.len(), result.iterations_used);
-        // All phi bounded
-        for phi in &result.phi_trace {
-            assert!(phi.is_finite() && *phi >= 0.0 && *phi <= 1.0);
-        }
-        // Errors list should be finite (no unbounded growth)
-        assert!(result.errors.len() <= 100);
-        assert!(result.observations.len() <= 1000);
-        // Energy should be finite and non-negative
-        assert!(result.total_energy.is_finite() && result.total_energy >= 0.0);
-    }
-
-    #[test]
-    fn test_determinism_same_input() {
-        let dir1 = tempfile::tempdir().unwrap();
-        let dir2 = tempfile::tempdir().unwrap();
-
-        let run = |dir: &std::path::Path| -> AgentResult {
-            let config = CodingAgentConfig {
-                max_iterations: 5,
-                working_dir: dir.to_path_buf(),
-                target_file: Some(PathBuf::from("det.rs")),
-                ..Default::default()
-            };
-            let mut agent = CodingAgent::new(config).unwrap();
-            agent.run("add a hello function")
-        };
-
-        let r1 = run(dir1.path());
-        let r2 = run(dir2.path());
-
-        // Same task should produce same phase progression
-        assert_eq!(r1.iterations_used, r2.iterations_used);
-        assert_eq!(format!("{}", r1.final_phase), format!("{}", r2.final_phase));
-        // Phi traces should be identical (deterministic CLS)
-        assert_eq!(r1.phi_trace.len(), r2.phi_trace.len());
-    }
-
-    #[test]
-    fn test_run_reset_clears_state() {
-        let dir = tempfile::tempdir().unwrap();
-        let config = CodingAgentConfig {
-            max_iterations: 3,
-            working_dir: dir.path().to_path_buf(),
-            target_file: Some(PathBuf::from("reset.rs")),
-            ..Default::default()
-        };
-        let mut agent = CodingAgent::new(config).unwrap();
-
-        // First run
-        let r1 = agent.run("add function foo");
-        assert!(r1.iterations_used > 0);
-
-        // Second run should start fresh — iteration counter and phi trace reset
-        let r2 = agent.run("add function bar");
-        assert!(r2.iterations_used > 0);
-        // Phi trace should track iterations (+-1 for retry strategies)
-        let diff1 = (r1.phi_trace.len() as isize - r1.iterations_used as isize).unsigned_abs();
-        let diff2 = (r2.phi_trace.len() as isize - r2.iterations_used as isize).unsigned_abs();
-        assert!(diff1 <= 1, "Run 1 phi trace should track iterations");
-        assert!(diff2 <= 1, "Run 2 phi trace should track iterations");
-        // Run 2 should not accumulate phi from run 1
-        assert!(
-            r2.phi_trace.len() <= r2.iterations_used + 1,
-            "Run 2 phi trace ({}) should not carry over from run 1 ({})",
-            r2.phi_trace.len(),
-            r1.phi_trace.len()
-        );
-    }
-
-    // The remaining tests are included via `use super::*;` in the submodules,
-    // but we keep them here since `mod tests` in the original file tested
-    // methods across all submodules.
-
-    // Include all the remaining tests inline — they test cross-module functionality
-    // and need access to private fields.
-    include!("tests.rs");
-}
+#[path = "tests.rs"]
+mod tests;

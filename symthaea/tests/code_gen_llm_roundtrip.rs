@@ -1,5 +1,8 @@
 #![cfg(feature = "code_generation")]
-// ==================================================================================
+
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root// ==================================================================================
 // Code Generation LLM Roundtrip Tests
 // ==================================================================================
 //
@@ -119,6 +122,7 @@ async fn test_llm_completion_roundtrip() {
         temperature: 0.2,
         max_tokens: 2048,
         system_prompt: Some(CODE_GENERATION_SYSTEM_PROMPT.to_string()),
+        consciousness_context: None,
     };
 
     let response = backend.generate(&prompt, &params).await;

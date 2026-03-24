@@ -289,7 +289,10 @@ impl CodingAgent {
     }
 
     /// Extract consciousness signals from a cycle result for decision-making.
-    pub(super) fn extract_consciousness_signals(&self, cycle_result: &CycleResult) -> ConsciousnessSignals {
+    pub(super) fn extract_consciousness_signals(
+        &self,
+        cycle_result: &CycleResult,
+    ) -> ConsciousnessSignals {
         let prediction_error = 1.0 - self.cognitive_loop.prediction_confidence();
         let confidence_velocity = if self.prediction_error_history.len() >= 2 {
             let prev = self.prediction_error_history[self.prediction_error_history.len() - 1];
@@ -312,6 +315,45 @@ impl CodingAgent {
             phi,
             phi_slope,
             fep_surprise,
+        }
+    }
+
+    /// Backfill error_knowledge with test success after tests pass.
+    ///
+    /// When a fix is recorded via `store_fix_strategies()`, `tests_passed` is set to
+    /// `None` because we don't know yet. Once tests actually pass, this method
+    /// re-records all recent facts with `tests_passed: Some(true)`, improving the
+    /// Bayesian success rate for those fix strategies.
+    pub(super) fn backfill_error_knowledge_test_success(&mut self) {
+        // Get the facts recorded during this run (recent ones with tests_passed=None)
+        let facts_to_update: Vec<(String, super::error_knowledge::ErrorCategory, String)> = self
+            .error_knowledge
+            .recent_facts()
+            .iter()
+            .filter(|f| f.tests_passed.is_none() && f.compiled)
+            .map(|f| (f.error_code.clone(), f.category, f.fix_strategy.clone()))
+            .collect();
+
+        for (error_code, category, fix_strategy) in facts_to_update {
+            self.error_knowledge
+                .record_fix(super::error_knowledge::CodeErrorFact {
+                    error_code,
+                    category,
+                    pattern_signature: String::new(), // already indexed by code
+                    fix_strategy,
+                    compiled: true,
+                    tests_passed: Some(true),
+                    context_snippet: String::new(),
+                });
+        }
+
+        if !self.error_knowledge.recent_facts().is_empty() {
+            tracing::info!(
+                target: "symthaea::coding_agent",
+                total_facts = self.error_knowledge.total_facts(),
+                distinct_codes = self.error_knowledge.distinct_codes(),
+                "Backfilled error knowledge with test success"
+            );
         }
     }
 }

@@ -1,4 +1,6 @@
-//! Integration tests for LLM backends
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Integration tests for LLM backends
 //!
 //! These tests verify the OpenAI and Anthropic backend implementations work correctly.
 //! They use mock HTTP servers for CI testing and can optionally test against real APIs.
@@ -238,6 +240,7 @@ fn test_generation_params_with_system_prompt() {
         temperature: 0.3,
         max_tokens: 100,
         system_prompt: Some("You are a consciousness researcher.".to_string()),
+        consciousness_context: None,
     };
     assert!((params.temperature - 0.3).abs() < 0.01);
     assert_eq!(params.max_tokens, 100);
@@ -263,6 +266,7 @@ async fn test_openai_real_api() {
         temperature: 0.3,
         max_tokens: 50,
         system_prompt: Some("Reply in exactly 5 words.".to_string()),
+        consciousness_context: None,
     };
 
     let result = backend.generate("Say hello", &params).await;
@@ -292,6 +296,7 @@ async fn test_anthropic_real_api() {
         temperature: 0.3,
         max_tokens: 50,
         system_prompt: Some("Reply in exactly 5 words.".to_string()),
+        consciousness_context: None,
     };
 
     let result = backend.generate("Say hello", &params).await;
@@ -321,6 +326,7 @@ async fn test_openai_streaming_real_api() {
         temperature: 0.3,
         max_tokens: 50,
         system_prompt: None,
+        consciousness_context: None,
     };
 
     let mut token_count = 0;
@@ -360,6 +366,7 @@ async fn test_anthropic_streaming_real_api() {
         temperature: 0.3,
         max_tokens: 50,
         system_prompt: None,
+        consciousness_context: None,
     };
 
     let mut token_count = 0;

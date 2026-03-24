@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # LLM Organ: Large Language Model Integration
 //!
 //! Provides integration with large language models for:
@@ -341,6 +344,7 @@ impl LLMOrgan {
                     .and_then(|p| p.max_length)
                     .unwrap_or(self.config.max_generation_length),
                 system_prompt: query.system_prompt.clone(),
+                consciousness_context: None,
             };
 
             match backend.generate(&query.content, &params).await {
@@ -413,6 +417,7 @@ impl LLMOrgan {
                     .and_then(|p| p.max_length)
                     .unwrap_or(self.config.max_generation_length),
                 system_prompt: query.system_prompt.clone(),
+                consciousness_context: None,
             };
 
             match backend

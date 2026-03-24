@@ -1,5 +1,8 @@
 #![cfg(feature = "code_generation")]
-// ==================================================================================
+
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root// ==================================================================================
 // Tier 2 Acid Test — Novel Algorithm Synthesis via Ollama
 // ==================================================================================
 //
@@ -234,6 +237,7 @@ async fn run_acid_test(
         temperature: 0.2,
         max_tokens: 4096,
         system_prompt: Some(CODE_GENERATION_SYSTEM_PROMPT.to_string()),
+        consciousness_context: None,
     };
 
     // ── Step 3: THE SYNTHESIS ──────────────────────────────────────────

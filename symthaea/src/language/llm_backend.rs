@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # LLM Backend: Trait and Implementations
 //!
 //! Provides the abstraction for connecting to language model backends.
@@ -20,6 +23,74 @@ pub struct GenerationParams {
     pub max_tokens: usize,
     /// System prompt to set context.
     pub system_prompt: Option<String>,
+    /// Optional consciousness context for consciousness-aware generation.
+    /// When present, OllamaBackend injects this into the system prompt
+    /// and adjusts temperature based on type_confidence.
+    pub consciousness_context: Option<ConsciousnessContext>,
+}
+
+/// Consciousness context carried through to LLM backends.
+///
+/// Enables consciousness-aware code generation: the LLM receives
+/// epistemic status, code quality signals, and consciousness level
+/// as structured context rather than relying on prompt engineering alone.
+#[derive(Debug, Clone)]
+pub struct ConsciousnessContext {
+    /// Epistemic status as string (Certain, Probable, Uncertain, Unknown, OutOfDomain)
+    pub epistemic_status: String,
+    /// Consciousness level (Phi, 0.0-1.0)
+    pub phi: f32,
+    /// Code-specific: type confidence (0.0-1.0, 0 = unknown types)
+    pub type_confidence: f32,
+    /// Code-specific: algorithm pattern strength (0.0-1.0)
+    pub algorithm_pattern: f32,
+    /// Code-specific: error likelihood (0.0-1.0)
+    pub error_likelihood: f32,
+    /// Code-specific: syntax complexity (0.0-1.0)
+    pub syntax_complexity: f32,
+}
+
+impl ConsciousnessContext {
+    /// Format as a system prompt supplement for code generation.
+    pub fn to_system_supplement(&self) -> String {
+        let mut parts = Vec::new();
+        parts.push(format!("EPISTEMIC_STATUS: {}", self.epistemic_status));
+        parts.push(format!("CONSCIOUSNESS_LEVEL: {:.2}", self.phi));
+
+        if self.type_confidence > 0.0 || self.algorithm_pattern > 0.0 {
+            parts.push(format!("TYPE_CONFIDENCE: {:.2}", self.type_confidence));
+            parts.push(format!("ALGORITHM_PATTERN: {:.2}", self.algorithm_pattern));
+            parts.push(format!("ERROR_LIKELIHOOD: {:.2}", self.error_likelihood));
+            parts.push(format!("SYNTAX_COMPLEXITY: {:.2}", self.syntax_complexity));
+        }
+
+        if self.error_likelihood > 0.5 {
+            parts.push(
+                "NOTE: High error likelihood — add extra error handling and validation."
+                    .to_string(),
+            );
+        }
+        if self.type_confidence < 0.3 {
+            parts.push("NOTE: Low type confidence — prefer explicit type annotations.".to_string());
+        }
+        if self.epistemic_status == "Uncertain" || self.epistemic_status == "Unknown" {
+            parts.push(
+                "NOTE: Low epistemic confidence — add TODO comments for uncertain logic."
+                    .to_string(),
+            );
+        }
+
+        parts.join("\n")
+    }
+
+    /// Suggest temperature adjustment based on consciousness context.
+    /// High type_confidence → lower temperature (more deterministic).
+    /// High error_likelihood → lower temperature (more cautious).
+    pub fn temperature_adjustment(&self) -> f32 {
+        let confidence_factor = self.type_confidence * 0.2; // up to -0.2
+        let error_factor = self.error_likelihood * 0.15; // up to -0.15
+        -(confidence_factor + error_factor) // negative = cooler
+    }
 }
 
 impl Default for GenerationParams {
@@ -28,6 +99,7 @@ impl Default for GenerationParams {
             temperature: 0.7,
             max_tokens: 256,
             system_prompt: None,
+            consciousness_context: None,
         }
     }
 }
@@ -252,13 +324,36 @@ impl LLMBackend for OllamaBackend {
     async fn generate(&self, prompt: &str, params: &GenerationParams) -> Result<String> {
         let url = format!("{}/api/generate", self.base_url);
 
+        // Merge consciousness context into system prompt if present
+        let effective_system: Option<String> =
+            match (&params.system_prompt, &params.consciousness_context) {
+                (Some(sys), Some(ctx)) => Some(format!(
+                    "{}\n\n# Consciousness Context\n{}",
+                    sys,
+                    ctx.to_system_supplement()
+                )),
+                (None, Some(ctx)) => Some(format!(
+                    "# Consciousness Context\n{}",
+                    ctx.to_system_supplement()
+                )),
+                (Some(sys), None) => Some(sys.clone()),
+                (None, None) => None,
+            };
+
+        // Adjust temperature based on consciousness context
+        let effective_temp = if let Some(ref ctx) = params.consciousness_context {
+            (params.temperature + ctx.temperature_adjustment()).clamp(0.1, 1.5)
+        } else {
+            params.temperature
+        };
+
         let request_body = OllamaRequest {
             model: &self.model,
             prompt,
-            system: params.system_prompt.as_deref(),
+            system: effective_system.as_deref(),
             stream: false,
             options: OllamaOptions {
-                temperature: params.temperature,
+                temperature: effective_temp,
                 num_predict: params.max_tokens,
             },
         };
@@ -584,6 +679,7 @@ mod tests {
             temperature: 0.3,
             max_tokens: 100,
             system_prompt: Some("You are helpful".to_string()),
+            consciousness_context: None,
         };
         assert!((params.temperature - 0.3).abs() < 0.01);
         assert_eq!(params.max_tokens, 100);
@@ -596,10 +692,77 @@ mod tests {
             temperature: 0.5,
             max_tokens: 200,
             system_prompt: Some("Test".to_string()),
+            consciousness_context: None,
         };
         let cloned = params.clone();
         assert!((params.temperature - cloned.temperature).abs() < 0.01);
         assert_eq!(params.max_tokens, cloned.max_tokens);
+    }
+
+    // =========================================================================
+    // ConsciousnessContext Tests
+    // =========================================================================
+
+    #[test]
+    fn test_consciousness_context_system_supplement() {
+        let ctx = ConsciousnessContext {
+            epistemic_status: "Certain".to_string(),
+            phi: 0.7,
+            type_confidence: 0.9,
+            algorithm_pattern: 0.5,
+            error_likelihood: 0.1,
+            syntax_complexity: 0.3,
+        };
+        let supplement = ctx.to_system_supplement();
+        assert!(supplement.contains("EPISTEMIC_STATUS: Certain"));
+        assert!(supplement.contains("CONSCIOUSNESS_LEVEL: 0.70"));
+        assert!(supplement.contains("TYPE_CONFIDENCE: 0.90"));
+        // Low error likelihood → no error note
+        assert!(!supplement.contains("High error likelihood"));
+    }
+
+    #[test]
+    fn test_consciousness_context_high_error_note() {
+        let ctx = ConsciousnessContext {
+            epistemic_status: "Uncertain".to_string(),
+            phi: 0.3,
+            type_confidence: 0.2,
+            algorithm_pattern: 0.0,
+            error_likelihood: 0.8,
+            syntax_complexity: 0.1,
+        };
+        let supplement = ctx.to_system_supplement();
+        assert!(supplement.contains("High error likelihood"));
+        assert!(supplement.contains("Low type confidence"));
+        assert!(supplement.contains("Low epistemic confidence"));
+    }
+
+    #[test]
+    fn test_consciousness_context_temperature_adjustment() {
+        // High confidence → cooler (more deterministic)
+        let ctx = ConsciousnessContext {
+            epistemic_status: "Certain".to_string(),
+            phi: 0.8,
+            type_confidence: 1.0,
+            algorithm_pattern: 0.5,
+            error_likelihood: 0.0,
+            syntax_complexity: 0.3,
+        };
+        let adj = ctx.temperature_adjustment();
+        assert!(adj < 0.0, "High type_confidence should lower temperature");
+        assert!(adj > -0.5, "Adjustment should be moderate");
+
+        // Low confidence → barely any adjustment
+        let ctx2 = ConsciousnessContext {
+            epistemic_status: "Unknown".to_string(),
+            phi: 0.2,
+            type_confidence: 0.0,
+            algorithm_pattern: 0.0,
+            error_likelihood: 0.0,
+            syntax_complexity: 0.0,
+        };
+        let adj2 = ctx2.temperature_adjustment();
+        assert!((adj2 - 0.0).abs() < 0.01, "No code signals → no adjustment");
     }
 
     // =========================================================================
@@ -731,6 +894,7 @@ mod tests {
             system_prompt: Some(
                 "You are a helpful assistant. Keep responses very brief.".to_string(),
             ),
+            consciousness_context: None,
         };
 
         let result = backend
@@ -896,12 +1060,14 @@ mod tests {
             temperature: 0.0,
             max_tokens: 10,
             system_prompt: Some("Be concise".to_string()),
+            consciousness_context: None,
         };
 
         let params_high_temp = GenerationParams {
             temperature: 1.0,
             max_tokens: 1000,
             system_prompt: None,
+            consciousness_context: None,
         };
 
         let result1 = backend.generate("Hello", &params_low_temp).await.unwrap();

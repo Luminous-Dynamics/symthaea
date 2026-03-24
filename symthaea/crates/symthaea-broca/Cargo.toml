@@ -86,6 +86,10 @@ path = "src/bin/gen_nsm_training_data.rs"
 name = "gen-creativity-training"
 path = "src/bin/gen_creativity_training.rs"
 
+[[bin]]
+name = "gen-moral-training"
+path = "src/bin/gen_moral_training.rs"
+
 [features]
 default = ["simd", "parallel", "gpu"]
 # GPU tensor acceleration via candle CUDA (auto-detects at runtime)

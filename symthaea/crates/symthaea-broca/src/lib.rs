@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Symthaea Broca: SSM Language Center
 //!
 //! Native CfC-HDC autoregressive thought-to-text generation.
@@ -51,8 +54,14 @@ pub mod encoder;
 pub mod evaluation;
 pub mod gating;
 pub mod generator;
+#[cfg(feature = "gpu")]
+pub mod gpu_cfc;
 pub mod tokenizer;
 pub mod training;
+
+// Creative mode: relaxed gating for poetry and artistic text generation
+pub mod creative_mode;
+pub mod syllable;
 
 // Liquid-Mamba fusion: pre-trained Mamba SSM + HDC projection + consciousness gating
 #[cfg(feature = "mamba-cpu")]
@@ -68,9 +77,13 @@ pub mod temporal_projection;
 
 pub use checkpoint::{AdamState, BrocaCheckpoint};
 pub use controller::{LanguageController, LanguageControllerConfig, NetworkSnapshot};
-pub use encoder::{ThoughtChannels, ThoughtLanguageEncoder};
+pub use encoder::{
+    ThoughtChannels, ThoughtLanguageEncoder, EPISTEMIC_CUBE_BASE, EPISTEMIC_CUBE_CHANNELS,
+};
 pub use evaluation::{EvalConfig, EvalResult, IntentScore};
-pub use gating::{CoherenceFeedback, EmotionalModulator, EpistemicGate, GatingConfig};
+pub use gating::{
+    CodeGate, CoherenceFeedback, EmotionalModulator, EpistemicCubeGate, EpistemicGate, GatingConfig,
+};
 pub use generator::{BrocaConfig, BrocaGenerator, GenerationResult, SamplingStrategy};
 pub use tokenizer::BpeTokenizer;
 pub use training::{

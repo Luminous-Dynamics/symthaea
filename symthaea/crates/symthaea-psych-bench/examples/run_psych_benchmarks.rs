@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Run the full psychological benchmark suite and print results.
 //!
 //! Usage:
@@ -46,6 +49,9 @@ use symthaea_psych_bench::benchmarks::attention::{
 };
 use symthaea_psych_bench::benchmarks::binding::TemporalOrderBenchmark;
 use symthaea_psych_bench::benchmarks::butlin::ButlinIndicatorSuite;
+use symthaea_psych_bench::benchmarks::coding::{
+    AlgorithmRecognitionBenchmark, BugDetectionBenchmark, HumanEvalMiniBenchmark,
+};
 use symthaea_psych_bench::benchmarks::cogbench::{
     BartBenchmark, HorizonBenchmark, InstrumentalLearningBenchmark,
     ProbabilisticReasoningBenchmark, RestlessBanditBenchmark, ReversalLearningBenchmark,
@@ -315,6 +321,10 @@ fn main() {
         Box::new(BlindSightBenchmark),
         // Substrate
         Box::new(SubstrateTransferBenchmark),
+        // Coding
+        Box::new(HumanEvalMiniBenchmark),
+        Box::new(BugDetectionBenchmark),
+        Box::new(AlgorithmRecognitionBenchmark),
     ];
 
     // Filter benchmarks by name if --filter was specified

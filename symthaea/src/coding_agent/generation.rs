@@ -66,10 +66,25 @@ impl CodingAgent {
                 dispatcher.force_next_tier(*tier);
             }
 
+            // Build consciousness context for the LLM backend
+            let consciousness_ctx = crate::language::llm_backend::ConsciousnessContext {
+                epistemic_status: format!("{:?}", epistemic),
+                phi: current_phi,
+                type_confidence: 0.0, // TODO: feed from CodeReasoningContext when available
+                algorithm_pattern: 0.0,
+                error_likelihood: if self.failure_patterns.is_empty() {
+                    0.2
+                } else {
+                    (self.failure_patterns.len() as f32 / 5.0).min(0.9)
+                },
+                syntax_complexity: 0.0,
+            };
+
             let params = GenerationParams {
                 temperature,
                 max_tokens: 1024,
                 system_prompt: Some(sys_prompt.clone()),
+                consciousness_context: Some(consciousness_ctx),
             };
 
             // Sync bridge for async dispatcher
@@ -156,6 +171,7 @@ impl CodingAgent {
                             temperature: 0.4,
                             max_tokens: 1024,
                             system_prompt: Some(sys_prompt.clone()),
+                            consciousness_context: None, // escalation path — no context needed
                         };
                         let llm_result = Self::block_on_dispatch(
                             dispatcher,
@@ -219,6 +235,24 @@ impl CodingAgent {
         let structured = crate::language::code_executor::parse_structured_errors(&test_output);
         if structured.is_empty() {
             return false;
+        }
+
+        // Check error knowledge graph for semantically-ranked fix strategies
+        for error in &structured {
+            let error_code = error.code.clone().unwrap_or_default();
+            let category = super::error_knowledge::ErrorCategory::from_error_code(&error_code);
+            if let Some(best) = self.error_knowledge.best_fix(&error_code, category) {
+                tracing::info!(
+                    target: "symthaea::coding_agent",
+                    error_code = %error_code,
+                    best_fix = %best,
+                    "Knowledge graph suggests fix strategy"
+                );
+                self.observations.push(format!(
+                    "Knowledge graph: best fix for {} is '{}'",
+                    error_code, best
+                ));
+            }
         }
 
         // Check experience store for cached fix strategies before re-parsing
@@ -604,22 +638,47 @@ impl CodingAgent {
         Some(rest[..end].to_string())
     }
 
-    /// Store fix strategies from successful auto-fixes into the experience store.
+    /// Store fix strategies from successful auto-fixes into both the experience store
+    /// and the semantic error knowledge graph.
     pub(super) fn store_fix_strategies(
         &mut self,
         errors: &[crate::language::code_executor::CompileError],
         strategy: &str,
     ) {
-        if let Some(ref mut store) = self.experience_store {
-            for error in errors {
-                let sig = Self::normalize_error_pattern(&error.message);
-                let strategy_desc = format!(
-                    "{} ({})",
-                    strategy,
-                    error.code.as_deref().unwrap_or("unknown")
-                );
+        for error in errors {
+            let sig = Self::normalize_error_pattern(&error.message);
+            let strategy_desc = format!(
+                "{} ({})",
+                strategy,
+                error.code.as_deref().unwrap_or("unknown")
+            );
+
+            // Store in flat experience store
+            if let Some(ref mut store) = self.experience_store {
                 store.store_fix_strategy(&sig, &strategy_desc);
             }
+
+            // Store in semantic error knowledge graph (richer: tracks success rates)
+            let error_code = error.code.clone().unwrap_or_default();
+            let category = super::error_knowledge::ErrorCategory::from_error_code(&error_code);
+            let context: String = self
+                .generated_code
+                .as_deref()
+                .unwrap_or("")
+                .chars()
+                .take(200)
+                .collect();
+
+            self.error_knowledge
+                .record_fix(super::error_knowledge::CodeErrorFact {
+                    error_code,
+                    category,
+                    pattern_signature: sig,
+                    fix_strategy: strategy_desc,
+                    compiled: true,     // we're recording a fix that was applied
+                    tests_passed: None, // not yet known — will be updated after testing
+                    context_snippet: context,
+                });
         }
     }
 
