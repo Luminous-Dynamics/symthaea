@@ -99,7 +99,30 @@ pub struct ConsciousnessProfile {
     pub community: f64,
 
     /// Domain-specific engagement (computed locally by each cluster bridge).
-    /// Based on event/query participation counts, decayed over time.
+    ///
+    /// ## Standard computation formula
+    ///
+    /// All bridge coordinators SHOULD compute engagement as:
+    ///
+    /// ```text
+    /// engagement = min(1.0, raw_events / baseline_events)
+    /// ```
+    ///
+    /// where:
+    /// - `raw_events` = count of domain-relevant actions (creates, updates, queries,
+    ///   votes) by this agent in the trailing 30-day window
+    /// - `baseline_events` = cluster-specific expected participation threshold
+    ///   (e.g., 50 for commons, 20 for governance, 10 for personal)
+    ///
+    /// Apply exponential decay with a 30-day half-life to match the reputation
+    /// dimension's decay characteristics:
+    ///
+    /// ```text
+    /// decayed_events = Σ event_i × 0.5^(age_days_i / 30)
+    /// ```
+    ///
+    /// Bridges that do not compute engagement locally SHOULD set this to 0.0
+    /// (conservative default), NOT 1.0.
     pub engagement: f64,
 }
 
@@ -223,6 +246,52 @@ impl ConsciousnessProfile {
             engagement: unified_consciousness.clamp(0.0, 1.0),
         }
     }
+
+    /// Create a profile from Symthaea's multi-dimensional consciousness signals.
+    ///
+    /// This is the enriched bridge — instead of mapping a single unified score
+    /// to `engagement`, it computes `engagement` as a weighted composite of
+    /// Symthaea's empirical consciousness metrics:
+    ///
+    /// ```text
+    /// engagement = 0.35 × phi + 0.25 × meta_awareness + 0.20 × coherence + 0.20 × care_activation
+    /// ```
+    ///
+    /// This weighting prioritizes empirical consciousness (phi, meta-awareness)
+    /// over social/empathic aspects, while keeping all signals meaningful.
+    ///
+    /// # Arguments
+    /// * `phi` — Integrated Information (Φ), primary consciousness measure [0, 1]
+    /// * `meta_awareness` — Depth of meta-cognition/self-reflection [0, 1]
+    /// * `coherence` — Narrative continuity and temporal binding [0, 1]
+    /// * `care_activation` — Empathic responsiveness [0, 1]
+    /// * `identity` — MFA assurance level [0, 1] (from identity bridge)
+    /// * `reputation` — Cross-hApp reputation [0, 1] (from reputation bridge)
+    /// * `community` — Peer trust attestations [0, 1] (from community)
+    pub fn from_symthaea(
+        phi: f64,
+        meta_awareness: f64,
+        coherence: f64,
+        care_activation: f64,
+        identity: f64,
+        reputation: f64,
+        community: f64,
+    ) -> Self {
+        let phi_c = phi.clamp(0.0, 1.0);
+        let meta_c = meta_awareness.clamp(0.0, 1.0);
+        let coh_c = coherence.clamp(0.0, 1.0);
+        let care_c = care_activation.clamp(0.0, 1.0);
+
+        let engagement = (0.35 * phi_c + 0.25 * meta_c + 0.20 * coh_c + 0.20 * care_c)
+            .clamp(0.0, 1.0);
+
+        Self {
+            identity: identity.clamp(0.0, 1.0),
+            reputation: reputation.clamp(0.0, 1.0),
+            community: community.clamp(0.0, 1.0),
+            engagement,
+        }
+    }
 }
 
 impl Default for ConsciousnessProfile {
@@ -312,6 +381,41 @@ impl ConsciousnessCredential {
             identity,
             reputation,
             community,
+        );
+        let tier = profile.clamped().tier();
+        Self {
+            did,
+            profile,
+            tier,
+            issued_at: now_us,
+            expires_at: now_us + Self::DEFAULT_TTL_US,
+            issuer,
+            trajectory_commitment: None,
+            extensions: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Issue a credential from Symthaea's multi-dimensional consciousness signals.
+    ///
+    /// Enriched bridge: computes `engagement` from phi, meta_awareness, coherence,
+    /// and care_activation instead of a single unified score.
+    ///
+    /// See [`ConsciousnessProfile::from_symthaea`] for the weighting formula.
+    pub fn from_symthaea(
+        did: String,
+        phi: f64,
+        meta_awareness: f64,
+        coherence: f64,
+        care_activation: f64,
+        identity: f64,
+        reputation: f64,
+        community: f64,
+        issuer: String,
+        now_us: u64,
+    ) -> Self {
+        let profile = ConsciousnessProfile::from_symthaea(
+            phi, meta_awareness, coherence, care_activation,
+            identity, reputation, community,
         );
         let tier = profile.clamped().tier();
         Self {
@@ -2625,6 +2729,73 @@ mod tests {
         let profile = ConsciousnessProfile::from_unified_consciousness(1.5, -0.2, 0.5, 0.5);
         assert_eq!(profile.engagement, 1.0);
         assert_eq!(profile.identity, 0.0);
+    }
+
+    // -- Enriched Symthaea bridge tests --
+
+    #[test]
+    fn symthaea_bridge_composite_engagement() {
+        // phi=0.8, meta=0.6, coherence=0.5, care=0.7
+        // engagement = 0.35*0.8 + 0.25*0.6 + 0.20*0.5 + 0.20*0.7
+        //            = 0.28 + 0.15 + 0.10 + 0.14 = 0.67
+        let profile = ConsciousnessProfile::from_symthaea(
+            0.8, 0.6, 0.5, 0.7, // Symthaea signals
+            0.75, 0.50, 0.40,    // identity/reputation/community
+        );
+        let expected_engagement = 0.35 * 0.8 + 0.25 * 0.6 + 0.20 * 0.5 + 0.20 * 0.7;
+        assert!((profile.engagement - expected_engagement).abs() < 1e-10);
+        assert_eq!(profile.identity, 0.75);
+        assert_eq!(profile.reputation, 0.50);
+        assert_eq!(profile.community, 0.40);
+    }
+
+    #[test]
+    fn symthaea_bridge_all_max() {
+        let profile = ConsciousnessProfile::from_symthaea(
+            1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+        );
+        assert_eq!(profile.engagement, 1.0);
+        assert_eq!(profile.combined_score(), 1.0);
+        assert_eq!(profile.tier(), ConsciousnessTier::Guardian);
+    }
+
+    #[test]
+    fn symthaea_bridge_all_zero() {
+        let profile = ConsciousnessProfile::from_symthaea(
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        );
+        assert_eq!(profile.engagement, 0.0);
+        assert_eq!(profile.combined_score(), 0.0);
+        assert_eq!(profile.tier(), ConsciousnessTier::Observer);
+    }
+
+    #[test]
+    fn symthaea_bridge_clamps_inputs() {
+        let profile = ConsciousnessProfile::from_symthaea(
+            1.5, -0.3, 2.0, -1.0, // out-of-range Symthaea signals
+            0.5, 0.5, 0.5,
+        );
+        // After clamping: phi=1.0, meta=0.0, coh=1.0, care=0.0
+        // engagement = 0.35*1.0 + 0.25*0.0 + 0.20*1.0 + 0.20*0.0 = 0.55
+        let expected = 0.35 + 0.20;
+        assert!((profile.engagement - expected).abs() < 1e-10);
+    }
+
+    #[test]
+    fn symthaea_credential_from_enriched_bridge() {
+        let now = 1_000_000_000_000_u64;
+        let cred = ConsciousnessCredential::from_symthaea(
+            "did:mycelix:enriched".into(),
+            0.7, 0.6, 0.5, 0.8, // phi, meta, coherence, care
+            0.80, 0.50, 0.40,    // identity, reputation, community
+            "did:mycelix:bridge".into(),
+            now,
+        );
+        assert_eq!(cred.did, "did:mycelix:enriched");
+        // engagement = 0.35*0.7 + 0.25*0.6 + 0.20*0.5 + 0.20*0.8 = 0.245+0.15+0.10+0.16 = 0.655
+        let expected_engagement = 0.35 * 0.7 + 0.25 * 0.6 + 0.20 * 0.5 + 0.20 * 0.8;
+        assert!((cred.profile.engagement - expected_engagement).abs() < 1e-10);
+        assert!(cred.tier >= ConsciousnessTier::Citizen);
     }
 
     #[test]
