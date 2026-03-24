@@ -233,8 +233,9 @@ impl FactcheckEpistemicFeedback {
         let h_value = (verdict_confidence * 0.7 + credibility * 0.3).clamp(0.0, 1.0) as f32;
 
         // Quality: same formula as the cube encoder
-        let quality =
-            (e_tier as f32 / 4.0) * 0.40 + (n_tier as f32 / 3.0) * 0.35 + (m_tier as f32 / 3.0) * 0.25;
+        let quality = (e_tier as f32 / 4.0) * 0.40
+            + (n_tier as f32 / 3.0) * 0.35
+            + (m_tier as f32 / 3.0) * 0.25;
 
         Self {
             e_tier,
@@ -524,7 +525,12 @@ pub enum GovernanceDispatchCommand {
         correlation_id: u64,
         description: String,
         proposer_did: String,
+        /// Enriched consciousness signals from Symthaea snapshot.
+        /// Used by the bridge adapter to call `ConsciousnessCredential::from_symthaea()`.
         consciousness_phi: f64,
+        meta_awareness: f64,
+        coherence: f64,
+        care_activation: f64,
         alignment_score: f64,
     },
     /// Cast a vote on an existing proposal.
@@ -535,6 +541,11 @@ pub enum GovernanceDispatchCommand {
         voter_did: String,
         approve: bool,
         rationale: String,
+        /// Enriched consciousness signals for vote weighting.
+        consciousness_phi: f64,
+        meta_awareness: f64,
+        coherence: f64,
+        care_activation: f64,
     },
     /// Query active proposals (response arrives via governance event channel).
     QueryActiveProposals,
@@ -727,13 +738,9 @@ impl MycelixBridge {
     }
 
     /// Submit a factcheck by verdict string (convenience method).
-    pub fn submit_factcheck_verdict(
-        &mut self,
-        statement: &str,
-        verdict: &str,
-        confidence: f64,
-    ) {
-        let feedback = FactcheckEpistemicFeedback::from_verdict_string(statement, verdict, confidence);
+    pub fn submit_factcheck_verdict(&mut self, statement: &str, verdict: &str, confidence: f64) {
+        let feedback =
+            FactcheckEpistemicFeedback::from_verdict_string(statement, verdict, confidence);
         self.submit_factcheck_feedback(feedback);
     }
 
@@ -835,6 +842,9 @@ impl MycelixBridge {
                     description: proposal.description.clone(),
                     proposer_did: self.agent_id.clone(),
                     consciousness_phi: consciousness.phi,
+                    meta_awareness: consciousness.meta_awareness,
+                    coherence: consciousness.coherence,
+                    care_activation: consciousness.care_activation,
                     alignment_score: alignment.overall_score,
                 }) {
                     Ok(()) => {
@@ -953,6 +963,10 @@ impl MycelixBridge {
                         "{:?}: score {:.2}",
                         alignment.recommendation, alignment.overall_score
                     ),
+                    consciousness_phi: consciousness.phi,
+                    meta_awareness: consciousness.meta_awareness,
+                    coherence: consciousness.coherence,
+                    care_activation: consciousness.care_activation,
                 }) {
                     Ok(()) => {
                         self.pending_confirmations.insert(cid, Instant::now());
@@ -1146,8 +1160,8 @@ impl MycelixBridge {
         let score = self.evaluate_asset(metadata, consciousness);
 
         // Serialize per-harmony scores for on-chain storage
-        let per_harmony_json = serde_json::to_string(&score.per_harmony)
-            .unwrap_or_else(|_| "{}".to_string());
+        let per_harmony_json =
+            serde_json::to_string(&score.per_harmony).unwrap_or_else(|_| "{}".to_string());
 
         // Dispatch to conductor
         let mut disconnected = false;

@@ -37,6 +37,9 @@ pub enum DispatchCommand {
         description: String,
         proposer_did: String,
         consciousness_phi: f64,
+        meta_awareness: f64,
+        coherence: f64,
+        care_activation: f64,
         alignment_score: f64,
     },
     CastVote {
@@ -45,6 +48,10 @@ pub enum DispatchCommand {
         voter_did: String,
         approve: bool,
         rationale: String,
+        consciousness_phi: f64,
+        meta_awareness: f64,
+        coherence: f64,
+        care_activation: f64,
     },
     QueryActiveProposals,
     /// Evaluate an asset and record consciousness assessment on-chain.
@@ -202,12 +209,18 @@ impl<T: ConductorTransport> GovernanceDispatcher<T> {
                 description,
                 proposer_did,
                 consciousness_phi,
+                meta_awareness,
+                coherence,
+                care_activation,
                 alignment_score,
             } => {
                 let payload = serde_json::json!({
                     "description": description,
                     "proposer_did": proposer_did,
                     "consciousness_phi": consciousness_phi,
+                    "meta_awareness": meta_awareness,
+                    "coherence": coherence,
+                    "care_activation": care_activation,
                     "alignment_score": alignment_score,
                 });
                 let payload_bytes = rmp_serde::to_vec(&payload).unwrap_or_default();
@@ -246,12 +259,20 @@ impl<T: ConductorTransport> GovernanceDispatcher<T> {
                 voter_did,
                 approve,
                 rationale,
+                consciousness_phi,
+                meta_awareness,
+                coherence,
+                care_activation,
             } => {
                 let payload = serde_json::json!({
                     "proposal_id": proposal_id,
                     "voter_did": voter_did,
                     "approve": approve,
                     "rationale": rationale,
+                    "consciousness_phi": consciousness_phi,
+                    "meta_awareness": meta_awareness,
+                    "coherence": coherence,
+                    "care_activation": care_activation,
                 });
                 let payload_bytes = rmp_serde::to_vec(&payload).unwrap_or_default();
 
@@ -432,6 +453,9 @@ mod tests {
             description: "Test proposal".into(),
             proposer_did: "did:mycelix:test".into(),
             consciousness_phi: 0.8,
+            meta_awareness: 0.6,
+            coherence: 0.7,
+            care_activation: 0.5,
             alignment_score: 0.9,
         };
         let json = serde_json::to_string(&cmd).unwrap();
@@ -483,6 +507,9 @@ mod tests {
             description: "Test proposal".into(),
             proposer_did: "did:mycelix:test".into(),
             consciousness_phi: 0.85,
+            meta_awareness: 0.6,
+            coherence: 0.7,
+            care_activation: 0.5,
             alignment_score: 0.9,
         };
 
@@ -505,6 +532,10 @@ mod tests {
             voter_did: "did:mycelix:voter".into(),
             approve: true,
             rationale: "Good proposal".into(),
+            consciousness_phi: 0.75,
+            meta_awareness: 0.6,
+            coherence: 0.7,
+            care_activation: 0.5,
         };
 
         let outcome = dispatcher.dispatch(cmd).await;
@@ -548,6 +579,9 @@ mod tests {
                 description: "will fail".into(),
                 proposer_did: "did:test".into(),
                 consciousness_phi: 0.5,
+                meta_awareness: 0.4,
+                coherence: 0.3,
+                care_activation: 0.4,
                 alignment_score: 0.5,
             })
             .unwrap();
