@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Carryover types — state that crosses cycle boundaries.
 
 use super::scheduling::CycleUrgency;
@@ -303,6 +306,17 @@ pub struct QualityMetrics {
     pub(crate) wm_knowledge_grounding: f64,
     /// Number of knowledge facts injected into working memory this cycle.
     pub(crate) wm_knowledge_injection_count: u8,
+    // ── Epistemic Cube Tiers ─────────────────────────────────────────
+    /// Last computed empirical tier (0–4).
+    pub(crate) last_cube_e_tier: Option<u8>,
+    /// Last computed normative tier (0–3).
+    pub(crate) last_cube_n_tier: Option<u8>,
+    /// Last computed materiality tier (0–3).
+    pub(crate) last_cube_m_tier: Option<u8>,
+    /// Last computed Harmony-value (0.0–1.0).
+    pub(crate) last_cube_h_value: f32,
+    /// Last computed cube quality composite.
+    pub(crate) last_cube_quality: f32,
 }
 
 impl Default for QualityMetrics {
@@ -368,6 +382,11 @@ impl Default for QualityMetrics {
             mechanism_activations: std::collections::HashMap::new(),
             wm_knowledge_grounding: 0.0,
             wm_knowledge_injection_count: 0,
+            last_cube_e_tier: None,
+            last_cube_n_tier: None,
+            last_cube_m_tier: None,
+            last_cube_h_value: 0.0,
+            last_cube_quality: 0.0,
         }
     }
 }

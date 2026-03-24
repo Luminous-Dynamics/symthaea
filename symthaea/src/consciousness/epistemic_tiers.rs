@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Revolutionary Improvement #53: Epistemic Causal Reasoning - Epistemic Tier Module
 //!
 //! **The Mycelix Epistemic Cube Applied to Causal Knowledge**
@@ -340,7 +343,7 @@ impl MaterialityTier {
 /// NSM grounding for empirical verification tiers
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub(crate) struct EmpiricalTierPrimitiveGrounding {
+pub struct EmpiricalTierPrimitiveGrounding {
     /// The tier being grounded
     pub tier: EmpiricalTier,
     /// NSM primitive composition
@@ -411,7 +414,7 @@ impl EmpiricalTierPrimitiveGrounding {
 /// NSM grounding for normative authority tiers
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub(crate) struct NormativeTierPrimitiveGrounding {
+pub struct NormativeTierPrimitiveGrounding {
     /// The tier being grounded
     pub tier: NormativeTier,
     /// NSM primitive composition
@@ -477,7 +480,7 @@ impl NormativeTierPrimitiveGrounding {
 /// NSM grounding for materiality/permanence tiers
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub(crate) struct MaterialityTierPrimitiveGrounding {
+pub struct MaterialityTierPrimitiveGrounding {
     /// The tier being grounded
     pub tier: MaterialityTier,
     /// NSM primitive composition
@@ -539,7 +542,7 @@ impl MaterialityTierPrimitiveGrounding {
 /// Unified NSM grounding system for epistemic tiers
 #[allow(dead_code)]
 #[derive(Debug)]
-pub(crate) struct EpistemicNSMGrounding {
+pub struct EpistemicNSMGrounding {
     /// Empirical tier groundings
     pub empirical_tiers: HashMap<EmpiricalTier, EmpiricalTierPrimitiveGrounding>,
     /// Normative tier groundings

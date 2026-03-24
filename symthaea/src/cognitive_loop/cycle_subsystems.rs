@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Advanced subsystem updates extracted from cycle.rs.
 //!
 //! Contains: hierarchical LTC, evolution coordinator, holographic analyzer,
@@ -405,7 +408,7 @@ impl CognitiveLoopService {
             // N0=personal, N1=communal (partner), N2=network (swarm), N3=axiomatic
             let n = {
                 let peers = self.swarm_manager.connected_peers();
-                let has_partner = self.social_mgr.partner_model.is_some();
+                let has_partner = self.behavior.social_mgr.partner_model.is_some();
                 let kg = self.carryover.quality.wm_knowledge_grounding;
                 let sources = self.carryover.quality.wm_knowledge_injection_count;
                 if kg > 0.8 && sources >= 3 {
@@ -562,10 +565,10 @@ impl CognitiveLoopService {
         //    has clear direction for improvement → focus rather than explore
         if consciousness_gradient_magnitude > 1.0 {
             // Strong gradient = clear optimization direction → reduce random exploration
-            self.curiosity_drive.boredom = (self.curiosity_drive.boredom - 0.05).max(0.0);
+            self.behavior.curiosity_drive.boredom = (self.behavior.curiosity_drive.boredom - 0.05).max(0.0);
         } else if consciousness_gradient_magnitude > 0.0 && consciousness_gradient_magnitude < 0.1 {
             // Near-zero gradient = plateau → boost exploration to escape
-            self.curiosity_drive.boredom = (self.curiosity_drive.boredom + 0.03).min(1.0);
+            self.behavior.curiosity_drive.boredom = (self.behavior.curiosity_drive.boredom + 0.03).min(1.0);
         }
 
         // 3. Holographic unity gates learning: high unity = coherent representation →
