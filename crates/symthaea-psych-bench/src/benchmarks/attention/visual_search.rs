@@ -66,8 +66,10 @@ impl VisualSearchBenchmark {
         let diff_model = difficulty_model_for(self.name());
         let sig_mult = diff_model.signal_multiplier(config.difficulty);
         let threshold: f64 = (0.35 - pressure * 0.10) * sig_mult;
+        // Temperature 0.15: sharper softmax decision better discriminates target
+        // from conjunction distractors (Wolfe 1994 guided search model).
         let temperature: f64 =
-            (0.18 + pressure * 0.15) * diff_model.temperature_multiplier(config.difficulty);
+            (0.15 + pressure * 0.15) * diff_model.temperature_multiplier(config.difficulty);
 
         let set_sizes = [4usize, 8, 16, 24];
         let trials_per_size = 20;

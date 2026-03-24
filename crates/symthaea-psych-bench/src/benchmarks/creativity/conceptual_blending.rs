@@ -146,11 +146,14 @@ impl ConceptualBlendingBenchmark {
             //
             // Earlier blends take more from A; later blends take more from B
             // (Ward, 1994: structured imagination starts with dominant frame).
-            let a_fraction = 0.6 - (i as f32 / n_blends as f32) * 0.2; // 0.6→0.4
+            // Higher base fractions (0.70→0.50) include more features from both
+            // input spaces, producing more coherent blends that preserve structure
+            // from both domains (Fauconnier & Turner, 2002: "vital relations").
+            let a_fraction = 0.70 - (i as f32 / n_blends as f32) * 0.20; // 0.70→0.50
             let n_from_a = (pair.n_features_a as f32 * a_fraction).ceil() as usize;
             let n_from_b = pair
                 .n_features_b
-                .min((pair.n_features_b as f32 * (1.0 - a_fraction + 0.2)).ceil() as usize);
+                .min((pair.n_features_b as f32 * (1.0 - a_fraction + 0.30)).ceil() as usize);
 
             let mut blend_parts: Vec<&ContinuousHV> = Vec::new();
             let mut blend_weights: Vec<f32> = Vec::new();

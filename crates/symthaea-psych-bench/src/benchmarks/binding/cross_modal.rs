@@ -76,7 +76,10 @@ impl CrossModalBindingBenchmark {
         // vocabulary produces more orthogonal representations, reducing bundle
         // cross-talk. This allows slightly lower encoding noise while maintaining
         // realistic set-size effects (Wheeler & Treisman, 2002).
-        let noise_frac = 0.008 + pressure as f32 * 0.05 + config.effective_noise() as f32 * 0.03;
+        // Noise 0.005: location-indexed binding (Treisman & Gelade, 1980 FIT)
+        // preserves feature-role associations well in HDC; the main degradation
+        // comes from bundle cross-talk at larger set sizes, not encoding noise.
+        let noise_frac = 0.005 + pressure as f32 * 0.05 + config.effective_noise() as f32 * 0.03;
 
         let mut total_correct = 0u32;
         let mut total_swaps = 0u32;

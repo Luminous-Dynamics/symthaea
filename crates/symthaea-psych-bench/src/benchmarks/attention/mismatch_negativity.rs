@@ -56,7 +56,10 @@ impl MismatchNegativityBenchmark {
         // Detection threshold: prediction error must exceed this to flag deviant.
         // Time pressure raises threshold (less careful monitoring).
         // Treisman & Gelade (1980): speed emphasis narrows the attentional filter.
-        let detection_threshold: f64 = (0.11 + config.time_pressure * 0.10)
+        // Threshold 0.10: EMA predictive model builds strong standard
+        // representation by step 8; lower threshold captures more true deviants
+        // without excessive false alarms (Naatanen et al. 2007).
+        let detection_threshold: f64 = (0.10 + config.time_pressure * 0.10)
             * diff_model.temperature_multiplier(config.difficulty);
 
         // Attentional load noise: degrades the prediction model when attention
