@@ -47,6 +47,8 @@ pub use routing::{
     CrossClusterRole, CIVIC_DOMAINS, COMMONS_DOMAINS,
 };
 
+pub mod routing_registry;
+
 pub mod metrics;
 
 #[cfg(kani)]

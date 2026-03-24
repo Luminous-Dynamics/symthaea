@@ -28,12 +28,12 @@ use commons_bridge_integrity::*;
 use commons_types::{CommonsEvent, CommonsQuery};
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    self as bridge, check_rate_limit_count, needs_refresh, resolve_commons_zome, AuditTrailEntry,
-    AuditTrailQuery, AuditTrailResult, BridgeDomain, BridgeHealth, CareAvailabilityQuery,
-    CareAvailabilityResult, ConsciousnessCredential, ConsciousnessTier, CrossClusterDispatchInput,
-    DispatchInput, DispatchResult, EventTypeQuery, GateAuditInput, GovernanceAuditFilter,
-    GovernanceAuditResult, PropertyOwnershipQuery, PropertyOwnershipResult, ResolveQueryInput,
-    RATE_LIMIT_WINDOW_SECS,
+    self as bridge, check_rate_limit_count, needs_refresh, resolve_commons_zome,
+    routing_registry, AuditTrailEntry, AuditTrailQuery, AuditTrailResult, BridgeDomain,
+    BridgeHealth, CareAvailabilityQuery, CareAvailabilityResult, ConsciousnessCredential,
+    ConsciousnessTier, CrossClusterDispatchInput, CrossClusterRole, DispatchInput, DispatchResult,
+    EventTypeQuery, GateAuditInput, GovernanceAuditFilter, GovernanceAuditResult,
+    PropertyOwnershipQuery, PropertyOwnershipResult, ResolveQueryInput, RATE_LIMIT_WINDOW_SECS,
 };
 
 // ============================================================================
@@ -41,119 +41,26 @@ use mycelix_bridge_common::{
 // ============================================================================
 
 /// Zomes that live in the commons_land DNA (physical infrastructure).
-const LAND_ZOMES: &[&str] = &[
-    // Property domain
-    "property_registry",
-    "property_transfer",
-    "property_disputes",
-    "property_commons",
-    // Housing domain
-    "housing_units",
-    "housing_membership",
-    "housing_finances",
-    "housing_maintenance",
-    "housing_clt",
-    "housing_governance",
-    // Water domain
-    "water_flow",
-    "water_purity",
-    "water_capture",
-    "water_steward",
-    "water_wisdom",
-    // Food domain
-    "food_production",
-    "food_distribution",
-    "food_preservation",
-    "food_knowledge",
-];
+const LAND_ZOMES: &[&str] = routing_registry::COMMONS_LAND_ZOMES;
 
 /// Zomes that live in the commons_care DNA (social/care).
-const CARE_ZOMES: &[&str] = &[
-    // Care domain
-    "care_timebank",
-    "care_circles",
-    "care_matching",
-    "care_plans",
-    "care_credentials",
-    // Mutual aid domain
-    "mutualaid_needs",
-    "mutualaid_circles",
-    "mutualaid_governance",
-    "mutualaid_pools",
-    "mutualaid_requests",
-    "mutualaid_resources",
-    "mutualaid_timebank",
-    // Transport domain
-    "transport_routes",
-    "transport_sharing",
-    "transport_impact",
-    // Support domain
-    "support_knowledge",
-    "support_tickets",
-    "support_diagnostics",
-    // Space
-    "space",
-];
+const CARE_ZOMES: &[&str] = routing_registry::COMMONS_CARE_ZOMES;
 
 // ============================================================================
 // Allowed zome names — security boundary for dispatch (union of both DNAs)
 // ============================================================================
 
-const ALLOWED_ZOMES: &[&str] = &[
-    // Property domain
-    "property_registry",
-    "property_transfer",
-    "property_disputes",
-    "property_commons",
-    // Housing domain
-    "housing_units",
-    "housing_membership",
-    "housing_finances",
-    "housing_maintenance",
-    "housing_clt",
-    "housing_governance",
-    // Care domain
-    "care_timebank",
-    "care_circles",
-    "care_matching",
-    "care_plans",
-    "care_credentials",
-    // Mutual aid domain
-    "mutualaid_needs",
-    "mutualaid_circles",
-    "mutualaid_governance",
-    "mutualaid_pools",
-    "mutualaid_requests",
-    "mutualaid_resources",
-    "mutualaid_timebank",
-    // Water domain
-    "water_flow",
-    "water_purity",
-    "water_capture",
-    "water_steward",
-    "water_wisdom",
-    // Food domain
-    "food_production",
-    "food_distribution",
-    "food_preservation",
-    "food_knowledge",
-    // Transport domain
-    "transport_routes",
-    "transport_sharing",
-    "transport_impact",
-    // Support domain
-    "support_knowledge",
-    "support_tickets",
-    "support_diagnostics",
-    // Space
-    "space",
-];
+const ALLOWED_ZOMES: &[&str] = routing_registry::COMMONS_LOCAL_ZOMES;
 
 /// hApp role name for the commons_land DNA.
 const COMMONS_LAND_ROLE: &str = "commons_land";
 
 /// hApp role name for the commons_care DNA.
 const COMMONS_CARE_ROLE: &str = "commons_care";
+
+// NOTE: COMMONS_LAND_ROLE and COMMONS_CARE_ROLE are sub-cluster role names,
+// not cross-cluster roles. They are internal to commons and not part of the
+// routing registry's CrossClusterRole enum.
 
 // ============================================================================
 // Sub-Cluster Detection
@@ -689,31 +596,11 @@ pub fn get_my_events(_: ()) -> ExternResult<Vec<Record>> {
 // ============================================================================
 
 /// Civic-side zomes that commons-bridge is allowed to call cross-cluster.
-const ALLOWED_CIVIC_ZOMES: &[&str] = &[
-    // Justice domain
-    "justice_cases",
-    "justice_evidence",
-    "justice_arbitration",
-    "justice_restorative",
-    "justice_enforcement",
-    // Emergency domain
-    "emergency_incidents",
-    "emergency_triage",
-    "emergency_resources",
-    "emergency_coordination",
-    "emergency_shelters",
-    "emergency_comms",
-    // Media domain
-    "media_publication",
-    "media_attribution",
-    "media_factcheck",
-    "media_curation",
-    // Civic bridge
-    "civic_bridge",
-];
+const ALLOWED_CIVIC_ZOMES: &[&str] =
+    routing_registry::get_allowed_zomes(CrossClusterRole::Commons, CrossClusterRole::Civic);
 
 /// The hApp role name for the Civic DNA.
-const CIVIC_ROLE: &str = "civic";
+const CIVIC_ROLE: &str = routing_registry::role_name(CrossClusterRole::Civic);
 
 /// Dispatch a call to any zome in the Civic DNA.
 ///
@@ -1097,10 +984,11 @@ pub fn check_care_availability(
 // ============================================================================
 
 /// Identity-side zomes that commons-bridge is allowed to call cross-cluster.
-const ALLOWED_IDENTITY_ZOMES: &[&str] = &["identity_bridge", "did_registry"];
+const ALLOWED_IDENTITY_ZOMES: &[&str] =
+    routing_registry::get_allowed_zomes(CrossClusterRole::Commons, CrossClusterRole::Identity);
 
 /// The hApp role name for the Identity DNA.
-const IDENTITY_ROLE: &str = "identity";
+const IDENTITY_ROLE: &str = routing_registry::role_name(CrossClusterRole::Identity);
 
 /// Dispatch a cross-cluster call to any allowed zome in the Identity DNA.
 #[hdk_extern]
@@ -1483,17 +1371,11 @@ fn calculate_local_engagement() -> ExternResult<f64> {
 // ============================================================================
 
 /// Finance-side zomes that commons-bridge is allowed to call cross-cluster.
-const ALLOWED_FINANCE_ZOMES: &[&str] = &[
-    "finance_bridge",
-    "currency_mint",
-    "payments",
-    "treasury",
-    "staking",
-    "recognition",
-];
+const ALLOWED_FINANCE_ZOMES: &[&str] =
+    routing_registry::get_allowed_zomes(CrossClusterRole::Commons, CrossClusterRole::Finance);
 
 /// The hApp role name for the Finance DNA.
-const FINANCE_ROLE: &str = "finance";
+const FINANCE_ROLE: &str = routing_registry::role_name(CrossClusterRole::Finance);
 
 /// Register a commons property as finance collateral.
 ///

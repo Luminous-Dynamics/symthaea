@@ -1,4 +1,6 @@
-//! Hearth Bridge Coordinator Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Hearth Bridge Coordinator Zome
 //!
 //! Unified gateway for cross-domain and cross-cluster communication in the
 //! Hearth (Family/Household) cluster. Provides three integration patterns:
@@ -18,34 +20,27 @@ use hearth_types::{
     SeveranceSummaryData, WeeklyDigest,
 };
 use mycelix_bridge_common::{
-    self as bridge, check_rate_limit_count, needs_refresh, BridgeHealth, ConsciousnessCredential,
-    ConsciousnessTier, CrossClusterDispatchInput, DispatchInput, DispatchResult, EventTypeQuery,
-    GateAuditInput, GovernanceAuditFilter, GovernanceAuditResult, ResolveQueryInput,
-    RATE_LIMIT_WINDOW_SECS,
+    self as bridge, check_rate_limit_count, needs_refresh, routing_registry, BridgeHealth,
+    ConsciousnessCredential, ConsciousnessTier, CrossClusterDispatchInput, CrossClusterRole,
+    DispatchInput, DispatchResult, EventTypeQuery, GateAuditInput, GovernanceAuditFilter,
+    GovernanceAuditResult, ResolveQueryInput, RATE_LIMIT_WINDOW_SECS,
 };
 
 // ============================================================================
 // Allowed zome names -- security boundary for dispatch
 // ============================================================================
 
-const ALLOWED_ZOMES: &[&str] = &[
-    "hearth_kinship",
-    "hearth_gratitude",
-    "hearth_stories",
-    "hearth_care",
-    "hearth_autonomy",
-    "hearth_emergency",
-    "hearth_decisions",
-    "hearth_resources",
-    "hearth_milestones",
-    "hearth_rhythms",
-];
+const ALLOWED_ZOMES: &[&str] = routing_registry::HEARTH_LOCAL_ZOMES;
 
 // Cross-cluster dispatch targets (what hearth bridge can call in other clusters)
-const ALLOWED_PERSONAL_ZOMES: &[&str] = &["personal_bridge"];
-const ALLOWED_IDENTITY_ZOMES: &[&str] = &["identity_bridge", "did_registry", "recovery"];
-const ALLOWED_COMMONS_ZOMES: &[&str] = &["commons_bridge"];
-const ALLOWED_CIVIC_ZOMES: &[&str] = &["civic_bridge"];
+const ALLOWED_PERSONAL_ZOMES: &[&str] =
+    routing_registry::get_allowed_zomes(CrossClusterRole::Hearth, CrossClusterRole::Personal);
+const ALLOWED_IDENTITY_ZOMES: &[&str] =
+    routing_registry::get_allowed_zomes(CrossClusterRole::Hearth, CrossClusterRole::Identity);
+const ALLOWED_COMMONS_ZOMES: &[&str] =
+    routing_registry::get_allowed_zomes(CrossClusterRole::Hearth, CrossClusterRole::Commons);
+const ALLOWED_CIVIC_ZOMES: &[&str] =
+    routing_registry::get_allowed_zomes(CrossClusterRole::Hearth, CrossClusterRole::Civic);
 
 // ============================================================================
 // Domain-to-zome resolution
@@ -455,10 +450,10 @@ pub fn get_my_queries(_: ()) -> ExternResult<Vec<Record>> {
 // Cross-Cluster Dispatch
 // ============================================================================
 
-const PERSONAL_ROLE: &str = "personal";
-const IDENTITY_ROLE: &str = "identity";
-const COMMONS_ROLE: &str = "commons";
-const CIVIC_ROLE: &str = "civic";
+const PERSONAL_ROLE: &str = routing_registry::role_name(CrossClusterRole::Personal);
+const IDENTITY_ROLE: &str = routing_registry::role_name(CrossClusterRole::Identity);
+const COMMONS_ROLE: &str = routing_registry::role_name(CrossClusterRole::Commons);
+const CIVIC_ROLE: &str = routing_registry::role_name(CrossClusterRole::Civic);
 
 /// Dispatch a call to the Personal cluster.
 #[hdk_extern]

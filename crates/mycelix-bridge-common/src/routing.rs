@@ -443,17 +443,36 @@ pub enum CrossClusterRole {
     Commons,
     Civic,
     Identity,
+    Hearth,
+    Personal,
+    Finance,
+    Governance,
 }
 
 impl CrossClusterRole {
     /// String matching the hApp role name.
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Commons => "commons",
             Self::Civic => "civic",
             Self::Identity => "identity",
+            Self::Hearth => "hearth",
+            Self::Personal => "personal",
+            Self::Finance => "finance",
+            Self::Governance => "governance",
         }
     }
+
+    /// All cross-cluster role variants.
+    pub const ALL: &'static [CrossClusterRole] = &[
+        Self::Commons,
+        Self::Civic,
+        Self::Identity,
+        Self::Hearth,
+        Self::Personal,
+        Self::Finance,
+        Self::Governance,
+    ];
 }
 
 // ============================================================================

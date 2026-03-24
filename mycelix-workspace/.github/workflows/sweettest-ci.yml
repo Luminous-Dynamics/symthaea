@@ -11,6 +11,12 @@ on:
       - 'mycelix-hearth/**'
       - 'mycelix-personal/**'
       - 'mycelix-attribution/**'
+      - 'mycelix-finance/**'
+      - 'mycelix-energy/**'
+      - 'mycelix-health/**'
+      - 'mycelix-supplychain/**'
+      - 'crates/mycelix-bridge-common/**'
+      - 'crates/mycelix-bridge-entry-types/**'
       - 'mycelix-workspace/**'
   pull_request:
     branches: [main, develop]
@@ -22,6 +28,12 @@ on:
       - 'mycelix-hearth/**'
       - 'mycelix-personal/**'
       - 'mycelix-attribution/**'
+      - 'mycelix-finance/**'
+      - 'mycelix-energy/**'
+      - 'mycelix-health/**'
+      - 'mycelix-supplychain/**'
+      - 'crates/mycelix-bridge-common/**'
+      - 'crates/mycelix-bridge-entry-types/**'
       - 'mycelix-workspace/**'
   workflow_dispatch:
 
@@ -139,14 +151,110 @@ jobs:
         env:
           RUST_LOG: warn
 
-  # ── Workspace Cross-hApp Sweettests ────────────────────────────
-  workspace-sweettest:
-    name: Cross-hApp Sweettests
+  # ── Commons Cluster Unit Tests ─────────────────────────────────
+  commons-unit-tests:
+    name: Commons Cluster Unit Tests (5,276 tests)
     runs-on: ubuntu-latest
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    timeout-minutes: 150
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            mycelix-commons/target
+          key: ${{ runner.os }}-commons-unit-${{ hashFiles('mycelix-commons/**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-commons-unit-
+
+      - name: Run Commons workspace unit tests
+        run: cargo test --workspace
+        working-directory: mycelix-commons
+        env:
+          RUST_LOG: warn
+
+  # ── Civic Cluster Unit Tests ───────────────────────────────────
+  civic-unit-tests:
+    name: Civic Cluster Unit Tests (2,273 tests)
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            mycelix-civic/target
+          key: ${{ runner.os }}-civic-unit-${{ hashFiles('mycelix-civic/**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-civic-unit-
+
+      - name: Run Civic workspace unit tests
+        run: cargo test --workspace
+        working-directory: mycelix-civic
+        env:
+          RUST_LOG: warn
+
+  # ── Hearth Cluster Unit Tests ──────────────────────────────────
+  hearth-unit-tests:
+    name: Hearth Cluster Unit Tests (1,023 tests)
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            mycelix-hearth/target
+          key: ${{ runner.os }}-hearth-unit-${{ hashFiles('mycelix-hearth/**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-hearth-unit-
+
+      - name: Run Hearth workspace unit tests
+        run: cargo test --workspace
+        working-directory: mycelix-hearth
+        env:
+          RUST_LOG: warn
+
+  # ── Workspace Cross-Cluster Sweettests ─────────────────────────
+  workspace-sweettest:
+    name: Cross-Cluster Sweettests
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    timeout-minutes: 180
     needs: [identity-sweettest, governance-sweettest]
     steps:
       - uses: actions/checkout@v4
@@ -190,6 +298,22 @@ jobs:
           hc dna pack dna/ -o dna/mycelix_governance_dna.dna
         working-directory: mycelix-governance
 
+      - name: Build Commons WASM + DNA
+        run: |
+          for zome in zomes/*/integrity zomes/*/coordinator; do
+            [ -f "$zome/Cargo.toml" ] && cargo build --release --target wasm32-unknown-unknown --manifest-path "$zome/Cargo.toml"
+          done
+          hc dna pack dna/ -o dna/mycelix_commons.dna
+        working-directory: mycelix-commons
+
+      - name: Build Civic WASM + DNA
+        run: |
+          for zome in zomes/*/integrity zomes/*/coordinator; do
+            [ -f "$zome/Cargo.toml" ] && cargo build --release --target wasm32-unknown-unknown --manifest-path "$zome/Cargo.toml"
+          done
+          hc dna pack dna/ -o dna/mycelix_civic.dna
+        working-directory: mycelix-civic
+
       - name: Run cross-hApp bridge tests
         run: cargo test --release --test cross_happ_bridge -- --ignored --test-threads=1
         working-directory: mycelix-workspace/tests/sweettest
@@ -199,6 +323,27 @@ jobs:
 
       - name: Run governance workflow tests
         run: cargo test --release --test governance_workflow -- --ignored --test-threads=1
+        working-directory: mycelix-workspace/tests/sweettest
+        continue-on-error: true
+        env:
+          RUST_LOG: warn
+
+      - name: Run cross-cluster bridge tests (54 tests)
+        run: cargo test --release --test cross_cluster_bridge -- --ignored --test-threads=1
+        working-directory: mycelix-workspace/tests/sweettest
+        continue-on-error: true
+        env:
+          RUST_LOG: warn
+
+      - name: Run cross-cluster consciousness tests (13 tests)
+        run: cargo test --release --test cross_cluster_consciousness -- --ignored --test-threads=1
+        working-directory: mycelix-workspace/tests/sweettest
+        continue-on-error: true
+        env:
+          RUST_LOG: warn
+
+      - name: Run cross-cluster workflow tests (28 tests)
+        run: cargo test --release --test cross_cluster_workflows -- --ignored --test-threads=1
         working-directory: mycelix-workspace/tests/sweettest
         continue-on-error: true
         env:

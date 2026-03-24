@@ -13,42 +13,21 @@
 use civic_bridge_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    self as bridge, check_rate_limit_count, needs_refresh, resolve_civic_zome, AuditTrailEntry,
-    AuditTrailQuery, AuditTrailResult, BridgeDomain, BridgeHealth, ConsciousnessCredential,
-    ConsciousnessTier, CrossClusterDispatchInput, DispatchInput, DispatchResult,
-    EmergencyCareQuery, EmergencyCareResult, EmergencyFoodQuery, EmergencyFoodResult,
-    EventTypeQuery, FactcheckStatusQuery, FactcheckStatusResult, GateAuditInput,
-    GovernanceAuditFilter, GovernanceAuditResult, JusticeAreaQuery, JusticeAreaResult,
-    ResolveQueryInput, ShelterCapacityQuery, ShelterCapacityResult, WaterSafetyQuery,
-    WaterSafetyResult, RATE_LIMIT_WINDOW_SECS,
+    self as bridge, check_rate_limit_count, needs_refresh, resolve_civic_zome, routing_registry,
+    AuditTrailEntry, AuditTrailQuery, AuditTrailResult, BridgeDomain, BridgeHealth,
+    ConsciousnessCredential, ConsciousnessTier, CrossClusterDispatchInput, CrossClusterRole,
+    DispatchInput, DispatchResult, EmergencyCareQuery, EmergencyCareResult, EmergencyFoodQuery,
+    EmergencyFoodResult, EventTypeQuery, FactcheckStatusQuery, FactcheckStatusResult,
+    GateAuditInput, GovernanceAuditFilter, GovernanceAuditResult, JusticeAreaQuery,
+    JusticeAreaResult, ResolveQueryInput, ShelterCapacityQuery, ShelterCapacityResult,
+    WaterSafetyQuery, WaterSafetyResult, RATE_LIMIT_WINDOW_SECS,
 };
 
 // ============================================================================
 // Allowed zome names — security boundary for dispatch
 // ============================================================================
 
-const ALLOWED_ZOMES: &[&str] = &[
-    // Justice domain
-    "justice_cases",
-    "justice_evidence",
-    "justice_arbitration",
-    "justice_restorative",
-    "justice_enforcement",
-    // Emergency domain
-    "emergency_incidents",
-    "emergency_triage",
-    "emergency_resources",
-    "emergency_coordination",
-    "emergency_shelters",
-    "emergency_comms",
-    // Media domain
-    "media_publication",
-    "media_attribution",
-    "media_factcheck",
-    "media_curation",
-    // Resonance domain
-    "resonance_feed",
-];
+const ALLOWED_ZOMES: &[&str] = routing_registry::CIVIC_LOCAL_ZOMES;
 
 // ============================================================================
 // Helpers (use zome-specific EntryTypes for anchors)
@@ -546,54 +525,11 @@ pub fn get_my_events(_: ()) -> ExternResult<Vec<Record>> {
 // ============================================================================
 
 /// Commons-side zomes that civic-bridge is allowed to call cross-cluster.
-const ALLOWED_COMMONS_ZOMES: &[&str] = &[
-    // Property domain
-    "property_registry",
-    "property_transfer",
-    "property_disputes",
-    "property_commons",
-    // Housing domain
-    "housing_units",
-    "housing_membership",
-    "housing_finances",
-    "housing_maintenance",
-    "housing_clt",
-    "housing_governance",
-    // Care domain
-    "care_timebank",
-    "care_circles",
-    "care_matching",
-    "care_plans",
-    "care_credentials",
-    // Mutual aid domain
-    "mutualaid_needs",
-    "mutualaid_circles",
-    "mutualaid_governance",
-    "mutualaid_pools",
-    "mutualaid_requests",
-    "mutualaid_resources",
-    "mutualaid_timebank",
-    // Water domain
-    "water_flow",
-    "water_purity",
-    "water_capture",
-    "water_steward",
-    "water_wisdom",
-    // Food domain
-    "food_production",
-    "food_distribution",
-    "food_preservation",
-    "food_knowledge",
-    // Transport domain
-    "transport_routes",
-    "transport_sharing",
-    "transport_impact",
-    // Commons bridge
-    "commons_bridge",
-];
+const ALLOWED_COMMONS_ZOMES: &[&str] =
+    routing_registry::get_allowed_zomes(CrossClusterRole::Civic, CrossClusterRole::Commons);
 
 /// The hApp role name for the Commons DNA.
-const COMMONS_ROLE: &str = "commons";
+const COMMONS_ROLE: &str = routing_registry::role_name(CrossClusterRole::Commons);
 
 /// Dispatch a call to any zome in the Commons DNA.
 ///
@@ -1200,10 +1136,11 @@ pub fn check_factcheck_status(input: FactcheckStatusQuery) -> ExternResult<Factc
 // ============================================================================
 
 /// Identity-side zomes that civic-bridge is allowed to call cross-cluster.
-const ALLOWED_IDENTITY_ZOMES: &[&str] = &["identity_bridge", "did_registry"];
+const ALLOWED_IDENTITY_ZOMES: &[&str] =
+    routing_registry::get_allowed_zomes(CrossClusterRole::Civic, CrossClusterRole::Identity);
 
 /// The hApp role name for the Identity DNA.
-const IDENTITY_ROLE: &str = "identity";
+const IDENTITY_ROLE: &str = routing_registry::role_name(CrossClusterRole::Identity);
 
 /// Dispatch a cross-cluster call to any allowed zome in the Identity DNA.
 #[hdk_extern]
