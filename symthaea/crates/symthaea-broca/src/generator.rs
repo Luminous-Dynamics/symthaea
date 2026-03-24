@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! BrocaGenerator: autoregressive text generation from thought channels.
 //!
 //! Orchestrates the full pipeline:
@@ -230,6 +233,9 @@ pub struct BrocaGenerator {
     /// Cached NSM semantic gate (built once at construction, reused per-generation).
     /// `None` when `enable_nsm_gate` is false.
     nsm_gate: Option<crate::gating::NsmSemanticGate>,
+    /// Code-aware gating: boosts/suppresses tokens based on code channels (24-27).
+    /// Active only when `GatingConfig::enable_code_gate` is true.
+    code_gate: crate::gating::CodeGate,
 }
 
 impl BrocaGenerator {
@@ -263,6 +269,8 @@ impl BrocaGenerator {
             None
         };
 
+        let code_gate = crate::gating::CodeGate::new(&tokenizer, &config.gating);
+
         Self {
             controller,
             tokenizer,
@@ -273,6 +281,7 @@ impl BrocaGenerator {
             coherence_feedback,
             sampling_rng,
             nsm_gate,
+            code_gate,
             config,
         }
     }
@@ -318,6 +327,8 @@ impl BrocaGenerator {
             None
         };
 
+        let code_gate = crate::gating::CodeGate::new(&tokenizer, &config.gating);
+
         Self {
             controller,
             tokenizer,
@@ -328,6 +339,7 @@ impl BrocaGenerator {
             coherence_feedback,
             sampling_rng,
             nsm_gate,
+            code_gate,
             config,
         }
     }
@@ -565,6 +577,10 @@ impl BrocaGenerator {
                 0.0
             };
 
+            // Code-aware gate: boost/suppress tokens based on code channels (24-27).
+            // Structural keywords when complex, error handling when error-prone, etc.
+            self.code_gate.apply(&mut logits, channels);
+
             // Coherence feedback: scale thought HV to strengthen binding when coherence drifts
             let mut this_binding_weight = 1.0f32;
             let mut this_veto = false;
@@ -796,6 +812,11 @@ impl BrocaGenerator {
     /// Get reference to the config.
     pub fn config(&self) -> &BrocaConfig {
         &self.config
+    }
+
+    /// Get mutable reference to the config (for training-time adjustments).
+    pub fn config_mut(&mut self) -> &mut BrocaConfig {
+        &mut self.config
     }
 }
 
@@ -1454,8 +1475,6 @@ mod tests {
 
     #[test]
     fn test_hallucination_flag_on_noise() {
-        use symthaea_core::hdc::ContinuousHV;
-
         // The hallucination flag detects 3+ consecutive tokens with
         // output-thought similarity < 0.05. With random weights this
         // may or may not trigger, so we just verify it's a bool.
@@ -1489,7 +1508,6 @@ mod tests {
 
         // Count distinct pairs
         let mut distinct_pairs = 0;
-        let total_pairs = 8 * 7 / 2; // C(8,2) = 28
         for i in 0..8 {
             for j in (i + 1)..8 {
                 if outputs[i] != outputs[j] {

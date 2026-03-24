@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Affective Consciousness: Emotional Awareness
 //!
 //! Based on Damasio's Somatic Marker Hypothesis and core affect theory.
@@ -759,17 +762,31 @@ impl AffectiveConsciousnessAnalyzer {
             return (0.0, 0.0);
         }
 
+        let divisor = (recent.len() - 1) as f32;
+
         let valence_trend: f32 = recent
             .windows(2)
             .map(|w| w[0].valence - w[1].valence)
             .sum::<f32>()
-            / (recent.len() - 1) as f32;
+            / divisor;
 
         let arousal_trend: f32 = recent
             .windows(2)
             .map(|w| w[0].arousal - w[1].arousal)
             .sum::<f32>()
-            / (recent.len() - 1) as f32;
+            / divisor;
+
+        // Guard: if any affect values were NaN/Inf, return neutral trend
+        let valence_trend = if valence_trend.is_finite() {
+            valence_trend
+        } else {
+            0.0
+        };
+        let arousal_trend = if arousal_trend.is_finite() {
+            arousal_trend
+        } else {
+            0.0
+        };
 
         (valence_trend, arousal_trend)
     }

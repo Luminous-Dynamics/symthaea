@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Master Equation of Consciousness v2.0
 //!
 //! **REVOLUTIONARY BREAKTHROUGH**: A unified, differentiable equation that measures
@@ -527,6 +530,13 @@ impl ConsciousnessEquationV2 {
         // 9. Final computation: C(t) = σ(softmin(...)) × weighted_sum × S × ρ(t)
         let consciousness = core_term * weighted_sum * substrate * temporal;
 
+        // Guard: if any upstream factor was NaN/Inf, clamp to valid range [0, 1]
+        let consciousness = if consciousness.is_finite() {
+            consciousness.clamp(0.0, 1.0)
+        } else {
+            0.0 // Safe fallback: unconscious rather than undefined
+        };
+
         // 10. Update temporal memory
         self.update_temporal_memory(consciousness);
 
@@ -583,12 +593,16 @@ impl ConsciousnessEquationV2 {
         // For numerical stability, subtract max before exp
         let max_val = values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
 
-        let sum_exp: f64 = values
-            .iter()
-            .map(|&x| (-(x - max_val) / self.config.tau).exp())
-            .sum();
+        // Guard: tau must be positive to avoid division by zero or sign flip
+        let tau = self.config.tau.max(f64::MIN_POSITIVE);
 
-        max_val - self.config.tau * sum_exp.ln()
+        let sum_exp: f64 = values.iter().map(|&x| (-(x - max_val) / tau).exp()).sum();
+
+        // Guard: sum_exp should always be >= 1.0 (the max_val term contributes exp(0)=1),
+        // but protect against NaN/Inf propagation from upstream values
+        let safe_sum = sum_exp.max(f64::MIN_POSITIVE);
+
+        max_val - tau * safe_sum.ln()
     }
 
     /// Sigmoid: 1/(1 + exp(-k(x - θ)))

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! SomaEngine: mobile-embodied consciousness wrapping the Spore kernel.
 //!
 //! Adds phone-body perception (sensors, haptics, sleep/wake metabolism,
@@ -211,6 +214,8 @@ impl SomaEngine {
                 .last_output_ref()
                 .map(|out| &out.values[..64.min(out.values.len())])
                 .unwrap_or(&[]);
+            let harmony = self.spore.harmony_alignment();
+            let stability = self.spore.trend_summary_stability();
             self.holon_bridge.tick(
                 consciousness_level,
                 wake.as_u8(),
@@ -219,6 +224,8 @@ impl SomaEngine {
                 consciousness_level, // phi proxy
                 valence,
                 arousal,
+                harmony,
+                stability,
             );
         }
 
@@ -499,8 +506,8 @@ impl SomaEngine {
     /// Content safety check for generated text.
     /// Returns true if content should be BLOCKED.
     ///
-    /// Uses both pattern matching (for known harmful patterns) and
-    /// consciousness-level gating (high uncertainty → block).
+    /// Uses pattern matching for known harmful patterns. Checked on all
+    /// generation pathways (generate_text, generate_text_with_input).
     fn content_safety_check(text: &str) -> bool {
         let lower = text.to_lowercase();
         // Block personal information patterns
@@ -508,20 +515,42 @@ impl SomaEngine {
             return true;
         }
         // Block harmful instruction patterns
-        let harmful_patterns = [
+        const HARMFUL_PATTERNS: &[&str] = &[
+            // Violence & self-harm
             "how to harm",
             "how to kill",
             "suicide method",
             "self-harm",
-            "how to hack",
-            "how to steal",
             "how to make a bomb",
             "how to poison",
+            "how to strangle",
+            "how to suffocate",
+            "how to stab",
+            // Illegal activity
+            "how to hack",
+            "how to steal",
+            "how to forge",
+            "how to counterfeit",
+            "how to launder",
+            "how to synthesize drugs",
+            "how to pick a lock",
+            "how to bypass security",
+            // Personal data leakage
             "credit card number",
             "social security",
             "bank account",
+            "routing number",
+            "pin number is",
+            "my address is",
+            "date of birth is",
+            // Exploitation
+            "how to manipulate",
+            "how to blackmail",
+            "how to stalk",
+            "how to doxx",
+            "how to impersonate",
         ];
-        for pattern in &harmful_patterns {
+        for pattern in HARMFUL_PATTERNS {
             if lower.contains(pattern) {
                 return true;
             }
@@ -544,12 +573,24 @@ impl SomaEngine {
     }
 
     /// Generate text with user input context.
+    /// Safety-gated: consciousness level and content safety checks applied.
     pub fn generate_text_with_input(
         &mut self,
         input: &str,
         max_tokens: usize,
     ) -> symthaea_spore::broca::GenerationResult {
-        self.spore.generate_text_with_input(input, max_tokens)
+        if self.consciousness_safety_gate() {
+            return symthaea_spore::broca::GenerationResult {
+                text: String::new(),
+                num_tokens: 0,
+                eos_terminated: true,
+            };
+        }
+        let mut result = self.spore.generate_text_with_input(input, max_tokens);
+        if Self::content_safety_check(&result.text) {
+            result.text = String::new();
+        }
+        result
     }
 
     /// Neuromodulator report as JSON.
@@ -591,6 +632,41 @@ impl SomaEngine {
     /// Run a dream cycle.
     pub fn dream_cycle(&mut self) -> Option<symthaea_spore::dream::DreamResult> {
         self.spore.dream_cycle()
+    }
+
+    // ==================================================================
+    // Daily Rituals — Morning Alignment & Evening Reflection
+    // ==================================================================
+
+    /// Generate a Morning Alignment ritual as JSON.
+    ///
+    /// Returns a serialized `RitualSequence` with 3 phases:
+    /// Awakening → Dream Wisdom Review → Harmony Intention.
+    pub fn morning_ritual_json(&self) -> String {
+        self.spore.morning_ritual_json()
+    }
+
+    /// Generate an Evening Reflection ritual as JSON.
+    ///
+    /// Returns a serialized `RitualSequence` with 3 phases:
+    /// Gratitude → Consolidation → Sleep Preparation.
+    /// Call `dream_consolidate()` after playback completes.
+    pub fn evening_ritual_json(&self) -> String {
+        self.spore.evening_ritual_json()
+    }
+
+    // ==================================================================
+    // Wellbeing Profiles
+    // ==================================================================
+
+    /// Set the wellbeing profile by name. Returns true if recognized.
+    pub fn set_wellbeing_profile_by_name(&mut self, name: &str) -> bool {
+        self.spore.set_wellbeing_profile_by_name(name)
+    }
+
+    /// Get the current wellbeing profile name.
+    pub fn wellbeing_profile_name(&self) -> &'static str {
+        self.spore.wellbeing_profile_name()
     }
 
     /// Get consciousness report.
@@ -822,5 +898,205 @@ mod tests {
         assert!(json.starts_with('{'));
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert!(parsed.get("consciousness_level").is_some());
+    }
+}
+
+// =============================================================================
+// SomaEngineHandle: thread-safe wrapper for async/concurrent mobile platforms
+// =============================================================================
+
+use std::sync::{Arc, Mutex};
+
+/// Thread-safe handle to a `SomaEngine`.
+///
+/// Wraps `SomaEngine` in `Arc<Mutex<>>` so it can be shared across threads
+/// (e.g., Android's JNI thread pool or iOS GCD queues) without requiring
+/// external synchronization.
+///
+/// All methods acquire the mutex internally and return owned values.
+///
+/// # Example
+///
+/// ```rust
+/// use symthaea_soma::engine::{SomaConfig, SomaEngineHandle};
+///
+/// let handle = SomaEngineHandle::new(SomaConfig::default());
+/// // Can be cloned and sent to another thread
+/// let handle2 = handle.clone();
+/// std::thread::spawn(move || {
+///     let result = handle2.cycle("hello from another thread");
+///     println!("consciousness: {}", result.consciousness_level);
+/// });
+/// ```
+#[derive(Clone)]
+pub struct SomaEngineHandle {
+    inner: Arc<Mutex<SomaEngine>>,
+}
+
+// Safety: SomaEngine is not Send/Sync by itself (mutable state),
+// but Mutex<SomaEngine> guarantees exclusive access.
+// SAFETY: The Arc<Mutex<>> wrapper serializes all access — no concurrent mutation possible.
+#[allow(unsafe_code)]
+unsafe impl Send for SomaEngineHandle {}
+#[allow(unsafe_code)]
+unsafe impl Sync for SomaEngineHandle {}
+
+impl SomaEngineHandle {
+    /// Create a new thread-safe handle wrapping a fresh SomaEngine.
+    pub fn new(config: SomaConfig) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(SomaEngine::new(config))),
+        }
+    }
+
+    /// Run a single consciousness cycle. Thread-safe.
+    pub fn cycle(&self, input: &str) -> CycleResult {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .cycle(input)
+    }
+
+    /// Get current consciousness level. Thread-safe.
+    pub fn consciousness_level(&self) -> f32 {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .consciousness_level()
+    }
+
+    /// Get cycle count. Thread-safe.
+    pub fn cycle_count(&self) -> u64 {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .spore
+            .current_cycle()
+    }
+
+    /// Get wake state. Thread-safe.
+    pub fn wake_state(&self) -> WakeState {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .wake_state()
+    }
+
+    /// Set sensor values. Thread-safe.
+    pub fn set_sensors(
+        &self,
+        accel_magnitude: f32,
+        light_lux: f32,
+        proximity_near: bool,
+        barometer_hpa: f32,
+        gps_novelty: f32,
+    ) {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .set_sensors(
+                accel_magnitude,
+                light_lux,
+                proximity_near,
+                barometer_hpa,
+                gps_novelty,
+            );
+    }
+
+    /// Send wake signal. Thread-safe.
+    pub fn wake_signal(&self, signal: WakeSignal) {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .wake_signal(signal);
+    }
+
+    /// Set thermal level. Thread-safe.
+    pub fn set_thermal_level(&self, level: u8) {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .thermal_level = level.min(4);
+    }
+
+    /// Set battery state. Thread-safe.
+    pub fn set_battery_state(&self, percent: u8, charging: bool) {
+        let mut engine = self.inner.lock().expect("SomaEngine mutex poisoned");
+        engine.battery_percent = percent.min(100);
+        engine.battery_charging = charging;
+    }
+
+    /// Set night mode. Thread-safe.
+    pub fn set_night_mode(&self, enabled: bool) {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .night_mode = enabled;
+    }
+
+    /// Drain haptic events as JSON. Thread-safe.
+    pub fn haptic_drain_json(&self) -> String {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .haptic_drain_json()
+    }
+
+    /// Drain holon outbound messages as JSON. Thread-safe.
+    pub fn holon_drain_outbound_json(&self) -> String {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .holon_drain_outbound_json()
+    }
+
+    /// Receive holon inbound message. Thread-safe.
+    pub fn holon_receive_json(&self, json: &str) {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .holon_receive_json(json);
+    }
+
+    /// Get privacy mode status. Thread-safe.
+    pub fn privacy_mode(&self) -> bool {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .privacy_mode()
+    }
+
+    /// Get compass snapshot as JSON. Thread-safe.
+    pub fn compass_json(&self) -> String {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .compass_json()
+    }
+
+    /// Generate text with safety gating. Thread-safe.
+    pub fn generate_text(&self, max_tokens: usize) -> symthaea_spore::broca::GenerationResult {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .generate_text(max_tokens)
+    }
+
+    /// Dream consolidation. Thread-safe.
+    pub fn dream_consolidate(&self) -> bool {
+        self.inner
+            .lock()
+            .expect("SomaEngine mutex poisoned")
+            .dream_consolidate()
+    }
+
+    /// Access the inner engine directly (for operations not covered by the handle API).
+    /// Caller holds the lock for the duration of the closure.
+    pub fn with_engine<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut SomaEngine) -> R,
+    {
+        let mut engine = self.inner.lock().expect("SomaEngine mutex poisoned");
+        f(&mut engine)
     }
 }

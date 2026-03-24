@@ -1,5 +1,7 @@
 #![allow(clippy::needless_range_loop)]
-
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Symthaea Speech-to-Text Library
 //!
 //! A neuromorphic speech recognition system built on:
@@ -77,6 +79,9 @@ pub mod liquid_hdc;
 pub mod liquid_projection;
 pub mod lm;
 pub mod ltc;
+#[cfg(feature = "gpu")]
+pub mod ltc_gpu;
+pub mod ltc_training;
 pub mod models;
 pub mod multiscale_scorer;
 pub mod phoneme;

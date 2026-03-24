@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Core dynamics phase of the cognitive cycle.
 //!
 //! `phase_dynamics()` orchestrates Phases A–11, delegating to three private helpers:
@@ -546,6 +549,39 @@ impl CognitiveLoopService {
                     let swarm_output = self.swarm_manager.process(snapshot);
                     self.subsystem_collector
                         .record("swarm_manager", swarm_output);
+                }
+
+                // ── Holon Receiver (every cycle — low cost) ────────────
+                // Process inbound messages from connected Soma devices.
+                // Routes tasks, knowledge, and peer state into the existing managers.
+                {
+                    let processed = self.holon_receiver.process_inbound(cycle_num as u64);
+                    if processed > 0 {
+                        // Collect peer data into local vec (avoid borrow conflict with swarm_manager)
+                        let peer_updates: Vec<_> = self
+                            .holon_receiver
+                            .peers()
+                            .map(|p| {
+                                (
+                                    p.device_id.clone(),
+                                    p.phi as f64,
+                                    p.valence as f64,
+                                    p.arousal as f64,
+                                )
+                            })
+                            .collect();
+                        for (peer_id, phi, valence, arousal) in peer_updates {
+                            use super::managers::swarm_manager::SwarmEvent;
+                            self.swarm_manager
+                                .inject_event(SwarmEvent::ConsciousnessUpdate {
+                                    peer_id,
+                                    phi,
+                                    valence,
+                                    arousal,
+                                });
+                        }
+                    }
+                    self.holon_receiver.evict_stale(cycle_num as u64, 500);
                 }
 
                 // ── Soul Manager (interval 43, co-prime) ──────────────
@@ -1229,7 +1265,7 @@ impl CognitiveLoopService {
         let goal_attention_bias = mem_bind.goal_attention_bias;
 
         // Re-derive reflection thresholds (also used in FEP decomposition below)
-        let reflection_thresholds = self.self_model_tier.self_reflection.get_thresholds();
+        let reflection_thresholds = self.consciousness.self_model_tier.self_reflection.get_thresholds();
 
         // 1b. Analyze emotional content for simple contagion (keyword-based)
         self.emotion_contagion.analyze(input);
@@ -2126,7 +2162,7 @@ impl CognitiveLoopService {
                 MotorCommandType::ReflectionInitiate => {
                     let intensity = enhanced_result.motor_command.intensity as f32;
                     if intensity > super::thresholds::MOTOR_REFLECTION_THRESHOLD {
-                        self.self_model_tier.self_reflection.force_reflection();
+                        self.consciousness.self_model_tier.self_reflection.force_reflection();
                         // Boost meta-awareness proportional to intensity
                         self.adjust_confidence(
                             "motor_reflection",
@@ -3037,7 +3073,7 @@ impl CognitiveLoopService {
         };
 
         // Coherence gate: skip resonator recall during unstable CfC dynamics
-        let reflection_thresholds = self.self_model_tier.self_reflection.get_thresholds();
+        let reflection_thresholds = self.consciousness.self_model_tier.self_reflection.get_thresholds();
         let resonator_coherence_gate = pre_update_coherence > reflection_thresholds.coherence_gate
             || self.stats.total_cycles < DYNAMICS_STARTUP_WARMUP_CYCLES;
         if resonator_coherence_gate && urgency.should_run(self.stats.total_cycles, 1, 1, 4) {
@@ -4087,7 +4123,24 @@ impl CognitiveLoopService {
                 };
                 #[cfg(feature = "parallel")]
                 {
-                    rayon_join(semantic_fn, episodic_fn)
+                    use std::panic::AssertUnwindSafe;
+                    let (sem, epi) = rayon_join(
+                        || {
+                            std::panic::catch_unwind(AssertUnwindSafe(semantic_fn))
+                                .unwrap_or_else(|_| {
+                                    tracing::error!("Parallel Branch A (semantic/causal) panicked — returning None");
+                                    None
+                                })
+                        },
+                        || {
+                            std::panic::catch_unwind(AssertUnwindSafe(episodic_fn))
+                                .unwrap_or_else(|_| {
+                                    tracing::error!("Parallel Branch B (episodic/learning) panicked — returning 0.0");
+                                    0.0
+                                })
+                        },
+                    );
+                    (sem, epi)
                 }
                 #[cfg(not(feature = "parallel"))]
                 {
@@ -4166,7 +4219,7 @@ impl CognitiveLoopService {
         // High fatigue → widen spacing (don't generate when attention depleted).
         // Science: Mackworth (1948) — vigilance decrement degrades production quality.
         let fatigue_spacing_boost = if self
-            .self_model_tier
+            .consciousness.self_model_tier
             .attention_schema
             .as_ref()
             .map(|s| s.fatigue_level())
@@ -4401,48 +4454,41 @@ impl CognitiveLoopService {
                 cube_h_value: self.carryover.quality.last_cube_h_value,
                 cube_quality: self.carryover.quality.last_cube_quality,
 
-                // Compute HDC encoding of the epistemic cube via NSM grounding.
-                // This semantically encodes the cube position so the thought HV
+                // Compute HDC encoding of the epistemic cube via cached NSM grounding.
+                // Semantically encodes the cube position so the thought HV
                 // carries *what kind of knowledge this is*, not just scalar metadata.
                 epistemic_cube_hv: {
-                    if let (Some(e), Some(n), Some(m)) = (
+                    if let (Some(e), Some(n), Some(m), Some(ref grounding)) = (
                         self.carryover.quality.last_cube_e_tier,
                         self.carryover.quality.last_cube_n_tier,
                         self.carryover.quality.last_cube_m_tier,
+                        &self.primitive_tier.epistemic_nsm_grounding,
                     ) {
                         use crate::consciousness::epistemic_tiers::{
-                            EmpiricalTier, EpistemicCoordinate, EpistemicNSMGrounding,
-                            MaterialityTier, NormativeTier,
-                        };
-                        let empirical = match e {
-                            0 => EmpiricalTier::E0Null,
-                            1 => EmpiricalTier::E1Testimonial,
-                            2 => EmpiricalTier::E2PrivatelyVerifiable,
-                            3 => EmpiricalTier::E3CryptographicallyProven,
-                            _ => EmpiricalTier::E4PubliclyReproducible,
-                        };
-                        let normative = match n {
-                            0 => NormativeTier::N0Personal,
-                            1 => NormativeTier::N1Communal,
-                            2 => NormativeTier::N2Network,
-                            _ => NormativeTier::N3Axiomatic,
-                        };
-                        let materiality = match m {
-                            0 => MaterialityTier::M0Ephemeral,
-                            1 => MaterialityTier::M1Temporal,
-                            2 => MaterialityTier::M2Persistent,
-                            _ => MaterialityTier::M3Foundational,
+                            EmpiricalTier, EpistemicCoordinate, MaterialityTier, NormativeTier,
                         };
                         let coord = EpistemicCoordinate {
-                            empirical,
-                            normative,
-                            materiality,
+                            empirical: match e {
+                                0 => EmpiricalTier::E0Null,
+                                1 => EmpiricalTier::E1Testimonial,
+                                2 => EmpiricalTier::E2PrivatelyVerifiable,
+                                3 => EmpiricalTier::E3CryptographicallyProven,
+                                _ => EmpiricalTier::E4PubliclyReproducible,
+                            },
+                            normative: match n {
+                                0 => NormativeTier::N0Personal,
+                                1 => NormativeTier::N1Communal,
+                                2 => NormativeTier::N2Network,
+                                _ => NormativeTier::N3Axiomatic,
+                            },
+                            materiality: match m {
+                                0 => MaterialityTier::M0Ephemeral,
+                                1 => MaterialityTier::M1Temporal,
+                                2 => MaterialityTier::M2Persistent,
+                                _ => MaterialityTier::M3Foundational,
+                            },
                         };
-                        let system =
-                            symthaea_core::hdc::primitive_system::PrimitiveSystem::global();
-                        let grounding = EpistemicNSMGrounding::new(&system);
-                        let binary_hv = grounding.encode_coordinate(&coord);
-                        Some(binary_hv.to_continuous())
+                        Some(grounding.encode_coordinate(&coord).to_continuous())
                     } else {
                         None
                     }

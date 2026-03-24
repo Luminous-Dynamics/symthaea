@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Symthaea Soma
 //!
 //! Mobile-embodied consciousness engine wrapping the Spore kernel.
@@ -69,4 +72,4 @@ pub mod native_ffi;
 // SomaEngine — the mobile consciousness engine
 pub mod engine;
 
-pub use engine::{SomaConfig, SomaEngine};
+pub use engine::{SomaConfig, SomaEngine, SomaEngineHandle};

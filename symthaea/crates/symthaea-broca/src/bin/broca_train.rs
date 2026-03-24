@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! broca-train: Command-line training tool for the Broca SSM language center.
 //!
 //! Usage:
@@ -86,8 +89,22 @@ fn main() {
         let mut config = BrocaConfig::default();
         config.controller.network_layers = opts.network_layers;
         config.controller.neurons_per_layer = opts.neurons_per_layer;
+        if opts.projection_dim > 0 {
+            config.controller.projection_dim = Some(opts.projection_dim);
+        }
         (BrocaGenerator::new_4k(&genesis, config), None)
     };
+
+    // Enable projection head if --projection-dim specified (works for both fresh and resume)
+    if opts.projection_dim > 0 && generator.controller().projection_dim().is_none() {
+        tracing::info!(
+            dim = opts.projection_dim,
+            "Enabling learned projection head"
+        );
+        generator
+            .controller_mut()
+            .enable_projection(&genesis, opts.projection_dim);
+    }
 
     // Re-tokenize all pairs with the generator's BPE tokenizer.
     // The JSONL may have target_ids from a different tokenizer (e.g., GPT-NeoX
@@ -157,6 +174,9 @@ fn main() {
         label_smoothing: opts.label_smoothing,
         best_checkpoint_path: best_path,
         hidden_dropout: opts.hidden_dropout,
+        adaptive_veto_target: opts.adaptive_veto_target,
+        veto_warmup_epochs: opts.veto_warmup_epochs,
+        enable_soft_veto_during_training: opts.enable_soft_veto_training,
         ..Default::default()
     };
 
@@ -385,6 +405,17 @@ struct TrainOpts {
     network_layers: usize,
     /// CfC neurons per layer (default: 8). Only used for fresh training (not --resume).
     neurons_per_layer: usize,
+    /// Projection head dimension (default: 0 = disabled).
+    /// Projects 16,384D output to this dimension before logit computation.
+    projection_dim: usize,
+    /// Adaptive veto target threshold (default: 0.0 = disabled).
+    /// When > 0, veto_threshold ramps from 0.0 to this value over the final
+    /// veto_warmup_epochs, teaching the CfC to satisfy the veto coherence gate.
+    adaptive_veto_target: f32,
+    /// Epochs over which to ramp veto threshold (default: 10).
+    veto_warmup_epochs: usize,
+    /// Enable soft veto during training (default: false).
+    enable_soft_veto_training: bool,
 }
 
 fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
@@ -426,6 +457,10 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
         hidden_dropout: 0.0,
         network_layers: 3,
         neurons_per_layer: 8,
+        projection_dim: 0,
+        adaptive_veto_target: 0.0,
+        veto_warmup_epochs: 10,
+        enable_soft_veto_training: false,
     };
 
     let mut i = 1;
@@ -655,6 +690,33 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
                     .parse()
                     .map_err(|_| "--neurons-per-layer must be a positive integer")?;
             }
+            "--projection-dim" => {
+                i += 1;
+                opts.projection_dim = args
+                    .get(i)
+                    .ok_or("--projection-dim requires a number")?
+                    .parse()
+                    .map_err(|_| "--projection-dim must be a positive integer")?;
+            }
+            "--adaptive-veto" => {
+                i += 1;
+                opts.adaptive_veto_target = args
+                    .get(i)
+                    .ok_or("--adaptive-veto requires a float (e.g., 0.15)")?
+                    .parse()
+                    .map_err(|_| "--adaptive-veto must be a float")?;
+            }
+            "--veto-warmup" => {
+                i += 1;
+                opts.veto_warmup_epochs = args
+                    .get(i)
+                    .ok_or("--veto-warmup requires a number")?
+                    .parse()
+                    .map_err(|_| "--veto-warmup must be a positive integer")?;
+            }
+            "--soft-veto-training" => {
+                opts.enable_soft_veto_training = true;
+            }
             "--fusion" => {
                 opts.enable_fusion = true;
             }
@@ -724,5 +786,11 @@ fn print_usage() {
     eprintln!("  --hidden-dropout F   CfC hidden state dropout rate (default: 0.0 = off)");
     eprintln!("  --network-layers N   CfC network layers (default: 3, fresh train only)");
     eprintln!("  --neurons-per-layer N  CfC neurons per layer (default: 8, fresh train only)");
+    eprintln!(
+        "  --projection-dim N   Project to N dimensions for logits (default: 0 = off, try 256)"
+    );
+    eprintln!("  --adaptive-veto F    Ramp veto threshold to F over final --veto-warmup epochs (default: 0.0 = off)");
+    eprintln!("  --veto-warmup N      Epochs over which to ramp veto threshold (default: 10)");
+    eprintln!("  --soft-veto-training Enable soft veto (partial CfC restore) during training");
     eprintln!("  --help, -h           Show this help message");
 }
