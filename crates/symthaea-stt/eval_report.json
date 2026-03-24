@@ -1,16 +1,16 @@
 {
-  "num_utterances": 20,
-  "total_audio_seconds": 156.47008,
-  "total_inference_seconds": 100.425316,
-  "rtf": 0.64181805,
-  "wer": 463.4146,
-  "per": 97.470314,
+  "num_utterances": 50,
+  "total_audio_seconds": 375.60007,
+  "total_inference_seconds": 78.96283,
+  "rtf": 0.21023114,
+  "wer": 445.85468,
+  "per": 98.5104,
   "word_correct": 0,
-  "word_substitutions": 410,
-  "word_insertions": 1490,
+  "word_substitutions": 977,
+  "word_insertions": 3379,
   "word_deletions": 0,
-  "phoneme_correct": 122,
-  "phoneme_substitutions": 1705,
-  "phoneme_insertions": 73,
-  "phoneme_deletions": 110
+  "phoneme_correct": 206,
+  "phoneme_substitutions": 4012,
+  "phoneme_insertions": 138,
+  "phoneme_deletions": 347
 }
