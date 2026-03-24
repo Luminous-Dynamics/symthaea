@@ -1318,6 +1318,98 @@ pub fn refresh_consciousness_credential(did: String) -> ExternResult<Consciousne
     Ok(credential)
 }
 
+/// Issue a consciousness credential enriched with Symthaea consciousness signals.
+///
+/// When a Symthaea instance is connected, it provides multi-dimensional consciousness
+/// data (phi, meta_awareness, coherence, care_activation) that produces a richer
+/// `engagement` score than the local activity-based calculation.
+///
+/// Falls back to `get_consciousness_credential` (local engagement) if Symthaea
+/// signals are not provided (all zero).
+#[hdk_extern]
+pub fn get_consciousness_credential_enriched(
+    input: EnrichedCredentialInput,
+) -> ExternResult<ConsciousnessCredential> {
+    // If no Symthaea signals provided, fall back to standard local engagement
+    let has_symthaea = input.phi > 0.0
+        || input.meta_awareness > 0.0
+        || input.coherence > 0.0
+        || input.care_activation > 0.0;
+
+    if !has_symthaea {
+        return get_consciousness_credential(input.did);
+    }
+
+    // 1. Get base credential from identity bridge (identity, reputation, community)
+    let payload = ExternIO::encode(input.did.clone())
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .0;
+    let dispatch = CrossClusterDispatchInput {
+        role: IDENTITY_ROLE.to_string(),
+        zome: "identity_bridge".to_string(),
+        fn_name: "issue_consciousness_credential".to_string(),
+        payload,
+    };
+    let result = bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_IDENTITY_ZOMES);
+
+    let base_cred: ConsciousnessCredential = match result {
+        Ok(r) if r.success => {
+            let response_bytes = r.response.ok_or_else(|| {
+                wasm_error!(WasmErrorInner::Guest(
+                    "Empty response from identity bridge".into()
+                ))
+            })?;
+            ExternIO(response_bytes).decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Failed to decode consciousness credential: {:?}",
+                    e
+                )))
+            })?
+        }
+        _ => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Identity cluster unreachable — cannot issue enriched credential for {}",
+                input.did
+            ))));
+        }
+    };
+
+    // 2. Build enriched credential using Symthaea signals for engagement
+    let now_us = sys_time()?.as_micros() as u64;
+    let credential = mycelix_bridge_common::ConsciousnessCredential::from_symthaea(
+        input.did,
+        input.phi,
+        input.meta_awareness,
+        input.coherence,
+        input.care_activation,
+        base_cred.profile.identity,
+        base_cred.profile.reputation,
+        base_cred.profile.community,
+        format!("did:mycelix:{}", agent_info()?.agent_initial_pubkey),
+        now_us,
+    );
+
+    // 3. Cache the enriched credential
+    let _ = cache_credential(&credential);
+
+    Ok(credential)
+}
+
+/// Input for enriched consciousness credential issuance.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct EnrichedCredentialInput {
+    /// Agent DID
+    pub did: String,
+    /// Symthaea Integrated Information (Φ) \[0, 1\]
+    pub phi: f64,
+    /// Symthaea meta-cognitive depth \[0, 1\]
+    pub meta_awareness: f64,
+    /// Symthaea narrative coherence \[0, 1\]
+    pub coherence: f64,
+    /// Symthaea empathic responsiveness \[0, 1\]
+    pub care_activation: f64,
+}
+
 /// Calculate local engagement score from this cluster's activity.
 ///
 /// Counts the calling agent's events and queries in the last 90 days,
