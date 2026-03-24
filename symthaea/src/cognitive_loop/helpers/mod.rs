@@ -579,36 +579,36 @@ impl CognitiveLoopService {
         self.stats.tau_trend = temporal_summary.features.trend;
 
         // Adaptive behavior stats
-        self.stats.adaptive_confidence = self.adaptive_behavior.confidence;
-        let hint_str = self.adaptive_behavior.action_hint.as_str();
+        self.stats.adaptive_confidence = self.behavior.adaptive_behavior.confidence;
+        let hint_str = self.behavior.adaptive_behavior.action_hint.as_str();
         if self.stats.action_hint != hint_str {
             self.stats.action_hint = hint_str.to_string();
         }
-        self.stats.learning_paused = self.adaptive_behavior.pause_learning;
+        self.stats.learning_paused = self.behavior.adaptive_behavior.pause_learning;
         self.stats.adaptive_learning_rate = self
-            .adaptive_behavior
+            .behavior.adaptive_behavior
             .effective_learning_rate(self.combined_learning_rate());
-        self.stats.adaptive_speech_rate = self.adaptive_behavior.speech_rate_multiplier;
+        self.stats.adaptive_speech_rate = self.behavior.adaptive_behavior.speech_rate_multiplier;
 
         // Prediction confidence stats
         self.stats.prediction_confidence = self.prediction_confidence as f32;
         // Decay rate: higher when in uncertain states
-        self.stats.confidence_decay_rate = match self.adaptive_behavior.action_hint {
+        self.stats.confidence_decay_rate = match self.behavior.adaptive_behavior.action_hint {
             ActionHint::Stabilize | ActionHint::SeekInput => 0.05,
             ActionHint::SlowDown => 0.03,
             _ => 0.0,
         };
 
         // Flow state stats
-        self.stats.in_flow = self.flow_state.in_flow;
-        self.stats.flow_intensity = self.flow_state.intensity;
-        self.stats.flow_streak = self.flow_state.streak;
-        self.stats.flow_learning_boost = self.flow_state.learning_boost;
+        self.stats.in_flow = self.behavior.flow_state.in_flow;
+        self.stats.flow_intensity = self.behavior.flow_state.intensity;
+        self.stats.flow_streak = self.behavior.flow_state.streak;
+        self.stats.flow_learning_boost = self.behavior.flow_state.learning_boost;
 
         // Emotion contagion stats
-        self.stats.emotional_valence = self.emotion_contagion.smoothed_valence();
-        self.stats.emotional_arousal = self.emotion_contagion.smoothed_arousal();
-        let (nudge_pattern, nudge_strength) = self.emotion_contagion.pattern_nudge();
+        self.stats.emotional_valence = self.behavior.emotion_contagion.smoothed_valence();
+        self.stats.emotional_arousal = self.behavior.emotion_contagion.smoothed_arousal();
+        let (nudge_pattern, nudge_strength) = self.behavior.emotion_contagion.pattern_nudge();
         let nudge_str = nudge_pattern.map(|p| p.as_str()).unwrap_or("None");
         if self.stats.emotion_nudge_pattern != nudge_str {
             self.stats.emotion_nudge_pattern = nudge_str.to_string();
@@ -616,11 +616,11 @@ impl CognitiveLoopService {
         self.stats.emotion_nudge_strength = nudge_strength;
 
         // Curiosity drive stats
-        self.stats.boredom = self.curiosity_drive.boredom;
-        self.stats.curiosity = self.curiosity_drive.curiosity;
-        self.stats.exploration_urge = self.curiosity_drive.exploration_urge as f32;
-        self.stats.curiosity_exploring = self.curiosity_drive.should_explore();
-        self.stats.novelty_bonus = self.curiosity_drive.novelty_bonus;
+        self.stats.boredom = self.behavior.curiosity_drive.boredom;
+        self.stats.curiosity = self.behavior.curiosity_drive.curiosity;
+        self.stats.exploration_urge = self.behavior.curiosity_drive.exploration_urge as f32;
+        self.stats.curiosity_exploring = self.behavior.curiosity_drive.should_explore();
+        self.stats.novelty_bonus = self.behavior.curiosity_drive.novelty_bonus;
 
         // Self-reflection stats
         let assess_str = self
@@ -677,7 +677,7 @@ impl CognitiveLoopService {
         }
 
         // Thalamic routing statistics
-        let (reflex_rate, cortical_rate, deep_rate) = self.thalamic_router.routing_stats();
+        let (reflex_rate, cortical_rate, deep_rate) = self.behavior.thalamic_router.routing_stats();
         self.stats.thalamic_reflex_rate = reflex_rate;
         self.stats.thalamic_cortical_rate = cortical_rate;
         self.stats.thalamic_deep_rate = deep_rate;
@@ -813,18 +813,18 @@ impl CognitiveLoopService {
         self.stats = LoopStats::default();
         self.start_time = Instant::now();
         self.language_comm.reset();
-        self.adaptive_behavior = AdaptiveBehavior::default();
+        self.behavior.adaptive_behavior = AdaptiveBehavior::default();
         self.prediction_confidence = 0.5;
         self.feedback_state = super::feedback_state::FeedbackState::new();
         self.feedback_state.begin_cycle();
         self.feedback_state.snapshot_cycle_start(0.5, 1.0, 0.0, 1.0);
-        self.flow_state.reset();
-        self.emotion_contagion.reset();
-        self.curiosity_drive.reset();
+        self.behavior.flow_state.reset();
+        self.behavior.emotion_contagion.reset();
+        self.behavior.curiosity_drive.reset();
         self.consciousness.self_model_tier.self_reflection.reset(); // Preserves learned thresholds
         self.fep.agent = ActiveInferenceAgent::new(self.fep.agent.config.clone());
         self.coherence_tracker.reset();
-        self.social_mgr = super::SocialManager::default();
+        self.behavior.social_mgr = super::SocialManager::default();
         // user_state reset handled by self.language_comm.reset() above
         self.policy_agreement_window.clear();
         self.carryover = CycleCarryover::default();

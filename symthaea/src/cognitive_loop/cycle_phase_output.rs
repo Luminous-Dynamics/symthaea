@@ -484,13 +484,13 @@ impl CognitiveLoopService {
             #[cfg(feature = "liquid-mamba")]
             liquid_mamba_generation_count: self.stats.liquid_mamba_generation_count,
             // Partnership / Phi-Dyad
-            relational_psi: self.social_mgr.social.relational_psi,
+            relational_psi: self.behavior.social_mgr.social.relational_psi,
             // Resonant Speech: response profile from neuromod bath signals.
             response_profile: {
                 let user_state = crate::resonant_speech::UserState::from_neuromod(
                     self.neuromod.bath.allostatic_load,
                     feedback.consciousness.consciousness_level,
-                    self.emotion_contagion.arousal,
+                    self.behavior.emotion_contagion.arousal,
                     self.neuromod.bath.oxytocin.effective(),
                 );
                 match user_state.cognitive_load {
@@ -552,13 +552,13 @@ impl CognitiveLoopService {
             metadata.smoothed_epistemic_uncertainty;
 
         // ── Social coherence telemetry ──
-        metadata.social_trust_current = self.social_mgr.social.social_trust;
-        metadata.social_cooperation_current = self.social_mgr.social.social_cooperation_rate;
+        metadata.social_trust_current = self.behavior.social_mgr.social.social_trust;
+        metadata.social_cooperation_current = self.behavior.social_mgr.social.social_cooperation_rate;
         metadata.social_strategy_bias_applied = perception.strategy.social_strategy_bias;
         metadata.social_learning_rate_factor = feedback.social_learning_rate_factor;
-        metadata.social_prediction_accuracy = self.social_mgr.social.social_prediction_accuracy;
-        metadata.social_models_count = self.social_mgr.social.social_models_count;
-        metadata.social_mean_trust = self.social_mgr.social.social_mean_trust;
+        metadata.social_prediction_accuracy = self.behavior.social_mgr.social.social_prediction_accuracy;
+        metadata.social_models_count = self.behavior.social_mgr.social.social_models_count;
+        metadata.social_mean_trust = self.behavior.social_mgr.social.social_mean_trust;
         metadata.tom_prediction_mismatch = self.stats.tom_prediction_mismatch_ema;
         metadata.tom_exploration_triggered =
             self.stats.tom_prediction_mismatch_ema > 0.4 && self.stats.total_cycles > 10;
@@ -599,7 +599,7 @@ impl CognitiveLoopService {
             && perception.urgency.error_slope > COMPOUND_INSTABILITY_ERROR_SLOPE
             && self.stats.total_cycles > 30;
         metadata.modulation.flow_feedback_relaxed =
-            self.flow_state.in_flow && self.flow_state.intensity > FLOW_INTENSITY_FEEDBACK;
+            self.behavior.flow_state.in_flow && self.behavior.flow_state.intensity > FLOW_INTENSITY_FEEDBACK;
         metadata.homeostasis_efficiency = self.carryover.quality.homeostasis_efficiency;
         // Session 10 telemetry (Session 11: lr_frozen from dynamics phase)
         metadata.modulation.confidence_crash_detected = dynamics.confidence_crash_detected;
@@ -648,7 +648,7 @@ impl CognitiveLoopService {
             > CONFIDENCE_VELOCITY_RISING_THRESHOLD
             && self.stats.total_cycles > 15;
         metadata.modulation.flow_lr_boost =
-            self.flow_state.in_flow && self.flow_state.intensity > FLOW_INTENSITY_LR_THRESHOLD;
+            self.behavior.flow_state.in_flow && self.behavior.flow_state.intensity > FLOW_INTENSITY_LR_THRESHOLD;
         metadata.modulation.fep_efficiency_boost = dynamics.fep.fep_accuracy
             > FEP_ACCURACY_EFFICIENCY_THRESHOLD
             && dynamics.fep.fep_complexity < FEP_COMPLEXITY_EFFICIENCY_THRESHOLD;
@@ -1627,11 +1627,11 @@ impl CognitiveLoopService {
         let feedback_consensus = self.feedback_state.end_cycle_ext(
             self.prediction_confidence,
             self.fep.lr_boost,
-            self.curiosity_drive.exploration_urge,
+            self.behavior.curiosity_drive.exploration_urge,
             self.carryover.learning.adaptive_threshold_scale,
             self.carryover.quality.consecutive_full_dampen,
-            self.flow_state.in_flow,
-            self.flow_state.intensity,
+            self.behavior.flow_state.in_flow,
+            self.behavior.flow_state.intensity,
         );
         // Track dampening streak for next cycle
         if self.feedback_state.feedback_dampened_count == 4 {
@@ -1709,12 +1709,12 @@ impl CognitiveLoopService {
                 self.adjust_exploration("subsystem_managers", integrated.exploration_delta as f32);
             }
             if integrated.arousal_delta != 0.0 {
-                self.emotion_contagion.arousal =
-                    (self.emotion_contagion.arousal + integrated.arousal_delta).clamp(0.0, 1.0);
+                self.behavior.emotion_contagion.arousal =
+                    (self.behavior.emotion_contagion.arousal + integrated.arousal_delta).clamp(0.0, 1.0);
             }
             if integrated.valence_delta != 0.0 {
-                self.emotion_contagion.valence =
-                    (self.emotion_contagion.valence + integrated.valence_delta).clamp(-1.0, 1.0);
+                self.behavior.emotion_contagion.valence =
+                    (self.behavior.emotion_contagion.valence + integrated.valence_delta).clamp(-1.0, 1.0);
             }
 
             // ── Act on subsystem flags ──────────────────────────────────
@@ -1735,7 +1735,7 @@ impl CognitiveLoopService {
             // ESCALATE_URGENCY: A subsystem detected a critical situation.
             // Boost arousal and suppress exploration to focus on the threat.
             if integrated.has_flag(output_flags::ESCALATE_URGENCY) {
-                self.emotion_contagion.arousal = (self.emotion_contagion.arousal
+                self.behavior.emotion_contagion.arousal = (self.behavior.emotion_contagion.arousal
                     + URGENCY_ESCALATION_AROUSAL_BOOST)
                     .clamp(0.0, 1.0);
                 self.scale_exploration("urgency_escalation", URGENCY_ESCALATION_EXPLORATION_SCALE);
@@ -1853,13 +1853,13 @@ impl CognitiveLoopService {
         // Final safety clamps — absolute last point in the cycle.
         // Late consciousness phases (integration, monitors) can multiply exploration_factor
         // below bounds set in cycle_quality.rs. Re-clamp here to guarantee invariants.
-        self.adaptive_behavior.exploration_factor =
-            self.adaptive_behavior.exploration_factor.clamp(0.1, 3.0);
-        self.adaptive_behavior.learning_rate_multiplier = self
-            .adaptive_behavior
+        self.behavior.adaptive_behavior.exploration_factor =
+            self.behavior.adaptive_behavior.exploration_factor.clamp(0.1, 3.0);
+        self.behavior.adaptive_behavior.learning_rate_multiplier = self
+            .behavior.adaptive_behavior
             .learning_rate_multiplier
             .clamp(0.1, 2.0);
-        self.curiosity_drive.boredom = self.curiosity_drive.boredom.clamp(0.0, 1.5);
+        self.behavior.curiosity_drive.boredom = self.behavior.curiosity_drive.boredom.clamp(0.0, 1.5);
 
         CycleResult {
             output: mem::take(&mut dynamics.core.output),

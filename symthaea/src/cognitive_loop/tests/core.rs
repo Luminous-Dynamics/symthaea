@@ -190,7 +190,7 @@ fn test_flow_state_reset() {
 
     // Flow state should be reset
     assert!(!service.in_flow());
-    assert_eq!(service.flow_state().streak, 0);
+    assert_eq!(service.behavior.flow_state().streak, 0);
 }
 
 #[test]
@@ -275,7 +275,7 @@ fn test_emotion_in_service() {
     // Should detect emotional content
     let valence = service.emotional_valence();
     // The smoothing will reduce the effect, but should be positive
-    assert!(valence >= 0.0 || service.emotion_contagion().valence > 0.0);
+    assert!(valence >= 0.0 || service.behavior.emotion_contagion().valence > 0.0);
 }
 
 #[test]

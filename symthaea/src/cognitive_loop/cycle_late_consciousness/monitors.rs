@@ -225,9 +225,9 @@ impl CognitiveLoopService {
                         coherence: ctx.coherence,
                         prediction_confidence: self.prediction_confidence as f32,
                         unified_psi: ctx.unified_psi,
-                        flow_intensity: self.flow_state.intensity,
-                        in_flow: self.flow_state.in_flow,
-                        curiosity_boredom: self.curiosity_drive.boredom,
+                        flow_intensity: self.behavior.flow_state.intensity,
+                        in_flow: self.behavior.flow_state.in_flow,
+                        curiosity_boredom: self.behavior.curiosity_drive.boredom,
                         fep_learning_signal: self.fep.learning_signal,
                         error_trend: self.stats.error_trend,
                         cycles_per_second: self.stats.cycles_per_second,
@@ -289,8 +289,8 @@ impl CognitiveLoopService {
                     ctx.surprise_triggered,
                     ctx.unified_psi,
                     moral_score,
-                    self.social_mgr.social.social_trust,
-                    self.social_mgr.social.social_cooperation_rate,
+                    self.behavior.social_mgr.social.social_trust,
+                    self.behavior.social_mgr.social.social_cooperation_rate,
                     0.0, // peer_valence: future — aggregate from social inbox
                 );
                 (affect.valence, affect.arousal)
@@ -302,7 +302,7 @@ impl CognitiveLoopService {
         if affective_valence > super::super::thresholds::AFFECTIVE_VALENCE_BROADEN_THRESHOLD
             && self.consciousness_state.affective_bridge.is_some()
         {
-            self.curiosity_drive.boredom *=
+            self.behavior.curiosity_drive.boredom *=
                 super::super::thresholds::AFFECTIVE_VALENCE_CURIOSITY_FACTOR;
         }
         // FEEDBACK: Arousal gates learning consolidation (Russell 1980 VAD model)
@@ -388,7 +388,7 @@ impl CognitiveLoopService {
             && narrative_self_psi < super::super::thresholds::NARRATIVE_SELF_WEAK_THRESHOLD
         {
             // Low self-coherence → amplify moral concern sensitivity
-            self.adaptive_behavior.attention_sensitivity *= 1.0
+            self.behavior.adaptive_behavior.attention_sensitivity *= 1.0
                 + (super::super::thresholds::NARRATIVE_SELF_WEAK_THRESHOLD as f32
                     - narrative_self_psi as f32)
                     * super::super::thresholds::NARRATIVE_SELF_MORAL_SENSITIVITY_SCALE;
@@ -397,7 +397,7 @@ impl CognitiveLoopService {
         // CROSS-COUPLING: Strong narrative identity stabilizes social trust (Baumeister & Leary 1995)
         // Science: Coherent self-identity supports consistent social relationships
         if narrative_self_psi > super::super::thresholds::NARRATIVE_SELF_HIGH_THRESHOLD {
-            self.social_mgr.social.social_trust *=
+            self.behavior.social_mgr.social.social_trust *=
                 super::super::thresholds::NARRATIVE_SELF_SOCIAL_TRUST_BOOST;
         }
 
@@ -487,7 +487,7 @@ impl CognitiveLoopService {
                     + hierarchical_total_free_energy
                         * super::super::thresholds::HFE_EXPLORATION_DAMPING))
                 as f32;
-            self.curiosity_drive.boredom *= fe_factor; // suppress exploration urge (gentler)
+            self.behavior.curiosity_drive.boredom *= fe_factor; // suppress exploration urge (gentler)
                                                        // Boost LR proportional to free energy (poor model → learn harder)
                                                        // Capped at +10% to avoid overshooting in short ablation windows
             let hfe_lr_boost = (1.0
@@ -589,7 +589,7 @@ impl CognitiveLoopService {
                 } else {
                     0.0
                 };
-                self.adaptive_behavior.attention_sensitivity *= 1.0 + gain;
+                self.behavior.adaptive_behavior.attention_sensitivity *= 1.0 + gain;
                 update.new_intensity
             } else {
                 0.0
@@ -616,7 +616,7 @@ impl CognitiveLoopService {
                 let focus_lock = (attention_schema_focus
                     - super::super::thresholds::ATTENTION_DEEP_FOCUS_THRESHOLD)
                     * super::super::thresholds::ATTENTION_FOCUS_LOCK_SCALE;
-                self.adaptive_behavior.exploration_factor *= (1.0 - focus_lock)
+                self.behavior.adaptive_behavior.exploration_factor *= (1.0 - focus_lock)
                     .max(super::super::thresholds::ATTENTION_MIN_EXPLORATION_IN_FOCUS);
             }
         }

@@ -362,7 +362,7 @@ impl CognitiveLoopService {
                 current_phi,
                 self.stats.total_cycles as u64,
                 prediction_error,
-                self.emotion_contagion.smoothed_valence(),
+                self.behavior.emotion_contagion.smoothed_valence(),
                 coherence_summary.coherence,
             )
             .with_dopamine(self.neuromod.bath.dopamine.effective())

@@ -388,8 +388,8 @@ impl CognitiveLoopService {
                 .smoothed_coherence(),
             self.stats.unified_psi as f64,
             phi_attention_weight,
-            self.emotion_contagion.arousal,
-            self.emotion_contagion.valence,
+            self.behavior.emotion_contagion.arousal,
+            self.behavior.emotion_contagion.valence,
             self.thermodynamic_load,
             self.carryover.quality.last_dissipative_health,
             self.somatic_bridge.systemic_stress(),
@@ -1132,7 +1132,7 @@ impl CognitiveLoopService {
             // Session 11 Item 4: Flow state raises crash threshold (×1.5).
             // Flow = committed mode, transient dips are normal.
             // Science: Csikszentmihalyi (1990) — flow tolerates transient perturbation.
-            let effective_crash_threshold = if self.flow_state.in_flow {
+            let effective_crash_threshold = if self.behavior.flow_state.in_flow {
                 CONFIDENCE_CRASH_THRESHOLD * CONFIDENCE_CRASH_FLOW_MULTIPLIER
             } else {
                 CONFIDENCE_CRASH_THRESHOLD
@@ -1268,18 +1268,18 @@ impl CognitiveLoopService {
         let reflection_thresholds = self.consciousness.self_model_tier.self_reflection.get_thresholds();
 
         // 1b. Analyze emotional content for simple contagion (keyword-based)
-        self.emotion_contagion.analyze(input);
+        self.behavior.emotion_contagion.analyze(input);
 
         // ── Phase 15+18: Emotional homeostasis ──
         // Session 9 Item 7: Track pre-pull valence distance for efficiency computation.
-        let pre_pull_valence = self.emotion_contagion.valence;
+        let pre_pull_valence = self.behavior.emotion_contagion.valence;
         let (valence_homeostasis_pull, arousal_homeostasis_pull, mut homeostasis_pull_strength) =
             self.apply_emotional_homeostasis();
 
         // Compute homeostasis efficiency: ratio of post/pre distance to target (0.0).
         // <1.0 = pulls working, >1.0 = overcorrecting.
         // Cannon (1929)/Ashby (1960): homeostatic regulation must be monitored for overshoot.
-        let post_pull_valence = self.emotion_contagion.valence;
+        let post_pull_valence = self.behavior.emotion_contagion.valence;
         let pre_dist = pre_pull_valence.abs().max(0.01);
         let post_dist = post_pull_valence.abs();
         let cycle_efficiency = if pre_dist.is_finite() && post_dist.is_finite() {
@@ -1349,10 +1349,10 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // 1c. Update Unified Emotional Bridge (VAD-based)
         // ═══════════════════════════════════════════════════════════════════════
-        let simple_valence = self.emotion_contagion.prosody_valence() as f64;
-        let simple_arousal = self.emotion_contagion.prosody_arousal() as f64;
-        let dominance = if self.flow_state.in_flow {
-            DOMINANCE_FLOW_BASE + DOMINANCE_FLOW_SCALE * self.flow_state.intensity as f64
+        let simple_valence = self.behavior.emotion_contagion.prosody_valence() as f64;
+        let simple_arousal = self.behavior.emotion_contagion.prosody_arousal() as f64;
+        let dominance = if self.behavior.flow_state.in_flow {
+            DOMINANCE_FLOW_BASE + DOMINANCE_FLOW_SCALE * self.behavior.flow_state.intensity as f64
         } else if self.prediction_confidence > DOMINANCE_CONFIDENCE_THRESHOLD {
             DOMINANCE_CONFIDENT
         } else {
@@ -1431,7 +1431,7 @@ impl CognitiveLoopService {
             articulation_score: coherence.clamp(0.0, 1.0),
             formant_accuracy: (1.0 - prediction_error).clamp(0.0, 1.0),
             speech_rate: super::thresholds::VOICE_HEARTBEAT_BASE_RATE
-                * self.adaptive_behavior.speech_rate_multiplier,
+                * self.behavior.adaptive_behavior.speech_rate_multiplier,
             pitch_stability: pattern_confidence,
             coarticulation_smoothness: coherence.clamp(0.0, 1.0)
                 * super::thresholds::VOICE_HEARTBEAT_COARTICULATION_WEIGHT,
@@ -1454,7 +1454,7 @@ impl CognitiveLoopService {
             .voice
             .summary()
             .voice_confidence;
-        self.adaptive_behavior = AdaptiveBehavior::from_consciousness_state(
+        self.behavior.adaptive_behavior = AdaptiveBehavior::from_consciousness_state(
             pattern,
             pattern_confidence,
             coherence,
@@ -1463,9 +1463,9 @@ impl CognitiveLoopService {
 
         self.reapply_strategy_modulation(selected_strategy);
 
-        self.adaptive_behavior.attention_sensitivity *= goal_attention_bias;
+        self.behavior.adaptive_behavior.attention_sensitivity *= goal_attention_bias;
         if wm_sensory_mismatch {
-            self.adaptive_behavior.attention_sensitivity *= ATTENTION_SENSITIVITY_BOOST_FACTOR;
+            self.behavior.adaptive_behavior.attention_sensitivity *= ATTENTION_SENSITIVITY_BOOST_FACTOR;
             // Sensory-abstract mismatch → slow consolidation + dampen confidence.
             // Hierarchical decomposition is breaking → protect abstract representations.
             // Science: Friston (2010) — hierarchical level misalignment = high free energy.
@@ -1753,9 +1753,9 @@ impl CognitiveLoopService {
 
         // ── FEP decomposition → adaptive behavior modulation ─────────────
         if fep_accuracy > 0.5 && fep_complexity < 0.5 {
-            self.adaptive_behavior.learning_rate_multiplier =
-                (self.adaptive_behavior.learning_rate_multiplier * 1.1).min(2.0);
-            self.adaptive_behavior.exploration_factor *= FEP_EFFICIENT_EXPLORATION_DAMPEN;
+            self.behavior.adaptive_behavior.learning_rate_multiplier =
+                (self.behavior.adaptive_behavior.learning_rate_multiplier * 1.1).min(2.0);
+            self.behavior.adaptive_behavior.exploration_factor *= FEP_EFFICIENT_EXPLORATION_DAMPEN;
             // Session 13 Item 6: Wire FEP efficiency into proposal system.
             // High accuracy + low complexity = efficient model → boost confidence.
             // Science: Friston (2010) — low complexity = good model evidence.
@@ -1763,22 +1763,22 @@ impl CognitiveLoopService {
         }
         let surprise_thresh = reflection_thresholds.surprise as f64;
         if fep_surprise > surprise_thresh {
-            self.adaptive_behavior.exploration_factor =
-                (self.adaptive_behavior.exploration_factor + 0.15).min(1.0);
-            self.adaptive_behavior.action_hint = ActionHint::Explore;
+            self.behavior.adaptive_behavior.exploration_factor =
+                (self.behavior.adaptive_behavior.exploration_factor + 0.15).min(1.0);
+            self.behavior.adaptive_behavior.action_hint = ActionHint::Explore;
         }
         if fep_complexity > FEP_COMPLEXITY_THRESHOLD {
             use super::thresholds::{
                 FEP_COMPLEXITY_LR_DAMPEN, FEP_COMPLEXITY_LR_FLOOR, FEP_COMPLEXITY_PAUSE_MAX,
                 FEP_COMPLEXITY_PAUSE_MULT,
             };
-            self.adaptive_behavior.learning_rate_multiplier =
-                (self.adaptive_behavior.learning_rate_multiplier * FEP_COMPLEXITY_LR_DAMPEN)
+            self.behavior.adaptive_behavior.learning_rate_multiplier =
+                (self.behavior.adaptive_behavior.learning_rate_multiplier * FEP_COMPLEXITY_LR_DAMPEN)
                     .max(FEP_COMPLEXITY_LR_FLOOR);
-            self.adaptive_behavior.pause_multiplier = (self.adaptive_behavior.pause_multiplier
+            self.behavior.adaptive_behavior.pause_multiplier = (self.behavior.adaptive_behavior.pause_multiplier
                 * FEP_COMPLEXITY_PAUSE_MULT)
                 .min(FEP_COMPLEXITY_PAUSE_MAX);
-            self.adaptive_behavior.action_hint = ActionHint::SlowDown;
+            self.behavior.adaptive_behavior.action_hint = ActionHint::SlowDown;
         }
 
         if fep_surprise > surprise_thresh {
@@ -1789,9 +1789,9 @@ impl CognitiveLoopService {
             }
         }
 
-        if self.social_mgr.social.external_reward.abs() > f32::EPSILON {
+        if self.behavior.social_mgr.social.external_reward.abs() > f32::EPSILON {
             let outcome_obs = Observation::from_consciousness_state(
-                self.social_mgr.social.external_reward as f64,
+                self.behavior.social_mgr.social.external_reward as f64,
                 coherence as f64,
                 self.prediction_confidence,
                 effective_lr as f64,
@@ -2123,8 +2123,8 @@ impl CognitiveLoopService {
                 MotorCommandType::AttentionShift => {
                     let shift_amount = enhanced_result.motor_command.intensity as f32
                         * MOTOR_ATTENTION_SHIFT_SCALE;
-                    self.adaptive_behavior.attention_sensitivity =
-                        (self.adaptive_behavior.attention_sensitivity
+                    self.behavior.adaptive_behavior.attention_sensitivity =
+                        (self.behavior.adaptive_behavior.attention_sensitivity
                             * (1.0 + shift_amount * MOTOR_ATTENTION_SENSITIVITY_SCALE))
                             .clamp(
                                 MOTOR_ATTENTION_SENSITIVITY_MIN,
@@ -3148,13 +3148,13 @@ impl CognitiveLoopService {
                                 for (label, _hv) in &factors {
                                     match label.as_str() {
                                         "positive" => {
-                                            self.emotion_contagion.valence =
-                                                (self.emotion_contagion.valence + 0.1)
+                                            self.behavior.emotion_contagion.valence =
+                                                (self.behavior.emotion_contagion.valence + 0.1)
                                                     .clamp(-1.0, 1.0);
                                         }
                                         "negative" => {
-                                            self.emotion_contagion.valence =
-                                                (self.emotion_contagion.valence - 0.1)
+                                            self.behavior.emotion_contagion.valence =
+                                                (self.behavior.emotion_contagion.valence - 0.1)
                                                     .clamp(-1.0, 1.0);
                                         }
                                         "high" => {
@@ -3799,7 +3799,7 @@ impl CognitiveLoopService {
         let consciousness_awake =
             self.carryover.history.consciousness_level > 0.0 || self.stats.total_cycles < 20;
         let (learning_occurred, training_loss) = if prediction_error > neuromod_threshold
-            && !self.adaptive_behavior.pause_learning
+            && !self.behavior.adaptive_behavior.pause_learning
             && !self.carryover.quality.narrative_veto_active
             && consciousness_awake
         {
@@ -4039,8 +4039,8 @@ impl CognitiveLoopService {
         let _t_core = Instant::now();
 
         let pp_total_cycles = self.stats.total_cycles;
-        let pp_in_flow = self.flow_state.in_flow;
-        let pp_emotional_valence = self.emotion_contagion.prosody_valence();
+        let pp_in_flow = self.behavior.flow_state.in_flow;
+        let pp_emotional_valence = self.behavior.emotion_contagion.prosody_valence();
         let pp_phi = self.unification_engine.psi as f32;
         let pp_smoothed_coh = coherence as f64;
         let pp_wm_importance_boost =
@@ -4379,8 +4379,8 @@ impl CognitiveLoopService {
                 epistemic_confidence: (self.carryover.quality.last_epistemic_confidence
                     - math_epistemic_penalty)
                     .clamp(0.0, 1.0),
-                emotional_valence: self.emotion_contagion.prosody_valence() + mode_valence_nudge,
-                emotional_arousal: self.emotion_contagion.prosody_arousal() + mode_arousal_nudge,
+                emotional_valence: self.behavior.emotion_contagion.prosody_valence() + mode_valence_nudge,
+                emotional_arousal: self.behavior.emotion_contagion.prosody_arousal() + mode_arousal_nudge,
                 emotional_warmth: mode_warmth,
                 consciousness_level: broca_psi,
                 meta_awareness: self.carryover.learning.self_model_accuracy as f32,
@@ -4668,8 +4668,8 @@ impl CognitiveLoopService {
     ///
     /// Returns (valence_pull, arousal_pull, pull_strength).
     fn apply_emotional_homeostasis(&mut self) -> (f32, f32, f32) {
-        let curr_v = self.emotion_contagion.valence;
-        let curr_a = self.emotion_contagion.prosody_arousal();
+        let curr_v = self.behavior.emotion_contagion.valence;
+        let curr_a = self.behavior.emotion_contagion.prosody_arousal();
 
         // Emotional inertia: resist rapid swings by blending toward previous state.
         // This closes the feedback loop — last_emotion_valence/arousal (written at
@@ -4692,14 +4692,14 @@ impl CognitiveLoopService {
         let v_pull = -smoothed_v * HOMEOSTASIS_PULL_VELOCITY_SCALE * pull_mult;
         let a_pull =
             (HOMEOSTASIS_AROUSAL_TARGET - smoothed_a) * HOMEOSTASIS_PULL_AROUSAL_SCALE * pull_mult;
-        self.emotion_contagion.valence = (smoothed_v + v_pull).clamp(-1.0, 1.0);
+        self.behavior.emotion_contagion.valence = (smoothed_v + v_pull).clamp(-1.0, 1.0);
 
         self.stats.avg_valence_homeostasis = self.stats.avg_valence_homeostasis
             * VALENCE_HOMEOSTASIS_MOMENTUM
             + v_pull.abs() * VALENCE_HOMEOSTASIS_ALPHA;
 
         // Store for next cycle's inertia computation.
-        self.carryover.history.last_emotion_valence = self.emotion_contagion.valence;
+        self.carryover.history.last_emotion_valence = self.behavior.emotion_contagion.valence;
         self.carryover.history.last_emotion_arousal = smoothed_a;
 
         (v_pull, a_pull, pull_mult)

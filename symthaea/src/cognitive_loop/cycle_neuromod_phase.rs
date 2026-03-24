@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Neuromodulator bath downstream modulation + Psi synthesis + experience bus.
 //!
 //! Extracted from cycle_phase_dynamics.rs — all logic and behavior preserved exactly.
@@ -79,7 +82,7 @@ impl CognitiveLoopService {
         self.set_exploration(
             "d2_flexibility",
             (NEUROMOD_D2_FLEXIBILITY_BASELINE
-                + (self.curiosity_drive.exploration_urge - NEUROMOD_D2_FLEXIBILITY_BASELINE)
+                + (self.behavior.curiosity_drive.exploration_urge - NEUROMOD_D2_FLEXIBILITY_BASELINE)
                     * flex_scale as f64) as f32,
         );
 
@@ -87,9 +90,9 @@ impl CognitiveLoopService {
         self.adjust_confidence("neuromod_serotonin", self.neuromod.bath.confidence_delta());
 
         // ACh → attention sensitivity + threshold
-        self.adaptive_behavior.attention_sensitivity *= self.neuromod.bath.attention_factor();
-        self.adaptive_behavior.attention_sensitivity =
-            self.adaptive_behavior.attention_sensitivity.clamp(
+        self.behavior.adaptive_behavior.attention_sensitivity *= self.neuromod.bath.attention_factor();
+        self.behavior.adaptive_behavior.attention_sensitivity =
+            self.behavior.adaptive_behavior.attention_sensitivity.clamp(
                 NEUROMOD_ATTENTION_SENSITIVITY_MIN,
                 NEUROMOD_ATTENTION_SENSITIVITY_MAX,
             );
@@ -98,10 +101,10 @@ impl CognitiveLoopService {
         // #3: Phasic NE burst → attentional reorienting (Corbetta & Shulman 2002)
         let ne_ph = self.neuromod.bath.ne_phasic();
         let ne_reorienting_boost = if ne_ph > NEUROMOD_NE_PHASIC_THRESHOLD {
-            self.adaptive_behavior.attention_sensitivity *=
+            self.behavior.adaptive_behavior.attention_sensitivity *=
                 1.0 + (ne_ph - NEUROMOD_NE_PHASIC_THRESHOLD) * NEUROMOD_NE_PHASIC_ATTENTION_GAIN;
-            self.adaptive_behavior.attention_sensitivity =
-                self.adaptive_behavior.attention_sensitivity.clamp(
+            self.behavior.adaptive_behavior.attention_sensitivity =
+                self.behavior.adaptive_behavior.attention_sensitivity.clamp(
                     NEUROMOD_ATTENTION_SENSITIVITY_MIN,
                     NEUROMOD_ATTENTION_SENSITIVITY_MAX,
                 );
@@ -116,16 +119,16 @@ impl CognitiveLoopService {
 
         // #6: Arousal ↔ NE bidirectional coupling (Berridge & Waterhouse 2003)
         // EMA: arousal pulled toward NE effective (10% per cycle)
-        let ne_arousal_before = self.emotion_contagion.arousal;
-        self.emotion_contagion.arousal = self.emotion_contagion.arousal
+        let ne_arousal_before = self.behavior.emotion_contagion.arousal;
+        self.behavior.emotion_contagion.arousal = self.behavior.emotion_contagion.arousal
             * NEUROMOD_AROUSAL_EMA_DECAY
             + self.neuromod.bath.noradrenaline.effective() * NEUROMOD_AROUSAL_EMA_INPUT;
         // Phasic NE burst → transient arousal spike
         if ne_ph > NEUROMOD_AROUSAL_PHASIC_THRESHOLD {
-            self.emotion_contagion.arousal += ne_ph * NEUROMOD_AROUSAL_PHASIC_SPIKE;
+            self.behavior.emotion_contagion.arousal += ne_ph * NEUROMOD_AROUSAL_PHASIC_SPIKE;
         }
-        self.emotion_contagion.arousal = self.emotion_contagion.arousal.clamp(0.0, 1.0);
-        let ne_arousal_feedback = self.emotion_contagion.arousal - ne_arousal_before;
+        self.behavior.emotion_contagion.arousal = self.behavior.emotion_contagion.arousal.clamp(0.0, 1.0);
+        let ne_arousal_feedback = self.behavior.emotion_contagion.arousal - ne_arousal_before;
 
         // #7: Confidence crash detection → 5-HT emergency dip (Cools et al. 2008)
         let confidence_velocity =
@@ -143,13 +146,13 @@ impl CognitiveLoopService {
 
         // #8: Exploration cost → 5-HT depletion (Tops et al. 2009)
         let exploration_sht_drain =
-            if self.curiosity_drive.exploration_urge > NEUROMOD_EXPLORATION_DRAIN_BASELINE {
-                let drain = (self.curiosity_drive.exploration_urge
+            if self.behavior.curiosity_drive.exploration_urge > NEUROMOD_EXPLORATION_DRAIN_BASELINE {
+                let drain = (self.behavior.curiosity_drive.exploration_urge
                     - NEUROMOD_EXPLORATION_DRAIN_BASELINE)
                     * NEUROMOD_EXPLORATION_DRAIN_FACTOR;
                 self.neuromod
                     .bath
-                    .apply_exploration_cost(self.curiosity_drive.exploration_urge as f32);
+                    .apply_exploration_cost(self.behavior.curiosity_drive.exploration_urge as f32);
                 drain as f32
             } else {
                 0.0
@@ -216,7 +219,7 @@ impl CognitiveLoopService {
                 uncertainty: (1.0 - self.prediction_confidence) as f32,
                 coherence: coherence.clamp(0.0, 1.0),
                 confidence: self.prediction_confidence as f32,
-                salience: self.curiosity_drive.exploration_urge as f32,
+                salience: self.behavior.curiosity_drive.exploration_urge as f32,
                 phi_monitor: unified_psi as f32,
             };
             bus.update_wisdom_from_signals();

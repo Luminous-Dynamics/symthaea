@@ -348,9 +348,9 @@ impl CognitiveLoopService {
         // ── Phase 18: Empathic tone → speech rate modulation ─────────────────
         let empathic_speech_rate_mod = if empathic_tone_adj.abs() > EMPATHIC_TONE_THRESHOLD as f64 {
             let rate_mod = 1.0 - empathic_tone_adj as f32 * EMPATHIC_TONE_RATE_SCALE;
-            self.adaptive_behavior.speech_rate_multiplier *= rate_mod;
-            self.adaptive_behavior.speech_rate_multiplier = self
-                .adaptive_behavior
+            self.behavior.adaptive_behavior.speech_rate_multiplier *= rate_mod;
+            self.behavior.adaptive_behavior.speech_rate_multiplier = self
+                .behavior.adaptive_behavior
                 .speech_rate_multiplier
                 .clamp(SPEECH_RATE_CLAMP_MIN, SPEECH_RATE_CLAMP_MAX);
             empathic_tone_adj as f32
@@ -364,8 +364,8 @@ impl CognitiveLoopService {
         {
             match consciousness_limiting_component.as_str() {
                 "Attention" => {
-                    self.adaptive_behavior.attention_sensitivity =
-                        (self.adaptive_behavior.attention_sensitivity * EFFICACY_ATTENTION_BOOST)
+                    self.behavior.adaptive_behavior.attention_sensitivity =
+                        (self.behavior.adaptive_behavior.attention_sensitivity * EFFICACY_ATTENTION_BOOST)
                             .min(NEUROMOD_ATTENTION_SENSITIVITY_MAX);
                     self.stats.limiting_component_boost_count += 1;
                     "Attention"
@@ -495,7 +495,7 @@ impl CognitiveLoopService {
 
         // ── Social trust → learning rate modulation (Decety & Chaminade 2003) ──
         let social_learning_rate_factor =
-            SOCIAL_LR_BASE + SOCIAL_LR_RANGE * self.social_mgr.social.social_trust; // [0.8, 1.2]
+            SOCIAL_LR_BASE + SOCIAL_LR_RANGE * self.behavior.social_mgr.social.social_trust; // [0.8, 1.2]
         if (social_learning_rate_factor - 1.0).abs() > SOCIAL_LR_CHANGE_THRESHOLD {
             self.scale_lr("social_trust", social_learning_rate_factor);
         }
@@ -505,8 +505,8 @@ impl CognitiveLoopService {
         // Low accuracy → dampen confidence (our model is unreliable).
         // Guard: only active when social models exist (avoid constant dampening
         // when no social context has been injected — default accuracy is 0.0).
-        if self.social_mgr.social.social_models_count > 0 {
-            let tom_accuracy = self.social_mgr.social.social_prediction_accuracy;
+        if self.behavior.social_mgr.social.social_models_count > 0 {
+            let tom_accuracy = self.behavior.social_mgr.social.social_prediction_accuracy;
             if tom_accuracy > TOM_ACCURACY_HIGH {
                 let boost = (tom_accuracy - TOM_ACCURACY_HIGH) * TOM_ACCURACY_SCALE; // [0, 0.015]
                 self.adjust_confidence("tom_accurate", boost);
@@ -1292,7 +1292,7 @@ impl CognitiveLoopService {
                 .last_moral_judgment()
                 .map(|j| j.moral_score)
                 .unwrap_or(0.0);
-            let valence = self.emotion_contagion.valence;
+            let valence = self.behavior.emotion_contagion.valence;
             let cycles = self.stats.total_cycles as u64;
             if let Some(ref mut soul) = self.ethics_values.soul {
                 let experience = crate::soul::Experience {
@@ -1309,9 +1309,9 @@ impl CognitiveLoopService {
 
         // ── Phi-Dyad: Relational Consciousness ─────────────────────────────
         // Compute Φ_dyad from recent AI + input HVs (Phase 6 wiring).
-        if self.social_mgr.recent_ai_hvs.len() >= 2 {
+        if self.behavior.social_mgr.recent_ai_hvs.len() >= 2 {
             if let (Some(ref dyad), Some(ref model)) =
-                (&self.social_mgr.phi_dyad, &self.social_mgr.partner_model)
+                (&self.behavior.social_mgr.phi_dyad, &self.behavior.social_mgr.partner_model)
             {
                 use symthaea_core::hdc::relational_consciousness::{
                     RelationMode, RelationalAssessment,
@@ -1334,14 +1334,14 @@ impl CognitiveLoopService {
                     explanation: String::new(),
                 };
                 let input = crate::partnership::DyadInput {
-                    ai_states: &self.social_mgr.recent_ai_hvs,
-                    human_states: &self.social_mgr.recent_input_hvs,
+                    ai_states: &self.behavior.social_mgr.recent_ai_hvs,
+                    human_states: &self.behavior.social_mgr.recent_input_hvs,
                     relational: &relational,
                     human_model: model,
                     weights: crate::partnership::DyadWeights::default(),
                 };
                 let result = dyad.compute(&input);
-                self.social_mgr.social.relational_psi = result.phi_dyad;
+                self.behavior.social_mgr.social.relational_psi = result.phi_dyad;
 
                 // Phi divergence → exploration (novel relational territory)
                 // Science: Friston (2010) — high divergence = high epistemic value
@@ -1390,7 +1390,7 @@ impl CognitiveLoopService {
 
         // Trust evolution from cycle coherence (Bowlby 1969)
         // Coherence > 0.5 builds trust, < 0.5 erodes it; slow decay prevents runaway
-        if let Some(ref mut model) = self.social_mgr.partner_model {
+        if let Some(ref mut model) = self.behavior.social_mgr.partner_model {
             let signal =
                 (dynamics.core.coherence as f64 - TRUST_SIGNAL_MIDPOINT) * TRUST_SIGNAL_RATE;
             model.trust =
@@ -1553,7 +1553,7 @@ impl CognitiveLoopService {
         // Session 13 Item 5: Flow state → subsystem LR modulation.
         // Flow = optimal learning zone → gently boost subsystem learning.
         // Science: Csikszentmihalyi (1990) — flow maximizes skill acquisition.
-        if self.flow_state.in_flow && self.flow_state.intensity > 0.5 {
+        if self.behavior.flow_state.in_flow && self.behavior.flow_state.intensity > 0.5 {
             self.carryover.learning.subsystem_lr_factor *= 1.05;
             self.carryover.learning.subsystem_lr_factor = self
                 .carryover

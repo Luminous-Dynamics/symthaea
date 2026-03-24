@@ -131,6 +131,7 @@ mod accessors;
 pub(crate) mod biorhythm_manager;
 pub(crate) mod cantor_dream_manager;
 pub(crate) mod consciousness_engine;
+pub(crate) mod behavioral_synthesis;
 pub(crate) mod consciousness_execution;
 pub(crate) mod consciousness_monitor_tier;
 pub(crate) mod consciousness_state_manager;
@@ -358,33 +359,16 @@ pub struct CognitiveLoopService {
     /// Language & communication: voice coherence, Broca, user state.
     pub(crate) language_comm: language_comm_manager::LanguageAndCommunicationManager,
 
-    /// Current adaptive behavior based on consciousness state
-    adaptive_behavior: AdaptiveBehavior,
+    /// Behavioral synthesis group: flow, emotion, curiosity, adaptive behavior,
+    /// thalamic routing, and social cognition.
+    /// Extracted from CognitiveLoopService to reduce field count (Phase 5, Stage 5).
+    pub(crate) behavior: behavioral_synthesis::BehavioralSynthesis,
 
     /// Prediction confidence (0.0 to 1.0)
     /// Decays during uncertain states, grows with accurate predictions
     prediction_confidence: f64,
 
-    /// Flow state tracker
-    /// Detects and maintains flow state for optimal cognitive engagement
-    flow_state: FlowState,
-
-    /// Emotion contagion tracker
-    /// Emotional content influences consciousness patterns
-    emotion_contagion: EmotionContagion,
-
-    /// Curiosity drive for novelty seeking
-    /// Triggers exploration when predictions are too accurate
-    curiosity_drive: CuriosityDrive,
-
     // NOTE: self_reflection moved to self_model_tier.self_reflection (Phase 3, Step 5)
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // MEGA-UNIFIED ARCHITECTURE: Consciousness Unification Engine
-    // ═══════════════════════════════════════════════════════════════════════
-    /// Thalamic router for cognitive depth selection
-    /// Routes inputs to Reflex/Cortical/DeepThought paths based on novelty and urgency
-    thalamic_router: ThalamicRouter,
 
     /// Consciousness Unification Engine - integrates all consciousness subsystems
     /// Provides: EmotionalBridge (VAD emotions), CausalReasoning, DialoguePipeline
@@ -521,8 +505,7 @@ pub struct CognitiveLoopService {
     /// ASCII heatmaps, JSON export, and Graphviz flow graphs.
     attention_visualizer: Option<crate::visualization::AttentionVisualizer>,
 
-    /// Social manager: social signals + phi-dyad + partner model + ring buffers.
-    pub(crate) social_mgr: SocialManager,
+    // social_mgr moved to behavioral_synthesis::BehavioralSynthesis
 
     // user_state moved to language_comm_manager
     /// Resonant speech generator: adapts response complexity to user cognitive load.

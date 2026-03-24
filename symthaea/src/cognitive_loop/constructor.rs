@@ -572,14 +572,16 @@ impl CognitiveLoopService {
                     None
                 },
             },
-            adaptive_behavior,
+            behavior: super::behavioral_synthesis::BehavioralSynthesis::new(
+                FlowState::default(),
+                EmotionContagion::default(),
+                CuriosityDrive::default(),
+                adaptive_behavior,
+                ThalamicRouter::default(),
+                super::SocialManager::new(enable_primitive_consciousness),
+            ),
             prediction_confidence: 0.5_f64, // Start neutral
-            flow_state: FlowState::default(),
-            emotion_contagion: EmotionContagion::default(),
-            curiosity_drive: CuriosityDrive::default(),
             // NOTE: self_reflection is now in self_model_tier
-            // Mega-unified architecture components
-            thalamic_router: ThalamicRouter::default(),
             unification_engine: ConsciousnessUnificationEngine::new(),
             cognitive_depth: CognitiveDepth::default(),
             fep: super::fep_module::FepModule {
@@ -807,7 +809,7 @@ impl CognitiveLoopService {
             } else {
                 None
             },
-            social_mgr: super::SocialManager::new(enable_primitive_consciousness),
+            // social_mgr moved to behavior (BehavioralSynthesis)
             vision_sensory: super::vision_sensory_manager::VisionAndSensoryManager {
                 coherence_field: if enable_coherence_field {
                     Some(crate::physiology::CoherenceField::new())
@@ -1380,14 +1382,14 @@ mod tests {
     fn default_social_signals_are_defaults() {
         let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
         // social_trust defaults to 0.5, cooperation_rate defaults to 0.0
-        assert!((service.social_mgr.social.social_trust - 0.5).abs() < f32::EPSILON);
-        assert!((service.social_mgr.social.social_cooperation_rate - 0.0).abs() < f32::EPSILON);
+        assert!((service.behavior.social_mgr.social.social_trust - 0.5).abs() < f32::EPSILON);
+        assert!((service.behavior.social_mgr.social.social_cooperation_rate - 0.0).abs() < f32::EPSILON);
     }
 
     #[test]
     fn default_external_reward_is_zero() {
         let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-        assert!((service.social_mgr.social.external_reward - 0.0).abs() < f32::EPSILON);
+        assert!((service.behavior.social_mgr.social.external_reward - 0.0).abs() < f32::EPSILON);
     }
 
     #[test]
@@ -1399,7 +1401,7 @@ mod tests {
     #[test]
     fn default_relational_psi_is_zero() {
         let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-        assert!((service.social_mgr.social.relational_psi - 0.0).abs() < f64::EPSILON);
+        assert!((service.behavior.social_mgr.social.relational_psi - 0.0).abs() < f64::EPSILON);
     }
 
     // ── Backend selection ─────────────────────────────────────────────
@@ -1647,11 +1649,11 @@ mod tests {
         config.enable_primitive_consciousness = true;
         let service = CognitiveLoopService::new(config).unwrap();
         assert!(
-            service.social_mgr.phi_dyad.is_some(),
+            service.behavior.social_mgr.phi_dyad.is_some(),
             "phi_dyad should be Some when enable_primitive_consciousness=true"
         );
         assert!(
-            service.social_mgr.partner_model.is_some(),
+            service.behavior.social_mgr.partner_model.is_some(),
             "partner_model should be Some when enable_primitive_consciousness=true"
         );
     }
@@ -1662,11 +1664,11 @@ mod tests {
         assert!(!config.enable_primitive_consciousness);
         let service = CognitiveLoopService::new(config).unwrap();
         assert!(
-            service.social_mgr.phi_dyad.is_none(),
+            service.behavior.social_mgr.phi_dyad.is_none(),
             "phi_dyad should be None when enable_primitive_consciousness=false"
         );
         assert!(
-            service.social_mgr.partner_model.is_none(),
+            service.behavior.social_mgr.partner_model.is_none(),
             "partner_model should be None when enable_primitive_consciousness=false"
         );
     }
@@ -1676,7 +1678,7 @@ mod tests {
         let mut config = CognitiveLoopConfig::default();
         config.enable_primitive_consciousness = true;
         let service = CognitiveLoopService::new(config).unwrap();
-        assert!(service.social_mgr.recent_ai_hvs.is_empty());
-        assert!(service.social_mgr.recent_input_hvs.is_empty());
+        assert!(service.behavior.social_mgr.recent_ai_hvs.is_empty());
+        assert!(service.behavior.social_mgr.recent_input_hvs.is_empty());
     }
 }

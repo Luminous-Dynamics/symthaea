@@ -128,9 +128,9 @@ impl CognitiveLoopService {
 
         // ── Social trust → strategy modulation (Decety & Chaminade 2003) ──
         // Proportional: trust deviation from neutral (0.5) scales bias strength
-        let trust_deviation = self.social_mgr.social.social_trust - SOCIAL_TRUST_MIDPOINT; // [-0.5, 0.5]
+        let trust_deviation = self.behavior.social_mgr.social.social_trust - SOCIAL_TRUST_MIDPOINT; // [-0.5, 0.5]
         let social_strategy_bias = if trust_deviation > SOCIAL_TRUST_DEADZONE
-            && self.social_mgr.social.social_cooperation_rate > SOCIAL_COOPERATION_THRESHOLD
+            && self.behavior.social_mgr.social.social_cooperation_rate > SOCIAL_COOPERATION_THRESHOLD
         {
             // High trust: strength scales [0, 1] over deviation [deadzone, 0.5]
             let strength =
@@ -170,8 +170,8 @@ impl CognitiveLoopService {
         // boost exploration to gather more data and refine the model.
         // Guard: only active when social models exist (avoid constant boost
         // when no social context has been injected).
-        if self.social_mgr.social.social_models_count > 0 {
-            let accuracy = self.social_mgr.social.social_prediction_accuracy;
+        if self.behavior.social_mgr.social.social_models_count > 0 {
+            let accuracy = self.behavior.social_mgr.social.social_prediction_accuracy;
             let mismatch = 1.0 - accuracy;
             // Update EMA (alpha = 1 - decay)
             self.stats.tom_prediction_mismatch_ema = if self.stats.total_cycles < 5 {
@@ -833,7 +833,7 @@ impl CognitiveLoopService {
             + (self.prediction_confidence - CONFIDENCE_SCALE_MIDPOINT as f64)
                 * CONFIDENCE_SCALE_SENSITIVITY as f64) as f32;
         let exploration_scale = (1.0
-            - (self.curiosity_drive.exploration_urge - EXPLORATION_SCALE_MIDPOINT as f64)
+            - (self.behavior.curiosity_drive.exploration_urge - EXPLORATION_SCALE_MIDPOINT as f64)
                 * EXPLORATION_SCALE_SENSITIVITY as f64) as f32;
         let effective_threshold = self.config.learning_threshold
             * self.carryover.learning.adaptive_threshold_scale as f32
