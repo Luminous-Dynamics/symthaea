@@ -310,7 +310,8 @@ pub fn emit_rust_from_skeleton(
     let mut code = String::new();
 
     // Function signature
-    let sig = signature.unwrap_or(&format!("fn {function_name}()"));
+    let default_sig = format!("fn {function_name}()");
+    let sig = signature.unwrap_or(&default_sig);
     code.push_str(&format!("pub {} {{\n", sig));
 
     // Emit body from skeleton
@@ -387,7 +388,8 @@ fn emit_body(combinator: &SkeletonCombinator, indent: usize) -> Option<String> {
         }
 
         SkeletonCombinator::Leaf(slot) => {
-            let expr = slot.filled.as_deref().unwrap_or(&format!("todo!(\"{}\")", slot.description));
+            let default_expr = format!("todo!(\"{}\")", slot.description);
+            let expr = slot.filled.as_deref().unwrap_or(&default_expr);
             Some(format!("{pad}{expr}"))
         }
     }

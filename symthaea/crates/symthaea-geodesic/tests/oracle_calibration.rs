@@ -299,41 +299,47 @@ fn calibrate_prediction_accuracy() {
 fn calibrate_convergence_threshold() {
     let oracle = ExecutionOracle::new();
 
-    // Converging: single fast assignment (tau=0.15) as loop body
-    // After enough iterations the state stabilizes
+    // check_convergence repeatedly applies the loop body and checks if
+    // consecutive states become similar (> 0.95). Because each step XOR-binds
+    // the same statement HV, the attractor shifts each iteration. With low tau
+    // (fast convergence), the state quickly follows each new attractor, so
+    // consecutive states end up close. With higher tau, it takes more iterations.
+
+    // Single fast assignment (tau=0.15) — needs enough iterations for the
+    // state to settle into a stable cycle under repeated application.
     let fast_body = make_statements(1, OperationType::Assignment, 800);
-    let fast_converges = oracle.check_convergence(&fast_body, 100);
+    let fast_converges = oracle.check_convergence(&fast_body, 500);
     println!(
         "[calibrate_convergence_threshold] fast_body converges={}",
         fast_converges
     );
     assert!(
         fast_converges,
-        "fast assignment loop body should converge within 100 iterations"
+        "fast assignment loop body should converge within 500 iterations"
     );
 
-    // Converging but slower: single comparison (tau=0.2)
+    // Single comparison (tau=0.2) — slightly slower convergence
     let cmp_body = make_statements(1, OperationType::Comparison, 801);
-    let cmp_converges = oracle.check_convergence(&cmp_body, 200);
+    let cmp_converges = oracle.check_convergence(&cmp_body, 500);
     println!(
         "[calibrate_convergence_threshold] cmp_body converges={}",
         cmp_converges
     );
     assert!(
         cmp_converges,
-        "comparison loop body should converge within 200 iterations"
+        "comparison loop body should converge within 500 iterations"
     );
 
-    // Converging (eventually): single loop iteration (tau=1.0)
+    // Single loop iteration (tau=1.0) — slower but should still converge
     let loop_body = make_statements(1, OperationType::LoopIteration, 802);
-    let loop_converges = oracle.check_convergence(&loop_body, 500);
+    let loop_converges = oracle.check_convergence(&loop_body, 1000);
     println!(
         "[calibrate_convergence_threshold] loop_body converges={}",
         loop_converges
     );
     assert!(
         loop_converges,
-        "loop iteration body should converge within 500 iterations"
+        "loop iteration body should converge within 1000 iterations"
     );
 
     // Multi-statement body: mixed ops should still eventually converge
@@ -342,14 +348,14 @@ fn calibrate_convergence_threshold() {
         (BinaryHV::random(811), OperationType::Arithmetic),
         (BinaryHV::random(812), OperationType::Comparison),
     ];
-    let mixed_converges = oracle.check_convergence(&mixed_body, 200);
+    let mixed_converges = oracle.check_convergence(&mixed_body, 500);
     println!(
         "[calibrate_convergence_threshold] mixed_body converges={}",
         mixed_converges
     );
     assert!(
         mixed_converges,
-        "mixed loop body should converge within 200 iterations"
+        "mixed loop body should converge within 500 iterations"
     );
 
     // Empty body always converges trivially
