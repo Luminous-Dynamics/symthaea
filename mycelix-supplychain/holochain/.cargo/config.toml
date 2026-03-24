@@ -1,8 +1,8 @@
+# IMPORTANT: Use "custom" backend, NOT "wasm_js". The wasm_js backend
+# pulls in wasm-bindgen which is incompatible with Holochain's WASM runtime.
+# HDK 0.6 provides __getrandom_v03_custom.
 [target.wasm32-unknown-unknown]
-rustflags = [
-    # Enable getrandom wasm_js support via cfg
-    "--cfg", "getrandom_backend=\"wasm_js\"",
-]
+rustflags = ['--cfg', 'getrandom_backend="custom"']
 
 [build]
 target = "wasm32-unknown-unknown"
