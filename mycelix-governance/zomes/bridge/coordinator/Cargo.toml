@@ -16,3 +16,5 @@ serde_json = { workspace = true }
 mycelix-bridge-common = { workspace = true }
 governance_bridge_integrity = { path = "../integrity" }
 governance-utils = { workspace = true }
+# WASM compatibility: getrandom 0.3 with custom backend (HDK provides __getrandom_v03_custom)
+getrandom_03 = { workspace = true }

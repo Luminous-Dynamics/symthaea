@@ -1,4 +1,6 @@
-//! Governance Bridge Coordinator Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Governance Bridge Coordinator Zome
 //!
 //! Cross-hApp communication for proposal queries, voting status,
 //! and execution requests across the Mycelix ecosystem.
@@ -17,6 +19,10 @@
 
 use governance_bridge_integrity::*;
 use hdk::prelude::*;
+// Explicit re-imports for WASM compilation (glob import doesn't re-export proc macros
+// in some dependency graph configurations — see Rust edition 2021 proc-macro scoping)
+use hdk::prelude::{hdk_extern, wasm_error, WasmErrorInner};
+use serde::{Deserialize, Serialize};
 
 mod attestation;
 mod consciousness;
