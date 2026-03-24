@@ -7,7 +7,9 @@
 pub mod degradation;
 pub mod latency;
 pub mod transfer;
+pub mod validation;
 
 pub use degradation::SubstrateDegradationBenchmark;
 pub use latency::SubstrateLatencyBenchmark;
 pub use transfer::SubstrateTransferBenchmark;
+pub use validation::SubstrateValidationBenchmark;

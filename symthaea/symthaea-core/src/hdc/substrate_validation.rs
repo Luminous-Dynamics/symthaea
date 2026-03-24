@@ -1,4 +1,6 @@
-//! Substrate Validation Research Framework
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Substrate Validation Research Framework
 //!
 //! This module provides a RIGOROUS scientific framework for validating
 //! substrate independence claims. It explicitly acknowledges what we
@@ -512,6 +514,125 @@ impl SubstrateValidationFramework {
     }
 }
 
+// ============================================================================
+// Prediction Execution & Evidence Tracking
+// ============================================================================
+
+/// Summary of prediction validation results for a substrate.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PredictionSummary {
+    pub substrate: String,
+    pub total_predictions: usize,
+    pub tested: usize,
+    pub passed: usize,
+    pub failed: usize,
+    pub evidence_level: EvidenceLevel,
+    pub honest_confidence: f64,
+}
+
+impl TestablePrediction {
+    /// Record the result of executing this prediction's test protocol.
+    pub fn record_result(&mut self, passed: bool) {
+        self.tested = true;
+        self.result = Some(passed);
+    }
+}
+
+impl SubstrateValidationFramework {
+    /// Get a mutable reference to a substrate's knowledge entry.
+    pub fn substrate_mut(&mut self, name: &str) -> Option<&mut SubstrateKnowledge> {
+        self.substrates.get_mut(name)
+    }
+
+    /// Record a prediction test result for a substrate.
+    /// Returns `true` if the evidence level was upgraded as a consequence.
+    pub fn record_prediction_result(
+        &mut self,
+        substrate: &str,
+        prediction_idx: usize,
+        passed: bool,
+    ) -> bool {
+        let old_level = self
+            .substrates
+            .get(substrate)
+            .map(|k| k.evidence_level)
+            .unwrap_or(EvidenceLevel::None);
+
+        if let Some(knowledge) = self.substrates.get_mut(substrate) {
+            if let Some(pred) = knowledge.predictions.get_mut(prediction_idx) {
+                pred.record_result(passed);
+            }
+        }
+
+        self.check_evidence_upgrade(substrate)
+            .map_or(false, |new| new > old_level)
+    }
+
+    /// Check if evidence level should upgrade based on tested predictions.
+    ///
+    /// Upgrade rules (conservative, inspired by medical evidence hierarchies):
+    /// - Theoretical → Indirect: at least one prediction tested and passed
+    /// - Indirect → CaseStudy: majority of predictions tested and passed
+    /// - CaseStudy → Observational: all predictions tested, >=80% passed
+    /// - Higher levels require external replication (cannot be reached internally)
+    pub fn check_evidence_upgrade(&mut self, substrate: &str) -> Option<EvidenceLevel> {
+        let knowledge = self.substrates.get_mut(substrate)?;
+        let total = knowledge.predictions.len();
+        if total == 0 {
+            return Some(knowledge.evidence_level);
+        }
+
+        let tested = knowledge.predictions.iter().filter(|p| p.tested).count();
+        let passed = knowledge
+            .predictions
+            .iter()
+            .filter(|p| p.result == Some(true))
+            .count();
+
+        let new_level = if tested == 0 {
+            knowledge.evidence_level.max(EvidenceLevel::Theoretical)
+        } else if passed == 0 {
+            EvidenceLevel::Theoretical
+        } else if passed >= 1 && knowledge.evidence_level < EvidenceLevel::Indirect {
+            EvidenceLevel::Indirect
+        } else if tested >= total / 2 && passed > tested / 2 {
+            knowledge.evidence_level.max(EvidenceLevel::CaseStudy)
+        } else if tested == total && passed * 5 >= total * 4 {
+            knowledge.evidence_level.max(EvidenceLevel::Observational)
+        } else {
+            knowledge.evidence_level
+        };
+
+        knowledge.evidence_level = new_level;
+        Some(new_level)
+    }
+
+    /// Summarize prediction validation status for all substrates.
+    pub fn prediction_summary(&self) -> Vec<PredictionSummary> {
+        self.substrates
+            .iter()
+            .map(|(name, knowledge)| {
+                let total = knowledge.predictions.len();
+                let tested = knowledge.predictions.iter().filter(|p| p.tested).count();
+                let passed = knowledge
+                    .predictions
+                    .iter()
+                    .filter(|p| p.result == Some(true))
+                    .count();
+                PredictionSummary {
+                    substrate: name.clone(),
+                    total_predictions: total,
+                    tested,
+                    passed,
+                    failed: tested - passed,
+                    evidence_level: knowledge.evidence_level,
+                    honest_confidence: knowledge.honest_confidence(),
+                }
+            })
+            .collect()
+    }
+}
+
 impl Default for SubstrateValidationFramework {
     fn default() -> Self {
         Self::new()
@@ -636,7 +757,64 @@ mod tests {
         let spacecraft = framework.get("spacecraft").unwrap();
 
         assert_eq!(spacecraft.evidence_level, EvidenceLevel::Theoretical);
-        assert!(spacecraft.honest_confidence() < 0.2); // Low actual confidence
+        assert!(spacecraft.honest_confidence() < 0.2);
         assert!(!spacecraft.predictions.is_empty());
+    }
+
+    #[test]
+    fn test_record_prediction_result() {
+        let mut pred = TestablePrediction::new("claim", "if_true", "if_false", "protocol", 5);
+        assert!(!pred.tested);
+        assert!(pred.result.is_none());
+        pred.record_result(true);
+        assert!(pred.tested);
+        assert_eq!(pred.result, Some(true));
+    }
+
+    #[test]
+    fn test_evidence_upgrade_theoretical_to_indirect() {
+        let mut framework = SubstrateValidationFramework::new();
+        assert_eq!(
+            framework.get("silicon").unwrap().evidence_level,
+            EvidenceLevel::Theoretical
+        );
+        let upgraded = framework.record_prediction_result("silicon", 0, true);
+        assert!(upgraded);
+        assert_eq!(
+            framework.get("silicon").unwrap().evidence_level,
+            EvidenceLevel::Indirect
+        );
+    }
+
+    #[test]
+    fn test_evidence_no_upgrade_on_failure() {
+        let mut framework = SubstrateValidationFramework::new();
+        let upgraded = framework.record_prediction_result("silicon", 0, false);
+        assert!(!upgraded);
+        assert_eq!(
+            framework.get("silicon").unwrap().evidence_level,
+            EvidenceLevel::Theoretical
+        );
+    }
+
+    #[test]
+    fn test_prediction_summary() {
+        let mut framework = SubstrateValidationFramework::new();
+        framework.record_prediction_result("silicon", 0, true);
+        let summaries = framework.prediction_summary();
+        let silicon = summaries.iter().find(|s| s.substrate == "silicon").unwrap();
+        assert_eq!(silicon.tested, 1);
+        assert_eq!(silicon.passed, 1);
+        assert_eq!(silicon.failed, 0);
+    }
+
+    #[test]
+    fn test_all_predictions_pass_upgrades_further() {
+        let mut framework = SubstrateValidationFramework::new();
+        let n = framework.get("silicon").unwrap().predictions.len();
+        for i in 0..n {
+            framework.record_prediction_result("silicon", i, true);
+        }
+        assert!(framework.get("silicon").unwrap().evidence_level >= EvidenceLevel::CaseStudy);
     }
 }
