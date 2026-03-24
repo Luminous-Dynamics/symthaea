@@ -106,7 +106,7 @@ impl TwoStepBenchmark {
             // (Daw et al., 2011: MB agents show strong transition×reward interaction
             // when the transition model is confident). +0.10/unit degrades MB signal,
             // shifting toward model-free under SAT (Heitz, 2014).
-            let mb_temp = 0.07 + config.time_pressure * 0.10;
+            let mb_temp = 0.05 + config.time_pressure * 0.10;
             let mb_max = mb_values[0].max(mb_values[1]);
             let mb_exp: Vec<f64> = mb_values
                 .iter()
@@ -119,7 +119,7 @@ impl TwoStepBenchmark {
             // (was 40). Slower ramp allows the transition model to stabilize before
             // MB dominates, producing cleaner transition×reward interaction. Daw et al.
             // (2011) analyzed 200-trial sessions where MB emerged late.
-            let progress = (ep as f64 / 80.0).min(1.0);
+            let progress = (ep as f64 / 60.0).min(1.0);
             let mb_weight = 0.3 + 0.65 * progress;
             let blended_probs: Vec<f64> = (0..2)
                 .map(|a| (1.0 - mb_weight) * fep_probs[a] + mb_weight * mb_probs[a])

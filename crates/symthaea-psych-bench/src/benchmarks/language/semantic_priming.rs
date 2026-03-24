@@ -163,11 +163,13 @@ impl SemanticPrimingBenchmark {
             // - Unrelated prime: no benefit (full noise)
             let base_noise = 0.55 + config.encoding_noise as f32 * 0.20;
             let fep_scale = if config.enable_fep { 1.0 } else { 0.4 };
-            // Multiplier 0.82: stronger spreading activation benefit
-            // produces priming_effect closer to Neely (1977) baseline of
-            // 0.10 — HDC cluster structure supports robust pre-activation.
+            // Multiplier 0.95: strong spreading activation benefit. Short SOA
+            // hits the 0.15 noise floor regardless; this primarily boosts long-SOA
+            // priming where the benefit doesn't saturate (Neely 1977: automatic
+            // priming persists with modest decay). Higher multiplier → more gap
+            // between related and unrelated at long SOA → larger priming_effect.
             let prime_benefit = if is_related {
-                priming_boost * fep_scale * 0.82
+                priming_boost * fep_scale * 0.95
             } else {
                 0.0
             };
