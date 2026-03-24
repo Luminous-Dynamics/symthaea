@@ -1569,7 +1569,7 @@ fn helper_lr_clamps_to_bounds() {
 #[test]
 fn helper_adjust_exploration_applies_delta_and_records_proposal() {
     let mut svc = make_helper_service();
-    svc.curiosity_drive.exploration_urge = 0.5;
+    svc.behavior.curiosity_drive.exploration_urge = 0.5;
     svc.feedback_state.begin_cycle();
     svc.feedback_state.snapshot_cycle_start(
         svc.prediction_confidence,
@@ -1580,9 +1580,9 @@ fn helper_adjust_exploration_applies_delta_and_records_proposal() {
     let delta: f32 = 0.2;
     svc.adjust_exploration("test_source", delta);
     assert!(
-        (svc.curiosity_drive.exploration_urge - (0.5 + delta as f64)).abs() < 1e-10,
+        (svc.behavior.curiosity_drive.exploration_urge - (0.5 + delta as f64)).abs() < 1e-10,
         "adjust_exploration should add delta: got {}",
-        svc.curiosity_drive.exploration_urge
+        svc.behavior.curiosity_drive.exploration_urge
     );
     assert_eq!(svc.feedback_state.exploration.len(), 1);
 }
@@ -1590,7 +1590,7 @@ fn helper_adjust_exploration_applies_delta_and_records_proposal() {
 #[test]
 fn helper_scale_exploration_applies_factor() {
     let mut svc = make_helper_service();
-    svc.curiosity_drive.exploration_urge = 0.8;
+    svc.behavior.curiosity_drive.exploration_urge = 0.8;
     svc.feedback_state.begin_cycle();
     svc.feedback_state.snapshot_cycle_start(
         svc.prediction_confidence,
@@ -1601,9 +1601,9 @@ fn helper_scale_exploration_applies_factor() {
     let factor: f32 = 0.5;
     svc.scale_exploration("test_source", factor);
     assert!(
-        (svc.curiosity_drive.exploration_urge - (0.8 * factor as f64)).abs() < 1e-10,
+        (svc.behavior.curiosity_drive.exploration_urge - (0.8 * factor as f64)).abs() < 1e-10,
         "scale_exploration should multiply: got {}",
-        svc.curiosity_drive.exploration_urge
+        svc.behavior.curiosity_drive.exploration_urge
     );
 }
 
@@ -1613,15 +1613,15 @@ fn helper_exploration_clamps_to_bounds() {
     svc.feedback_state.begin_cycle();
     svc.set_exploration("test", 2.0);
     assert!(
-        (svc.curiosity_drive.exploration_urge - 1.0).abs() < 1e-7,
+        (svc.behavior.curiosity_drive.exploration_urge - 1.0).abs() < 1e-7,
         "exploration should clamp to 1.0: got {}",
-        svc.curiosity_drive.exploration_urge
+        svc.behavior.curiosity_drive.exploration_urge
     );
     svc.set_exploration("test", -1.0);
     assert!(
-        (svc.curiosity_drive.exploration_urge - 0.0).abs() < 1e-7,
+        (svc.behavior.curiosity_drive.exploration_urge - 0.0).abs() < 1e-7,
         "exploration should clamp to 0.0: got {}",
-        svc.curiosity_drive.exploration_urge
+        svc.behavior.curiosity_drive.exploration_urge
     );
 }
 
@@ -1685,7 +1685,7 @@ fn helper_multiple_proposals_accumulate_within_cycle() {
     svc.feedback_state.snapshot_cycle_start(
         svc.prediction_confidence,
         svc.fep.lr_boost,
-        svc.curiosity_drive.exploration_urge,
+        svc.behavior.curiosity_drive.exploration_urge,
         svc.carryover.learning.adaptive_threshold_scale,
     );
     let d1: f32 = 0.05;

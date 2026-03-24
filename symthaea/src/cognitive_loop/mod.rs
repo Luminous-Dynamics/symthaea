@@ -149,6 +149,7 @@ mod cycle_strategy;
 mod cycle_subsystems;
 pub(crate) mod episodic_persistence_manager;
 pub(crate) mod ethics_engine;
+pub(crate) mod memory_execution;
 pub(crate) mod ethics_values_manager;
 pub(crate) mod feature_integration_manager;
 pub mod feedback_state;
@@ -390,7 +391,7 @@ pub struct CognitiveLoopService {
     coherence_tracker: ConversationCoherenceTracker,
 
     /// Memory & consolidation: semantic memory, coordinator, resonator, stability, discovery.
-    pub(crate) memory_consol: memory_consolidation_manager::MemoryAndConsolidationManager,
+    pub(crate) memory: memory_execution::MemoryExecution,
 
     /// Feature integrations: neural bridge, semantic encoder, school, causal, physics.
     pub(crate) feature_integ: feature_integration_manager::FeatureIntegrationManager,
@@ -402,13 +403,10 @@ pub struct CognitiveLoopService {
     /// Causal loop enhancer for discovering causal structure in (input, output) pairs.
     /// When enabled via `config.causal_enhancement`, this:
     /// - Tracks recent (input, output) pairs
-    /// - Periodically runs causal discovery
-    /// - Weights attention based on discovered causal parents
-    /// - Suggests interventions for exploration
-    causal_enhancer: Option<CausalLoopEnhancer>,
+    // causal_enhancer moved to memory_execution::MemoryExecution
 
     /// Episodic persistence: replay, database, flush guard, reasoning context.
-    pub(crate) episodic_persistence: episodic_persistence_manager::EpisodicPersistenceManager,
+    // episodic_persistence moved to memory_execution::MemoryExecution
 
     /// Conscious Reasoning Engine: unified 7-step reasoning cycle
     /// Composes epistemic conflict, temporal planning, counterfactual reasoning,
@@ -573,7 +571,7 @@ pub struct CognitiveLoopService {
     /// Extracts structured facts from input, encodes as HDC vectors, stores in a
     /// temporal knowledge graph, builds causal DAG edges, and grows adaptive ontology.
     /// Science: Kanerva (2009) HDC, Pearl (2009) Causality, Carey (2009) conceptual change.
-    knowledge_manager: Option<crate::knowledge::KnowledgeManager>,
+    // knowledge_manager moved to memory_execution::MemoryExecution
 
     // last_reasoning_context moved to episodic_persistence manager
     /// Experience integration bus for principled signal tracking and harmonic reasoning.

@@ -992,8 +992,8 @@ mod tests {
     fn test_social_high_trust_switches_concise_to_supportive() {
         let mut svc = make_service();
         // trust=0.85 → deviation=0.35, strength=(0.35-0.1)*2.5=0.625 > 0.5
-        svc.social_mgr.social.social_trust = 0.85;
-        svc.social_mgr.social.social_cooperation_rate = 0.5;
+        svc.behavior.social_mgr.social.social_trust = 0.85;
+        svc.behavior.social_mgr.social.social_cooperation_rate = 0.5;
         // Force CLL to pick Concise
         svc.fep
             .closed_learning_loop
@@ -1007,7 +1007,7 @@ mod tests {
     fn test_social_low_trust_switches_exploratory_to_detailed() {
         let mut svc = make_service();
         // trust=0.1 → deviation=-0.4, caution=(0.4-0.1)*2.5=0.75 > 0.5
-        svc.social_mgr.social.social_trust = 0.1;
+        svc.behavior.social_mgr.social.social_trust = 0.1;
         // Force CLL to pick Exploratory
         svc.fep
             .closed_learning_loop
@@ -1021,7 +1021,7 @@ mod tests {
     fn test_social_neutral_trust_no_bias() {
         let mut svc = make_service();
         // trust=0.5 → deviation=0.0, within dead zone (|deviation| < 0.1)
-        svc.social_mgr.social.social_trust = 0.5;
+        svc.behavior.social_mgr.social.social_trust = 0.5;
         let result = svc.run_strategy_selection(false);
         assert!(!result.social_strategy_bias);
     }

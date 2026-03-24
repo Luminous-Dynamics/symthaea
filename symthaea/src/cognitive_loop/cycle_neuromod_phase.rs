@@ -358,7 +358,7 @@ mod tests {
     #[test]
     fn test_exploration_sht_drain_below_threshold() {
         let mut svc = make_service();
-        svc.curiosity_drive.exploration_urge = 0.2; // below threshold
+        svc.behavior.curiosity_drive.exploration_urge = 0.2; // below threshold
         let result = svc.run_neuromodulator_and_psi_phase(0.1, 0.5);
         assert_eq!(result.exploration_sht_drain, 0.0);
     }
@@ -370,13 +370,13 @@ mod tests {
         // begin_cycle + snapshot_cycle_start seeds the feedback consensus at 0.8.
         svc.feedback_state.begin_cycle();
         svc.feedback_state.snapshot_cycle_start(0.5, 0.01, 0.8, 1.0);
-        svc.curiosity_drive.exploration_urge = 0.8; // above threshold
+        svc.behavior.curiosity_drive.exploration_urge = 0.8; // above threshold
         let result = svc.run_neuromodulator_and_psi_phase(0.1, 0.5);
         assert!(
             result.exploration_sht_drain > 0.0,
             "expected sht drain > 0, got {}; exploration_urge was {}",
             result.exploration_sht_drain,
-            svc.curiosity_drive.exploration_urge
+            svc.behavior.curiosity_drive.exploration_urge
         );
     }
 

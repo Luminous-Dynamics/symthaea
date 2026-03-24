@@ -470,8 +470,8 @@ mod tests {
         for i in 0..6 {
             let _ = svc.phase_perception(&format!("input {i}"), Instant::now(), &mut timings);
         }
-        assert!(svc.social_mgr.recent_ai_hvs.len() <= 4);
-        assert!(svc.social_mgr.recent_input_hvs.len() <= 4);
+        assert!(svc.behavior.social_mgr.recent_ai_hvs.len() <= 4);
+        assert!(svc.behavior.social_mgr.recent_input_hvs.len() <= 4);
     }
 
     #[test]

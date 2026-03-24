@@ -61,7 +61,7 @@ impl CognitiveLoopService {
             // chains boost consolidation priority for offline integration.
             // Science: Festinger (1957) — cognitive dissonance drives consolidation;
             //          Hobson & Friston (2012) — active inference in dreams consolidates causal models.
-            if let Some(ref km) = self.knowledge_manager {
+            if let Some(ref km) = self.memory.knowledge_manager {
                 let sigs = km.signals();
                 // Active contradictions boost consolidation by 20%
                 if sigs.contradiction_signal.is_finite() && sigs.contradiction_signal > 0.0 {
@@ -236,7 +236,7 @@ impl CognitiveLoopService {
                 // Science: Rasch & Born (2013) — targeted memory reactivation during
                 // NREM sleep selectively strengthens task-relevant memory traces.
                 if dream_phi_improvement > 0.0 {
-                    if let Some(ref mut km) = self.knowledge_manager {
+                    if let Some(ref mut km) = self.memory.knowledge_manager {
                         let topics = km.top_grounded_facts(
                             super::super::thresholds::KNOWLEDGE_EPISODIC_MAX_PER_DREAM,
                         );
@@ -363,7 +363,7 @@ impl CognitiveLoopService {
         // ── Knowledge → Episodic memory bridge ───────────────────────────
         // Promote high-confidence facts to episodic memory during dreams.
         // Science: Tse et al. (2007) — schema-consistent facts consolidate rapidly
-        if let Some(ref km) = self.knowledge_manager {
+        if let Some(ref km) = self.memory.knowledge_manager {
             if let Some(ref mut bus) = self.experience_bus {
                 let signals = km.signals();
                 if signals.relevance > 0.3 {
@@ -388,8 +388,8 @@ impl CognitiveLoopService {
         // retrieval counts), distill them into semantic knowledge graph facts.
         // Science: Stickgold & Walker (2013) — sleep-dependent memory consolidation;
         //          McClelland et al. (1995) — complementary learning systems theory.
-        if let Some(ref mut km) = self.knowledge_manager {
-            let top = self.memory_consol.memory_coordinator.most_replayed(5);
+        if let Some(ref mut km) = self.memory.knowledge_manager {
+            let top = self.memory.memory_consol.memory_coordinator.most_replayed(5);
             for (content_hash, replay_count) in &top {
                 if *replay_count >= 3 {
                     let label = format!("episode_0x{:016x}", content_hash);

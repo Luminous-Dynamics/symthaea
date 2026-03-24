@@ -944,7 +944,7 @@ impl CognitiveLoopService {
                 },
                 // Knowledge grounding: dynamic from KnowledgeManager signals
                 // Science: Barsalou (2008), Clark (2013) — grounded cognition modulates consciousness
-                knowledge_grounding: if let Some(ref km) = self.knowledge_manager {
+                knowledge_grounding: if let Some(ref km) = self.memory.knowledge_manager {
                     let s = km.signals();
                     let grounding = (s.relevance
                         * super::thresholds::KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT
@@ -962,7 +962,7 @@ impl CognitiveLoopService {
                 // Knowledge coherence: composite quality from graph size, calibration, contradictions.
                 // Formula: (log2(graph_size+1)/10) × (1-ece) × (1/(1 + contradictions×0.1))
                 // Science: Stanovich (2009) — epistemic rationality; Guo et al. (2017) — calibration.
-                knowledge_coherence: if let Some(ref km) = self.knowledge_manager {
+                knowledge_coherence: if let Some(ref km) = self.memory.knowledge_manager {
                     let t = km.telemetry();
                     let log_scale = super::thresholds::KNOWLEDGE_COHERENCE_LOG_SCALE;
                     let size_factor =
@@ -1023,13 +1023,13 @@ impl CognitiveLoopService {
                 self.carryover.learning.subsystem_lr_factor.clamp(0.8, 1.2);
         }
         if let Some(consolidation_boost) = consciousness_output.episodic_consolidation_boost {
-            if let Some(ref mut replay) = self.episodic_persistence.replay {
+            if let Some(ref mut replay) = self.memory.episodic_persistence.replay {
                 replay.boost_recent_consolidation(consolidation_boost);
             }
         }
         // ── Knowledge Engine: PE → ontology learning rate ────────────────
         // High prediction error → faster ontology adaptation (Rescorla-Wagner 1972).
-        if let Some(ref mut km) = self.knowledge_manager {
+        if let Some(ref mut km) = self.memory.knowledge_manager {
             km.set_ontology_lr_from_pe(prediction_error as f32);
             km.modulate_lr_from_consciousness(self.stats.unified_psi as f64);
         }
@@ -1990,8 +1990,8 @@ mod tests {
     #[test]
     fn feedback_tom_accuracy_requires_social_models() {
         let mut svc = make_service();
-        svc.social_mgr.social.social_prediction_accuracy = 0.0;
-        svc.social_mgr.social.social_models_count = 0;
+        svc.behavior.social_mgr.social.social_prediction_accuracy = 0.0;
+        svc.behavior.social_mgr.social.social_models_count = 0;
         for _ in 0..15 {
             svc.cycle("warmup");
         }

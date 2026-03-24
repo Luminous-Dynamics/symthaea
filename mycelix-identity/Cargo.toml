@@ -2,6 +2,9 @@
 resolver = "2"
 # Tests excluded from WASM workspace (use different deps)
 exclude = ["tests", "cli"]
+
+[workspace.package]
+license = "AGPL-3.0-or-later"
 members = [
     # Shared crypto-agile types (PQE abstraction layer)
     "crates/mycelix-crypto",

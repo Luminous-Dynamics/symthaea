@@ -1089,7 +1089,7 @@ impl CognitiveLoopService {
     ///
     /// Science: Pearl (2009) — deeper causal understanding → more confident moral reasoning.
     pub(crate) fn cross_couple_knowledge_ethics(&mut self) {
-        if let Some(ref km) = self.knowledge_manager {
+        if let Some(ref km) = self.memory.knowledge_manager {
             let depth = km.signals().causal_depth;
             if depth.is_finite()
                 && depth > super::super::thresholds::KNOWLEDGE_ETHICS_CAUSAL_DEPTH_THRESHOLD

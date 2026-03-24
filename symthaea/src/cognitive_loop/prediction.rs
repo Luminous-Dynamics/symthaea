@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Multi-scale prediction, primitive state building, and consolidation.
 
 use crate::consciousness::primitive_consciousness::{
@@ -97,7 +100,7 @@ impl CognitiveLoopService {
         // Only re-query the causal graph every 41 cycles (co-prime with world model update)
         // to avoid redundant graph copies. Between updates, use uniform weighting.
         let causal_dims: Option<Vec<bool>> = if self.stats.total_cycles % 41 == 0 {
-            if let Some(ref enhancer) = self.causal_enhancer {
+            if let Some(ref enhancer) = self.memory.causal_enhancer {
                 let graph = enhancer.current_graph();
                 let mut has_edge = vec![false; dim];
                 for e in &graph.edges {

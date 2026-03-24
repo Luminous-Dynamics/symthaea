@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Language controller: HdcLtcUnifiedNetwork + weight-tied output projection.
 //!
 //! Direct analog of `VocalTractController` (`crates/symthaea-vocal-tract/src/controller.rs`).
@@ -526,6 +529,19 @@ impl LanguageController {
         &self.config
     }
 
+    /// Get GPU embedding cache for accelerated logit computation.
+    /// Returns `None` when GPU features are disabled or cache not initialized.
+    #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+    pub fn gpu_embedding_cache(&self) -> Option<&GpuEmbeddingCache> {
+        self.gpu_embeddings.as_ref()
+    }
+
+    /// Stub for when GPU features are disabled.
+    #[cfg(not(any(feature = "mamba-cpu", feature = "gpu-logits")))]
+    pub fn gpu_embedding_cache(&self) -> Option<&()> {
+        None
+    }
+
     /// Get mutable reference to the controller configuration.
     /// Used by training-time fusion to enable/disable flags per epoch.
     pub fn config_mut(&mut self) -> &mut LanguageControllerConfig {
@@ -580,6 +596,41 @@ impl LanguageController {
     /// Get the effective dt used in the last forward_step (for BPTT consistency).
     pub fn last_effective_dt(&self) -> f32 {
         self.last_effective_dt
+    }
+
+    // ── Projection API stubs (TODO: implement for projected-gradient training) ──
+
+    /// Position base vector reference for projected gradient computation.
+    pub fn position_base_ref(&self) -> &ContinuousHV {
+        &self.position_base
+    }
+
+    /// Projection dimensionality (stub: returns None until projection is implemented).
+    pub fn projection_dim(&self) -> Option<usize> {
+        None
+    }
+
+    /// Projected embedding matrix (stub: returns None).
+    pub fn projected_embeddings(&self) -> Option<&[Vec<f32>]> {
+        None
+    }
+
+    /// Projection weight matrix (stub: returns None).
+    pub fn projection_weights(&self) -> Option<&[f32]> {
+        None
+    }
+
+    /// Mutable projection weights (stub: returns None).
+    pub fn projection_weights_mut(&mut self) -> Option<&mut [f32]> {
+        None
+    }
+
+    /// Refresh projected embeddings after weight update (stub: no-op).
+    pub fn refresh_projected_embeddings(&mut self) {}
+
+    /// Project and normalize a vector through the projection matrix (stub).
+    pub fn project_and_normalize(_output: &[f32], _weights: &[f32], _dim: usize) -> Vec<f32> {
+        vec![]
     }
 
     /// Get the refined output HV from the last forward step.

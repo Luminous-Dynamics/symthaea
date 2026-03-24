@@ -21,6 +21,7 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::checkpoint::AdamState;
+use symthaea_core::hdc::ContinuousHV;
 use crate::encoder::ThoughtChannels;
 use crate::generator::BrocaGenerator;
 use crate::tokenizer::BpeTokenizer;
@@ -1289,6 +1290,7 @@ pub fn train_with_adam(
                     || force_train_network;
 
                 // Compute gradient of CE loss w.r.t. output HV (for CfC BPTT)
+                #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
                 let d_output = if train_network_this_epoch {
                     Some(compute_ce_gradient_wrt_output(
                         &logits,
@@ -1298,6 +1300,8 @@ pub fn train_with_adam(
                 } else {
                     None
                 };
+                #[cfg(not(any(feature = "mamba-cpu", feature = "gpu-logits")))]
+                let d_output: Option<ContinuousHV> = None;
 
                 // Apply embedding gradient update (skipped when freeze_embeddings is set)
                 let (grad_norm, was_clipped) = if config.freeze_embeddings {
@@ -1802,6 +1806,10 @@ fn cross_entropy_loss_smooth(logits: &[f32], target: usize, label_smoothing: f32
 /// Full chain: ∂L/∂o = scale × Σ_i (softmax[i] - 1_{i=target}) × (e_i/||e_i|| - cos_i × o)
 ///
 /// This gradient is used to backpropagate through the CfC network.
+// TODO(blocked:projection-api): Requires LanguageController projection methods
+// (project_and_normalize, projected_embeddings, projection_dim, etc.)
+// that have not been implemented yet. Gate behind gpu-logits until ready.
+#[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
 fn compute_ce_gradient_wrt_output(
     logits: &[f32],
     target: usize,
@@ -1946,6 +1954,7 @@ fn compute_ce_gradient_cpu(
 /// 1. error @ E_hat: [1, V] × [V, D] → [1, D] (matmul)
 /// 2. Subtract the output-projection term
 // candle-core is always available (non-optional dep)
+#[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
 fn compute_ce_gradient_gpu(
     exps: &[f32],
     sum_exp: f32,

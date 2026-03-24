@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! MetricsProvider trait implementation for CognitiveLoopService.
 //!
 //! Bridges the cognitive loop's internal state to the IPC metrics system,
@@ -21,10 +24,10 @@ impl MetricsProvider for CognitiveLoopService {
             is_conscious: phi > 0.3,
             cognitive_depth: format!("{:?}", self.cognitive_depth),
             strategy: format!("{:?}", self.fep.closed_learning_loop.current_strategy),
-            in_flow: self.flow_state.in_flow,
+            in_flow: self.behavior.flow_state.in_flow,
             prediction_error: self.stats.avg_prediction_error,
-            emotional_valence: self.emotion_contagion.prosody_valence(),
-            emotional_arousal: self.emotion_contagion.prosody_arousal(),
+            emotional_valence: self.behavior.emotion_contagion.prosody_valence(),
+            emotional_arousal: self.behavior.emotion_contagion.prosody_arousal(),
             timestamp_ms: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
@@ -60,7 +63,7 @@ impl MetricsProvider for CognitiveLoopService {
     }
 
     fn in_flow(&self) -> bool {
-        self.flow_state.in_flow
+        self.behavior.flow_state.in_flow
     }
 
     fn uptime_secs(&self) -> u64 {

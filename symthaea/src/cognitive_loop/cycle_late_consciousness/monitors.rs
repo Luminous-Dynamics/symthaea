@@ -62,7 +62,7 @@ impl CognitiveLoopService {
                     for grad in &graduates {
                         // Route graduate through resonator for importance scoring
                         let grad_importance =
-                            if let Some(ref mut res_mem) = self.memory_consol.resonator_memory {
+                            if let Some(ref mut res_mem) = self.memory.memory_consol.resonator_memory {
                                 let res_dim = res_mem.resonator.config.dim;
                                 let grad_vals = &grad.embedding.values;
                                 if grad_vals.len() >= res_dim && !res_mem.episodes.is_empty() {
@@ -107,7 +107,7 @@ impl CognitiveLoopService {
                             };
                         // Route through MemoryCoordinator for quality filtering instead of
                         // bypassing directly to fep.episodic_memory.encode().
-                        self.memory_consol.memory_coordinator.queue_graduation(
+                        self.memory.memory_consol.memory_coordinator.queue_graduation(
                             crate::memory::memory_coordinator::GraduationEvent {
                                 content: grad.embedding.clone(),
                                 label: grad.id.clone(),
@@ -272,36 +272,52 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // AFFECTIVE BRIDGE: Evaluate somatic markers from cognitive signals
         // Runs every cycle (lightweight: ~5 arithmetic ops + blend)
+        //
+        // Phase 1 Affect Consolidation: Feed somatic signals into the unified
+        // EmotionalBridge (UnifiedEmotionalState) so all consumers read from
+        // a single canonical source. Legacy AffectiveBridge still runs as
+        // fallback when enabled, but consumers read from unified state.
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let (affective_valence, affective_arousal) =
-            if let Some(ref mut bridge) = self.consciousness_state.affective_bridge {
-                let moral_score = self
-                    .ethics_values
-                    .last_moral_judgment
-                    .as_ref()
-                    .map(|j| j.moral_score)
-                    .unwrap_or(0.0);
-                // Social modulation: feed ToM signals into affect (Decety & Chaminade 2003)
-                // Social trust/cooperation injected by Mind module via set_social_signals()
-                let affect = bridge.evaluate_from_signals_with_social(
-                    ctx.prediction_error,
-                    ctx.surprise_triggered,
-                    ctx.unified_psi,
-                    moral_score,
-                    self.behavior.social_mgr.social.social_trust,
-                    self.behavior.social_mgr.social.social_cooperation_rate,
-                    0.0, // peer_valence: future — aggregate from social inbox
-                );
-                (affect.valence, affect.arousal)
-            } else {
-                (0.0, 0.5)
-            };
+        let moral_score = self
+            .ethics_values
+            .last_moral_judgment
+            .as_ref()
+            .map(|j| j.moral_score)
+            .unwrap_or(0.0);
+
+        // Primary path: update unified EmotionalBridge with somatic signals
+        self.unification_engine.emotional.update_from_somatic_signals(
+            ctx.prediction_error,
+            ctx.surprise_triggered,
+            ctx.unified_psi,
+            moral_score,
+            self.behavior.social_mgr.social.social_trust,
+            self.behavior.social_mgr.social.social_cooperation_rate,
+            0.0, // peer_valence: future — aggregate from social inbox
+        );
+
+        // Legacy fallback: keep AffectiveBridge in sync (deprecated — will be removed)
+        if let Some(ref mut bridge) = self.consciousness_state.affective_bridge {
+            bridge.evaluate_from_signals_with_social(
+                ctx.prediction_error,
+                ctx.surprise_triggered,
+                ctx.unified_psi,
+                moral_score,
+                self.behavior.social_mgr.social.social_trust,
+                self.behavior.social_mgr.social.social_cooperation_rate,
+                0.0,
+            );
+        }
+
+        // Read from unified state for downstream consumers
+        let unified_emo = self.unification_engine.emotional.state();
+        let affective_valence = unified_emo.valence as f32;
+        let affective_arousal = unified_emo.arousal as f32;
 
         // FEEDBACK: Positive affect broadens exploration (Fredrickson 2001 broaden-and-build)
-        if affective_valence > super::super::thresholds::AFFECTIVE_VALENCE_BROADEN_THRESHOLD
-            && self.consciousness_state.affective_bridge.is_some()
-        {
+        // Now reads from unified state — no longer gated on AffectiveBridge being enabled
+        if affective_valence > super::super::thresholds::AFFECTIVE_VALENCE_BROADEN_THRESHOLD {
             self.behavior.curiosity_drive.boredom *=
                 super::super::thresholds::AFFECTIVE_VALENCE_CURIOSITY_FACTOR;
         }

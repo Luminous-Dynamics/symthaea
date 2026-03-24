@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Quality-aware adaptive processing + end-of-cycle homeostasis.
 //!
 //! Extracted from cycle_phase_feedback.rs — all logic and behavior preserved exactly.
@@ -144,21 +147,21 @@ impl CognitiveLoopService {
         // Clamp attention_sensitivity to [0.5, 2.0] after all modifications.
         // 10+ subsystems multiply this field per cycle; without bounding, it can drift
         // to extreme values. Science: Weber-Fechner law — perception has bounded dynamic range.
-        self.adaptive_behavior.attention_sensitivity =
-            self.adaptive_behavior.attention_sensitivity.clamp(0.5, 2.0);
+        self.behavior.adaptive_behavior.attention_sensitivity =
+            self.behavior.adaptive_behavior.attention_sensitivity.clamp(0.5, 2.0);
 
         // Boredom↔confidence homeostasis (Turrigiano 2004 — homeostatic plasticity)
         // High boredom signals stagnation → dampen confidence (system shouldn't be confident
         // when stuck in repetitive states). Prevents confidence runaway from accumulated boosts.
-        if self.curiosity_drive.boredom > 0.7 {
-            let boredom_dampen = (self.curiosity_drive.boredom - 0.7) * 0.15;
+        if self.behavior.curiosity_drive.boredom > 0.7 {
+            let boredom_dampen = (self.behavior.curiosity_drive.boredom - 0.7) * 0.15;
             self.scale_confidence("boredom_dampen", (1.0 - boredom_dampen).max(0.85));
         }
 
         // Boredom homeostasis: slow drift toward neutral (0.5) prevents monotonic saturation.
         // Phase 18: urgency-adaptive pull (Cruise=1.5×, Critical=0.6×)
-        self.curiosity_drive.boredom +=
-            (0.5 - self.curiosity_drive.boredom) * 0.02 * homeostasis_pull_strength;
+        self.behavior.curiosity_drive.boredom +=
+            (0.5 - self.behavior.curiosity_drive.boredom) * 0.02 * homeostasis_pull_strength;
 
         // Exploration urge per-cycle budget: clamp total change to ±0.5.
         // 15+ subsystems write exploration_urge per cycle; without bounding, cumulative
@@ -173,7 +176,7 @@ impl CognitiveLoopService {
         // Exploration urge homeostasis: slow drift toward neutral (0.3) prevents saturation.
         // Phase 18: urgency-adaptive pull (Cruise=1.5×, Critical=0.6×)
         let drift_delta =
-            (0.3 - self.curiosity_drive.exploration_urge) * 0.03 * homeostasis_pull_strength as f64;
+            (0.3 - self.behavior.curiosity_drive.exploration_urge) * 0.03 * homeostasis_pull_strength as f64;
         self.adjust_exploration("homeostasis_drift", drift_delta as f32);
 
         // Store urgency for next cycle's hysteresis
@@ -281,11 +284,11 @@ mod tests {
         svc.carryover.quality.last_coherence = 0.5;
         svc.stats.total_cycles = 100;
         // Start with extreme exploration
-        svc.curiosity_drive.exploration_urge = 0.1;
+        svc.behavior.curiosity_drive.exploration_urge = 0.1;
         let mut timings = ModuleTimings::default();
         let _result = svc.run_quality_and_homeostasis(0.5, false, 0.1, 1.0, 0.9, 0.8, &mut timings);
         // Exploration should be clamped within ±0.5 of start (0.1)
-        assert!(svc.curiosity_drive.exploration_urge >= 0.0);
-        assert!(svc.curiosity_drive.exploration_urge <= 0.6);
+        assert!(svc.behavior.curiosity_drive.exploration_urge >= 0.0);
+        assert!(svc.behavior.curiosity_drive.exploration_urge <= 0.6);
     }
 }

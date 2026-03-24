@@ -921,7 +921,7 @@ impl CognitiveLoopService {
                 // ── Knowledge Manager: per-cycle extraction + neuromod coupling ──
                 // Not a CognitiveSubsystem — called directly with (input, cycle).
                 // Science: Kanerva (2009) HDC, Pearl (2009) Causality.
-                if let Some(ref mut km) = self.knowledge_manager {
+                if let Some(ref mut km) = self.memory.knowledge_manager {
                     let (_telem, sigs) = km.process(input, cycle_num);
 
                     // Extract scalar fields to release the borrow on km,
@@ -1680,7 +1680,7 @@ impl CognitiveLoopService {
         }
 
         if fep_td_error.abs() > FEP_TD_ERROR_DISCOVERY_THRESHOLD {
-            if let Some(ref mut enhancer) = self.causal_enhancer {
+            if let Some(ref mut enhancer) = self.memory.causal_enhancer {
                 if enhancer.should_discover() {
                     let graph = enhancer.run_discovery();
                     tracing::trace!(edges = graph.edges.len(), "causal discovery completed");
@@ -1704,7 +1704,7 @@ impl CognitiveLoopService {
         }
 
         // ── Track 5e: Causal graph → attention weighting ─────────────────
-        let causal_attention_edges: usize = if let Some(ref enhancer) = self.causal_enhancer {
+        let causal_attention_edges: usize = if let Some(ref enhancer) = self.memory.causal_enhancer {
             let graph = enhancer.current_graph();
             let edge_count = graph.edges.len();
             if edge_count > 0 {
@@ -1782,7 +1782,7 @@ impl CognitiveLoopService {
         }
 
         if fep_surprise > surprise_thresh {
-            if let Some(ref mut replay) = self.episodic_persistence.replay {
+            if let Some(ref mut replay) = self.memory.episodic_persistence.replay {
                 let surprise_boost = (fep_surprise - surprise_thresh).min(FEP_SURPRISE_EXPLORE_CAP)
                     * FEP_SURPRISE_EXPLORE_SCALE;
                 replay.boost_recent_consolidation(surprise_boost);
@@ -2413,7 +2413,7 @@ impl CognitiveLoopService {
                 // Active rest: boost episodic memory consolidation priority.
                 // Rest states are when the brain consolidates recent experiences
                 // (Diekelmann & Born 2010 — memory consolidation during rest).
-                if let Some(ref mut replay) = self.episodic_persistence.replay {
+                if let Some(ref mut replay) = self.memory.episodic_persistence.replay {
                     replay.boost_recent_consolidation(0.15);
                 }
             }
@@ -2940,7 +2940,7 @@ impl CognitiveLoopService {
                 .as_ref()
                 .map_or(false, |e| e.has_causal_structure())
             {
-                self.causal_enhancer
+                self.memory.causal_enhancer
                     .as_ref()
                     .map_or(0, |e| e.current_graph().edges.len())
             } else {
@@ -3077,7 +3077,7 @@ impl CognitiveLoopService {
         let resonator_coherence_gate = pre_update_coherence > reflection_thresholds.coherence_gate
             || self.stats.total_cycles < DYNAMICS_STARTUP_WARMUP_CYCLES;
         if resonator_coherence_gate && urgency.should_run(self.stats.total_cycles, 1, 1, 4) {
-            if let Some(ref mut res_mem) = self.memory_consol.resonator_memory {
+            if let Some(ref mut res_mem) = self.memory.memory_consol.resonator_memory {
                 let res_start = Instant::now();
 
                 let res_dim_ok =
@@ -3178,7 +3178,7 @@ impl CognitiveLoopService {
                         }
 
                         if !match_timestamps.is_empty() {
-                            if let Some(ref mut replay) = self.episodic_persistence.replay {
+                            if let Some(ref mut replay) = self.memory.episodic_persistence.replay {
                                 replay.boost_causal_consolidation(
                                     &match_timestamps,
                                     super::thresholds::RESONATOR_CAUSAL_CONSOLIDATION_BOOST as f64,
@@ -3698,7 +3698,7 @@ impl CognitiveLoopService {
         // Incorporate causal structure into world model (every 41 cycles, co-prime).
         // Pearl (2009): causal knowledge provides structural priors beyond correlation.
         if self.stats.total_cycles % super::thresholds::CAUSAL_STRUCTURE_INTERVAL == 0 {
-            if let Some(ref enhancer) = self.causal_enhancer {
+            if let Some(ref enhancer) = self.memory.causal_enhancer {
                 let graph = enhancer.current_graph();
                 if !graph.is_empty() {
                     let edges: Vec<(usize, usize, f32)> = graph
@@ -4063,16 +4063,16 @@ impl CognitiveLoopService {
         };
 
         let (evicted_semantic, memory_confidence_boost) = {
-            let stability_regime = &mut self.memory_consol.stability_regime;
-            let discovery_service = &mut self.memory_consol.discovery_service;
-            let semantic_memory = &mut self.memory_consol.semantic_memory;
-            let causal_enhancer = &mut self.causal_enhancer;
+            let stability_regime = &mut self.memory.memory_consol.stability_regime;
+            let discovery_service = &mut self.memory.memory_consol.discovery_service;
+            let semantic_memory = &mut self.memory.memory_consol.semantic_memory;
+            let causal_enhancer = &mut self.memory.causal_enhancer;
             let episodic_memory = &mut self.fep.episodic_memory;
             let primitive_belief_bridge = &mut self.primitive_belief_bridge;
             let closed_learning_loop = &mut self.fep.closed_learning_loop;
             let fep_learning_signal = &mut self.fep.learning_signal;
             let prev_primitive_state = &mut self.prev_primitive_state;
-            let resonator_memory = &mut self.memory_consol.resonator_memory;
+            let resonator_memory = &mut self.memory.memory_consol.resonator_memory;
 
             module_timings.stability_regime = helpers::run_stability_regime(
                 stability_regime,
@@ -4155,7 +4155,7 @@ impl CognitiveLoopService {
         let had_semantic_eviction = evicted_semantic.is_some();
         if let Some(evicted) = evicted_semantic {
             let steps_survived = pp_total_cycles.saturating_sub(evicted.timestamp as usize) as u64;
-            self.memory_consol.memory_coordinator.queue_graduation(
+            self.memory.memory_consol.memory_coordinator.queue_graduation(
                 crate::memory::memory_coordinator::GraduationEvent {
                     content: symthaea_core::hdc::ContinuousHV::from_vec(evicted.hdc_vector),
                     label: evicted.category.unwrap_or_default(),
@@ -4176,8 +4176,8 @@ impl CognitiveLoopService {
 
         module_timings.core_parallel_postprocess = _t_core.elapsed().as_micros() as u64;
 
-        self.stats.semantic_hits = self.memory_consol.semantic_memory.stats().semantic_hits;
-        self.stats.semantic_misses = self.memory_consol.semantic_memory.stats().semantic_misses;
+        self.stats.semantic_hits = self.memory.memory_consol.semantic_memory.stats().semantic_hits;
+        self.stats.semantic_misses = self.memory.memory_consol.semantic_memory.stats().semantic_misses;
         self.stats.semantic_lr_factor = semantic_lr_factor;
         self.stats.semantic_avg_retrieved_error = self
             .memory_consol
@@ -4185,7 +4185,7 @@ impl CognitiveLoopService {
             .stats()
             .avg_retrieved_error;
         self.stats.semantic_entries_stored =
-            self.memory_consol.semantic_memory.stats().total_stored;
+            self.memory.memory_consol.semantic_memory.stats().total_stored;
 
         TrainingPostResult {
             learning_occurred,

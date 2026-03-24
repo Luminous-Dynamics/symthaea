@@ -1214,7 +1214,7 @@ impl CognitiveLoopService {
             match crate::databases::SqliteMemory::new(db_path) {
                 Ok(db) => {
                     tracing::info!(path = %db_path, "Memory persistence database initialized");
-                    service.episodic_persistence.db = Some(std::sync::Arc::new(db));
+                    service.memory.episodic_persistence.db = Some(std::sync::Arc::new(db));
                 }
                 Err(e) => {
                     tracing::warn!(path = %db_path, error = %e, "Failed to open memory database — persistence disabled");
@@ -1223,8 +1223,8 @@ impl CognitiveLoopService {
         }
 
         // Startup rehydration: load top-64 episodes from SQLite into episodic replay
-        if let Some(ref db) = service.episodic_persistence.db {
-            if let Some(ref mut replay) = service.episodic_persistence.replay {
+        if let Some(ref db) = service.memory.episodic_persistence.db {
+            if let Some(ref mut replay) = service.memory.episodic_persistence.replay {
                 let records = db.load_top_by_psi_sync(64);
                 let mut rehydrated = 0usize;
                 for record in records {

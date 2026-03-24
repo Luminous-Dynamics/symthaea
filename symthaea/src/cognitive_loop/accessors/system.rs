@@ -57,10 +57,10 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════
 
         /// Get semantic memory statistics
-        pub fn semantic_memory_stats(&self) -> &crate::memory::semantic_memory::SemanticMemoryStats { self.memory_consol.semantic_memory.stats() }
+        pub fn semantic_memory_stats(&self) -> &crate::memory::semantic_memory::SemanticMemoryStats { self.memory.memory_consol.semantic_memory.stats() }
 
         /// Get reference to the stability regime processor
-        pub fn stability_regime(&self) -> &crate::consciousness::stability_regime::StabilityRegimeProcessor { &self.memory_consol.stability_regime }
+        pub fn stability_regime(&self) -> &crate::consciousness::stability_regime::StabilityRegimeProcessor { &self.memory.memory_consol.stability_regime }
 
         // ═══════════════════════════════════════════════════════════════════
         // PREDICTION CONFIDENCE
@@ -503,27 +503,27 @@ impl CognitiveLoopService {
 
     /// Whether the knowledge engine is active.
     pub fn has_knowledge_engine(&self) -> bool {
-        self.knowledge_manager.is_some()
+        self.memory.knowledge_manager.is_some()
     }
 
     /// Get a reference to the knowledge manager (if enabled).
     pub fn knowledge_manager(&self) -> Option<&crate::knowledge::KnowledgeManager> {
-        self.knowledge_manager.as_ref()
+        self.memory.knowledge_manager.as_ref()
     }
 
     /// Get a mutable reference to the knowledge manager (if enabled).
     pub fn knowledge_manager_mut(&mut self) -> Option<&mut crate::knowledge::KnowledgeManager> {
-        self.knowledge_manager.as_mut()
+        self.memory.knowledge_manager.as_mut()
     }
 
     /// Get the latest knowledge telemetry (if enabled).
     pub fn knowledge_telemetry(&self) -> Option<&crate::knowledge::KnowledgeTelemetry> {
-        self.knowledge_manager.as_ref().map(|km| km.telemetry())
+        self.memory.knowledge_manager.as_ref().map(|km| km.telemetry())
     }
 
     /// Get the latest knowledge signals (if enabled).
     pub fn knowledge_signals(&self) -> Option<&crate::knowledge::KnowledgeSignals> {
-        self.knowledge_manager.as_ref().map(|km| km.signals())
+        self.memory.knowledge_manager.as_ref().map(|km| km.signals())
     }
 
     /// Register a custom entity in the knowledge extractor.
@@ -532,7 +532,7 @@ impl CognitiveLoopService {
         text: &str,
         entity_type: crate::knowledge::EntityType,
     ) {
-        if let Some(ref mut km) = self.knowledge_manager {
+        if let Some(ref mut km) = self.memory.knowledge_manager {
             km.register_entity(text, entity_type);
         }
     }
@@ -543,7 +543,7 @@ impl CognitiveLoopService {
         role_terms: &[(crate::knowledge::extraction::SemanticRole, &str)],
         k: usize,
     ) -> Vec<crate::knowledge::graph::FactSearchResult> {
-        if let Some(ref mut km) = self.knowledge_manager {
+        if let Some(ref mut km) = self.memory.knowledge_manager {
             let query = km.compose_query(role_terms);
             km.search_with_vector(&query, k)
         } else {
@@ -553,12 +553,12 @@ impl CognitiveLoopService {
 
     /// Get the last assembled reasoning context (if knowledge engine is enabled).
     pub fn reasoning_context(&self) -> Option<&crate::knowledge::ReasoningContext> {
-        self.episodic_persistence.last_reasoning_context.as_ref()
+        self.memory.episodic_persistence.last_reasoning_context.as_ref()
     }
 
     /// Trace causal chains from a starting concept through the knowledge causal bridge.
     pub fn knowledge_causal_chain(&self, start: &str, max_depth: usize) -> Vec<Vec<String>> {
-        if let Some(ref km) = self.knowledge_manager {
+        if let Some(ref km) = self.memory.knowledge_manager {
             km.trace_causal_chain(start, max_depth)
         } else {
             Vec::new()
@@ -568,7 +568,7 @@ impl CognitiveLoopService {
     /// Consolidate knowledge: prune weak facts and strengthen causal ones.
     /// Returns (pruned_count, strengthened_count).
     pub fn knowledge_consolidate_and_forget(&mut self) -> (usize, usize) {
-        if let Some(ref mut km) = self.knowledge_manager {
+        if let Some(ref mut km) = self.memory.knowledge_manager {
             km.consolidate_and_forget()
         } else {
             (0, 0)
@@ -577,7 +577,7 @@ impl CognitiveLoopService {
 
     /// Force a knowledge persistence snapshot to SQLite.
     pub fn knowledge_persist_snapshot(&mut self) {
-        if let Some(ref mut km) = self.knowledge_manager {
+        if let Some(ref mut km) = self.memory.knowledge_manager {
             km.persist_snapshot();
         }
     }
@@ -587,7 +587,7 @@ impl CognitiveLoopService {
         &mut self,
         query: &str,
     ) -> crate::knowledge::reasoning_context::KnowledgeQueryResult {
-        if let Some(ref km) = self.knowledge_manager {
+        if let Some(ref km) = self.memory.knowledge_manager {
             km.query(query)
         } else {
             Default::default()
@@ -596,7 +596,7 @@ impl CognitiveLoopService {
 
     /// Export the causal bridge as a Graphviz DOT string.
     pub fn knowledge_export_dot(&self) -> String {
-        if let Some(ref km) = self.knowledge_manager {
+        if let Some(ref km) = self.memory.knowledge_manager {
             km.causal_bridge().export_dot()
         } else {
             String::from("digraph causal {}")
@@ -605,7 +605,7 @@ impl CognitiveLoopService {
 
     /// Export the causal bridge as a Mermaid diagram string.
     pub fn knowledge_export_mermaid(&self) -> String {
-        if let Some(ref km) = self.knowledge_manager {
+        if let Some(ref km) = self.memory.knowledge_manager {
             km.causal_bridge().export_mermaid()
         } else {
             String::from("graph TD")
@@ -615,7 +615,7 @@ impl CognitiveLoopService {
     /// Counterfactual query: "If X hadn't happened, would Y still hold?"
     /// Returns (cause, necessity_score) pairs.
     pub fn knowledge_counterfactual(&self, effect: &str, max_depth: usize) -> Vec<(String, f32)> {
-        if let Some(ref km) = self.knowledge_manager {
+        if let Some(ref km) = self.memory.knowledge_manager {
             km.counterfactual(effect, max_depth)
         } else {
             Vec::new()
@@ -629,7 +629,7 @@ impl CognitiveLoopService {
         target_domain: &str,
         top_k: usize,
     ) -> Vec<(String, f32)> {
-        if let Some(ref km) = self.knowledge_manager {
+        if let Some(ref km) = self.memory.knowledge_manager {
             km.find_analogous(source_id, target_domain, top_k)
         } else {
             Vec::new()
@@ -638,7 +638,7 @@ impl CognitiveLoopService {
 
     /// Get per-domain uncertainty for knowledge-aware attention allocation.
     pub fn knowledge_domain_uncertainty(&self) -> Vec<(String, f32, usize)> {
-        if let Some(ref km) = self.knowledge_manager {
+        if let Some(ref km) = self.memory.knowledge_manager {
             km.domain_uncertainty()
         } else {
             Vec::new()

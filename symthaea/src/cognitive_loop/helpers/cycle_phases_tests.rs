@@ -174,7 +174,7 @@ fn test_run_cycle_init_lr_suppressed_during_warmup() {
 fn test_run_cycle_init_exploration_urge_suppressed_during_warmup() {
     let mut service =
         CognitiveLoopService::new(super::super::super::CognitiveLoopConfig::default()).unwrap();
-    service.curiosity_drive.exploration_urge = 0.8;
+    service.behavior.curiosity_drive.exploration_urge = 0.8;
     service.stats.total_cycles = 10; // 10/50 = 0.2 progress
     let mut timings = super::super::super::ModuleTimings::default();
     let result = service.run_cycle_init(&mut timings);
