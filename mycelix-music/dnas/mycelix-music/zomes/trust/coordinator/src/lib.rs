@@ -1,4 +1,6 @@
-//! Trust Coordinator Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Trust Coordinator Zome
 //!
 //! Implements the trust layer for Mycelix Music:
 //! - Web-of-trust artist verification
@@ -9,6 +11,16 @@
 
 use hdk::prelude::*;
 use trust_integrity::*;
+use mycelix_bridge_common::{
+    gate_consciousness, requirement_for_basic, requirement_for_voting, GovernanceRequirement,
+};
+
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<()> {
+    gate_consciousness("music_bridge", requirement, action_name)
+}
 
 /// Helper to ensure a path exists and return its entry hash
 fn ensure_path(path: Path, link_type: LinkTypes) -> ExternResult<EntryHash> {
@@ -20,6 +32,7 @@ fn ensure_path(path: Path, link_type: LinkTypes) -> ExternResult<EntryHash> {
 /// Create a trust claim (vouch for another agent)
 #[hdk_extern]
 pub fn create_trust_claim(input: CreateTrustClaimInput) -> ExternResult<ActionHash> {
+    require_consciousness(&requirement_for_basic(), "create_trust_claim")?;
     let my_agent = agent_info()?.agent_initial_pubkey;
 
     let claim = TrustClaim {
@@ -174,6 +187,7 @@ pub fn get_verification_status(agent: AgentPubKey) -> ExternResult<Option<Verifi
 /// Register as a CDN node
 #[hdk_extern]
 pub fn register_cdn_node(input: RegisterCdnNodeInput) -> ExternResult<ActionHash> {
+    require_consciousness(&requirement_for_voting(), "register_cdn_node")?;
     let my_agent = agent_info()?.agent_initial_pubkey;
 
     let reputation = CdnNodeReputation {
@@ -390,6 +404,7 @@ fn update_cdn_reputation(node: AgentPubKey, success: bool, latency_ms: u32) -> E
 /// Report Byzantine behavior
 #[hdk_extern]
 pub fn report_byzantine_behavior(input: ReportByzantineInput) -> ExternResult<ActionHash> {
+    require_consciousness(&requirement_for_voting(), "report_byzantine_behavior")?;
     let my_agent = agent_info()?.agent_initial_pubkey;
 
     let report = ByzantineReport {

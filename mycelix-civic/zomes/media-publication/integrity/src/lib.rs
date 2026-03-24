@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Publication Integrity Zome
 //! Updated to use HDI 0.7 patterns with FlatOp validation
 use hdi::prelude::*;
@@ -36,6 +39,14 @@ pub enum ContentType {
     Interview,
     Report,
     Editorial,
+    VisualArt,
+    Photography,
+    Sculpture,
+    Video,
+    Audio,
+    MixedMedia,
+    DigitalArt,
+    Performance,
     Other(String),
 }
 
@@ -77,6 +88,27 @@ pub struct PublicationVersion {
     pub created: Timestamp,
 }
 
+/// Visual art metadata — supplements a Publication of type VisualArt/Photography/etc.
+/// Linked via PublicationToMetadata.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct VisualArtMetadata {
+    /// Publication this metadata belongs to
+    pub publication_id: String,
+    /// Physical dimensions (e.g., "100x80cm", "1920x1080px")
+    pub dimensions: Option<String>,
+    /// Medium (e.g., "oil on canvas", "digital", "bronze")
+    pub medium: Option<String>,
+    /// Edition size (1 for originals, >1 for prints/editions)
+    pub edition_size: Option<u32>,
+    /// IPFS CID for preview image (lower resolution)
+    pub ipfs_preview_cid: Option<String>,
+    /// IPFS CID for full-resolution file
+    pub ipfs_full_cid: Option<String>,
+    /// Provenance chain — list of previous owner DIDs (most recent last)
+    pub provenance_chain: Vec<String>,
+}
+
 #[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
@@ -85,6 +117,7 @@ pub enum EntryTypes {
     Publication(Publication),
     ContentBlock(ContentBlock),
     PublicationVersion(PublicationVersion),
+    VisualArtMetadata(VisualArtMetadata),
 }
 
 #[hdk_link_types]
@@ -93,6 +126,7 @@ pub enum LinkTypes {
     TagToPublications,
     PublicationToBlocks,
     PublicationToVersions,
+    PublicationToMetadata,
 }
 
 /// Genesis self-check
@@ -118,6 +152,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     EntryCreationAction::Create(action),
                     version,
                 ),
+                EntryTypes::VisualArtMetadata(meta) => validate_visual_art_metadata(&meta),
             },
             OpEntry::UpdateEntry {
                 app_entry, action, ..
@@ -132,6 +167,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::PublicationVersion(_) => Ok(ValidateCallbackResult::Invalid(
                     "Publication versions cannot be updated".into(),
                 )),
+                EntryTypes::VisualArtMetadata(meta) => validate_visual_art_metadata(&meta),
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
@@ -147,7 +183,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 LinkTypes::AuthorToPublications
                 | LinkTypes::TagToPublications
                 | LinkTypes::PublicationToBlocks
-                | LinkTypes::PublicationToVersions => {
+                | LinkTypes::PublicationToVersions
+                | LinkTypes::PublicationToMetadata => {
                     if tag_len > 256 {
                         return Ok(ValidateCallbackResult::Invalid(
                             "Link tag too long (max 256 bytes)".into(),
@@ -425,6 +462,55 @@ fn validate_create_publication_version(
         ));
     }
 
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_visual_art_metadata(meta: &VisualArtMetadata) -> ExternResult<ValidateCallbackResult> {
+    if meta.publication_id.is_empty() || meta.publication_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "publication_id must be 1-256 chars".to_string(),
+        ));
+    }
+    if let Some(ref dims) = meta.dimensions {
+        if dims.len() > 64 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "dimensions must be <= 64 chars".to_string(),
+            ));
+        }
+    }
+    if let Some(ref medium) = meta.medium {
+        if medium.len() > 128 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "medium must be <= 128 chars".to_string(),
+            ));
+        }
+    }
+    if let Some(ref cid) = meta.ipfs_preview_cid {
+        if cid.len() > 128 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "IPFS preview CID must be <= 128 chars".to_string(),
+            ));
+        }
+    }
+    if let Some(ref cid) = meta.ipfs_full_cid {
+        if cid.len() > 128 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "IPFS full CID must be <= 128 chars".to_string(),
+            ));
+        }
+    }
+    if meta.provenance_chain.len() > 100 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Provenance chain may have at most 100 entries".to_string(),
+        ));
+    }
+    for did in &meta.provenance_chain {
+        if !did.starts_with("did:") || did.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Each provenance entry must be a valid DID (did:..., <= 256 chars)".to_string(),
+            ));
+        }
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -1370,7 +1456,8 @@ mod tests {
             LinkTypes::AuthorToPublications
             | LinkTypes::TagToPublications
             | LinkTypes::PublicationToBlocks
-            | LinkTypes::PublicationToVersions => {
+            | LinkTypes::PublicationToVersions
+            | LinkTypes::PublicationToMetadata => {
                 if tag_len > 256 {
                     ValidateCallbackResult::Invalid("Link tag too long (max 256 bytes)".into())
                 } else {
@@ -1437,6 +1524,7 @@ mod tests {
             LinkTypes::TagToPublications,
             LinkTypes::PublicationToBlocks,
             LinkTypes::PublicationToVersions,
+            LinkTypes::PublicationToMetadata,
         ];
         for lt in &all_types {
             let result = validate_create_link_tag(lt, &massive_tag);

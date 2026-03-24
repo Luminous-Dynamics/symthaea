@@ -1,4 +1,6 @@
-//! Catalog Coordinator Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Catalog Coordinator Zome
 //!
 //! Provides the callable functions for managing the music catalog.
 //! Handles song uploads, album creation, and artist profile management.
@@ -6,6 +8,17 @@
 
 use catalog_integrity::*;
 use hdk::prelude::*;
+use mycelix_bridge_common::{
+    gate_consciousness, requirement_for_proposal, GovernanceRequirement,
+};
+
+/// Consciousness gate: requires at least Participant tier for write operations.
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<()> {
+    gate_consciousness("music_bridge", requirement, action_name)
+}
 
 /// Helper to ensure a path exists and return its entry hash
 fn ensure_path(path: Path, link_type: LinkTypes) -> ExternResult<EntryHash> {
@@ -17,6 +30,7 @@ fn ensure_path(path: Path, link_type: LinkTypes) -> ExternResult<EntryHash> {
 /// Create a new song entry
 #[hdk_extern]
 pub fn create_song(song: Song) -> ExternResult<ActionHash> {
+    require_consciousness(&requirement_for_proposal(), "create_song")?;
     let action_hash = create_entry(EntryTypes::Song(song.clone()))?;
 
     // Link from artist to song
@@ -139,6 +153,7 @@ pub fn get_songs_by_genre(genre: String) -> ExternResult<Vec<Song>> {
 /// Create an album
 #[hdk_extern]
 pub fn create_album(album: Album) -> ExternResult<ActionHash> {
+    require_consciousness(&requirement_for_proposal(), "create_album")?;
     let action_hash = create_entry(EntryTypes::Album(album.clone()))?;
 
     // Link from artist to album
@@ -206,6 +221,7 @@ pub fn get_album_with_songs(action_hash: ActionHash) -> ExternResult<Option<Albu
 /// Create or update artist profile
 #[hdk_extern]
 pub fn set_artist_profile(profile: ArtistProfile) -> ExternResult<ActionHash> {
+    require_consciousness(&requirement_for_proposal(), "set_artist_profile")?;
     let my_agent = agent_info()?.agent_initial_pubkey;
     let profile_path = Path::from(format!("profile/{}", my_agent));
     let typed_path = profile_path.typed(LinkTypes::AllArtists)?;

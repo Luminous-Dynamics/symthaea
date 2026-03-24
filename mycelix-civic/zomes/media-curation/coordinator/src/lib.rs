@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Curation Coordinator Zome
 use hdk::prelude::*;
 use media_curation_integrity::*;
@@ -583,6 +586,124 @@ pub fn get_public_collections(_: ()) -> ExternResult<Vec<Record>> {
         }
     }
     Ok(results)
+}
+
+// ============================================================================
+// Gallery & Exhibition (Visual Art Curation)
+// ============================================================================
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateGalleryInput {
+    pub name: String,
+    pub description: String,
+    pub theme: Option<String>,
+    pub initial_publication_ids: Vec<String>,
+}
+
+/// Create a new curated gallery (Participant+).
+#[hdk_extern]
+pub fn create_gallery(input: CreateGalleryInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "create_gallery")?;
+    let agent = agent_info()?.agent_initial_pubkey;
+    let now = sys_time()?;
+
+    let gallery = Gallery {
+        id: format!("gal:{}:{}", agent, now.as_micros()),
+        name: input.name,
+        description: input.description,
+        curator_did: format!("did:holo:{}", agent),
+        theme: input.theme,
+        publication_ids: input.initial_publication_ids,
+        created: now,
+        updated: now,
+    };
+
+    let action_hash = create_entry(&EntryTypes::Gallery(gallery.clone()))?;
+    let curator_anchor = anchor_hash(&format!("did:holo:{}", agent))?;
+    create_link(
+        curator_anchor,
+        action_hash.clone(),
+        LinkTypes::CuratorToGalleries,
+        (),
+    )?;
+
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AddToGalleryInput {
+    pub gallery_hash: ActionHash,
+    pub publication_id: String,
+}
+
+/// Add a publication to a gallery (Observer+).
+#[hdk_extern]
+pub fn add_to_gallery(input: AddToGalleryInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "add_to_gallery")?;
+
+    let record = get(input.gallery_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Gallery not found".into())))?;
+
+    let mut gallery: Gallery = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid gallery".into())))?;
+
+    gallery.publication_ids.push(input.publication_id);
+    gallery.updated = sys_time()?;
+
+    let updated_hash = update_entry(input.gallery_hash, &EntryTypes::Gallery(gallery))?;
+    get_latest_record(updated_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateExhibitionInput {
+    pub name: String,
+    pub description: String,
+    pub gallery_hash: ActionHash,
+    pub featured_publication_ids: Vec<String>,
+    pub end_date: Option<Timestamp>,
+}
+
+/// Create a time-bounded exhibition (Citizen+).
+#[hdk_extern]
+pub fn create_exhibition(input: CreateExhibitionInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_voting(), "create_exhibition")?;
+    let agent = agent_info()?.agent_initial_pubkey;
+    let now = sys_time()?;
+
+    let exhibition = Exhibition {
+        id: format!("exh:{}:{}", agent, now.as_micros()),
+        name: input.name,
+        description: input.description,
+        gallery_id: input.gallery_hash.to_string(),
+        curator_did: format!("did:holo:{}", agent),
+        featured_publication_ids: input.featured_publication_ids,
+        start_date: now,
+        end_date: input.end_date,
+        created: now,
+    };
+
+    let action_hash = create_entry(&EntryTypes::Exhibition(exhibition))?;
+    create_link(
+        input.gallery_hash,
+        action_hash.clone(),
+        LinkTypes::GalleryToExhibitions,
+        (),
+    )?;
+
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+}
+
+/// Get all publications in a gallery.
+#[hdk_extern]
+pub fn get_gallery(gallery_hash: ActionHash) -> ExternResult<Option<Gallery>> {
+    let record = get(gallery_hash, GetOptions::default())?;
+    match record {
+        Some(r) => Ok(r.entry().to_app_option().ok().flatten()),
+        None => Ok(None),
+    }
 }
 
 #[cfg(test)]

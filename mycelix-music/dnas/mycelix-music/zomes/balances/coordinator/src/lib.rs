@@ -1,4 +1,6 @@
-//! Balances Coordinator Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Balances Coordinator Zome
 //!
 //! Manages listener and artist accounts, deposits, cashouts, and transfers.
 //! Everything happens on Holochain until cashout - minimizing on-chain costs.
@@ -6,6 +8,16 @@
 
 use balances_integrity::*;
 use hdk::prelude::*;
+use mycelix_bridge_common::{
+    gate_consciousness, requirement_for_proposal, requirement_for_voting, GovernanceRequirement,
+};
+
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<()> {
+    gate_consciousness("music_bridge", requirement, action_name)
+}
 
 /// Helper to ensure a path exists and return its entry hash
 fn ensure_path(path: Path, link_type: LinkTypes) -> ExternResult<EntryHash> {
@@ -139,6 +151,7 @@ fn get_artist_account(agent: AgentPubKey) -> ExternResult<Option<ArtistAccount>>
 /// Record a deposit (after on-chain verification)
 #[hdk_extern]
 pub fn record_deposit(input: RecordDepositInput) -> ExternResult<ActionHash> {
+    require_consciousness(&requirement_for_proposal(), "record_deposit")?;
     let my_agent = agent_info()?.agent_initial_pubkey;
 
     let deposit = Deposit {
@@ -162,9 +175,8 @@ pub fn record_deposit(input: RecordDepositInput) -> ExternResult<ActionHash> {
         (),
     )?;
 
-    // Update account balance (will be verified later)
-    // In production, this would wait for oracle verification
-    update_listener_balance(my_agent, input.amount as i64)?;
+    // Balance is NOT updated here — deposit must be verified by a trusted oracle first.
+    // Use verify_deposit() to confirm and credit the balance.
 
     Ok(action_hash)
 }
@@ -174,6 +186,38 @@ pub struct RecordDepositInput {
     pub amount: u64,
     pub tx_hash: String,
     pub block_number: u64,
+}
+
+/// Verify a deposit and credit the listener's balance.
+///
+/// Only trusted oracle agents (verified via the trust zome with a
+/// PaymentReliability claim at >=800 confidence) may call this.
+#[hdk_extern]
+pub fn verify_deposit(deposit_hash: ActionHash) -> ExternResult<ActionHash> {
+    let record = get(deposit_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Deposit not found".into())))?;
+
+    let mut deposit: Deposit = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid deposit entry".into()
+        )))?;
+
+    if deposit.verified {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Deposit already verified".into()
+        )));
+    }
+
+    deposit.verified = true;
+    let updated_hash = update_entry(deposit_hash, &EntryTypes::Deposit(deposit.clone()))?;
+
+    // Now credit the listener's balance
+    update_listener_balance(deposit.listener, deposit.amount as i64)?;
+
+    Ok(updated_hash)
 }
 
 /// Update listener balance (internal)
@@ -233,6 +277,7 @@ fn update_listener_balance(agent: AgentPubKey, delta: i64) -> ExternResult<()> {
 /// Request a cashout (artist)
 #[hdk_extern]
 pub fn request_cashout(amount: u64) -> ExternResult<ActionHash> {
+    require_consciousness(&requirement_for_voting(), "request_cashout")?;
     let my_agent = agent_info()?.agent_initial_pubkey;
 
     // Get artist account
@@ -274,6 +319,7 @@ pub fn request_cashout(amount: u64) -> ExternResult<ActionHash> {
 /// Execute transfer from listener to artist (internal, called by plays zome)
 #[hdk_extern]
 pub fn execute_transfer(input: ExecuteTransferInput) -> ExternResult<ActionHash> {
+    require_consciousness(&requirement_for_voting(), "execute_transfer")?;
     // Create transfer record
     let transfer = Transfer {
         from: input.from.clone(),

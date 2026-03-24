@@ -1,4 +1,6 @@
-//! Plays Integrity Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Plays Integrity Zome
 //!
 //! Defines validation rules for play records.
 //! CRITICAL: Plays are recorded on the listener's source chain - ZERO COST.
@@ -151,11 +153,42 @@ fn validate_create_play(play: PlayRecord, _action: Create) -> ExternResult<Valid
 }
 
 fn validate_create_attestation(
-    _attestation: PlayAttestation,
+    attestation: PlayAttestation,
     _action: Create,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Attestation signature verification would happen here
-    // For now, accept all attestations
+    // Verify the attestation references a real play and the signature is valid
+    let play_record = must_get_valid_record(attestation.play_hash.clone())?;
+
+    // The signature must be non-empty
+    if attestation.listener_signature.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "PlayAttestation must include a non-empty signature".to_string(),
+        ));
+    }
+
+    // Verify that the referenced play matches attestation fields
+    if let Some(play) = play_record
+        .entry()
+        .to_app_option::<PlayRecord>()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+    {
+        if play.song_hash != attestation.song_hash {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Attestation song_hash does not match play record".to_string(),
+            ));
+        }
+        if play.artist != attestation.artist {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Attestation artist does not match play record".to_string(),
+            ));
+        }
+        if play.amount_owed != attestation.amount_owed {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Attestation amount_owed does not match play record".to_string(),
+            ));
+        }
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 

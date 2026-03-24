@@ -28,6 +28,7 @@ description: |
   - Finance (ECONOMY): Payments (SAP/TEND/MYCEL), treasury, staking, recognition, currency-mint
   - Governance (DEMOCRACY): Proposals, voting, DKG, councils, constitution, execution
   - Health (SOVEREIGN): Patient, provider, records, prescriptions, consent (standalone DNA)
+  - Music (CULTURE): Zero-cost streaming, catalog, plays, balances, trust/CDN reputation
   Enables cross-cluster calls between all tiers via OtherRole dispatch.
   Commons split into two sub-cluster DNAs to fit under Holochain's 16MB limit.
   Note: "HEARTH" in the finance hApp refers to commons pool governance;
@@ -164,4 +165,18 @@ roles:
       modifiers:
         network_seed: ~
         properties: ~
+      clone_limit: 0
+
+  - name: music
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ../../mycelix-music/dnas/mycelix-music/mycelix_music.dna
+      modifiers:
+        network_seed: ~
+        properties:
+          platform_fee_rate: 0.03
+          artist_share: 0.70
+          label_share: 0.20
       clone_limit: 0

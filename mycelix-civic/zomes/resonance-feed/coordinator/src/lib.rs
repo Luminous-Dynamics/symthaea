@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use hdk::prelude::*;
 use resonance_feed_integrity::*;
 use mycelix_bridge_common::{
@@ -50,9 +53,43 @@ pub fn publish_content(entry: ContentEntry) -> ExternResult<Record> {
 /// Vote resonance on content (Observer+, lowest bar).
 #[hdk_extern]
 pub fn vote_resonance(vote: ResonanceVote) -> ExternResult<Record> {
-    // Observer+ can vote — no consciousness gate needed (lowest bar)
-    let action_hash = create_entry(&EntryTypes::ResonanceVote(vote.clone()))?;
     let agent = agent_info()?.agent_initial_pubkey;
+
+    // Duplicate vote detection: check if this agent already voted on this content
+    let existing_votes = get_links(
+        LinkQuery::try_new(vote.content_hash.clone(), LinkTypes::ContentToVotes)?,
+        GetStrategy::Local,
+    )?;
+    for link in &existing_votes {
+        if let Some(target_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(target_hash, GetOptions::default())? {
+                if record.action().author() == &agent {
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "You have already voted on this content".into()
+                    )));
+                }
+            }
+        }
+    }
+
+    // Rate limiting: max 50 votes per 60 seconds
+    let agent_votes = get_links(
+        LinkQuery::try_new(agent.clone(), LinkTypes::AgentToVotes)?,
+        GetStrategy::Local,
+    )?;
+    let now = sys_time()?;
+    let window_start = Timestamp::from_micros(now.as_micros() - 60_000_000);
+    let recent_count = agent_votes
+        .iter()
+        .filter(|l| l.timestamp >= window_start)
+        .count();
+    if recent_count >= 50 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Rate limit exceeded: max 50 resonance votes per 60 seconds".into()
+        )));
+    }
+
+    let action_hash = create_entry(&EntryTypes::ResonanceVote(vote.clone()))?;
 
     create_link(vote.content_hash, action_hash.clone(), LinkTypes::ContentToVotes, ())?;
     create_link(agent, action_hash.clone(), LinkTypes::AgentToVotes, ())?;
