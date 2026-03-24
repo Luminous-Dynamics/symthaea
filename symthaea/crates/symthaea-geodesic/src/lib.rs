@@ -28,6 +28,8 @@
 //! - Structural equivalence across syntactic variations
 
 pub mod ast_bridge;
+pub mod codebase_bridge;
+pub mod emitter_bridge;
 pub mod execution_oracle;
 pub mod manifold;
 pub mod manifold_bootstrap;
@@ -37,6 +39,7 @@ pub mod skeleton_synthesis;
 pub mod synthesis;
 pub mod token_codebook;
 pub mod topology;
+pub mod verification;
 
 // Re-export key types for convenience.
 pub use execution_oracle::{ComplexityClass, ExecutionOracle, PredictionResult};
@@ -51,3 +54,9 @@ pub use skeleton_synthesis::{
 pub use synthesis::{CodeSpec, GeodesicSynthesizer, SynthesisConfig, SynthesisResult};
 pub use token_codebook::TokenCodebook;
 pub use topology::{BettiNumbers, TopologicalConstraint, TopologicalFingerprint};
+pub use emitter_bridge::{
+    emit_rust_from_skeleton, skeleton_to_code_spec, skeleton_to_plan_steps,
+    GeodesicCodeSpec, GeodesicPlanAction, GeodesicPlanStep,
+};
+pub use codebase_bridge::{index_directory, index_file, IndexResult};
+pub use verification::{verify_generated_code, VerificationResult};

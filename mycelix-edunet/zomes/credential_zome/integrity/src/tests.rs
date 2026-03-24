@@ -1,4 +1,6 @@
-//! Unit tests for Credential integrity zome validation logic
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Unit tests for Credential integrity zome validation logic
 //!
 //! Tests validate entry validation functions for:
 //! - VerifiableCredential
@@ -359,5 +361,78 @@ mod edge_case_tests {
 
         let result = validate_verifiable_credential(cred);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+}
+
+// =============================================================================
+// Security validation tests (is_finite guards)
+// =============================================================================
+
+#[cfg(test)]
+mod security_validation_tests {
+    use super::*;
+
+    /// Helper that creates a credential with all fields populated (including epistemic)
+    fn test_credential() -> VerifiableCredential {
+        let mut cred = create_valid_credential();
+        cred.epistemic_empirical = Some(2);
+        cred.epistemic_normative = Some(1);
+        cred.epistemic_materiality = Some(1);
+        cred
+    }
+
+    #[test]
+    fn test_credential_valid() {
+        let cred = test_credential();
+        let result = validate_verifiable_credential(cred);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_credential_nan_score_rejected() {
+        let mut cred = test_credential();
+        cred.score = Some(f32::NAN);
+        let result = validate_verifiable_credential(cred);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_credential_inf_score_rejected() {
+        let mut cred = test_credential();
+        cred.score = Some(f32::INFINITY);
+        let result = validate_verifiable_credential(cred);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_credential_neg_inf_score_rejected() {
+        let mut cred = test_credential();
+        cred.score = Some(f32::NEG_INFINITY);
+        let result = validate_verifiable_credential(cred);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_credential_empty_issuer_rejected() {
+        let mut cred = test_credential();
+        cred.issuer = "".to_string();
+        let result = validate_verifiable_credential(cred);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_credential_missing_type_rejected() {
+        let mut cred = test_credential();
+        cred.credential_type = vec!["EducationalCredential".to_string()];
+        let result = validate_verifiable_credential(cred);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_credential_empty_type_vec_rejected() {
+        let mut cred = test_credential();
+        cred.credential_type = vec![];
+        let result = validate_verifiable_credential(cred);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
 }

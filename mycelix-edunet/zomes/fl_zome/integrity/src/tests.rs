@@ -1,4 +1,6 @@
-//! Unit tests for FL integrity zome validation logic
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Unit tests for FL integrity zome validation logic
 //!
 //! Tests validate entry validation functions for:
 //! - FlUpdate
@@ -513,5 +515,197 @@ mod edge_case_tests {
 
         let result = validate_privacy_params(params);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+}
+
+// =============================================================================
+// Security validation tests (is_finite guards)
+// =============================================================================
+
+#[cfg(test)]
+mod security_validation_tests {
+    use super::*;
+
+    // ---- FlUpdate NaN/Inf guards ----
+
+    #[test]
+    fn test_fl_update_nan_l2_norm_rejected() {
+        let mut update = create_valid_fl_update();
+        update.clipped_l2_norm = f32::NAN;
+        let result = validate_fl_update(update);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_fl_update_inf_l2_norm_rejected() {
+        let mut update = create_valid_fl_update();
+        update.clipped_l2_norm = f32::INFINITY;
+        let result = validate_fl_update(update);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_fl_update_neg_inf_l2_norm_rejected() {
+        let mut update = create_valid_fl_update();
+        update.clipped_l2_norm = f32::NEG_INFINITY;
+        let result = validate_fl_update(update);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_fl_update_valid_passes() {
+        let update = create_valid_fl_update();
+        let result = validate_fl_update(update);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_fl_update_zero_samples_rejected() {
+        let mut update = create_valid_fl_update();
+        update.sample_count = 0;
+        let result = validate_fl_update(update);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_fl_update_nan_val_loss_rejected() {
+        let mut update = create_valid_fl_update();
+        update.local_val_loss = f32::NAN;
+        let result = validate_fl_update(update);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_fl_update_inf_val_loss_rejected() {
+        let mut update = create_valid_fl_update();
+        update.local_val_loss = f32::INFINITY;
+        let result = validate_fl_update(update);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // ---- FlRound NaN/Inf guards ----
+
+    #[test]
+    fn test_fl_round_nan_clip_norm_rejected() {
+        let mut round = create_valid_fl_round();
+        round.clip_norm = f32::NAN;
+        let result = validate_fl_round(round);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_fl_round_inf_clip_norm_rejected() {
+        let mut round = create_valid_fl_round();
+        round.clip_norm = f32::INFINITY;
+        let result = validate_fl_round(round);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_fl_round_nan_epsilon_rejected() {
+        let mut round = create_valid_fl_round();
+        round.privacy_epsilon = Some(f32::NAN);
+        let result = validate_fl_round(round);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_fl_round_inf_epsilon_rejected() {
+        let mut round = create_valid_fl_round();
+        round.privacy_epsilon = Some(f32::INFINITY);
+        let result = validate_fl_round(round);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_fl_round_nan_delta_rejected() {
+        let mut round = create_valid_fl_round();
+        round.privacy_delta = Some(f32::NAN);
+        let result = validate_fl_round(round);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_fl_round_inf_delta_rejected() {
+        let mut round = create_valid_fl_round();
+        round.privacy_delta = Some(f32::INFINITY);
+        let result = validate_fl_round(round);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_fl_round_min_gt_max_rejected() {
+        let mut round = create_valid_fl_round();
+        round.min_participants = 10;
+        round.max_participants = 3;
+        let result = validate_fl_round(round);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // ---- PrivacyParams NaN/Inf guards ----
+
+    #[test]
+    fn test_privacy_params_nan_epsilon_rejected() {
+        let mut params = create_valid_privacy_params();
+        params.base_epsilon = f32::NAN;
+        let result = validate_privacy_params(params);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_privacy_params_inf_epsilon_rejected() {
+        let mut params = create_valid_privacy_params();
+        params.base_epsilon = f32::INFINITY;
+        let result = validate_privacy_params(params);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_privacy_params_nan_min_epsilon_rejected() {
+        let mut params = create_valid_privacy_params();
+        params.min_epsilon = f32::NAN;
+        let result = validate_privacy_params(params);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_privacy_params_nan_max_epsilon_rejected() {
+        let mut params = create_valid_privacy_params();
+        params.max_epsilon = f32::NAN;
+        let result = validate_privacy_params(params);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_privacy_params_nan_sensitivity_rejected() {
+        let mut params = create_valid_privacy_params();
+        params.sensitivity_score = f32::NAN;
+        let result = validate_privacy_params(params);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_privacy_params_inf_sensitivity_rejected() {
+        let mut params = create_valid_privacy_params();
+        params.sensitivity_score = f32::INFINITY;
+        let result = validate_privacy_params(params);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_privacy_params_valid_passes() {
+        let params = create_valid_privacy_params();
+        let result = validate_privacy_params(params);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_privacy_params_wrong_order_rejected() {
+        let mut params = create_valid_privacy_params();
+        params.min_epsilon = 2.0; // min > base (base is 2.0, so min = base, but > would fail)
+        params.base_epsilon = 1.0; // base < min
+        params.max_epsilon = 3.0;
+        let result = validate_privacy_params(params);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
 }

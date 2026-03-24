@@ -1,4 +1,6 @@
-// Unit tests for Learning Zome validation logic
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root// Unit tests for Learning Zome validation logic
 //
 // Tests all validation functions comprehensively to ensure data integrity
 
@@ -624,6 +626,140 @@ mod edge_case_tests {
         assert!(matches!(
             result.unwrap(),
             ValidateCallbackResult::Valid
+        ));
+    }
+}
+
+// =================================================================================
+// Security Validation Tests (is_finite guards)
+// =================================================================================
+
+#[cfg(test)]
+mod security_validation_tests {
+    use super::*;
+
+    // ---- LearnerProgress NaN/Inf guards ----
+
+    #[test]
+    fn test_progress_nan_rejected() {
+        let mut progress = create_valid_progress();
+        progress.progress_percent = f32::NAN;
+        let result = validate_learner_progress(&progress);
+        assert!(matches!(
+            result.unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
+    }
+
+    #[test]
+    fn test_progress_inf_rejected() {
+        let mut progress = create_valid_progress();
+        progress.progress_percent = f32::INFINITY;
+        let result = validate_learner_progress(&progress);
+        assert!(matches!(
+            result.unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
+    }
+
+    #[test]
+    fn test_progress_neg_inf_rejected() {
+        let mut progress = create_valid_progress();
+        progress.progress_percent = f32::NEG_INFINITY;
+        let result = validate_learner_progress(&progress);
+        assert!(matches!(
+            result.unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
+    }
+
+    #[test]
+    fn test_progress_valid_passes() {
+        let progress = create_valid_progress();
+        let result = validate_learner_progress(&progress);
+        assert!(matches!(
+            result.unwrap(),
+            ValidateCallbackResult::Valid
+        ));
+    }
+
+    // ---- LearningActivity NaN/Inf guards ----
+
+    #[test]
+    fn test_activity_nan_outcome_rejected() {
+        let mut activity = create_valid_activity();
+        activity.outcome = Some(f32::NAN);
+        let result = validate_learning_activity(&activity);
+        assert!(matches!(
+            result.unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
+    }
+
+    #[test]
+    fn test_activity_inf_outcome_rejected() {
+        let mut activity = create_valid_activity();
+        activity.outcome = Some(f32::INFINITY);
+        let result = validate_learning_activity(&activity);
+        assert!(matches!(
+            result.unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
+    }
+
+    #[test]
+    fn test_activity_neg_inf_outcome_rejected() {
+        let mut activity = create_valid_activity();
+        activity.outcome = Some(f32::NEG_INFINITY);
+        let result = validate_learning_activity(&activity);
+        assert!(matches!(
+            result.unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
+    }
+
+    // ---- Course validation ----
+
+    #[test]
+    fn test_course_valid_passes() {
+        let course = create_valid_course();
+        let result = validate_course(&course);
+        assert!(matches!(
+            result.unwrap(),
+            ValidateCallbackResult::Valid
+        ));
+    }
+
+    #[test]
+    fn test_course_title_too_long_rejected() {
+        let mut course = create_valid_course();
+        course.title = "x".repeat(201);
+        let result = validate_course(&course);
+        assert!(matches!(
+            result.unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
+    }
+
+    #[test]
+    fn test_course_empty_title_rejected() {
+        let mut course = create_valid_course();
+        course.title = "".to_string();
+        let result = validate_course(&course);
+        assert!(matches!(
+            result.unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
+    }
+
+    #[test]
+    fn test_course_empty_description_rejected() {
+        let mut course = create_valid_course();
+        course.description = "".to_string();
+        let result = validate_course(&course);
+        assert!(matches!(
+            result.unwrap(),
+            ValidateCallbackResult::Invalid(_)
         ));
     }
 }

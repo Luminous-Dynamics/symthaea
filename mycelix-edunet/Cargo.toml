@@ -27,6 +27,9 @@ members = [
   # Integration Layer (cross-zome orchestration)
   "zomes/integration_zome/integrity",
   "zomes/integration_zome/coordinator",
+  # Trust Tier Bridge (cross-domain dispatch + consciousness gating)
+  "zomes/edunet-bridge/integrity",
+  "zomes/edunet-bridge/coordinator",
 ]
 # Excluded from workspace: these pull in non-WASM-compatible deps.
 # - tests: full holochain conductor (tokio/mio)
@@ -38,7 +41,7 @@ exclude = ["tests", "crates/edunet-agg", "crates/mycelix-governance"]
 version = "0.1.0"
 edition = "2021"
 authors = ["Luminous Dynamics <info@mycelix.org>"]
-license = "Apache-2.0"
+license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/mycelix-edunet"
 
 [workspace.dependencies]
@@ -63,7 +66,7 @@ anyhow = "1.0"
 
 # Utilities
 # Note: Use default-features = false to avoid wasm-bindgen for Holochain
-chrono = { version = "0.4", default-features = false, features = ["serde", "std"] }
+chrono = { version = "0.4", default-features = false, features = ["serde", "std", "clock"] }
 
 # Statistics (for aggregation)
 statrs = "0.17"
