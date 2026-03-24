@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Internal helper methods for CognitiveLoopService.
 //!
 //! Contains experience creation, statistics updates, error trend computation,
@@ -621,25 +624,25 @@ impl CognitiveLoopService {
 
         // Self-reflection stats
         let assess_str = self
-            .self_model_tier
+            .consciousness.self_model_tier
             .self_reflection
             .self_assessment
             .as_str();
         if self.stats.self_assessment != assess_str {
             self.stats.self_assessment = assess_str.to_string();
         }
-        self.stats.reflection_count = self.self_model_tier.self_reflection.reflection_count;
-        self.stats.adjustments_made = self.self_model_tier.self_reflection.adjustments_made;
+        self.stats.reflection_count = self.consciousness.self_model_tier.self_reflection.reflection_count;
+        self.stats.adjustments_made = self.consciousness.self_model_tier.self_reflection.adjustments_made;
         self.stats.learning_effectiveness = self
-            .self_model_tier
+            .consciousness.self_model_tier
             .self_reflection
             .learning_effectiveness();
-        let summary = self.self_model_tier.self_reflection.summary();
+        let summary = self.consciousness.self_model_tier.self_reflection.summary();
         self.stats.next_reflection_in = summary.next_reflection_in;
         self.stats.adapted_flow_threshold =
-            self.self_model_tier.self_reflection.flow_error_threshold;
+            self.consciousness.self_model_tier.self_reflection.flow_error_threshold;
         self.stats.adapted_boredom_threshold =
-            self.self_model_tier.self_reflection.boredom_threshold;
+            self.consciousness.self_model_tier.self_reflection.boredom_threshold;
 
         // ═══════════════════════════════════════════════════════════════════════
         // MEGA-UNIFIED ARCHITECTURE STATS
@@ -747,7 +750,11 @@ impl CognitiveLoopService {
 
         if denominator.abs() > 0.0001 {
             let slope = numerator / denominator;
-            if slope.is_finite() { slope } else { 0.0 }
+            if slope.is_finite() {
+                slope
+            } else {
+                0.0
+            }
         } else {
             0.0
         }
@@ -814,7 +821,7 @@ impl CognitiveLoopService {
         self.flow_state.reset();
         self.emotion_contagion.reset();
         self.curiosity_drive.reset();
-        self.self_model_tier.self_reflection.reset(); // Preserves learned thresholds
+        self.consciousness.self_model_tier.self_reflection.reset(); // Preserves learned thresholds
         self.fep.agent = ActiveInferenceAgent::new(self.fep.agent.config.clone());
         self.coherence_tracker.reset();
         self.social_mgr = super::SocialManager::default();
@@ -822,18 +829,18 @@ impl CognitiveLoopService {
         self.policy_agreement_window.clear();
         self.carryover = CycleCarryover::default();
         self.consciousness_state.reset();
-        if let Some(ref mut thermo) = self.consciousness_monitors.thermodynamics {
+        if let Some(ref mut thermo) = self.consciousness.consciousness_monitors.thermodynamics {
             *thermo = crate::consciousness::consciousness_thermodynamics::ConsciousnessThermodynamicsAnalyzer::new(
                 crate::consciousness::consciousness_thermodynamics::ThermodynamicsConfig::default(),
             );
         }
-        if let Some(ref mut binding) = self.consciousness_monitors.phenomenal_binding {
+        if let Some(ref mut binding) = self.consciousness.consciousness_monitors.phenomenal_binding {
             *binding =
                 crate::consciousness::phenomenal_binding::TemporalSynchronizationAnalyzer::new(
                     crate::consciousness::phenomenal_binding::PhenomenalBindingConfig::default(),
                 );
         }
-        if let Some(ref mut hfe) = self.consciousness_monitors.hierarchical_free_energy {
+        if let Some(ref mut hfe) = self.consciousness.consciousness_monitors.hierarchical_free_energy {
             *hfe = crate::consciousness::hierarchical_free_energy::HierarchicalFreeEnergy::new(
                 crate::consciousness::hierarchical_free_energy::HierarchicalFEConfig::default(),
             );

@@ -51,6 +51,30 @@ jobs:
       - name: Check formatting
         run: cargo fmt --check
 
+  doc-tests:
+    name: Documentation Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.0
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-doctests-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-doctests-
+
+      - name: Run doc tests
+        run: cargo test --doc
+
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
@@ -196,7 +220,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Split into 5 groups to stay under runner preemption thresholds.
+          # Split into 7 groups to stay under runner preemption thresholds.
           # Each group targets ~10 min wall-clock.
           - group: core-infra
             features: >-
@@ -207,10 +231,13 @@ jobs:
             features: >-
               voice-tts,voice-stt,audio,vocal-tract,neural-vocoder,
               embeddings,vision,perception,vision-manifold,foveation
-          - group: science-ai
+          - group: science-ai-core
             features: >-
               multi_agent,full_consciousness,full_perception,
-              full_language,magi_loop,reasoning_engine,code_generation,
+              full_language,magi_loop
+          - group: science-ai-extended
+            features: >-
+              reasoning_engine,code_generation,
               wasm-sandbox,school_learning
           - group: science-benchmarks
             features: >-
@@ -322,6 +349,7 @@ jobs:
       fail-fast: false
       matrix:
         features:
+          - "default-mind"
           - "shell"
           - "service"
           - "full_consciousness"
@@ -376,15 +404,19 @@ jobs:
 
       - name: Test with feature ${{ matrix.features }}
         continue-on-error: ${{ matrix.features == 'school_learning' }}
-        run: |
-          FEATURES="${{ matrix.features }}"
-          if [ "$FEATURES" = "school_learning" ]; then
-            # school_learning is very slow on free-tier runners — limit parallelism
-            # to reduce memory pressure and avoid 6h timeout
-            cargo test --lib --features "$FEATURES" -- --test-threads=1
-          else
-            cargo test --lib --features "$FEATURES" || cargo test --lib --features "$FEATURES"
-          fi
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 30
+          max_attempts: 2
+          command: |
+            FEATURES="${{ matrix.features }}"
+            if [ "$FEATURES" = "school_learning" ]; then
+              # school_learning is very slow on free-tier runners — limit parallelism
+              # to reduce memory pressure and avoid 6h timeout
+              cargo test --lib --features "$FEATURES" -- --test-threads=1
+            else
+              cargo test --lib --features "$FEATURES"
+            fi
 
   psych-bench:
     name: Psych-Bench Regression
@@ -560,7 +592,7 @@ jobs:
             ${{ runner.os }}-cargo-wasm-
 
       - name: Install wasm-bindgen CLI
-        run: cargo install wasm-bindgen-cli --version 0.2.108
+        run: cargo install wasm-bindgen-cli --version 0.2.114
 
       - name: Install wasm-opt (binaryen)
         run: |

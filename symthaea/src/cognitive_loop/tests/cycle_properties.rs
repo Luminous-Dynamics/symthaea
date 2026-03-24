@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Property-based and invariant tests for the cognitive loop's core cycle.
 //!
 //! These tests verify structural invariants that must hold regardless of input:

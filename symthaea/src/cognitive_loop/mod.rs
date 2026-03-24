@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Cognitive Loop Service - Emergent HDC↔CfC Integration
 //!
 //! This module implements the **bidirectional cognitive loop** that creates
@@ -128,6 +131,7 @@ mod accessors;
 pub(crate) mod biorhythm_manager;
 pub(crate) mod cantor_dream_manager;
 pub(crate) mod consciousness_engine;
+pub(crate) mod consciousness_execution;
 pub(crate) mod consciousness_monitor_tier;
 pub(crate) mod consciousness_state_manager;
 mod constructor;
@@ -255,7 +259,7 @@ use crate::consciousness::dream::DreamEngine;
 use crate::consciousness::enactive_cognition::EnactiveCognition;
 // ActiveInferenceAgent, EnhancedFEPBridge moved to fep_module.rs
 // UnifiedGlobalWorkspace now owned by GwtManager
-use crate::consciousness::master_consciousness_equation::MasterConsciousnessEquation;
+// MasterConsciousnessEquation now owned by ConsciousnessExecution
 use crate::consciousness::narrative_gwt_integration::NarrativeGWTIntegration;
 // PredictiveMind now owned by ConsciousnessStateManager
 use crate::consciousness::primitive_belief_bridge::PrimitiveBeliefBridge;
@@ -469,15 +473,9 @@ pub struct CognitiveLoopService {
     /// gates learning/exploration when memory utilization is high.
     prefrontal: Option<PrefrontalCortex>,
 
-    /// Self-model subsystems: narrative, predictive, attention schema, meta-cognition.
-    self_model_tier: self_model_tier::SelfModelTierManager,
-
-    /// GWT manager: workspace + memory flag + perception counter.
-    gwt_mgr: gwt_manager::GwtManager,
-
-    /// Consciousness monitoring tier: resonance, quantum, temporal, embodied,
-    /// thermodynamics, phenomenal binding, hierarchical free energy.
-    consciousness_monitors: consciousness_monitor_tier::ConsciousnessMonitorTier,
+    /// Consciousness execution group: consciousness engine, monitors, GWT, self-model, MCE.
+    /// Extracted from CognitiveLoopService to reduce field count (Phase 5, Stage 1).
+    pub(crate) consciousness: consciousness_execution::ConsciousnessExecution,
 
     /// Narrative-GWT integration (consciousness governance capstone).
     /// When enabled, provides coherence veto, value checking, goal alignment
@@ -561,10 +559,7 @@ pub struct CognitiveLoopService {
     /// Capacity bound: POLICY_WINDOW_SIZE (20) — evict before push.
     policy_agreement_window: VecDeque<bool>,
 
-    /// Master Consciousness Equation (MCE) — comprehensive consciousness metric.
-    /// C(t) = σ(softmin(Φ, B, W, A, R, E, K; τ)) × weighted_sum × S × ρ(t) × M × N × Soc
-    /// Runs every 10th cycle to provide richer consciousness measurement than Phi alone.
-    master_equation: MasterConsciousnessEquation,
+    // master_equation moved to consciousness_execution::ConsciousnessExecution
 
     /// Unified Living Mind: life-mind continuity integration (full_consciousness feature).
     /// Integrates autopoietic self-maintenance, enactive sense-making, affect, and prediction
@@ -640,10 +635,7 @@ pub struct CognitiveLoopService {
     /// Built at the start of each cycle (Phase A: OBSERVE).
     last_snapshot: Option<subsystem_trait::CycleSnapshot>,
 
-    /// Unified Consciousness Engine: wraps SpectralMIP + MultiModal + EquationV2 + Pipeline
-    /// into a single `measure()` call per cycle with co-prime interval scheduling.
-    /// Runs **alongside** existing inline code (additive wiring — old code not removed yet).
-    consciousness_engine: consciousness_engine::ConsciousnessEngine,
+    // consciousness_engine moved to consciousness_execution::ConsciousnessExecution
 
     /// Substrate independence manager: consolidates feasibility, validation overlay,
     /// speed/scale modulation, and telemetry into a single cohesive struct.
@@ -708,6 +700,11 @@ pub struct CognitiveLoopService {
     /// Swarm Manager: Peer consciousness signals → social buffering, affective contagion,
     /// collective Φ modulation. Implements CognitiveSubsystem at interval 41.
     swarm_manager: managers::SwarmManager,
+
+    /// Holon Receiver: Desktop-side bridge accepting Soma WebSocket connections.
+    /// Processes inbound SomaMessages (heartbeats, CVs, tasks, knowledge) and
+    /// routes them to SwarmManager (peers), ReasoningManager (tasks), KnowledgeManager (offers).
+    holon_receiver: crate::consciousness::holon_receiver::HolonReceiver,
 
     /// Receiver for swarm events from external async P2P layer.
     /// Drained non-blocking in Phase B before `swarm_manager.process()`.

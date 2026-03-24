@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Dream engine phase: recording, simulation, wisdom application.
 //!
 //! Contains `run_dream_phase`.
@@ -42,7 +45,7 @@ impl CognitiveLoopService {
             // Science: Tononi (2015) — consciousness = integrated information = memory salience
             // Narrative→Dream coupling (Conway 2005): self-relevant memories encode preferentially.
             let narrative_salience = self
-                .self_model_tier
+                .consciousness.self_model_tier
                 .narrative_self
                 .as_ref()
                 .map(
@@ -197,7 +200,7 @@ impl CognitiveLoopService {
                             // Dream→Narrative coupling: dream insights feed narrative self-model.
                             // Science: Revonsuo (2000) — dreaming enhances threat simulation
                             // and narrative integration of novel experiences.
-                            if let Some(ref mut narrative) = self.self_model_tier.narrative_self {
+                            if let Some(ref mut narrative) = self.consciousness.self_model_tier.narrative_self {
                                 narrative.process_experience(
                                     hv16_cached,
                                     &format!("dream_insight_{}", result.insights),
@@ -212,7 +215,7 @@ impl CognitiveLoopService {
                             // Science: Walker (2009) — sleep-dependent memory consolidation
                             // strengthens autobiographical narrative structure.
                             // Valence: phi improvement is intrinsically positive.
-                            self.master_equation.narrative_coherence.add_episode(
+                            self.consciousness.master_equation.narrative_coherence.add_episode(
                                 format!(
                                     "dream_insight_{}_phi{:.3}",
                                     result.insights, result.best_phi_improvement

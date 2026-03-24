@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Feedback integration phase of the cognitive cycle.
 //!
 //! Extracts the post-processing feedback loops from the original `cycle()` method:
@@ -622,7 +625,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // RESONATOR CODEBOOK GROWTH
         // ═══════════════════════════════════════════════════════════════════════
-        let reflection_thresholds = self.self_model_tier.self_reflection.get_thresholds();
+        let reflection_thresholds = self.consciousness.self_model_tier.self_reflection.get_thresholds();
         let ResonatorCodebookResult {
             resonator_promotions,
             codebook_evictions,
@@ -868,7 +871,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let encoding_hdv = &perception.encoding.encoding_result.hdv;
         let phi_spectral_weight = self.carryover.quality.phi_spectral_weight;
-        let consciousness_output = self.consciousness_engine.measure(
+        let consciousness_output = self.consciousness.consciousness_engine.measure(
             &super::consciousness_engine::ConsciousnessEngineInput {
                 hdv: encoding_hdv,
                 hv16: &perception.encoding.hv16_cached,
@@ -897,7 +900,7 @@ impl CognitiveLoopService {
                 // Basis: Kruger & Dunning (1999) — miscalibrated self-assessment.
                 hot_depth: {
                     let raw_hot = self
-                        .self_model_tier
+                        .consciousness.self_model_tier
                         .meta_cognition
                         .as_ref()
                         .map(|mc| {
@@ -997,7 +1000,7 @@ impl CognitiveLoopService {
                     .phi_contribution(),
             },
         );
-        self.consciousness_engine
+        self.consciousness.consciousness_engine
             .update_cache(&mut self.carryover.consciousness);
         if consciousness_output.confidence_delta != 0.0 {
             self.adjust_confidence(

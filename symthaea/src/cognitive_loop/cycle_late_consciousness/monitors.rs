@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use std::time::Instant;
 
 use super::{LateConsciousnessContext, LateConsciousnessResult};
@@ -166,7 +169,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (meta_cognitive_accuracy, meta_cognitive_depth) =
             if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
-                if let Some(ref mut meta) = self.self_model_tier.meta_cognition {
+                if let Some(ref mut meta) = self.consciousness.self_model_tier.meta_cognition {
                     meta.update_self_model(ctx.prediction_error);
                     meta.deepen_recursion();
                     let accuracy = meta.accuracy();
@@ -184,7 +187,7 @@ impl CognitiveLoopService {
                 }
             } else {
                 // Read cached accuracy/depth without updating (avoid 0.0 in telemetry on skip)
-                self.self_model_tier
+                self.consciousness.self_model_tier
                     .meta_cognition
                     .as_ref()
                     .map(|m| (m.accuracy(), m.depth()))
@@ -194,7 +197,7 @@ impl CognitiveLoopService {
         // ── Moral circularity → deepen meta-cognitive recursion ──
         // When β₁ > 0 (circular reasoning patterns detected in the moral
         // topology), trigger additional meta-cognitive introspection.
-        if let Some(ref mut meta) = self.self_model_tier.meta_cognition {
+        if let Some(ref mut meta) = self.consciousness.self_model_tier.meta_cognition {
             let topo = self.ethics_engine.moral_topology().last_summary();
             if topo.beta_1 > 0 {
                 meta.deepen_recursion();
@@ -324,7 +327,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let narrative_self_psi = if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
-            if let Some(ref mut narrative) = self.self_model_tier.narrative_self {
+            if let Some(ref mut narrative) = self.consciousness.self_model_tier.narrative_self {
                 let significance = if ctx.moral_concern_detected {
                     super::super::thresholds::NARRATIVE_MORAL_SIGNIFICANCE
                 } else {
@@ -343,7 +346,7 @@ impl CognitiveLoopService {
             }
         } else {
             // Read cached self_phi without processing (avoid 0.0 triggering weak-identity feedback)
-            self.self_model_tier
+            self.consciousness.self_model_tier
                 .narrative_self
                 .as_ref()
                 .map(|n| n.self_phi())
@@ -447,7 +450,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let hierarchical_total_free_energy =
             if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
-                if let Some(ref mut hfe) = self.consciousness_monitors.hierarchical_free_energy {
+                if let Some(ref mut hfe) = self.consciousness.consciousness_monitors.hierarchical_free_energy {
                     // FEEDBACK: Phi→precision coupling — higher integrated information
                     // sharpens lower-level precision (Feldman & Friston 2010, §7.4).
                     // This creates a causal mechanism: consciousness improves perceptual accuracy.
@@ -504,8 +507,8 @@ impl CognitiveLoopService {
         // Urgency-gated: Critical=always, Normal=every 2nd, Cruise=every 4th
         // ═══════════════════════════════════════════════════════════════════════
         let predictive_self_safety = if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
-            if let Some(ref mut pred_self) = self.self_model_tier.predictive_self {
-                if let Some(ref narrative) = self.self_model_tier.narrative_self {
+            if let Some(ref mut pred_self) = self.consciousness.self_model_tier.predictive_self {
+                if let Some(ref narrative) = self.consciousness.self_model_tier.narrative_self {
                     pred_self.observe(narrative);
                 }
 
@@ -569,7 +572,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let attention_schema_focus = if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
-            if let Some(ref mut schema) = self.self_model_tier.attention_schema {
+            if let Some(ref mut schema) = self.consciousness.self_model_tier.attention_schema {
                 let salience = ctx.prediction_error.max(0.1);
                 let update = schema.update(ctx.hv16_cached, salience);
                 let gain = if update.control_signal
@@ -622,7 +625,7 @@ impl CognitiveLoopService {
         // Science: Sustained attention on a single target degrades performance after ~30 cycles.
         // The schema's fatigue_level() reflects accumulated focus duration. When fatigue is
         // high, increase exploration to encourage attention re-allocation.
-        if let Some(ref schema) = self.self_model_tier.attention_schema {
+        if let Some(ref schema) = self.consciousness.self_model_tier.attention_schema {
             let fatigue = schema.fatigue_level();
             if fatigue > super::super::thresholds::VIGILANCE_FATIGUE_THRESHOLD {
                 // Graduated exploration push: 0.0 at fatigue=0.5, up to 0.04 at fatigue=1.0
@@ -698,20 +701,20 @@ impl CognitiveLoopService {
             hierarchical_total_free_energy,
             predictive_self_safety,
             predictive_behavioral_error: self
-                .self_model_tier
+                .consciousness.self_model_tier
                 .predictive_self
                 .as_ref()
                 .map(|ps| ps.stats.behavioral_prediction_error as f32)
                 .unwrap_or(0.0),
             attention_schema_focus,
             attention_fatigue: self
-                .self_model_tier
+                .consciousness.self_model_tier
                 .attention_schema
                 .as_ref()
                 .map(|s| s.fatigue_level())
                 .unwrap_or(0.0),
             attention_prediction_accuracy: self
-                .self_model_tier
+                .consciousness.self_model_tier
                 .attention_schema
                 .as_ref()
                 .map(|s| s.prediction_accuracy() as f32)

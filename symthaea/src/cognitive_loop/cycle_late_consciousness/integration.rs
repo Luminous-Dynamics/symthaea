@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use std::time::Instant;
 
 use super::{ConsciousnessIntegrationResult, LateConsciousnessContext, LateConsciousnessResult};
@@ -24,7 +27,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (gwt_broadcast, gwt_coalition_size, gwt_activation) =
             if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
-                if let Some(ref mut gwt) = self.gwt_mgr.gwt {
+                if let Some(ref mut gwt) = self.consciousness.gwt_mgr.gwt {
                     let activation = (1.0 - ctx.prediction_error as f64).clamp(0.0, 1.0);
                     // Submit current encoding with activation-weighted salience
                     gwt.submit_strategy(
@@ -204,7 +207,7 @@ impl CognitiveLoopService {
         // Pre-compute to avoid borrow conflict with mutable subsystem references below
         let wm_utilization = self.prefrontal_utilization();
         let resonance_frequency = if ctx.urgency.run_consciousness_monitors() {
-            if let Some(ref mut resonance) = self.consciousness_monitors.resonance {
+            if let Some(ref mut resonance) = self.consciousness.consciousness_monitors.resonance {
                 let dims = [
                     ctx.unified_psi,
                     ctx.coherence as f64,
@@ -234,7 +237,7 @@ impl CognitiveLoopService {
         }
 
         let quantum_coherence_level = if ctx.urgency.run_consciousness_monitors() {
-            if let Some(ref mut qc) = self.consciousness_monitors.quantum_coherence {
+            if let Some(ref mut qc) = self.consciousness.consciousness_monitors.quantum_coherence {
                 qc.observe(&ctx.hv16_cached, ctx.unified_psi);
                 qc.coherence()
             } else {
@@ -276,7 +279,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (phenomenal_binding_strength, phenomenal_fragmented) =
             if ctx.urgency.run_consciousness_monitors() {
-                if let Some(ref mut binding) = self.consciousness_monitors.phenomenal_binding {
+                if let Some(ref mut binding) = self.consciousness.consciousness_monitors.phenomenal_binding {
                     let dims = [
                         ctx.unified_psi,
                         ctx.coherence as f64,
@@ -361,12 +364,12 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (temporal_coherence_score, temporal_discontinuity) =
             if ctx.urgency.run_consciousness_monitors() {
-                if let Some(ref mut temporal) = self.consciousness_monitors.temporal {
+                if let Some(ref mut temporal) = self.consciousness.consciousness_monitors.temporal {
                     temporal.observe(
                         &ctx.hv16_cached,
                         ctx.unified_psi,
-                        self.self_model_tier.narrative_self.as_ref(),
-                        self.self_model_tier.predictive_self.as_ref(),
+                        self.consciousness.self_model_tier.narrative_self.as_ref(),
+                        self.consciousness.self_model_tier.predictive_self.as_ref(),
                     );
                     let coherence = temporal.overall_temporal_coherence();
                     let healthy = temporal.is_temporally_healthy();
@@ -438,7 +441,7 @@ impl CognitiveLoopService {
         if temporal_coherence_score
             > crate::cognitive_loop::thresholds::TEMPORAL_NARRATIVE_THRESHOLD
         {
-            if let Some(ref mut narrative) = self.self_model_tier.narrative_self {
+            if let Some(ref mut narrative) = self.consciousness.self_model_tier.narrative_self {
                 let continuity_boost = (temporal_coherence_score
                     - crate::cognitive_loop::thresholds::TEMPORAL_NARRATIVE_THRESHOLD)
                     * crate::cognitive_loop::thresholds::TEMPORAL_NARRATIVE_BOOST_SCALE;
@@ -475,7 +478,7 @@ impl CognitiveLoopService {
             .urgency
             .run_consciousness_monitors()
         {
-            if let Some(ref mut thermo) = self.consciousness_monitors.thermodynamics {
+            if let Some(ref mut thermo) = self.consciousness.consciousness_monitors.thermodynamics {
                 let dims = [
                     ctx.unified_psi,
                     ctx.coherence as f64,
@@ -555,7 +558,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (embodied_psi_modulation, embodied_agency) =
             if ctx.urgency.should_run(self.stats.total_cycles, 1, 1, 2) {
-                if let Some(ref mut embodied) = self.consciousness_monitors.embodied {
+                if let Some(ref mut embodied) = self.consciousness.consciousness_monitors.embodied {
                     if let Some(ref body) = self.vision_sensory.virtual_body {
                         embodied.update_interoception(body.interoceptive_state().clone());
                     }
@@ -751,7 +754,7 @@ impl CognitiveLoopService {
         // memory even without full conscious access (pre-attentive encoding).
         if ctx.surprise_triggered {
             let valence = -(ctx.prediction_error as f64 * 0.3); // surprise is mildly negative
-            self.master_equation.narrative_coherence.add_episode(
+            self.consciousness.master_equation.narrative_coherence.add_episode(
                 format!("surprise_pre_pe{:.2}", ctx.prediction_error),
                 valence,
             );
@@ -765,7 +768,7 @@ impl CognitiveLoopService {
             // Wire embodiment factor from cognitive loop signals.
             // Science: Friston (2010) — low PE = good embodied prediction (sensorimotor accuracy)
             // Science: Barrett (2017) — interoceptive coherence from allostatic regulation
-            self.master_equation.embodiment_factor.record_prediction(
+            self.consciousness.master_equation.embodiment_factor.record_prediction(
                 1.0 - ctx.prediction_error as f64,
                 1.0 - ctx.prediction_error as f64,
             );
@@ -774,7 +777,7 @@ impl CognitiveLoopService {
             {
                 let allostatic = self.neuromod.bath.allostatic_load;
                 let coherence = 1.0 - allostatic as f64;
-                self.master_equation
+                self.consciousness.master_equation
                     .embodiment_factor
                     .update_interoceptive(coherence, coherence);
             }
@@ -785,7 +788,7 @@ impl CognitiveLoopService {
             // Conway (2005) — narrative identity forms from dense episodic sampling.
             if self.stats.total_cycles % 5 == 0 {
                 let valence = (1.0 - ctx.prediction_error as f64).clamp(-1.0, 1.0);
-                self.master_equation
+                self.consciousness.master_equation
                     .narrative_coherence
                     .add_episode(format!("cycle_{}", self.stats.total_cycles), valence);
             }
@@ -795,7 +798,7 @@ impl CognitiveLoopService {
             // Science: Schacter et al. (2012) — prospection uses same networks as episodic memory
             if self.stats.total_cycles % 25 == 0 {
                 let horizon = ((1.0 - ctx.prediction_error as f64) * 10.0).max(1.0) as usize;
-                self.master_equation
+                self.consciousness.master_equation
                     .narrative_coherence
                     .add_future_scenario(
                         format!("prediction_horizon_{}", self.stats.total_cycles),
@@ -824,7 +827,7 @@ impl CognitiveLoopService {
                     format!("coherence_{:.1}", ctx.coherence),
                     format!("safety_{:.1}", late.predictive_self_safety),
                 ];
-                self.master_equation.social_embedding.update_self_model(
+                self.consciousness.master_equation.social_embedding.update_self_model(
                     self_goals,
                     self_beliefs,
                     late.affective_valence as f64,
@@ -841,7 +844,7 @@ impl CognitiveLoopService {
                         self.social_mgr.social.social_cooperation_rate
                     ),
                 ];
-                self.master_equation.social_embedding.update_agent_model(
+                self.consciousness.master_equation.social_embedding.update_agent_model(
                     "user",
                     user_beliefs,
                     user_goals,
@@ -860,10 +863,10 @@ impl CognitiveLoopService {
                 let c_level = self.carryover.history.consciousness_level;
                 let c_tom_mod = 0.85 + 0.25 * c_level; // [0.85, 1.10]
                 let accuracy = (raw_accuracy * c_tom_mod).clamp(0.0, 1.0);
-                self.master_equation
+                self.consciousness.master_equation
                     .social_embedding
                     .record_tom_prediction("user", accuracy);
-                self.master_equation
+                self.consciousness.master_equation
                     .social_embedding
                     .provide_tom_feedback("user", accuracy);
             }
@@ -978,7 +981,7 @@ impl CognitiveLoopService {
                     + self.flow_state.intensity as f64 * 0.25)
                     .clamp(0.1, 1.0),
             };
-            let mce_result = self.master_equation.compute(&inputs);
+            let mce_result = self.consciousness.master_equation.compute(&inputs);
             let level = mce_result.consciousness_level;
 
             // Cache MCE factor telemetry for output phase
@@ -1065,7 +1068,7 @@ impl CognitiveLoopService {
                 } else {
                     format!("consolidation_c{:.2}", level)
                 };
-                self.master_equation
+                self.consciousness.master_equation
                     .narrative_coherence
                     .add_episode(episode_label, episode_valence);
             }
@@ -1087,7 +1090,7 @@ impl CognitiveLoopService {
                 let probability = (1.0 - pe).clamp(0.1, 0.9);
                 // Desirability: valence of the predicted state
                 let desirability = late.body_valence as f64;
-                self.master_equation
+                self.consciousness.master_equation
                     .narrative_coherence
                     .add_future_scenario(
                         format!("prediction_h{}_pe{:.2}", horizon_steps, pe),

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Constructor and backend selection for CognitiveLoopService.
 
 use super::CycleCarryover;
@@ -795,21 +798,7 @@ impl CognitiveLoopService {
             support: super::support_manager::SupportManager::new(),
             carryover: CycleCarryover::default(),
             prefrontal,
-            self_model_tier,
-            gwt_mgr: super::gwt_manager::GwtManager::new(
-                gwt,
-                gwt_memory_flag,
-                gwt_perception_count,
-            ),
-            consciousness_monitors: super::consciousness_monitor_tier::ConsciousnessMonitorTier {
-                resonance: consciousness_resonance,
-                quantum_coherence,
-                temporal: temporal_consciousness,
-                embodied: embodied_cognition,
-                thermodynamics: consciousness_thermodynamics,
-                phenomenal_binding,
-                hierarchical_free_energy,
-            },
+            // self_model_tier, gwt_mgr, consciousness_monitors moved into consciousness field below
             narrative_gwt,
             attention_visualizer: if enable_visualization {
                 Some(crate::visualization::AttentionVisualizer::with_max_history(
@@ -859,7 +848,7 @@ impl CognitiveLoopService {
             // canvas_manager, last_canvas_svg moved to motor_rendering manager
             psi_attestation_buffer: std::collections::VecDeque::with_capacity(attestation_buf_cap),
             policy_agreement_window: std::collections::VecDeque::with_capacity(20),
-            master_equation: MasterConsciousnessEquation::default(),
+            // master_equation moved into consciousness field below
             // Unified Living Mind: life-mind continuity (full_consciousness only)
             #[cfg(feature = "full_consciousness")]
             unified_living_mind: UnifiedLivingMind::new(),
@@ -905,38 +894,56 @@ impl CognitiveLoopService {
             last_snapshot: None,
 
             // ── Unified Engines (additive wiring — old fields remain) ────────
-            consciousness_engine: {
-                // SpectralMIPFinder is now solely owned by the engine (no top-level duplicate).
-                let engine_smf =
-                    symthaea_core::consciousness_metrics::SpectralMIPFinder::with_defaults();
-                // Create fresh optional subsystems for the engine.
-                let engine_mmi = if has_primitive_processor {
-                    Some(
-                        crate::consciousness::multi_modal_integration::MultiModalIntegrator::new(
-                            crate::consciousness::multi_modal_integration::IntegrationConfig::default(),
-                        ),
+            consciousness: super::consciousness_execution::ConsciousnessExecution::new(
+                {
+                    // SpectralMIPFinder is now solely owned by the engine (no top-level duplicate).
+                    let engine_smf =
+                        symthaea_core::consciousness_metrics::SpectralMIPFinder::with_defaults();
+                    // Create fresh optional subsystems for the engine.
+                    let engine_mmi = if has_primitive_processor {
+                        Some(
+                            crate::consciousness::multi_modal_integration::MultiModalIntegrator::new(
+                                crate::consciousness::multi_modal_integration::IntegrationConfig::default(),
+                            ),
+                        )
+                    } else {
+                        None
+                    };
+                    let engine_eq = if has_primitive_processor {
+                        Some(
+                            crate::consciousness::consciousness_equation_v2::ConsciousnessEquationV2::new(),
+                        )
+                    } else {
+                        None
+                    };
+                    let engine_ucp = if has_primitive_processor {
+                        crate::consciousness::unified_consciousness_pipeline::UnifiedConsciousnessPipeline::new(
+                            crate::consciousness::unified_consciousness_pipeline::PipelineConfig::default(),
+                        ).map_err(|e| tracing::warn!(err = %e, "UnifiedConsciousnessPipeline init failed")).ok()
+                    } else {
+                        None
+                    };
+                    super::consciousness_engine::ConsciousnessEngine::new(
+                        engine_smf, engine_mmi, engine_eq, engine_ucp,
                     )
-                } else {
-                    None
-                };
-                let engine_eq = if has_primitive_processor {
-                    Some(
-                        crate::consciousness::consciousness_equation_v2::ConsciousnessEquationV2::new(),
-                    )
-                } else {
-                    None
-                };
-                let engine_ucp = if has_primitive_processor {
-                    crate::consciousness::unified_consciousness_pipeline::UnifiedConsciousnessPipeline::new(
-                        crate::consciousness::unified_consciousness_pipeline::PipelineConfig::default(),
-                    ).map_err(|e| tracing::warn!(err = %e, "UnifiedConsciousnessPipeline init failed")).ok()
-                } else {
-                    None
-                };
-                super::consciousness_engine::ConsciousnessEngine::new(
-                    engine_smf, engine_mmi, engine_eq, engine_ucp,
-                )
-            },
+                },
+                super::consciousness_monitor_tier::ConsciousnessMonitorTier {
+                    resonance: consciousness_resonance,
+                    quantum_coherence,
+                    temporal: temporal_consciousness,
+                    embodied: embodied_cognition,
+                    thermodynamics: consciousness_thermodynamics,
+                    phenomenal_binding,
+                    hierarchical_free_energy,
+                },
+                super::gwt_manager::GwtManager::new(
+                    gwt,
+                    gwt_memory_flag,
+                    gwt_perception_count,
+                ),
+                self_model_tier,
+                MasterConsciousnessEquation::default(),
+            ),
             substrate_manager,
             // physics_integration moved to feature_integ manager
             convergence_cycle: 0,

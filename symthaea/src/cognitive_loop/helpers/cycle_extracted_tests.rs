@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Unit tests for extracted cycle helpers: compute_unified_psi, step_fep_active_inference,
 //! compose_effective_lr.
 
@@ -250,7 +253,7 @@ fn test_step_fep_repeated_calls_stable() {
         );
     }
     // Trust threshold should remain bounded
-    let trust = s.self_model_tier.self_reflection.trust_threshold;
+    let trust = s.consciousness.self_model_tier.self_reflection.trust_threshold;
     assert!(
         trust >= 0.1 && trust <= 0.9,
         "trust_threshold should be clamped to [0.1, 0.9], got {trust}"

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Output phase of the cognitive cycle.
 //!
 //! Extracts the final metadata assembly and CycleResult construction from
@@ -685,7 +688,7 @@ impl CognitiveLoopService {
         metadata.modulation.crash_binding_relaxed =
             self.carryover.quality.crash_freeze_remaining > 0;
         metadata.modulation.attention_fatigue_broca_gated = self
-            .self_model_tier
+            .consciousness.self_model_tier
             .attention_schema
             .as_ref()
             .map_or(false, |a| {
@@ -845,11 +848,11 @@ impl CognitiveLoopService {
 
         // ── GWT handler telemetry ──
         metadata.gwt_memory_consolidation_requested = self
-            .gwt_mgr
+            .consciousness.gwt_mgr
             .memory_flag
             .swap(false, std::sync::atomic::Ordering::Relaxed);
         metadata.gwt_perception_broadcasts =
-            self.gwt_mgr
+            self.consciousness.gwt_mgr
                 .perception_count
                 .swap(0, std::sync::atomic::Ordering::Relaxed) as u32;
 
@@ -1491,7 +1494,7 @@ impl CognitiveLoopService {
             feedback.memory.codebook_evictions,
             feedback.memory.codebook_diversity,
             dynamics.fep.fep_surprise,
-            self.self_model_tier
+            self.consciousness.self_model_tier
                 .self_reflection
                 .get_thresholds()
                 .surprise as f64,

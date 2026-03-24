@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Resonator codebook growth, episodic replay, and memory coordinator phases.
 //!
 //! Contains `run_resonator_codebook_phase` and `run_episodic_replay_and_memory_phase`.

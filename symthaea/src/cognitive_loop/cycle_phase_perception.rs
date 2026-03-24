@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Perception phase of the cognitive cycle.
 //!
 //! Extracts Phases 0–1.2 from the original `cycle()` method:
@@ -268,7 +271,7 @@ impl CognitiveLoopService {
 
         // ── GWT injection: feed foveation results into Global Workspace ──
         #[cfg(feature = "foveation")]
-        if let Some(ref mut gwt) = self.gwt_mgr.gwt {
+        if let Some(ref mut gwt) = self.consciousness.gwt_mgr.gwt {
             for result in &fov_results {
                 let binary_hv = result.semantic_hv.to_binary(0.0);
                 let activation = result.confidence as f64;

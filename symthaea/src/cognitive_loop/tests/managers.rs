@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Integration tests for manager round-trip behavior.
 //!
 //! Verifies that manager structs (VoiceCoherenceBridge, SocialManager,
@@ -96,13 +99,13 @@ fn gwt_manager_default_flags() {
     let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     // Memory flag should be false initially
     assert!(!service
-        .gwt_mgr
+        .consciousness.gwt_mgr
         .memory_flag
         .load(std::sync::atomic::Ordering::Relaxed));
     // Perception count should be 0
     assert_eq!(
         service
-            .gwt_mgr
+            .consciousness.gwt_mgr
             .perception_count
             .load(std::sync::atomic::Ordering::Relaxed),
         0
@@ -113,7 +116,7 @@ fn gwt_manager_default_flags() {
 fn gwt_manager_gwt_enabled_by_default() {
     let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     // GWT is enabled by default
-    assert!(service.gwt_mgr.gwt.is_some());
+    assert!(service.consciousness.gwt_mgr.gwt.is_some());
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -399,13 +402,13 @@ fn test_mce_narrative_wiring() {
     let mut service = CognitiveLoopService::new(config).unwrap();
 
     // N should start low (no episodes yet)
-    let n_start = service.master_equation.narrative_coherence.compute();
+    let n_start = service.consciousness.master_equation.narrative_coherence.compute();
     assert!(
         n_start < 0.2,
         "N should start low with no episodes, got {n_start}"
     );
     assert_eq!(
-        service.master_equation.narrative_coherence.episode_count(),
+        service.consciousness.master_equation.narrative_coherence.episode_count(),
         0
     );
 
@@ -414,9 +417,9 @@ fn test_mce_narrative_wiring() {
         let _ = service.cycle("narrative wiring test");
     }
 
-    let n_end = service.master_equation.narrative_coherence.compute();
-    let episodes = service.master_equation.narrative_coherence.episode_count();
-    let scenarios = service.master_equation.narrative_coherence.scenario_count();
+    let n_end = service.consciousness.master_equation.narrative_coherence.compute();
+    let episodes = service.consciousness.master_equation.narrative_coherence.episode_count();
+    let scenarios = service.consciousness.master_equation.narrative_coherence.scenario_count();
 
     // After 200 cycles, should have accumulated episodes from consolidation events
     assert!(

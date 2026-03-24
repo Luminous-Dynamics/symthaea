@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Strategy selection and encoding phases extracted from cycle_phase_perception.rs.
 //!
 //! Contains:
@@ -498,7 +501,7 @@ impl CognitiveLoopService {
         // encoding into compressed_state, the system's beliefs about its own
         // attention causally shape what it perceives next — closing the loop
         // from observation to top-down control.
-        let compressed_state = if let Some(ref schema) = self.self_model_tier.attention_schema {
+        let compressed_state = if let Some(ref schema) = self.consciousness.self_model_tier.attention_schema {
             let ast_encoding = schema.encode_for_thought_vector();
             let ast_weight = super::thresholds::AST_ENCODING_WEIGHT;
             let mut modulated = compressed_state;

@@ -59,6 +59,7 @@ members = [
     "crates/symthaea-soma",
     "crates/symthaea-crucible",
     "crates/symthaea-canvas",
+    "crates/symthaea-aesthetic",
     "crates/symthaea-circular",
     "crates/symthaea-clinical",
     "crates/symthaea-therapeutic",
@@ -237,6 +238,9 @@ symthaea-physics-bridge = { path = "crates/symthaea-physics-bridge", optional = 
 
 # Symthaea Broca - SSM Language Center: CfC-HDC autoregressive thought-to-text generation
 symthaea-broca = { path = "crates/symthaea-broca", optional = true }
+
+# Symthaea Geodesic - Topology-aware code verification (PDG, Betti numbers, execution oracle)
+symthaea-geodesic = { path = "crates/symthaea-geodesic", optional = true }
 
 # Symthaea Canvas - Living topology UI: cognitive geometry → SVG
 symthaea-canvas = { path = "crates/symthaea-canvas", optional = true }
@@ -451,6 +455,13 @@ full = ["service", "shell", "gui", "demo"]  # All binaries
 api_module = ["axum", "tower-http"]         # HTTP API binary + module
 
 # ── Voice & Audio ───────────────────────────────────────────────────
+# Voice Pipeline (hierarchy):
+#   voice-tts       → base TTS with Kokoro ONNX + espeak-ng G2P
+#   audio           → voice-tts + rodio playback
+#   vocal-tract     → articulatory synthesis (LTC-driven, independent of TTS)
+#   neural-vocoder  → vocal-tract + BigVGAN ONNX (Path A waveform generation)
+#   live-voice      → real-time cpal output + vocal-tract (UNTESTED in CI)
+#   liquid-mamba    → SSM language center + pre-trained Mamba fusion (CPU; see ssm_language)
 voice-tts = ["ort", "hound", "hf-hub", "espeak-rs"]  # TTS with Kokoro (ONNX) + espeak-ng G2P
 voice-stt = ["symthaea-stt", "hound"]                 # STT with symthaea-stt crate (HDC + LTC + CfC)
 audio = ["voice-tts", "rodio"]                        # Full audio including playback
@@ -502,10 +513,8 @@ mycelix_sdk = ["mycelix", "dep:mycelix-sdk"]                  # Enabled Mycelix 
 
 # ── Sovereign Inoculation ──────────────────────────────────────────
 mesh-trust = ["mesh", "identity"]              # Post-quantum web-of-trust over mesh
-mesh-naming = ["mesh"]                         # DORMANT: no active code references (0 cfg gates in src/)
 social-fabric = ["mesh"]                       # Resonance-based content routing (sovereign social)
 survival = ["mesh"]                            # Infrastructure monitoring + demand forecasting
-survival-mqtt = ["survival"]                   # DORMANT: no active code references (0 cfg gates in src/); MQTT sensor bridge placeholder
 
 # ── Desktop & System Integration ────────────────────────────────────
 notifications = ["zbus"]                    # D-Bus desktop notifications
@@ -555,6 +564,7 @@ reasoning_engine = ["magi_loop", "symthaea-causal-reasoning/counterfactual"]
 # ── Code Understanding & Generation ─────────────────────────────────
 # Subsumes former code_understanding feature (tree-sitter parsers + code generation).
 code_generation = ["tree-sitter-rust", "tree-sitter-python"]
+geodesic_synthesis = ["dep:symthaea-geodesic"]  # GCS verification gate for CodingAgent (PDG topology + execution oracle)
 wasm-sandbox = ["dep:wasmtime"]
 
 # ── Example & module build gates ───────────────────────────────────

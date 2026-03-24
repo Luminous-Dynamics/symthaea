@@ -231,7 +231,5 @@ hal, ssm-power-hal (I2C hardware)
 | Bundle | Includes |
 |--------|----------|
 | `full` | service + shell + gui + demo |
-| `candle_stack` | neural-bridge |
 | `consciousness_full` | reasoning_engine + identity |
-| `nix_full` | nix-mind |
 | `all_benchmarks` | benchmarks + physics |

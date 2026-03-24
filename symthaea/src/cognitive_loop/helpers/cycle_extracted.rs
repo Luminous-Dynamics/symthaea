@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Extracted helpers from cycle() — Phases 1–4.
 //!
 //! Phase 1 (LOW risk): safety precheck, cognitive depth, negation detection, LR composition
@@ -705,8 +708,8 @@ impl CognitiveLoopService {
                 // Tighten trust via precision
                 if let Some(ref fe) = self.fep.agent.last_fe_components {
                     let precision_mod = (1.0 - fe.prediction_error).clamp(0.0, 1.0) as f32;
-                    self.self_model_tier.self_reflection.trust_threshold =
-                        (self.self_model_tier.self_reflection.trust_threshold * 0.9
+                    self.consciousness.self_model_tier.self_reflection.trust_threshold =
+                        (self.consciousness.self_model_tier.self_reflection.trust_threshold * 0.9
                             + precision_mod * 0.1)
                             .clamp(0.1, 0.9);
                 }
@@ -956,8 +959,8 @@ impl CognitiveLoopService {
                 Priority::Safety,
             );
 
-            self.self_model_tier.self_reflection.trust_threshold =
-                (self.self_model_tier.self_reflection.trust_threshold * 1.2).clamp(0.1, 0.95);
+            self.consciousness.self_model_tier.self_reflection.trust_threshold =
+                (self.consciousness.self_model_tier.self_reflection.trust_threshold * 1.2).clamp(0.1, 0.95);
 
             self.adaptive_behavior.pause_multiplier *= MORAL_CONCERN_PAUSE_BOOST;
 
@@ -1001,7 +1004,7 @@ impl CognitiveLoopService {
                 .iter()
                 .any(|v| v.contains("perfect") || v.contains("duty"))
             {
-                self.self_model_tier.self_reflection.force_reflection();
+                self.consciousness.self_model_tier.self_reflection.force_reflection();
                 self.carryover.learning.subsystem_lr_factor *= MORAL_DUTY_LR_FACTOR;
                 moral_steering_category = "duty";
             } else if !moral_judgment.violations.is_empty() {
@@ -1061,7 +1064,7 @@ impl CognitiveLoopService {
         prediction_error: f32,
         coherence: f32,
     ) {
-        let adapted_thresholds = self.self_model_tier.self_reflection.get_thresholds();
+        let adapted_thresholds = self.consciousness.self_model_tier.self_reflection.get_thresholds();
         self.flow_state.update_with_thresholds(
             pattern,
             prediction_error,
@@ -1100,14 +1103,14 @@ impl CognitiveLoopService {
         }
 
         // Self-reflection
-        self.self_model_tier.self_reflection.record_cycle(
+        self.consciousness.self_model_tier.self_reflection.record_cycle(
             prediction_error,
             self.flow_state.in_flow,
             self.curiosity_drive.should_explore(),
             self.prediction_confidence as f32,
         );
-        if self.self_model_tier.self_reflection.should_reflect() {
-            let recommendations = self.self_model_tier.self_reflection.reflect();
+        if self.consciousness.self_model_tier.self_reflection.should_reflect() {
+            let recommendations = self.consciousness.self_model_tier.self_reflection.reflect();
             for rec in &recommendations {
                 if rec.confidence < REFLECTION_CONFIDENCE_THRESHOLD {
                     continue;
