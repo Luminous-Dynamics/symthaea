@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Consciousness Unification Layer
 //!
 //! This module provides the glue that connects all consciousness subsystems into
@@ -313,14 +316,16 @@ impl Default for UnifiedEmotionalState {
     fn default() -> Self {
         Self {
             valence: 0.0,
-            arousal: 0.0,
+            // Match CoreAffect::neutral() where arousal=0.5 (Russell 1980 circumplex:
+            // neutral is mid-arousal, not zero arousal)
+            arousal: 0.5,
             dominance: 0.0,
             discrete_emotion: Some(UnifiedEmotion::Neutral),
             blend: Vec::new(),
             trajectory: VecDeque::with_capacity(100),
             mood: MoodState {
                 baseline_valence: 0.0,
-                baseline_arousal: 0.0,
+                baseline_arousal: 0.5,
                 stability: 0.5,
             },
             sources: EmotionalSources::default(),
@@ -539,6 +544,71 @@ impl EmotionalBridge {
         self.unified.arousal = arousal;
         self.unified.discrete_emotion = Some(emotion);
         self.unified.sources.has_emotional_core = true;
+        self.record_history();
+    }
+
+    /// Update from somatic marker signals (Damasio 1994).
+    ///
+    /// This replicates the computation from `AffectiveBridge::evaluate_from_signals_with_social`
+    /// so that the unified emotional state receives the same somatic marker inputs without
+    /// requiring the legacy AffectiveBridge subsystem to be enabled.
+    ///
+    /// Inputs:
+    /// - `prediction_error`: current prediction error (higher = worse fit)
+    /// - `surprise_triggered`: whether surprise detection fired this cycle
+    /// - `consciousness_proxy`: unified Psi (consciousness level, 0.0-1.0)
+    /// - `moral_score`: last moral judgment score (positive = morally good)
+    /// - `social_trust`: trust level from social/ToM module (0.0-1.0)
+    /// - `social_cooperation_rate`: cooperation rate from social module (0.0-1.0)
+    /// - `peer_valence`: aggregate peer emotional valence (0.0 if unavailable)
+    pub fn update_from_somatic_signals(
+        &mut self,
+        prediction_error: f32,
+        surprise_triggered: bool,
+        consciousness_proxy: f64,
+        moral_score: f32,
+        social_trust: f32,
+        social_cooperation_rate: f32,
+        peer_valence: f32,
+    ) {
+        // Base affect from cognitive signals (matches AffectiveBridge::evaluate_from_signals)
+        let mut valence = ((0.5 - prediction_error) + moral_score * 0.3).clamp(-1.0, 1.0);
+        let mut arousal = (0.3
+            + if surprise_triggered { 0.3 } else { 0.0 }
+            + (consciousness_proxy * 0.4) as f32
+            + (prediction_error * 0.3).min(0.3))
+        .clamp(0.0, 1.0);
+        let mut dominance = ((consciousness_proxy * 0.6) as f32 - 0.3).clamp(-1.0, 1.0);
+
+        // Social modulation (Decety & Chaminade 2003)
+        valence = (valence + peer_valence * 0.15).clamp(-1.0, 1.0);
+        arousal = (arousal + social_cooperation_rate * 0.1).clamp(0.0, 1.0);
+        dominance = (dominance + (social_trust - 0.5) * 0.2).clamp(-1.0, 1.0);
+
+        // Blend into unified state with momentum (0.3 blend factor matches AffectiveBridge)
+        let blend = 0.3_f64;
+        let new_v = valence as f64;
+        let new_a = arousal as f64;
+        let new_d = dominance as f64;
+        self.unified.valence = self.unified.valence * (1.0 - blend) + new_v * blend;
+        self.unified.arousal = self.unified.arousal * (1.0 - blend) + new_a * blend;
+        self.unified.dominance = self.unified.dominance * (1.0 - blend) + new_d * blend;
+
+        // Decay toward neutral (global_affect_decay = 0.05 in AffectiveBridge default)
+        let decay = 0.05_f64;
+        self.unified.valence *= 1.0 - decay;
+        self.unified.arousal = 0.5 + (self.unified.arousal - 0.5) * (1.0 - decay);
+        self.unified.dominance *= 1.0 - decay;
+
+        // Update discrete emotion from new VAD
+        self.unified.discrete_emotion = Some(UnifiedEmotion::from_vad(
+            self.unified.valence,
+            self.unified.arousal,
+            self.unified.dominance,
+        ));
+
+        // Mark source and record history
+        self.unified.sources.has_core_affect = true;
         self.record_history();
     }
 
@@ -1873,11 +1943,17 @@ mod tests {
     fn test_unified_emotional_state_default() {
         let state = UnifiedEmotionalState::default();
         assert!((state.valence - 0.0).abs() < f64::EPSILON);
-        assert!((state.arousal - 0.0).abs() < f64::EPSILON);
+        // Arousal defaults to 0.5 to match CoreAffect::neutral() (Russell 1980 circumplex)
+        assert!(
+            (state.arousal - 0.5).abs() < f64::EPSILON,
+            "Default arousal should be 0.5 (neutral mid-arousal), got {}",
+            state.arousal
+        );
         assert!((state.dominance - 0.0).abs() < f64::EPSILON);
         assert_eq!(state.discrete_emotion, Some(UnifiedEmotion::Neutral));
         assert!(state.blend.is_empty());
         assert!(state.trajectory.is_empty());
+        assert!((state.mood.baseline_arousal - 0.5).abs() < f64::EPSILON);
         assert!((state.mood.stability - 0.5).abs() < f64::EPSILON);
     }
 
@@ -1886,6 +1962,66 @@ mod tests {
         let bridge = EmotionalBridge::default();
         assert!((bridge.state().valence - 0.0).abs() < f64::EPSILON);
         assert_eq!(bridge.detect_pattern(), EmotionalPattern::Stable);
+    }
+
+    #[test]
+    fn test_emotional_bridge_somatic_signals_shifts_state() {
+        let mut bridge = EmotionalBridge::new();
+        let initial_valence = bridge.state().valence;
+        let initial_arousal = bridge.state().arousal;
+
+        // Low prediction error + high consciousness -> positive valence shift
+        bridge.update_from_somatic_signals(
+            0.1,   // low prediction error
+            false, // no surprise
+            0.8,   // high consciousness
+            0.5,   // positive moral score
+            0.6,   // moderate trust
+            0.5,   // moderate cooperation
+            0.0,   // no peer valence
+        );
+
+        let state = bridge.state();
+        // Valence should shift positive (low error + positive moral score)
+        assert!(
+            state.valence > initial_valence,
+            "Somatic signals should shift valence positive: {} -> {}",
+            initial_valence,
+            state.valence
+        );
+        // Arousal should shift from neutral (consciousness + base arousal)
+        assert!(
+            (state.arousal - initial_arousal).abs() > 0.001,
+            "Somatic signals should shift arousal: {} -> {}",
+            initial_arousal,
+            state.arousal
+        );
+        // Source should be marked
+        assert!(state.sources.has_core_affect);
+    }
+
+    #[test]
+    fn test_emotional_bridge_somatic_signals_high_error_negative_valence() {
+        let mut bridge = EmotionalBridge::new();
+
+        // High prediction error + surprise -> negative valence, high arousal
+        bridge.update_from_somatic_signals(
+            0.9,  // high prediction error
+            true, // surprise triggered
+            0.3,  // low consciousness
+            -0.5, // negative moral score
+            0.2,  // low trust
+            0.1,  // low cooperation
+            -0.3, // negative peer valence
+        );
+
+        let state = bridge.state();
+        // High error + negative moral -> valence should be negative
+        assert!(
+            state.valence < 0.0,
+            "High error + negative moral should produce negative valence: {}",
+            state.valence
+        );
     }
 
     #[test]
