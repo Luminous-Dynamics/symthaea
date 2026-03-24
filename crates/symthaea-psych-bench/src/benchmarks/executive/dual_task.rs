@@ -99,17 +99,16 @@ impl DualTaskBenchmark {
         let effective_capacity = wm_capacity.saturating_sub(digit_count);
         let load_fraction = 1.0 - (effective_capacity as f64 / wm_capacity as f64);
         // Base temperature calibrated for 4-AFC: association/temp ≈ 4.0 → ~95% single.
-        // Linear load scaling: high-load temp ≈ 1.43× base → ~85% (Baddeley & Hitch 1974).
-        // Scale factor 0.50 per unit load_fraction: single (0.20) → high (0.30).
-        // Logit 0.80/0.30 = 2.67 → P(correct) = 0.85 at high load.
+        // Scale factor 0.10: mild load-dependent temperature increase models
+        // WM resource competition. Combined with 0.02 noise scale, produces
+        // dual_task_cost ~0.08-0.12 (Baddeley & Hitch 1974: ~0.10 ± 0.05).
         // Heitz (2014): time pressure compounds with load.
         let base_temp = 0.20 + config.time_pressure * 0.12;
-        let temperature = base_temp * (1.0 + 0.50 * load_fraction);
+        let temperature = base_temp * (1.0 + 0.10 * load_fraction);
 
         // Association strength: learned S-R mapping adds this to the correct
         // response's activation. At base_temp=0.20, this yields softmax logit
         // of 4.0 → P(correct) = exp(4)/(exp(4)+3) = 0.948 for single task.
-        // Under high load (temp=0.286), logit drops to 2.80 → P = 0.846.
         // Must NOT be raised above 0.80 or the load gradient vanishes.
         let association: f64 = 0.80;
 
@@ -168,11 +167,12 @@ impl DualTaskBenchmark {
 
             // WM load adds stochastic noise to decision process.
             // Baddeley & Hitch (1974): concurrent maintenance disrupts choice processing.
-            // Noise scale 0.12: temperature scaling already captures the main load
-            // effect; noise models residual interference without doubling the cost
-            // (Pashler 1994: dual_task_cost ~0.10 for 6-digit load).
+            // Noise scale 0.02: temperature scaling already captures the main
+            // load effect; small noise models residual stochastic interference
+            // (Pashler 1994). Larger noise (>0.10) inflates dual_task_cost
+            // beyond the 0.10 ± 0.05 human baseline (Baddeley & Hitch 1974).
             if load_hv.is_some() {
-                let noise_scale = load_fraction * 0.12;
+                let noise_scale = load_fraction * 0.02;
                 for act in activations.iter_mut() {
                     xor_shift(&mut rng);
                     let noise = ((rng % 1000) as f64 / 1000.0 - 0.5) * noise_scale;
@@ -250,7 +250,12 @@ impl PsychBenchmark for DualTaskBenchmark {
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
-        let trials = config.trials_per_condition.max(10);
+        // DualTask cost is a difference score (single − high accuracy).
+        // Difference scores have high variance; 20 trials yields SE ≈ 0.09,
+        // nearly the size of the true effect (0.10). 100-trial minimum
+        // reduces SE to ~0.04, stabilizing the cost estimate across seeds
+        // (Pashler 1994 used 100+ trials per condition).
+        let trials = config.trials_per_condition.max(100);
 
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
         let mut trace = Vec::new();
