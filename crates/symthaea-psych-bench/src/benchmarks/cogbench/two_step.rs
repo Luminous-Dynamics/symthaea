@@ -101,10 +101,12 @@ impl TwoStepBenchmark {
                 })
                 .collect();
 
-            // Softmax over model-based values — low temp makes MB signal decisive
-            // Time pressure: base 0.1 preserves model-based control (Daw et al., 2011 two-step);
-            // +0.10/unit degrades MB signal, shifting toward model-free under SAT (Heitz, 2014).
-            let mb_temp = 0.1 + config.time_pressure * 0.10;
+            // Softmax over model-based values — low temp makes MB signal decisive.
+            // Time pressure: base 0.07 sharpens model-based action selection
+            // (Daw et al., 2011: MB agents show strong transition×reward interaction
+            // when the transition model is confident). +0.10/unit degrades MB signal,
+            // shifting toward model-free under SAT (Heitz, 2014).
+            let mb_temp = 0.07 + config.time_pressure * 0.10;
             let mb_max = mb_values[0].max(mb_values[1]);
             let mb_exp: Vec<f64> = mb_values
                 .iter()

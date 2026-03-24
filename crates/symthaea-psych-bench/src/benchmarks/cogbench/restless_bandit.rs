@@ -106,13 +106,13 @@ impl RestlessBanditBenchmark {
                         // makes staleness a meaningful exploration driver.
                         let staleness = (trial - arm_last_pull[i]) as f64;
                         let recency_bonus = (staleness / 10.0).min(0.5);
-                        // Time pressure: base UCB scale 0.12 (Daw et al., 2006 restless bandit).
-                        // For restless bandits, moderate exploration is critical to track drifting
-                        // arm values (Speekenbrink & Konstantinidis 2015). Too little exploration
-                        // causes stale estimates and worse long-run accuracy.
+                        // Time pressure: base UCB scale 0.08 (tuned for restless bandit).
+                        // Moderate exploration tracks drifting arms (Speekenbrink &
+                        // Konstantinidis 2015) but excessive exploration sacrifices
+                        // exploitation accuracy. 0.08 balances tracking vs harvesting.
                         // +0.10/unit inflates under deadline.
-                        let ucb_scale = 0.12 + config.time_pressure * 0.10;
-                        (i, ema + count_bonus * ucb_scale + recency_bonus * 0.20)
+                        let ucb_scale = 0.08 + config.time_pressure * 0.10;
+                        (i, ema + count_bonus * ucb_scale + recency_bonus * 0.12)
                     })
                     .max_by(|(_, a), (_, b)| a.total_cmp(b))
                     .map(|(i, _)| i)

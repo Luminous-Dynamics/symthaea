@@ -168,9 +168,11 @@ impl DualTaskBenchmark {
 
             // WM load adds stochastic noise to decision process.
             // Baddeley & Hitch (1974): concurrent maintenance disrupts choice processing.
-            // Noise scale 0.20 per unit load_fraction compounds with temperature scaling.
+            // Noise scale 0.12: temperature scaling already captures the main load
+            // effect; noise models residual interference without doubling the cost
+            // (Pashler 1994: dual_task_cost ~0.10 for 6-digit load).
             if load_hv.is_some() {
-                let noise_scale = load_fraction * 0.20;
+                let noise_scale = load_fraction * 0.12;
                 for act in activations.iter_mut() {
                     xor_shift(&mut rng);
                     let noise = ((rng % 1000) as f64 / 1000.0 - 0.5) * noise_scale;
