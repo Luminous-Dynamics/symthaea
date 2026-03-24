@@ -173,7 +173,11 @@ impl SemanticPrimingBenchmark {
             } else {
                 0.0
             };
-            let effective_noise = (base_noise - prime_benefit).clamp(0.15, 0.80);
+            // Floor 0.10: stronger priming produces cleaner probes (more
+            // signal, less noise). The floor prevents degenerate noiseless
+            // probes while allowing the priming benefit to fully express
+            // (Neely 1977: short-SOA priming is near-automatic).
+            let effective_noise = (base_noise - prime_benefit).clamp(0.10, 0.80);
             let probe_noise =
                 ContinuousHV::random(dim, seed.wrapping_add(pair_idx as u64 * 777 + 42));
             let probe = ContinuousHV::weighted_bundle(

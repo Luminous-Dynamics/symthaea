@@ -9,7 +9,7 @@ CogBench::ProbabilisticReasoning,beta2_likelihood_weight,0.861052,0.500000,0.150
 CogBench::HorizonTask,horizon_6::directed_exploration,0.366667,0.350000,0.120000,0.138889,0.138889,55.523105,Average
 CogBench::RestlessBandit,overall_accuracy,0.736500,0.750000,0.100000,-0.135000,-0.135000,44.630590,Average
 CogBench::InstrumentalLearning,contingency_sensitivity,0.800000,0.700000,0.150000,0.666667,0.666667,74.750753,Average
-CogBench::TwoStep,beta3_model_basedness,0.462235,0.600000,0.200000,-0.688827,-0.688827,24.546611,Average
+CogBench::TwoStep,beta3_model_basedness,0.580549,0.600000,0.200000,-0.097255,-0.097255,46.126182,Average
 CogBench::TemporalDiscounting,discounting_score_S,0.543750,0.500000,0.150000,0.291667,0.291667,61.472919,Average
 CogBench::BART,average_pumps,29.739709,30.000000,12.000000,-0.021691,-0.021691,49.134722,Average
 CogBench::ReversalLearning,win_stay_rate,0.998556,0.850000,0.080000,1.856955,1.856955,96.834125,Above average
@@ -19,7 +19,7 @@ Executive::Stroop,incongruent_accuracy,0.891250,0.880000,0.060000,0.187500,0.187
 Executive::Flanker,incongruent_accuracy,0.910000,0.900000,0.060000,0.166667,0.166667,56.618384,Average
 Executive::TowerOfLondon,overall_optimal_rate,0.791812,0.630000,0.150000,1.078743,1.078743,85.964892,Above average
 Executive::DualTask,dual_task_cost,0.090000,0.100000,0.050000,0.200000,0.200000,57.925969,Average
-Metacognition::Calibration,calibration_error_ece,0.159415,0.150000,0.050000,-0.188293,-0.188293,42.532338,Average
+Metacognition::Calibration,calibration_error_ece,0.164620,0.150000,0.050000,-0.292395,-0.292395,38.499224,Average
 Metacognition::FeelingOfKnowing,fok_gamma,0.701566,0.650000,0.100000,0.515660,0.515660,69.695407,Average
 Metacognition::ChangeBlindness,detection_with_disruption,0.680000,0.450000,0.120000,1.916667,1.916667,97.235992,Above average
 Butlin::ConsciousnessIndicators,mean_quality_score,0.867143,0.800000,0.100000,0.671429,0.671429,74.902630,Average

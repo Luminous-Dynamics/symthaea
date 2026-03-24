@@ -6,7 +6,7 @@ Butlin,0.671429,1,Average
 CausalReasoning,0.800595,3,Average
 Clinical,2.002855,6,Exceptional
 Coding,1.859877,3,Strong
-CogBench,0.564459,8,Average
+CogBench,0.638406,8,Average
 Consciousness,1.413595,3,Strong
 Creativity,0.729019,4,Average
 Executive,0.751551,7,Average
@@ -15,7 +15,7 @@ InstitutionalReasoning,2.248707,7,Exceptional
 Language,1.753382,4,Strong
 Mathematics,1.253455,11,Strong
 MemoryAgent,1.000000,5,Strong
-Metacognition,0.748011,3,Average
+Metacognition,0.713310,3,Average
 Motor,2.323371,4,Exceptional
 Reasoning,1.391064,11,Strong
 Security,2.001438,6,Exceptional

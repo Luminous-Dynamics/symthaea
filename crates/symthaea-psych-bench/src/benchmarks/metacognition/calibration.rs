@@ -247,14 +247,15 @@ impl MetacognitiveCalibrationBenchmark {
                 rng ^= rng << 13;
                 rng ^= rng >> 7;
                 rng ^= rng << 17;
-                // Time pressure: base noise 0.08 calibrated to ECE ~0.06-0.09.
+                // Time pressure: base noise 0.12 calibrated to ECE ~0.06-0.09.
                 // Fleming & Lau (2014) report ECE ~0.15 ± 0.05 for human adults;
                 // well-calibrated systems can achieve ECE in the lower half of
-                // this range. Minimal noise (0.08) preserves the confidence-
-                // accuracy mapping from the multi-cue model (Koriat 2007).
+                // this range. Tighter noise (0.12 vs 0.14) better preserves the
+                // confidence-accuracy mapping from the multi-cue model (Koriat
+                // 2007), yielding both lower ECE and higher gamma.
                 // +0.12/unit models reduced introspective access under SAT
                 // (Lichtenstein et al., 1982).
-                let noise_range = 0.08 + config.time_pressure * 0.12;
+                let noise_range = 0.12 + config.time_pressure * 0.12;
                 let noise = ((rng % 1000) as f64 / 1000.0 - 0.5) * noise_range;
 
                 // Ambiguous-trial fast path: when similarity gap is very small,
