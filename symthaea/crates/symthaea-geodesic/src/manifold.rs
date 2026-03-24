@@ -41,6 +41,13 @@ pub struct FiberPoint {
     pub fingerprint: TopologicalFingerprint,
     /// Quality score in [0.0, 1.0] (from compilation/test success rate).
     pub quality: f32,
+    /// Original source code snippet (for retrieval-based slot filling).
+    ///
+    /// When filling skeleton slots, we retrieve real code from the nearest
+    /// fiber rather than decoding HDC vectors to tokens. This sidesteps the
+    /// lossy encoding problem entirely — the HDC similarity finds the right
+    /// fiber, and the source provides the actual expressions.
+    pub source: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -155,11 +162,24 @@ impl ProgramManifold {
         fingerprint: TopologicalFingerprint,
         quality: f32,
     ) {
+        self.insert_with_source(name, encoding, fingerprint, quality, None);
+    }
+
+    /// Insert a function with its source code for retrieval-based filling.
+    pub fn insert_with_source(
+        &mut self,
+        name: &str,
+        encoding: BinaryHV,
+        fingerprint: TopologicalFingerprint,
+        quality: f32,
+        source: Option<String>,
+    ) {
         let point = FiberPoint {
             name: name.to_string(),
             encoding,
             fingerprint,
             quality: quality.clamp(0.0, 1.0),
+            source,
         };
 
         // Find the nearest fiber

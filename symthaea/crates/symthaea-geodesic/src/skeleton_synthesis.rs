@@ -598,10 +598,47 @@ fn fill_slot(slot: &mut SkeletonSlot, manifold: &ProgramManifold, filled: &mut u
 
     // Query manifold for nearest implementation matching this slot's intent
     if let Some(fiber) = manifold.nearest_fiber(&slot.intent_hv) {
-        // Use fiber centroid as the "abstract pattern" for this slot
         let similarity = slot.intent_hv.similarity(&fiber.centroid);
         if similarity > 0.1 {
-            // Decode the centroid HV back to a Rust expression via the token codebook
+            // Strategy 1 (preferred): Retrieve real source from the nearest fiber point.
+            // This sidesteps the lossy HDC encoding problem — we use similarity for
+            // FINDING, and the stored source for FILLING.
+            let best_source = fiber
+                .points
+                .iter()
+                .filter(|p| p.source.is_some())
+                .max_by(|a, b| {
+                    a.quality
+                        .partial_cmp(&b.quality)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+                .and_then(|p| p.source.as_deref());
+
+            if let Some(src) = best_source {
+                // Extract a relevant snippet (first non-empty body line)
+                let snippet: String = src
+                    .lines()
+                    .filter(|l| {
+                        let t = l.trim();
+                        !t.is_empty()
+                            && !t.starts_with("fn ")
+                            && !t.starts_with("pub fn ")
+                            && t != "{"
+                            && t != "}"
+                    })
+                    .take(3)
+                    .map(|l| l.trim())
+                    .collect::<Vec<_>>()
+                    .join("\n    ");
+
+                if !snippet.is_empty() {
+                    slot.filled = Some(snippet);
+                    *filled += 1;
+                    return;
+                }
+            }
+
+            // Strategy 2 (fallback): Decode centroid HV via token codebook.
             let expression =
                 crate::token_codebook::codebook().decode_expression(&fiber.centroid, 3);
             slot.filled = Some(format!(

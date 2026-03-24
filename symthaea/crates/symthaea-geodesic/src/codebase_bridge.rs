@@ -153,11 +153,51 @@ pub fn index_file(manifold: &mut ProgramManifold, path: &Path, source: &str) -> 
         // Insert using topology-derived encoding (same strategy as
         // bootstrap_with_topology): functions with identical Betti numbers
         // cluster into the same fiber.
-        manifold.insert(&qualified, fingerprint.hdc_encoding, fingerprint, 0.5);
+        // Store function source for retrieval-based slot filling.
+        // Extract the function body from the original source (approximate).
+        let fn_source = extract_function_source(source, &name);
+        manifold.insert_with_source(
+            &qualified,
+            fingerprint.hdc_encoding,
+            fingerprint,
+            0.5,
+            fn_source,
+        );
         count += 1;
     }
 
     count
+}
+
+/// Extract a function's source from the file source by name.
+/// Finds `fn name(` and extracts until the matching closing brace.
+fn extract_function_source(source: &str, name: &str) -> Option<String> {
+    let pattern = format!("fn {name}(");
+    let alt_pattern = format!("fn {name}<");
+    let start = source.find(&pattern).or_else(|| source.find(&alt_pattern))?;
+
+    // Walk back to find `pub` or line start
+    let line_start = source[..start].rfind('\n').map(|p| p + 1).unwrap_or(0);
+
+    // Walk forward counting braces to find the matching close
+    let mut depth = 0;
+    let mut found_open = false;
+    for (i, ch) in source[line_start..].char_indices() {
+        match ch {
+            '{' => {
+                depth += 1;
+                found_open = true;
+            }
+            '}' => {
+                depth -= 1;
+                if found_open && depth == 0 {
+                    return Some(source[line_start..line_start + i + 1].to_string());
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 // ---------------------------------------------------------------------------
