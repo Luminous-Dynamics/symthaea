@@ -761,7 +761,7 @@ fn infer_rust_body(
     if purpose_lower.contains("mode") {
         if params.len() == 1 && params[0].1.contains("Vec") {
             return format!(
-                "let mut counts = std::collections::HashMap::new();\n    for v in {0}.iter() {{\n        *counts.entry(v).or_insert(0usize) += 1;\n    }}\n    counts.into_iter().max_by_key(|&(_, c)| c).map(|(v, _)| *v).unwrap()",
+                "let mut counts = std::collections::HashMap::new();\n    for v in {0}.iter() {{\n        *counts.entry(v).or_insert(0usize) += 1;\n    }}\n    counts.into_iter().max_by_key(|&(_, c)| c).map(|(v, _)| *v).unwrap_or_default()",
                 params[0].0
             );
         }

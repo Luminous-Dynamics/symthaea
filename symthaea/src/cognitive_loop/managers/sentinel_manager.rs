@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Sentinel Manager — Distributed Immune Pattern Recognition
 //!
 //! Detects governance anomalies, network threats, and behavioral patterns
@@ -656,7 +659,9 @@ impl SentinelManager {
             self.agent_activity
                 .insert(agent_id.to_string(), AgentActivity::default());
         }
-        self.agent_activity.get_mut(agent_id).unwrap()
+        self.agent_activity
+            .get_mut(agent_id)
+            .expect("agent_activity entry was just inserted")
     }
 }
 

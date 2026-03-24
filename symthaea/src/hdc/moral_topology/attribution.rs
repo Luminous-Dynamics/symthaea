@@ -160,7 +160,7 @@ impl MoralTopology {
         contributions.sort_by(|a, b| {
             b.marginal_contribution
                 .partial_cmp(&a.marginal_contribution)
-                .unwrap()
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         CausalAttribution {

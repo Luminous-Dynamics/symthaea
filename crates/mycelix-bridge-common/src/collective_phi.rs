@@ -1,4 +1,6 @@
-//! # Collective Phi — Group Consciousness Measurement
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Collective Phi — Group Consciousness Measurement
 //!
 //! Measures whether a group of agents is *thinking together* (high integration)
 //! or just averaging independent opinions (low integration).
@@ -30,6 +32,15 @@
 //! data. No float math crosses the validation boundary.
 
 use serde::{Deserialize, Serialize};
+
+/// Clamp a consciousness dimension to [0.0, 1.0], replacing NaN/Inf with 0.0.
+fn sanitize_dim(v: f64) -> f64 {
+    if v.is_finite() {
+        v.clamp(0.0, 1.0)
+    } else {
+        0.0
+    }
+}
 
 /// Maximum agents to process synchronously. Above this, we sample.
 pub const COLLECTIVE_PHI_MAX_SYNC: usize = 100;
@@ -95,7 +106,23 @@ pub struct CollectivePhiEngine {
 
 impl CollectivePhiEngine {
     /// Create a new engine with the given agent vectors.
+    ///
+    /// All consciousness dimensions are clamped to [0.0, 1.0] and
+    /// non-finite values are replaced with 0.0 to prevent corrupt
+    /// cosine similarity results.
     pub fn new(vectors: Vec<AgentConsciousnessVector>) -> Self {
+        let vectors = vectors
+            .into_iter()
+            .map(|mut v| {
+                v.consciousness_level = sanitize_dim(v.consciousness_level);
+                v.meta_awareness = sanitize_dim(v.meta_awareness);
+                v.coherence = sanitize_dim(v.coherence);
+                v.care_activation = sanitize_dim(v.care_activation);
+                v.harmonic_alignment = sanitize_dim(v.harmonic_alignment);
+                v.epistemic_confidence = sanitize_dim(v.epistemic_confidence);
+                v
+            })
+            .collect();
         Self { vectors }
     }
 

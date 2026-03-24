@@ -481,7 +481,7 @@ impl MoralTopology {
                     sims_flat.push(recent_hvs[i].similarity(recent_hvs[j]) as f64);
                 }
             }
-            sims_flat.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            sims_flat.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
             let char_scale = if sims_flat.is_empty() {
                 0.5
             } else {

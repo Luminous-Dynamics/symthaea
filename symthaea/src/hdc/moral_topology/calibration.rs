@@ -103,13 +103,17 @@ pub fn calibrate_convergence_threshold(
         });
     }
 
-    roc_curve.sort_by(|a, b| a.threshold.partial_cmp(&b.threshold).unwrap());
+    roc_curve.sort_by(|a, b| {
+        a.threshold
+            .partial_cmp(&b.threshold)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     let mut sorted_by_fpr = roc_curve.clone();
     sorted_by_fpr.sort_by(|a, b| {
         a.false_positive_rate
             .partial_cmp(&b.false_positive_rate)
-            .unwrap()
+            .unwrap_or(std::cmp::Ordering::Equal)
     });
     let auc: f64 = if sorted_by_fpr.len() >= 2 {
         sorted_by_fpr
@@ -126,7 +130,7 @@ pub fn calibrate_convergence_threshold(
 
     let best = roc_curve
         .iter()
-        .max_by(|a, b| a.f1.partial_cmp(&b.f1).unwrap())
+        .max_by(|a, b| a.f1.partial_cmp(&b.f1).unwrap_or(std::cmp::Ordering::Equal))
         .cloned()
         .unwrap_or(RocPoint {
             threshold: 0.15,
@@ -161,7 +165,7 @@ impl MoralTopology {
             .filter(|p| p.f1 > 0.0)
             .map(|p| (p.threshold, p.true_positive_rate))
             .collect();
-        cdf_points.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        cdf_points.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
         cdf_points.dedup_by(|a, b| (a.0 - b.0).abs() < 1e-9);
         if !cdf_points.is_empty() {
             self.set_severity_calibration(cdf_points);
@@ -186,7 +190,12 @@ impl MoralTopology {
             return raw;
         }
         // Binary search for interpolation bracket
-        match cdf.binary_search_by(|probe| probe.0.partial_cmp(&raw).unwrap()) {
+        match cdf.binary_search_by(|probe| {
+            probe
+                .0
+                .partial_cmp(&raw)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        }) {
             Ok(idx) => cdf[idx].1,
             Err(0) => cdf[0].1,
             Err(idx) if idx >= cdf.len() => cdf.last().unwrap().1,

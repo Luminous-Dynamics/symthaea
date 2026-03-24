@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Adaptive Ontology — Primitive Learning System
 //!
 //! Enables the HDC primitive system to grow new concepts from experience.
@@ -127,14 +130,9 @@ impl AdaptiveOntology {
                     usage.usage_count += 1;
                     usage.last_used_cycle = current_cycle;
                 }
-                return Some((
-                    self.primitives
-                        .get(best_name.as_ref().unwrap())
-                        .unwrap()
-                        .name
-                        .as_str(),
-                    best_sim,
-                ));
+                if let Some(primitive) = self.primitives.get(name) {
+                    return Some((primitive.name.as_str(), best_sim));
+                }
             }
         }
 

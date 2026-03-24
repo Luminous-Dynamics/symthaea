@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # REPL Voice Output Module
 //!
 //! Provides consciousness-modulated speech synthesis for the symthaea-repl binary.
@@ -2402,7 +2405,9 @@ impl ReplVoiceOutput {
             let mut phrase_starts: Vec<(usize, Intonation)> = vec![(0, Intonation::Statement)];
             for aw in &analyzed_words {
                 if aw.boundary_after == PhraseBoundary::Intonational {
-                    phrase_starts.last_mut().unwrap().1 = aw.intonation;
+                    if let Some(last) = phrase_starts.last_mut() {
+                        last.1 = aw.intonation;
+                    }
                     phrase_starts.push((phrase_starts.len(), Intonation::Statement));
                 }
             }

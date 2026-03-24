@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Unified HDC-LTC Neuron Architecture
 //!
 //! A revolutionary architecture where the neuron STATE is a hypervector that evolves
@@ -830,6 +833,8 @@ impl HdcLtcUnifiedNeuron {
                 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
                 {
                     if crate::hdc::simd_detect::has_avx2() && crate::hdc::simd_detect::has_fma() {
+                        // SAFETY: AVX2+FMA availability verified by runtime feature detection above.
+                        // All slice arguments are the same length (ContinuousHV dimension).
                         unsafe {
                             fused_tanh_avx2(
                                 &mut self.state.values,
@@ -849,6 +854,8 @@ impl HdcLtcUnifiedNeuron {
                 // NEON fast path (AArch64)
                 #[cfg(all(target_arch = "aarch64", feature = "simd"))]
                 {
+                    // SAFETY: NEON availability verified by compile-time target_arch check.
+                    // All slice arguments are the same length (ContinuousHV dimension).
                     unsafe {
                         fused_tanh_neon(
                             &mut self.state.values,
@@ -900,6 +907,8 @@ impl HdcLtcUnifiedNeuron {
                 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
                 {
                     if crate::hdc::simd_detect::has_avx2() && crate::hdc::simd_detect::has_fma() {
+                        // SAFETY: AVX2+FMA availability verified by runtime feature detection.
+                        // All slice arguments are the same length (ContinuousHV dimension).
                         unsafe {
                             fused_identity_avx2(
                                 &mut self.state.values,
@@ -918,6 +927,8 @@ impl HdcLtcUnifiedNeuron {
                 // NEON fast path (AArch64)
                 #[cfg(all(target_arch = "aarch64", feature = "simd"))]
                 {
+                    // SAFETY: NEON availability verified by compile-time target_arch check.
+                    // All slice arguments are the same length (ContinuousHV dimension).
                     unsafe {
                         fused_identity_neon(
                             &mut self.state.values,
@@ -946,6 +957,8 @@ impl HdcLtcUnifiedNeuron {
                 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
                 {
                     if crate::hdc::simd_detect::has_avx2() && crate::hdc::simd_detect::has_fma() {
+                        // SAFETY: AVX2+FMA availability verified by runtime feature detection above.
+                        // All slice arguments are the same length (ContinuousHV dimension).
                         unsafe {
                             fused_tanh_avx2(
                                 &mut self.state.values,
@@ -965,6 +978,8 @@ impl HdcLtcUnifiedNeuron {
                 // NEON fast path (AArch64)
                 #[cfg(all(target_arch = "aarch64", feature = "simd"))]
                 {
+                    // SAFETY: NEON availability verified by compile-time target_arch check.
+                    // All slice arguments are the same length (ContinuousHV dimension).
                     unsafe {
                         fused_tanh_neon(
                             &mut self.state.values,
@@ -1612,6 +1627,46 @@ impl HdcLtcUnifiedNeuron {
         &self.weight_momentum
     }
 
+    /// Get mutable reference to weight momentum
+    pub fn weight_momentum_mut(&mut self) -> &mut ContinuousHV {
+        &mut self.weight_momentum
+    }
+
+    /// Get reference to input mask
+    pub fn input_mask_mut(&mut self) -> &mut ContinuousHV {
+        &mut self.input_mask
+    }
+
+    /// Get reference to input momentum
+    pub fn input_momentum_ref(&self) -> &ContinuousHV {
+        &self.input_momentum
+    }
+
+    /// Get mutable reference to input momentum
+    pub fn input_momentum_mut(&mut self) -> &mut ContinuousHV {
+        &mut self.input_momentum
+    }
+
+    /// Get reference to tau modulator
+    pub fn tau_modulator_ref(&self) -> &ContinuousHV {
+        &self.tau_modulator
+    }
+
+    /// Get mutable reference to tau modulator
+    pub fn tau_modulator_mut(&mut self) -> &mut ContinuousHV {
+        &mut self.tau_modulator
+    }
+
+    /// Get reference to gate weight
+    pub fn gate_weight_ref(&self) -> &ContinuousHV {
+        &self.gate_weight
+    }
+
+    /// Get reference to gate bias
+    pub fn gate_bias_ref(&self) -> &ContinuousHV {
+        &self.gate_bias
+    }
+
     /// Reset momentum accumulators (useful for fine-tuning)
     pub fn reset_momentum(&mut self) {
         self.weight_momentum = ContinuousHV::zero(self.config.dimension);
@@ -1934,6 +1989,16 @@ impl HdcLtcUnifiedNetwork {
     /// Get mutable layer by index
     pub fn layer_mut(&mut self, idx: usize) -> Option<&mut Vec<HdcLtcUnifiedNeuron>> {
         self.layers.get_mut(idx)
+    }
+
+    /// Get network configuration
+    pub fn config(&self) -> &UnifiedNetworkConfig {
+        &self.config
+    }
+
+    /// Get layer binding vector by index
+    pub fn layer_binding(&self, idx: usize) -> &ContinuousHV {
+        &self.layer_bindings[idx]
     }
 
     /// Get the bundled output of a specific layer.

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Mesh Receiver — Multi-peer fragment reassembly with timeout expiry.
 //!
 //! Listens on any mesh transport (LoRa, B.A.T.M.A.N., Yggdrasil) and
@@ -377,7 +380,9 @@ impl MeshReceiver {
 
         if is_complete {
             // Extract the completed assembly
-            let assembly = self.pending.remove(&key).unwrap();
+            let Some(assembly) = self.pending.remove(&key) else {
+                return None; // Assembly entry missing despite is_complete — should not happen
+            };
             let used_fec = assembly.assembler.used_fec_recovery();
 
             // When fragment_encryption is active, fragments were already
