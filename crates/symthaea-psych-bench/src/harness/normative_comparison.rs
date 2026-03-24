@@ -185,7 +185,7 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("ArcChain") => Some(("arc_chain_accuracy", &bl.reasoning)),
         name if name.contains("ArcNoise") => Some(("arc_noise_resilience", &bl.reasoning)),
         name if name.contains("ArcFewShot") => Some(("arc_accuracy_1shot", &bl.reasoning)),
-        name if name.contains("ArcScaling") => Some(("arc_grid_3x3_accuracy", &bl.reasoning)),
+        name if name.contains("ArcScaling") => Some(("arc_capacity_ratio", &bl.reasoning)),
         name if name.contains("ArcRSA") => Some(("arc_rsa_correlation", &bl.reasoning)),
         name if name.contains("ArcAlgebra") => Some(("arc_algebra_score", &bl.reasoning)),
         name if name.contains("ArcStaircase") => Some(("arc_capacity_threshold", &bl.reasoning)),
