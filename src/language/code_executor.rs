@@ -1447,8 +1447,8 @@ pub fn parse_test_failure_details(test_output: &str) -> Vec<TestFailure> {
             }
 
             if !message.is_empty() || assertion.is_some() || expected.is_some() {
-                failures.push(TestFailure {
-                    test_name,
+                let detail_entry = TestFailure {
+                    test_name: test_name.clone(),
                     assertion,
                     expected,
                     actual,
@@ -1457,7 +1457,14 @@ pub fn parse_test_failure_details(test_output: &str) -> Vec<TestFailure> {
                     } else {
                         message
                     },
-                });
+                };
+                // Replace any existing skeleton entry (from "test ... FAILED" line)
+                // with the detailed version from the stdout section
+                if let Some(pos) = failures.iter().position(|f| f.test_name == test_name) {
+                    failures[pos] = detail_entry;
+                } else {
+                    failures.push(detail_entry);
+                }
             }
 
             i = j;
