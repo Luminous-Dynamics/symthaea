@@ -1418,13 +1418,31 @@ pub fn parse_test_failure_details(test_output: &str) -> Vec<TestFailure> {
                     assertion = Some(detail.to_string());
                 }
 
-                // Extract left/right values from Rust assertion output
+                // Extract left/right values from Rust assertion output.
+                // Values may have trailing artifacts from the panic message:
+                // - `5', src/lib.rs:5:5` — strip `', <location>` suffix
+                // - `"world"'` — strip trailing single quote from `panicked at '...'` wrapper
+                let strip_trailing_artifacts = |s: &str| -> String {
+                    let mut trimmed = s.trim().to_string();
+                    // Strip `', <location>` suffix (e.g., `5', src/lib.rs:5:5`)
+                    if let Some(pos) = trimmed.rfind("', ") {
+                        let candidate = &trimmed[pos + 3..];
+                        if candidate.contains(':') || candidate.contains('/') {
+                            trimmed = trimmed[..pos].to_string();
+                        }
+                    }
+                    // Strip trailing `'` from `panicked at '...'` wrapper
+                    if trimmed.ends_with('\'') && !trimmed.starts_with('\'') {
+                        trimmed.pop();
+                    }
+                    trimmed
+                };
                 if detail.starts_with("left:") || detail.starts_with("left =") {
                     let val = detail
                         .split_once(':')
                         .map(|x| x.1)
                         .or_else(|| detail.split_once('=').map(|x| x.1))
-                        .map(|s| s.trim().to_string());
+                        .map(|s| strip_trailing_artifacts(s));
                     actual = val;
                 }
                 if detail.starts_with("right:") || detail.starts_with("right =") {
@@ -1432,7 +1450,7 @@ pub fn parse_test_failure_details(test_output: &str) -> Vec<TestFailure> {
                         .split_once(':')
                         .map(|x| x.1)
                         .or_else(|| detail.split_once('=').map(|x| x.1))
-                        .map(|s| s.trim().to_string());
+                        .map(|s| strip_trailing_artifacts(s));
                     expected = val;
                 }
 
