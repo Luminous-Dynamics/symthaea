@@ -43,6 +43,7 @@ pub mod skeleton_synthesis;
 pub mod synthesis;
 pub mod token_codebook;
 pub mod topology;
+pub mod tri_oracle;
 pub mod verification;
 
 // Re-export key types for convenience.
@@ -64,6 +65,7 @@ pub use emitter_bridge::{
 };
 pub use codebase_bridge::{index_directory, index_file, IndexResult};
 pub use verification::{verify_generated_code, VerificationResult};
+pub use tri_oracle::{TriOracle, TriOracleConfig, TriOracleScore};
 pub use program_memory::{ProgramMemory, ProgramMemoryEntry};
 pub use program_emitter::{emit_expression, emit_rust};
 pub use resonant_explorer::{ExplorationConfig, ExplorationResult, ResonantExplorer};
