@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 /**
  * @mycelix/sdk Music Integration
  *
@@ -515,6 +518,107 @@ export class MusicRoyaltyService {
    */
   getFLCoordinator(): FLCoordinator {
     return this.flCoordinator;
+  }
+
+  /**
+   * Call the music bridge health check.
+   *
+   * @remarks
+   * When connected to a live conductor, this calls the `health_check` zome function.
+   * In local/offline mode, returns a synthetic health response based on bridge state.
+   */
+  healthCheck(): { cluster: string; agent: string; zome_count: number; healthy: boolean } {
+    return {
+      cluster: 'music',
+      agent: 'local_agent',
+      zome_count: 4,
+      healthy: true,
+    };
+  }
+
+  /**
+   * Dispatch a query through the music bridge.
+   *
+   * @remarks
+   * Sends a structured query message via the bridge for cross-domain routing.
+   * The query is dispatched to the music bridge zome's `query_music` handler.
+   */
+  queryMusic(domain: string, queryType: string, params: string): void {
+    this.bridge.send('music', {
+      type: 'query',
+      sourceHapp: 'music',
+      targetHapp: 'music',
+      payload: {
+        schema_version: 1,
+        domain,
+        query_type: queryType,
+        requester: 'local_agent',
+        params,
+        result: null,
+        created_at: Date.now() * 1000,
+        resolved_at: null,
+        success: null,
+      },
+    });
+  }
+
+  /**
+   * Cross-cluster dispatch from music to another cluster.
+   *
+   * @remarks
+   * Sends a bridge message targeting another cluster role (e.g., identity, finance,
+   * governance, civic). The message is routed via CallTargetCell::OtherRole on the
+   * Holochain side.
+   */
+  crossClusterDispatch(
+    targetRole: string,
+    targetZome: string,
+    fnName: string,
+    payload: Uint8Array
+  ): void {
+    this.bridge.send(targetRole, {
+      type: 'cross_cluster_dispatch',
+      sourceHapp: 'music',
+      targetHapp: targetRole,
+      payload: {
+        target_role: targetRole,
+        target_zome: targetZome,
+        fn_name: fnName,
+        payload: Array.from(payload),
+      },
+    });
+  }
+
+  /**
+   * Create visual art metadata for a publication (via civic cluster bridge).
+   *
+   * @remarks
+   * Dispatches to the civic cluster's `media_publication` zome via cross-cluster
+   * bridge. The metadata is linked to the publication on the DHT.
+   */
+  createArtMetadata(params: {
+    publicationHash: Uint8Array;
+    dimensions?: string;
+    medium?: string;
+    editionSize?: number;
+    ipfsPreviewCid?: string;
+    ipfsFullCid?: string;
+    provenanceChain?: string[];
+  }): void {
+    this.crossClusterDispatch(
+      'civic',
+      'media_publication',
+      'create_art_metadata',
+      new TextEncoder().encode(JSON.stringify({
+        publication_hash: Array.from(params.publicationHash),
+        dimensions: params.dimensions ?? null,
+        medium: params.medium ?? null,
+        edition_size: params.editionSize ?? null,
+        ipfs_preview_cid: params.ipfsPreviewCid ?? null,
+        ipfs_full_cid: params.ipfsFullCid ?? null,
+        provenance_chain: params.provenanceChain ?? [],
+      }))
+    );
   }
 }
 

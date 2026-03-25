@@ -368,3 +368,78 @@ pub fn health_check(_: ()) -> ExternResult<BridgeHealth> {
         healthy: true,
     })
 }
+
+// ============================================================================
+// Cross-Cluster Dispatch
+// ============================================================================
+
+/// Input for cross-cluster dispatch to other hApp roles.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CrossClusterInput {
+    /// Target role name (e.g., "identity", "finance", "governance")
+    pub target_role: String,
+    /// Target zome within that role
+    pub target_zome: String,
+    /// Function name to call
+    pub fn_name: String,
+    /// Serialized payload
+    pub payload: Vec<u8>,
+}
+
+/// Dispatch a call to another cluster via CallTargetCell::OtherRole.
+///
+/// Enables Music -> Identity (DID verification), Music -> Finance (royalty
+/// settlement via SAP/TEND), Music -> Governance (artist proposals).
+///
+/// Requires Citizen+ consciousness tier.
+#[hdk_extern]
+pub fn cross_cluster_dispatch(input: CrossClusterInput) -> ExternResult<DispatchResult> {
+    mycelix_bridge_common::gate_consciousness(
+        "music_bridge",
+        &mycelix_bridge_common::requirement_for_voting(),
+        "cross_cluster_dispatch",
+    )?;
+
+    // Validate target role
+    let allowed_targets = ["identity", "finance", "governance", "civic", "commons_land", "commons_care"];
+    if !allowed_targets.contains(&input.target_role.as_str()) {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cross-cluster dispatch to '{}' not allowed from music. Allowed: {:?}",
+            input.target_role, allowed_targets
+        ))));
+    }
+
+    if input.target_zome.trim().is_empty() || input.fn_name.trim().is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Target zome and function name cannot be empty".into()
+        )));
+    }
+
+    enforce_rate_limit(&format!("xcluster:{}", input.target_role))?;
+
+    let response = call(
+        CallTargetCell::OtherRole(input.target_role.into()),
+        ZomeName::from(input.target_zome),
+        FunctionName::from(input.fn_name),
+        None,
+        ExternIO(input.payload),
+    )?;
+
+    match response {
+        ZomeCallResponse::Ok(output) => Ok(DispatchResult {
+            success: true,
+            response: Some(output.0),
+            error: None,
+        }),
+        ZomeCallResponse::NetworkError(err) => Ok(DispatchResult {
+            success: false,
+            response: None,
+            error: Some(format!("Network error: {}", err)),
+        }),
+        other => Ok(DispatchResult {
+            success: false,
+            response: None,
+            error: Some(format!("Call failed: {:?}", other)),
+        }),
+    }
+}

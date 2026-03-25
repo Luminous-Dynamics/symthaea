@@ -488,6 +488,70 @@ pub fn compute_author_stats(author_did: String, versions: &[u32]) -> AuthorStats
     }
 }
 
+// ============================================================================
+// Visual Art Metadata
+// ============================================================================
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateArtMetadataInput {
+    pub publication_hash: ActionHash,
+    pub dimensions: Option<String>,
+    pub medium: Option<String>,
+    pub edition_size: Option<u32>,
+    pub ipfs_preview_cid: Option<String>,
+    pub ipfs_full_cid: Option<String>,
+    pub provenance_chain: Vec<String>,
+}
+
+/// Attach visual art metadata to a publication (Participant+).
+#[hdk_extern]
+pub fn create_art_metadata(input: CreateArtMetadataInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "create_art_metadata")?;
+
+    let metadata = VisualArtMetadata {
+        publication_id: input.publication_hash.to_string(),
+        dimensions: input.dimensions,
+        medium: input.medium,
+        edition_size: input.edition_size,
+        ipfs_preview_cid: input.ipfs_preview_cid,
+        ipfs_full_cid: input.ipfs_full_cid,
+        provenance_chain: input.provenance_chain,
+    };
+
+    let action_hash = create_entry(&EntryTypes::VisualArtMetadata(metadata))?;
+
+    // Link publication to its art metadata
+    create_link(
+        input.publication_hash,
+        action_hash.clone(),
+        LinkTypes::PublicationToMetadata,
+        (),
+    )?;
+
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+}
+
+/// Get art metadata for a publication.
+#[hdk_extern]
+pub fn get_art_metadata(publication_hash: ActionHash) -> ExternResult<Option<VisualArtMetadata>> {
+    let links = get_links(
+        LinkQuery::new(
+            publication_hash,
+            LinkTypeFilter::single_type(0.into(), (LinkTypes::PublicationToMetadata as u8).into()),
+        ),
+        GetStrategy::default(),
+    )?;
+
+    if let Some(link) = links.last() {
+        if let Some(target) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(target, GetOptions::default())? {
+                return Ok(record.entry().to_app_option().ok().flatten());
+            }
+        }
+    }
+    Ok(None)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
