@@ -678,7 +678,7 @@ impl CognitiveLoopService {
             if let Some(ref engine) = self.support.triage_engine {
                 let result = engine.triage(input, "");
                 triage_count = 1;
-                if let Some(ref manager) = self.support.knowledge_manager {
+                if let Some(ref manager) = self.support.memory.knowledge_manager {
                     let category_str = result.suggested_category.as_str();
                     let articles = manager.search(category_str, 3);
                     if !articles.is_empty() {
@@ -719,7 +719,7 @@ impl CognitiveLoopService {
                     .unwrap_or(true);
 
                 if can_share {
-                    if let Some(ref manager) = self.support.knowledge_manager {
+                    if let Some(ref manager) = self.support.memory.knowledge_manager {
                         let pending = Vec::new();
                         let result =
                             symthaea_support::federation::check_graduations(manager, &pending);
@@ -1970,11 +1970,11 @@ mod tests {
     #[test]
     fn feedback_social_trust_modulates_lr() {
         let mut svc_hi = make_service();
-        svc_hi.social_mgr.social.social_trust = 0.9;
+        svc_hi.behavior.social_mgr.social.social_trust = 0.9;
         let hi = svc_hi.cycle("trust high");
 
         let mut svc_lo = make_service();
-        svc_lo.social_mgr.social.social_trust = 0.1;
+        svc_lo.behavior.social_mgr.social.social_trust = 0.1;
         let lo = svc_lo.cycle("trust low");
 
         // Social LR factor = 0.8 + 0.4 * trust → [0.84, 1.16]

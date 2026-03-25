@@ -31,10 +31,10 @@ fn test_compute_unified_psi_all_components_zero_gives_low_psi() {
     let mut s = make_service();
     // Zero out all contributing fields:
     // flow_state.in_flow = false (already default) → flow_psi = 0
-    s.flow_state.in_flow = false;
-    s.flow_state.intensity = 0.0;
+    s.behavior.flow_state.in_flow = false;
+    s.behavior.flow_state.intensity = 0.0;
     // relational_psi = 0 (already default)
-    s.social_mgr.social.relational_psi = 0.0;
+    s.behavior.social_mgr.social.relational_psi = 0.0;
     // body/embodied phi modulations at neutral (1.0) → contribution = (1.0 - 1.0) * weight = 0
     s.carryover.consciousness.body_phi_modulation = 1.0;
     s.carryover.consciousness.embodied_phi_modulation = 1.0;
@@ -54,9 +54,9 @@ fn test_compute_unified_psi_all_components_zero_gives_low_psi() {
 fn test_compute_unified_psi_clamped_at_one() {
     let mut s = make_service();
     // Push every component to maximum:
-    s.flow_state.in_flow = true;
-    s.flow_state.intensity = 10.0; // very high
-    s.social_mgr.social.relational_psi = 10.0; // very high
+    s.behavior.flow_state.in_flow = true;
+    s.behavior.flow_state.intensity = 10.0; // very high
+    s.behavior.social_mgr.social.relational_psi = 10.0; // very high
                                                // body/embodied modulations far above neutral to maximize their contribution
     s.carryover.consciousness.body_phi_modulation = 100.0;
     s.carryover.consciousness.embodied_phi_modulation = 100.0;
@@ -135,14 +135,14 @@ fn test_compute_unified_psi_weight_constants_are_positive() {
 fn test_compute_unified_psi_flow_contribution_only_when_in_flow() {
     let mut s = make_service();
     // Not in flow
-    s.flow_state.in_flow = false;
-    s.flow_state.intensity = 1.0;
+    s.behavior.flow_state.in_flow = false;
+    s.behavior.flow_state.intensity = 1.0;
     let psi_no_flow = s.compute_unified_psi();
 
     // Reset and enable flow
     let mut s2 = make_service();
-    s2.flow_state.in_flow = true;
-    s2.flow_state.intensity = 1.0;
+    s2.behavior.flow_state.in_flow = true;
+    s2.behavior.flow_state.intensity = 1.0;
     let psi_with_flow = s2.compute_unified_psi();
 
     // Flow should add FLOW_PSI_WEIGHT * intensity to psi

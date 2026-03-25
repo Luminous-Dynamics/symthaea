@@ -59,12 +59,12 @@ fn moral_concern_dampens_exploration() {
     for _ in 0..10 {
         svc.cycle("warmup");
     }
-    let exploration_before = svc.behavior.adaptive_behavior().exploration_factor;
+    let exploration_before = svc.behavior.adaptive_behavior.exploration_factor;
     // Run many cycles — moral system should keep exploration bounded
     for _ in 0..50 {
         svc.cycle("test moral concern exploration");
     }
-    let exploration_after = svc.behavior.adaptive_behavior().exploration_factor;
+    let exploration_after = svc.behavior.adaptive_behavior.exploration_factor;
     // Exploration should remain bounded regardless of moral activity
     assert!(
         exploration_after >= 0.0 && exploration_after <= 1.0,

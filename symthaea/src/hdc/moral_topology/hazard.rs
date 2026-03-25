@@ -38,9 +38,9 @@ pub struct EscalationPolicy {
     /// Minimum cycles before de-escalation is permitted.
     pub cooldown_cycles: u64,
     /// Current escalation level.
-    current_level: EscalationLevel,
+    pub(crate) current_level: EscalationLevel,
     /// Cycles remaining in current cooldown (0 = can change).
-    cooldown_remaining: u64,
+    pub(crate) cooldown_remaining: u64,
 }
 
 impl Default for EscalationPolicy {
@@ -278,7 +278,7 @@ pub struct HazardSignature {
 /// Registry of known hazard signature templates.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct HazardSignatureRegistry {
-    signatures: Vec<HazardSignature>,
+    pub(crate) signatures: Vec<HazardSignature>,
 }
 
 impl HazardSignatureRegistry {

@@ -29,9 +29,9 @@ fn test_prefrontal_veto_suppresses_exploration() {
         // Not exactly 0.0 because end-of-cycle homeostatic drift nudges it slightly toward 0.3,
         // and knowledge engine contradiction→exploration coupling adds a small boost (~0.02).
         assert!(
-            service.behavior.curiosity_drive().exploration_urge < 0.10,
+            service.behavior.curiosity_drive.exploration_urge < 0.10,
             "Prefrontal veto should suppress exploration_urge to near-zero, got: {}",
-            service.behavior.curiosity_drive().exploration_urge,
+            service.behavior.curiosity_drive.exploration_urge,
         );
     }
     // Even if veto didn't trigger this exact cycle, verify the mechanism exists
@@ -41,9 +41,9 @@ fn test_prefrontal_veto_suppresses_exploration() {
         "Prediction error should be finite with prefrontal veto enabled"
     );
     assert!(
-        (0.0..=1.0).contains(&service.behavior.curiosity_drive().exploration_urge),
+        (0.0..=1.0).contains(&service.behavior.curiosity_drive.exploration_urge),
         "Exploration urge should be in [0, 1]: {}",
-        service.behavior.curiosity_drive().exploration_urge
+        service.behavior.curiosity_drive.exploration_urge
     );
 }
 
@@ -98,7 +98,7 @@ fn test_attention_schema_bidirectional() {
 
     // With the new bidirectional gain (up to +30%), the attention_sensitivity
     // can be much higher than the old 10% cap allowed
-    let sensitivity = service.behavior.adaptive_behavior().attention_sensitivity;
+    let sensitivity = service.behavior.adaptive_behavior.attention_sensitivity;
     assert!(
         sensitivity > 0.0,
         "Attention sensitivity should be positive: {sensitivity}"
@@ -324,7 +324,7 @@ fn test_quantum_coherence_boosts_exploration() {
     }
 
     // Exploration urge should be within valid range
-    let urge = service.behavior.curiosity_drive().exploration_urge;
+    let urge = service.behavior.curiosity_drive.exploration_urge;
     assert!(
         (0.0..=1.0).contains(&urge),
         "Exploration urge should be in [0, 1]: got {urge}"
@@ -568,7 +568,7 @@ fn test_v063_affective_curiosity_feedback() {
 
     // Run enough cycles for affective bridge to produce positive valence
     // (low prediction error → positive valence → boredom *= 1.05)
-    let initial_boredom = service.behavior.curiosity_drive().boredom;
+    let initial_boredom = service.behavior.curiosity_drive.boredom;
     assert!(
         initial_boredom.is_finite(),
         "Initial boredom should be finite"
@@ -579,7 +579,7 @@ fn test_v063_affective_curiosity_feedback() {
     }
 
     // Boredom should have been modulated by affective feedback
-    let final_boredom = service.behavior.curiosity_drive().boredom;
+    let final_boredom = service.behavior.curiosity_drive.boredom;
     assert!(
         final_boredom.is_finite(),
         "Boredom should be finite: {final_boredom}"
