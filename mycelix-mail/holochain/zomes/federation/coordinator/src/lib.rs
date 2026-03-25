@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Federation Coordinator Zome
 //!
 //! Manages cross-cell email federation, routing, and bridge protocols.
@@ -146,6 +149,14 @@ pub fn register_network(input: RegisterNetworkInput) -> ExternResult<ActionHash>
     let dna_info = dna_info()?;
     let now = sys_time()?;
 
+    // Check for duplicate network ID
+    let existing = get_network(input.network_id.clone())?;
+    if existing.is_some() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Network with ID '{}' already exists", input.network_id)
+        )));
+    }
+
     let network = FederatedNetwork {
         network_id: input.network_id.clone(),
         dna_hash: dna_info.hash,
@@ -223,9 +234,41 @@ pub fn deactivate_network(network_id: String) -> ExternResult<()> {
 
 // ==================== ROUTING ====================
 
+/// Check if the calling agent owns a given network
+fn is_network_owner(network_id: &str) -> ExternResult<bool> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let links = get_links(
+        LinkQuery::try_new(agent.clone(), LinkTypes::AgentToOwnedNetworks)?,
+        GetStrategy::default(),
+    )?;
+    for link in links {
+        if let Some(hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(hash, GetOptions::default())? {
+                if let Some(network) = record
+                    .entry()
+                    .to_app_option::<FederatedNetwork>()
+                    .map_err(|e| wasm_error!(e))?
+                {
+                    if network.network_id == network_id {
+                        return Ok(true);
+                    }
+                }
+            }
+        }
+    }
+    Ok(false)
+}
+
 /// Create a federation route
 #[hdk_extern]
 pub fn create_route(input: CreateRouteInput) -> ExternResult<ActionHash> {
+    // Verify caller owns the source network
+    if !is_network_owner(&input.source_network)? {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the network owner can create routes for a network".to_string()
+        )));
+    }
+
     let now = sys_time()?;
 
     let route = FederationRoute {

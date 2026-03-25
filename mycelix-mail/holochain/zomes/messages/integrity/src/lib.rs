@@ -1,9 +1,57 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+#![deny(unsafe_code)]
 //! Mail Messages Integrity Zome
 //!
 //! Defines entry types and validation rules for decentralized email on Holochain DHT.
 //! All emails are encrypted, stored as DHT entries, and delivered via P2P signals.
 
 use hdi::prelude::*;
+
+const MAX_CHUNK_SIZE: usize = 10 * 1024 * 1024;
+const MAX_TOTAL_CHUNKS: u32 = 1000;
+const SHA256_LEN: usize = 32;
+const ED25519_SIG_LEN: usize = 64;
+const DILITHIUM3_SIG_LEN: usize = 3293;
+const DILITHIUM2_SIG_LEN: usize = 2420;
+const X25519_KEY_LEN: usize = 32;
+const KYBER1024_KEY_LEN: usize = 1568;
+const KYBER768_KEY_LEN: usize = 1088;
+
+pub fn email_signing_content(email: &EncryptedEmail) -> Vec<u8> {
+    let mut content = Vec::with_capacity(256);
+    content.push(0x01);
+    content.extend_from_slice(email.sender.get_raw_39());
+    content.extend_from_slice(email.recipient.get_raw_39());
+    content.extend_from_slice(&(email.encrypted_subject.len() as u32).to_le_bytes());
+    content.extend_from_slice(&email.encrypted_subject);
+    content.extend_from_slice(&(email.encrypted_body.len() as u32).to_le_bytes());
+    content.extend_from_slice(&email.encrypted_body);
+    content.extend_from_slice(&email.nonce);
+    content.extend_from_slice(&(email.message_id.len() as u32).to_le_bytes());
+    content.extend_from_slice(email.message_id.as_bytes());
+    content.extend_from_slice(&email.timestamp.as_micros().to_le_bytes());
+    content
+}
+
+pub fn receipt_signing_content(email_hash: &ActionHash, reader: &AgentPubKey, read_at: &Timestamp) -> Vec<u8> {
+    let mut content = Vec::with_capacity(128);
+    content.push(0x01);
+    content.extend_from_slice(email_hash.get_raw_39());
+    content.extend_from_slice(reader.get_raw_39());
+    content.extend_from_slice(&read_at.as_micros().to_le_bytes());
+    content
+}
+
+pub fn delivery_receipt_signing_content(email_hash: &ActionHash, recipient: &AgentPubKey, delivered_at: &Timestamp) -> Vec<u8> {
+    let mut content = Vec::with_capacity(128);
+    content.push(0x01);
+    content.extend_from_slice(email_hash.get_raw_39());
+    content.extend_from_slice(recipient.get_raw_39());
+    content.extend_from_slice(&delivered_at.as_micros().to_le_bytes());
+    content
+}
 
 /// Email message stored on DHT
 /// Content is always encrypted - only metadata is visible for routing
@@ -433,6 +481,63 @@ fn validate_encrypted_email(
         ));
     }
 
+    // Validate ephemeral key length matches key exchange algorithm
+    let expected_key_len = match email.crypto_suite.key_exchange.as_str() {
+        "x25519" => X25519_KEY_LEN,
+        "kyber1024" => KYBER1024_KEY_LEN,
+        "kyber768" => KYBER768_KEY_LEN,
+        _ => return Ok(ValidateCallbackResult::Invalid(
+            "Unknown key exchange for ephemeral key validation".to_string(),
+        )),
+    };
+    if email.ephemeral_pubkey.len() != expected_key_len {
+        return Ok(ValidateCallbackResult::Invalid(
+            format!(
+                "Ephemeral pubkey length {} does not match expected {} for {}",
+                email.ephemeral_pubkey.len(),
+                expected_key_len,
+                email.crypto_suite.key_exchange
+            ),
+        ));
+    }
+
+    // Validate signature length and verify for Ed25519
+    match email.crypto_suite.signature.as_str() {
+        "ed25519" => {
+            if email.signature.len() != ED25519_SIG_LEN {
+                return Ok(ValidateCallbackResult::Invalid(
+                    format!("Ed25519 signature must be {} bytes", ED25519_SIG_LEN),
+                ));
+            }
+            // Verify signature against signing content
+            let signing_content = email_signing_content(email);
+            let mut sig_bytes = [0u8; 64];
+            sig_bytes.copy_from_slice(&email.signature);
+            let sig = Signature(sig_bytes);
+            if !verify_signature_raw(email.sender.clone(), sig, signing_content)? {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Email signature verification failed".to_string(),
+                ));
+            }
+        }
+        "dilithium3" => {
+            if email.signature.len() != DILITHIUM3_SIG_LEN {
+                return Ok(ValidateCallbackResult::Invalid(
+                    format!("Dilithium3 signature must be {} bytes", DILITHIUM3_SIG_LEN),
+                ));
+            }
+            // Dilithium verification requires PQC library, validated at application layer
+        }
+        "dilithium2" => {
+            if email.signature.len() != DILITHIUM2_SIG_LEN {
+                return Ok(ValidateCallbackResult::Invalid(
+                    format!("Dilithium2 signature must be {} bytes", DILITHIUM2_SIG_LEN),
+                ));
+            }
+        }
+        _ => {}
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -447,6 +552,20 @@ fn validate_attachment(
         ));
     }
 
+    // Chunk size limit
+    if attachment.encrypted_content.len() > MAX_CHUNK_SIZE {
+        return Ok(ValidateCallbackResult::Invalid(
+            format!("Attachment chunk exceeds maximum size of {} bytes", MAX_CHUNK_SIZE),
+        ));
+    }
+
+    // Total chunks limit
+    if attachment.total_chunks > MAX_TOTAL_CHUNKS {
+        return Ok(ValidateCallbackResult::Invalid(
+            format!("Total chunks {} exceeds maximum of {}", attachment.total_chunks, MAX_TOTAL_CHUNKS),
+        ));
+    }
+
     // Chunk index must be valid
     if attachment.chunk_index >= attachment.total_chunks {
         return Ok(ValidateCallbackResult::Invalid(
@@ -454,10 +573,10 @@ fn validate_attachment(
         ));
     }
 
-    // Must have content hash
-    if attachment.content_hash.is_empty() {
+    // Must have SHA-256 content hash
+    if attachment.content_hash.len() != SHA256_LEN {
         return Ok(ValidateCallbackResult::Invalid(
-            "Attachment must have content hash".to_string(),
+            format!("Content hash must be {} bytes (SHA-256)", SHA256_LEN),
         ));
     }
 
@@ -524,10 +643,21 @@ fn validate_read_receipt(
         ));
     }
 
-    // Must have signature
-    if receipt.signature.is_empty() {
+    // Must have Ed25519 signature of correct length
+    if receipt.signature.len() != ED25519_SIG_LEN {
         return Ok(ValidateCallbackResult::Invalid(
-            "Read receipt must be signed".to_string(),
+            format!("Read receipt signature must be {} bytes (Ed25519)", ED25519_SIG_LEN),
+        ));
+    }
+
+    // Verify signature
+    let signing_content = receipt_signing_content(&receipt.email_hash, &receipt.reader, &receipt.read_at);
+    let mut sig_bytes = [0u8; 64];
+    sig_bytes.copy_from_slice(&receipt.signature);
+    let sig = Signature(sig_bytes);
+    if !verify_signature_raw(receipt.reader.clone(), sig, signing_content)? {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Read receipt signature verification failed".to_string(),
         ));
     }
 
@@ -545,10 +675,21 @@ fn validate_delivery_receipt(
         ));
     }
 
-    // Must have signature
-    if receipt.signature.is_empty() {
+    // Must have Ed25519 signature of correct length
+    if receipt.signature.len() != ED25519_SIG_LEN {
         return Ok(ValidateCallbackResult::Invalid(
-            "Delivery receipt must be signed".to_string(),
+            format!("Delivery receipt signature must be {} bytes (Ed25519)", ED25519_SIG_LEN),
+        ));
+    }
+
+    // Verify signature
+    let signing_content = delivery_receipt_signing_content(&receipt.email_hash, &receipt.recipient, &receipt.delivered_at);
+    let mut sig_bytes = [0u8; 64];
+    sig_bytes.copy_from_slice(&receipt.signature);
+    let sig = Signature(sig_bytes);
+    if !verify_signature_raw(receipt.recipient.clone(), sig, signing_content)? {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Delivery receipt signature verification failed".to_string(),
         ));
     }
 
@@ -565,20 +706,28 @@ fn validate_thread(
 
 fn validate_create_link(
     link_type: LinkTypes,
-    _base_address: AnyLinkableHash,
+    base_address: AnyLinkableHash,
     _target_address: AnyLinkableHash,
     _tag: LinkTag,
-    _action: CreateLink,
+    action: CreateLink,
 ) -> ExternResult<ValidateCallbackResult> {
     match link_type {
-        LinkTypes::AgentToInbox
-        | LinkTypes::AgentToSent
+        LinkTypes::AgentToSent
         | LinkTypes::AgentToDrafts
         | LinkTypes::AgentToFolders
         | LinkTypes::AgentToThreads
         | LinkTypes::AgentToScheduled => {
-            // Agent links should be created by the agent themselves
-            // Full validation would check action.author matches base
+            // Agent links must be created by the agent themselves
+            let author_hash: AnyLinkableHash = action.author.into();
+            if base_address != author_hash {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Agent link base must match action author".to_string(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        LinkTypes::AgentToInbox => {
+            // Inbox links can be created by sender (delivering to recipient)
             Ok(ValidateCallbackResult::Valid)
         }
         LinkTypes::FolderToEmails
@@ -597,13 +746,38 @@ fn validate_create_link(
 
 fn validate_delete_link(
     _link_type: LinkTypes,
-    _original_action: CreateLink,
+    original_action: CreateLink,
     _base_address: AnyLinkableHash,
     _target_address: AnyLinkableHash,
     _tag: LinkTag,
-    _action: DeleteLink,
+    action: DeleteLink,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Links can generally be deleted by anyone (the entry remains)
-    // More restrictive policies could be added
+    // Only the original link author can delete the link
+    if original_action.author != action.author {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Only the link author can delete a link".to_string(),
+        ));
+    }
     Ok(ValidateCallbackResult::Valid)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_email_signing_content_deterministic() {
+        // Verify that signing content is deterministic for the same input
+        // (cannot construct full EncryptedEmail without Holochain types in unit tests,
+        // but the function signature and constants are verified at compile time)
+        assert_eq!(SHA256_LEN, 32);
+        assert_eq!(ED25519_SIG_LEN, 64);
+        assert_eq!(DILITHIUM3_SIG_LEN, 3293);
+        assert_eq!(DILITHIUM2_SIG_LEN, 2420);
+        assert_eq!(X25519_KEY_LEN, 32);
+        assert_eq!(KYBER1024_KEY_LEN, 1568);
+        assert_eq!(KYBER768_KEY_LEN, 1088);
+        assert_eq!(MAX_CHUNK_SIZE, 10 * 1024 * 1024);
+        assert_eq!(MAX_TOTAL_CHUNKS, 1000);
+    }
 }

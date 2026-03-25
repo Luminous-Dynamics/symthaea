@@ -53,6 +53,10 @@ x25519-dalek = { version = "2", features = ["static_secrets"] }  # Key exchange
 ed25519-dalek = "2.1"  # Ed25519 signature verification
 rand = "0.8"  # Secure random
 sha2 = "0.10"  # Key derivation
+hkdf = "0.12"
+pqcrypto-kyber = "0.8"
+pqcrypto-dilithium = "0.5"
+pqcrypto-traits = "0.3"
 hex = "0.4"  # Hex encoding for DID parsing
 bs58 = "0.5"  # Base58 encoding for did:key parsing
 

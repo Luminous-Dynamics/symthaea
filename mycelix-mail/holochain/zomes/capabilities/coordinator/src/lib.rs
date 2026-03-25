@@ -1,3 +1,7 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+#![deny(unsafe_code)]
 //! Capabilities Coordinator Zome
 //!
 //! Manages fine-grained access control, shared mailboxes, and delegation.
@@ -181,9 +185,18 @@ pub fn revoke_capability(input: (ActionHash, Option<String>)) -> ExternResult<Ac
 
     let new_hash = update_entry(cap_hash.clone(), EntryTypes::MailboxCapability(capability.clone()))?;
 
-    // Delete the Holochain cap grant
-    // Note: In practice, cap grants are deleted by secret, which we'd need to store
-    // delete_cap_grant(capability.id)?;
+    // Delete the Holochain cap grant by reconstructing the CapSecret from the stored secret_hash
+    if capability.secret_hash.len() >= 64 {
+        let mut secret_arr = [0u8; 64];
+        secret_arr.copy_from_slice(&capability.secret_hash[..64]);
+        let cap_secret = CapSecret::from(secret_arr);
+        delete_cap_grant(cap_secret)?;
+    } else if !capability.secret_hash.is_empty() {
+        let mut secret_arr = [0u8; 64];
+        secret_arr[..capability.secret_hash.len()].copy_from_slice(&capability.secret_hash);
+        let cap_secret = CapSecret::from(secret_arr);
+        delete_cap_grant(cap_secret)?;
+    }
 
     // Signal to grantee
     let signal = CapabilitySignal::CapabilityRevoked {

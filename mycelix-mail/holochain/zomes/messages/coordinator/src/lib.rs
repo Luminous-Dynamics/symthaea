@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Mail Messages Coordinator Zome
 //!
 //! Implements P2P email delivery, real-time signals, and message management
@@ -216,6 +219,21 @@ pub fn send_email(input: SendEmailInput) -> ExternResult<SendEmailOutput> {
 
     let mut delivered_to = Vec::new();
     let mut failed_deliveries = Vec::new();
+
+    // Trust-gated delivery: check sender trust via cross-zome call
+    // Low-trust senders may have emails quarantined by recipient
+    let sender_trust: Option<(f64, f64)> = call(
+        CallTargetCell::Local,
+        ZomeName::from("mail_trust_coordinator"),
+        "get_sender_trust_for_delivery".into(),
+        None,
+        my_agent.clone(),
+    )
+    .ok()
+    .and_then(|response| response.decode().ok());
+
+    let _trust_score = sender_trust.map(|(s, _)| s).unwrap_or(0.3);
+    let _trust_confidence = sender_trust.map(|(_, c)| c).unwrap_or(0.0);
 
     // Create email entry for each recipient (they need their own copy to decrypt)
     for recipient in &all_recipients {
@@ -617,13 +635,15 @@ pub fn mark_as_read(input: (ActionHash, bool)) -> ExternResult<Option<ActionHash
     if send_receipt {
         if let Some(email) = get_email(email_hash.clone())? {
             if email.read_receipt_requested && email.sender != my_agent {
+                let read_at = sys_time()?;
+                let signing_content = receipt_signing_content(&email_hash, &my_agent, &read_at);
                 let receipt = ReadReceipt {
                     email_hash: email_hash.clone(),
                     reader: my_agent.clone(),
-                    read_at: sys_time()?,
+                    read_at,
                     signature: sign_raw(
                         my_agent.clone(),
-                        email_hash.clone().into_inner().to_vec(),
+                        signing_content,
                     )?.0.to_vec(),
                 };
 

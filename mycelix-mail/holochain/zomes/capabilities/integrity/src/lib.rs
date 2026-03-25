@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Capabilities Integrity Zome
 //!
 //! Fine-grained access control for Mycelix Mail using Holochain capabilities.
@@ -338,9 +341,16 @@ fn validate_update_entry(
         }
         // Shared mailboxes can be updated by owner or admin
         EntryTypes::SharedMailbox(mailbox) => {
-            // In full implementation, would check if author is owner or admin
             if mailbox.owner != action.author {
-                // Check if admin...
+                // Check if the author is an admin member
+                let is_admin = mailbox.members.iter().any(|m| {
+                    m.agent == action.author && matches!(m.role, SharedMailboxRole::Admin)
+                });
+                if !is_admin {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "Only mailbox owner or admin can update shared mailbox".to_string(),
+                    ));
+                }
             }
             Ok(ValidateCallbackResult::Valid)
         }

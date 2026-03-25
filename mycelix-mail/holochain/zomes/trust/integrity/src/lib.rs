@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Trust Integrity Zome - MATL (Mycelix Advanced Trust Logic)
 //!
 //! Implements a sophisticated web-of-trust system with:
@@ -386,11 +389,12 @@ fn validate_update_entry(
             }
             Ok(ValidateCallbackResult::Valid)
         }
-        // Disputes can be updated for resolution
+        // Disputes can be updated for resolution by disputer only
         EntryTypes::TrustDispute(dispute) => {
-            // Disputer or trusted resolver can update
             if dispute.disputer != action.author {
-                // Could add resolver whitelist check here
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the disputer can update a dispute".to_string(),
+                ));
             }
             Ok(ValidateCallbackResult::Valid)
         }
@@ -416,10 +420,10 @@ fn validate_attestation(
         ));
     }
 
-    // Trust level must be in valid range
-    if attestation.trust_level < -1.0 || attestation.trust_level > 1.0 {
+    // Trust level must be in valid range and finite
+    if !attestation.trust_level.is_finite() || attestation.trust_level < -1.0 || attestation.trust_level > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Trust level must be between -1.0 and 1.0".to_string(),
+            "Trust level must be a finite number between -1.0 and 1.0".to_string(),
         ));
     }
 
@@ -430,20 +434,20 @@ fn validate_attestation(
         ));
     }
 
-    // Validate evidence weights
+    // Validate evidence weights (must be finite)
     for evidence in &attestation.evidence {
-        if evidence.weight < 0.0 || evidence.weight > 1.0 {
+        if !evidence.weight.is_finite() || evidence.weight < 0.0 || evidence.weight > 1.0 {
             return Ok(ValidateCallbackResult::Invalid(
-                "Evidence weight must be between 0.0 and 1.0".to_string(),
+                "Evidence weight must be a finite number between 0.0 and 1.0".to_string(),
             ));
         }
     }
 
-    // If staking, validate stake
+    // If staking, validate stake (penalty_multiplier must be finite)
     if let Some(stake) = &attestation.stake {
-        if stake.penalty_multiplier < 1.0 {
+        if !stake.penalty_multiplier.is_finite() || stake.penalty_multiplier < 1.0 {
             return Ok(ValidateCallbackResult::Invalid(
-                "Penalty multiplier must be at least 1.0".to_string(),
+                "Penalty multiplier must be a finite number at least 1.0".to_string(),
             ));
         }
     }
@@ -461,17 +465,17 @@ fn validate_attestation(
 }
 
 fn validate_score(score: &TrustScore, _action: &Create) -> ExternResult<ValidateCallbackResult> {
-    // Score must be in valid range
-    if score.score < 0.0 || score.score > 1.0 {
+    // Score must be in valid range and finite
+    if !score.score.is_finite() || score.score < 0.0 || score.score > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Score must be between 0.0 and 1.0".to_string(),
+            "Score must be a finite number between 0.0 and 1.0".to_string(),
         ));
     }
 
-    // Confidence must be in valid range
-    if score.confidence < 0.0 || score.confidence > 1.0 {
+    // Confidence must be in valid range and finite
+    if !score.confidence.is_finite() || score.confidence < 0.0 || score.confidence > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Confidence must be between 0.0 and 1.0".to_string(),
+            "Confidence must be a finite number between 0.0 and 1.0".to_string(),
         ));
     }
 
@@ -520,10 +524,10 @@ fn validate_introduction(
         ));
     }
 
-    // Recommendation level must be valid
-    if intro.recommendation_level < 0.0 || intro.recommendation_level > 1.0 {
+    // Recommendation level must be valid and finite
+    if !intro.recommendation_level.is_finite() || intro.recommendation_level < 0.0 || intro.recommendation_level > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Recommendation level must be between 0.0 and 1.0".to_string(),
+            "Recommendation level must be a finite number between 0.0 and 1.0".to_string(),
         ));
     }
 

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Trust Coordinator Zome - MATL Algorithm Implementation
 //!
 //! Full implementation of Mycelix Advanced Trust Logic (MATL) for
@@ -934,6 +937,17 @@ pub fn file_dispute(input: TrustDispute) -> ExternResult<ActionHash> {
     })?;
 
     Ok(dispute_hash)
+}
+
+// ==================== TRUST-GATED DELIVERY ====================
+
+/// Get sender trust score for delivery gating.
+/// Returns (score, confidence) tuple. Used by messages coordinator
+/// to decide whether to accept or quarantine an incoming email.
+#[hdk_extern]
+pub fn get_sender_trust_for_delivery(sender: AgentPubKey) -> ExternResult<(f64, f64)> {
+    let score = get_trust_score(sender)?;
+    Ok((score.score, score.confidence))
 }
 
 // ==================== SIGNAL HANDLING ====================

@@ -1,0 +1,17 @@
+[package]
+name = "mycelix-mail-fuzz"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+mail_messages_integrity = { path = "../zomes/messages/integrity" }
+mail_trust_integrity = { path = "../zomes/trust/integrity" }
+mail_search_integrity = { path = "../zomes/search/integrity" }
+
+# Fuzz targets need their own workspace to avoid conflicts
+[workspace]

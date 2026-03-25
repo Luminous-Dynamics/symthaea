@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Federation Integrity Zome
 //!
 //! Cross-cell federation for Mycelix Mail enabling:
@@ -494,6 +497,7 @@ fn validate_create_entry(
         EntryTypes::FederationRoute(route) => validate_route(&route, &action),
         EntryTypes::FederatedEnvelope(envelope) => validate_envelope(&envelope, &action),
         EntryTypes::DomainRegistration(domain) => validate_domain(&domain, &action),
+        EntryTypes::BridgeAgent(bridge) => validate_bridge_agent(&bridge, &action),
         _ => Ok(ValidateCallbackResult::Valid),
     }
 }
@@ -509,10 +513,24 @@ fn validate_network(
         ));
     }
 
+    // Network ID length cap
+    if network.network_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Network ID cannot exceed 256 characters".to_string(),
+        ));
+    }
+
     // Domain must not be empty
     if network.domain.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Network domain cannot be empty".to_string(),
+        ));
+    }
+
+    // Domain length cap
+    if network.domain.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Network domain cannot exceed 256 characters".to_string(),
         ));
     }
 
@@ -534,6 +552,25 @@ fn validate_route(
     if route.route_id.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Route ID cannot be empty".to_string(),
+        ));
+    }
+
+    // Priority cap
+    if route.priority > 100 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Route priority cannot exceed 100".to_string(),
+        ));
+    }
+
+    // Pattern length caps
+    if route.source_pattern.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Source pattern cannot exceed 256 characters".to_string(),
+        ));
+    }
+    if route.dest_pattern.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Destination pattern cannot exceed 256 characters".to_string(),
         ));
     }
 
@@ -559,11 +596,37 @@ fn validate_envelope(
         ));
     }
 
+    // TTL cap (7 days)
+    if envelope.ttl > 604800 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "TTL cannot exceed 604800 seconds (7 days)".to_string(),
+        ));
+    }
+
+    // Max hops cap
+    if envelope.max_hops > 20 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Max hops cannot exceed 20".to_string(),
+        ));
+    }
+
     // Hop count must not exceed max
     if envelope.hop_count > envelope.max_hops {
         return Ok(ValidateCallbackResult::Invalid(
             "Envelope hop count exceeds maximum".to_string(),
         ));
+    }
+
+    // Loop detection: check for duplicate network IDs in previous hops
+    {
+        let mut seen = std::collections::HashSet::new();
+        for hop in &envelope.previous_hops {
+            if !seen.insert(hop) {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Loop detected: duplicate network in previous hops".to_string(),
+                ));
+            }
+        }
     }
 
     // Must have encrypted payload or be plaintext bridge
@@ -578,6 +641,34 @@ fn validate_envelope(
     if envelope.signature.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Envelope must be signed".to_string(),
+        ));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_bridge_agent(
+    bridge: &BridgeAgent,
+    action: &Create,
+) -> ExternResult<ValidateCallbackResult> {
+    // Agent must be the author
+    if bridge.agent != action.author {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Bridge agent must match action author".to_string(),
+        ));
+    }
+
+    // Trust score must be finite and in range
+    if !bridge.trust_score.is_finite() || bridge.trust_score < 0.0 || bridge.trust_score > 1.0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Bridge trust score must be a finite number between 0.0 and 1.0".to_string(),
+        ));
+    }
+
+    // Must connect at least one network
+    if bridge.connected_networks.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Bridge must connect at least one network".to_string(),
         ));
     }
 
