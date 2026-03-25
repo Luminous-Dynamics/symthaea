@@ -28,6 +28,8 @@ members = [
     "crates/symthaea-support",
     "crates/symthaea-psych-bench",
     "crates/symthaea-flight",
+    "crates/symthaea-helicopter",
+    "crates/symthaea-auv",
     "crates/symthaea-humanoid",
     "crates/symthaea-physics",
     "crates/symthaea-physics-bridge",
@@ -84,6 +86,10 @@ default-members = [
     ".",
     "symthaea-core",
 ]
+
+[workspace.package]
+edition = "2021"
+license = "AGPL-3.0-or-later"
 
 # Workspace-wide lint configuration. Members opt in via [lints] workspace = true.
 # These lints apply on top of any crate-level #![deny/allow/warn] attributes.
@@ -223,6 +229,9 @@ symthaea-sentinel = { path = "crates/symthaea-sentinel", optional = true }
 
 # Symthaea Flight - HDC-LTC + FEP Active Inference quadrotor flight control
 symthaea-flight = { path = "crates/symthaea-flight", optional = true }
+
+# Symthaea Helicopter - HDC-LTC + FEP Active Inference SAR helicopter control
+symthaea-helicopter = { path = "crates/symthaea-helicopter", optional = true }
 
 # Symthaea Humanoid - HDC-LTC + FEP Active Inference DMC Humanoid bipedal control
 symthaea-humanoid = { path = "crates/symthaea-humanoid", optional = true }
@@ -529,6 +538,7 @@ flight = ["dep:symthaea-flight"]            # HDC-LTC quadrotor flight control v
 flight-mujoco = ["flight", "symthaea-flight/mujoco"]   # Flight control with MuJoCo physics
 flight-mujoco-renderer = ["flight-mujoco", "symthaea-flight/mujoco-renderer"]  # Offscreen MuJoCo rendering for video capture
 flight-swarm = ["flight", "symthaea-flight/swarm"]     # Parallel swarm training via MuJoCo + rayon
+helicopter = ["dep:symthaea-helicopter"]    # HDC-LTC SAR helicopter control via FEP Active Inference
 humanoid = ["dep:symthaea-humanoid"]       # HDC-LTC bipedal humanoid control via FEP Active Inference (DMC benchmark)
 hal = ["dep:symthaea-hal", "humanoid"]    # Hardware abstraction layer (PCA9685 servos, I2C sensors, safety interlocks)
 ssm-power = ["dep:symthaea-ssm", "mesh", "school_learning"]  # Diagonal SSM sensor integration (power stream)
