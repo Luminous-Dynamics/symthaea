@@ -7,6 +7,7 @@
 //! If yes: genuine generation. If no: sophisticated retrieval.
 
 use symthaea_core::hdc::program_algebra::ProgramNode;
+use symthaea_geodesic::composer::compose_from_patterns;
 use symthaea_geodesic::noise::perturb;
 use symthaea_geodesic::program_emitter::emit_expression;
 use symthaea_geodesic::program_memory::ProgramMemory;
@@ -22,6 +23,15 @@ fn search(target: &ProgramNode, memory: &ProgramMemory, max_steps: usize) -> (Pr
     let mut best_score = oracle.score(&best, target).composite;
     let mut sigma = 0.12_f32;
 
+    // Try compositional recombination first — it may beat any single pattern
+    if let Some((composed, comp_score)) = compose_from_patterns(target, memory, 5) {
+        if comp_score > best_score {
+            best = composed;
+            best_score = comp_score;
+        }
+    }
+
+    // Then run resonant search to refine further
     for step in 0..max_steps {
         let perturbed = perturb(&best.encode(), sigma, step as u64 + 7);
         let candidate = memory.nearest(&perturbed).map(|e| e.node.clone()).unwrap_or(best.clone());
