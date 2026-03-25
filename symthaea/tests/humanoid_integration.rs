@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Integration tests for the `symthaea-humanoid` crate.
 //!
 //! Covers: encoder, controller, simulator, gait analyzer, reward functions,
@@ -1222,7 +1225,7 @@ fn test_motor_bridge_step_returns_perception() {
     let mut bridge = MotorBridge::new(&genesis);
 
     let thought = ContinuousHV::random(HDC_DIMENSION, 42);
-    let (cmd, perception) = bridge.step(&thought);
+    let (cmd, perception) = bridge.step_direct(&thought);
 
     // Motor command should be valid
     for &t in &cmd.torques {
@@ -1250,12 +1253,12 @@ fn test_motor_bridge_perception_evolves() {
     let thought = ContinuousHV::random(HDC_DIMENSION, 99);
 
     // Initial perception
-    let (_, p1) = bridge.step(&thought);
+    let (_, p1) = bridge.step_direct(&thought);
 
     // Step multiple times to let state evolve
     let mut p_last = p1.clone();
     for _ in 0..20 {
-        let (_, p) = bridge.step(&thought);
+        let (_, p) = bridge.step_direct(&thought);
         p_last = p;
     }
 
@@ -1275,7 +1278,7 @@ fn test_motor_bridge_reset() {
     let mut bridge = MotorBridge::new(&genesis);
 
     let thought = ContinuousHV::random(HDC_DIMENSION, 7);
-    bridge.step(&thought);
+    bridge.step_direct(&thought);
     assert!(bridge.last_perception().is_some());
     assert_eq!(bridge.total_steps(), 1);
 
@@ -1420,7 +1423,7 @@ fn test_motor_bridge_from_controller() {
     let mut bridge = MotorBridge::from_controller(controller, config);
     let thought = ContinuousHV::random(HDC_DIMENSION, 123);
 
-    let (cmd, perception) = bridge.step(&thought);
+    let (cmd, perception) = bridge.step_direct(&thought);
     assert!(cmd.torques.iter().all(|t| t.is_finite()));
     assert_eq!(perception.dim(), HDC_DIMENSION);
 }
