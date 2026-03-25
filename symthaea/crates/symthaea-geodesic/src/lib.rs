@@ -29,6 +29,7 @@
 
 pub mod ast_bridge;
 pub mod codebase_bridge;
+pub mod composer;
 pub mod emitter_bridge;
 pub mod execution_oracle;
 pub mod manifold;
