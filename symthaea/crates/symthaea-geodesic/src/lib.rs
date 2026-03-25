@@ -33,7 +33,11 @@ pub mod emitter_bridge;
 pub mod execution_oracle;
 pub mod manifold;
 pub mod manifold_bootstrap;
+pub mod noise;
 pub mod pdg;
+pub mod program_emitter;
+pub mod program_memory;
+pub mod resonant_explorer;
 pub mod sheaf;
 pub mod skeleton_synthesis;
 pub mod synthesis;
@@ -60,3 +64,6 @@ pub use emitter_bridge::{
 };
 pub use codebase_bridge::{index_directory, index_file, IndexResult};
 pub use verification::{verify_generated_code, VerificationResult};
+pub use program_memory::{ProgramMemory, ProgramMemoryEntry};
+pub use program_emitter::{emit_expression, emit_rust};
+pub use resonant_explorer::{ExplorationConfig, ExplorationResult, ResonantExplorer};
