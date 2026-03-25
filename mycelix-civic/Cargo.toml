@@ -25,6 +25,8 @@ members = [
     "zomes/emergency-resources/coordinator",
     "zomes/emergency-coordination/integrity",
     "zomes/emergency-coordination/coordinator",
+    "zomes/robotics-dispatch/integrity",
+    "zomes/robotics-dispatch/coordinator",
     "zomes/emergency-shelters/integrity",
     "zomes/emergency-shelters/coordinator",
     "zomes/emergency-comms/integrity",
