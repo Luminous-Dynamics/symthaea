@@ -17,7 +17,7 @@ fn require_consciousness(
     requirement: &GovernanceRequirement,
     action_name: &str,
 ) -> ExternResult<()> {
-    gate_consciousness("music_bridge", requirement, action_name)
+    gate_consciousness("music_bridge", requirement, action_name).map(|_| ())
 }
 
 /// Helper to ensure a path exists and return its entry hash
