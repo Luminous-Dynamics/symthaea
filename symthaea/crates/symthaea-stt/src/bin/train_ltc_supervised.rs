@@ -1,35 +1,38 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Supervised LTC Training — BPTT with Contrastive Phoneme Loss
+//! Supervised LTC Training — HdcLtcUnifiedNeuron Architecture
 //!
-//! Trains the LTC cell weights to produce phoneme-discriminative hidden states,
-//! fixing the core STT bottleneck (BLAKE3 random projection loses phoneme structure).
+//! Trains a 16,384D unified HDC-LTC neuron for phoneme recognition using
+//! the same architecture as Broca's language generation pipeline.
+//!
+//! Key difference from basic LTC: the neuron STATE is a 16,384D hypervector
+//! that evolves through HDC bind/bundle operations with SIMD acceleration.
 //!
 //! Usage:
 //!   cargo run --release -p symthaea-stt --bin train-ltc-supervised -- \
 //!     --alignments data/alignments/data/dev_clean-00000-of-00001.parquet \
 //!     --audio-dir data/librispeech/LibriSpeech/dev-clean \
-//!     --output data/models/v2/ltc_supervised.bin \
-//!     --epochs 10 --lr 0.001 --hidden-size 128
+//!     --output data/models/v2/unified_ltc.bin \
+//!     --epochs 10 --lr 0.01
 
 use clap::Parser;
 use console::style;
 use indicatif::{ProgressBar, ProgressStyle};
-use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
 
+use symthaea_core::genesis::GenesisSeed;
 use symthaea_stt::{
-    id_to_audio_path, load_alignments, AudioConfig, AudioFrontend, LtcConfig,
-    ltc::LtcCell,
-    ltc_training::{PhonemeCentroids, LtcTrainingConfig, train_utterance},
+    id_to_audio_path, load_alignments, AudioConfig, AudioFrontend,
+    audio_hdc_encoder::AudioHdcEncoder,
+    phoneme_hdc_ltc::PhonemeHdcLtc,
 };
 
 #[derive(Parser)]
 #[command(
     name = "train-ltc-supervised",
-    about = "Train LTC weights via BPTT with contrastive phoneme loss",
+    about = "Train unified HDC-LTC neuron for phoneme recognition (16,384D)",
     version,
     author
 )]
@@ -43,7 +46,7 @@ struct Cli {
     audio_dir: PathBuf,
 
     /// Output model file
-    #[arg(short, long, default_value = "data/models/v2/ltc_supervised.bin")]
+    #[arg(short, long, default_value = "data/models/v2/unified_ltc.bin")]
     output: PathBuf,
 
     /// Number of training epochs
@@ -51,24 +54,12 @@ struct Cli {
     epochs: usize,
 
     /// Learning rate
-    #[arg(long, default_value = "0.001")]
+    #[arg(long, default_value = "0.01")]
     lr: f32,
 
-    /// LTC hidden size
-    #[arg(long, default_value = "128")]
-    hidden_size: usize,
-
-    /// BPTT truncation length (frames)
-    #[arg(long, default_value = "50")]
-    bptt_length: usize,
-
-    /// Contrastive loss temperature
-    #[arg(long, default_value = "0.1")]
-    temperature: f32,
-
-    /// Gradient clipping norm
-    #[arg(long, default_value = "5.0")]
-    grad_clip: f32,
+    /// Base time constant (seconds). 20ms matches phoneme duration.
+    #[arg(long, default_value = "0.020")]
+    tau_base: f32,
 
     /// Maximum utterances (0 = all)
     #[arg(long, default_value = "0")]
@@ -78,25 +69,20 @@ struct Cli {
     #[arg(long, default_value = "0.010")]
     frame_hop: f32,
 
-    /// Verbose output
-    #[arg(short, long)]
-    verbose: bool,
+    /// Genesis seed phrase
+    #[arg(long, default_value = "unified-stt-v1")]
+    genesis: String,
 }
 
 fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info".parse().unwrap()),
-        )
-        .init();
-
     let cli = Cli::parse();
 
-    println!("{}", style("╔══════════════════════════════════════════════════╗").cyan());
-    println!("{}", style("║   SUPERVISED LTC TRAINING — BPTT + CONTRASTIVE  ║").cyan());
-    println!("{}", style("╚══════════════════════════════════════════════════╝").cyan());
+    println!("{}", style("╔══════════════════════════════════════════════════════════╗").cyan());
+    println!("{}", style("║   UNIFIED HDC-LTC TRAINING — 16,384D Phoneme Neuron     ║").cyan());
+    println!("{}", style("╚══════════════════════════════════════════════════════════╝").cyan());
     println!();
+
+    let genesis = GenesisSeed::from_phrase(&cli.genesis);
 
     // Load alignments
     println!("  Loading alignments from {:?}...", cli.alignments);
@@ -119,31 +105,14 @@ fn main() {
     let phoneme_labels: Vec<String> = phoneme_set.into_iter().collect();
     println!("    {} unique phonemes", phoneme_labels.len());
 
-    // Create LTC cell
-    let ltc_config = LtcConfig {
-        hidden_size: cli.hidden_size,
-        tau_init: 0.020,
-        adaptive_tau: false, // We'll train tau via BPTT instead
-        ..LtcConfig::default()
-    };
-    let mel_dim = 40; // Standard mel channels
-    let mut ltc = LtcCell::new_reservoir(mel_dim, ltc_config, 0.9, 1.0);
+    // Create audio HDC encoder (mel → 16,384D)
+    let mel_dim = 40;
+    let encoder = AudioHdcEncoder::new(mel_dim, &genesis);
 
-    // Create phoneme centroids
-    let centroids = PhonemeCentroids::new(&phoneme_labels, cli.hidden_size, cli.temperature);
+    // Create unified phoneme HDC-LTC neuron (16,384D state)
+    let mut phoneme_ltc = PhonemeHdcLtc::new(&genesis, &phoneme_labels, cli.tau_base);
 
-    // Training config
-    let train_config = LtcTrainingConfig {
-        learning_rate: cli.lr,
-        grad_clip: cli.grad_clip,
-        bptt_length: cli.bptt_length,
-        temperature: cli.temperature,
-        epochs: cli.epochs,
-        report_interval: 100,
-        frame_hop: cli.frame_hop,
-    };
-
-    // Audio frontend
+    // Audio frontend for mel extraction
     let mut frontend = AudioFrontend::new(AudioConfig::default());
 
     // Prepare utterance IDs
@@ -154,13 +123,12 @@ fn main() {
     }
 
     println!();
-    println!("  Training config:");
-    println!("    Hidden size:  {}", cli.hidden_size);
-    println!("    Epochs:       {}", cli.epochs);
-    println!("    LR:           {}", cli.lr);
-    println!("    BPTT length:  {}", cli.bptt_length);
-    println!("    Temperature:  {}", cli.temperature);
-    println!("    Utterances:   {}", utterance_ids.len());
+    println!("  Architecture: HdcLtcUnifiedNeuron (16,384D state)");
+    println!("  Phonemes:     {}", phoneme_labels.len());
+    println!("  Epochs:       {}", cli.epochs);
+    println!("  LR:           {}", cli.lr);
+    println!("  Tau base:     {}ms", cli.tau_base * 1000.0);
+    println!("  Utterances:   {}", utterance_ids.len());
     println!();
 
     // Training loop
@@ -174,22 +142,30 @@ fn main() {
         let mut processed = 0usize;
 
         let pb = ProgressBar::new(utterance_ids.len() as u64);
-        pb.set_style(ProgressStyle::default_bar()
-            .template("  [epoch {msg}] {bar:40.cyan/blue} {pos}/{len} ({eta})")
-            .unwrap());
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("  [epoch {msg}] {bar:40.cyan/blue} {pos}/{len} ({eta})")
+                .unwrap(),
+        );
         pb.set_message(format!("{}/{}", epoch + 1, cli.epochs));
 
         for utt_id in &utterance_ids {
             let alignment = &alignments[utt_id];
 
-            // Load audio
+            // Load audio (FLAC or WAV)
             let audio_path = match id_to_audio_path(utt_id, &cli.audio_dir) {
                 Some(p) => p,
-                None => { pb.inc(1); continue; }
+                None => {
+                    pb.inc(1);
+                    continue;
+                }
             };
-            let (audio, _sample_rate) = match AudioFrontend::load_wav(&audio_path) {
+            let (audio, _sample_rate) = match AudioFrontend::load_audio(&audio_path) {
                 Ok(a) => a,
-                Err(_) => { pb.inc(1); continue; }
+                Err(_) => {
+                    pb.inc(1);
+                    continue;
+                }
             };
 
             // Extract mel frames
@@ -210,20 +186,34 @@ fn main() {
                 }
             }
 
-            // Train on this utterance
-            let (loss, correct, total) = train_utterance(
-                &mut ltc,
-                &centroids,
-                &mel_frames,
-                &frame_labels,
-                &train_config,
-            );
+            // Reset neuron state for each utterance
+            phoneme_ltc.reset();
 
-            epoch_loss += loss;
-            epoch_correct += correct;
-            epoch_total += total;
+            // Train on each frame
+            let mut utt_sim = 0.0f32;
+            for (frame_idx, mel) in mel_frames.iter().take(n_frames).enumerate() {
+                // Encode mel → 16,384D HV
+                let input_hv = encoder.encode_frame(mel);
+
+                // Train step: evolve + contrastive update
+                let sim = phoneme_ltc.train_step(
+                    &input_hv,
+                    &frame_labels[frame_idx],
+                    cli.frame_hop,
+                    cli.lr,
+                );
+                utt_sim += sim;
+
+                // Check accuracy
+                let (pred, _) = phoneme_ltc.decode();
+                if pred == frame_labels[frame_idx] {
+                    epoch_correct += 1;
+                }
+                epoch_total += 1;
+            }
+
+            epoch_loss += utt_sim / n_frames.max(1) as f32;
             processed += 1;
-
             pb.inc(1);
         }
 
@@ -241,7 +231,7 @@ fn main() {
         };
 
         println!(
-            "  [epoch {}/{}] loss={:.4}  accuracy={:.1}% ({}/{})  elapsed={:.0}s",
+            "  [epoch {}/{}] loss={:.6}  accuracy={:.1}% ({}/{})  elapsed={:.0}s",
             epoch + 1,
             cli.epochs,
             avg_loss,
@@ -253,14 +243,13 @@ fn main() {
 
         if accuracy > best_accuracy {
             best_accuracy = accuracy;
-            // Save best model
-            // For now, save the LTC state + centroids
-            let model = TrainedLtcModel {
-                ltc_state: bincode::serialize(&ltc).unwrap_or_default(),
-                centroid_labels: phoneme_labels.clone(),
-                hidden_size: cli.hidden_size,
+            // Save model
+            let model = UnifiedLtcModel {
+                neuron_state: bincode::serialize(phoneme_ltc.neuron()).unwrap_or_default(),
+                phoneme_labels: phoneme_labels.clone(),
                 best_accuracy,
                 epoch: epoch + 1,
+                genesis_phrase: cli.genesis.clone(),
             };
             if let Ok(data) = bincode::serialize(&model) {
                 if let Err(e) = std::fs::write(&cli.output, &data) {
@@ -273,19 +262,28 @@ fn main() {
     }
 
     println!();
-    println!("{}", style("═══════════════════════════════════════════════════").green());
-    println!("{}", style("           SUPERVISED LTC TRAINING COMPLETE        ").green());
-    println!("{}", style("═══════════════════════════════════════════════════").green());
+    println!(
+        "{}",
+        style("═══════════════════════════════════════════════════════════").green()
+    );
+    println!(
+        "{}",
+        style("          UNIFIED HDC-LTC TRAINING COMPLETE                ").green()
+    );
+    println!(
+        "{}",
+        style("═══════════════════════════════════════════════════════════").green()
+    );
     println!("  Best accuracy: {:.1}%", best_accuracy * 100.0);
     println!("  Model saved:   {:?}", cli.output);
     println!("  Total time:    {:.0}s", start.elapsed().as_secs_f32());
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
-struct TrainedLtcModel {
-    ltc_state: Vec<u8>,
-    centroid_labels: Vec<String>,
-    hidden_size: usize,
+struct UnifiedLtcModel {
+    neuron_state: Vec<u8>,
+    phoneme_labels: Vec<String>,
     best_accuracy: f32,
     epoch: usize,
+    genesis_phrase: String,
 }

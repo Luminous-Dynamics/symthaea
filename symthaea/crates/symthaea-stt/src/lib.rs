@@ -83,6 +83,10 @@ pub mod ltc;
 pub mod ltc_gpu;
 pub mod ltc_training;
 pub mod models;
+
+// Unified HDC-LTC architecture (reuses symthaea-core)
+pub mod audio_hdc_encoder;
+pub mod phoneme_hdc_ltc;
 pub mod multiscale_scorer;
 pub mod phoneme;
 pub mod rls;
