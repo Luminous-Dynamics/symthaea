@@ -156,6 +156,8 @@ pub mod feedback_state;
 pub(crate) mod fep_module;
 pub(crate) mod gwt_manager;
 mod helpers;
+#[cfg(feature = "mycelix")]
+pub(crate) mod broca_factcheck;
 pub(crate) mod language_comm_manager;
 pub(crate) mod managers;
 pub(crate) mod memory_consolidation_manager;
@@ -193,8 +195,14 @@ pub(crate) mod physics_integration;
 #[cfg(feature = "physics-bridge")]
 pub use physics_integration::ParetoContext;
 
+pub(crate) mod thermodynamic_state;
+pub(crate) mod thermodynamic_physics_bridge;
+pub(crate) mod thermodynamic_integration;
+
 #[cfg(feature = "mycelix")]
 pub use managers::governance_manager::{GovernanceEvent, GovernanceEventKind, GovernanceOutcome};
+#[cfg(feature = "mycelix")]
+pub use broca_factcheck::{BrocaFactcheckBridge, BrocaModulation, FactCheckResult, FactCheckVerdict, FactcheckChannels, FactcheckTelemetry};
 
 pub use ethics_engine::EthicalVerdict;
 pub use managers::network_service_bridge::{
@@ -678,6 +686,12 @@ pub struct CognitiveLoopService {
     #[cfg(feature = "mycelix")]
     governance_mgr: managers::GovernanceManager,
 
+    /// Broca Factcheck Bridge: Verifies Broca language output against the Mycelix
+    /// knowledge graph. Extracts claims, submits for verification, modulates
+    /// confidence/cadence based on verdicts. Feature-gated behind `mycelix`.
+    #[cfg(feature = "mycelix")]
+    factcheck_bridge: broca_factcheck::BrocaFactcheckBridge,
+
     /// Swarm Manager: Peer consciousness signals → social buffering, affective contagion,
     /// collective Φ modulation. Implements CognitiveSubsystem at interval 41.
     swarm_manager: managers::SwarmManager,
@@ -852,6 +866,20 @@ pub struct CognitiveLoopService {
 
     /// Aggregate security telemetry for the crypto/swarm stack.
     pub(crate) security_telemetry: crate::swarm::SecurityTelemetry,
+
+    /// Embodiment bridge: physical motor control with proprioceptive feedback.
+    /// When `Some`, each cycle steps the bridge, blending proprioceptive HV
+    /// into the next cycle's perception at `embodiment_blend_weight`.
+    #[cfg(feature = "humanoid")]
+    pub(crate) embodiment_bridge: Option<Box<dyn motor_bridge::EmbodimentBridge>>,
+
+    /// Last proprioceptive HV from the embodiment bridge.
+    #[cfg(feature = "humanoid")]
+    pub(crate) last_proprioceptive_hv: Option<symthaea_core::hdc::ContinuousHV>,
+
+    /// Embodiment telemetry from the most recent step.
+    #[cfg(feature = "humanoid")]
+    pub(crate) embodiment_telemetry: motor_bridge::EmbodimentTelemetry,
 }
 
 // MetricsProvider impl is in metrics_provider.rs

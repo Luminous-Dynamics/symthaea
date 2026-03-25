@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Configuration types for the cognitive loop.
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Configuration types for the cognitive loop.
 //!
 //! Temporal backend selection (CfC vs HdcLtcUnified), training methods,
 //! and the main `CognitiveLoopConfig` builder.
@@ -748,6 +749,33 @@ pub struct CognitiveLoopConfig {
     /// Aggregation interval in cycles.
     #[cfg(feature = "fhe-wisdom")]
     pub fhe_aggregation_interval: usize,
+
+    // ── Embodiment Bridge ────────────────────────────────────────────────
+    /// Which embodiment platform to use for proprioceptive loop closure.
+    /// Default: `None` (disembodied cognitive loop).
+    #[cfg(feature = "humanoid")]
+    #[serde(default)]
+    pub embodiment_platform: super::motor_bridge::EmbodimentPlatform,
+
+    /// Blend weight for proprioceptive HV injection (0.0–1.0). Default: 0.2.
+    #[cfg(feature = "humanoid")]
+    #[serde(default = "default_embodiment_blend")]
+    pub embodiment_blend_weight: f32,
+
+    /// Embodiment step interval in cognitive cycles. Default: 1.
+    #[cfg(feature = "humanoid")]
+    #[serde(default = "default_embodiment_interval")]
+    pub embodiment_step_interval: usize,
+}
+
+#[cfg(feature = "humanoid")]
+fn default_embodiment_blend() -> f32 {
+    0.2
+}
+
+#[cfg(feature = "humanoid")]
+fn default_embodiment_interval() -> usize {
+    1
 }
 
 impl Default for CognitiveLoopConfig {
@@ -898,6 +926,12 @@ impl Default for CognitiveLoopConfig {
             fhe_threshold_k: 3,
             #[cfg(feature = "fhe-wisdom")]
             fhe_aggregation_interval: 100,
+            #[cfg(feature = "humanoid")]
+            embodiment_platform: super::motor_bridge::EmbodimentPlatform::None,
+            #[cfg(feature = "humanoid")]
+            embodiment_blend_weight: 0.2,
+            #[cfg(feature = "humanoid")]
+            embodiment_step_interval: 1,
         }
     }
 }

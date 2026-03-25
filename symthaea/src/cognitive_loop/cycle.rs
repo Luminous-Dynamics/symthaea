@@ -212,6 +212,38 @@ impl CognitiveLoopService {
         }
 
         // ═══════════════════════════════════════════════════════════════════
+        // PHASE 2.5: EMBODIMENT
+        // Motor output → physics sim → proprioceptive HV → next cycle blend
+        // Science: Lakoff & Johnson (1999) embodied cognition, Varela (1991) enactivism
+        // ═══════════════════════════════════════════════════════════════════
+        #[cfg(feature = "humanoid")]
+        {
+            let cycle_num = self.stats.total_cycles as usize;
+            let interval = self.config.embodiment_step_interval.max(1);
+            if self.embodiment_bridge.is_some() && cycle_num % interval == 0 {
+                let phi = self.carryover.history.consciousness_level;
+                let dt = self.config.cfc_config.delta_t;
+                let mut bridge = self.embodiment_bridge.take().unwrap();
+                let thought_hv = perception.encoding.encoding_result.hdv.clone();
+                let result = bridge.step(&thought_hv, dt, phi);
+                if result.success {
+                    let proprioceptive_hv = bridge.encode_perception();
+                    let w = self.config.embodiment_blend_weight;
+                    if w > 0.0 {
+                        perception
+                            .encoding
+                            .encoding_result
+                            .hdv
+                            .lerp_in_place(&proprioceptive_hv, 1.0 - w, w);
+                    }
+                    self.last_proprioceptive_hv = Some(proprioceptive_hv);
+                }
+                self.embodiment_telemetry = bridge.telemetry();
+                self.embodiment_bridge = Some(bridge);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
         // PHASE 3: FEEDBACK
         // Consciousness metrics, quality gating, homeostasis, dream engine
         // ═══════════════════════════════════════════════════════════════════

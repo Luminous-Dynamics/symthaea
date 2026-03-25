@@ -479,6 +479,33 @@ impl CognitiveLoopService {
         self.motor_rendering.output_bridge.is_some()
     }
 
+    /// Whether a physical embodiment bridge is active.
+    #[cfg(feature = "humanoid")]
+    pub fn has_embodiment(&self) -> bool {
+        self.embodiment_bridge.is_some()
+    }
+
+    /// Get the current embodiment platform.
+    #[cfg(feature = "humanoid")]
+    pub fn embodiment_platform(&self) -> super::super::motor_bridge::EmbodimentPlatform {
+        self.embodiment_bridge
+            .as_ref()
+            .map(|b| b.platform())
+            .unwrap_or(super::super::motor_bridge::EmbodimentPlatform::None)
+    }
+
+    /// Get the latest embodiment telemetry.
+    #[cfg(feature = "humanoid")]
+    pub fn embodiment_telemetry(&self) -> &super::super::motor_bridge::EmbodimentTelemetry {
+        &self.embodiment_telemetry
+    }
+
+    /// Get the last proprioceptive HV.
+    #[cfg(feature = "humanoid")]
+    pub fn last_proprioceptive_hv(&self) -> Option<&symthaea_core::hdc::ContinuousHV> {
+        self.last_proprioceptive_hv.as_ref()
+    }
+
     /// Get the math service for dispatching mathematical queries.
     #[cfg(feature = "mathematics")]
     pub fn math_service(&self) -> &super::super::math_service::MathService {

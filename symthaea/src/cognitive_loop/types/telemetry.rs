@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Telemetry types — CycleMetadata and sub-structs.
 //!
 //! # Field Naming Convention
@@ -1142,6 +1145,12 @@ pub struct CycleMetadata {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub broca: Option<BrocaGenerationTelemetry>,
 
+    // ── Broca Factcheck Telemetry (Mycelix knowledge graph verification) ─
+    /// Factcheck bridge telemetry: accuracy EMA, claims verified/suppressed.
+    /// None when `mycelix` feature disabled.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub factcheck: Option<FactcheckTelemetry>,
+
     // ── Adaptive Dynamics Telemetry (Sessions 2-4) ───────────────────────
     /// Epistemic uncertainty: prediction disagreement across horizons (0.0–1.0).
     /// High = model uncertain (reducible by exploration).
@@ -1460,6 +1469,23 @@ pub struct CycleMetadata {
     /// Whether desynchronization alert was triggered.
     #[serde(default)]
     pub cpg_desync_alert: bool,
+
+    // ── Embodiment Bridge Telemetry ──────────────────────────────────────
+    /// Total embodiment steps executed.
+    #[serde(default)]
+    pub embodiment_total_steps: u64,
+    /// Control effort from the most recent embodiment step.
+    #[serde(default)]
+    pub embodiment_control_effort: f32,
+    /// Prediction error from the most recent embodiment step.
+    #[serde(default)]
+    pub embodiment_prediction_error: f32,
+    /// Active embodiment platform name (empty if disembodied).
+    #[serde(default)]
+    pub embodiment_platform: String,
+    /// Number of actuators in the active embodiment platform.
+    #[serde(default)]
+    pub embodiment_num_actuators: u32,
 
     // ── Radio/Spectrum Manager Telemetry ───────────────────────────────────
     /// Network health: 0=AllUp, 1=LocalDown, 2=MetroOnly, 3=Blackout.
@@ -2060,6 +2086,30 @@ pub struct BrocaGenerationTelemetry {
     /// Science: Grice (1975) — cooperative principle; semantic coverage = communicative success.
     #[serde(default)]
     pub nsm_prime_coverage: f32,
+}
+
+/// Broca→Mycelix factcheck bridge telemetry snapshot.
+///
+/// Tracks verification accuracy, claims submitted/verified/suppressed,
+/// and current modulation state. Populated when `mycelix` feature enabled.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct FactcheckTelemetry {
+    /// Running accuracy EMA of Broca's verifiable claims (0.0–1.0).
+    pub accuracy_ema: f32,
+    /// Total claims submitted for verification (lifetime).
+    pub total_claims_submitted: u64,
+    /// Total claims verified as True (lifetime).
+    pub total_claims_verified: u64,
+    /// Total claims suppressed due to False verdict (lifetime).
+    pub total_claims_suppressed: u64,
+    /// Claims checked this cycle.
+    pub claims_this_cycle: u32,
+    /// Whether output was suppressed this cycle.
+    pub suppressed_this_cycle: bool,
+    /// Current cadence penalty being applied.
+    pub cadence_penalty: f32,
+    /// Pending claims awaiting verification.
+    pub pending_count: usize,
 }
 
 /// Memory-resonator subsystem telemetry: dreams, codebook, replay.

@@ -621,7 +621,8 @@ impl CognitiveLoopService {
             },
             feedback_state: super::feedback_state::FeedbackState::new(),
             coherence_tracker: ConversationCoherenceTracker::new(0.3),
-            memory_consol: super::memory_consolidation_manager::MemoryAndConsolidationManager {
+            memory: super::memory_execution::MemoryExecution {
+                memory_consol: super::memory_consolidation_manager::MemoryAndConsolidationManager {
                 stability_regime: StabilityRegimeProcessor::new(),
                 discovery_service: PrimitiveDiscoveryService::new(DiscoveryServiceConfig::default()),
                 semantic_memory: SemanticMemory::with_threshold(1000, 0.3),
@@ -682,6 +683,30 @@ impl CognitiveLoopService {
                     phi_cb.add("high", make_hv(seed_base.wrapping_add(202), dim));
                     mem.add_codebook(phi_cb);
                     Some(mem)
+                } else {
+                    None
+                },
+                },
+                causal_enhancer,
+                episodic_persistence:
+                    super::episodic_persistence_manager::EpisodicPersistenceManager::new(
+                        phi_episodic_replay,
+                    ),
+                knowledge_manager: if enable_knowledge_engine {
+                    let km_config = crate::knowledge::manager::KnowledgeManagerConfig {
+                        graph_capacity: knowledge_graph_capacity,
+                        causal_capacity: knowledge_causal_capacity,
+                        search_top_k: knowledge_search_top_k,
+                        ontology_config: crate::knowledge::adaptive_ontology::AdaptiveOntologyConfig {
+                            max_primitives: knowledge_ontology_max,
+                            ..Default::default()
+                        },
+                        db_path: knowledge_db_path.clone(),
+                        ..Default::default()
+                    };
+                    let mut km = crate::knowledge::KnowledgeManager::new(km_config);
+                    km.bootstrap_entities();
+                    Some(km)
                 } else {
                     None
                 },
@@ -747,11 +772,6 @@ impl CognitiveLoopService {
                 physics_integration,
             },
             async_trainer,
-            causal_enhancer,
-            episodic_persistence:
-                super::episodic_persistence_manager::EpisodicPersistenceManager::new(
-                    phi_episodic_replay,
-                ),
             #[cfg(feature = "reasoning_engine")]
             reasoning_engine: Some(
                 crate::consciousness::reasoning_engine::ConsciousReasoningEngine::new(),
@@ -864,24 +884,6 @@ impl CognitiveLoopService {
             enactive: EnactiveCognition::new(),
             biorhythm_mgr: super::biorhythm_manager::BiorhythmManager::new(timezone_offset_hours),
             metrics_collector: Some(crate::infrastructure::MetricsCollector::new()),
-            knowledge_manager: if enable_knowledge_engine {
-                let km_config = crate::knowledge::manager::KnowledgeManagerConfig {
-                    graph_capacity: knowledge_graph_capacity,
-                    causal_capacity: knowledge_causal_capacity,
-                    search_top_k: knowledge_search_top_k,
-                    ontology_config: crate::knowledge::adaptive_ontology::AdaptiveOntologyConfig {
-                        max_primitives: knowledge_ontology_max,
-                        ..Default::default()
-                    },
-                    db_path: knowledge_db_path.clone(),
-                    ..Default::default()
-                };
-                let mut km = crate::knowledge::KnowledgeManager::new(km_config);
-                km.bootstrap_entities();
-                Some(km)
-            } else {
-                None
-            },
             // last_reasoning_context moved to episodic_persistence manager
             experience_bus: Some(crate::experience::ExperienceBus::with_defaults()),
             // school_bridge + causal_consciousness moved to feature_integ manager
@@ -1016,6 +1018,8 @@ impl CognitiveLoopService {
             },
             #[cfg(feature = "mycelix")]
             governance_mgr: super::managers::GovernanceManager::default(),
+            #[cfg(feature = "mycelix")]
+            factcheck_bridge: super::broca_factcheck::BrocaFactcheckBridge::new(),
             swarm_manager: super::managers::SwarmManager::default(),
             holon_receiver: crate::consciousness::holon_receiver::HolonReceiver::new(),
             swarm_event_rx: std::sync::Mutex::new(Some(swarm_event_rx)),
@@ -1175,6 +1179,21 @@ impl CognitiveLoopService {
             #[cfg(feature = "vision-manifold")]
             vision_manager: super::managers::VisionManager::default(),
             security_telemetry: crate::swarm::SecurityTelemetry::default(),
+            #[cfg(feature = "humanoid")]
+            embodiment_bridge: {
+                use super::motor_bridge::EmbodimentPlatform;
+                match config.embodiment_platform {
+                    EmbodimentPlatform::Humanoid => {
+                        let bridge = super::motor_bridge::MotorBridge::new(&genesis);
+                        Some(Box::new(bridge) as Box<dyn super::motor_bridge::EmbodimentBridge>)
+                    }
+                    _ => None,
+                }
+            },
+            #[cfg(feature = "humanoid")]
+            last_proprioceptive_hv: None,
+            #[cfg(feature = "humanoid")]
+            embodiment_telemetry: super::motor_bridge::EmbodimentTelemetry::default(),
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
             streaming_inference: if enable_streaming_inference {
                 // Cycle-aligned config: batch=1, max_latency=32ms (~31Hz loop)

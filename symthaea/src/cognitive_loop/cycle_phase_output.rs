@@ -219,6 +219,7 @@ impl CognitiveLoopService {
                 dream_wisdom_count: feedback.memory.dream_wisdom_count,
                 continuity_replay_triggered: feedback.consciousness.continuity_replay_needed,
                 resonator_codebook_size: self
+                    .memory
                     .memory_consol
                     .resonator_memory
                     .as_ref()
@@ -226,12 +227,14 @@ impl CognitiveLoopService {
                     .map(|cb| cb.len())
                     .unwrap_or(0),
                 resonator_episodes: self
+                    .memory
                     .memory_consol
                     .resonator_memory
                     .as_ref()
                     .map(|m| m.len())
                     .unwrap_or(0),
                 resonator_factorization_iters: self
+                    .memory
                     .memory_consol
                     .resonator_memory
                     .as_ref()
@@ -974,6 +977,17 @@ impl CognitiveLoopService {
             metadata.cpg_desync_alert = ct.desync_alert;
         }
 
+        // ── Embodiment Bridge telemetry ──
+        #[cfg(feature = "humanoid")]
+        {
+            let et = &self.embodiment_telemetry;
+            metadata.embodiment_total_steps = et.total_steps;
+            metadata.embodiment_control_effort = et.control_effort;
+            metadata.embodiment_prediction_error = et.prediction_error;
+            metadata.embodiment_platform = et.platform.clone();
+            metadata.embodiment_num_actuators = et.num_actuators as u32;
+        }
+
         // ── Fabrication Manager telemetry ──
         #[cfg(feature = "advanced-manufacturing")]
         {
@@ -1263,6 +1277,12 @@ impl CognitiveLoopService {
                 .map(|m| m.last_telemetry().clone());
         }
 
+        // Broca factcheck telemetry
+        #[cfg(feature = "mycelix")]
+        {
+            metadata.factcheck = Some(self.factcheck_bridge.telemetry());
+        }
+
         metadata.consciousness.weight_convergence_state =
             mem::take(&mut feedback.consciousness.convergence_state);
         if metadata.consciousness.weight_convergence_state == "Converged"
@@ -1420,7 +1440,7 @@ impl CognitiveLoopService {
         }
 
         // ── Knowledge Engine telemetry ──
-        if let Some(ref km) = self.knowledge_manager {
+        if let Some(ref km) = self.memory.knowledge_manager {
             let telem = km.telemetry();
             let sigs = km.signals();
             metadata.knowledge_graph_size = telem.graph_size;
