@@ -1,0 +1,117 @@
+/* Mycelix EduNet — Leptos CSR Styles */
+
+:root {
+    --bg: #0a0a0a;
+    --surface: #1a1a2e;
+    --primary: #7c3aed;
+    --text: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --border: #334155;
+    --radius: 8px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+}
+
+.navbar {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    padding: 1rem 2rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.logo { font-weight: 700; font-size: 1.25rem; color: var(--primary); text-decoration: none; }
+
+.nav-links { display: flex; gap: 1.5rem; }
+.nav-links a { color: var(--text-secondary); text-decoration: none; transition: color 0.2s; }
+.nav-links a:hover, .nav-links a.active { color: var(--text); }
+
+main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+
+.home { text-align: center; padding: 4rem 0; }
+.home h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
+.subtitle { color: var(--text-secondary); margin-bottom: 3rem; }
+
+.feature-grid, .course-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.feature-card, .course-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    text-decoration: none;
+    color: var(--text);
+    transition: border-color 0.2s;
+}
+
+.feature-card:hover, .course-card:hover { border-color: var(--primary); }
+
+.feature-card h3, .course-card h3 { margin-bottom: 0.5rem; }
+.feature-card p, .course-card p { color: var(--text-secondary); font-size: 0.9rem; }
+
+.domain-tag {
+    display: inline-block;
+    margin-top: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    background: rgba(124, 58, 237, 0.15);
+    color: var(--primary);
+    border-radius: 999px;
+    font-size: 0.8rem;
+}
+
+h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
+
+.stub-page {
+    padding: 2rem 0;
+}
+
+.stub-page h2 {
+    margin-bottom: 1rem;
+}
+
+.stub-page p {
+    color: var(--text-secondary);
+    max-width: 600px;
+    line-height: 1.8;
+}
+
+.stub-page .planned-features {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.stub-page .planned-features h3 {
+    margin-bottom: 0.75rem;
+    font-size: 1.1rem;
+}
+
+.stub-page .planned-features ul {
+    list-style: none;
+    padding: 0;
+}
+
+.stub-page .planned-features li {
+    padding: 0.4rem 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.stub-page .planned-features li::before {
+    content: "\2192  ";
+    color: var(--primary);
+}
