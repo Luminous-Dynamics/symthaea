@@ -412,6 +412,26 @@ impl ProgramDependenceGraph {
                 || trimmed == "loop"
             {
                 (NodeKind::LoopHead, trimmed.to_string())
+            } else if trimmed.contains(".iter()")
+                || trimmed.contains(".into_iter()")
+                || trimmed.contains(".iter_mut()")
+                || trimmed.contains(".map(")
+                || trimmed.contains(".filter(")
+                || trimmed.contains(".fold(")
+                || trimmed.contains(".for_each(")
+                || trimmed.contains(".flat_map(")
+                || trimmed.contains(".filter_map(")
+                || trimmed.contains(".find(")
+                || trimmed.contains(".any(")
+                || trimmed.contains(".all(")
+                || trimmed.contains(".position(")
+                || trimmed.contains(".enumerate(")
+                || trimmed.contains(".zip(")
+                || trimmed.contains(".scan(")
+            {
+                // Iterator chains are implicit loops — each consumes the
+                // collection element-by-element, equivalent to β₁=1.
+                (NodeKind::LoopHead, trimmed.to_string())
             } else if trimmed.starts_with("return") {
                 (NodeKind::Return, trimmed.to_string())
             } else if trimmed.starts_with("let ") {

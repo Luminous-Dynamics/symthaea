@@ -24,6 +24,10 @@ use crate::topology::TopologicalFingerprint;
 ///
 /// BinaryHV similarity is in [0, 1] where 0.5 is orthogonal (random).
 /// A threshold of 0.65 means "clearly more similar than chance".
+/// Similarity threshold for assigning a new point to an existing fiber.
+/// Random BinaryHV similarity is ~0.5; 0.65 means "clearly above chance".
+/// With size-aware encoding, functions of different structural complexity
+/// will fall below this threshold and create separate fibers.
 const FIBER_ASSIGNMENT_THRESHOLD: f32 = 0.65;
 
 // ---------------------------------------------------------------------------
