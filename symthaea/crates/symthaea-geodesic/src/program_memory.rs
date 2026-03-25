@@ -169,6 +169,95 @@ impl ProgramMemory {
             ProgramNode::atom("step_b"),
         ]));
 
+        // ── Extended: arithmetic with different variable names ──
+        // (Fix 3: atom names matter in encoding, so include common variants)
+        mem.add_basic("add_xy", ProgramNode::apply(
+            ProgramNode::op("ADD"), vec![ProgramNode::atom("x"), ProgramNode::atom("y")]));
+        mem.add_basic("mul_xy", ProgramNode::apply(
+            ProgramNode::op("MUL"), vec![ProgramNode::atom("x"), ProgramNode::atom("y")]));
+        mem.add_basic("sub_xy", ProgramNode::apply(
+            ProgramNode::op("SUB"), vec![ProgramNode::atom("x"), ProgramNode::atom("y")]));
+        mem.add_basic("lt_xy", ProgramNode::apply(
+            ProgramNode::op("LT"), vec![ProgramNode::atom("x"), ProgramNode::atom("y")]));
+
+        // ── Extended: multi-step compositions ──
+        // Accumulate pattern: init → loop → accumulate → return
+        mem.add_basic("sum_loop", ProgramNode::seq(vec![
+            ProgramNode::typed("sum", "INT"),
+            ProgramNode::iterate(
+                ProgramNode::atom("sum = 0"),
+                ProgramNode::apply(ProgramNode::op("ADD"),
+                    vec![ProgramNode::atom("sum"), ProgramNode::atom("arr[i]")]),
+                ProgramNode::apply(ProgramNode::op("LT"),
+                    vec![ProgramNode::atom("i"), ProgramNode::atom("len")]),
+            ),
+            ProgramNode::atom("sum"),
+        ]));
+
+        // Find max: branch inside loop
+        mem.add_basic("find_max", ProgramNode::seq(vec![
+            ProgramNode::atom("max = arr[0]"),
+            ProgramNode::iterate(
+                ProgramNode::atom("i = 1"),
+                ProgramNode::branch(
+                    ProgramNode::apply(ProgramNode::op("GT"),
+                        vec![ProgramNode::atom("arr[i]"), ProgramNode::atom("max")]),
+                    ProgramNode::atom("max = arr[i]"),
+                    ProgramNode::atom("/* no-op */"),
+                ),
+                ProgramNode::apply(ProgramNode::op("LT"),
+                    vec![ProgramNode::atom("i"), ProgramNode::atom("len")]),
+            ),
+            ProgramNode::atom("max"),
+        ]));
+
+        // Contains: loop with early return
+        mem.add_basic("contains", ProgramNode::seq(vec![
+            ProgramNode::iterate(
+                ProgramNode::atom("i = 0"),
+                ProgramNode::branch(
+                    ProgramNode::apply(ProgramNode::op("EQ"),
+                        vec![ProgramNode::atom("arr[i]"), ProgramNode::atom("target")]),
+                    ProgramNode::atom("return true"),
+                    ProgramNode::atom("i += 1"),
+                ),
+                ProgramNode::apply(ProgramNode::op("LT"),
+                    vec![ProgramNode::atom("i"), ProgramNode::atom("len")]),
+            ),
+            ProgramNode::atom("false"),
+        ]));
+
+        // Fibonacci recursive
+        mem.add_basic("fibonacci", ProgramNode::recurse(
+            ProgramNode::branch(
+                ProgramNode::apply(ProgramNode::op("LT"),
+                    vec![ProgramNode::atom("n"), ProgramNode::typed("2", "INT")]),
+                ProgramNode::atom("n"),
+                ProgramNode::apply(ProgramNode::op("ADD"), vec![
+                    ProgramNode::apply(ProgramNode::atom("fib"),
+                        vec![ProgramNode::apply(ProgramNode::op("SUB"),
+                            vec![ProgramNode::atom("n"), ProgramNode::typed("1", "INT")])]),
+                    ProgramNode::apply(ProgramNode::atom("fib"),
+                        vec![ProgramNode::apply(ProgramNode::op("SUB"),
+                            vec![ProgramNode::atom("n"), ProgramNode::typed("2", "INT")])]),
+                ]),
+            ),
+            ProgramNode::atom("fib"),
+        ));
+
+        // Filter + map chain
+        mem.add_basic("filter_map", ProgramNode::seq(vec![
+            ProgramNode::filter(ProgramNode::atom("predicate"), ProgramNode::atom("items")),
+            ProgramNode::map(ProgramNode::atom("transform"), ProgramNode::atom("filtered")),
+        ]));
+
+        // Reduce with multiply (product)
+        mem.add_basic("product_reduce", ProgramNode::reduce(
+            ProgramNode::op("MUL"),
+            ProgramNode::typed("1", "INT"),
+            ProgramNode::atom("arr"),
+        ));
+
         mem
     }
 
@@ -205,6 +294,31 @@ impl ProgramMemory {
             .iter()
             .map(|e| (e.node.clone(), e.encoding))
             .collect()
+    }
+
+    /// Find the top-k nearest entries by encoding similarity.
+    pub fn nearest_k(&self, query: &BinaryHV, k: usize) -> Vec<(&ProgramMemoryEntry, f32)> {
+        let mut scored: Vec<_> = self.entries.iter()
+            .map(|e| (e, e.encoding.similarity(query)))
+            .collect();
+        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        scored.truncate(k);
+        scored
+    }
+
+    /// Find the nearest sub-pattern across all entries.
+    /// Searches decomposed sub-trees for fine-grained matching.
+    pub fn nearest_sub_pattern(&self, query: &BinaryHV) -> Option<(&ProgramNode, f32)> {
+        let mut best: Option<(&ProgramNode, f32)> = None;
+        for entry in &self.entries {
+            for (_, node, enc) in &entry.sub_patterns {
+                let sim = enc.similarity(query);
+                if best.map_or(true, |(_, s)| sim > s) {
+                    best = Some((node, sim));
+                }
+            }
+        }
+        best
     }
 
     /// Number of entries.
