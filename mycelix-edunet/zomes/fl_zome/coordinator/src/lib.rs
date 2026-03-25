@@ -1,4 +1,6 @@
-//! # FL Coordinator Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # FL Coordinator Zome
 //!
 //! Implements business logic for federated learning rounds and updates.
 //! This zome is upgradeable - business logic can change without breaking data.
@@ -114,6 +116,13 @@ pub fn weighted_mean(gradients: &[Vec<f32>], weights: &[f32]) -> Result<Vec<f32>
 /// Create a new federated learning round
 #[hdk_extern]
 pub fn create_round(round: FlRound) -> ExternResult<ActionHash> {
+    // Trust tier gate: requires Steward tier to create FL rounds
+    mycelix_bridge_common::gate_consciousness(
+        "edunet_bridge",
+        &mycelix_bridge_common::requirement_for_constitutional(),
+        "create_round",
+    )?;
+
     // REVOLUTIONARY: Automatically calculate adaptive privacy params if not set
     let round_with_privacy = if round.privacy_epsilon.is_none() {
         let params = calculate_adaptive_privacy(

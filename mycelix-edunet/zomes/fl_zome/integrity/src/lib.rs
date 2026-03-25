@@ -1,4 +1,6 @@
-//! # FL Integrity Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # FL Integrity Zome
 //!
 //! Defines entry types and validation rules for federated learning.
 //! This zome is immutable - entry definitions cannot change without breaking data.
@@ -131,7 +133,7 @@ pub enum LinkTypes {
 /// Validation function for FlUpdate entries
 pub fn validate_fl_update(update: FlUpdate) -> ExternResult<ValidateCallbackResult> {
     // Validate L2 norm is non-negative
-    if update.clipped_l2_norm < 0.0 {
+    if !update.clipped_l2_norm.is_finite() || update.clipped_l2_norm < 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "L2 norm must be non-negative".to_string(),
         ));
@@ -177,7 +179,7 @@ pub fn validate_fl_round(round: FlRound) -> ExternResult<ValidateCallbackResult>
     }
 
     // Validate clip norm is positive
-    if round.clip_norm <= 0.0 {
+    if !round.clip_norm.is_finite() || round.clip_norm <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Clip norm must be positive".to_string(),
         ));
@@ -185,7 +187,7 @@ pub fn validate_fl_round(round: FlRound) -> ExternResult<ValidateCallbackResult>
 
     // Validate privacy parameters if present
     if let Some(epsilon) = round.privacy_epsilon {
-        if epsilon <= 0.0 {
+        if !epsilon.is_finite() || epsilon <= 0.0 {
             return Ok(ValidateCallbackResult::Invalid(
                 "Privacy epsilon must be positive".to_string(),
             ));
@@ -193,7 +195,7 @@ pub fn validate_fl_round(round: FlRound) -> ExternResult<ValidateCallbackResult>
     }
 
     if let Some(delta) = round.privacy_delta {
-        if delta < 0.0 || delta > 1.0 {
+        if !delta.is_finite() || delta < 0.0 || delta > 1.0 {
             return Ok(ValidateCallbackResult::Invalid(
                 "Privacy delta must be between 0 and 1".to_string(),
             ));
@@ -206,7 +208,7 @@ pub fn validate_fl_round(round: FlRound) -> ExternResult<ValidateCallbackResult>
 /// Validation function for PrivacyParams entries
 pub fn validate_privacy_params(params: PrivacyParams) -> ExternResult<ValidateCallbackResult> {
     // Validate epsilon bounds
-    if params.min_epsilon <= 0.0 || params.max_epsilon <= 0.0 || params.base_epsilon <= 0.0 {
+    if !params.min_epsilon.is_finite() || !params.max_epsilon.is_finite() || !params.base_epsilon.is_finite() || params.min_epsilon <= 0.0 || params.max_epsilon <= 0.0 || params.base_epsilon <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "All epsilon values must be positive".to_string(),
         ));
@@ -219,7 +221,7 @@ pub fn validate_privacy_params(params: PrivacyParams) -> ExternResult<ValidateCa
     }
 
     // Validate sensitivity score
-    if params.sensitivity_score < 0.0 || params.sensitivity_score > 1.0 {
+    if !params.sensitivity_score.is_finite() || params.sensitivity_score < 0.0 || params.sensitivity_score > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Sensitivity score must be between 0 and 1".to_string(),
         ));

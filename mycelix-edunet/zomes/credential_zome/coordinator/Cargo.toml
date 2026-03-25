@@ -33,4 +33,7 @@ blake3.workspace = true
 # Time handling
 chrono.workspace = true
 
+# Cross-cluster bridge (consciousness gating)
+mycelix-bridge-common = { path = "../../../../crates/mycelix-bridge-common" }
+
 # Note: mycelix-sdk removed - rand 0.8 dependency causes getrandom 0.2 issues in WASM

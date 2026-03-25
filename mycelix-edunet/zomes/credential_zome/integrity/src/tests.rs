@@ -35,6 +35,9 @@ fn create_valid_credential() -> VerifiableCredential {
         verification_method: "did:example:issuer123#key-1".to_string(),
         proof_purpose: "assertionMethod".to_string(),
         proof_value: "abc123signature".to_string(),
+        epistemic_empirical: Some(2),
+        epistemic_normative: Some(1),
+        epistemic_materiality: Some(1),
     }
 }
 
@@ -212,6 +215,9 @@ mod credential_validation_tests {
             verification_method: "did:example:issuer#key-1".to_string(),
             proof_purpose: "assertionMethod".to_string(),
             proof_value: "signature".to_string(),
+            epistemic_empirical: None,
+            epistemic_normative: None,
+            epistemic_materiality: None,
         };
 
         let result = validate_verifiable_credential(cred);

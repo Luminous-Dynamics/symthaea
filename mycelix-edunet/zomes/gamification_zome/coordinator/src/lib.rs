@@ -1,4 +1,6 @@
-//! # Gamification Coordinator Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Gamification Coordinator Zome
 //!
 //! Implements the business logic for the gamification system including:
 //! - XP earning and spending
@@ -106,13 +108,13 @@ pub fn award_xp(input: AwardXpInput) -> ExternResult<Record> {
     let streak_bonus = get_streak_bonus()?;
 
     // Apply streak bonus to base XP
-    let bonus_xp = (input.base_xp as u64 * streak_bonus as u64 / 1000) as u32;
+    let bonus_xp_u64 = input.base_xp as u64 * streak_bonus as u64 / 1000; let bonus_xp = bonus_xp_u64.min(u32::MAX as u64) as u32;
 
     // Update XP
-    xp.total_xp += bonus_xp as u64;
-    xp.daily_xp += bonus_xp;
-    xp.weekly_xp += bonus_xp;
-    xp.monthly_xp += bonus_xp;
+    xp.total_xp = xp.total_xp.saturating_add(bonus_xp as u64);
+    xp.daily_xp = xp.daily_xp.saturating_add(bonus_xp);
+    xp.weekly_xp = xp.weekly_xp.saturating_add(bonus_xp);
+    xp.monthly_xp = xp.monthly_xp.saturating_add(bonus_xp);
     xp.level = calculate_level(xp.total_xp);
     xp.last_activity_at = now;
     xp.modified_at = now;
@@ -387,6 +389,13 @@ pub fn freeze_streak(_: ()) -> ExternResult<Record> {
 /// Create a new badge definition
 #[hdk_extern]
 pub fn create_badge_definition(input: CreateBadgeInput) -> ExternResult<Record> {
+    // Trust tier gate: requires Steward tier to create badge definitions
+    mycelix_bridge_common::gate_consciousness(
+        "edunet_bridge",
+        &mycelix_bridge_common::requirement_for_constitutional(),
+        "create_badge_definition",
+    )?;
+
     let now = current_time()?;
 
     let badge = BadgeDefinition {

@@ -1,4 +1,6 @@
-//! Provenance tracking for models and credentials
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Provenance tracking for models and credentials
 
 use crate::types::{ModelHash, ModelId};
 use serde::{Deserialize, Serialize};
@@ -125,6 +127,7 @@ mod tests {
         let prov = ModelProvenance::new(
             ModelId("model-1".to_string()),
             ModelHash("hash-1".to_string()),
+            1234567890i64,
         );
         assert_eq!(prov.model_id.0, "model-1");
         assert!(prov.parent_hash.is_none());
@@ -137,11 +140,13 @@ mod tests {
         let prov1 = ModelProvenance::new(
             ModelId("model-1".to_string()),
             ModelHash("hash-1".to_string()),
+            1234567890i64,
         );
 
         let prov2 = ModelProvenance::new(
             ModelId("model-2".to_string()),
             ModelHash("hash-2".to_string()),
+            1234567891i64,
         )
         .with_parent(ModelHash("hash-1".to_string()));
 

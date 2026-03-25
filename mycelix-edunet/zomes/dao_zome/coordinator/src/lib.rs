@@ -1,4 +1,6 @@
-//! # DAO Coordinator Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # DAO Coordinator Zome
 //!
 //! Implements business logic for decentralized governance.
 //! This zome is upgradeable - business logic can change without breaking data.
@@ -19,19 +21,19 @@ use dao_integrity::{
 /// Create a new governance proposal
 #[hdk_extern]
 pub fn create_proposal(input: CreateProposalInput) -> ExternResult<ActionHash> {
+    // Trust tier gate: requires Participant tier with identity >= 0.25
+    mycelix_bridge_common::gate_consciousness(
+        "edunet_bridge",
+        &mycelix_bridge_common::requirement_for_proposal(),
+        "create_proposal",
+    )?;
+
     // Get proposer agent info
     let agent_info = agent_info()?;
     let proposer_pubkey = agent_info.agent_initial_pubkey;
 
-    // Calculate voting deadline based on proposal type
-    let deadline_hours = match input.proposal_type {
-        ProposalType::Fast => 48,    // 2 days
-        ProposalType::Normal => 168, // 7 days
-        ProposalType::Slow => 336,   // 14 days
-    };
-
     let now = chrono::Utc::now().timestamp();
-    let voting_deadline = now + (deadline_hours * 3600);
+    let voting_deadline = voting_deadline(now, &input.proposal_type);
 
     // Serialize actions to JSON string
     let actions_json = serde_json::to_string(&input.actions)
@@ -97,6 +99,13 @@ pub fn create_proposal(input: CreateProposalInput) -> ExternResult<ActionHash> {
 /// Cast a vote on a proposal
 #[hdk_extern]
 pub fn cast_vote(input: CastVoteInput) -> ExternResult<ActionHash> {
+    // Trust tier gate: requires Citizen tier with identity >= 0.5
+    mycelix_bridge_common::gate_consciousness(
+        "edunet_bridge",
+        &mycelix_bridge_common::requirement_for_voting(),
+        "cast_vote",
+    )?;
+
     // Get voter agent info
     let agent_info = agent_info()?;
     let voter_pubkey = agent_info.agent_initial_pubkey;
@@ -320,6 +329,63 @@ pub fn get_all_proposals(_: ()) -> ExternResult<Vec<Record>> {
 }
 
 // ============================================================================
+// Pure business logic (HDK-free, unit-testable)
+// ============================================================================
+
+/// Determine proposal outcome from vote counts.
+///
+/// Requires strictly more than `threshold_pct`% of non-abstain votes to pass.
+/// If there are zero non-abstain votes, the proposal is rejected.
+pub fn determine_proposal_outcome(
+    for_votes: u32,
+    against_votes: u32,
+    _abstain: u32,
+    threshold_pct: u32,
+) -> ProposalStatus {
+    let total_deciding = for_votes + against_votes;
+    if total_deciding == 0 {
+        return ProposalStatus::Rejected;
+    }
+    let for_percentage = (for_votes as f64 / total_deciding as f64) * 100.0;
+    if for_percentage > threshold_pct as f64 {
+        ProposalStatus::Approved
+    } else {
+        ProposalStatus::Rejected
+    }
+}
+
+/// Calculate voting deadline timestamp from creation time and proposal type.
+///
+/// Returns deadline as Unix timestamp (seconds).
+/// - Fast: 48 hours
+/// - Normal: 168 hours (7 days)
+/// - Slow: 336 hours (14 days)
+pub fn voting_deadline(created_at: i64, proposal_type: &ProposalType) -> i64 {
+    let deadline_hours: i64 = match proposal_type {
+        ProposalType::Fast => 48,
+        ProposalType::Normal => 168,
+        ProposalType::Slow => 336,
+    };
+    created_at + deadline_hours * 3600
+}
+
+/// Increment vote tallies on a proposal (pure mutation, no HDK).
+///
+/// Returns the updated (for_votes, against_votes, abstain_votes).
+pub fn apply_vote(
+    for_votes: u32,
+    against_votes: u32,
+    abstain_votes: u32,
+    choice: &VoteChoice,
+) -> (u32, u32, u32) {
+    match choice {
+        VoteChoice::For => (for_votes.saturating_add(1), against_votes, abstain_votes),
+        VoteChoice::Against => (for_votes, against_votes.saturating_add(1), abstain_votes),
+        VoteChoice::Abstain => (for_votes, against_votes, abstain_votes.saturating_add(1)),
+    }
+}
+
+// ============================================================================
 // Helper functions
 // ============================================================================
 
@@ -329,42 +395,32 @@ fn ensure_path(path: Path, link_type: LinkTypes) -> ExternResult<EntryHash> {
     typed.path_entry_hash()
 }
 
-/// Update vote tallies on a proposal based on a new vote
+/// Update vote tallies on a proposal based on a new vote.
+/// Delegates to pure helper functions for testable logic.
 fn update_proposal_vote_tallies(
     _proposal_hash: ActionHash,
     mut proposal: Proposal,
     vote_choice: &VoteChoice,
 ) -> ExternResult<Proposal> {
-    // Increment the appropriate vote counter based on choice
-    match vote_choice {
-        VoteChoice::For => {
-            proposal.for_votes = proposal.for_votes.saturating_add(1);
-        }
-        VoteChoice::Against => {
-            proposal.against_votes = proposal.against_votes.saturating_add(1);
-        }
-        VoteChoice::Abstain => {
-            proposal.abstain_votes = proposal.abstain_votes.saturating_add(1);
-        }
-    }
+    let (f, a, ab) = apply_vote(
+        proposal.for_votes,
+        proposal.against_votes,
+        proposal.abstain_votes,
+        vote_choice,
+    );
+    proposal.for_votes = f;
+    proposal.against_votes = a;
+    proposal.abstain_votes = ab;
 
     // Check if voting deadline has passed and update status if needed
     let now = chrono::Utc::now().timestamp();
     if now > proposal.voting_deadline && proposal.status == ProposalStatus::Active {
-        // Calculate total votes
-        let total_votes = proposal.for_votes + proposal.against_votes + proposal.abstain_votes;
-        let for_percentage = if total_votes > 0 {
-            (proposal.for_votes as f64 / total_votes as f64) * 100.0
-        } else {
-            0.0
-        };
-
-        // Determine outcome: requires >50% for votes to pass
-        if for_percentage > 50.0 {
-            proposal.status = ProposalStatus::Approved;
-        } else {
-            proposal.status = ProposalStatus::Rejected;
-        }
+        proposal.status = determine_proposal_outcome(
+            proposal.for_votes,
+            proposal.against_votes,
+            proposal.abstain_votes,
+            50, // >50% threshold
+        );
     }
 
     Ok(proposal)
@@ -422,7 +478,118 @@ pub struct CastVoteInput {
 }
 
 // ============================================================================
-// Tests (host-side only; relies on coordinator logic)
+// Tests -- pure business logic only (no HDK required)
 // ============================================================================
 
-// Note: host-side tests are omitted because Holochain mock helpers are not available in this crate.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ---- determine_proposal_outcome ----
+
+    #[test]
+    fn test_proposal_passes_at_majority() {
+        let status = determine_proposal_outcome(51, 49, 0, 50);
+        assert_eq!(status, ProposalStatus::Approved);
+    }
+
+    #[test]
+    fn test_proposal_fails_at_exactly_50_percent() {
+        let status = determine_proposal_outcome(50, 50, 0, 50);
+        assert_eq!(status, ProposalStatus::Rejected);
+    }
+
+    #[test]
+    fn test_proposal_passes_with_abstains() {
+        let status = determine_proposal_outcome(6, 4, 100, 50);
+        assert_eq!(status, ProposalStatus::Approved);
+    }
+
+    #[test]
+    fn test_proposal_rejected_zero_votes() {
+        let status = determine_proposal_outcome(0, 0, 0, 50);
+        assert_eq!(status, ProposalStatus::Rejected);
+    }
+
+    #[test]
+    fn test_proposal_rejected_only_abstains() {
+        let status = determine_proposal_outcome(0, 0, 10, 50);
+        assert_eq!(status, ProposalStatus::Rejected);
+    }
+
+    #[test]
+    fn test_proposal_single_for_vote() {
+        let status = determine_proposal_outcome(1, 0, 0, 50);
+        assert_eq!(status, ProposalStatus::Approved);
+    }
+
+    #[test]
+    fn test_proposal_single_against_vote() {
+        let status = determine_proposal_outcome(0, 1, 0, 50);
+        assert_eq!(status, ProposalStatus::Rejected);
+    }
+
+    #[test]
+    fn test_proposal_supermajority_threshold() {
+        let status = determine_proposal_outcome(67, 33, 0, 66);
+        assert_eq!(status, ProposalStatus::Approved);
+
+        let status = determine_proposal_outcome(66, 34, 0, 66);
+        assert_eq!(status, ProposalStatus::Rejected);
+    }
+
+    // ---- voting_deadline ----
+
+    #[test]
+    fn test_fast_deadline() {
+        let created = 1_000_000i64;
+        let deadline = voting_deadline(created, &ProposalType::Fast);
+        assert_eq!(deadline, created + 48 * 3600);
+    }
+
+    #[test]
+    fn test_normal_deadline() {
+        let created = 1_000_000i64;
+        let deadline = voting_deadline(created, &ProposalType::Normal);
+        assert_eq!(deadline, created + 168 * 3600);
+    }
+
+    #[test]
+    fn test_slow_deadline() {
+        let created = 1_000_000i64;
+        let deadline = voting_deadline(created, &ProposalType::Slow);
+        assert_eq!(deadline, created + 336 * 3600);
+    }
+
+    #[test]
+    fn test_deadline_from_zero() {
+        let deadline = voting_deadline(0, &ProposalType::Fast);
+        assert_eq!(deadline, 48 * 3600);
+    }
+
+    // ---- apply_vote ----
+
+    #[test]
+    fn test_apply_vote_for() {
+        let (f, a, ab) = apply_vote(5, 3, 2, &VoteChoice::For);
+        assert_eq!((f, a, ab), (6, 3, 2));
+    }
+
+    #[test]
+    fn test_apply_vote_against() {
+        let (f, a, ab) = apply_vote(5, 3, 2, &VoteChoice::Against);
+        assert_eq!((f, a, ab), (5, 4, 2));
+    }
+
+    #[test]
+    fn test_apply_vote_abstain() {
+        let (f, a, ab) = apply_vote(5, 3, 2, &VoteChoice::Abstain);
+        assert_eq!((f, a, ab), (5, 3, 3));
+    }
+
+    #[test]
+    fn test_apply_vote_saturating() {
+        let (f, _, _) = apply_vote(u32::MAX, 0, 0, &VoteChoice::For);
+        assert_eq!(f, u32::MAX);
+    }
+}

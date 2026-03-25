@@ -1,4 +1,6 @@
-//! # Learning Integrity Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Learning Integrity Zome
 //!
 //! Defines entry types and validation rules for the learning domain.
 //! This zome is immutable - it defines the data structures that cannot change.
@@ -350,7 +352,7 @@ fn validate_course(course: &Course) -> ExternResult<ValidateCallbackResult> {
 /// Validate a LearnerProgress entry
 fn validate_learner_progress(progress: &LearnerProgress) -> ExternResult<ValidateCallbackResult> {
     // Progress percentage must be 0-100
-    if progress.progress_percent < 0.0 || progress.progress_percent > 100.0 {
+    if !progress.progress_percent.is_finite() || progress.progress_percent < 0.0 || progress.progress_percent > 100.0 {
         return Ok(ValidateCallbackResult::Invalid("Progress must be between 0 and 100".to_string()));
     }
 
@@ -381,7 +383,7 @@ fn validate_learning_activity(activity: &LearningActivity) -> ExternResult<Valid
 
     // Outcome (if present) should be 0-100 for scores
     if let Some(outcome) = activity.outcome {
-        if outcome < 0.0 || outcome > 100.0 {
+        if !outcome.is_finite() || outcome < 0.0 || outcome > 100.0 {
             return Ok(ValidateCallbackResult::Invalid("Activity outcome must be between 0 and 100".to_string()));
         }
     }

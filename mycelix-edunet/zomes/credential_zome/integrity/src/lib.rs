@@ -1,4 +1,6 @@
-//! # Credential Integrity Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Credential Integrity Zome
 //!
 //! Defines entry types and validation rules for W3C Verifiable Credentials.
 //! This zome is immutable - entry definitions cannot change without breaking data.
@@ -205,9 +207,9 @@ pub fn validate_verifiable_credential(
 
     // Validate score if present
     if let Some(score) = credential.score {
-        if score < 0.0 || score > 100.0 {
+        if !score.is_finite() || score < 0.0 || score > 100.0 {
             return Ok(ValidateCallbackResult::Invalid(
-                "Score must be between 0 and 100".to_string(),
+                "Score must be a finite number between 0 and 100".to_string(),
             ));
         }
     }

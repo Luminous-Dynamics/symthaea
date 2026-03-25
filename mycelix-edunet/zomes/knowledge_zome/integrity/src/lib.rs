@@ -1,4 +1,6 @@
-//! # Knowledge Roots Integrity Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Knowledge Roots Integrity Zome
 //!
 //! Defines the decentralized curriculum graph - a community-built knowledge structure.
 //!
@@ -441,6 +443,14 @@ pub fn validate_create_node(node: &KnowledgeNode) -> ExternResult<ValidateCallba
         ));
     }
 
+    if node.description.len() > 10000 { return Ok(ValidateCallbackResult::Invalid("Node description too long (max 10000 characters)".to_string())); }
+    if node.domain.len() > 200 { return Ok(ValidateCallbackResult::Invalid("Domain name too long (max 200 characters)".to_string())); }
+    if let Some(ref sub) = node.subdomain { if sub.len() > 200 { return Ok(ValidateCallbackResult::Invalid("Subdomain name too long (max 200 characters)".to_string())); } }
+    if node.tags.len() > 50 { return Ok(ValidateCallbackResult::Invalid("Too many tags (max 50)".to_string())); }
+    for tag in &node.tags { if tag.len() > 100 { return Ok(ValidateCallbackResult::Invalid("Tag too long (max 100 characters)".to_string())); } }
+    if node.related_courses.len() > 100 { return Ok(ValidateCallbackResult::Invalid("Too many related courses (max 100)".to_string())); }
+    if node.skill_alignments.len() > 50 { return Ok(ValidateCallbackResult::Invalid("Too many skill alignments (max 50)".to_string())); }
+
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -512,5 +522,27 @@ mod tests {
     #[test]
     fn test_edge_type_default() {
         assert_eq!(EdgeType::default(), EdgeType::Recommends);
+    }
+
+    #[test]
+    fn test_node_valid() {
+        let node = KnowledgeNode { title: "Rust".to_string(), description: "Learn Rust".to_string(), node_type: NodeType::Course, difficulty: DifficultyLevel::Beginner, domain: "Programming".to_string(), subdomain: None, tags: vec!["rust".to_string()], estimated_hours: 40, skill_alignments: vec![], related_courses: vec![], creator: AgentPubKey::from_raw_36(vec![0u8; 36]), status: NodeStatus::Proposed, created_at: 0, modified_at: 0, version: 1 };
+        assert!(matches!(validate_create_node(&node).unwrap(), ValidateCallbackResult::Valid));
+    }
+    #[test]
+    fn test_node_description_too_long() {
+        let node = KnowledgeNode { title: "T".to_string(), description: "x".repeat(10001), node_type: NodeType::Concept, difficulty: DifficultyLevel::Beginner, domain: "T".to_string(), subdomain: None, tags: vec![], estimated_hours: 10, skill_alignments: vec![], related_courses: vec![], creator: AgentPubKey::from_raw_36(vec![0u8; 36]), status: NodeStatus::Proposed, created_at: 0, modified_at: 0, version: 1 };
+        assert!(matches!(validate_create_node(&node).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+    #[test]
+    fn test_node_too_many_tags() {
+        let node = KnowledgeNode { title: "T".to_string(), description: "T".to_string(), node_type: NodeType::Concept, difficulty: DifficultyLevel::Beginner, domain: "T".to_string(), subdomain: None, tags: (0..51).map(|i| format!("t{}", i)).collect(), estimated_hours: 10, skill_alignments: vec![], related_courses: vec![], creator: AgentPubKey::from_raw_36(vec![0u8; 36]), status: NodeStatus::Proposed, created_at: 0, modified_at: 0, version: 1 };
+        assert!(matches!(validate_create_node(&node).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+    #[test]
+    fn test_edge_self_loop() {
+        let h = ActionHash::from_raw_36(vec![1u8; 36]);
+        let edge = LearningEdge { source_node: h.clone(), target_node: h, edge_type: EdgeType::Requires, strength_permille: 800, rationale: "T".to_string(), proposer: AgentPubKey::from_raw_36(vec![0u8; 36]), status: EdgeStatus::Proposed, upvotes: 0, downvotes: 0, created_at: 0 };
+        assert!(matches!(validate_create_edge(&edge).unwrap(), ValidateCallbackResult::Invalid(_)));
     }
 }
