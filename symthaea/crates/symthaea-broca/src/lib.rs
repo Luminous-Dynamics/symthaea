@@ -56,8 +56,13 @@ pub mod gating;
 pub mod generator;
 #[cfg(feature = "gpu")]
 pub mod gpu_cfc;
+pub mod speech_encoder;
 pub mod tokenizer;
 pub mod training;
+
+// Speech heuristics: bootstrap targets for SpeechThoughtEncoder training
+#[cfg(feature = "speech-data")]
+pub mod speech_heuristics;
 
 // Creative mode: relaxed gating for poetry and artistic text generation
 pub mod creative_mode;

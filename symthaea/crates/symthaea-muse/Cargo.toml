@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-muse"
+version = "0.1.0"
+edition = "2021"
+description = "Consciousness-driven music synthesis for Symthaea — CfC temporal dynamics to tonal art"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-aesthetic = { path = "../symthaea-aesthetic" }
+serde = { workspace = true }
+rand = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,0 +1,20 @@
+[package]
+name = "symthaea-atelier"
+version = "0.1.0"
+edition = "2021"
+description = "Generative visual art engine for Symthaea — consciousness-driven SVG composition"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-canvas = { path = "../symthaea-canvas" }
+symthaea-aesthetic = { path = "../symthaea-aesthetic" }
+serde = { workspace = true }
+rand = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+symthaea-muse = { path = "../symthaea-muse" }
+symthaea-gallery = { path = "../symthaea-gallery" }
+
+[lints]
+workspace = true
