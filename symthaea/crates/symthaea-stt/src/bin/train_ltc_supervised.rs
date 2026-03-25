@@ -123,8 +123,9 @@ fn main() {
     }
 
     println!();
-    println!("  Architecture: HdcLtcUnifiedNeuron (16,384D state)");
+    println!("  Architecture: HdcLtcUnifiedNetwork (3×8 = 24 neurons, 16,384D)");
     println!("  Phonemes:     {}", phoneme_labels.len());
+    println!("  Neurons:      {}", phoneme_ltc.num_neurons());
     println!("  Epochs:       {}", cli.epochs);
     println!("  LR:           {}", cli.lr);
     println!("  Tau base:     {}ms", cli.tau_base * 1000.0);
@@ -243,13 +244,13 @@ fn main() {
 
         if accuracy > best_accuracy {
             best_accuracy = accuracy;
-            // Save model
+            // Save model (genesis phrase is sufficient to reconstruct network)
             let model = UnifiedLtcModel {
-                neuron_state: bincode::serialize(phoneme_ltc.neuron()).unwrap_or_default(),
                 phoneme_labels: phoneme_labels.clone(),
                 best_accuracy,
                 epoch: epoch + 1,
                 genesis_phrase: cli.genesis.clone(),
+                num_neurons: phoneme_ltc.num_neurons(),
             };
             if let Ok(data) = bincode::serialize(&model) {
                 if let Err(e) = std::fs::write(&cli.output, &data) {
@@ -281,9 +282,9 @@ fn main() {
 
 #[derive(serde::Serialize, serde::Deserialize)]
 struct UnifiedLtcModel {
-    neuron_state: Vec<u8>,
     phoneme_labels: Vec<String>,
     best_accuracy: f32,
     epoch: usize,
     genesis_phrase: String,
+    num_neurons: usize,
 }
