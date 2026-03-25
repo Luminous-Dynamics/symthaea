@@ -57,6 +57,12 @@ Full rules: @.claude/rules/DEVELOPMENT.md
   - `src/symthaea.rs` — public facade (8-phase pipeline: perception → cognition → translation)
   - `src/cognitive_loop/cycle.rs` — core cognitive pipeline with rayon-parallel post-processing
   - `symthaea-core/src/hdc/hdc_ltc_unified.rs` — unified HDC-LTC neuron (O(1) closed-form temporal jumps)
+- **CognitiveLoopService refactor** (Mar 2026): 56→38 fields via 3 sub-structs + ethics merge:
+  - `consciousness: ConsciousnessExecution` — consciousness_engine, monitors, gwt_mgr, self_model_tier, master_equation
+  - `memory: MemoryExecution` — memory_consol, episodic_persistence, causal_enhancer, knowledge_manager
+  - `behavior: BehavioralSynthesis` — flow_state, emotion_contagion, curiosity_drive, adaptive_behavior, thalamic_router, social_mgr
+  - EthicsAndValuesManager dissolved into EthicsEngine (eliminates dual-throttle moral evaluation)
+  - Internal field access: `self.consciousness.X`, `self.memory.X`, `self.behavior.X`
 - **Build**: `cargo test --lib` (default features), `cargo test --all-features`
 - **CI**: `symthaea-ci.yml` (GREEN) — fmt, clippy, test, docs, 49 feature matrix, 52 sub-crates
 - **Features**: 100 feature flags (default=[]), key flags: `reasoning_engine`, `identity`, `neural-bridge`, `lancedb-backend`, `ssm_language`, `integrity`, `safety-agents`, `sentinel`
@@ -100,9 +106,10 @@ Fractal CivOS with 5 tiers, consolidated into cluster DNAs (single DNA = cross-d
 | **mycelix-core** | `mycelix-core/` | 0TML federated learning research | 62 FL tests |
 
 - **Total**: 133+ zomes, ~785K lines Rust (~643K code, tokei-verified), 14 built hApp bundles
-- **Shared types**: `crates/mycelix-bridge-entry-types/` (DHT entries), `crates/mycelix-bridge-common/` (coordinator dispatch + cross-cluster + consciousness gating, 295+ tests)
-- **Cross-cluster bridge**: All clusters via `CallTargetCell::OtherRole` (unified hApp: `mycelix-workspace/happs/mycelix-unified-happ.yaml`)
-- **Consciousness gating**: 4D profile (identity/reputation/community/engagement) → 5 tiers (Observer→Guardian) → progressive vote weights
+- **Shared types**: `crates/mycelix-bridge-entry-types/` (DHT entries + error_messages), `crates/mycelix-bridge-common/` (coordinator dispatch + cross-cluster + consciousness gating + routing_registry, 450+ tests)
+- **Cross-cluster bridge**: All clusters via `CallTargetCell::OtherRole` (unified hApp: `mycelix-workspace/happs/mycelix-unified-happ.yaml`). Centralized routing in `routing_registry.rs` (13 routes, 35 tests)
+- **Consciousness gating**: 4D profile (identity/reputation/community/engagement) → 5 tiers (Observer→Guardian) → configurable vote weights (`VoteWeightConfig`: default/constitutional/budget/emergency presets)
+- **Sub-Passport**: Automatic effective_tier recovery (6h cooldown, 3:1 correction ratio, gradual one-tier-per-cooldown)
 - **SDKs**: Rust (18 modules, ~50K LOC, 1,036+ tests), TypeScript (37 modules, ~226K LOC, 6,316 tests), Python, WASM
 - **Dashboards**: LUCID (SvelteKit + Tauri, 40+ components, 95% Symthaea bridge), Observatory (SvelteKit)
 - **Build**: `just build-commons` / `just build-civic` (or `cargo build --release --target wasm32-unknown-unknown`)
