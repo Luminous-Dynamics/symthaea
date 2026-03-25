@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help dev test build clean web rust zomes fmt lint bench check
+.PHONY: help dev test build clean web rust zomes fmt lint bench check integration-test conductor-up conductor-down dna happ
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -24,7 +24,7 @@ web: ## Build web application
 
 zomes: ## Build Holochain zomes to WASM
 	@echo "▶ Building Holochain zomes..."
-	@echo "TODO: Add hc tooling commands when zomes are ready"
+	./scripts/build-wasm.sh
 
 fmt: ## Format all code
 	cargo fmt --all
@@ -61,3 +61,26 @@ clean: ## Clean all build artifacts
 
 reset: ## Reset Holochain dev environment
 	./scripts/hc-reset.sh
+
+dna: zomes ## Package DNA bundle
+	@echo "▶ Packaging DNA bundle..."
+	cd dna && hc dna pack . -o edunet.dna
+	@echo "  DNA: dna/edunet.dna"
+
+happ: dna ## Package hApp bundle
+	@echo "▶ Packaging hApp bundle..."
+	cp dna/edunet.dna happ/edunet.dna
+	hc app pack happ/ -o happ/mycelix-edunet.happ
+	@echo "  hApp: happ/mycelix-edunet.happ"
+
+integration-test: ## Run ignored integration tests (builds WASM + DNA + hApp first)
+	./scripts/run-integration-tests.sh
+
+conductor-up: happ ## Start conductor via docker-compose
+	@echo "▶ Starting Holochain conductor..."
+	docker compose up -d conductor
+	@echo "  Admin: ws://localhost:8888"
+	@echo "  App:   ws://localhost:8889"
+
+conductor-down: ## Stop conductor
+	docker compose down

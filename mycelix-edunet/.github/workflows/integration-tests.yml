@@ -1,0 +1,100 @@
+name: EduNet Integration Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'zomes/**'
+      - 'crates/**'
+      - 'tests/**'
+      - 'dna/**'
+      - 'happ/**'
+      - '.github/workflows/integration-tests.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'zomes/**'
+      - 'crates/**'
+      - 'tests/**'
+      - 'dna/**'
+      - 'happ/**'
+      - '.github/workflows/integration-tests.yml'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  integration:
+    name: Sweettest Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          # Cache both native and WASM targets
+          cache-targets: true
+          key: integration-tests
+
+      # Install Holochain CLI tools for DNA/hApp packaging
+      - name: Install Holochain tools
+        run: |
+          cargo install hc --version 0.6.0 --locked
+
+      # Step 1: Build all 20 WASM zomes
+      - name: Build WASM zomes
+        run: |
+          echo "Building integrity zomes..."
+          cargo build --target wasm32-unknown-unknown --release \
+            -p learning_integrity \
+            -p fl_integrity \
+            -p credential_integrity \
+            -p dao_integrity \
+            -p srs_integrity \
+            -p gamification_integrity \
+            -p adaptive_integrity \
+            -p integration_integrity \
+            -p pods_integrity \
+            -p knowledge_integrity
+
+          echo "Building coordinator zomes..."
+          cargo build --target wasm32-unknown-unknown --release \
+            -p learning_coordinator \
+            -p fl_coordinator \
+            -p credential_coordinator \
+            -p dao_coordinator \
+            -p srs_coordinator \
+            -p gamification_coordinator \
+            -p adaptive_coordinator \
+            -p integration_coordinator \
+            -p pods_coordinator \
+            -p knowledge_coordinator
+
+      # Step 2: Package DNA
+      - name: Package DNA bundle
+        run: |
+          cd dna && hc dna pack . -o edunet.dna
+          ls -lh edunet.dna
+
+      # Step 3: Package hApp
+      - name: Package hApp bundle
+        run: |
+          cp dna/edunet.dna happ/edunet.dna
+          hc app pack happ/ -o happ/mycelix-edunet.happ
+          ls -lh happ/mycelix-edunet.happ
+
+      # Step 4: Run sweettest integration tests
+      # SweetConductor runs an in-process conductor; no Docker needed.
+      - name: Run integration tests
+        run: |
+          cargo test --manifest-path tests/Cargo.toml -- --ignored
+        env:
+          RUST_LOG: info
+          RUST_BACKTRACE: 1

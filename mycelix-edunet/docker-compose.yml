@@ -10,7 +10,12 @@ services:
       - "3000:80"
     environment:
       - NODE_ENV=production
+      - HOLOCHAIN_ADMIN_URL=ws://conductor:8888
+      - HOLOCHAIN_APP_URL=ws://conductor:8889
     restart: unless-stopped
+    depends_on:
+      conductor:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/health"]
       interval: 30s
@@ -20,39 +25,29 @@ services:
     networks:
       - edunet
 
-  # Holochain conductor (future use)
-  # Uncomment when Holochain integration is complete (v0.2.0+)
-  # conductor:
-  #   build:
-  #     context: .
-  #     dockerfile: docker/Dockerfile.conductor
-  #   ports:
-  #     - "4444:4444"  # Admin interface
-  #     - "8888:8888"  # App interface
-  #   volumes:
-  #     - conductor_data:/data
-  #     - ./config/conductor-config.yaml:/data/conductor-config.yaml:ro
-  #   environment:
-  #     - RUST_LOG=info
-  #   restart: unless-stopped
-  #   healthcheck:
-  #     test: ["CMD", "holochain", "--version"]
-  #     interval: 30s
-  #     timeout: 3s
-  #     retries: 3
-  #     start_period: 10s
-  #   networks:
-  #     - edunet
-
-  # Lair keystore (future use)
-  # Uncomment when Holochain integration is complete
-  # lair:
-  #   image: holochain/lair-keystore:latest-0.4.x
-  #   volumes:
-  #     - lair_data:/data
-  #   restart: unless-stopped
-  #   networks:
-  #     - edunet
+  # Holochain conductor (v0.6)
+  conductor:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.conductor
+    ports:
+      - "8888:8888"  # Admin interface
+      - "8889:8889"  # App interface
+    volumes:
+      - conductor_data:/data
+      - ./conductor/dev-conductor-config.yaml:/app/conductor-config.yaml:ro
+      - ./happ/mycelix-edunet.happ:/app/mycelix-edunet.happ:ro
+    environment:
+      - RUST_LOG=info
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "holochain", "--version"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    networks:
+      - edunet
 
 networks:
   edunet:
@@ -60,6 +55,4 @@ networks:
 
 volumes:
   conductor_data:
-    driver: local
-  lair_data:
     driver: local

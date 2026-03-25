@@ -15,7 +15,7 @@ use hdk::prelude::*;
 use hdk::prelude::HdkPathExt;
 use dao_integrity::{
     Proposal, Vote, ProposalType, ProposalCategory, ProposalStatus, VoteChoice,
-    EntryTypes, LinkTypes
+    VotingMode, EntryTypes, LinkTypes
 };
 
 /// Create a new governance proposal
@@ -51,6 +51,9 @@ pub fn create_proposal(input: CreateProposalInput) -> ExternResult<ActionHash> {
         for_votes: 0,
         against_votes: 0,
         abstain_votes: 0,
+        weighted_for: 0,
+        weighted_against: 0,
+        voting_mode: input.voting_mode.unwrap_or_default(),
         voting_deadline,
         created_at: now,
         executed_at: None,
@@ -153,6 +156,24 @@ pub fn cast_vote(input: CastVoteInput) -> ExternResult<ActionHash> {
         )));
     }
 
+    // Compute vote weight for weighted voting modes
+    let (reputation_allocated, vote_weight) = match proposal.voting_mode {
+        VotingMode::Quadratic => {
+            let rep = input.reputation_allocated.unwrap_or(1000); // default 1000 permille
+            let weight = isqrt(rep);
+            (Some(rep), Some(weight))
+        }
+        VotingMode::Conviction => {
+            // Conviction voting: for now, treat like quadratic (future: time-lock)
+            let rep = input.reputation_allocated.unwrap_or(1000);
+            let weight = isqrt(rep);
+            (Some(rep), Some(weight))
+        }
+        VotingMode::Simple => {
+            (None, None)
+        }
+    };
+
     // Create vote entry
     let vote = Vote {
         proposal_id: input.proposal_id.clone(),
@@ -160,6 +181,8 @@ pub fn cast_vote(input: CastVoteInput) -> ExternResult<ActionHash> {
         choice: input.choice,
         justification: input.justification,
         timestamp: chrono::Utc::now().timestamp(),
+        reputation_allocated,
+        vote_weight,
     };
 
     // Store vote entry
@@ -188,6 +211,7 @@ pub fn cast_vote(input: CastVoteInput) -> ExternResult<ActionHash> {
         input.proposal_hash.clone(),
         proposal,
         &vote.choice,
+        vote_weight,
     )?;
 
     // Update the proposal entry with new tallies
@@ -395,13 +419,38 @@ fn ensure_path(path: Path, link_type: LinkTypes) -> ExternResult<EntryHash> {
     typed.path_entry_hash()
 }
 
+/// Integer square root for u64 (Newton's method)
+///
+/// Used for quadratic voting: vote_weight = isqrt(reputation_allocated)
+pub fn isqrt(n: u64) -> u64 {
+    if n <= 1 {
+        return n;
+    }
+    // Newton's method with overflow-safe initial guess
+    let mut x = n;
+    let mut y = n / 2 + 1;
+    // Ensure y < x for the first iteration (y = n/2+1 can equal n when n=2)
+    if y >= x {
+        y = x - 1;
+    }
+    loop {
+        if y >= x {
+            return x;
+        }
+        x = y;
+        y = (x + n / x) / 2;
+    }
+}
+
 /// Update vote tallies on a proposal based on a new vote.
 /// Delegates to pure helper functions for testable logic.
 fn update_proposal_vote_tallies(
     _proposal_hash: ActionHash,
     mut proposal: Proposal,
     vote_choice: &VoteChoice,
+    vote_weight: Option<u64>,
 ) -> ExternResult<Proposal> {
+    // Always update simple tallies (for backward compatibility and audit)
     let (f, a, ab) = apply_vote(
         proposal.for_votes,
         proposal.against_votes,
@@ -411,6 +460,21 @@ fn update_proposal_vote_tallies(
     proposal.for_votes = f;
     proposal.against_votes = a;
     proposal.abstain_votes = ab;
+
+    // Update weighted tallies for non-Simple modes
+    if let Some(weight) = vote_weight {
+        match vote_choice {
+            VoteChoice::For => {
+                proposal.weighted_for = proposal.weighted_for.saturating_add(weight);
+            }
+            VoteChoice::Against => {
+                proposal.weighted_against = proposal.weighted_against.saturating_add(weight);
+            }
+            VoteChoice::Abstain => {
+                // Abstain doesn't affect weighted tallies
+            }
+        }
+    }
 
     // Check if voting deadline has passed and update status if needed
     let now = chrono::Utc::now().timestamp();
@@ -467,6 +531,8 @@ pub struct CreateProposalInput {
     pub proposal_type: ProposalType,
     pub category: ProposalCategory,
     pub actions: Vec<serde_json::Value>, // Serialized to JSON string in entry
+    /// Voting mode (defaults to Simple for backward compatibility)
+    pub voting_mode: Option<VotingMode>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -475,6 +541,8 @@ pub struct CastVoteInput {
     pub proposal_hash: ActionHash,
     pub choice: VoteChoice,
     pub justification: Option<String>,
+    /// Reputation to stake on this vote (permille, required for Quadratic mode)
+    pub reputation_allocated: Option<u64>,
 }
 
 // ============================================================================
@@ -591,5 +659,79 @@ mod tests {
     fn test_apply_vote_saturating() {
         let (f, _, _) = apply_vote(u32::MAX, 0, 0, &VoteChoice::For);
         assert_eq!(f, u32::MAX);
+    }
+
+    // ---- isqrt ----
+
+    #[test]
+    fn test_isqrt_known_values() {
+        assert_eq!(isqrt(0), 0);
+        assert_eq!(isqrt(1), 1);
+        assert_eq!(isqrt(4), 2);
+        assert_eq!(isqrt(9), 3);
+        assert_eq!(isqrt(100), 10);
+        assert_eq!(isqrt(400), 20);
+        assert_eq!(isqrt(10000), 100);
+    }
+
+    #[test]
+    fn test_isqrt_non_perfect_squares() {
+        // isqrt floors to nearest integer
+        assert_eq!(isqrt(2), 1);
+        assert_eq!(isqrt(3), 1);
+        assert_eq!(isqrt(5), 2);
+        assert_eq!(isqrt(99), 9);
+        assert_eq!(isqrt(101), 10);
+    }
+
+    #[test]
+    fn test_isqrt_large_values() {
+        assert_eq!(isqrt(1_000_000), 1000);
+        assert_eq!(isqrt(u64::MAX), 4294967295); // floor(sqrt(2^64 - 1))
+    }
+
+    // ---- quadratic voting weight ----
+
+    #[test]
+    fn test_quadratic_vote_weight() {
+        // isqrt(100) = 10, isqrt(400) = 20
+        assert_eq!(isqrt(100), 10);
+        assert_eq!(isqrt(400), 20);
+    }
+
+    #[test]
+    fn test_weighted_tallying() {
+        // Two voters: rep 100 and 900
+        // Weights: isqrt(100) = 10, isqrt(900) = 30
+        let weight_a = isqrt(100);
+        let weight_b = isqrt(900);
+        assert_eq!(weight_a, 10);
+        assert_eq!(weight_b, 30);
+
+        // Total weighted_for if both vote For
+        let total = weight_a + weight_b;
+        assert_eq!(total, 40);
+    }
+
+    #[test]
+    fn test_simple_mode_backward_compatible() {
+        // In Simple mode, apply_vote works as before
+        let (f, a, ab) = apply_vote(0, 0, 0, &VoteChoice::For);
+        assert_eq!((f, a, ab), (1, 0, 0));
+    }
+
+    #[test]
+    fn test_voting_mode_default_is_simple() {
+        assert_eq!(VotingMode::default(), VotingMode::Simple);
+    }
+
+    #[test]
+    fn test_voting_mode_enum_variants() {
+        let simple = VotingMode::Simple;
+        let quadratic = VotingMode::Quadratic;
+        let conviction = VotingMode::Conviction;
+        assert_ne!(simple, quadratic);
+        assert_ne!(quadratic, conviction);
+        assert_ne!(simple, conviction);
     }
 }

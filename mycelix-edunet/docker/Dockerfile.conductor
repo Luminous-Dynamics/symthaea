@@ -1,57 +1,40 @@
 # Holochain Conductor Dockerfile for Mycelix EduNet
-# Currently for future use when Holochain integration is complete (v0.2.0+)
+# Multi-stage build for Holochain 0.6
 
-FROM rust:1.75-bookworm AS builder
+FROM rust:1.84-slim-bookworm AS builder
 
-# Install Holochain dependencies
 RUN apt-get update && apt-get install -y \
-    build-essential \
-    libssl-dev \
-    pkg-config \
+    pkg-config libssl-dev cmake git curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Holochain CLI tools
-RUN cargo install holochain --version ~0.3 --locked
-RUN cargo install lair_keystore --version ~0.4 --locked
-
-WORKDIR /app
-
-# Copy workspace files
-COPY Cargo.toml Cargo.lock ./
-COPY crates/ ./crates/
-COPY zomes/ ./zomes/
-
-# Build all zomes (when HDK is integrated)
-# RUN cargo build --release --workspace
+# Install Holochain tools (0.6.x)
+RUN cargo install holochain --version 0.6.0 --locked
+RUN cargo install lair-keystore --version 0.6.0 --locked
+RUN cargo install hc --version 0.6.0 --locked
 
 # Stage 2: Runtime image
 FROM debian:bookworm-slim
 
-# Install runtime dependencies
 RUN apt-get update && apt-get install -y \
-    ca-certificates \
-    libssl3 \
+    libssl3 ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Holochain binaries from builder
 COPY --from=builder /usr/local/cargo/bin/holochain /usr/local/bin/
 COPY --from=builder /usr/local/cargo/bin/lair-keystore /usr/local/bin/
+COPY --from=builder /usr/local/cargo/bin/hc /usr/local/bin/
 
-# Copy built zomes (when ready)
-# COPY --from=builder /app/target/release/*.wasm /app/zomes/
+# Create app directory and data directory
+WORKDIR /app
+RUN mkdir -p /data/databases
 
-# Create data directory
-RUN mkdir -p /data
-WORKDIR /data
+# Expose ports:
+#   8888 - Admin WebSocket interface
+#   8889 - App WebSocket interface
+EXPOSE 8888 8889
 
-# Expose ports
-# 4444: Admin interface
-# 8888: App interface
-EXPOSE 4444 8888
+HEALTHCHECK --interval=5s --timeout=3s --retries=5 \
+    CMD holochain --version || exit 1
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD holochain --version || exit 1
-
-# Note: Actual conductor launch will be configured via docker-compose
-CMD ["holochain", "--version"]
+ENTRYPOINT ["holochain"]
+CMD ["-c", "/app/conductor-config.yaml"]

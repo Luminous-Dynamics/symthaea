@@ -32,10 +32,17 @@ pub struct Proposal {
     /// Current status
     pub status: ProposalStatus,
 
-    /// Vote tallies (flattened)
+    /// Vote tallies (flattened, simple mode)
     pub for_votes: u32,
     pub against_votes: u32,
     pub abstain_votes: u32,
+
+    /// Weighted vote tallies (permille, for Quadratic/Conviction modes)
+    pub weighted_for: u64,
+    pub weighted_against: u64,
+
+    /// Voting mode for this proposal
+    pub voting_mode: VotingMode,
 
     /// Voting deadline
     pub voting_deadline: i64,
@@ -68,6 +75,12 @@ pub struct Vote {
 
     /// Vote timestamp
     pub timestamp: i64,
+
+    /// Reputation staked on this vote (permille, for weighted voting modes)
+    pub reputation_allocated: Option<u64>,
+
+    /// Computed vote weight (permille, for auditing)
+    pub vote_weight: Option<u64>,
 }
 
 // ============================================================================
@@ -125,6 +138,23 @@ pub enum VoteChoice {
     For,
     Against,
     Abstain,
+}
+
+/// Voting mode for proposals
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
+pub enum VotingMode {
+    /// 1 person = 1 vote (default, backward compatible)
+    Simple,
+    /// sqrt(reputation) voting — prevents plutocracy
+    Quadratic,
+    /// Time-locked voting (future implementation)
+    Conviction,
+}
+
+impl Default for VotingMode {
+    fn default() -> Self {
+        VotingMode::Simple
+    }
 }
 
 // ============================================================================
@@ -233,6 +263,13 @@ pub fn validate_create_proposal(proposal: &Proposal) -> ExternResult<ValidateCal
         ));
     }
 
+    // Validate weighted tallies start at zero
+    if proposal.weighted_for != 0 || proposal.weighted_against != 0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "New proposals must have zero weighted votes".to_string(),
+        ));
+    }
+
     // Validate status is Active for new proposals
     if proposal.status != ProposalStatus::Active {
         return Ok(ValidateCallbackResult::Invalid(
@@ -321,6 +358,9 @@ mod tests {
             for_votes: 0,
             against_votes: 0,
             abstain_votes: 0,
+            weighted_for: 0,
+            weighted_against: 0,
+            voting_mode: VotingMode::Simple,
             voting_deadline: now + (7 * 24 * 3600), // 7 days from now
             created_at: now,
             executed_at: None,
@@ -336,6 +376,8 @@ mod tests {
             choice: VoteChoice::For,
             justification: Some("I support this proposal".to_string()),
             timestamp: now,
+            reputation_allocated: None,
+            vote_weight: None,
         }
     }
 
