@@ -54,55 +54,57 @@ enum TemplateKind {
 }
 
 /// Extract a ProgramNode's template: what kind is it, and what are the
-/// encodings of its children (the "holes" to fill)?
+/// STRUCTURAL encodings of its children (the "holes" to fill)?
+/// Uses property-based encoding so matching is name-independent.
 fn extract_template(node: &ProgramNode) -> (TemplateKind, Vec<BinaryHV>) {
+    use crate::periodic_table::encode_structural as enc;
     match node {
         ProgramNode::Atom(_) | ProgramNode::Typed(_, _) => {
-            (TemplateKind::Leaf, vec![node.encode()])
+            (TemplateKind::Leaf, vec![enc(node)])
         }
         ProgramNode::Apply { func, args } => {
-            let mut children = vec![func.encode()];
-            children.extend(args.iter().map(|a| a.encode()));
+            let mut children = vec![enc(func)];
+            children.extend(args.iter().map(|a| enc(a)));
             (TemplateKind::Apply { arity: args.len() }, children)
         }
         ProgramNode::Sequence(steps) => {
-            let children = steps.iter().map(|s| s.encode()).collect();
+            let children = steps.iter().map(|s| enc(s)).collect();
             (TemplateKind::Sequence { length: steps.len() }, children)
         }
         ProgramNode::Branch { condition, then_branch, else_branch } => {
             (TemplateKind::Branch, vec![
-                condition.encode(), then_branch.encode(), else_branch.encode(),
+                enc(condition), enc(then_branch), enc(else_branch),
             ])
         }
         ProgramNode::Iterate { init, step, condition } => {
             (TemplateKind::Iterate, vec![
-                init.encode(), step.encode(), condition.encode(),
+                enc(init), enc(step), enc(condition),
             ])
         }
         ProgramNode::Recurse { base_case, recursive_step } => {
             (TemplateKind::Recurse, vec![
-                base_case.encode(), recursive_step.encode(),
+                enc(base_case), enc(recursive_step),
             ])
         }
         ProgramNode::Map { func, collection } => {
-            (TemplateKind::Map, vec![func.encode(), collection.encode()])
+            (TemplateKind::Map, vec![enc(func), enc(collection)])
         }
         ProgramNode::Filter { predicate, collection } => {
-            (TemplateKind::Filter, vec![predicate.encode(), collection.encode()])
+            (TemplateKind::Filter, vec![enc(predicate), enc(collection)])
         }
         ProgramNode::Reduce { func, initial, collection } => {
             (TemplateKind::Reduce, vec![
-                func.encode(), initial.encode(), collection.encode(),
+                enc(func), enc(initial), enc(collection),
             ])
         }
         ProgramNode::Compose(f, g) => {
-            (TemplateKind::Compose, vec![f.encode(), g.encode()])
+            (TemplateKind::Compose, vec![enc(f), enc(g)])
         }
         ProgramNode::Collect(source) => {
-            (TemplateKind::Collect, vec![source.encode()])
+            (TemplateKind::Collect, vec![enc(source)])
         }
         ProgramNode::Abstract(examples) => {
-            let children = examples.iter().map(|e| e.encode()).collect();
+            let children = examples.iter().map(|e| enc(e)).collect();
             (TemplateKind::Sequence { length: examples.len() }, children)
         }
     }
@@ -113,16 +115,19 @@ fn extract_template(node: &ProgramNode) -> (TemplateKind, Vec<BinaryHV>) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// For each child position in the template, find the best-matching donor sub-tree.
+/// Uses structural (property-based) encoding for matching — name-independent.
 fn find_best_donors(
     child_targets: &[BinaryHV],
     donors: &[(String, ProgramNode, BinaryHV)],
 ) -> Vec<ProgramNode> {
+    use crate::periodic_table::encode_structural;
     child_targets.iter()
         .map(|target_child| {
             donors.iter()
                 .max_by(|a, b| {
-                    a.2.similarity(target_child)
-                        .partial_cmp(&b.2.similarity(target_child))
+                    // Compare using structural encoding of the donor node
+                    encode_structural(&a.1).similarity(target_child)
+                        .partial_cmp(&encode_structural(&b.1).similarity(target_child))
                         .unwrap_or(Ordering::Equal)
                 })
                 .map(|(_, node, _)| node.clone())

@@ -99,11 +99,23 @@ impl TriOracle {
         candidate: &ProgramNode,
         expected: &ProgramNode,
     ) -> TriOracleScore {
-        let candidate_enc = candidate.encode();
-        let expected_enc = expected.encode();
+        // Blend property-based structural encoding (name-independent, for composition)
+        // with name-based encoding (operator-discriminative, for scoring).
+        // Structural encoding makes ADD(a,b) ≈ ADD(x,y) but also ADD(a,b) ≈ MUL(a,b).
+        // Name encoding makes ADD(a,b) ≈ ADD(x,y)=0.5 but ADD(a,b) ≠ MUL(a,b).
+        // Blend: 50% structural + 50% name → best of both.
+        let structural_enc_c = crate::periodic_table::encode_structural(candidate);
+        let structural_enc_e = crate::periodic_table::encode_structural(expected);
+        let name_enc_c = candidate.encode();
+        let name_enc_e = expected.encode();
 
-        // Oracle 1: Structural (encoding similarity)
-        let structural = Self::structural_score(&candidate_enc, &expected_enc);
+        let structural_sim = structural_enc_c.similarity(&structural_enc_e);
+        let name_sim = name_enc_c.similarity(&name_enc_e);
+        let structural = 0.5 * structural_sim + 0.5 * name_sim;
+
+        // Use name-based encoding for trajectory (it needs operator distinction)
+        let candidate_enc = name_enc_c;
+        let expected_enc = name_enc_e;
 
         // Oracle 2: Topological (PDG Betti comparison)
         let topological = Self::topological_score(candidate, expected);
