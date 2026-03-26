@@ -777,6 +777,10 @@ required-features = ["flight-mujoco"]
 name = "humanoid_integration"
 required-features = ["humanoid"]
 
+[[test]]
+name = "embodiment_integration"
+required-features = ["humanoid"]
+
 [[example]]
 name = "dmc_humanoid_stand"
 required-features = ["humanoid"]

@@ -36,7 +36,9 @@
 
 #![allow(clippy::needless_range_loop)]
 
+pub mod benchmarks;
 pub mod controller;
+pub mod embodiment;
 pub mod encoder;
 pub mod fep_agent;
 pub mod perturbations;
