@@ -24,6 +24,9 @@ members = [
   # Adaptive Learning Intelligence (ML-inspired personalization)
   "zomes/adaptive_zome/integrity",
   "zomes/adaptive_zome/coordinator",
+  # Classroom Management (teacher/student/parent roles)
+  "zomes/classroom_zome/integrity",
+  "zomes/classroom_zome/coordinator",
   # Integration Layer (cross-zome orchestration)
   "zomes/integration_zome/integrity",
   "zomes/integration_zome/coordinator",

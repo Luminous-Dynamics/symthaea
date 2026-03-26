@@ -19,6 +19,7 @@ mod gamification_social;
 mod retention;
 mod flow;
 mod mastery;
+pub mod grade_adaptation;
 
 pub use tutoring::*;
 pub use analytics::*;
@@ -26,6 +27,7 @@ pub use gamification_social::*;
 pub use retention::*;
 pub use flow::*;
 pub use mastery::*;
+pub use grade_adaptation::*;
 
 // ============== Constants ==============
 

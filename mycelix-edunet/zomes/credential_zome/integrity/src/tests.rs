@@ -371,6 +371,299 @@ mod edge_case_tests {
 }
 
 // =============================================================================
+// Assessment validation tests
+// =============================================================================
+
+#[cfg(test)]
+mod assessment_validation_tests {
+    use super::*;
+
+    fn create_valid_assessment() -> Assessment {
+        Assessment {
+            node_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            assessment_type: AssessmentType::Quiz,
+            title: "Rust Basics Quiz".to_string(),
+            instructions: Some("Answer all questions".to_string()),
+            max_score: 100,
+            passing_score: 70,
+            rubric: vec![RubricCriterion {
+                name: "Understanding".to_string(),
+                description: "Core concepts".to_string(),
+                max_points: 50,
+                levels: vec![
+                    RubricLevel {
+                        label: "Exceeds".to_string(),
+                        points: 50,
+                        description: "Demonstrates deep understanding".to_string(),
+                    },
+                    RubricLevel {
+                        label: "Meets".to_string(),
+                        points: 35,
+                        description: "Meets expectations".to_string(),
+                    },
+                    RubricLevel {
+                        label: "Beginning".to_string(),
+                        points: 15,
+                        description: "Developing understanding".to_string(),
+                    },
+                ],
+            }],
+            bloom_level: Some("Apply".to_string()),
+            time_limit_minutes: Some(30),
+            creator: AgentPubKey::from_raw_36(vec![0xdb; 36]),
+            created_at: 1700000000,
+        }
+    }
+
+    #[test]
+    fn test_valid_assessment() {
+        let a = create_valid_assessment();
+        let result = validate_assessment(&a);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_assessment_empty_title() {
+        let mut a = create_valid_assessment();
+        a.title = "".to_string();
+        let result = validate_assessment(&a);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_assessment_title_too_long() {
+        let mut a = create_valid_assessment();
+        a.title = "x".repeat(201);
+        let result = validate_assessment(&a);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_assessment_title_at_max_length() {
+        let mut a = create_valid_assessment();
+        a.title = "x".repeat(200);
+        let result = validate_assessment(&a);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_assessment_passing_exceeds_max() {
+        let mut a = create_valid_assessment();
+        a.passing_score = 101;
+        a.max_score = 100;
+        let result = validate_assessment(&a);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_assessment_passing_equals_max() {
+        let mut a = create_valid_assessment();
+        a.passing_score = 100;
+        a.max_score = 100;
+        let result = validate_assessment(&a);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_assessment_too_many_rubric_criteria() {
+        let mut a = create_valid_assessment();
+        a.rubric = (0..21)
+            .map(|i| RubricCriterion {
+                name: format!("Criterion {}", i),
+                description: "desc".to_string(),
+                max_points: 5,
+                levels: vec![],
+            })
+            .collect();
+        let result = validate_assessment(&a);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_assessment_rubric_name_too_long() {
+        let mut a = create_valid_assessment();
+        a.rubric[0].name = "x".repeat(101);
+        let result = validate_assessment(&a);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_assessment_too_many_rubric_levels() {
+        let mut a = create_valid_assessment();
+        a.rubric[0].levels = (0..11)
+            .map(|i| RubricLevel {
+                label: format!("Level {}", i),
+                points: i as u32,
+                description: "desc".to_string(),
+            })
+            .collect();
+        let result = validate_assessment(&a);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_assessment_no_rubric_is_valid() {
+        let mut a = create_valid_assessment();
+        a.rubric = vec![];
+        let result = validate_assessment(&a);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_assessment_default_type() {
+        assert_eq!(AssessmentType::default(), AssessmentType::Quiz);
+    }
+}
+
+// =============================================================================
+// StudentResult validation tests
+// =============================================================================
+
+#[cfg(test)]
+mod student_result_validation_tests {
+    use super::*;
+
+    fn create_valid_student_result() -> StudentResult {
+        StudentResult {
+            assessment_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            student: AgentPubKey::from_raw_36(vec![0xdb; 36]),
+            score: 85,
+            rubric_scores: vec![40, 45],
+            attempt_number: 1,
+            reasoning_trace: None,
+            consciousness_level_permille: Some(750),
+            feedback: Some("Good work".to_string()),
+            graded_by: Some(AgentPubKey::from_raw_36(vec![0xab; 36])),
+            completed_at: 1700000000,
+        }
+    }
+
+    #[test]
+    fn test_valid_student_result() {
+        let r = create_valid_student_result();
+        let result = validate_student_result(&r);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_student_result_zero_attempt() {
+        let mut r = create_valid_student_result();
+        r.attempt_number = 0;
+        let result = validate_student_result(&r);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_student_result_consciousness_over_1000() {
+        let mut r = create_valid_student_result();
+        r.consciousness_level_permille = Some(1001);
+        let result = validate_student_result(&r);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_student_result_consciousness_at_1000() {
+        let mut r = create_valid_student_result();
+        r.consciousness_level_permille = Some(1000);
+        let result = validate_student_result(&r);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_student_result_no_consciousness_level() {
+        let mut r = create_valid_student_result();
+        r.consciousness_level_permille = None;
+        let result = validate_student_result(&r);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+}
+
+// =============================================================================
+// ReportCard validation tests
+// =============================================================================
+
+#[cfg(test)]
+mod report_card_validation_tests {
+    use super::*;
+
+    fn create_valid_report_card() -> ReportCard {
+        ReportCard {
+            student: AgentPubKey::from_raw_36(vec![0xdb; 36]),
+            classroom_hash: None,
+            period: "2025-Spring".to_string(),
+            subject_grades: vec![SubjectGrade {
+                subject: "Mathematics".to_string(),
+                grade_band: "A".to_string(),
+                mastery_permille: 920,
+                standards_met: 18,
+                standards_total: 20,
+            }],
+            total_mastery_permille: 920,
+            attendance_days: 170,
+            absence_days: 10,
+            teacher_narrative: Some("Excellent student".to_string()),
+            generated_at: 1700000000,
+        }
+    }
+
+    #[test]
+    fn test_valid_report_card() {
+        let rc = create_valid_report_card();
+        let result = validate_report_card(&rc);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_report_card_empty_period() {
+        let mut rc = create_valid_report_card();
+        rc.period = "".to_string();
+        let result = validate_report_card(&rc);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_report_card_mastery_over_1000() {
+        let mut rc = create_valid_report_card();
+        rc.total_mastery_permille = 1001;
+        let result = validate_report_card(&rc);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_report_card_subject_empty_name() {
+        let mut rc = create_valid_report_card();
+        rc.subject_grades[0].subject = "".to_string();
+        let result = validate_report_card(&rc);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_report_card_subject_mastery_over_1000() {
+        let mut rc = create_valid_report_card();
+        rc.subject_grades[0].mastery_permille = 1001;
+        let result = validate_report_card(&rc);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_report_card_standards_met_exceeds_total() {
+        let mut rc = create_valid_report_card();
+        rc.subject_grades[0].standards_met = 21;
+        rc.subject_grades[0].standards_total = 20;
+        let result = validate_report_card(&rc);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_report_card_no_grades_is_valid() {
+        let mut rc = create_valid_report_card();
+        rc.subject_grades = vec![];
+        let result = validate_report_card(&rc);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+}
+
+// =============================================================================
 // Security validation tests (is_finite guards)
 // =============================================================================
 

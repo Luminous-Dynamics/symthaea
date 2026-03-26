@@ -26,6 +26,8 @@ integrity:
       path: ../target/wasm32-unknown-unknown/release/pods_integrity.wasm
     - name: knowledge_integrity
       path: ../target/wasm32-unknown-unknown/release/knowledge_integrity.wasm
+    - name: classroom_integrity
+      path: ../target/wasm32-unknown-unknown/release/classroom_integrity.wasm
 
 coordinator:
   zomes:
@@ -75,3 +77,7 @@ coordinator:
       path: ../target/wasm32-unknown-unknown/release/knowledge_coordinator.wasm
       dependencies:
         - name: knowledge_integrity
+    - name: classroom_coordinator
+      path: ../target/wasm32-unknown-unknown/release/classroom_coordinator.wasm
+      dependencies:
+        - name: classroom_integrity

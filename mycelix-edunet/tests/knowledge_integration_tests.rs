@@ -1,4 +1,6 @@
-//! Integration tests for Knowledge Roots Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Integration tests for Knowledge Roots Zome
 //!
 //! These tests verify complete workflows using the Knowledge Roots coordinator functions.
 //! They cover the full knowledge graph lifecycle: nodes → edges → paths → progress → recommendations.
@@ -44,6 +46,10 @@ fn create_test_node(
         created_at: 1700000000,
         modified_at: 1700000000,
         version: 1,
+        grade_levels: vec![],
+        bloom_level: None,
+        subject_area: None,
+        academic_standards: vec![],
     }
 }
 

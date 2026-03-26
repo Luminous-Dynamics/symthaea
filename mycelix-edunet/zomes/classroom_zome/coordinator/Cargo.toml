@@ -1,0 +1,25 @@
+[package]
+name = "classroom_coordinator"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Classroom coordinator zome - implements classroom management with teacher/student/parent roles"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "classroom_coordinator"
+
+[dependencies]
+# Holochain Development Kit (HDK) for zome functions
+hdk.workspace = true
+
+# Link to the integrity zome
+classroom_integrity = { path = "../integrity" }
+
+# Core types
+edunet-core = { path = "../../../crates/edunet-core" }
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true

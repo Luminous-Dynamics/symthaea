@@ -18,7 +18,7 @@ use knowledge_integrity::{
     EntryTypes, LinkTypes, KnowledgeNode, LearningEdge, LearningPath,
     SkillTree, NodeProgress, EdgeVote, PathRecommendation,
     DifficultyLevel, EdgeType, EdgeStatus, NodeStatus,
-    ProgressStatus, VoteDirection,
+    ProgressStatus, VoteDirection, GradeLevel, SubjectArea,
 };
 
 // Helper function to ensure a path exists and return its entry hash
@@ -58,6 +58,31 @@ pub fn create_node(node: KnowledgeNode) -> ExternResult<ActionHash> {
             LinkTypes::NodeToCourses,
             (),
         )?;
+    }
+
+    // Link by grade levels
+    for grade in &node.grade_levels {
+        let grade_path = Path::from(format!("grade.{}", grade.ordinal()));
+        let grade_hash = ensure_path(grade_path, LinkTypes::GradeToNodes)?;
+        create_link(grade_hash, action_hash.clone(), LinkTypes::GradeToNodes, ())?;
+    }
+
+    // Link by subject area
+    if let Some(ref subject) = node.subject_area {
+        let subject_key = match subject {
+            SubjectArea::Mathematics => "mathematics".to_string(),
+            SubjectArea::EnglishLanguageArts => "english_language_arts".to_string(),
+            SubjectArea::Science => "science".to_string(),
+            SubjectArea::SocialStudies => "social_studies".to_string(),
+            SubjectArea::ForeignLanguage => "foreign_language".to_string(),
+            SubjectArea::Arts => "arts".to_string(),
+            SubjectArea::PhysicalEducation => "physical_education".to_string(),
+            SubjectArea::Technology => "technology".to_string(),
+            SubjectArea::Custom(name) => name.to_lowercase(),
+        };
+        let subject_path = Path::from(format!("subject.{}", subject_key));
+        let subject_hash = ensure_path(subject_path, LinkTypes::SubjectToNodes)?;
+        create_link(subject_hash, action_hash.clone(), LinkTypes::SubjectToNodes, ())?;
     }
 
     Ok(action_hash)
@@ -141,6 +166,31 @@ pub fn search_nodes(query: SearchNodesInput) -> ExternResult<Vec<Record>> {
                 // Match by domain
                 if let Some(ref domain) = query.domain {
                     if !node.domain.to_lowercase().contains(&domain.to_lowercase()) {
+                        return false;
+                    }
+                }
+                // Match by grade level
+                if let Some(ref grade) = query.grade_level {
+                    if !node.grade_levels.contains(grade) {
+                        return false;
+                    }
+                }
+                // Match by subject area
+                if let Some(ref subject) = query.subject_area {
+                    let subject_lower = subject.to_lowercase();
+                    let matches = match &node.subject_area {
+                        Some(SubjectArea::Mathematics) => "mathematics".contains(&subject_lower),
+                        Some(SubjectArea::EnglishLanguageArts) => "english_language_arts".contains(&subject_lower),
+                        Some(SubjectArea::Science) => "science".contains(&subject_lower),
+                        Some(SubjectArea::SocialStudies) => "social_studies".contains(&subject_lower),
+                        Some(SubjectArea::ForeignLanguage) => "foreign_language".contains(&subject_lower),
+                        Some(SubjectArea::Arts) => "arts".contains(&subject_lower),
+                        Some(SubjectArea::PhysicalEducation) => "physical_education".contains(&subject_lower),
+                        Some(SubjectArea::Technology) => "technology".contains(&subject_lower),
+                        Some(SubjectArea::Custom(name)) => name.to_lowercase().contains(&subject_lower),
+                        None => false,
+                    };
+                    if !matches {
                         return false;
                     }
                 }
@@ -651,6 +701,84 @@ pub fn list_skill_trees(_: ()) -> ExternResult<Vec<Record>> {
     Ok(trees)
 }
 
+// ============== Grade & Subject Query Functions ==============
+
+/// Get all knowledge nodes tagged for a specific grade level
+#[hdk_extern]
+pub fn get_nodes_by_grade(grade: GradeLevel) -> ExternResult<Vec<Record>> {
+    let path = Path::from(format!("grade.{}", grade.ordinal()));
+    let path_hash = ensure_path(path, LinkTypes::GradeToNodes)?;
+
+    let links = get_links(
+        LinkQuery::try_new(path_hash, LinkTypes::GradeToNodes)?,
+        GetStrategy::Local,
+    )?;
+
+    let mut records = Vec::new();
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!("Failed to convert link target"))?;
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            records.push(record);
+        }
+    }
+    Ok(records)
+}
+
+/// Get all knowledge nodes in a specific subject area
+#[hdk_extern]
+pub fn get_nodes_by_subject(subject: String) -> ExternResult<Vec<Record>> {
+    let path = Path::from(format!("subject.{}", subject.to_lowercase()));
+    let path_hash = ensure_path(path, LinkTypes::SubjectToNodes)?;
+
+    let links = get_links(
+        LinkQuery::try_new(path_hash, LinkTypes::SubjectToNodes)?,
+        GetStrategy::Local,
+    )?;
+
+    let mut records = Vec::new();
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!("Failed to convert link target"))?;
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            records.push(record);
+        }
+    }
+    Ok(records)
+}
+
+/// Get nodes matching a grade range (inclusive)
+#[hdk_extern]
+pub fn get_nodes_by_grade_range(input: GradeRangeInput) -> ExternResult<Vec<Record>> {
+    let min = input.min_grade.ordinal();
+    let max = input.max_grade.ordinal();
+
+    let mut all_records = Vec::new();
+    let mut seen_hashes = std::collections::HashSet::new();
+
+    for ordinal in min..=max {
+        let path = Path::from(format!("grade.{}", ordinal));
+        let path_hash = ensure_path(path, LinkTypes::GradeToNodes)?;
+
+        let links = get_links(
+            LinkQuery::try_new(path_hash, LinkTypes::GradeToNodes)?,
+            GetStrategy::Local,
+        )?;
+
+        for link in links {
+            let action_hash = ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!("Failed to convert link target"))?;
+            if seen_hashes.insert(action_hash.clone()) {
+                if let Some(record) = get(action_hash, GetOptions::default())? {
+                    all_records.push(record);
+                }
+            }
+        }
+    }
+
+    Ok(all_records)
+}
+
 // ============== Input/Output Types ==============
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -658,6 +786,10 @@ pub struct SearchNodesInput {
     pub tag: Option<String>,
     pub domain: Option<String>,
     pub difficulty: Option<DifficultyLevel>,
+    #[serde(default)]
+    pub grade_level: Option<GradeLevel>,
+    #[serde(default)]
+    pub subject_area: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -686,6 +818,12 @@ pub struct RecommendationInput {
     pub target_skill: String,
     pub max_hours: Option<u32>,
     pub preferred_difficulty: Option<DifficultyLevel>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GradeRangeInput {
+    pub min_grade: GradeLevel,
+    pub max_grade: GradeLevel,
 }
 
 // ============================================================================
