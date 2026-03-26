@@ -20,6 +20,7 @@ mod retention;
 mod flow;
 mod mastery;
 pub mod grade_adaptation;
+pub mod scheduling;
 
 pub use tutoring::*;
 pub use analytics::*;
@@ -28,6 +29,7 @@ pub use retention::*;
 pub use flow::*;
 pub use mastery::*;
 pub use grade_adaptation::*;
+pub use scheduling::*;
 
 // ============== Constants ==============
 
