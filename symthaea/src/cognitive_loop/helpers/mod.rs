@@ -605,9 +605,12 @@ impl CognitiveLoopService {
         self.stats.flow_streak = self.behavior.flow_state.streak;
         self.stats.flow_learning_boost = self.behavior.flow_state.learning_boost;
 
-        // Emotion contagion stats
-        self.stats.emotional_valence = self.behavior.emotion_contagion.smoothed_valence();
-        self.stats.emotional_arousal = self.behavior.emotion_contagion.smoothed_arousal();
+        // Emotion contagion stats — read from unified emotional state (canonical source)
+        // EmotionContagion is now a stateless preprocessor; UnifiedEmotionalState
+        // is the single source of truth for affect (Phase 2 consolidation).
+        let unified_emo = self.unification_engine.emotional.state();
+        self.stats.emotional_valence = unified_emo.valence as f32;
+        self.stats.emotional_arousal = unified_emo.arousal as f32;
         let (nudge_pattern, nudge_strength) = self.behavior.emotion_contagion.pattern_nudge();
         let nudge_str = nudge_pattern.map(|p| p.as_str()).unwrap_or("None");
         if self.stats.emotion_nudge_pattern != nudge_str {
@@ -849,7 +852,7 @@ impl CognitiveLoopService {
         self.primitive_tier.reset();
         self.memory.memory_consol.reset();
         self.feature_integ.reset();
-        self.vision_sensory.reset();
+        self.sensorimotor.vision_sensory.reset();
         // Note: predictive_phi_modulation and cross_modal_psi already reset
         // via self.carryover = CycleCarryover::default() above.
         self.subsystem_collector.clear();

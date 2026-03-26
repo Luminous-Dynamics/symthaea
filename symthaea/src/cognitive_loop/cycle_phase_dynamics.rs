@@ -392,7 +392,7 @@ impl CognitiveLoopService {
             self.behavior.emotion_contagion.valence,
             self.thermodynamic_load,
             self.carryover.quality.last_dissipative_health,
-            self.somatic_bridge.systemic_stress(),
+            self.sensorimotor.somatic_bridge.systemic_stress(),
             urgency,
             false, // attention_budget_exceeded not yet known at this point
             &perception.encoding.compressed_state,
@@ -551,10 +551,31 @@ impl CognitiveLoopService {
                         .record("swarm_manager", swarm_output);
                 }
 
+                // ── Thermodynamic Manager (interval 43, co-prime) ─────
+                // Unified thermodynamics: cross-couples dissipative,
+                // analyzer, HFE, physics bridge. Inputs set by cycle_consciousness,
+                // integration, monitors, and cycle phases.
+                {
+                    use super::subsystem_trait::CognitiveSubsystem;
+                    if self.thermodynamic_mgr.should_run(cycle_num, urgency_u8) {
+                        let thermo_output = self.thermodynamic_mgr.process(snapshot);
+                        self.subsystem_collector
+                            .record("thermodynamic_manager", thermo_output);
+                    }
+                }
+
                 // ── Holon Receiver (every cycle — low cost) ────────────
-                // Process inbound messages from connected Soma devices.
+                // Drain HTTP channel into HolonReceiver, then process all queued messages.
                 // Routes tasks, knowledge, and peer state into the existing managers.
                 {
+                    // Drain mpsc channel from HTTP handlers (HolonHttpState) into HolonReceiver.
+                    if let Ok(guard) = self.holon_inbound_rx.lock() {
+                        if let Some(ref rx) = *guard {
+                            while let Ok((device_id, msg)) = rx.try_recv() {
+                                self.holon_receiver.enqueue_message(device_id, msg);
+                            }
+                        }
+                    }
                     let processed = self.holon_receiver.process_inbound(cycle_num as u64);
                     if processed > 0 {
                         // Collect peer data into local vec (avoid borrow conflict with swarm_manager)
@@ -1349,8 +1370,10 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // 1c. Update Unified Emotional Bridge (VAD-based)
         // ═══════════════════════════════════════════════════════════════════════
-        let simple_valence = self.behavior.emotion_contagion.prosody_valence() as f64;
-        let simple_arousal = self.behavior.emotion_contagion.prosody_arousal() as f64;
+        // Feed raw text-derived affect into unified bridge (EmotionContagion
+        // is a stateless preprocessor; smoothing happens in UnifiedEmotionalState).
+        let simple_valence = self.behavior.emotion_contagion.valence as f64;
+        let simple_arousal = self.behavior.emotion_contagion.arousal as f64;
         let dominance = if self.behavior.flow_state.in_flow {
             DOMINANCE_FLOW_BASE + DOMINANCE_FLOW_SCALE * self.behavior.flow_state.intensity as f64
         } else if self.prediction_confidence > DOMINANCE_CONFIDENCE_THRESHOLD {
@@ -2208,7 +2231,7 @@ impl CognitiveLoopService {
                                     .to_string(),
                             ),
                         };
-                        self.motor_rendering.last_result = Some(result);
+                        self.sensorimotor.motor_rendering.last_result = Some(result);
                     } else if self.carryover.quality.subsystem_veto {
                         // Subsystem veto: sentinel/safety manager flagged this cycle unsafe
                         tracing::warn!(
@@ -2226,9 +2249,10 @@ impl CognitiveLoopService {
                                     .to_string(),
                             ),
                         };
-                        self.motor_rendering.last_result = Some(result);
-                    } else if let Some(ref mut bridge) = self.motor_rendering.output_bridge {
+                        self.sensorimotor.motor_rendering.last_result = Some(result);
+                    } else if let Some(ref mut bridge) = self.sensorimotor.motor_rendering.output_bridge {
                         let request = self
+                            .sensorimotor
                             .motor_rendering
                             .pending_request
                             .take()
@@ -2274,8 +2298,8 @@ impl CognitiveLoopService {
                         );
                         self.fep.agent.perceive(&motor_obs);
 
-                        self.motor_rendering.last_phi = motor_phi;
-                        self.motor_rendering.last_result = Some(result);
+                        self.sensorimotor.motor_rendering.last_phi = motor_phi;
+                        self.sensorimotor.motor_rendering.last_result = Some(result);
                     }
                 }
                 MotorCommandType::NoOp => {}
@@ -2936,6 +2960,7 @@ impl CognitiveLoopService {
             fep_tau_factor,
             prediction_horizon_tau,
             causal_world_model_edges: if self
+                .memory
                 .causal_enhancer
                 .as_ref()
                 .map_or(false, |e| e.has_causal_structure())
@@ -3285,6 +3310,7 @@ impl CognitiveLoopService {
             .unwrap_or(Cow::Borrowed(&perception.encoding.compressed_state));
         let current_phi_for_lr = pre_update_coherence as f64;
         let mut semantic_lr_factor = self
+            .memory
             .memory_consol
             .semantic_memory
             .compute_lr_factor_phi_weighted(
@@ -3466,7 +3492,7 @@ impl CognitiveLoopService {
 
         // 10th factor: Thermal bridge — platform heat → CfC slowdown.
         // Science: Angilletta (2009) thermal performance curves.
-        let thermal_tau_factor = self.thermal_bridge.signals().tau_factor as f32;
+        let thermal_tau_factor = self.sensorimotor.thermal_bridge.signals().tau_factor as f32;
 
         // 11th factor: Neuroevolution champion τ — evolved tau_base ratio.
         // When neuroevolution discovers a better tau_base, blend it toward the
@@ -3515,6 +3541,7 @@ impl CognitiveLoopService {
             * coherence_velocity_tau_factor
             * prediction_horizon_tau
             * self
+                .sensorimotor
                 .somatic_bridge
                 .to_interoceptive_signals()
                 .tau_slowdown_factor as f32
@@ -4040,7 +4067,7 @@ impl CognitiveLoopService {
 
         let pp_total_cycles = self.stats.total_cycles;
         let pp_in_flow = self.behavior.flow_state.in_flow;
-        let pp_emotional_valence = self.behavior.emotion_contagion.prosody_valence();
+        let pp_emotional_valence = self.unification_engine.emotional.state().valence as f32;
         let pp_phi = self.unification_engine.psi as f32;
         let pp_smoothed_coh = coherence as f64;
         let pp_wm_importance_boost =
@@ -4180,6 +4207,7 @@ impl CognitiveLoopService {
         self.stats.semantic_misses = self.memory.memory_consol.semantic_memory.stats().semantic_misses;
         self.stats.semantic_lr_factor = semantic_lr_factor;
         self.stats.semantic_avg_retrieved_error = self
+            .memory
             .memory_consol
             .semantic_memory
             .stats()
@@ -4379,8 +4407,8 @@ impl CognitiveLoopService {
                 epistemic_confidence: (self.carryover.quality.last_epistemic_confidence
                     - math_epistemic_penalty)
                     .clamp(0.0, 1.0),
-                emotional_valence: self.behavior.emotion_contagion.prosody_valence() + mode_valence_nudge,
-                emotional_arousal: self.behavior.emotion_contagion.prosody_arousal() + mode_arousal_nudge,
+                emotional_valence: self.unification_engine.emotional.state().valence as f32 + mode_valence_nudge,
+                emotional_arousal: self.unification_engine.emotional.state().arousal as f32 + mode_arousal_nudge,
                 emotional_warmth: mode_warmth,
                 consciousness_level: broca_psi,
                 meta_awareness: self.carryover.learning.self_model_accuracy as f32,
@@ -4507,6 +4535,22 @@ impl CognitiveLoopService {
                     #[cfg(not(feature = "therapeutic"))]
                     let text = std::mem::take(&mut result.text);
                     self.language_comm.last_broca_text = Some(text);
+                }
+
+                // ── Factcheck bridge: extract claims from Broca output ──
+                #[cfg(all(feature = "mycelix", feature = "ssm_language"))]
+                if let Some(ref broca_text) = self.language_comm.last_broca_text {
+                    let _modulation =
+                        self.factcheck_bridge.on_broca_generation(broca_text, cycle_num);
+                    // If factcheck says suppress, clear the output
+                    if _modulation.suppress {
+                        self.language_comm.last_broca_text = None;
+                        tracing::info!(
+                            target: "cognitive_loop::factcheck",
+                            cycle = cycle_num,
+                            "Broca output suppressed by factcheck bridge (high-confidence False verdict)"
+                        );
+                    }
                 }
 
                 #[cfg(feature = "liquid-mamba")]
@@ -4668,8 +4712,9 @@ impl CognitiveLoopService {
     ///
     /// Returns (valence_pull, arousal_pull, pull_strength).
     fn apply_emotional_homeostasis(&mut self) -> (f32, f32, f32) {
-        let curr_v = self.behavior.emotion_contagion.valence;
-        let curr_a = self.behavior.emotion_contagion.prosody_arousal();
+        let unified_emo = self.unification_engine.emotional.state();
+        let curr_v = unified_emo.valence as f32;
+        let curr_a = unified_emo.arousal as f32;
 
         // Emotional inertia: resist rapid swings by blending toward previous state.
         // This closes the feedback loop — last_emotion_valence/arousal (written at

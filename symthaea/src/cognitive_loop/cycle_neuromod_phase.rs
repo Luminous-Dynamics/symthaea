@@ -206,6 +206,26 @@ impl CognitiveLoopService {
         let neuromod_consciousness_mod = self.neuromod.bath.consciousness_modulation();
         let unified_psi = (unified_psi * neuromod_consciousness_mod as f64).clamp(0.0, 1.0);
 
+        // ── Hodge harmonic fraction → consciousness coherence modulation ─────
+        // High harmonic fraction indicates topologically-protected global resonance
+        // on the moral manifold — symmetric information coupling across the
+        // simplicial complex. This correlates with unified conscious experience.
+        // Modulation: ±3% (clamped), centered at harmonic=0.33 (equipartition).
+        // Science: Hodge (1941) — harmonics are cohomology representatives;
+        // Tononi (2004) — integrated information requires global coupling.
+        const HODGE_HARMONIC_CONSCIOUSNESS_SCALE: f64 = 0.03;
+        const HODGE_HARMONIC_BASELINE: f64 = 0.33; // Equipartition (1/3 each)
+        let hodge_mod = {
+            let summary = self.ethics_engine.moral_topology().last_summary();
+            if let Some(ref fracs) = summary.hodge_fractions {
+                let delta = fracs.harmonic - HODGE_HARMONIC_BASELINE;
+                1.0 + delta * HODGE_HARMONIC_CONSCIOUSNESS_SCALE / 0.67 // Normalize: max delta is 0.67
+            } else {
+                1.0 // No fractions available — neutral
+            }
+        };
+        let unified_psi = (unified_psi * hodge_mod).clamp(0.0, 1.0);
+
         // ═══════════════════════════════════════════════════════════════════════
         // 10h.exp EXPERIENCE BUS: Update principled signals from cognitive state
         // Maps cycle values to 5 principled signals (Active Inference).
@@ -278,7 +298,7 @@ impl CognitiveLoopService {
         // NE → surprise threshold (attention aperture), DA → compute budget.
         // Science: Corbetta & Shulman (2002) — NE modulates attentional scope.
         #[cfg(feature = "foveation")]
-        if let Some(ref fov_mutex) = self.vision_sensory.foveation_manager {
+        if let Some(ref fov_mutex) = self.sensorimotor.vision_sensory.foveation_manager {
             let ne = self.neuromod.bath.noradrenaline.effective();
             let da = self.neuromod.bath.dopamine.effective();
             if let Ok(mut fov) = fov_mutex.lock() {

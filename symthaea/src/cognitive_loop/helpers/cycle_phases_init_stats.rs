@@ -19,7 +19,7 @@ impl CognitiveLoopService {
     ///
     /// Mutates: `self.stats`, `self.behavior.curiosity_drive`, `self.carryover`,
     /// `self.feedback_state`, `self.subsystem_collector`, `self.biorhythm_mgr.rhythm`,
-    /// `self.neuromod.bath`, `self.somatic_bridge`, `self.behavior.emotion_contagion`,
+    /// `self.neuromod.bath`, `self.sensorimotor.somatic_bridge`, `self.behavior.emotion_contagion`,
     /// `self.thermodynamic_load`, `self.neuromod.phase_tracker`,
     /// `self.neuromod.drift_tracker`.
     pub(in crate::cognitive_loop) fn run_cycle_init(
@@ -267,8 +267,8 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // NOCICEPTION: Drain infrastructure errors and convert to felt signals
         // ═══════════════════════════════════════════════════════════════════════
-        self.somatic_bridge.update();
-        let somatic_signals = self.somatic_bridge.to_interoceptive_signals();
+        self.sensorimotor.somatic_bridge.update();
+        let somatic_signals = self.sensorimotor.somatic_bridge.to_interoceptive_signals();
         // Apply somatic stress to thermodynamic load (additive)
         self.thermodynamic_load =
             (self.thermodynamic_load + somatic_signals.thermodynamic_load_delta).min(1.0);
@@ -278,14 +278,14 @@ impl CognitiveLoopService {
                 (self.behavior.emotion_contagion.arousal + somatic_signals.arousal_spike).min(1.0);
         }
         // #5: Forward somatic stress to neuromodulator bath (McEwen 2007)
-        let somatic_stress_level = self.somatic_bridge.systemic_stress() as f32;
+        let somatic_stress_level = self.sensorimotor.somatic_bridge.systemic_stress() as f32;
         self.neuromod.bath.apply_stress(somatic_stress_level);
 
         // ═══════════════════════════════════════════════════════════════════════
         // THERMOCEPTION: Drain platform thermal reports and update tau modulation
         // Science: Angilletta (2009) thermal performance curves
         // ═══════════════════════════════════════════════════════════════════════
-        self.thermal_bridge.update();
+        self.sensorimotor.thermal_bridge.update();
 
         // ═══════════════════════════════════════════════════════════════════════
         // NEUROMODULATOR BATH: Produce from previous cycle's signals (Phase A)
@@ -612,7 +612,7 @@ impl CognitiveLoopService {
 
         // Populate v0.8.0 Resonance Metadata
         metadata.temporal.thermodynamic_load = self.thermodynamic_load;
-        metadata.embodied.somatic_stress = self.somatic_bridge.systemic_stress();
+        metadata.embodied.somatic_stress = self.sensorimotor.somatic_bridge.systemic_stress();
         metadata.embodied.mood_temperature = self.mood_temperature;
         // Phase 2.2: feedback proposal attribution telemetry
         metadata.feedback.feedback_confidence_proposals =

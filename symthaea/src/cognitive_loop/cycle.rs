@@ -39,6 +39,12 @@ impl CognitiveLoopService {
         let cycle_start = Instant::now();
         self.stats.total_cycles += 1;
         self.substrate_manager.tick_energy(&self.config);
+        // Feed substrate energy data to ThermodynamicManager
+        self.thermodynamic_mgr.set_energy(
+            self.substrate_manager.energy_per_cycle,
+            self.substrate_manager.total_energy_spent,
+            self.substrate_manager.energy_throughput_multiplier,
+        );
 
         // Integrity: run tamper detection (temporal every cycle, canaries at co-prime intervals)
         #[cfg(feature = "integrity")]
@@ -205,7 +211,7 @@ impl CognitiveLoopService {
 
         // Coherence field: apply hormone modulation from neuromod bath
         // Science: McEwen (2007) — allostatic load shapes integration capacity
-        if let Some(ref mut cf) = self.vision_sensory.coherence_field {
+        if let Some(ref mut cf) = self.sensorimotor.vision_sensory.coherence_field {
             use super::neuromodulators::NeuromodulatorBathExt;
             let hormones = self.neuromod.bath.to_hormone_state();
             cf.apply_hormone_modulation(&hormones);
@@ -220,10 +226,10 @@ impl CognitiveLoopService {
         {
             let cycle_num = self.stats.total_cycles as usize;
             let interval = self.config.embodiment_step_interval.max(1);
-            if self.embodiment_bridge.is_some() && cycle_num % interval == 0 {
+            if self.sensorimotor.embodiment_bridge.is_some() && cycle_num % interval == 0 {
                 let phi = self.carryover.history.consciousness_level;
                 let dt = self.config.cfc_config.delta_t;
-                let mut bridge = self.embodiment_bridge.take().unwrap();
+                let mut bridge = self.sensorimotor.embodiment_bridge.take().unwrap();
                 let thought_hv = perception.encoding.encoding_result.hdv.clone();
                 let result = bridge.step(&thought_hv, dt, phi);
                 if result.success {
@@ -236,10 +242,10 @@ impl CognitiveLoopService {
                             .hdv
                             .lerp_in_place(&proprioceptive_hv, 1.0 - w, w);
                     }
-                    self.last_proprioceptive_hv = Some(proprioceptive_hv);
+                    self.sensorimotor.last_proprioceptive_hv = Some(proprioceptive_hv);
                 }
-                self.embodiment_telemetry = bridge.telemetry();
-                self.embodiment_bridge = Some(bridge);
+                self.sensorimotor.embodiment_telemetry = bridge.telemetry();
+                self.sensorimotor.embodiment_bridge = Some(bridge);
             }
         }
 
@@ -350,13 +356,13 @@ impl CognitiveLoopService {
                     }
                     super::defense::DefenseActionKind::RestrictMotorToReadOnly => {
                         // Restrict motor output to read-only via safety level gate
-                        if let Some(ref mut bridge) = self.motor_rendering.output_bridge {
+                        if let Some(ref mut bridge) = self.sensorimotor.motor_rendering.output_bridge {
                             bridge.set_safety_level(crate::safety::SafetyLevel::Orange);
                         }
                     }
                     super::defense::DefenseActionKind::HaltMotor => {
                         // Halt all motor output via safety level gate
-                        if let Some(ref mut bridge) = self.motor_rendering.output_bridge {
+                        if let Some(ref mut bridge) = self.sensorimotor.motor_rendering.output_bridge {
                             bridge.set_safety_level(crate::safety::SafetyLevel::Red);
                         }
                     }

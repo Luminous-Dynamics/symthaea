@@ -338,6 +338,9 @@ impl CognitiveLoopService {
                     && moral_anomaly_report.anomaly_score > 0.0,
                 harmony_entropy: topo_summary.harmony_entropy,
                 moral_attractor_detected: topo_summary.attractor_detected,
+                hodge_harmonic_fraction: topo_summary.hodge_fractions.map(|f| f.harmonic).unwrap_or(0.0),
+                hodge_gradient_fraction: topo_summary.hodge_fractions.map(|f| f.gradient).unwrap_or(0.0),
+                hodge_curl_fraction: topo_summary.hodge_fractions.map(|f| f.curl).unwrap_or(0.0),
                 in_active_rest: self.stats.in_active_rest,
                 stillness_dominance_streak: self.stats.stillness_dominance_streak,
                 unified_verdict: self
@@ -980,7 +983,7 @@ impl CognitiveLoopService {
         // ── Embodiment Bridge telemetry ──
         #[cfg(feature = "humanoid")]
         {
-            let et = &self.embodiment_telemetry;
+            let et = &self.sensorimotor.embodiment_telemetry;
             metadata.embodiment_total_steps = et.total_steps;
             metadata.embodiment_control_effort = et.control_effort;
             metadata.embodiment_prediction_error = et.prediction_error;
@@ -1145,7 +1148,7 @@ impl CognitiveLoopService {
 
         // ── Thermal telemetry ──
         {
-            let thermal_signals = self.thermal_bridge.signals();
+            let thermal_signals = self.sensorimotor.thermal_bridge.signals();
             metadata.thermal = super::ThermalTelemetry {
                 thermal_level: thermal_signals.level as u8,
                 thermal_tau_factor: thermal_signals.tau_factor,
@@ -1244,7 +1247,7 @@ impl CognitiveLoopService {
         // Foveation bridge telemetry
         #[cfg(feature = "foveation")]
         {
-            if let Some(ref fov_mutex) = self.vision_sensory.foveation_manager {
+            if let Some(ref fov_mutex) = self.sensorimotor.vision_sensory.foveation_manager {
                 if let Ok(fov) = fov_mutex.lock() {
                     let ft = fov.telemetry();
                     metadata.foveation = Some(super::FoveationBridgeTelemetry {
@@ -1529,7 +1532,7 @@ impl CognitiveLoopService {
 
         // Cross-manifold predictor: observe actual cognitive state for Hebbian learning
         #[cfg(feature = "vision-manifold")]
-        if let Some(ref mut pred) = self.vision_sensory.cross_manifold_predictor {
+        if let Some(ref mut pred) = self.sensorimotor.vision_sensory.cross_manifold_predictor {
             pred.observe_cognitive(&perception.encoding.encoding_result.hdv);
         }
 

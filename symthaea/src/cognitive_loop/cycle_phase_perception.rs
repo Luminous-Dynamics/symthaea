@@ -103,7 +103,7 @@ impl CognitiveLoopService {
 
         // ACh-modulated scene memory thresholds
         #[cfg(feature = "vision-manifold")]
-        if let Some(ref mut bridge) = self.vision_sensory.vision_bridge {
+        if let Some(ref mut bridge) = self.sensorimotor.vision_sensory.vision_bridge {
             let ach = self.neuromod.bath.acetylcholine.effective();
             let ach_factor = ach.max(super::thresholds::VISION_ACH_FLOOR);
             let base_coh = self.config.scene_memory_coherence_threshold;
@@ -132,9 +132,10 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         #[cfg(feature = "vision-manifold")]
         let (visual_hv, vision_telemetry) = if let Some(ref mut bridge) =
-            self.vision_sensory.vision_bridge
+            self.sensorimotor.vision_sensory.vision_bridge
         {
             let frame = self
+                .sensorimotor
                 .vision_sensory
                 .vision_frame_buffer
                 .take()
@@ -156,7 +157,7 @@ impl CognitiveLoopService {
         // Cross-manifold predictor: predict cognitive state from vision state
         #[cfg(feature = "vision-manifold")]
         let cross_manifold_prediction_error =
-            if let Some(ref mut pred) = self.vision_sensory.cross_manifold_predictor {
+            if let Some(ref mut pred) = self.sensorimotor.vision_sensory.cross_manifold_predictor {
                 if let Some(ref vis_hv) = visual_hv {
                     let vis_chv = symthaea_core::hdc::ContinuousHV::from_slice(vis_hv.as_slice());
                     let _predicted = pred.predict_cognitive(&vis_chv);
@@ -171,6 +172,7 @@ impl CognitiveLoopService {
         // ── Vision mean surprise + horizon errors + scene recognition ──
         #[cfg(feature = "vision-manifold")]
         let vision_mean_surprise = self
+            .sensorimotor
             .vision_sensory
             .vision_bridge
             .as_ref()
@@ -179,6 +181,7 @@ impl CognitiveLoopService {
 
         #[cfg(feature = "vision-manifold")]
         let vision_horizon_errors = self
+            .sensorimotor
             .vision_sensory
             .vision_bridge
             .as_ref()
@@ -200,7 +203,7 @@ impl CognitiveLoopService {
             Vec::new()
         } else {
             let mut collected = Vec::new();
-            if let Some(ref fov_mutex) = self.vision_sensory.foveation_manager {
+            if let Some(ref fov_mutex) = self.sensorimotor.vision_sensory.foveation_manager {
                 if let Ok(mut fov) = fov_mutex.lock() {
                     // Neuromod modulation: NE → surprise threshold, DA → concurrent capacity
                     let ne = self.neuromod.bath.noradrenaline.effective();
@@ -208,7 +211,7 @@ impl CognitiveLoopService {
                     fov.modulate(ne, da);
 
                     // Feed current frame to foveation
-                    if let Some(ref bridge) = self.vision_sensory.vision_bridge {
+                    if let Some(ref bridge) = self.sensorimotor.vision_sensory.vision_bridge {
                         let w = self.config.vision_frame_width;
                         let h = self.config.vision_frame_height;
                         let frame_count = bridge.frame_count();
@@ -292,7 +295,7 @@ impl CognitiveLoopService {
 
         // ── Surprise dampening: reduce surprise at recognized locations ──
         #[cfg(feature = "foveation")]
-        if let Some(ref mut bridge) = self.vision_sensory.vision_bridge {
+        if let Some(ref mut bridge) = self.sensorimotor.vision_sensory.vision_bridge {
             for result in &fov_results {
                 if result.confidence > 0.7 {
                     // Predict current position using velocity + processing latency

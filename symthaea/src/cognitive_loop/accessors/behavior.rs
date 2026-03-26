@@ -44,11 +44,11 @@ impl CognitiveLoopService {
         // EMOTION CONTAGION
         // ═══════════════════════════════════════════════════════════════════
 
-        /// Get current emotional valence from content analysis
-        pub fn emotional_valence(&self) -> f32 { self.behavior.emotion_contagion.smoothed_valence() }
+        /// Get current emotional valence (from unified emotional state)
+        pub fn emotional_valence(&self) -> f32 { self.unification_engine.emotional.state().valence as f32 }
 
-        /// Get current emotional arousal
-        pub fn emotional_arousal(&self) -> f32 { self.behavior.emotion_contagion.smoothed_arousal() }
+        /// Get current emotional arousal (from unified emotional state)
+        pub fn emotional_arousal(&self) -> f32 { self.unification_engine.emotional.state().arousal as f32 }
 
         /// Get emotion-based pattern nudge suggestion
         pub fn emotion_pattern_nudge(&self) -> (Option<ConsciousnessPattern>, f32) { self.behavior.emotion_contagion.pattern_nudge() }
@@ -200,7 +200,7 @@ impl CognitiveLoopService {
 
     /// Check if emotional content is significant
     pub fn has_emotional_content(&self) -> bool {
-        self.behavior.emotion_contagion.smoothed_valence().abs() > 0.2
+        (self.unification_engine.emotional.state().valence as f32).abs() > 0.2
     }
 
     /// Force an immediate reflection cycle
@@ -956,6 +956,18 @@ impl CognitiveLoopService {
         self.holon_receiver.total_processed()
     }
 
+    /// Clone the Holon inbound sender for use by HTTP handlers.
+    ///
+    /// The channel is created eagerly at CLS construction. Clone the returned
+    /// sender and pass it to `HolonHttpState::new(tx)` so HTTP handlers can
+    /// inject SomaMessages into the cognitive loop. The receiver is drained
+    /// non-blocking in Phase B before `holon_receiver.process_inbound()`.
+    pub fn holon_inbound_sender(
+        &self,
+    ) -> std::sync::mpsc::Sender<(String, crate::consciousness::holon_receiver::SomaMessage)> {
+        self.holon_inbound_tx.clone()
+    }
+
     // ========================================================================
     // SWARM NEUROMODULATORY COUPLING
     // ========================================================================
@@ -1261,7 +1273,7 @@ impl CognitiveLoopService {
 
     /// Access the vision and sensory manager.
     pub fn vision_sensory(&self) -> &super::super::vision_sensory_manager::VisionAndSensoryManager {
-        &self.vision_sensory
+        &self.sensorimotor.vision_sensory
     }
 
     /// Get the current unified ethical verdict.
