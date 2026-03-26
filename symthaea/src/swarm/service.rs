@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Network Service - High-Level Swarm Integration
 //!
 //! This module provides a standalone network service that can be wired into
@@ -250,6 +253,87 @@ impl NetworkService {
     /// that need to run the handshake protocol on newly-connected channels.
     pub fn handshake_arc(&self) -> Arc<RwLock<HybridHandshake>> {
         self.handshake.clone()
+    }
+
+    /// Initialize attestation for this network service.
+    ///
+    /// Generates or loads an Ed25519 signing key and configures the
+    /// `AttestationManager` on both the IrohNode and any bridge actors.
+    ///
+    /// - If `identity_path` is set in config, loads the key from disk (or
+    ///   generates and saves if the file doesn't exist).
+    /// - If `identity_path` is `None`, generates an ephemeral key.
+    ///
+    /// Returns the shared `AttestationManager` for use with
+    /// `NetworkServiceBridge::spawn_with_attestation()`.
+    #[cfg(feature = "identity")]
+    pub fn initialize_attestation(
+        &mut self,
+    ) -> SwarmResult<Arc<parking_lot::RwLock<crate::swarm::attestation::AttestationManager>>> {
+        use crate::swarm::attestation::AttestationManager;
+
+        let signing_key = match &self.config.identity_path {
+            Some(path) => {
+                let key_path = std::path::Path::new(path).join("signing_key.bin");
+                if key_path.exists() {
+                    // Load existing key
+                    let bytes = std::fs::read(&key_path).map_err(|e| {
+                        SwarmError::Internal(format!("Failed to read signing key: {e}"))
+                    })?;
+                    if bytes.len() < 32 {
+                        return Err(SwarmError::Internal(
+                            "Signing key file too short (need 32 bytes)".into(),
+                        ));
+                    }
+                    let key_bytes: [u8; 32] = bytes[..32].try_into().map_err(|_| {
+                        SwarmError::Internal("Invalid signing key bytes".into())
+                    })?;
+                    let key = ed25519_dalek::SigningKey::from_bytes(&key_bytes);
+                    tracing::info!(
+                        path = %key_path.display(),
+                        "Loaded Ed25519 signing key from disk"
+                    );
+                    key
+                } else {
+                    // Generate and save
+                    let key = ed25519_dalek::SigningKey::generate(&mut rand::thread_rng());
+                    if let Some(parent) = key_path.parent() {
+                        std::fs::create_dir_all(parent).map_err(|e| {
+                            SwarmError::Internal(format!(
+                                "Failed to create identity directory: {e}"
+                            ))
+                        })?;
+                    }
+                    std::fs::write(&key_path, key.to_bytes()).map_err(|e| {
+                        SwarmError::Internal(format!("Failed to save signing key: {e}"))
+                    })?;
+                    tracing::info!(
+                        path = %key_path.display(),
+                        "Generated and saved new Ed25519 signing key"
+                    );
+                    key
+                }
+            }
+            None => {
+                // Ephemeral key — valid for this session only
+                let key = ed25519_dalek::SigningKey::generate(&mut rand::thread_rng());
+                tracing::info!("Generated ephemeral Ed25519 signing key (no identity_path)");
+                key
+            }
+        };
+
+        let pubkey_hex = hex::encode(signing_key.verifying_key().as_bytes());
+        tracing::info!(pubkey = %&pubkey_hex[..16], "Attestation manager initialized");
+
+        let mgr = Arc::new(parking_lot::RwLock::new(AttestationManager::new(signing_key)));
+
+        // Wire into IrohNode if available
+        #[cfg(feature = "swarm")]
+        if let Some(ref mut iroh) = self.iroh {
+            iroh.set_attestation(mgr.clone());
+        }
+
+        Ok(mgr)
     }
 
     /// Check if the service is running with real networking

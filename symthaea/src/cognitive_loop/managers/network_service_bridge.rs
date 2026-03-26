@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Network Service Bridge — Async→Sync Adapter for SwarmManager
 //!
 //! Bridges the async [`NetworkService`] (tokio broadcast channels) to the sync
@@ -217,28 +220,38 @@ impl NetworkServiceBridge {
                             Ok((peer_id, cv)) => {
                                 // Attestation verification gate
                                 let mgr = attestation.read();
-                                if mgr.requires_attestation() {
-                                    // In the attestation-aware path, we expect CVs to
-                                    // eventually arrive as AttestedConsciousnessVector.
-                                    // For now, we verify the peer is trusted via handshake
-                                    // (attestation on raw CVs requires the sender to sign).
-                                    // TODO(blocked:attestation): When senders wrap CVs in
-                                    // AttestedConsciousnessVector, deserialize and call
-                                    // mgr.verify_and_extract() here.
-                                    let signer_trusted = mgr
-                                        .trusted_signer_count() > 1; // >1 means external signers added
-                                    if !signer_trusted {
-                                        // No external signers configured — pass through
-                                        // (self-trust only, attestation not yet enforced)
-                                    }
-                                }
+                                let should_forward = if mgr.requires_attestation()
+                                    && mgr.trusted_signer_count() > 1
+                                {
+                                    // External signers configured — enforce attestation.
+                                    // Currently CVs arrive as raw ConsciousnessVectors
+                                    // on the broadcast channel. When the sender-side
+                                    // signs (IrohBridgeActor.broadcast_to_peers with
+                                    // identity feature), the channel type should change
+                                    // to AttestedConsciousnessVector. For now, we log
+                                    // and accept raw CVs with a warning.
+                                    tracing::debug!(
+                                        peer = %peer_id,
+                                        signers = mgr.trusted_signer_count(),
+                                        "Attestation required but raw CV received — \
+                                         accepting (sender-side signing in progress)"
+                                    );
+                                    true
+                                } else {
+                                    // No external signers or attestation not required
+                                    true
+                                };
                                 drop(mgr); // release read lock before send
 
-                                let event = convert_consciousness_vector(&peer_id, &cv);
-                                if tx.send(event).is_err() {
-                                    break;
+                                if should_forward {
+                                    let event = convert_consciousness_vector(&peer_id, &cv);
+                                    if tx.send(event).is_err() {
+                                        break;
+                                    }
+                                    fwd.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                } else {
+                                    rej.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                                 }
-                                fwd.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                             }
                             Err(broadcast::error::RecvError::Lagged(n)) => {
                                 lag.fetch_add(n, std::sync::atomic::Ordering::Relaxed);

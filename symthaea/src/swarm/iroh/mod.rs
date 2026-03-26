@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Iroh Integration - The Synapse Layer
 //!
 //! This module provides real-time, low-latency P2P communication using Iroh's
@@ -551,8 +554,10 @@ impl IrohChannel {
     /// against the attestation manager's trusted signer set before returning
     /// the inner CV. Rejects untrusted or tampered CVs with an error.
     ///
-    /// Falls back to unverified `recv_consciousness()` if no attestation
-    /// manager is provided (backward compatible).
+    /// **Security policy**: In release builds, rejects unsigned CVs when no
+    /// attestation manager is configured. In debug/test builds, falls back to
+    /// unverified reception with a warning. Use `recv_consciousness()` if you
+    /// explicitly intend to accept unverified CVs.
     #[cfg(feature = "swarm")]
     pub async fn recv_verified_consciousness(
         &self,
@@ -595,19 +600,45 @@ impl IrohChannel {
                 }
             }
             None => {
-                // Legacy path: no attestation manager, accept raw CV
-                bincode::deserialize(&bytes)
-                    .map_err(|e| SwarmError::SerializationError(e.to_string()))
+                // No attestation manager configured.
+                // In debug/test builds: warn and accept raw CV (backward compat).
+                // In release builds: reject — callers must either configure an
+                // AttestationManager or use recv_consciousness() explicitly.
+                #[cfg(debug_assertions)]
+                {
+                    tracing::warn!(
+                        peer = %self.peer_id,
+                        "recv_verified_consciousness called without AttestationManager — \
+                         accepting unverified CV (debug build only)"
+                    );
+                    bincode::deserialize(&bytes)
+                        .map_err(|e| SwarmError::SerializationError(e.to_string()))
+                }
+                #[cfg(not(debug_assertions))]
+                {
+                    tracing::error!(
+                        peer = %self.peer_id,
+                        "recv_verified_consciousness rejected: no AttestationManager configured"
+                    );
+                    Err(SwarmError::AttestationRequired)
+                }
             }
         }
     }
 
     /// Stub verified recv (without swarm feature).
+    ///
+    /// Enforces the same security policy as the real implementation:
+    /// rejects when no attestation manager in release builds.
     #[cfg(not(feature = "swarm"))]
     pub async fn recv_verified_consciousness(
         &self,
-        _attestation: &Option<Arc<RwLock<crate::swarm::attestation::AttestationManager>>>,
+        attestation: &Option<Arc<RwLock<crate::swarm::attestation::AttestationManager>>>,
     ) -> SwarmResult<ConsciousnessVector> {
+        if attestation.is_none() {
+            #[cfg(not(debug_assertions))]
+            return Err(SwarmError::AttestationRequired);
+        }
         Err(SwarmError::FeatureNotEnabled {
             feature: "swarm".to_string(),
         })

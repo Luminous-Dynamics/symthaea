@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use super::super::*;
 use symthaea_core::hdc::ContinuousHV;
 
@@ -3402,6 +3405,7 @@ fn test_moral_topology_packet_roundtrip() {
         attractor_detected: false,
         trajectory_fingerprint: [0.0; 8],
         trajectory_entropy: 0.0,
+        hodge_fractions: None,
     };
 
     let packet = WisdomPacket::from_moral_topology([1, 2, 3, 4, 5, 6, 7, 8], 42, 0.65, &summary);
