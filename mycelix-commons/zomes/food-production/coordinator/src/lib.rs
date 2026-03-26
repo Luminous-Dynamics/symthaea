@@ -1,4 +1,6 @@
-//! Food Production Coordinator Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Food Production Coordinator Zome
 //! Business logic for plot management, crop tracking, and harvest recording.
 
 use food_production_integrity::*;
@@ -93,6 +95,14 @@ pub fn register_plot(plot: Plot) -> ExternResult<Record> {
         LinkTypes::StewardToPlot,
         (),
     )?;
+
+    // Geohash spatial index
+    {
+        let geo_hash = commons_types::geo::geohash_encode(plot.location_lat, plot.location_lon, 6);
+        let geo_anchor_str = format!("geo:{}", geo_hash);
+        create_entry(&EntryTypes::Anchor(Anchor(geo_anchor_str.clone())))?;
+        create_link(anchor_hash(&geo_anchor_str)?, action_hash.clone(), LinkTypes::GeoIndex, geo_hash.as_bytes().to_vec())?;
+    }
 
     get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created plot".into()

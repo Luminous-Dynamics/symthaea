@@ -35,6 +35,9 @@ members = [
     # Web of Trust
     "zomes/web-of-trust/coordinator",
     "zomes/web-of-trust/integrity",
+    # Cross-Cluster Reputation Aggregator
+    "zomes/reputation-aggregator/coordinator",
+    "zomes/reputation-aggregator/integrity",
 ]
 
 [workspace.dependencies]

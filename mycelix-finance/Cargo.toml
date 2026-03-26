@@ -38,6 +38,7 @@ serde_json = "1.0"
 
 # Bridge
 mycelix-bridge-common = { path = "../crates/mycelix-bridge-common" }
+mycelix-bridge-entry-types = { path = "../crates/mycelix-bridge-entry-types" }
 
 # Utilities
 chrono = "0.4"

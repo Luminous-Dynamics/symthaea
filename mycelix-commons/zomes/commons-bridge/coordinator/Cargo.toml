@@ -16,3 +16,4 @@ holochain_serialized_bytes = { workspace = true }
 commons_bridge_integrity = { path = "../integrity" }
 commons-types = { workspace = true }
 mycelix-bridge-common = { workspace = true }
+mycelix-bridge-entry-types = { workspace = true }

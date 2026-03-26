@@ -1,9 +1,12 @@
-//! Bridge Integrity Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Bridge Integrity Zome
 //!
 //! Defines entry types and validation for cross-hApp climate verification.
 //! Uses HDI 0.7.0-dev.1 with FlatOp validation pattern.
 
 use hdi::prelude::*;
+use mycelix_bridge_entry_types::CrossClusterNotification;
 
 /// Anchor entry for creating deterministic link bases
 #[hdk_entry_helper]
@@ -130,6 +133,7 @@ pub enum EntryTypes {
     ClimateResult(ClimateResult),
     #[entry_type(visibility = "public")]
     MarketplaceListing(MarketplaceListing),
+    Notification(CrossClusterNotification),
 }
 
 /// Link types for the bridge zome
@@ -147,6 +151,9 @@ pub enum LinkTypes {
     SellerToListings,
     /// Credit to listings
     CreditToListings,
+    AgentToNotification,
+    AllNotifications,
+    NotificationSubscription,
 }
 
 /// Validate DIDs have proper format
@@ -304,6 +311,11 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::ClimateQuery(query) => validate_climate_query(&query),
                 EntryTypes::ClimateResult(result) => validate_climate_result(&result),
                 EntryTypes::MarketplaceListing(listing) => validate_marketplace_listing(&listing),
+                EntryTypes::Notification(n) => {
+                    mycelix_bridge_entry_types::validate_notification(&n)
+                        .map(|()| ValidateCallbackResult::Valid)
+                        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))
+                }
             },
             OpEntry::UpdateEntry { app_entry, .. } => match app_entry {
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Invalid(
@@ -314,6 +326,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     "Climate results cannot be updated once submitted".to_string(),
                 )),
                 EntryTypes::MarketplaceListing(listing) => validate_marketplace_listing(&listing),
+                EntryTypes::Notification(_) => Ok(ValidateCallbackResult::Invalid(
+                    "Notifications cannot be updated".to_string(),
+                )),
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
@@ -323,7 +338,10 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             | LinkTypes::RequesterToQueries
             | LinkTypes::AnchorToListings
             | LinkTypes::SellerToListings
-            | LinkTypes::CreditToListings => Ok(ValidateCallbackResult::Valid),
+            | LinkTypes::CreditToListings
+            | LinkTypes::AgentToNotification
+            | LinkTypes::AllNotifications
+            | LinkTypes::NotificationSubscription => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterDeleteLink { link_type, .. } => match link_type {
             LinkTypes::QueryToResult => Ok(ValidateCallbackResult::Invalid(

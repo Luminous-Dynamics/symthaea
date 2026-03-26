@@ -1,4 +1,6 @@
-//! Community Land Trust Coordinator Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Community Land Trust Coordinator Zome
 //! Business logic for land trusts, ground leases, resale calculations,
 //! and affordability reporting.
 
@@ -46,7 +48,7 @@ pub fn create_land_trust(trust: LandTrust) -> ExternResult<Record> {
         )));
     }
 
-    let action_hash = create_entry(&EntryTypes::LandTrust(trust))?;
+    let action_hash = create_entry(&EntryTypes::LandTrust(trust.clone()))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_trusts".to_string())))?;
     create_link(
@@ -55,6 +57,17 @@ pub fn create_land_trust(trust: LandTrust) -> ExternResult<Record> {
         LinkTypes::AllTrusts,
         (),
     )?;
+
+    // Geohash spatial index (centroid of boundary polygon)
+    if !trust.boundary.is_empty() {
+        let n = trust.boundary.len() as f64;
+        let centroid_lat = trust.boundary.iter().map(|(lat, _)| lat).sum::<f64>() / n;
+        let centroid_lon = trust.boundary.iter().map(|(_, lon)| lon).sum::<f64>() / n;
+        let geo_hash = commons_types::geo::geohash_encode(centroid_lat, centroid_lon, 6);
+        let geo_anchor_str = format!("geo:{}", geo_hash);
+        create_entry(&EntryTypes::Anchor(Anchor(geo_anchor_str.clone())))?;
+        create_link(anchor_hash(&geo_anchor_str)?, action_hash.clone(), LinkTypes::GeoIndex, geo_hash.as_bytes().to_vec())?;
+    }
 
     get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created trust".into()

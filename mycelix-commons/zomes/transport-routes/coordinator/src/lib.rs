@@ -1,4 +1,6 @@
-//! Transport Routes Coordinator Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Transport Routes Coordinator Zome
 //! Business logic for vehicle registration, route creation, and stop management.
 
 use hdk::prelude::*;
@@ -145,6 +147,17 @@ pub fn add_stop(stop: Stop) -> ExternResult<Record> {
         action_hash.clone(),
         LinkTypes::RouteToStop,
         (),
+    )?;
+
+    // Geo-spatial index for stop location
+    let geo_hash = commons_types::geo::geohash_encode(stop.location_lat, stop.location_lon, 6);
+    let geo_anchor_str = format!("geo:{}", geo_hash);
+    create_entry(&EntryTypes::Anchor(Anchor(geo_anchor_str.clone())))?;
+    create_link(
+        anchor_hash(&geo_anchor_str)?,
+        action_hash.clone(),
+        LinkTypes::GeoIndex,
+        geo_hash.as_bytes().to_vec(),
     )?;
 
     get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(

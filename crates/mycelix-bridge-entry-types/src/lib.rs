@@ -1,4 +1,6 @@
-//! Mycelix Bridge Entry Types — Shared DHT entry structs for cluster bridges
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Mycelix Bridge Entry Types — Shared DHT entry structs for cluster bridges
 //!
 //! Provides the canonical entry types stored on the DHT by both the Commons
 //! and Civic bridge integrity zomes. Each integrity zome wraps these in its
@@ -1510,4 +1512,136 @@ mod tests {
             other => panic!("Expected Invalid, got {other:?}"),
         }
     }
+}
+
+// ============================================================================
+// Cross-Cluster Notification Entry
+// ============================================================================
+
+/// A notification dispatched across cluster boundaries.
+///
+/// Stored on the target cluster's DHT when received via cross-cluster fanout.
+/// Used by the notification service to provide unified inbox, unread tracking,
+/// and multi-channel delivery (signal, email, SMS, webhook).
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug, SerializedBytes)]
+pub struct CrossClusterNotification {
+    /// Schema version (currently 1)
+    pub schema_version: u8,
+    /// Source cluster role name (e.g., "commons", "civic")
+    pub source_cluster: String,
+    /// Source zome that generated the notification
+    pub source_zome: String,
+    /// Event type identifier (e.g., "property_transfer_initiated", "disaster_declared")
+    pub event_type: String,
+    /// Target cluster role names. Empty = broadcast to all clusters.
+    pub target_clusters: Vec<String>,
+    /// Target agent public keys (base64). Empty = broadcast to all agents.
+    pub target_agents: Vec<String>,
+    /// JSON-serialized notification payload
+    pub payload: String,
+    /// Priority: 0=Low, 1=Normal, 2=High, 3=Emergency
+    pub priority: u8,
+    /// When the notification was created (from source cluster)
+    pub created_at: Timestamp,
+    /// When the notification expires. None = never.
+    pub expires_at: Option<Timestamp>,
+}
+
+impl TryFrom<&Entry> for CrossClusterNotification {
+    type Error = WasmError;
+    fn try_from(entry: &Entry) -> Result<Self, Self::Error> {
+        match entry {
+            Entry::App(bytes) => {
+                let sb = SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec()));
+                <Self as TryFrom<SerializedBytes>>::try_from(sb)
+                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))
+            }
+            _ => Err(wasm_error!(WasmErrorInner::Guest(
+                "Not an app entry".into(),
+            ))),
+        }
+    }
+}
+
+impl Default for CrossClusterNotification {
+    fn default() -> Self {
+        Self {
+            schema_version: 1,
+            source_cluster: String::new(),
+            source_zome: String::new(),
+            event_type: String::new(),
+            target_clusters: vec![],
+            target_agents: vec![],
+            payload: String::new(),
+            priority: 1,
+            created_at: Timestamp::from_micros(0),
+            expires_at: None,
+        }
+    }
+}
+
+/// Validate a cross-cluster notification entry.
+pub fn validate_notification(entry: &CrossClusterNotification) -> Result<(), String> {
+    if entry.source_cluster.is_empty() {
+        return Err("source_cluster cannot be empty".into());
+    }
+    if entry.source_cluster.len() > 64 {
+        return Err("source_cluster exceeds 64 chars".into());
+    }
+    if entry.source_zome.is_empty() {
+        return Err("source_zome cannot be empty".into());
+    }
+    if entry.event_type.is_empty() {
+        return Err("event_type cannot be empty".into());
+    }
+    if entry.event_type.len() > 256 {
+        return Err("event_type exceeds 256 chars".into());
+    }
+    if entry.payload.len() > 65_536 {
+        return Err("payload exceeds 64KB limit".into());
+    }
+    if entry.priority > 3 {
+        return Err(format!("priority must be 0-3, got {}", entry.priority));
+    }
+    if entry.target_clusters.len() > 16 {
+        return Err("Cannot target more than 16 clusters".into());
+    }
+    if entry.target_agents.len() > 100 {
+        return Err("Cannot target more than 100 agents".into());
+    }
+    Ok(())
+}
+
+// ============================================================================
+// Saga Entry
+// ============================================================================
+
+/// A saga workflow entry stored on the DHT for durability and auditability.
+///
+/// The `saga_json` field contains a serialized `SagaDefinition` from
+/// `mycelix_bridge_common::saga`.
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug, SerializedBytes)]
+pub struct SagaEntry {
+    /// Schema version (currently 1)
+    pub schema_version: u8,
+    /// JSON-serialized SagaDefinition
+    pub saga_json: String,
+    /// Agent who initiated the saga
+    pub initiator: String,
+    /// When the saga was created
+    pub created_at: Timestamp,
+}
+
+/// Validate a saga entry.
+pub fn validate_saga_entry(entry: &SagaEntry) -> Result<(), String> {
+    if entry.saga_json.is_empty() {
+        return Err("saga_json cannot be empty".into());
+    }
+    if entry.saga_json.len() > 1_048_576 {
+        return Err("saga_json exceeds 1MB limit".into());
+    }
+    if entry.initiator.is_empty() {
+        return Err("initiator cannot be empty".into());
+    }
+    Ok(())
 }

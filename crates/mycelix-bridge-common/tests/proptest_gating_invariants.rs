@@ -1,4 +1,6 @@
-//! Property-based tests for the consciousness gating kernel.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Property-based tests for the consciousness gating kernel.
 //!
 //! All functions under test are pure (no HDK dependency).
 
@@ -659,15 +661,17 @@ fn make_offline_credential(
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(1000))]
 
-    /// Future-dated attestation timestamps always cause tier degradation.
+    /// Future-dated attestation timestamps beyond clock-skew tolerance cause tier degradation.
+    /// Offsets within 15-minute tolerance are accepted as clock skew (not degraded).
     #[test]
     fn future_attestation_degrades(
-        future_offset_us in 1u64..1_000_000_000_000u64,
+        // Start beyond the 15-minute clock skew tolerance (900_000_001 microseconds)
+        future_offset_us in 900_000_001u64..1_000_000_000_000u64,
     ) {
         let now_us = BASE_US;
         let cred = make_offline_credential(ConsciousnessTier::Guardian, 0);
         let mut offline = OfflineCredential::new(cred);
-        // Add a signed attestation in the future
+        // Add a signed attestation in the future (beyond tolerance)
         offline.attestation = Some(FreshnessAttestation {
             attester_did: "did:mycelix:peer".into(),
             timestamp: now_us + future_offset_us,
@@ -677,7 +681,7 @@ proptest! {
         let tier = offline.effective_tier(now_us);
         // Should degrade by 2 (Guardian → Citizen)
         prop_assert_eq!(tier, ConsciousnessTier::Citizen,
-            "Future attestation should degrade tier by 2, got {:?}", tier);
+            "Future attestation beyond tolerance should degrade tier by 2, got {:?}", tier);
     }
 
     /// Attestation timestamp before credential issuance causes tier degradation (causality).

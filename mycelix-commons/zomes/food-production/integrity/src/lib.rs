@@ -1,4 +1,6 @@
-//! Food Production Integrity Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Food Production Integrity Zome
 //! Entry types and validation for community food growing operations.
 //!
 //! Manages plots, crops, yield records, and season planning for
@@ -274,6 +276,7 @@ pub enum LinkTypes {
     PlotToResourceInput,
     AgentToResourceInput,
     AllResourceInputs,
+    GeoIndex,
 }
 
 // ============================================================================
@@ -382,6 +385,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 }
                 Ok(ValidateCallbackResult::Valid)
             }
+            LinkTypes::GeoIndex => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterDeleteLink { action, .. } => {
             let original_action = must_get_action(action.link_add_address.clone())?;
@@ -1517,7 +1521,8 @@ mod tests {
             | LinkTypes::PlotToMembers
             | LinkTypes::PlotToResourceInput
             | LinkTypes::AgentToResourceInput
-            | LinkTypes::AllResourceInputs => 256,
+            | LinkTypes::AllResourceInputs
+            | LinkTypes::GeoIndex => 256,
         };
         let name = match link_type {
             LinkTypes::AllPlots => "AllPlots",
@@ -1530,6 +1535,7 @@ mod tests {
             LinkTypes::PlotToResourceInput => "PlotToResourceInput",
             LinkTypes::AgentToResourceInput => "AgentToResourceInput",
             LinkTypes::AllResourceInputs => "AllResourceInputs",
+            LinkTypes::GeoIndex => "GeoIndex",
         };
         if tag.0.len() > max {
             ValidateCallbackResult::Invalid(format!(

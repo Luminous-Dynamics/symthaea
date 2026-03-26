@@ -1,4 +1,6 @@
-/**
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root/**
  * @mycelix/sdk EduNet Integration
  *
  * hApp-specific adapter for Mycelix-EduNet providing:
@@ -441,6 +443,254 @@ export class EduNetCredentialService {
     if (!reputation) return false;
     return reputationValue(reputation) >= minimumScore;
   }
+}
+
+// ============================================================================
+// Bridge Client (Holochain Zome Calls)
+// ============================================================================
+
+import { type MycelixClient } from '../../client/index.js';
+
+const EDUNET_ROLE = 'edunet';
+
+/**
+ * EduNetBridgeClient - Direct Holochain zome calls for educational operations
+ *
+ * Provides the same capabilities as EduNetCredentialService but backed by the
+ * Holochain conductor instead of in-memory Maps.
+ */
+export class EduNetBridgeClient {
+  constructor(private client: MycelixClient) {}
+
+  // --- learning_zome ---
+
+  async createCourse(course: {
+    title: string;
+    description: string;
+    provider: string;
+    provider_did: string;
+    duration: number;
+    level: string;
+    prerequisites: string[];
+    skills: string[];
+  }): Promise<Uint8Array> {
+    return this.client.callZome({
+      role_name: EDUNET_ROLE,
+      zome_name: 'learning_zome',
+      fn_name: 'create_course',
+      payload: course,
+    });
+  }
+
+  async getCourse(actionHash: Uint8Array): Promise<Record<string, unknown> | null> {
+    return this.client.callZome({
+      role_name: EDUNET_ROLE,
+      zome_name: 'learning_zome',
+      fn_name: 'get_course',
+      payload: actionHash,
+    });
+  }
+
+  async listCourses(): Promise<Record<string, unknown>[]> {
+    return this.client.callZome({
+      role_name: EDUNET_ROLE,
+      zome_name: 'learning_zome',
+      fn_name: 'list_courses',
+      payload: null,
+    });
+  }
+
+  async updateCourse(input: {
+    original_action_hash: Uint8Array;
+    updated_course: {
+      title: string;
+      description: string;
+      provider: string;
+      provider_did: string;
+      duration: number;
+      level: string;
+      prerequisites: string[];
+      skills: string[];
+    };
+  }): Promise<Uint8Array> {
+    return this.client.callZome({
+      role_name: EDUNET_ROLE,
+      zome_name: 'learning_zome',
+      fn_name: 'update_course',
+      payload: input,
+    });
+  }
+
+  async deleteCourse(actionHash: Uint8Array): Promise<Uint8Array> {
+    return this.client.callZome({
+      role_name: EDUNET_ROLE,
+      zome_name: 'learning_zome',
+      fn_name: 'delete_course',
+      payload: actionHash,
+    });
+  }
+
+  async enroll(courseActionHash: Uint8Array): Promise<void> {
+    return this.client.callZome({
+      role_name: EDUNET_ROLE,
+      zome_name: 'learning_zome',
+      fn_name: 'enroll',
+      payload: courseActionHash,
+    });
+  }
+
+  async getEnrolledCourses(): Promise<Record<string, unknown>[]> {
+    return this.client.callZome({
+      role_name: EDUNET_ROLE,
+      zome_name: 'learning_zome',
+      fn_name: 'get_enrolled_courses',
+      payload: null,
+    });
+  }
+
+  async getCourseEnrollments(courseActionHash: Uint8Array): Promise<Uint8Array[]> {
+    return this.client.callZome({
+      role_name: EDUNET_ROLE,
+      zome_name: 'learning_zome',
+      fn_name: 'get_course_enrollments',
+      payload: courseActionHash,
+    });
+  }
+
+  async updateProgress(progress: {
+    course_hash: Uint8Array;
+    completion_percentage: number;
+    current_module?: string;
+  }): Promise<Uint8Array> {
+    return this.client.callZome({
+      role_name: EDUNET_ROLE,
+      zome_name: 'learning_zome',
+      fn_name: 'update_progress',
+      payload: progress,
+    });
+  }
+
+  async getProgress(actionHash: Uint8Array): Promise<Record<string, unknown> | null> {
+    return this.client.callZome({
+      role_name: EDUNET_ROLE,
+      zome_name: 'learning_zome',
+      fn_name: 'get_progress',
+      payload: actionHash,
+    });
+  }
+
+  async recordActivity(activity: {
+    course_hash: Uint8Array;
+    activity_type: string;
+    duration_minutes: number;
+    metadata?: string;
+  }): Promise<Uint8Array> {
+    return this.client.callZome({
+      role_name: EDUNET_ROLE,
+      zome_name: 'learning_zome',
+      fn_name: 'record_activity',
+      payload: activity,
+    });
+  }
+
+  // --- credential_zome ---
+
+  async issueCredential(input: {
+    learner: Uint8Array;
+    course_id: string;
+    credential_type: string;
+    grade?: number;
+    skills?: string[];
+    metadata?: string;
+  }): Promise<Uint8Array> {
+    return this.client.callZome({
+      role_name: EDUNET_ROLE,
+      zome_name: 'credential_zome',
+      fn_name: 'issue_credential',
+      payload: input,
+    });
+  }
+
+  async verifyCredential(actionHash: Uint8Array): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: EDUNET_ROLE,
+      zome_name: 'credential_zome',
+      fn_name: 'verify_credential',
+      payload: actionHash,
+    });
+  }
+
+  async getLearnerCredentials(learnerAgent: Uint8Array): Promise<Record<string, unknown>[]> {
+    return this.client.callZome({
+      role_name: EDUNET_ROLE,
+      zome_name: 'credential_zome',
+      fn_name: 'get_learner_credentials',
+      payload: learnerAgent,
+    });
+  }
+
+  async getCourseCredentials(courseId: string): Promise<Record<string, unknown>[]> {
+    return this.client.callZome({
+      role_name: EDUNET_ROLE,
+      zome_name: 'credential_zome',
+      fn_name: 'get_course_credentials',
+      payload: courseId,
+    });
+  }
+
+  async getIssuerCredentials(issuer: Uint8Array): Promise<Record<string, unknown>[]> {
+    return this.client.callZome({
+      role_name: EDUNET_ROLE,
+      zome_name: 'credential_zome',
+      fn_name: 'get_issuer_credentials',
+      payload: issuer,
+    });
+  }
+
+  async revokeCredential(input: {
+    credential_hash: Uint8Array;
+    reason: string;
+  }): Promise<void> {
+    return this.client.callZome({
+      role_name: EDUNET_ROLE,
+      zome_name: 'credential_zome',
+      fn_name: 'revoke_credential',
+      payload: input,
+    });
+  }
+
+  async verifyEpistemicRequirements(input: {
+    credential_hash: Uint8Array;
+    required_level: string;
+  }): Promise<boolean> {
+    return this.client.callZome({
+      role_name: EDUNET_ROLE,
+      zome_name: 'credential_zome',
+      fn_name: 'verify_epistemic_requirements',
+      payload: input,
+    });
+  }
+
+  async getEpistemicClassification(credentialHash: Uint8Array): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: EDUNET_ROLE,
+      zome_name: 'credential_zome',
+      fn_name: 'get_epistemic_classification',
+      payload: credentialHash,
+    });
+  }
+}
+
+// Bridge client singleton
+let edunetBridgeInstance: EduNetBridgeClient | null = null;
+
+export function getEduNetBridgeClient(client: MycelixClient): EduNetBridgeClient {
+  if (!edunetBridgeInstance) edunetBridgeInstance = new EduNetBridgeClient(client);
+  return edunetBridgeInstance;
+}
+
+export function resetEduNetBridgeClient(): void {
+  edunetBridgeInstance = null;
 }
 
 // ============================================================================

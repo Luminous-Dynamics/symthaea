@@ -635,6 +635,196 @@ export {
   AggregationMethod,
 };
 
+// ============================================================================
+// Music Holochain Bridge Client
+// ============================================================================
+
+/** Holochain conductor bridge client for Music cluster */
+export class MusicBridgeClient {
+  constructor(
+    private client: {
+      callZome(input: {
+        role_name: string;
+        zome_name: string;
+        fn_name: string;
+        payload: any;
+      }): Promise<any>;
+    },
+  ) {}
+
+  // -- Catalog zome --
+
+  async registerTrack(input: Omit<Track, 'verified'>): Promise<Track> {
+    return this.client.callZome({
+      role_name: 'music',
+      zome_name: 'catalog',
+      fn_name: 'register_track',
+      payload: input,
+    });
+  }
+
+  async getTrack(trackId: string): Promise<Track> {
+    return this.client.callZome({
+      role_name: 'music',
+      zome_name: 'catalog',
+      fn_name: 'get_track',
+      payload: trackId,
+    });
+  }
+
+  async listTracks(params?: { artistId?: string; genre?: string; limit?: number }): Promise<Track[]> {
+    return this.client.callZome({
+      role_name: 'music',
+      zome_name: 'catalog',
+      fn_name: 'list_tracks',
+      payload: params ?? {},
+    });
+  }
+
+  async updateTrack(trackId: string, updates: Partial<Track>): Promise<Track> {
+    return this.client.callZome({
+      role_name: 'music',
+      zome_name: 'catalog',
+      fn_name: 'update_track',
+      payload: { track_id: trackId, ...updates },
+    });
+  }
+
+  async deleteTrack(trackId: string): Promise<void> {
+    return this.client.callZome({
+      role_name: 'music',
+      zome_name: 'catalog',
+      fn_name: 'delete_track',
+      payload: trackId,
+    });
+  }
+
+  // -- Plays zome --
+
+  async recordPlay(input: {
+    trackId: string;
+    listenerId: string;
+    platform: string;
+    durationPlayed?: number;
+  }): Promise<PlayRecord> {
+    return this.client.callZome({
+      role_name: 'music',
+      zome_name: 'plays',
+      fn_name: 'record_play',
+      payload: {
+        track_id: input.trackId,
+        listener_id: input.listenerId,
+        platform: input.platform,
+        duration_played: input.durationPlayed ?? 30,
+      },
+    });
+  }
+
+  async getTrackPlays(trackId: string): Promise<PlayRecord[]> {
+    return this.client.callZome({
+      role_name: 'music',
+      zome_name: 'plays',
+      fn_name: 'get_track_plays',
+      payload: trackId,
+    });
+  }
+
+  async getTrackStats(trackId: string): Promise<{
+    track: Track;
+    totalPlays: number;
+    completedPlays: number;
+    platformBreakdown: Record<string, number>;
+    uniqueListeners: number;
+  }> {
+    return this.client.callZome({
+      role_name: 'music',
+      zome_name: 'plays',
+      fn_name: 'get_track_stats',
+      payload: trackId,
+    });
+  }
+
+  // -- Balances zome --
+
+  async distributeRoyalties(input: {
+    trackId: string;
+    totalAmount: number;
+    currency: string;
+    periodStart?: number;
+    periodEnd?: number;
+  }): Promise<RoyaltyDistribution> {
+    return this.client.callZome({
+      role_name: 'music',
+      zome_name: 'balances',
+      fn_name: 'distribute_royalties',
+      payload: {
+        track_id: input.trackId,
+        total_amount: input.totalAmount,
+        currency: input.currency,
+        period_start: input.periodStart,
+        period_end: input.periodEnd,
+      },
+    });
+  }
+
+  async getArtistProfile(artistId: string): Promise<ArtistProfile> {
+    return this.client.callZome({
+      role_name: 'music',
+      zome_name: 'balances',
+      fn_name: 'get_artist_profile',
+      payload: artistId,
+    });
+  }
+
+  // -- Trust zome --
+
+  async getCollaboration(trackId: string): Promise<CollaborationAgreement | null> {
+    return this.client.callZome({
+      role_name: 'music',
+      zome_name: 'trust',
+      fn_name: 'get_collaboration',
+      payload: trackId,
+    });
+  }
+
+  async disputeCollaboration(input: {
+    trackId: string;
+    disputantId: string;
+    reason: string;
+  }): Promise<void> {
+    return this.client.callZome({
+      role_name: 'music',
+      zome_name: 'trust',
+      fn_name: 'dispute_collaboration',
+      payload: {
+        track_id: input.trackId,
+        disputant_id: input.disputantId,
+        reason: input.reason,
+      },
+    });
+  }
+
+  async isArtistTrustworthy(artistId: string, threshold?: number): Promise<boolean> {
+    return this.client.callZome({
+      role_name: 'music',
+      zome_name: 'trust',
+      fn_name: 'is_artist_trustworthy',
+      payload: { artist_id: artistId, threshold: threshold ?? 0.7 },
+    });
+  }
+
+  // -- Bridge / health --
+
+  async healthCheck(): Promise<{ cluster: string; agent: string; zome_count: number; healthy: boolean }> {
+    return this.client.callZome({
+      role_name: 'music',
+      zome_name: 'catalog',
+      fn_name: 'health_check',
+      payload: null,
+    });
+  }
+}
+
 // Default service instance
 let defaultService: MusicRoyaltyService | null = null;
 

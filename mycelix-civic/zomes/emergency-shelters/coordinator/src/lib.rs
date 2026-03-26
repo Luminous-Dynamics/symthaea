@@ -1,4 +1,6 @@
-//! Shelters Coordinator Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Shelters Coordinator Zome
 //! Shelter registration, occupancy tracking, and person check-in/out
 
 use emergency_shelters_integrity::*;
@@ -90,6 +92,17 @@ pub fn register_shelter(input: RegisterShelterInput) -> ExternResult<Record> {
         action_hash.clone(),
         LinkTypes::ShelterByType,
         (),
+    )?;
+
+    // Geo-spatial index for shelter location
+    let geo_hash = commons_types::geo::geohash_encode(input.location_lat, input.location_lon, 6);
+    let geo_anchor_str = format!("geo:{}", geo_hash);
+    create_entry(&EntryTypes::Anchor(Anchor(geo_anchor_str.clone())))?;
+    create_link(
+        anchor_hash(&geo_anchor_str)?,
+        action_hash.clone(),
+        LinkTypes::GeoIndex,
+        geo_hash.as_bytes().to_vec(),
     )?;
 
     get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
@@ -478,6 +491,34 @@ pub fn haversine_distance_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 
         + lat1.to_radians().cos() * lat2.to_radians().cos() * (dlon / 2.0).sin().powi(2);
     let c = 2.0 * a.sqrt().asin();
     6371.0 * c
+}
+
+/// Get shelters near a given location using geohash-based proximity search.
+#[hdk_extern]
+pub fn get_nearby_shelters(input: commons_types::geo::NearbyQuery) -> ExternResult<Vec<Record>> {
+    let center_hash = commons_types::geo::geohash_encode(input.latitude, input.longitude, 6);
+    let mut all_cells = vec![center_hash.clone()];
+    all_cells.extend(commons_types::geo::geohash_neighbors(&center_hash));
+
+    let mut records = Vec::new();
+    for cell in &all_cells {
+        let anchor_str = format!("geo:{}", cell);
+        let anchor_entry = Anchor(anchor_str);
+        let anchor_hash = hash_entry(&anchor_entry)?;
+        if let Ok(links) = get_links(
+            LinkQuery::try_new(anchor_hash, LinkTypes::GeoIndex)?,
+            GetStrategy::Local,
+        ) {
+            for link in links {
+                if let Ok(action_hash) = ActionHash::try_from(link.target) {
+                    if let Some(record) = get(action_hash, GetOptions::default())? {
+                        records.push(record);
+                    }
+                }
+            }
+        }
+    }
+    Ok(records)
 }
 
 #[cfg(test)]

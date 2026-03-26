@@ -55,6 +55,7 @@ exclude = ["tests"]
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
+license = "AGPL-3.0-or-later"
 
 [workspace.dependencies]
 # Holochain 0.6 compatible
@@ -79,6 +80,7 @@ civic-types = { path = "crates/civic-types" }
 mycelix-bridge-common = { path = "../crates/mycelix-bridge-common" }
 mycelix-bridge-entry-types = { path = "../crates/mycelix-bridge-entry-types" }
 mycelix-zome-helpers = { path = "../mycelix-workspace/crates/mycelix-zome-helpers" }
+commons-types = { path = "../mycelix-commons/crates/commons-types" }
 
 [profile.dev]
 opt-level = "z"

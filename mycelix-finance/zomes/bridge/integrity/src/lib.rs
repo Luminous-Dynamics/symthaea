@@ -1,11 +1,15 @@
 #![deny(unsafe_code)]
-//! Finance Bridge Integrity Zome
+
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Finance Bridge Integrity Zome
 //! Updated to use HDI 0.7 patterns with FlatOp validation
 //!
 //! Entry types for cross-hApp payment processing, collateral management,
 //! and collateral bridge deposits for SAP minting.
 
 use hdi::prelude::*;
+use mycelix_bridge_entry_types::CrossClusterNotification;
 
 // =============================================================================
 // STRING LENGTH LIMITS — Prevent DHT bloat attacks
@@ -248,6 +252,7 @@ pub enum EntryTypes {
     EnergyCertificate(EnergyCertificate),
     AgriculturalAsset(AgriculturalAsset),
     MultiCollateralPosition(MultiCollateralPosition),
+    Notification(CrossClusterNotification),
 }
 
 #[hdk_link_types]
@@ -266,6 +271,9 @@ pub enum LinkTypes {
     MultiCollateralRegistry,
     HolderToPositions,
     CovenantIdToCovenant,
+    AgentToNotification,
+    AllNotifications,
+    NotificationSubscription,
 }
 
 /// Genesis self-check
@@ -319,6 +327,11 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                         pos,
                     )
                 }
+                EntryTypes::Notification(n) => {
+                    mycelix_bridge_entry_types::validate_notification(&n)
+                        .map(|()| ValidateCallbackResult::Valid)
+                        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))
+                }
             },
             OpEntry::UpdateEntry {
                 app_entry, action, ..
@@ -352,6 +365,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::MultiCollateralPosition(pos) => {
                     validate_update_multi_collateral_position(action, pos)
                 }
+                EntryTypes::Notification(_) => Ok(ValidateCallbackResult::Invalid(
+                    "Notifications cannot be updated".into(),
+                )),
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
@@ -412,6 +428,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 }
                 Ok(ValidateCallbackResult::Valid)
             }
+            LinkTypes::AgentToNotification
+            | LinkTypes::AllNotifications
+            | LinkTypes::NotificationSubscription => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),

@@ -17,3 +17,4 @@ hearth_bridge_integrity = { path = "../integrity" }
 hearth-types = { workspace = true }
 hearth-coordinator-common = { workspace = true }
 mycelix-bridge-common = { workspace = true }
+mycelix-bridge-entry-types = { workspace = true }

@@ -1,0 +1,13 @@
+[package]
+name = "reputation_aggregator_integrity"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "reputation_aggregator_integrity"
+
+[dependencies]
+hdi = { workspace = true }
+serde = { workspace = true }

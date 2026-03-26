@@ -1,4 +1,6 @@
-//! Steward Integrity Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Steward Integrity Zome
 //! Watershed governance, water rights, transfers, and dispute resolution
 
 use hdi::prelude::*;
@@ -233,6 +235,8 @@ pub enum LinkTypes {
     AgentToDispute,
     /// Stewardship type to watersheds
     StewardshipTypeToWatershed,
+    /// Geohash anchor to entry for spatial indexing
+    GeoIndex,
 }
 
 // ============================================================================
@@ -325,6 +329,14 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 if tag.0.len() > 512 {
                     return Ok(ValidateCallbackResult::Invalid(
                         "StewardshipTypeToWatershed link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::GeoIndex => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "GeoIndex link tag too long (max 256 bytes)".into(),
                     ));
                 }
                 Ok(ValidateCallbackResult::Valid)
@@ -1710,7 +1722,8 @@ mod tests {
             | LinkTypes::WatershedToRight
             | LinkTypes::HolderToRight
             | LinkTypes::WatershedToDispute
-            | LinkTypes::AgentToDispute => {
+            | LinkTypes::AgentToDispute
+            | LinkTypes::GeoIndex => {
                 if tag.0.len() > 256 {
                     return Ok(ValidateCallbackResult::Invalid(format!(
                         "{:?} link tag too long (max 256 bytes)",

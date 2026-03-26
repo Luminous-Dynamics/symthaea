@@ -1,4 +1,6 @@
-//! Property Registry Integrity Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Property Registry Integrity Zome
 use hdi::prelude::*;
 use mycelix_bridge_entry_types::{check_author_match, check_link_author_match};
 
@@ -120,6 +122,7 @@ pub enum LinkTypes {
     PropertyToDeeds,
     LocationToProperty,
     PropertyToEncumbrances,
+    GeoIndex,
 }
 
 /// Genesis self-check
@@ -194,6 +197,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     }
                     Ok(ValidateCallbackResult::Valid)
                 }
+                LinkTypes::GeoIndex => Ok(ValidateCallbackResult::Valid),
             }
         }
         FlatOp::RegisterDeleteLink {
@@ -246,6 +250,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     }
                     Ok(ValidateCallbackResult::Valid)
                 }
+                LinkTypes::GeoIndex => Ok(ValidateCallbackResult::Valid),
             }
         }
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
@@ -1940,6 +1945,7 @@ mod tests {
                 }
                 Ok(ValidateCallbackResult::Valid)
             }
+            LinkTypes::GeoIndex => Ok(ValidateCallbackResult::Valid),
         }
     }
 
@@ -1981,6 +1987,7 @@ mod tests {
                 }
                 Ok(ValidateCallbackResult::Valid)
             }
+            LinkTypes::GeoIndex => Ok(ValidateCallbackResult::Valid),
         }
     }
 

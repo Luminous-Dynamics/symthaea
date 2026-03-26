@@ -1,4 +1,6 @@
-//! Shelters Integrity Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Shelters Integrity Zome
 //! Emergency shelter registration and occupancy tracking
 
 use hdi::prelude::*;
@@ -90,6 +92,8 @@ pub enum LinkTypes {
     ShelterToRegistration,
     ShelterByType,
     PersonToRegistration,
+    /// Geohash anchor to entry for spatial indexing
+    GeoIndex,
 }
 
 #[hdk_extern]
@@ -159,6 +163,14 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     if tag_len > 256 {
                         return Ok(ValidateCallbackResult::Invalid(
                             "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::GeoIndex => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "GeoIndex link tag too long (max 256 bytes)".into(),
                         ));
                     }
                     Ok(ValidateCallbackResult::Valid)
@@ -927,7 +939,8 @@ mod tests {
             LinkTypes::AllShelters
             | LinkTypes::OpenShelters
             | LinkTypes::ShelterToRegistration
-            | LinkTypes::PersonToRegistration => {
+            | LinkTypes::PersonToRegistration
+            | LinkTypes::GeoIndex => {
                 if tag_len > 256 {
                     ValidateCallbackResult::Invalid("Link tag too long (max 256 bytes)".into())
                 } else {
@@ -1025,6 +1038,7 @@ mod tests {
             LinkTypes::ShelterToRegistration,
             LinkTypes::ShelterByType,
             LinkTypes::PersonToRegistration,
+            LinkTypes::GeoIndex,
         ];
         for lt in &all_types {
             let result = validate_create_link_tag(lt, &massive_tag);

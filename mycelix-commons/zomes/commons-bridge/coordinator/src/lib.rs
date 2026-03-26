@@ -408,6 +408,58 @@ pub fn broadcast_event(event: CommonsEvent) -> ExternResult<Record> {
     };
     emit_signal(&signal)?;
 
+    // Cross-cluster notification fanout
+    // Dispatch notification to other clusters for events that cross boundaries
+    {
+        let notification = mycelix_bridge_entry_types::CrossClusterNotification {
+            schema_version: 1,
+            source_cluster: "commons".into(),
+            source_zome: event.domain.clone(),
+            event_type: event.event_type.clone(),
+            target_clusters: vec![], // broadcast to all
+            target_agents: vec![],
+            payload: event.payload.clone(),
+            priority: 1, // Normal priority
+            created_at: sys_time()?,
+            expires_at: None,
+        };
+
+        let payload_bytes = ExternIO::encode(&notification)
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            .0;
+
+        // Fan out to connected clusters (best-effort, don't fail on dispatch errors)
+        let targets: &[(CrossClusterRole, &str)] = &[
+            (CrossClusterRole::Civic, "civic_bridge"),
+            (CrossClusterRole::Identity, "identity_bridge"),
+            (CrossClusterRole::Finance, "finance_bridge"),
+            (CrossClusterRole::Hearth, "hearth_bridge"),
+        ];
+
+        for (target_role, zome) in targets {
+            let allowed = routing_registry::get_allowed_zomes(
+                CrossClusterRole::Commons,
+                *target_role,
+            );
+            // Skip if the target zome isn't in the allowed list for this route
+            if allowed.is_empty() || !allowed.iter().any(|z| *z == *zome) {
+                continue;
+            }
+            let dispatch = CrossClusterDispatchInput {
+                role: target_role.as_str().to_string(),
+                zome: zome.to_string(),
+                fn_name: "receive_notification".into(),
+                payload: payload_bytes.clone(),
+            };
+            // Best-effort: log errors but don't fail the broadcast
+            if let Ok(result) = bridge::dispatch_call_cross_cluster(&dispatch, allowed) {
+                if !result.success {
+                    debug!("Notification fanout to {} failed: {:?}", target_role.as_str(), result.error);
+                }
+            }
+        }
+    }
+
     get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created event".into()
     )))
@@ -1717,6 +1769,187 @@ pub fn get_bridge_metrics(_: ()) -> ExternResult<String> {
             e
         )))
     })
+}
+
+// ============================================================================
+// Notification Service
+// ============================================================================
+
+/// Receive a cross-cluster notification and store it locally.
+///
+/// Called by other bridges via `CallTargetCell::OtherRole("commons")`.
+#[hdk_extern]
+pub fn receive_notification(notification: mycelix_bridge_entry_types::CrossClusterNotification) -> ExternResult<ActionHash> {
+    let action_hash = create_entry(&EntryTypes::Notification(notification.clone()))?;
+
+    // Link to agent's notification inbox
+    let agent = agent_info()?.agent_initial_pubkey;
+    let inbox_anchor = ensure_anchor(&format!("notifications:{:?}", agent))?;
+    create_link(inbox_anchor, action_hash.clone(), LinkTypes::AgentToNotification, ())?;
+
+    // Link to global notifications anchor
+    let all_anchor = ensure_anchor("all_notifications")?;
+    create_link(all_anchor, action_hash.clone(), LinkTypes::AllNotifications, ())?;
+
+    // Emit signal to connected UI clients
+    let signal = mycelix_bridge_common::notifications::NotificationSignal {
+        signal_type: "cross_cluster_notification".into(),
+        source_cluster: notification.source_cluster,
+        event_type: notification.event_type,
+        payload: notification.payload,
+        priority: notification.priority,
+    };
+    emit_signal(&signal)?;
+
+    Ok(action_hash)
+}
+
+/// Get notifications for the calling agent.
+#[hdk_extern]
+pub fn get_my_notifications(input: mycelix_bridge_common::notifications::NotificationQueryInput) -> ExternResult<Vec<Record>> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let inbox_anchor = ensure_anchor(&format!("notifications:{:?}", agent))?;
+    let links = get_links(
+        LinkQuery::try_new(inbox_anchor, LinkTypes::AgentToNotification)?,
+        GetStrategy::Local,
+    )?;
+
+    let limit = input.limit
+        .unwrap_or(mycelix_bridge_common::notifications::DEFAULT_NOTIFICATION_LIMIT)
+        .min(mycelix_bridge_common::notifications::MAX_NOTIFICATIONS_PER_AGENT);
+
+    let mut records = Vec::new();
+    for link in links.iter().rev().take(limit) {
+        let hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(hash, GetOptions::default())? {
+            records.push(record);
+        }
+    }
+    Ok(records)
+}
+
+/// Get unread notification count for the calling agent.
+#[hdk_extern]
+pub fn get_unread_count(_: ()) -> ExternResult<u32> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let inbox_anchor = ensure_anchor(&format!("notifications:{:?}", agent))?;
+    let links = get_links(
+        LinkQuery::try_new(inbox_anchor, LinkTypes::AgentToNotification)?,
+        GetStrategy::Local,
+    )?;
+    Ok(links.len() as u32)
+}
+
+/// Subscribe to specific event types from specific clusters.
+#[hdk_extern]
+pub fn subscribe_events(input: mycelix_bridge_common::notifications::SubscribeInput) -> ExternResult<ActionHash> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let sub_anchor = ensure_anchor(&format!("subscriptions:{:?}", agent))?;
+
+    let payload = serde_json::to_string(&input)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+
+    let event = mycelix_bridge_entry_types::BridgeEventEntry {
+        schema_version: 1,
+        domain: "notifications".into(),
+        event_type: "subscription".into(),
+        source_agent: agent.clone(),
+        payload,
+        created_at: sys_time()?,
+        related_hashes: vec![],
+    };
+    let action_hash = create_entry(&EntryTypes::Event(event))?;
+    create_link(sub_anchor, action_hash.clone(), LinkTypes::NotificationSubscription, ())?;
+
+    Ok(action_hash)
+}
+
+/// Unsubscribe from events by deleting the subscription link.
+#[hdk_extern]
+pub fn unsubscribe_events(subscription_hash: ActionHash) -> ExternResult<()> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let sub_anchor = ensure_anchor(&format!("subscriptions:{:?}", agent))?;
+
+    let links = get_links(
+        LinkQuery::try_new(sub_anchor, LinkTypes::NotificationSubscription)?,
+        GetStrategy::Local,
+    )?;
+
+    for link in links {
+        let target = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if target == subscription_hash {
+            delete_link(link.create_link_hash, GetOptions::default())?;
+            break;
+        }
+    }
+    Ok(())
+}
+
+// ============================================================================
+// Geo-Spatial Proximity Queries
+// ============================================================================
+
+/// Get entries near a given location by dispatching to the appropriate domain zome.
+///
+/// The `entry_type` field in the query determines which zome to call:
+/// - "property" → property_registry::get_nearby_properties
+/// - "shelter" → emergency_shelters::get_nearby_shelters (cross-cluster to civic)
+/// - Default → property_registry::get_nearby_properties
+#[hdk_extern]
+pub fn get_nearby(input: commons_types::geo::NearbyQuery) -> ExternResult<Vec<Record>> {
+    let zome = match input.entry_type.as_deref() {
+        Some("property") | None => "property_registry",
+        Some("housing") => "housing_units",
+        Some("food") => "food_production",
+        Some("water") => "water_capture",
+        Some("shelter") => {
+            // Cross-cluster dispatch to civic
+            let payload = ExternIO::encode(&input)
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+            let dispatch = CrossClusterDispatchInput {
+                role: "civic".into(),
+                zome: "emergency_shelters".into(),
+                fn_name: "get_nearby_shelters".into(),
+                payload: payload.0,
+            };
+            let result = bridge::dispatch_call_cross_cluster(
+                &dispatch,
+                routing_registry::get_allowed_zomes(CrossClusterRole::Commons, CrossClusterRole::Civic),
+            )?;
+            if result.success {
+                if let Some(response) = result.response {
+                    return ExternIO(response).decode::<Vec<Record>>()
+                        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())));
+                }
+            }
+            return Ok(vec![]);
+        }
+        Some(other) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                format!("Unknown entry_type for get_nearby: '{}'. Supported: property, housing, food, water, shelter", other)
+            )));
+        }
+    };
+
+    // Local dispatch to the appropriate commons zome
+    let payload = ExternIO::encode(&input)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+    let fn_name = format!("get_nearby_{}", input.entry_type.as_deref().unwrap_or("properties"));
+    let dispatch = DispatchInput {
+        zome: zome.into(),
+        fn_name,
+        payload: payload.0,
+    };
+    let result = bridge::dispatch_call_checked(&dispatch, routing_registry::COMMONS_LOCAL_ZOMES)?;
+    if result.success {
+        if let Some(response) = result.response {
+            return ExternIO(response).decode::<Vec<Record>>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())));
+        }
+    }
+    Ok(vec![])
 }
 
 // ============================================================================
