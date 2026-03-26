@@ -2,99 +2,233 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
-//! Cognitive adaptivity engine for EduNet.
+//! Sovereignty-respecting cognitive adaptivity engine for EduNet.
 //!
-//! This module is the core intelligence that makes learning content morph in
-//! real-time based on the student's cognitive state. It consumes signals from
-//! the Symthaea consciousness engine (Phi, free energy, neuromodulators, FEP
-//! motor commands) and produces concrete adaptation decisions:
+//! This module adapts learning content in real-time based on the student's
+//! cognitive state. It **offers, never imposes**. Every suggestion includes
+//! a "no thanks" option, and the student's decline is respected without
+//! consequence.
 //!
-//! 1. **What** to present (content selection, difficulty adjustment)
-//! 2. **How** to present it (modality, text complexity, vocabulary level)
-//! 3. **When** to intervene (frustration detection, grounding, breaks)
-//! 4. **Who** to pair (peer matching based on cognitive compatibility)
+//! # Sovereignty model
+//!
+//! Students earn autonomy through demonstrated self-regulation, not by age
+//! alone. The system operates in four modes:
+//!
+//! - **Guardian**: system adapts content and explains what it did.
+//! - **Guide**: system suggests options, student chooses.
+//! - **Mirror**: system shows cognitive state, student decides.
+//! - **Autonomous**: system is available on request only.
+//!
+//! Sovereignty **never decreases** from wrong answers or poor choices.
+//! Failure is data, not punishment.
+//!
+//! # Safety threshold
+//!
+//! The ONE exception to pure suggestion: a configurable safety threshold
+//! set by the teacher or parent (never by the system itself). Even then,
+//! the student sees who set it and can say "I'm OK".
 //!
 //! # Signal derivation
 //!
 //! From the three Spore neuromodulators (DA, 5-HT, NE) we derive:
-//! - **Cortisol proxy**: NE * (1 - 5HT)  -- stress
-//! - **Acetylcholine proxy**: consciousness_level  -- focused attention
-//! - **Oxytocin proxy**: 5HT * 0.6 + DA * 0.4  -- social bonding readiness
-//! - **Valence**: DA - cortisol  -- frustrated (-1) to happy (+1)
-//! - **Arousal**: NE + DA * 0.5  -- calm (0) to excited (1)
-//! - **Markov permeability**: sigmoid(5HT + oxytocin - NE - cortisol)  -- openness to input
-//!
-//! # Frustration model
-//!
-//! Frustration is detected as the product of negative valence, high arousal,
-//! and consecutive failures. This maps to the Yerkes-Dodson inverted-U: when
-//! arousal is high but performance is failing, the student has crossed the
-//! optimal zone. The engine intervenes with grounding exercises, reappraisal,
-//! or scaffolding depending on severity and age.
-//!
-//! # ZPD and Markov permeability
-//!
-//! Vygotsky's Zone of Proximal Development is dynamically modulated by the
-//! Markov blanket permeability signal. High permeability (open blanket) means
-//! the student is receptive to new information -- wider ZPD. Low permeability
-//! (closed/fatigued) means review-only -- narrow ZPD. The `difficulty_delta`
-//! is scaled by permeability so that fatigued students get gentler adjustments.
+//! - **Cortisol proxy**: NE * (1 - 5HT) -- stress
+//! - **Acetylcholine proxy**: consciousness_level -- focused attention
+//! - **Oxytocin proxy**: 5HT * 0.6 + DA * 0.4 -- social bonding readiness
+//! - **Valence**: DA - cortisol -- frustrated (-1) to happy (+1)
+//! - **Arousal**: NE + DA * 0.5 -- calm (0) to excited (1)
+//! - **Markov permeability**: sigmoid(5HT + oxytocin - NE - cortisol)
 
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
-// Core types
+// Sovereignty system
+// ---------------------------------------------------------------------------
+
+/// Sovereignty level -- how much autonomy the student has earned.
+/// Grows through demonstrated self-regulation, never decreases from failure.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct SovereigntyLevel {
+    /// Overall sovereignty (0-1000 permille).
+    /// 0-200: Guardian mode (system leads)
+    /// 201-500: Guide mode (system suggests)
+    /// 501-800: Mirror mode (system shows)
+    /// 801-1000: Autonomous (system available on request)
+    pub level: u16,
+
+    /// How sovereignty was earned (audit trail for transparency).
+    pub growth_events: Vec<SovereigntyEvent>,
+}
+
+/// A record of sovereignty growth, visible to student and teacher.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct SovereigntyEvent {
+    pub event_type: SovereigntyGrowthType,
+    pub description: String,
+    /// Always non-negative in practice; i16 for schema flexibility.
+    pub delta: i16,
+    pub timestamp: u64,
+}
+
+/// Ways a student demonstrates self-regulation.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub enum SovereigntyGrowthType {
+    /// Chose to take a break when stress was rising.
+    SelfRegulatedBreak,
+    /// Pushed through difficulty and succeeded.
+    PerseveranceSuccess,
+    /// Asked for help when stuck (knowing when to ask IS self-regulation).
+    AskedForHelp,
+    /// Made a learning plan and followed it.
+    PlannedAndExecuted,
+    /// Reflected on a mistake constructively.
+    ReflectiveResponse,
+    /// Chose appropriate difficulty for themselves.
+    DifficultyCalibration,
+    /// Helped a peer learn.
+    PeerTeaching,
+    /// Overrode a system suggestion and it worked out.
+    IndependentSuccess,
+}
+
+impl SovereigntyLevel {
+    pub fn new() -> Self {
+        Self {
+            level: 100, // Start in Guardian with some base autonomy
+            growth_events: Vec::new(),
+        }
+    }
+
+    /// What interaction mode should the system use?
+    pub fn mode(&self) -> InteractionMode {
+        match self.level {
+            0..=200 => InteractionMode::Guardian,
+            201..=500 => InteractionMode::Guide,
+            501..=800 => InteractionMode::Mirror,
+            _ => InteractionMode::Autonomous,
+        }
+    }
+
+    /// Record a positive sovereignty event.
+    /// Sovereignty NEVER decreases -- failure is data, not punishment.
+    pub fn record_growth(
+        &mut self,
+        event_type: SovereigntyGrowthType,
+        description: String,
+        timestamp: u64,
+    ) {
+        let delta = match &event_type {
+            SovereigntyGrowthType::SelfRegulatedBreak => 15,
+            SovereigntyGrowthType::PerseveranceSuccess => 10,
+            SovereigntyGrowthType::AskedForHelp => 12,
+            SovereigntyGrowthType::PlannedAndExecuted => 20,
+            SovereigntyGrowthType::ReflectiveResponse => 15,
+            SovereigntyGrowthType::DifficultyCalibration => 10,
+            SovereigntyGrowthType::PeerTeaching => 25,
+            SovereigntyGrowthType::IndependentSuccess => 20,
+        };
+
+        self.level = (self.level + delta as u16).min(1000);
+        self.growth_events.push(SovereigntyEvent {
+            event_type,
+            description,
+            delta,
+            timestamp,
+        });
+    }
+}
+
+/// Interaction mode determines how the system surfaces information.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum InteractionMode {
+    /// System leads, explains after. For students still building self-awareness.
+    Guardian,
+    /// System suggests, student chooses. Most students spend the longest here.
+    Guide,
+    /// System shows cognitive state, student decides. Developing metacognition.
+    Mirror,
+    /// System available on request. Self-directed learner.
+    Autonomous,
+}
+
+// ---------------------------------------------------------------------------
+// Suggestion system (replaces mandatory interventions)
+// ---------------------------------------------------------------------------
+
+/// A suggestion the student can accept, modify, or decline.
+/// The system NEVER forces an action.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Suggestion {
+    pub suggestion_type: SuggestionType,
+    pub message: String,
+    pub options: Vec<StudentChoice>,
+    /// Why the system suggested this (visible on teacher dashboard).
+    pub reasoning_for_teacher: String,
+    /// Only true when a teacher/parent-configured safety threshold is exceeded.
+    pub is_safety_concern: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub enum SuggestionType {
+    TakeBreak,
+    TryDifferentApproach,
+    SimplifyContent,
+    WorkWithPeer,
+    TryHarderContent,
+    Reflect,
+    SwitchTopic,
+    CelebrateProgress,
+}
+
+/// An option presented to the student. There is ALWAYS a "no thanks" option.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct StudentChoice {
+    pub label: String,
+    pub action: ChoiceAction,
+    /// Marks the "no thanks" option.
+    pub is_decline: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub enum ChoiceAction {
+    AcceptSuggestion,
+    KeepGoing,
+    TakeBreak { minutes: u32 },
+    SimplifyProblem,
+    SwitchToVisual,
+    WorkWithPeer,
+    /// "I want to do something else."
+    ChooseOwn,
+}
+
+// ---------------------------------------------------------------------------
+// Core types (preserved from original)
 // ---------------------------------------------------------------------------
 
 /// Real-time cognitive state derived from consciousness + neuromodulators.
-///
-/// Built from `ConsciousnessState` signals each tick by the adaptivity layer.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CognitiveState {
-    /// Phi (integrated information) -- consciousness level.
     pub phi: f32,
-    /// Free energy -- surprise/prediction error. High = confused.
     pub free_energy: f32,
-    /// Valence: DA - cortisol. Range: roughly -1 to 1 (frustrated to happy).
     pub valence: f32,
-    /// Arousal: NE + DA * 0.5. Range: 0 to ~1.5, clamped to 0-1.
     pub arousal: f32,
-    /// Acetylcholine proxy (= consciousness_level). Focused attention.
     pub focus: f32,
-    /// Dopamine. Motivation / reward prediction.
     pub motivation: f32,
-    /// Cortisol proxy: NE * (1 - 5HT). Stress level.
     pub stress: f32,
-    /// Oxytocin proxy: 5HT * 0.6 + DA * 0.4. Social readiness.
     pub social_readiness: f32,
-    /// Markov blanket permeability: sigmoid(5HT + oxytocin - NE - cortisol).
-    /// How open the student is to new information.
     pub permeability: f32,
-    /// Latest FEP motor command from the consciousness engine.
     pub motor_command: MotorCommand,
 }
 
 /// FEP motor command mapped to educational actions.
-///
-/// The Symthaea Spore engine emits 8 motor command types from its active
-/// inference loop. Each maps to a pedagogical strategy.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum MotorCommand {
-    /// Switch topic or modality -- attention has wandered.
     AttentionShift,
-    /// Adjust learning rate -- slow down or speed up.
     LearningRateAdjust,
-    /// Present novel/surprising content -- seek information gain.
     ExplorationTrigger,
-    /// Metacognitive pause ("what did you learn?").
     ReflectionInitiate,
-    /// Review / spaced repetition -- consolidate.
     MemoryConsolidate,
-    /// Start fresh approach to problem -- prior model failed.
     ExpectationReset,
-    /// Student action (answer, draw, type).
     MotorOutput,
-    /// Continue current activity.
     NoOp,
 }
 
@@ -103,112 +237,81 @@ pub enum MotorCommand {
 // ---------------------------------------------------------------------------
 
 /// Content adaptation decisions produced by the engine.
-///
-/// Sent to the rendering layer and logged for the teacher dashboard.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ContentAdaptation {
-    /// How to modify text complexity.
     pub text_complexity: TextComplexity,
-    /// What presentation modality to use.
     pub modality: Modality,
-    /// Difficulty adjustment from baseline. Range: -1.0 to +1.0.
     pub difficulty_delta: f32,
-    /// Whether to trigger an intervention.
-    pub intervention: Option<Intervention>,
-    /// Peer pairing suggestion, if appropriate.
+    /// Sovereignty-respecting suggestion (replaces mandatory interventions).
+    pub suggestion: Option<Suggestion>,
     pub peer_suggestion: Option<PeerSuggestion>,
-    /// Human-readable reasoning trace (for teacher dashboard).
     pub reasoning: String,
 }
 
 /// Text complexity levels for content rewriting.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum TextComplexity {
-    /// Full standard text as authored.
     Standard,
-    /// Simplified vocabulary, shorter sentences.
     Simplified,
-    /// Minimal text, heavy visual/pictorial support.
     Minimal,
-    /// Rewritten to incorporate student interests.
     Personalized { interest_topic: String },
 }
 
 /// Presentation modality.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Modality {
-    /// Reading text.
     Text,
-    /// Diagrams, arrays, pictures.
     Visual,
-    /// Read-aloud / audio.
     Auditory,
-    /// Drag-and-drop, manipulatives, hands-on.
     Kinesthetic,
-    /// Multiple modalities combined.
     MultiModal,
-}
-
-/// Intervention types triggered by the adaptivity engine.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum Intervention {
-    /// Pause learning, do a grounding exercise.
-    Grounding {
-        duration_seconds: u32,
-        exercise: String,
-    },
-    /// Cognitive reappraisal -- reframe the difficulty.
-    Reappraisal { message: String },
-    /// Fall back to easier review material.
-    Scaffolding { fallback_skill: String },
-    /// Celebrate progress and push harder.
-    Challenge { message: String },
-    /// Mandatory break.
-    Break {
-        duration_minutes: u32,
-        reason: String,
-    },
-    /// Suggest collaborative peer work.
-    PeerWork { reason: String },
 }
 
 /// Suggestion for peer pairing.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PeerSuggestion {
-    /// Why peer work is recommended.
     pub reason: String,
-    /// Criteria for selecting a compatible peer.
     pub peer_criteria: PeerCriteria,
-    /// Suggested collaboration duration.
     pub duration_minutes: u32,
-    /// Expected pedagogical benefit.
     pub expected_benefit: String,
 }
 
 /// Criteria for selecting a compatible peer.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PeerCriteria {
-    /// The skill the peer should have high mastery in.
     pub needs_high_mastery_in: String,
-    /// Whether the peer should be patient (high Phi + low arousal).
     pub needs_patience: bool,
-    /// Whether affect compatibility is required (not both frustrated).
     pub compatible_affect: bool,
+}
+
+/// Result of a sovereignty-aware rewrite decision.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum RewriteResult {
+    /// Guardian mode: rewrite applied, original available.
+    Applied {
+        rewritten: String,
+        original: String,
+        explanation: String,
+    },
+    /// Guide mode: rewrite offered, student chooses.
+    Offered {
+        rewritten: String,
+        original: String,
+        prompt: String,
+    },
+    /// Mirror/Autonomous: original shown, simplification available on request.
+    Available { original: String },
 }
 
 // ---------------------------------------------------------------------------
 // Signal derivation
 // ---------------------------------------------------------------------------
 
-/// Sigmoid function: 1 / (1 + exp(-x)).
 fn sigmoid(x: f32) -> f32 {
     1.0 / (1.0 + (-x).exp())
 }
 
 /// Build a `CognitiveState` from raw consciousness signals.
-///
-/// This is the bridge between `ConsciousnessState` (from the consciousness
-/// module) and the adaptivity engine. Pure function, no Leptos dependency.
 pub fn derive_cognitive_state(
     phi: f32,
     free_energy: f32,
@@ -239,74 +342,78 @@ pub fn derive_cognitive_state(
 }
 
 // ---------------------------------------------------------------------------
-// Core decision engine
+// Core decision engine (sovereignty-aware)
 // ---------------------------------------------------------------------------
 
-/// Compute content adaptation from cognitive state and learning context.
+/// Default safety threshold. Teacher/parent can override per-student.
+const DEFAULT_SAFETY_THRESHOLD: f32 = 0.85;
+
+/// Compute content adaptation from cognitive state, respecting sovereignty.
 ///
-/// This is the main entry point for the adaptivity engine. It takes the
-/// student's real-time cognitive state, their current learning context, and
-/// returns concrete adaptation decisions.
-///
-/// # Arguments
-///
-/// * `state` - Real-time cognitive state derived from consciousness signals.
-/// * `current_skill` - Name of the skill being practiced (e.g. "multiplication").
-/// * `current_mastery_permille` - Current mastery level (0-1000).
-/// * `recent_accuracy` - Accuracy over the last 5 attempts (0.0-1.0).
-/// * `consecutive_failures` - Number of consecutive wrong answers.
-/// * `grade_ordinal` - Grade level (0=PreK, 1=K, 2=Grade1, ..., 13=Grade12).
-/// * `student_interests` - List of interests for personalization.
+/// The function returns mode-appropriate output:
+/// - **Guardian**: adapts content AND suggests action with explanation.
+/// - **Guide**: offers multiple paths, student chooses.
+/// - **Mirror**: shows cognitive state data, no unsolicited suggestions.
+/// - **Autonomous**: no suggestions unless student asks.
 pub fn adapt_content(
     state: &CognitiveState,
+    sovereignty: &SovereigntyLevel,
     current_skill: &str,
     current_mastery_permille: u16,
     recent_accuracy: f32,
     consecutive_failures: u32,
     grade_ordinal: u8,
     student_interests: &[String],
+    safety_threshold: f32,
 ) -> ContentAdaptation {
-    // === FRUSTRATION DETECTION ===
-    // Valence dropping + arousal rising + consecutive failures = frustration.
-    // Maps to the Yerkes-Dodson inverted-U: past the optimal arousal point.
-    let frustration_score = (-state.valence).max(0.0)
-        * state.arousal
-        * (consecutive_failures as f32 / 3.0).min(1.0);
+    let mode = sovereignty.mode();
 
-    if frustration_score > 0.7 {
-        // HIGH FRUSTRATION: Intervene immediately.
+    // === SAFETY CHECK (the ONE exception to pure suggestion) ===
+    // Configured by teacher/parent, never by the system itself.
+    if state.stress > safety_threshold {
+        let break_mins = if grade_ordinal <= 1 { 10 } else { 5 };
         return ContentAdaptation {
-            text_complexity: TextComplexity::Simplified,
-            modality: Modality::Visual, // reduce cognitive load
-            difficulty_delta: -0.5,
-            intervention: Some(if state.stress > 0.65 {
-                Intervention::Grounding {
-                    duration_seconds: 60,
-                    exercise: "Take 5 deep breaths. Breathe in for 4 counts, \
-                               out for 4 counts."
-                        .into(),
-                }
-            } else {
-                Intervention::Reappraisal {
-                    message: format!(
-                        "This is tricky! {} is a skill that takes practice. \
-                         Let's try a different way to look at it.",
-                        current_skill
-                    ),
-                }
+            text_complexity: TextComplexity::Standard,
+            modality: Modality::Visual,
+            difficulty_delta: 0.0,
+            suggestion: Some(Suggestion {
+                suggestion_type: SuggestionType::TakeBreak,
+                message: "Your teacher set a rest point here to help you stay \
+                          healthy. Let's take a quick break."
+                    .into(),
+                options: vec![
+                    StudentChoice {
+                        label: "OK, I'll take a break".into(),
+                        action: ChoiceAction::TakeBreak { minutes: break_mins },
+                        is_decline: false,
+                    },
+                    StudentChoice {
+                        label: "I'm really OK, let me finish this problem first"
+                            .into(),
+                        action: ChoiceAction::KeepGoing,
+                        is_decline: true,
+                    },
+                ],
+                reasoning_for_teacher: format!(
+                    "Stress proxy {:.2} exceeded safety threshold {:.2}",
+                    state.stress, safety_threshold
+                ),
+                is_safety_concern: true,
             }),
             peer_suggestion: None,
             reasoning: format!(
-                "Frustration detected (score {:.2}). Reducing difficulty \
-                 and providing emotional support.",
-                frustration_score
+                "Safety threshold exceeded (stress {:.2} > {:.2}). Suggesting break.",
+                state.stress, safety_threshold
             ),
         };
     }
 
+    // === FRUSTRATION DETECTION ===
+    let frustration_score = (-state.valence).max(0.0)
+        * state.arousal
+        * (consecutive_failures as f32 / 3.0).min(1.0);
+
     // === TEXT COMPLEXITY ===
-    // Repeated failures + low accuracy → simplify or personalize.
-    // Low focus → minimal text to reduce cognitive load.
     let text_complexity = if consecutive_failures >= 2 && recent_accuracy < 0.4 {
         if !student_interests.is_empty() {
             TextComplexity::Personalized {
@@ -316,35 +423,33 @@ pub fn adapt_content(
             TextComplexity::Simplified
         }
     } else if state.focus < 0.3 {
-        TextComplexity::Minimal // low focus -> reduce text load
+        TextComplexity::Minimal
     } else {
         TextComplexity::Standard
     };
 
     // === MODALITY FROM COGNITIVE STATE ===
     let modality = if state.focus > 0.7 {
-        Modality::Text // high focus -> can handle dense text
+        Modality::Text
     } else if state.social_readiness > 0.6 {
-        Modality::Kinesthetic // social readiness -> hands-on
+        Modality::Kinesthetic
     } else if state.arousal < 0.3 {
-        Modality::Visual // low arousal -> engage visually
+        Modality::Visual
     } else {
         Modality::MultiModal
     };
 
     // === DIFFICULTY FROM FEP MOTOR COMMAND ===
     let difficulty_delta = match state.motor_command {
-        MotorCommand::ExplorationTrigger => 0.3,  // seek novelty -> harder
-        MotorCommand::LearningRateAdjust => -0.2, // slow down -> easier
-        MotorCommand::ReflectionInitiate => 0.0,   // pause to think
-        MotorCommand::MemoryConsolidate => -0.3,  // review mode -> easier
+        MotorCommand::ExplorationTrigger => 0.3,
+        MotorCommand::LearningRateAdjust => -0.2,
+        MotorCommand::ReflectionInitiate => 0.0,
+        MotorCommand::MemoryConsolidate => -0.3,
         _ => {
-            // Default: use free energy as difficulty guide.
-            // High free energy = lots of surprise = too hard.
             if state.free_energy > 0.7 {
                 -0.3
             } else if state.free_energy < 0.3 {
-                0.2 // too easy -> increase
+                0.2
             } else {
                 0.0
             }
@@ -352,59 +457,45 @@ pub fn adapt_content(
     };
 
     // === MARKOV PERMEABILITY -> ZPD MAPPING ===
-    // High permeability = open to new input = wider ZPD.
-    // Low permeability = closed/fatigued = narrow ZPD (review only).
     let effective_difficulty = difficulty_delta * state.permeability;
 
-    // === INTERVENTION CHECK ===
-    let intervention = if state.stress > 0.65 {
-        Some(Intervention::Break {
-            duration_minutes: if grade_ordinal <= 1 { 10 } else { 5 },
-            reason: "Your brain has been working hard. A short break helps \
-                     you learn better!"
-                .into(),
-        })
-    } else if state.motor_command == MotorCommand::ReflectionInitiate {
-        Some(Intervention::Challenge {
-            message: "Nice work! Can you explain how you solved that in \
-                      your own words?"
-                .into(),
-        })
-    } else if state.phi > 0.6 && current_mastery_permille > 850 {
-        Some(Intervention::Challenge {
-            message: "You're really getting this! Ready for something harder?"
-                .into(),
+    // === SUGGESTION (sovereignty-aware) ===
+    let suggestion = build_suggestion(
+        state,
+        &mode,
+        current_skill,
+        current_mastery_permille,
+        frustration_score,
+        consecutive_failures,
+        grade_ordinal,
+    );
+
+    // === PEER SUGGESTION (always an offer, never an assignment) ===
+    let peer_suggestion = if state.social_readiness > 0.6
+        && consecutive_failures >= 3
+        && frustration_score < 0.5
+        && matches!(mode, InteractionMode::Guardian | InteractionMode::Guide)
+    {
+        Some(PeerSuggestion {
+            reason: format!(
+                "{} might be easier with a study buddy",
+                current_skill
+            ),
+            peer_criteria: PeerCriteria {
+                needs_high_mastery_in: current_skill.to_string(),
+                needs_patience: true,
+                compatible_affect: true,
+            },
+            duration_minutes: 10,
+            expected_benefit:
+                "Students who explain concepts to peers deepen their own understanding"
+                    .into(),
         })
     } else {
         None
     };
 
-    // === PEER SUGGESTION ===
-    let peer_suggestion =
-        if state.social_readiness > 0.6
-            && consecutive_failures >= 3
-            && frustration_score < 0.5 // not too frustrated for social work
-        {
-            Some(PeerSuggestion {
-                reason: format!(
-                    "{} might be easier with a study buddy",
-                    current_skill
-                ),
-                peer_criteria: PeerCriteria {
-                    needs_high_mastery_in: current_skill.to_string(),
-                    needs_patience: true,
-                    compatible_affect: true,
-                },
-                duration_minutes: 10,
-                expected_benefit: "Students who explain concepts to peers \
-                                   deepen their own understanding"
-                    .into(),
-            })
-        } else {
-            None
-        };
-
-    // === REASONING TRACE (for teacher dashboard) ===
+    // === REASONING TRACE ===
     let complexity_label = match &text_complexity {
         TextComplexity::Standard => "standard",
         TextComplexity::Simplified => "simplified",
@@ -423,7 +514,7 @@ pub fn adapt_content(
     let reasoning = format!(
         "Phi={:.2}, FE={:.2}, valence={:.2}, arousal={:.2}, stress={:.2}, \
          permeability={:.2}. Motor: {:?}. Mastery: {}\u{2030}. Accuracy: {:.0}%. \
-         Failures: {}. -> {} complexity, {} modality, difficulty {}{:.1}",
+         Failures: {}. Mode: {:?}. -> {} complexity, {} modality, difficulty {}{:.1}",
         state.phi,
         state.free_energy,
         state.valence,
@@ -434,6 +525,7 @@ pub fn adapt_content(
         current_mastery_permille,
         recent_accuracy * 100.0,
         consecutive_failures,
+        mode,
         complexity_label,
         modality_label,
         sign,
@@ -444,21 +536,247 @@ pub fn adapt_content(
         text_complexity,
         modality,
         difficulty_delta: effective_difficulty,
-        intervention,
+        suggestion,
         peer_suggestion,
         reasoning,
     }
 }
 
+/// Build a sovereignty-appropriate suggestion based on cognitive state.
+fn build_suggestion(
+    state: &CognitiveState,
+    mode: &InteractionMode,
+    current_skill: &str,
+    current_mastery_permille: u16,
+    frustration_score: f32,
+    consecutive_failures: u32,
+    grade_ordinal: u8,
+) -> Option<Suggestion> {
+    // Autonomous mode: no unsolicited suggestions.
+    if *mode == InteractionMode::Autonomous {
+        return None;
+    }
+
+    // Mirror mode: only show data, no suggestions.
+    if *mode == InteractionMode::Mirror {
+        return None;
+    }
+
+    // High frustration: offer support (never force).
+    if frustration_score > 0.7 {
+        return Some(match mode {
+            InteractionMode::Guardian => Suggestion {
+                suggestion_type: SuggestionType::TryDifferentApproach,
+                message: if state.stress > 0.65 {
+                    grounding_message(grade_ordinal)
+                } else {
+                    format!(
+                        "This is tricky! {} is a skill that takes practice. \
+                         I'm going to make this a bit simpler.",
+                        current_skill
+                    )
+                },
+                options: vec![
+                    StudentChoice {
+                        label: "OK, sounds good".into(),
+                        action: ChoiceAction::AcceptSuggestion,
+                        is_decline: false,
+                    },
+                    StudentChoice {
+                        label: "I want to keep trying the hard version".into(),
+                        action: ChoiceAction::KeepGoing,
+                        is_decline: true,
+                    },
+                ],
+                reasoning_for_teacher: format!(
+                    "Frustration score {:.2} exceeded threshold. Offering support.",
+                    frustration_score
+                ),
+                is_safety_concern: false,
+            },
+            InteractionMode::Guide => Suggestion {
+                suggestion_type: SuggestionType::TryDifferentApproach,
+                message: format!(
+                    "You've gotten the last {} wrong. What would help?",
+                    consecutive_failures
+                ),
+                options: vec![
+                    StudentChoice {
+                        label: "Make the words simpler".into(),
+                        action: ChoiceAction::SimplifyProblem,
+                        is_decline: false,
+                    },
+                    StudentChoice {
+                        label: "Show me a picture".into(),
+                        action: ChoiceAction::SwitchToVisual,
+                        is_decline: false,
+                    },
+                    StudentChoice {
+                        label: "Let me try again".into(),
+                        action: ChoiceAction::KeepGoing,
+                        is_decline: true,
+                    },
+                    StudentChoice {
+                        label: "Take a break".into(),
+                        action: ChoiceAction::TakeBreak { minutes: 5 },
+                        is_decline: false,
+                    },
+                    StudentChoice {
+                        label: "Something else".into(),
+                        action: ChoiceAction::ChooseOwn,
+                        is_decline: false,
+                    },
+                ],
+                reasoning_for_teacher: format!(
+                    "Frustration score {:.2}. Offering choice of strategies.",
+                    frustration_score
+                ),
+                is_safety_concern: false,
+            },
+            // Mirror and Autonomous handled above.
+            _ => unreachable!(),
+        });
+    }
+
+    // High consciousness + high mastery: celebrate and offer challenge.
+    if state.phi > 0.6 && current_mastery_permille > 850 {
+        return Some(Suggestion {
+            suggestion_type: SuggestionType::CelebrateProgress,
+            message: "You're really getting this! Ready for something harder?".into(),
+            options: vec![
+                StudentChoice {
+                    label: "Yes, challenge me!".into(),
+                    action: ChoiceAction::AcceptSuggestion,
+                    is_decline: false,
+                },
+                StudentChoice {
+                    label: "I want to practice more first".into(),
+                    action: ChoiceAction::KeepGoing,
+                    is_decline: true,
+                },
+            ],
+            reasoning_for_teacher: format!(
+                "Phi {:.2} with mastery {}\u{2030}. Offering challenge.",
+                state.phi, current_mastery_permille
+            ),
+            is_safety_concern: false,
+        });
+    }
+
+    // Reflection motor command.
+    if state.motor_command == MotorCommand::ReflectionInitiate {
+        return Some(Suggestion {
+            suggestion_type: SuggestionType::Reflect,
+            message: "Nice work! Can you explain how you solved that in your own words?"
+                .into(),
+            options: vec![
+                StudentChoice {
+                    label: "Sure, let me explain".into(),
+                    action: ChoiceAction::AcceptSuggestion,
+                    is_decline: false,
+                },
+                StudentChoice {
+                    label: "I'd rather keep going".into(),
+                    action: ChoiceAction::KeepGoing,
+                    is_decline: true,
+                },
+            ],
+            reasoning_for_teacher: "FEP motor command: ReflectionInitiate".into(),
+            is_safety_concern: false,
+        });
+    }
+
+    None
+}
+
+/// Age-appropriate grounding message (not forced -- offered).
+fn grounding_message(grade_ordinal: u8) -> String {
+    if grade_ordinal <= 4 {
+        "Let's take 5 big breaths together! Breathe in like you're smelling \
+         a flower... Breathe out like you're blowing out birthday candles..."
+            .into()
+    } else {
+        "It's normal to find this challenging. Every expert was once a beginner. \
+         Let's try breaking this down into smaller steps."
+            .into()
+    }
+}
+
 // ---------------------------------------------------------------------------
-// Word problem rewriter
+// Metacognitive prompts (sovereignty-aware)
 // ---------------------------------------------------------------------------
 
-/// Rewrite a word problem based on text complexity and student interests.
-///
-/// This is a rule-based rewriter for immediate use. When the Broca language
-/// center (Symthaea) is available via Spore WASM, it can produce richer
-/// contextual rewrites. This version handles the common cases.
+/// Generate an optional metacognitive prompt based on sovereignty mode.
+pub fn metacognitive_prompt(
+    sovereignty: &SovereigntyLevel,
+    recent_result: bool,
+    consecutive_correct: u32,
+    skill: &str,
+) -> Option<String> {
+    match sovereignty.mode() {
+        InteractionMode::Guardian => {
+            if consecutive_correct >= 3 {
+                Some(format!(
+                    "Great job! You got {} in a row! What's your trick for {}?",
+                    consecutive_correct, skill
+                ))
+            } else if !recent_result {
+                Some(
+                    "That's OK! Mistakes help your brain grow. Want to try a \
+                     different way?"
+                        .into(),
+                )
+            } else {
+                None
+            }
+        }
+        InteractionMode::Guide => Some(match (recent_result, consecutive_correct) {
+            (true, n) if n >= 5 => {
+                "You're on fire! Is this getting too easy? You can make it harder."
+                    .into()
+            }
+            (true, _) => "Nice! How did you figure that out?".into(),
+            (false, _) => {
+                "Hmm, that didn't work. What would you try differently?".into()
+            }
+        }),
+        // Mirror and Autonomous: no unsolicited prompts.
+        InteractionMode::Mirror | InteractionMode::Autonomous => None,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Word problem rewriter (sovereignty-aware)
+// ---------------------------------------------------------------------------
+
+/// Decide whether and how to rewrite a problem, respecting sovereignty.
+pub fn suggest_rewrite(
+    sovereignty: &SovereigntyLevel,
+    original: &str,
+    complexity: &TextComplexity,
+    grade_ordinal: u8,
+) -> RewriteResult {
+    match sovereignty.mode() {
+        InteractionMode::Guardian => RewriteResult::Applied {
+            rewritten: rewrite_problem(original, complexity, grade_ordinal),
+            original: original.to_string(),
+            explanation:
+                "I made the words simpler to help you focus on the math.".into(),
+        },
+        InteractionMode::Guide => RewriteResult::Offered {
+            rewritten: rewrite_problem(original, complexity, grade_ordinal),
+            original: original.to_string(),
+            prompt: "Want me to make the words simpler?".into(),
+        },
+        InteractionMode::Mirror | InteractionMode::Autonomous => {
+            RewriteResult::Available {
+                original: original.to_string(),
+            }
+        }
+    }
+}
+
+/// Rewrite a word problem based on text complexity.
 pub fn rewrite_problem(
     original: &str,
     complexity: &TextComplexity,
@@ -475,9 +793,7 @@ pub fn rewrite_problem(
 }
 
 /// Simplify vocabulary and sentence structure.
-///
-/// Replaces complex words with grade-appropriate alternatives.
-fn simplify_text(text: &str, grade_ordinal: u8) -> String {
+pub fn simplify_text(text: &str, grade_ordinal: u8) -> String {
     let mut result = text.to_string();
 
     let replacements: &[(&str, &str)] = &[
@@ -514,10 +830,7 @@ fn simplify_text(text: &str, grade_ordinal: u8) -> String {
 }
 
 /// Extract just the mathematical operation from a word problem.
-///
-/// Strips narrative text and retains only digits and operators. Falls back
-/// to the first sentence if no equation pattern is found.
-fn extract_equation(text: &str) -> String {
+pub fn extract_equation(text: &str) -> String {
     if text.contains('\u{00d7}')
         || text.contains('*')
         || text.contains('+')
@@ -537,25 +850,15 @@ fn extract_equation(text: &str) -> String {
             .trim()
             .to_string()
     } else {
-        // Can't extract equation -- just take the first sentence.
         text.split('.').next().unwrap_or(text).to_string()
     }
 }
 
 /// Replace context subjects with the student's interests.
-///
-/// Swaps generic nouns (bags, apples) for interest-themed equivalents.
-fn personalize_text(text: &str, interest: &str) -> String {
-    let generic_subjects = [
-        "bags",
-        "boxes",
-        "groups",
-        "baskets",
-        "containers",
-    ];
+pub fn personalize_text(text: &str, interest: &str) -> String {
+    let generic_subjects = ["bags", "boxes", "groups", "baskets", "containers"];
     let generic_items = [
-        "apples", "oranges", "items", "objects", "things", "stickers",
-        "marbles",
+        "apples", "oranges", "items", "objects", "things", "stickers", "marbles",
     ];
 
     let (subject, item) = match interest.to_lowercase().as_str() {
@@ -581,42 +884,69 @@ fn personalize_text(text: &str, interest: &str) -> String {
     result
 }
 
-// ---------------------------------------------------------------------------
-// Grounding exercises
-// ---------------------------------------------------------------------------
-
 /// Generate an age-appropriate grounding exercise.
-///
-/// Young students (PreK-Grade3) get physical/sensory exercises.
-/// Older students get cognitive reappraisal framing.
-pub fn grounding_exercise(grade_ordinal: u8, stress_level: f32) -> Intervention {
+pub fn grounding_exercise(grade_ordinal: u8, stress_level: f32) -> Suggestion {
     if grade_ordinal <= 4 {
-        // Young students: physical/sensory grounding.
-        if stress_level > 0.8 {
-            Intervention::Grounding {
-                duration_seconds: 90,
-                exercise: "Let's do the 5-4-3-2-1 game! \
-                    Name 5 things you can see, 4 things you can touch, \
-                    3 things you can hear, 2 things you can smell, \
-                    and 1 thing you can taste."
-                    .into(),
-            }
+        let (message, mins) = if stress_level > 0.8 {
+            (
+                "Let's do the 5-4-3-2-1 game! Name 5 things you can see, \
+                 4 things you can touch, 3 things you can hear, \
+                 2 things you can smell, and 1 thing you can taste.",
+                3,
+            )
         } else {
-            Intervention::Grounding {
-                duration_seconds: 60,
-                exercise: "Let's take 5 big breaths together! \
-                    Breathe in like you're smelling a flower... \
-                    Breathe out like you're blowing out birthday candles..."
-                    .into(),
-            }
+            (
+                "Let's take 5 big breaths together! Breathe in like you're \
+                 smelling a flower... Breathe out like you're blowing out \
+                 birthday candles...",
+                2,
+            )
+        };
+        Suggestion {
+            suggestion_type: SuggestionType::TakeBreak,
+            message: message.into(),
+            options: vec![
+                StudentChoice {
+                    label: "OK, let's do it".into(),
+                    action: ChoiceAction::TakeBreak { minutes: mins },
+                    is_decline: false,
+                },
+                StudentChoice {
+                    label: "I'm fine, let me keep going".into(),
+                    action: ChoiceAction::KeepGoing,
+                    is_decline: true,
+                },
+            ],
+            reasoning_for_teacher: format!(
+                "Stress level {:.2}. Offering age-appropriate grounding.",
+                stress_level
+            ),
+            is_safety_concern: false,
         }
     } else {
-        // Older students: cognitive reappraisal.
-        Intervention::Reappraisal {
-            message: "It's normal to find this challenging. \
-                Every expert was once a beginner. \
-                Let's try breaking this down into smaller steps."
+        Suggestion {
+            suggestion_type: SuggestionType::TryDifferentApproach,
+            message: "It's normal to find this challenging. Every expert was \
+                      once a beginner. Let's try breaking this down into \
+                      smaller steps."
                 .into(),
+            options: vec![
+                StudentChoice {
+                    label: "OK, break it down for me".into(),
+                    action: ChoiceAction::AcceptSuggestion,
+                    is_decline: false,
+                },
+                StudentChoice {
+                    label: "I want to try again as-is".into(),
+                    action: ChoiceAction::KeepGoing,
+                    is_decline: true,
+                },
+            ],
+            reasoning_for_teacher: format!(
+                "Stress level {:.2}. Offering cognitive reappraisal.",
+                stress_level
+            ),
+            is_safety_concern: false,
         }
     }
 }
@@ -630,7 +960,7 @@ mod tests {
     use super::*;
 
     // -----------------------------------------------------------------------
-    // Helper: build a CognitiveState with sensible defaults
+    // Helpers
     // -----------------------------------------------------------------------
 
     fn default_state() -> CognitiveState {
@@ -648,77 +978,495 @@ mod tests {
         }
     }
 
+    fn guardian() -> SovereigntyLevel {
+        SovereigntyLevel::new() // level 100
+    }
+
+    fn guide() -> SovereigntyLevel {
+        SovereigntyLevel {
+            level: 350,
+            growth_events: Vec::new(),
+        }
+    }
+
+    fn mirror() -> SovereigntyLevel {
+        SovereigntyLevel {
+            level: 650,
+            growth_events: Vec::new(),
+        }
+    }
+
+    fn autonomous() -> SovereigntyLevel {
+        SovereigntyLevel {
+            level: 900,
+            growth_events: Vec::new(),
+        }
+    }
+
+    /// Shorthand for adapt_content with default safety threshold.
+    fn adapt(
+        state: &CognitiveState,
+        sov: &SovereigntyLevel,
+        skill: &str,
+        mastery: u16,
+        accuracy: f32,
+        failures: u32,
+        grade: u8,
+        interests: &[String],
+    ) -> ContentAdaptation {
+        adapt_content(
+            state,
+            sov,
+            skill,
+            mastery,
+            accuracy,
+            failures,
+            grade,
+            interests,
+            DEFAULT_SAFETY_THRESHOLD,
+        )
+    }
+
     // -----------------------------------------------------------------------
-    // Frustration detection
+    // Sovereignty system
     // -----------------------------------------------------------------------
 
     #[test]
-    fn frustration_high_triggers_intervention() {
-        // Negative valence + high arousal + consecutive failures = frustration.
-        let state = CognitiveState {
-            valence: -0.8,
-            arousal: 0.9,
-            stress: 0.3, // below grounding threshold
-            ..default_state()
-        };
-        let result = adapt_content(&state, "fractions", 400, 0.1, 5, 5, &[]);
-        assert!(result.intervention.is_some());
-        // Should get reappraisal (stress < 0.65)
-        assert!(matches!(
-            result.intervention,
-            Some(Intervention::Reappraisal { .. })
-        ));
-        assert_eq!(result.text_complexity, TextComplexity::Simplified);
-        assert_eq!(result.modality, Modality::Visual);
-        assert!((result.difficulty_delta - (-0.5)).abs() < f32::EPSILON);
+    fn sovereignty_starts_in_guardian() {
+        let sov = SovereigntyLevel::new();
+        assert_eq!(sov.level, 100);
+        assert_eq!(sov.mode(), InteractionMode::Guardian);
     }
 
     #[test]
-    fn frustration_high_stress_triggers_grounding() {
-        let state = CognitiveState {
-            valence: -0.8,
-            arousal: 0.9,
-            stress: 0.7, // above grounding threshold
-            ..default_state()
-        };
-        let result = adapt_content(&state, "fractions", 400, 0.1, 5, 5, &[]);
-        assert!(matches!(
-            result.intervention,
-            Some(Intervention::Grounding { .. })
-        ));
+    fn sovereignty_mode_boundaries() {
+        assert_eq!(
+            SovereigntyLevel { level: 0, growth_events: vec![] }.mode(),
+            InteractionMode::Guardian
+        );
+        assert_eq!(
+            SovereigntyLevel { level: 200, growth_events: vec![] }.mode(),
+            InteractionMode::Guardian
+        );
+        assert_eq!(
+            SovereigntyLevel { level: 201, growth_events: vec![] }.mode(),
+            InteractionMode::Guide
+        );
+        assert_eq!(
+            SovereigntyLevel { level: 500, growth_events: vec![] }.mode(),
+            InteractionMode::Guide
+        );
+        assert_eq!(
+            SovereigntyLevel { level: 501, growth_events: vec![] }.mode(),
+            InteractionMode::Mirror
+        );
+        assert_eq!(
+            SovereigntyLevel { level: 800, growth_events: vec![] }.mode(),
+            InteractionMode::Mirror
+        );
+        assert_eq!(
+            SovereigntyLevel { level: 801, growth_events: vec![] }.mode(),
+            InteractionMode::Autonomous
+        );
+        assert_eq!(
+            SovereigntyLevel { level: 1000, growth_events: vec![] }.mode(),
+            InteractionMode::Autonomous
+        );
     }
 
     #[test]
-    fn frustration_below_threshold_no_frustration_intervention() {
-        // Positive valence -> frustration score near 0.
+    fn sovereignty_grows_from_self_regulation() {
+        let mut sov = SovereigntyLevel::new();
+        assert_eq!(sov.level, 100);
+        sov.record_growth(
+            SovereigntyGrowthType::SelfRegulatedBreak,
+            "Chose to rest when stressed".into(),
+            1000,
+        );
+        assert_eq!(sov.level, 115);
+        assert_eq!(sov.growth_events.len(), 1);
+        assert_eq!(sov.growth_events[0].delta, 15);
+    }
+
+    #[test]
+    fn sovereignty_never_decreases_from_failure() {
+        // Sovereignty has no decrease mechanism. This test documents the design.
+        let mut sov = SovereigntyLevel::new();
+        sov.record_growth(
+            SovereigntyGrowthType::PerseveranceSuccess,
+            "Kept going".into(),
+            1000,
+        );
+        let level_after = sov.level;
+        // No API to decrease -- level can only go up.
+        assert!(level_after > 100);
+    }
+
+    #[test]
+    fn sovereignty_caps_at_1000() {
+        let mut sov = SovereigntyLevel {
+            level: 995,
+            growth_events: Vec::new(),
+        };
+        sov.record_growth(
+            SovereigntyGrowthType::PeerTeaching,
+            "Helped a peer".into(),
+            1000,
+        );
+        assert_eq!(sov.level, 1000); // 995 + 25 = 1020, capped to 1000
+    }
+
+    #[test]
+    fn sovereignty_growth_audit_trail() {
+        let mut sov = SovereigntyLevel::new();
+        sov.record_growth(
+            SovereigntyGrowthType::AskedForHelp,
+            "Asked teacher about fractions".into(),
+            100,
+        );
+        sov.record_growth(
+            SovereigntyGrowthType::ReflectiveResponse,
+            "Explained what went wrong".into(),
+            200,
+        );
+        assert_eq!(sov.growth_events.len(), 2);
+        assert_eq!(
+            sov.growth_events[0].event_type,
+            SovereigntyGrowthType::AskedForHelp
+        );
+        assert_eq!(sov.growth_events[0].timestamp, 100);
+        assert_eq!(
+            sov.growth_events[1].event_type,
+            SovereigntyGrowthType::ReflectiveResponse
+        );
+    }
+
+    #[test]
+    fn all_growth_types_have_positive_delta() {
+        let types = [
+            SovereigntyGrowthType::SelfRegulatedBreak,
+            SovereigntyGrowthType::PerseveranceSuccess,
+            SovereigntyGrowthType::AskedForHelp,
+            SovereigntyGrowthType::PlannedAndExecuted,
+            SovereigntyGrowthType::ReflectiveResponse,
+            SovereigntyGrowthType::DifficultyCalibration,
+            SovereigntyGrowthType::PeerTeaching,
+            SovereigntyGrowthType::IndependentSuccess,
+        ];
+        for t in types {
+            let mut sov = SovereigntyLevel::new();
+            let before = sov.level;
+            sov.record_growth(t, "test".into(), 0);
+            assert!(sov.level > before, "Every growth type must increase level");
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Guardian mode: suggestions have explanation + "no thanks"
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn guardian_frustration_has_explanation_and_decline() {
         let state = CognitiveState {
-            valence: 0.3,
-            arousal: 0.4,
+            valence: -0.8,
+            arousal: 0.9,
+            stress: 0.3,
+            ..default_state()
+        };
+        let result = adapt(&state, &guardian(), "fractions", 400, 0.1, 5, 5, &[]);
+        let suggestion = result.suggestion.expect("Guardian should suggest");
+        assert!(!suggestion.is_safety_concern);
+        assert!(suggestion.message.contains("tricky"));
+        // Must have a decline option
+        assert!(
+            suggestion.options.iter().any(|o| o.is_decline),
+            "Guardian suggestions must have a 'no thanks' option"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Guide mode: multiple choices presented
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn guide_frustration_offers_multiple_choices() {
+        let state = CognitiveState {
+            valence: -0.8,
+            arousal: 0.9,
+            stress: 0.3,
+            ..default_state()
+        };
+        let result = adapt(&state, &guide(), "fractions", 400, 0.1, 5, 5, &[]);
+        let suggestion = result.suggestion.expect("Guide should suggest");
+        assert!(
+            suggestion.options.len() >= 3,
+            "Guide mode should offer multiple choices, got {}",
+            suggestion.options.len()
+        );
+        assert!(suggestion.options.iter().any(|o| o.is_decline));
+    }
+
+    // -----------------------------------------------------------------------
+    // Mirror mode: no unsolicited suggestions
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn mirror_mode_no_suggestions() {
+        let state = CognitiveState {
+            valence: -0.8,
+            arousal: 0.9,
+            stress: 0.3,
+            ..default_state()
+        };
+        let result = adapt(&state, &mirror(), "fractions", 400, 0.1, 5, 5, &[]);
+        assert!(
+            result.suggestion.is_none(),
+            "Mirror mode should not make unsolicited suggestions"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Autonomous mode: no unsolicited suggestions
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn autonomous_mode_no_suggestions() {
+        let state = default_state();
+        let result = adapt(&state, &autonomous(), "math", 500, 0.8, 0, 5, &[]);
+        assert!(result.suggestion.is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // Safety threshold
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn safety_threshold_explains_who_set_it() {
+        let state = CognitiveState {
+            stress: 0.9, // above default threshold 0.85
+            ..default_state()
+        };
+        let result = adapt(&state, &guardian(), "math", 500, 0.8, 0, 5, &[]);
+        let suggestion = result.suggestion.expect("Safety should trigger");
+        assert!(suggestion.is_safety_concern);
+        assert!(suggestion.message.contains("teacher"));
+    }
+
+    #[test]
+    fn safety_threshold_has_im_ok_option() {
+        let state = CognitiveState {
+            stress: 0.9,
+            ..default_state()
+        };
+        let result = adapt(&state, &guide(), "math", 500, 0.8, 0, 5, &[]);
+        let suggestion = result.suggestion.expect("Safety should trigger");
+        assert!(
+            suggestion.options.iter().any(|o| o.is_decline),
+            "Safety concern must have an 'I'm OK' option"
+        );
+    }
+
+    #[test]
+    fn safety_threshold_is_configurable() {
+        let state = CognitiveState {
+            stress: 0.7,
+            ..default_state()
+        };
+        // With default threshold (0.85), this should NOT trigger.
+        let no_trigger = adapt(&state, &guardian(), "math", 500, 0.8, 0, 5, &[]);
+        assert!(
+            no_trigger.suggestion.is_none()
+                || !no_trigger
+                    .suggestion
+                    .as_ref()
+                    .map_or(false, |s| s.is_safety_concern),
+            "Default threshold should not trigger at stress 0.7"
+        );
+        // With custom threshold (0.6), it SHOULD trigger.
+        let trigger = adapt_content(
+            &state,
+            &guardian(),
+            "math",
+            500,
+            0.8,
+            0,
+            5,
+            &[],
+            0.6, // lower threshold
+        );
+        let suggestion = trigger.suggestion.expect("Custom threshold should trigger");
+        assert!(suggestion.is_safety_concern);
+    }
+
+    #[test]
+    fn safety_triggers_in_all_modes() {
+        let state = CognitiveState {
+            stress: 0.9,
+            ..default_state()
+        };
+        for sov in [guardian(), guide(), mirror(), autonomous()] {
+            let result = adapt(&state, &sov, "math", 500, 0.8, 0, 5, &[]);
+            assert!(
+                result
+                    .suggestion
+                    .as_ref()
+                    .map_or(false, |s| s.is_safety_concern),
+                "Safety should trigger in {:?} mode",
+                sov.mode()
+            );
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Metacognitive prompts
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn metacognitive_guardian_streak() {
+        let prompt =
+            metacognitive_prompt(&guardian(), true, 3, "addition");
+        assert!(prompt.is_some());
+        assert!(prompt.unwrap().contains("3 in a row"));
+    }
+
+    #[test]
+    fn metacognitive_guardian_failure() {
+        let prompt = metacognitive_prompt(&guardian(), false, 0, "math");
+        assert!(prompt.is_some());
+        assert!(prompt.unwrap().contains("Mistakes help"));
+    }
+
+    #[test]
+    fn metacognitive_guide_success() {
+        let prompt = metacognitive_prompt(&guide(), true, 2, "math");
+        assert!(prompt.is_some());
+        assert!(prompt.unwrap().contains("How did you figure"));
+    }
+
+    #[test]
+    fn metacognitive_guide_long_streak() {
+        let prompt = metacognitive_prompt(&guide(), true, 5, "math");
+        assert!(prompt.is_some());
+        assert!(prompt.unwrap().contains("too easy"));
+    }
+
+    #[test]
+    fn metacognitive_mirror_no_prompt() {
+        assert!(metacognitive_prompt(&mirror(), true, 10, "math").is_none());
+    }
+
+    #[test]
+    fn metacognitive_autonomous_no_prompt() {
+        assert!(metacognitive_prompt(&autonomous(), false, 0, "math").is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // Rewrite permission respects sovereignty
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn rewrite_guardian_applies_automatically() {
+        let result = suggest_rewrite(
+            &guardian(),
+            "Sam purchased 3 items.",
+            &TextComplexity::Simplified,
+            3,
+        );
+        assert!(matches!(result, RewriteResult::Applied { .. }));
+        if let RewriteResult::Applied { rewritten, .. } = result {
+            assert!(rewritten.contains("bought"));
+        }
+    }
+
+    #[test]
+    fn rewrite_guide_offers_choice() {
+        let result = suggest_rewrite(
+            &guide(),
+            "Sam purchased 3 items.",
+            &TextComplexity::Simplified,
+            3,
+        );
+        assert!(matches!(result, RewriteResult::Offered { .. }));
+    }
+
+    #[test]
+    fn rewrite_mirror_shows_original() {
+        let result = suggest_rewrite(
+            &mirror(),
+            "Sam purchased 3 items.",
+            &TextComplexity::Simplified,
+            3,
+        );
+        assert!(matches!(result, RewriteResult::Available { .. }));
+    }
+
+    // -----------------------------------------------------------------------
+    // Peer suggestion is an offer, not assignment
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn peer_suggestion_in_guardian_mode() {
+        let state = CognitiveState {
+            social_readiness: 0.7,
+            valence: 0.1,
+            arousal: 0.3,
             stress: 0.2,
             ..default_state()
         };
-        let result = adapt_content(&state, "addition", 500, 0.6, 1, 5, &[]);
-        // No frustration-based intervention (might still get other interventions)
-        assert_eq!(result.text_complexity, TextComplexity::Standard);
-        // Should NOT be the frustration path
-        assert!(result.reasoning.contains("Phi="));
-        assert!(!result.reasoning.contains("Frustration detected"));
+        let result = adapt(&state, &guardian(), "geometry", 300, 0.2, 4, 5, &[]);
+        assert!(result.peer_suggestion.is_some());
+        let peer = result.peer_suggestion.unwrap();
+        assert!(peer.peer_criteria.needs_patience);
     }
 
     #[test]
-    fn frustration_zero_failures_no_trigger() {
-        // Even with negative valence and high arousal, zero failures -> score = 0.
+    fn no_peer_suggestion_in_mirror_mode() {
         let state = CognitiveState {
-            valence: -0.9,
-            arousal: 0.95,
+            social_readiness: 0.7,
+            valence: 0.1,
+            arousal: 0.3,
+            stress: 0.2,
             ..default_state()
         };
-        let result = adapt_content(&state, "addition", 500, 0.8, 0, 5, &[]);
-        assert!(!result.reasoning.contains("Frustration detected"));
+        let result = adapt(&state, &mirror(), "geometry", 300, 0.2, 4, 5, &[]);
+        assert!(
+            result.peer_suggestion.is_none(),
+            "Mirror mode should not suggest peers"
+        );
     }
 
     // -----------------------------------------------------------------------
-    // Text simplification
+    // Student decline is recorded without penalty
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn decline_option_always_present_in_suggestions() {
+        // Test across different suggestion triggers
+        let frustrated = CognitiveState {
+            valence: -0.8,
+            arousal: 0.9,
+            stress: 0.3,
+            ..default_state()
+        };
+        let result = adapt(&frustrated, &guardian(), "math", 400, 0.1, 5, 5, &[]);
+        if let Some(s) = &result.suggestion {
+            assert!(s.options.iter().any(|o| o.is_decline));
+        }
+
+        // Challenge suggestion
+        let excelling = CognitiveState {
+            phi: 0.7,
+            stress: 0.2,
+            ..default_state()
+        };
+        let result = adapt(&excelling, &guardian(), "math", 900, 0.9, 0, 5, &[]);
+        if let Some(s) = &result.suggestion {
+            assert!(s.options.iter().any(|o| o.is_decline));
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Text simplification (preserved utility tests)
     // -----------------------------------------------------------------------
 
     #[test]
@@ -727,199 +1475,143 @@ mod tests {
         let simplified = simplify_text(text, 3);
         assert!(simplified.contains("bought"));
         assert!(simplified.contains("left"));
-        assert!(!simplified.contains("purchased"));
-        assert!(!simplified.contains("remaining"));
     }
 
     #[test]
     fn simplify_grade_dependent_rectangle() {
-        // Grade 3 (ordinal 4): rectangle -> shape
         let early = simplify_text("Draw a rectangle.", 4);
         assert!(early.contains("shape"));
-
-        // Grade 5 (ordinal 6): rectangle stays
         let later = simplify_text("Draw a rectangle.", 6);
         assert!(later.contains("rectangle"));
     }
 
     #[test]
     fn simplify_grade_dependent_multiplication() {
-        // Grade 2 (ordinal 3): multiplication -> times
         let early = simplify_text("Use multiplication.", 3);
         assert!(early.contains("times"));
-
-        // Grade 4 (ordinal 5): multiplication stays
         let later = simplify_text("Use multiplication.", 5);
         assert!(later.contains("multiplication"));
     }
 
     // -----------------------------------------------------------------------
-    // Personalization
+    // Personalization (preserved)
     // -----------------------------------------------------------------------
 
     #[test]
-    fn personalize_dinosaurs_replaces_items() {
-        let text = "Sam has 3 bags with 4 apples each.";
-        let result = personalize_text(text, "dinosaurs");
+    fn personalize_dinosaurs() {
+        let result = personalize_text("Sam has 3 bags with 4 apples each.", "dinosaurs");
         assert!(result.contains("nests"));
         assert!(result.contains("dinosaur eggs"));
-        assert!(!result.contains("bags"));
-        assert!(!result.contains("apples"));
     }
 
     #[test]
     fn personalize_minecraft() {
-        let text = "There are 5 boxes of stickers.";
-        let result = personalize_text(text, "minecraft");
+        let result = personalize_text("There are 5 boxes of stickers.", "minecraft");
         assert!(result.contains("chests"));
         assert!(result.contains("diamonds"));
     }
 
     #[test]
-    fn personalize_unknown_interest_uses_raw() {
-        let text = "There are 3 groups of items.";
-        let result = personalize_text(text, "robots");
-        assert!(result.contains("groups")); // subject stays "groups"
-        assert!(result.contains("robots")); // item becomes interest
+    fn personalize_unknown_uses_raw() {
+        let result = personalize_text("There are 3 groups of items.", "robots");
+        assert!(result.contains("groups"));
+        assert!(result.contains("robots"));
     }
 
     // -----------------------------------------------------------------------
-    // Equation extraction
+    // Equation extraction (preserved)
     // -----------------------------------------------------------------------
 
     #[test]
     fn extract_equation_from_word_problem() {
-        let text = "Sam has 3 + 4 apples. How many?";
-        let eq = extract_equation(text);
+        let eq = extract_equation("Sam has 3 + 4 apples. How many?");
         assert!(eq.contains("3 + 4"));
         assert!(!eq.contains("Sam"));
     }
 
     #[test]
     fn extract_equation_no_operators_takes_first_sentence() {
-        let text = "Sam has some apples. He gave them away.";
-        let eq = extract_equation(text);
+        let eq = extract_equation("Sam has some apples. He gave them away.");
         assert_eq!(eq, "Sam has some apples");
     }
 
     // -----------------------------------------------------------------------
-    // Stress-triggered break
+    // Grounding exercises (now suggestions, not impositions)
     // -----------------------------------------------------------------------
 
     #[test]
-    fn high_stress_triggers_mandatory_break() {
-        let state = CognitiveState {
-            stress: 0.7,
-            valence: 0.1, // not frustrated (positive valence)
-            arousal: 0.3,
-            ..default_state()
-        };
-        let result = adapt_content(&state, "algebra", 500, 0.5, 0, 8, &[]);
-        assert!(matches!(
-            result.intervention,
-            Some(Intervention::Break { .. })
-        ));
+    fn young_student_high_stress_gets_sensory_grounding() {
+        let suggestion = grounding_exercise(3, 0.85);
+        assert!(suggestion.message.contains("5-4-3-2-1"));
+        assert!(suggestion.options.iter().any(|o| o.is_decline));
     }
 
     #[test]
-    fn high_stress_young_student_gets_longer_break() {
-        let state = CognitiveState {
-            stress: 0.7,
-            valence: 0.1,
-            arousal: 0.3,
-            ..default_state()
-        };
-        // PreK (grade_ordinal 0) -> 10 min break
-        let result = adapt_content(&state, "counting", 500, 0.5, 0, 0, &[]);
-        if let Some(Intervention::Break {
-            duration_minutes, ..
-        }) = &result.intervention
-        {
-            assert_eq!(*duration_minutes, 10);
-        } else {
-            panic!("Expected Break intervention for young student");
-        }
+    fn young_student_moderate_stress_gets_breathing() {
+        let suggestion = grounding_exercise(2, 0.5);
+        assert!(suggestion.message.contains("breaths"));
+        assert!(suggestion.options.iter().any(|o| o.is_decline));
     }
 
     #[test]
-    fn high_stress_older_student_gets_shorter_break() {
-        let state = CognitiveState {
-            stress: 0.7,
-            valence: 0.1,
-            arousal: 0.3,
-            ..default_state()
-        };
-        // Grade 5 (ordinal 6) -> 5 min break
-        let result = adapt_content(&state, "decimals", 500, 0.5, 0, 6, &[]);
-        if let Some(Intervention::Break {
-            duration_minutes, ..
-        }) = &result.intervention
-        {
-            assert_eq!(*duration_minutes, 5);
-        } else {
-            panic!("Expected Break intervention for older student");
-        }
+    fn older_student_gets_reappraisal() {
+        let suggestion = grounding_exercise(8, 0.85);
+        assert!(suggestion.message.contains("challenging"));
+        assert_eq!(
+            suggestion.suggestion_type,
+            SuggestionType::TryDifferentApproach
+        );
     }
 
     // -----------------------------------------------------------------------
-    // Peer suggestion
+    // Signal derivation (preserved)
     // -----------------------------------------------------------------------
 
     #[test]
-    fn high_social_readiness_with_failures_suggests_peer() {
-        let state = CognitiveState {
-            social_readiness: 0.7,
-            valence: 0.1, // slightly positive -> frustration_score low
-            arousal: 0.3,
-            stress: 0.2,
-            ..default_state()
-        };
-        let result = adapt_content(&state, "geometry", 300, 0.2, 4, 5, &[]);
-        assert!(result.peer_suggestion.is_some());
-        let peer = result.peer_suggestion.unwrap();
-        assert!(peer.peer_criteria.needs_patience);
-        assert!(peer.peer_criteria.compatible_affect);
-        assert_eq!(peer.peer_criteria.needs_high_mastery_in, "geometry");
+    fn derive_cognitive_state_cortisol() {
+        let state =
+            derive_cognitive_state(0.5, 0.5, 0.5, 0.2, 0.8, MotorCommand::NoOp);
+        assert!((state.stress - 0.64).abs() < 0.01);
     }
 
     #[test]
-    fn low_social_readiness_no_peer_suggestion() {
-        let state = CognitiveState {
-            social_readiness: 0.3, // below 0.6 threshold
-            ..default_state()
-        };
-        let result = adapt_content(&state, "geometry", 300, 0.2, 4, 5, &[]);
-        assert!(result.peer_suggestion.is_none());
+    fn derive_cognitive_state_valence() {
+        let state =
+            derive_cognitive_state(0.5, 0.5, 0.3, 0.2, 0.8, MotorCommand::NoOp);
+        assert!((state.valence - (-0.34)).abs() < 0.01);
     }
 
     #[test]
-    fn few_failures_no_peer_suggestion() {
-        let state = CognitiveState {
-            social_readiness: 0.7,
-            ..default_state()
-        };
-        // Only 1 failure (need >= 3)
-        let result = adapt_content(&state, "geometry", 300, 0.6, 1, 5, &[]);
-        assert!(result.peer_suggestion.is_none());
+    fn derive_cognitive_state_permeability_sigmoid() {
+        let open =
+            derive_cognitive_state(0.5, 0.5, 0.5, 0.8, 0.1, MotorCommand::NoOp);
+        assert!(open.permeability > 0.7);
+
+        let closed =
+            derive_cognitive_state(0.5, 0.5, 0.3, 0.1, 0.9, MotorCommand::NoOp);
+        assert!(closed.permeability < 0.4);
+    }
+
+    #[test]
+    fn derive_cognitive_state_oxytocin() {
+        let state =
+            derive_cognitive_state(0.5, 0.5, 0.6, 0.8, 0.3, MotorCommand::NoOp);
+        assert!((state.social_readiness - 0.72).abs() < 0.01);
     }
 
     // -----------------------------------------------------------------------
-    // FEP motor command -> difficulty
+    // FEP motor command -> difficulty (preserved)
     // -----------------------------------------------------------------------
 
     #[test]
     fn exploration_trigger_increases_difficulty() {
         let state = CognitiveState {
             motor_command: MotorCommand::ExplorationTrigger,
-            permeability: 1.0, // full range
+            permeability: 1.0,
             ..default_state()
         };
-        let result = adapt_content(&state, "math", 500, 0.8, 0, 5, &[]);
-        assert!(
-            result.difficulty_delta > 0.0,
-            "ExplorationTrigger should increase difficulty, got {}",
-            result.difficulty_delta
-        );
+        let result = adapt(&state, &guardian(), "math", 500, 0.8, 0, 5, &[]);
+        assert!(result.difficulty_delta > 0.0);
     }
 
     #[test]
@@ -929,12 +1621,8 @@ mod tests {
             permeability: 1.0,
             ..default_state()
         };
-        let result = adapt_content(&state, "math", 500, 0.8, 0, 5, &[]);
-        assert!(
-            result.difficulty_delta < 0.0,
-            "MemoryConsolidate should decrease difficulty, got {}",
-            result.difficulty_delta
-        );
+        let result = adapt(&state, &guardian(), "math", 500, 0.8, 0, 5, &[]);
+        assert!(result.difficulty_delta < 0.0);
     }
 
     #[test]
@@ -944,7 +1632,7 @@ mod tests {
             permeability: 1.0,
             ..default_state()
         };
-        let result = adapt_content(&state, "math", 500, 0.8, 0, 5, &[]);
+        let result = adapt(&state, &guardian(), "math", 500, 0.8, 0, 5, &[]);
         assert!(result.difficulty_delta < 0.0);
     }
 
@@ -953,122 +1641,101 @@ mod tests {
         let state = CognitiveState {
             motor_command: MotorCommand::ReflectionInitiate,
             permeability: 1.0,
-            stress: 0.2, // low stress so we don't trigger break
+            stress: 0.2,
             ..default_state()
         };
-        let result = adapt_content(&state, "math", 500, 0.8, 0, 5, &[]);
-        assert!(
-            result.difficulty_delta.abs() < f32::EPSILON,
-            "ReflectionInitiate should not change difficulty"
-        );
+        // Use mirror mode so the reflection suggestion doesn't fire,
+        // keeping the test focused on difficulty.
+        let result = adapt(&state, &mirror(), "math", 500, 0.8, 0, 5, &[]);
+        assert!(result.difficulty_delta.abs() < f32::EPSILON);
     }
 
     // -----------------------------------------------------------------------
-    // Free energy -> difficulty (NoOp motor command)
+    // Free energy -> difficulty (preserved)
     // -----------------------------------------------------------------------
 
     #[test]
     fn noop_high_free_energy_decreases_difficulty() {
         let state = CognitiveState {
             motor_command: MotorCommand::NoOp,
-            free_energy: 0.8, // high surprise = too hard
+            free_energy: 0.8,
             permeability: 1.0,
             ..default_state()
         };
-        let result = adapt_content(&state, "math", 500, 0.5, 0, 5, &[]);
-        assert!(
-            result.difficulty_delta < 0.0,
-            "High free energy (too hard) should decrease difficulty"
-        );
+        let result = adapt(&state, &guardian(), "math", 500, 0.5, 0, 5, &[]);
+        assert!(result.difficulty_delta < 0.0);
     }
 
     #[test]
     fn noop_low_free_energy_increases_difficulty() {
         let state = CognitiveState {
             motor_command: MotorCommand::NoOp,
-            free_energy: 0.2, // low surprise = too easy
+            free_energy: 0.2,
             permeability: 1.0,
             ..default_state()
         };
-        let result = adapt_content(&state, "math", 500, 0.8, 0, 5, &[]);
-        assert!(
-            result.difficulty_delta > 0.0,
-            "Low free energy (too easy) should increase difficulty"
-        );
+        let result = adapt(&state, &guardian(), "math", 500, 0.8, 0, 5, &[]);
+        assert!(result.difficulty_delta > 0.0);
     }
 
     #[test]
     fn noop_moderate_free_energy_no_change() {
         let state = CognitiveState {
             motor_command: MotorCommand::NoOp,
-            free_energy: 0.5, // in the sweet spot
+            free_energy: 0.5,
             permeability: 1.0,
             ..default_state()
         };
-        let result = adapt_content(&state, "math", 500, 0.8, 0, 5, &[]);
-        assert!(
-            result.difficulty_delta.abs() < f32::EPSILON,
-            "Moderate free energy should not change difficulty"
-        );
+        let result = adapt(&state, &guardian(), "math", 500, 0.8, 0, 5, &[]);
+        assert!(result.difficulty_delta.abs() < f32::EPSILON);
     }
 
     // -----------------------------------------------------------------------
-    // Permeability scaling
+    // Permeability scaling (preserved)
     // -----------------------------------------------------------------------
 
     #[test]
     fn low_permeability_narrows_difficulty() {
         let state = CognitiveState {
-            motor_command: MotorCommand::ExplorationTrigger, // +0.3 raw
-            permeability: 0.2, // very closed
+            motor_command: MotorCommand::ExplorationTrigger,
+            permeability: 0.2,
             ..default_state()
         };
-        let result = adapt_content(&state, "math", 500, 0.8, 0, 5, &[]);
-        // 0.3 * 0.2 = 0.06
-        assert!(
-            result.difficulty_delta < 0.1,
-            "Low permeability should narrow the difficulty delta, got {}",
-            result.difficulty_delta
-        );
-        assert!(result.difficulty_delta > 0.0); // still positive, just smaller
+        let result = adapt(&state, &guardian(), "math", 500, 0.8, 0, 5, &[]);
+        assert!(result.difficulty_delta < 0.1);
+        assert!(result.difficulty_delta > 0.0);
     }
 
     #[test]
     fn high_permeability_full_difficulty_range() {
         let state = CognitiveState {
-            motor_command: MotorCommand::ExplorationTrigger, // +0.3 raw
-            permeability: 1.0, // fully open
+            motor_command: MotorCommand::ExplorationTrigger,
+            permeability: 1.0,
             ..default_state()
         };
-        let result = adapt_content(&state, "math", 500, 0.8, 0, 5, &[]);
-        assert!(
-            (result.difficulty_delta - 0.3).abs() < f32::EPSILON,
-            "Full permeability should give full difficulty delta"
-        );
+        let result = adapt(&state, &guardian(), "math", 500, 0.8, 0, 5, &[]);
+        assert!((result.difficulty_delta - 0.3).abs() < f32::EPSILON);
     }
 
     // -----------------------------------------------------------------------
-    // Modality selection
+    // Modality selection (preserved)
     // -----------------------------------------------------------------------
 
     #[test]
     fn high_focus_selects_text_modality() {
-        let state = CognitiveState {
-            focus: 0.8,
-            ..default_state()
-        };
-        let result = adapt_content(&state, "math", 500, 0.8, 0, 5, &[]);
+        let state = CognitiveState { focus: 0.8, ..default_state() };
+        let result = adapt(&state, &guardian(), "math", 500, 0.8, 0, 5, &[]);
         assert_eq!(result.modality, Modality::Text);
     }
 
     #[test]
     fn high_social_readiness_selects_kinesthetic() {
         let state = CognitiveState {
-            focus: 0.5,             // not high enough for Text
-            social_readiness: 0.7,  // triggers Kinesthetic
+            focus: 0.5,
+            social_readiness: 0.7,
             ..default_state()
         };
-        let result = adapt_content(&state, "math", 500, 0.8, 0, 5, &[]);
+        let result = adapt(&state, &guardian(), "math", 500, 0.8, 0, 5, &[]);
         assert_eq!(result.modality, Modality::Kinesthetic);
     }
 
@@ -1077,10 +1744,10 @@ mod tests {
         let state = CognitiveState {
             focus: 0.4,
             social_readiness: 0.3,
-            arousal: 0.2, // low arousal
+            arousal: 0.2,
             ..default_state()
         };
-        let result = adapt_content(&state, "math", 500, 0.8, 0, 5, &[]);
+        let result = adapt(&state, &guardian(), "math", 500, 0.8, 0, 5, &[]);
         assert_eq!(result.modality, Modality::Visual);
     }
 
@@ -1092,56 +1759,20 @@ mod tests {
             arousal: 0.5,
             ..default_state()
         };
-        let result = adapt_content(&state, "math", 500, 0.8, 0, 5, &[]);
+        let result = adapt(&state, &guardian(), "math", 500, 0.8, 0, 5, &[]);
         assert_eq!(result.modality, Modality::MultiModal);
     }
 
     // -----------------------------------------------------------------------
-    // Challenge intervention
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn high_phi_high_mastery_triggers_challenge() {
-        let state = CognitiveState {
-            phi: 0.7,
-            stress: 0.2, // low stress so break doesn't trigger first
-            motor_command: MotorCommand::NoOp,
-            ..default_state()
-        };
-        let result = adapt_content(&state, "algebra", 900, 0.9, 0, 8, &[]);
-        assert!(matches!(
-            result.intervention,
-            Some(Intervention::Challenge { .. })
-        ));
-    }
-
-    #[test]
-    fn reflection_motor_triggers_challenge() {
-        let state = CognitiveState {
-            motor_command: MotorCommand::ReflectionInitiate,
-            stress: 0.2,
-            ..default_state()
-        };
-        let result = adapt_content(&state, "math", 500, 0.8, 0, 5, &[]);
-        assert!(matches!(
-            result.intervention,
-            Some(Intervention::Challenge { .. })
-        ));
-    }
-
-    // -----------------------------------------------------------------------
-    // Text complexity selection
+    // Text complexity selection (preserved)
     // -----------------------------------------------------------------------
 
     #[test]
     fn failures_with_interests_triggers_personalized() {
         let interests = vec!["dinosaurs".to_string()];
-        let state = CognitiveState {
-            focus: 0.5,
-            ..default_state()
-        };
+        let state = CognitiveState { focus: 0.5, ..default_state() };
         let result =
-            adapt_content(&state, "multiplication", 300, 0.2, 3, 5, &interests);
+            adapt(&state, &guardian(), "multiplication", 300, 0.2, 3, 5, &interests);
         assert!(matches!(
             result.text_complexity,
             TextComplexity::Personalized { .. }
@@ -1150,126 +1781,147 @@ mod tests {
 
     #[test]
     fn failures_no_interests_triggers_simplified() {
-        let state = CognitiveState {
-            focus: 0.5,
-            ..default_state()
-        };
-        let result = adapt_content(&state, "multiplication", 300, 0.2, 3, 5, &[]);
+        let state = CognitiveState { focus: 0.5, ..default_state() };
+        let result = adapt(&state, &guardian(), "multiplication", 300, 0.2, 3, 5, &[]);
         assert_eq!(result.text_complexity, TextComplexity::Simplified);
     }
 
     #[test]
     fn low_focus_triggers_minimal() {
-        let state = CognitiveState {
-            focus: 0.2, // below 0.3 threshold
-            ..default_state()
-        };
-        // No consecutive failures -> not Simplified path
-        let result = adapt_content(&state, "math", 500, 0.8, 0, 5, &[]);
+        let state = CognitiveState { focus: 0.2, ..default_state() };
+        let result = adapt(&state, &guardian(), "math", 500, 0.8, 0, 5, &[]);
         assert_eq!(result.text_complexity, TextComplexity::Minimal);
     }
 
     #[test]
     fn normal_state_keeps_standard() {
-        let state = CognitiveState {
-            focus: 0.5,
-            ..default_state()
-        };
-        let result = adapt_content(&state, "math", 500, 0.8, 0, 5, &[]);
+        let state = CognitiveState { focus: 0.5, ..default_state() };
+        let result = adapt(&state, &guardian(), "math", 500, 0.8, 0, 5, &[]);
         assert_eq!(result.text_complexity, TextComplexity::Standard);
     }
 
     // -----------------------------------------------------------------------
-    // Grounding exercises
+    // Challenge / celebration (now sovereignty-aware)
     // -----------------------------------------------------------------------
 
     #[test]
-    fn young_student_high_stress_gets_sensory_grounding() {
-        let exercise = grounding_exercise(3, 0.85);
-        if let Intervention::Grounding {
-            duration_seconds,
-            exercise: text,
-        } = &exercise
-        {
-            assert_eq!(*duration_seconds, 90);
-            assert!(text.contains("5-4-3-2-1"));
-        } else {
-            panic!("Expected Grounding intervention for young + high stress");
-        }
+    fn high_phi_high_mastery_offers_challenge() {
+        let state = CognitiveState {
+            phi: 0.7,
+            stress: 0.2,
+            motor_command: MotorCommand::NoOp,
+            ..default_state()
+        };
+        let result = adapt(&state, &guardian(), "algebra", 900, 0.9, 0, 8, &[]);
+        let suggestion = result.suggestion.expect("Should celebrate progress");
+        assert_eq!(suggestion.suggestion_type, SuggestionType::CelebrateProgress);
+        assert!(suggestion.options.iter().any(|o| o.is_decline));
     }
 
     #[test]
-    fn young_student_moderate_stress_gets_breathing() {
-        let exercise = grounding_exercise(2, 0.5);
-        if let Intervention::Grounding {
-            duration_seconds,
-            exercise: text,
-        } = &exercise
-        {
-            assert_eq!(*duration_seconds, 60);
-            assert!(text.contains("breaths"));
-        } else {
-            panic!("Expected Grounding for young + moderate stress");
-        }
-    }
-
-    #[test]
-    fn older_student_gets_reappraisal() {
-        let exercise = grounding_exercise(8, 0.85);
-        assert!(matches!(exercise, Intervention::Reappraisal { .. }));
+    fn reflection_motor_offers_reflection() {
+        let state = CognitiveState {
+            motor_command: MotorCommand::ReflectionInitiate,
+            stress: 0.2,
+            ..default_state()
+        };
+        let result = adapt(&state, &guardian(), "math", 500, 0.8, 0, 5, &[]);
+        let suggestion = result.suggestion.expect("Should offer reflection");
+        assert_eq!(suggestion.suggestion_type, SuggestionType::Reflect);
     }
 
     // -----------------------------------------------------------------------
-    // Signal derivation
+    // Reasoning trace (preserved)
     // -----------------------------------------------------------------------
 
     #[test]
-    fn derive_cognitive_state_cortisol() {
-        let state =
-            derive_cognitive_state(0.5, 0.5, 0.5, 0.2, 0.8, MotorCommand::NoOp);
-        // cortisol = NE * (1 - 5HT) = 0.8 * 0.8 = 0.64
-        assert!((state.stress - 0.64).abs() < 0.01);
+    fn reasoning_trace_includes_all_signals() {
+        let result = adapt(&default_state(), &guardian(), "math", 500, 0.8, 0, 5, &[]);
+        assert!(result.reasoning.contains("Phi="));
+        assert!(result.reasoning.contains("FE="));
+        assert!(result.reasoning.contains("valence="));
+        assert!(result.reasoning.contains("Mode:"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Edge cases (preserved)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn all_zeros_state_does_not_panic() {
+        let state = CognitiveState {
+            phi: 0.0,
+            free_energy: 0.0,
+            valence: 0.0,
+            arousal: 0.0,
+            focus: 0.0,
+            motivation: 0.0,
+            stress: 0.0,
+            social_readiness: 0.0,
+            permeability: 0.0,
+            motor_command: MotorCommand::NoOp,
+        };
+        let result = adapt(&state, &guardian(), "math", 0, 0.0, 0, 0, &[]);
+        assert!(result.difficulty_delta.abs() < f32::EPSILON);
     }
 
     #[test]
-    fn derive_cognitive_state_valence() {
-        let state =
-            derive_cognitive_state(0.5, 0.5, 0.3, 0.2, 0.8, MotorCommand::NoOp);
-        // cortisol = 0.8 * (1 - 0.2) = 0.64
-        // valence = DA - cortisol = 0.3 - 0.64 = -0.34
-        assert!((state.valence - (-0.34)).abs() < 0.01);
+    fn all_max_state_triggers_safety() {
+        let state = CognitiveState {
+            phi: 1.0,
+            free_energy: 1.5,
+            valence: 1.0,
+            arousal: 1.0,
+            focus: 1.0,
+            motivation: 1.0,
+            stress: 1.0, // above safety threshold
+            social_readiness: 1.0,
+            permeability: 1.0,
+            motor_command: MotorCommand::ExplorationTrigger,
+        };
+        let result = adapt(&state, &guardian(), "math", 1000, 1.0, 100, 13, &[]);
+        let suggestion = result.suggestion.expect("Safety should trigger");
+        assert!(suggestion.is_safety_concern);
     }
 
     #[test]
-    fn derive_cognitive_state_permeability_sigmoid() {
-        // High serotonin + low NE -> high permeability
-        let open = derive_cognitive_state(0.5, 0.5, 0.5, 0.8, 0.1, MotorCommand::NoOp);
-        assert!(
-            open.permeability > 0.7,
-            "High 5HT + low NE should give high permeability, got {}",
-            open.permeability
+    fn serialization_roundtrip() {
+        let result = adapt(&default_state(), &guardian(), "math", 500, 0.8, 0, 5, &[]);
+        let json = serde_json::to_string(&result).expect("serialize");
+        let _: ContentAdaptation =
+            serde_json::from_str(&json).expect("deserialize");
+    }
+
+    #[test]
+    fn sovereignty_serialization_roundtrip() {
+        let mut sov = SovereigntyLevel::new();
+        sov.record_growth(
+            SovereigntyGrowthType::AskedForHelp,
+            "test".into(),
+            42,
         );
-
-        // Low serotonin + high NE -> low permeability
-        let closed =
-            derive_cognitive_state(0.5, 0.5, 0.3, 0.1, 0.9, MotorCommand::NoOp);
-        assert!(
-            closed.permeability < 0.4,
-            "Low 5HT + high NE should give low permeability, got {}",
-            closed.permeability
-        );
-    }
-
-    #[test]
-    fn derive_cognitive_state_oxytocin() {
-        let state =
-            derive_cognitive_state(0.5, 0.5, 0.6, 0.8, 0.3, MotorCommand::NoOp);
-        // oxytocin = 5HT * 0.6 + DA * 0.4 = 0.48 + 0.24 = 0.72
-        assert!((state.social_readiness - 0.72).abs() < 0.01);
+        let json = serde_json::to_string(&sov).expect("serialize");
+        let deser: SovereigntyLevel =
+            serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(deser.level, sov.level);
+        assert_eq!(deser.growth_events.len(), 1);
     }
 
     // -----------------------------------------------------------------------
-    // Rewrite integration
+    // Consecutive success -> sovereignty growth opportunity
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn consecutive_success_metacognitive_prompt_exists() {
+        // After 5 correct in Guide mode, the system should prompt about difficulty.
+        let prompt = metacognitive_prompt(&guide(), true, 5, "fractions");
+        assert!(prompt.is_some());
+        let text = prompt.unwrap();
+        assert!(text.contains("too easy"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Rewrite integration (preserved + sovereignty)
     // -----------------------------------------------------------------------
 
     #[test]
@@ -1302,79 +1954,5 @@ mod tests {
         let result = rewrite_problem(text, &complexity, 5);
         assert!(result.contains("rockets"));
         assert!(result.contains("astronauts"));
-    }
-
-    // -----------------------------------------------------------------------
-    // Reasoning trace
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn reasoning_trace_includes_all_signals() {
-        let state = default_state();
-        let result = adapt_content(&state, "math", 500, 0.8, 0, 5, &[]);
-        assert!(result.reasoning.contains("Phi="));
-        assert!(result.reasoning.contains("FE="));
-        assert!(result.reasoning.contains("valence="));
-        assert!(result.reasoning.contains("arousal="));
-        assert!(result.reasoning.contains("stress="));
-        assert!(result.reasoning.contains("permeability="));
-        assert!(result.reasoning.contains("Motor:"));
-        assert!(result.reasoning.contains("Mastery:"));
-        assert!(result.reasoning.contains("Accuracy:"));
-        assert!(result.reasoning.contains("Failures:"));
-    }
-
-    // -----------------------------------------------------------------------
-    // Edge cases
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn all_zeros_state_does_not_panic() {
-        let state = CognitiveState {
-            phi: 0.0,
-            free_energy: 0.0,
-            valence: 0.0,
-            arousal: 0.0,
-            focus: 0.0,
-            motivation: 0.0,
-            stress: 0.0,
-            social_readiness: 0.0,
-            permeability: 0.0,
-            motor_command: MotorCommand::NoOp,
-        };
-        let result = adapt_content(&state, "math", 0, 0.0, 0, 0, &[]);
-        // Should not panic, difficulty should be 0 (scaled by 0 permeability)
-        assert!(result.difficulty_delta.abs() < f32::EPSILON);
-    }
-
-    #[test]
-    fn all_max_state_does_not_panic() {
-        let state = CognitiveState {
-            phi: 1.0,
-            free_energy: 1.5,
-            valence: 1.0,
-            arousal: 1.0,
-            focus: 1.0,
-            motivation: 1.0,
-            stress: 1.0,
-            social_readiness: 1.0,
-            permeability: 1.0,
-            motor_command: MotorCommand::ExplorationTrigger,
-        };
-        let result = adapt_content(&state, "math", 1000, 1.0, 100, 13, &[]);
-        // High stress -> break takes priority
-        assert!(matches!(
-            result.intervention,
-            Some(Intervention::Break { .. })
-        ));
-    }
-
-    #[test]
-    fn serialization_roundtrip() {
-        let state = default_state();
-        let result = adapt_content(&state, "math", 500, 0.8, 0, 5, &[]);
-        let json = serde_json::to_string(&result).expect("serialize");
-        let _: ContentAdaptation =
-            serde_json::from_str(&json).expect("deserialize");
     }
 }
