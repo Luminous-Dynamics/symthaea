@@ -108,6 +108,14 @@ members = [
     "zomes/resource-mesh/coordinator",
     "zomes/resource-mesh/integrity",
 
+    # Tool Library domain (2 zomes)
+    "zomes/tool-library/integrity",
+    "zomes/tool-library/coordinator",
+
+    # Community Calendar (1 zome)
+    "zomes/community-calendar/integrity",
+    "zomes/community-calendar/coordinator",
+
     # Waste/Circular domain (8 zomes)
     "zomes/waste-registry/integrity",
     "zomes/waste-registry/coordinator",

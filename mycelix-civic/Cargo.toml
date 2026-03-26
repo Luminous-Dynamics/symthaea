@@ -46,6 +46,10 @@ members = [
     "zomes/resonance-feed/coordinator",
     "zomes/resonance-feed/integrity",
 
+    # Mediation domain (2 zomes)
+    "zomes/mediation/integrity",
+    "zomes/mediation/coordinator",
+
     # Unified bridge (1 zome)
     "zomes/civic-bridge/integrity",
     "zomes/civic-bridge/coordinator",

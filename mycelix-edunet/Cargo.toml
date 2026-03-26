@@ -30,6 +30,9 @@ members = [
   # Integration Layer (cross-zome orchestration)
   "zomes/integration_zome/integrity",
   "zomes/integration_zome/coordinator",
+  # Mentorship Matching (mentor/mentee pairing + session tracking)
+  "zomes/mentorship_zome/integrity",
+  "zomes/mentorship_zome/coordinator",
   # Trust Tier Bridge (cross-domain dispatch + consciousness gating)
   "zomes/edunet-bridge/integrity",
   "zomes/edunet-bridge/coordinator",

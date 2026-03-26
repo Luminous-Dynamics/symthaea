@@ -87,6 +87,10 @@ pub const COMMONS_LOCAL_ZOMES: &[&str] = &[
     "support_diagnostics",
     // Space (1)
     "space",
+    // Community Calendar (1)
+    "community_calendar",
+    // Tool Library (1)
+    "tool_library",
 ];
 
 /// Zomes allowed for local dispatch within the Civic cluster.
@@ -111,6 +115,8 @@ pub const CIVIC_LOCAL_ZOMES: &[&str] = &[
     "media_curation",
     // Resonance domain (1)
     "resonance_feed",
+    // Mediation domain (1)
+    "mediation",
 ];
 
 /// Zomes allowed for local dispatch within the Music cluster.
@@ -199,6 +205,10 @@ pub const COMMONS_CARE_ZOMES: &[&str] = &[
     "support_diagnostics",
     // Space
     "space",
+    // Community Calendar
+    "community_calendar",
+    // Tool Library
+    "tool_library",
 ];
 
 /// Zomes allowed for local dispatch within the Health cluster.
@@ -286,6 +296,7 @@ pub const EDUNET_LOCAL_ZOMES: &[&str] = &[
     "pods_zome",
     "knowledge_zome",
     "integration_zome",
+    "mentorship_zome",
     "edunet_bridge",
 ];
 
@@ -742,12 +753,12 @@ mod tests {
 
     #[test]
     fn commons_local_zome_count() {
-        assert_eq!(COMMONS_LOCAL_ZOMES.len(), 38);
+        assert_eq!(COMMONS_LOCAL_ZOMES.len(), 40);
     }
 
     #[test]
     fn civic_local_zome_count() {
-        assert_eq!(CIVIC_LOCAL_ZOMES.len(), 16);
+        assert_eq!(CIVIC_LOCAL_ZOMES.len(), 17);
     }
 
     #[test]
@@ -767,7 +778,7 @@ mod tests {
 
     #[test]
     fn commons_care_zome_count() {
-        assert_eq!(COMMONS_CARE_ZOMES.len(), 19);
+        assert_eq!(COMMONS_CARE_ZOMES.len(), 21);
     }
 
     #[test]
@@ -1107,8 +1118,8 @@ mod tests {
     #[test]
     fn get_local_zomes_returns_expected() {
         // All 16 clusters now have local zome lists
-        assert_eq!(get_local_zomes(CrossClusterRole::Commons).unwrap().len(), 38);
-        assert_eq!(get_local_zomes(CrossClusterRole::Civic).unwrap().len(), 16);
+        assert_eq!(get_local_zomes(CrossClusterRole::Commons).unwrap().len(), 40);
+        assert_eq!(get_local_zomes(CrossClusterRole::Civic).unwrap().len(), 17);
         assert_eq!(get_local_zomes(CrossClusterRole::Hearth).unwrap().len(), 10);
         assert_eq!(get_local_zomes(CrossClusterRole::Personal).unwrap().len(), 3);
         assert_eq!(get_local_zomes(CrossClusterRole::Music).unwrap().len(), 4);
@@ -1118,7 +1129,7 @@ mod tests {
         assert_eq!(get_local_zomes(CrossClusterRole::Climate).unwrap().len(), 3);
         assert_eq!(get_local_zomes(CrossClusterRole::Manufacturing).unwrap().len(), 6);
         assert_eq!(get_local_zomes(CrossClusterRole::Supplychain).unwrap().len(), 8);
-        assert_eq!(get_local_zomes(CrossClusterRole::Edunet).unwrap().len(), 11);
+        assert_eq!(get_local_zomes(CrossClusterRole::Edunet).unwrap().len(), 12);
         assert_eq!(get_local_zomes(CrossClusterRole::Legacy).unwrap().len(), 5);
         assert_eq!(get_local_zomes(CrossClusterRole::Identity).unwrap().len(), 12);
         assert_eq!(get_local_zomes(CrossClusterRole::Finance).unwrap().len(), 8);

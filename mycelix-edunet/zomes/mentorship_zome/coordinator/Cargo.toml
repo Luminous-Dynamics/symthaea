@@ -1,0 +1,28 @@
+[package]
+name = "mentorship_coordinator"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Mentorship matching coordinator zome - mentor/mentee pairing, session tracking, and completion"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "mentorship_coordinator"
+
+[dependencies]
+# Holochain Development Kit (HDK) for zome functions
+hdk.workspace = true
+
+# Link to the integrity zome
+mentorship_integrity = { path = "../integrity" }
+
+# Core types
+edunet-core = { path = "../../../crates/edunet-core" }
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Cross-cluster bridge (consciousness gating)
+mycelix-bridge-common = { path = "../../../../crates/mycelix-bridge-common" }

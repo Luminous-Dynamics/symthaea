@@ -1,0 +1,23 @@
+[package]
+name = "mentorship_integrity"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Mentorship matching integrity zome - entry types and validation for mentor/mentee pairing"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "mentorship_integrity"
+
+[dependencies]
+# Holochain Integrity (HDI) for entry definitions
+hdi.workspace = true
+
+# Core types
+edunet-core = { path = "../../../crates/edunet-core" }
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+holochain_serialized_bytes.workspace = true
