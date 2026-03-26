@@ -5,6 +5,7 @@
 use leptos::prelude::*;
 
 mod app;
+mod cognitive_adaptivity;
 mod components;
 mod consciousness;
 mod holochain;
