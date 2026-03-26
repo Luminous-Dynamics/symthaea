@@ -10,7 +10,7 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use crate::error::ClientError;
 use crate::transport::HolochainTransport;
-use crate::types::{ConnectionStatus, decode, encode};
+use crate::types::{ConnectConfig, ConnectionStatus, decode, encode};
 
 /// A typed Holochain client bound to a specific hApp and default role.
 ///
@@ -68,10 +68,24 @@ impl<T: HolochainTransport> HolochainClient<T> {
 
     /// Connect the underlying transport to a conductor.
     ///
+    /// Uses the client's `app_id` and an optional auth token to build
+    /// the [`ConnectConfig`]. After connecting, the transport will have
+    /// the role->cell_id mapping populated.
+    ///
     /// # Arguments
     /// * `url` — WebSocket URL (e.g. "ws://localhost:8888")
-    pub async fn connect(&self, url: &str) -> Result<(), ClientError> {
-        self.transport.connect(url).await
+    /// * `auth_token` — Optional authentication token from the admin API.
+    pub async fn connect(
+        &self,
+        url: &str,
+        auth_token: Option<Vec<u8>>,
+    ) -> Result<(), ClientError> {
+        let config = ConnectConfig {
+            url: url.to_string(),
+            app_id: self.app_id.clone(),
+            auth_token,
+        };
+        self.transport.connect(config).await
     }
 
     /// Disconnect from the conductor.
@@ -165,6 +179,7 @@ impl<T: HolochainTransport> HolochainClient<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::future::Future;
     use std::pin::Pin;
 
     /// Mock transport for testing the client layer.
@@ -196,7 +211,10 @@ mod tests {
             ConnectionStatus::Connected
         }
 
-        fn connect(&self, _url: &str) -> Pin<Box<dyn Future<Output = Result<(), ClientError>>>> {
+        fn connect(
+            &self,
+            _config: ConnectConfig,
+        ) -> Pin<Box<dyn Future<Output = Result<(), ClientError>>>> {
             Box::pin(async { Ok(()) })
         }
 

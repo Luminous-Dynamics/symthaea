@@ -5,10 +5,10 @@
 //!
 //! Implementations:
 //! - [`BrowserWsTransport`](crate::browser::BrowserWsTransport) — browser `WebSocket`
-//! - `TauriIpcTransport` — (future) Tauri IPC bridge
+//! - [`TauriIpcTransport`](crate::tauri::TauriIpcTransport) — Tauri IPC bridge
 
 use crate::error::ClientError;
-use crate::types::ConnectionStatus;
+use crate::types::{ConnectConfig, ConnectionStatus};
 use std::future::Future;
 use std::pin::Pin;
 
@@ -41,11 +41,18 @@ pub trait HolochainTransport: 'static {
     /// Current connection status.
     fn status(&self) -> ConnectionStatus;
 
-    /// Establish a connection to the conductor at the given WebSocket URL.
+    /// Establish a connection to the conductor.
+    ///
+    /// Performs WebSocket open, optional authentication, and app_info
+    /// discovery to build the role→cell_id mapping.
     ///
     /// # Arguments
-    /// * `url` — WebSocket URL (e.g. "ws://localhost:8888")
-    fn connect(&self, url: &str) -> Pin<Box<dyn Future<Output = Result<(), ClientError>>>>;
+    /// * `config` — Connection configuration including URL, app ID, and
+    ///   optional auth token.
+    fn connect(
+        &self,
+        config: ConnectConfig,
+    ) -> Pin<Box<dyn Future<Output = Result<(), ClientError>>>>;
 
     /// Disconnect from the conductor, dropping the underlying connection.
     fn disconnect(&self);

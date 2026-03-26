@@ -32,7 +32,7 @@
 
 use crate::error::ClientError;
 use crate::transport::HolochainTransport;
-use crate::types::ConnectionStatus;
+use crate::types::{ConnectConfig, ConnectionStatus};
 
 use std::cell::RefCell;
 use std::future::Future;
@@ -117,15 +117,27 @@ impl Default for TauriIpcTransport {
 }
 
 impl HolochainTransport for TauriIpcTransport {
-    fn connect(&self, _url: &str) -> Pin<Box<dyn Future<Output = Result<(), ClientError>>>> {
+    fn connect(
+        &self,
+        config: ConnectConfig,
+    ) -> Pin<Box<dyn Future<Output = Result<(), ClientError>>>> {
         let status = Rc::clone(&self.status);
 
         Box::pin(async move {
             *status.borrow_mut() = ConnectionStatus::Connecting;
 
-            // Verify the Tauri IPC bridge is available by invoking a lightweight
-            // `ping` command. The backend should return `"pong"`.
-            match tauri_invoke("ping", JsValue::NULL).await {
+            // For Tauri, the backend manages conductor connection, authentication,
+            // and cell mapping internally. We just verify the IPC bridge is alive.
+            // The config.url and config.auth_token are passed to the backend's
+            // `connect` command so it can establish the conductor connection.
+            let connect_args = serde_wasm_bindgen::to_value(&serde_json::json!({
+                "url": config.url,
+                "app_id": config.app_id,
+                "auth_token": config.auth_token,
+            }))
+            .map_err(|e| ClientError::SerializationError(e.to_string()))?;
+
+            match tauri_invoke("holochain_connect", connect_args).await {
                 Ok(_) => {
                     *status.borrow_mut() = ConnectionStatus::Connected;
                     Ok(())

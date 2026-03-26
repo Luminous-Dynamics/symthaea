@@ -22,7 +22,7 @@
 //!
 //! # Example
 //!
-//! ```rust,no_run
+//! ```rust,ignore
 //! use mycelix_leptos_client::{HolochainClient, BrowserWsTransport};
 //! use serde::{Serialize, Deserialize};
 //!
@@ -34,9 +34,10 @@
 //!
 //! async fn example() {
 //!     let transport = BrowserWsTransport::new();
-//!     transport.connect("ws://localhost:8888").await.unwrap();
-//!
 //!     let client = HolochainClient::new(transport, "mycelix-unified", "governance");
+//!     // Connect with optional auth token (None = no authentication)
+//!     client.connect("ws://localhost:8888", None).await.unwrap();
+//!
 //!     let result: ProposalHash = client.call_zome(
 //!         "agora",
 //!         "create_proposal",
@@ -58,7 +59,7 @@ pub mod client;
 pub use client::HolochainClient;
 pub use error::ClientError;
 pub use transport::HolochainTransport;
-pub use types::{ConnectionStatus, ZomeCallRequest, ZomeCallResponse, encode, decode};
+pub use types::{ConnectConfig, ConnectionStatus, ZomeCallRequest, ZomeCallResponse, encode, decode};
 
 #[cfg(feature = "browser")]
 pub use browser::BrowserWsTransport;

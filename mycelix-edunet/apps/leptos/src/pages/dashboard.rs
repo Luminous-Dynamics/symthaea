@@ -10,6 +10,7 @@
 
 use leptos::prelude::*;
 
+use crate::consciousness::ConsciousnessCard;
 use crate::holochain::use_holochain;
 
 // ---------------------------------------------------------------------------
@@ -173,6 +174,7 @@ pub fn DashboardPage() -> impl IntoView {
         <div class="dashboard">
             <h2>"Learner Dashboard"</h2>
             <div class="dashboard-grid">
+                <ConsciousnessCard />
                 <XpLevelCard />
                 <StreakCard />
                 <DueReviewsCard />

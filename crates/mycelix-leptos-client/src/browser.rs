@@ -6,11 +6,22 @@
 //! Uses `web-sys::WebSocket` to send binary (MessagePack) frames to the
 //! Holochain conductor. Request/response correlation is handled via a
 //! monotonic request ID and an in-memory pending-request map.
+//!
+//! # Wire protocol
+//!
+//! The conductor App API expects:
+//! 1. **Authentication** (optional) — send `AppRequest::Authenticate` with
+//!    the token issued by the admin API.
+//! 2. **App info discovery** — send `AppRequest::AppInfo` to get the
+//!    `role_name → CellId` mapping.
+//! 3. **Zome calls** — send `AppRequest::CallZome` with the resolved `CellId`,
+//!    nonce, expiry, and unsigned provenance/signature.
 
 use crate::error::ClientError;
 use crate::transport::HolochainTransport;
 use crate::types::{
-    ConnectionStatus, WireRequest, WireResponse, ZomeCallWireData,
+    AppRequest, AppResponse, CallZomeRequestWire, CellId, CellInfoVariant,
+    ConnectConfig, ConnectionStatus, WireRequest, WireResponse,
 };
 
 use std::cell::RefCell;
@@ -45,6 +56,10 @@ struct Inner {
     status: ConnectionStatus,
     next_id: u64,
     pending: PendingMap,
+    /// Role name → CellId mapping, populated by app_info after connect.
+    cell_map: HashMap<String, CellId>,
+    /// Agent public key from the first cell, used as provenance for unsigned calls.
+    agent_pub_key: Option<Vec<u8>>,
     /// Closures that must be kept alive for the WebSocket callbacks.
     /// Stored as JsValue to avoid type-parameter complexity.
     _callbacks: Vec<JsValue>,
@@ -57,6 +72,8 @@ impl Default for Inner {
             status: ConnectionStatus::Disconnected,
             next_id: 1,
             pending: HashMap::new(),
+            cell_map: HashMap::new(),
+            agent_pub_key: None,
             _callbacks: Vec::new(),
         }
     }
@@ -69,8 +86,9 @@ impl Default for Inner {
 /// WebSocket-based transport for browser WASM targets.
 ///
 /// This transport opens a binary WebSocket to the Holochain conductor,
-/// sends MessagePack-encoded zome call requests, and correlates responses
-/// by request ID.
+/// authenticates (if a token is provided), discovers the role→cell_id
+/// mapping via `app_info`, and then sends properly-formed zome call
+/// requests with the correct `CellId`.
 ///
 /// # Thread safety
 ///
@@ -102,6 +120,65 @@ impl BrowserWsTransport {
         id
     }
 
+    /// Send a request envelope over the WebSocket and await the response bytes.
+    ///
+    /// This is the core request/response primitive used by authenticate,
+    /// app_info, and call_zome.
+    fn send_request(
+        inner_rc: &Rc<RefCell<Inner>>,
+        request_type: &str,
+        data: Vec<u8>,
+    ) -> Pin<Box<dyn Future<Output = Result<Vec<u8>, ClientError>>>> {
+        let inner = Rc::clone(inner_rc);
+        let request_type = request_type.to_string();
+
+        Box::pin(async move {
+            let (id, wire_bytes) = {
+                let mut state = inner.borrow_mut();
+
+                let ws = state.ws.as_ref().ok_or(ClientError::NotConnected)?;
+                if ws.ready_state() != WebSocket::OPEN {
+                    return Err(ClientError::NotConnected);
+                }
+
+                let id = Self::next_id(&mut state);
+                let envelope = WireRequest {
+                    id,
+                    request_type,
+                    data,
+                };
+
+                let wire_bytes = rmp_serde::to_vec_named(&envelope)
+                    .map_err(|e| ClientError::SerializationError(e.to_string()))?;
+
+                (id, wire_bytes)
+            };
+
+            // Create a oneshot channel for the response
+            let (tx, rx) = futures::channel::oneshot::channel();
+
+            {
+                let mut state = inner.borrow_mut();
+                state.pending.insert(
+                    id,
+                    PendingRequest {
+                        resolve: Box::new(move |result| {
+                            let _ = tx.send(result);
+                        }),
+                    },
+                );
+
+                let ws = state.ws.as_ref().ok_or(ClientError::NotConnected)?;
+                ws.send_with_u8_array(&wire_bytes)
+                    .map_err(|e| ClientError::WebSocketError(format!("{e:?}")))?;
+            }
+
+            rx.await.map_err(|_| {
+                ClientError::WebSocketError("Response channel dropped".to_string())
+            })?
+        })
+    }
+
     /// Set up WebSocket event callbacks (onmessage, onerror, onclose).
     fn attach_callbacks(inner_rc: &Rc<RefCell<Inner>>, ws: &WebSocket) {
         let mut callbacks = Vec::new();
@@ -112,14 +189,14 @@ impl BrowserWsTransport {
             let onmessage = Closure::<dyn FnMut(MessageEvent)>::new(move |event: MessageEvent| {
                 let data = event.data();
 
-                // Binary frame → ArrayBuffer
+                // Binary frame -> ArrayBuffer
                 let bytes = if let Ok(buf) = data.dyn_into::<ArrayBuffer>() {
                     let arr = Uint8Array::new(&buf);
                     let mut vec = vec![0u8; arr.length() as usize];
                     arr.copy_to(&mut vec);
                     vec
                 } else {
-                    // Not a binary frame — ignore (could be text heartbeat)
+                    // Not a binary frame -- ignore (could be text heartbeat)
                     return;
                 };
 
@@ -212,9 +289,11 @@ impl Default for BrowserWsTransport {
 }
 
 impl HolochainTransport for BrowserWsTransport {
-    fn connect(&self, url: &str) -> Pin<Box<dyn Future<Output = Result<(), ClientError>>>> {
+    fn connect(
+        &self,
+        config: ConnectConfig,
+    ) -> Pin<Box<dyn Future<Output = Result<(), ClientError>>>> {
         let inner = Rc::clone(&self.inner);
-        let url = url.to_string();
 
         Box::pin(async move {
             // If already connected, no-op
@@ -226,7 +305,7 @@ impl HolochainTransport for BrowserWsTransport {
             }
 
             // Create WebSocket
-            let ws = WebSocket::new(&url)
+            let ws = WebSocket::new(&config.url)
                 .map_err(|e| ClientError::ConnectionFailed(format!("{e:?}")))?;
 
             // Set binary type to arraybuffer for MessagePack
@@ -241,7 +320,7 @@ impl HolochainTransport for BrowserWsTransport {
                     resolve.call0(&JsValue::NULL).unwrap_or(JsValue::UNDEFINED);
                 });
                 ws.set_onopen(Some(onopen.as_ref().unchecked_ref()));
-                // Prevent GC — the closure is consumed after one call
+                // Prevent GC -- the closure is consumed after one call
                 onopen.forget();
 
                 // Also wire up a rejection on the pre-open error case
@@ -265,9 +344,97 @@ impl HolochainTransport for BrowserWsTransport {
             Self::attach_callbacks(&inner, &ws);
 
             // Store the connected WebSocket
-            let mut state = inner.borrow_mut();
-            state.ws = Some(ws);
-            state.status = ConnectionStatus::Connected;
+            {
+                let mut state = inner.borrow_mut();
+                state.ws = Some(ws);
+                state.status = ConnectionStatus::Connected;
+            }
+
+            // --- Fix 1: Authentication ---
+            if let Some(token) = config.auth_token {
+                let auth_payload = AppRequest::Authenticate { token };
+                let auth_bytes = rmp_serde::to_vec_named(&auth_payload)
+                    .map_err(|e| ClientError::SerializationError(e.to_string()))?;
+
+                let response_bytes =
+                    Self::send_request(&inner, "authenticate", auth_bytes).await?;
+
+                // The conductor responds with an empty success or an error.
+                // If we got here without error, authentication succeeded.
+                // Check for an explicit error in the response.
+                if let Ok(resp) = rmp_serde::from_slice::<AppResponse>(&response_bytes) {
+                    if let AppResponse::Error(e) = resp {
+                        let mut state = inner.borrow_mut();
+                        state.status = ConnectionStatus::Disconnected;
+                        if let Some(ws) = state.ws.take() {
+                            let _ = ws.close();
+                        }
+                        return Err(ClientError::AuthenticationFailed(e.message));
+                    }
+                }
+            }
+
+            // --- Fix 2: AppInfo discovery ---
+            {
+                let app_info_payload = AppRequest::AppInfo {
+                    installed_app_id: config.app_id.clone(),
+                };
+                let app_info_bytes = rmp_serde::to_vec_named(&app_info_payload)
+                    .map_err(|e| ClientError::SerializationError(e.to_string()))?;
+
+                let response_bytes =
+                    Self::send_request(&inner, "app_info", app_info_bytes).await?;
+
+                // Parse the response to build role→cell_id mapping
+                let app_info: AppResponse = rmp_serde::from_slice(&response_bytes)
+                    .map_err(|e| ClientError::InvalidResponse(format!(
+                        "Failed to parse app_info response: {e}"
+                    )))?;
+
+                match app_info {
+                    AppResponse::AppInfo(info) => {
+                        let mut state = inner.borrow_mut();
+                        let mut first_agent: Option<Vec<u8>> = None;
+
+                        for entry in &info.cell_info {
+                            for cell_variant in &entry.cells {
+                                if let CellInfoVariant::Provisioned(cell) = cell_variant {
+                                    state.cell_map.insert(
+                                        entry.role_name.clone(),
+                                        cell.cell_id.clone(),
+                                    );
+                                    // Capture agent pub key from the first cell
+                                    if first_agent.is_none() {
+                                        first_agent = Some(cell.cell_id.1.clone());
+                                    }
+                                    break; // Use first provisioned cell per role
+                                }
+                            }
+                        }
+
+                        state.agent_pub_key = first_agent;
+
+                        if state.cell_map.is_empty() {
+                            web_sys::console::warn_1(
+                                &format!(
+                                    "app_info for '{}' returned no provisioned cells",
+                                    config.app_id
+                                ).into(),
+                            );
+                        }
+                    }
+                    AppResponse::Error(e) => {
+                        return Err(ClientError::ConnectionFailed(format!(
+                            "app_info failed: {}", e.message
+                        )));
+                    }
+                    _ => {
+                        return Err(ClientError::InvalidResponse(
+                            "Unexpected response type for app_info".into(),
+                        ));
+                    }
+                }
+            }
 
             Ok(())
         })
@@ -286,67 +453,58 @@ impl HolochainTransport for BrowserWsTransport {
         let fn_name = fn_name.to_string();
 
         Box::pin(async move {
-            // Build the wire-protocol zome call data
-            let call_data = ZomeCallWireData {
-                provenance: vec![0u8; 32], // Unsigned — signing handled by conductor
-                role_name: role_name.clone(),
-                zome_name: zome_name.clone(),
-                fn_name: fn_name.clone(),
+            // --- Fix 3: Look up cell_id from stored mapping ---
+            let (cell_id, agent_pub_key) = {
+                let state = inner.borrow();
+
+                let cell_id = state
+                    .cell_map
+                    .get(&role_name)
+                    .ok_or_else(|| ClientError::UnknownRole(role_name.clone()))?
+                    .clone();
+
+                let agent_pub_key = state
+                    .agent_pub_key
+                    .clone()
+                    .unwrap_or_else(|| cell_id.1.clone());
+
+                (cell_id, agent_pub_key)
+            };
+
+            // --- Fix 4: Proper AppRequest enum serialization ---
+            // --- Fix 6: Unsigned calls with zeroed signature, proper nonce ---
+            let call_zome_data = CallZomeRequestWire {
+                cell_id,
+                zome_name,
+                fn_name,
                 payload,
                 cap_secret: None,
+                provenance: agent_pub_key,
+                signature: vec![0u8; 64], // Unsigned — zeroed signature
                 nonce: generate_nonce(),
                 expires_at: now_micros() + 5_000_000, // 5 second expiry
             };
 
-            let call_bytes = rmp_serde::to_vec_named(&call_data)
+            let call_request = AppRequest::CallZome(call_zome_data);
+            let call_bytes = rmp_serde::to_vec_named(&call_request)
                 .map_err(|e| ClientError::SerializationError(e.to_string()))?;
 
-            // Allocate request ID and build envelope
-            let (id, wire_bytes) = {
-                let mut state = inner.borrow_mut();
+            let response_bytes =
+                Self::send_request(&inner, "call_zome", call_bytes).await?;
 
-                let ws = state.ws.as_ref().ok_or(ClientError::NotConnected)?;
-                if ws.ready_state() != WebSocket::OPEN {
-                    return Err(ClientError::NotConnected);
+            // Try to decode as AppResponse for proper error handling
+            match rmp_serde::from_slice::<AppResponse>(&response_bytes) {
+                Ok(AppResponse::ZomeCalled(data)) => Ok(data),
+                Ok(AppResponse::Error(e)) => {
+                    Err(ClientError::ZomeCallFailed(e.message))
                 }
-
-                let id = Self::next_id(&mut state);
-                let envelope = WireRequest {
-                    id,
-                    request_type: "zome_call".to_string(),
-                    data: call_bytes,
-                };
-
-                let wire_bytes = rmp_serde::to_vec_named(&envelope)
-                    .map_err(|e| ClientError::SerializationError(e.to_string()))?;
-
-                (id, wire_bytes)
-            };
-
-            // Create a future that will be resolved when the response arrives
-            let (tx, rx) = futures::channel::oneshot::channel();
-
-            {
-                let mut state = inner.borrow_mut();
-                state.pending.insert(
-                    id,
-                    PendingRequest {
-                        resolve: Box::new(move |result| {
-                            let _ = tx.send(result);
-                        }),
-                    },
-                );
-
-                // Send the binary frame
-                let ws = state.ws.as_ref().ok_or(ClientError::NotConnected)?;
-                ws.send_with_u8_array(&wire_bytes)
-                    .map_err(|e| ClientError::WebSocketError(format!("{e:?}")))?;
+                Ok(other) => Err(ClientError::InvalidResponse(format!(
+                    "Unexpected response type for call_zome: {other:?}"
+                ))),
+                // If we can't parse as AppResponse, return the raw bytes
+                // (the WireResponse layer already handled errors)
+                Err(_) => Ok(response_bytes),
             }
-
-            // Await the response
-            rx.await.map_err(|_| {
-                ClientError::WebSocketError("Response channel dropped".to_string())
-            })?
         })
     }
 
@@ -360,6 +518,8 @@ impl HolochainTransport for BrowserWsTransport {
             let _ = ws.close();
         }
         state.status = ConnectionStatus::Disconnected;
+        state.cell_map.clear();
+        state.agent_pub_key = None;
         state._callbacks.clear();
 
         // Fail all pending requests

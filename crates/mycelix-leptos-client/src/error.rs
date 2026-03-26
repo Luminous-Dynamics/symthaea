@@ -37,4 +37,12 @@ pub enum ClientError {
     /// The conductor sent a response that could not be parsed.
     #[error("Invalid response: {0}")]
     InvalidResponse(String),
+
+    /// Authentication with the conductor failed.
+    #[error("Authentication failed: {0}")]
+    AuthenticationFailed(String),
+
+    /// The requested role name was not found in the app info.
+    #[error("Unknown role: {0}")]
+    UnknownRole(String),
 }

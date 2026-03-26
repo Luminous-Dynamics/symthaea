@@ -8,6 +8,7 @@ use leptos_router::{
     path,
 };
 
+use crate::consciousness::ConsciousnessProvider;
 use crate::holochain::{ConnectionBadge, HolochainProvider};
 use crate::pages::*;
 
@@ -15,6 +16,7 @@ use crate::pages::*;
 pub fn App() -> impl IntoView {
     view! {
         <HolochainProvider>
+        <ConsciousnessProvider>
             <Router>
                 <nav class="navbar">
                     <a href="/" class="logo">"EduNet"</a>
@@ -38,6 +40,7 @@ pub fn App() -> impl IntoView {
                     </Routes>
                 </main>
             </Router>
+        </ConsciousnessProvider>
         </HolochainProvider>
     }
 }

@@ -6,6 +6,7 @@ use leptos::prelude::*;
 
 mod app;
 mod components;
+mod consciousness;
 mod holochain;
 mod pages;
 
