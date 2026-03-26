@@ -1,4 +1,6 @@
-//! Core connection manager for the Holochain conductor.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Core connection manager for the Holochain conductor.
 //!
 //! Manages a persistent WebSocket connection to a Holochain conductor,
 //! with automatic reconnection and exponential backoff on failure.
@@ -242,6 +244,159 @@ impl HolochainConductor {
     }
 }
 
+// ============================================================================
+// MULTI-CONDUCTOR FAILOVER
+// ============================================================================
+
+/// Multi-conductor manager with automatic failover.
+///
+/// Wraps multiple `HolochainConductor` instances and transparently routes
+/// zome calls to healthy conductors. Primary conductor is tried first; on
+/// failure, secondaries are attempted in order. Conductors are marked
+/// unhealthy after [`MAX_CONSECUTIVE_FAILURES`] and automatically re-tried
+/// after a cooldown period.
+///
+/// # Example
+/// ```rust,no_run
+/// # async fn example() -> symthaea_mycelix_holochain::Result<()> {
+/// use symthaea_mycelix_holochain::MultiConductor;
+///
+/// let multi = MultiConductor::from_urls(
+///     &["ws://localhost:8888", "ws://backup:8888"],
+///     "mycelix-unified",
+/// );
+/// let result = multi.call_zome("governance", "agora", "get_proposals", serde_json::json!({})).await?;
+/// # Ok(())
+/// # }
+/// ```
+pub struct MultiConductor {
+    conductors: Vec<Arc<HolochainConductor>>,
+    app_id: String,
+}
+
+impl MultiConductor {
+    /// Create a multi-conductor from a list of WebSocket URLs.
+    ///
+    /// The first URL is the primary conductor; the rest are fallbacks.
+    /// At least one URL must be provided.
+    pub fn from_urls(urls: &[&str], app_id: &str) -> Self {
+        assert!(!urls.is_empty(), "At least one conductor URL is required");
+        let conductors = urls
+            .iter()
+            .map(|url| Arc::new(HolochainConductor::new(*url, app_id)))
+            .collect();
+        Self {
+            conductors,
+            app_id: app_id.to_string(),
+        }
+    }
+
+    /// Create a single-conductor instance (drop-in replacement for `HolochainConductor`).
+    pub fn single(url: &str, app_id: &str) -> Self {
+        Self::from_urls(&[url], app_id)
+    }
+
+    /// Call a zome function, trying conductors in order until one succeeds.
+    ///
+    /// - Primary conductor is tried first
+    /// - On failure, each secondary is tried in order
+    /// - Conductors with `MAX_CONSECUTIVE_FAILURES` are skipped (unless all are unhealthy)
+    /// - Returns `AllConductorsUnhealthy` if every conductor fails
+    pub async fn call_zome(
+        &self,
+        role: &str,
+        zome: &str,
+        fn_name: &str,
+        payload: serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        let mut last_error = None;
+
+        // First pass: try healthy conductors
+        for conductor in &self.conductors {
+            if conductor.consecutive_failures() >= MAX_CONSECUTIVE_FAILURES {
+                tracing::debug!(
+                    url = %conductor.conductor_url(),
+                    "Skipping unhealthy conductor"
+                );
+                continue;
+            }
+
+            match conductor.call_zome(role, zome, fn_name, payload.clone()).await {
+                Ok(result) => return Ok(result),
+                Err(e) => {
+                    tracing::warn!(
+                        url = %conductor.conductor_url(),
+                        error = %e,
+                        "Conductor failed, trying next"
+                    );
+                    last_error = Some(e);
+                }
+            }
+        }
+
+        // Second pass: try ALL conductors (including unhealthy) as last resort
+        for conductor in &self.conductors {
+            if conductor.consecutive_failures() < MAX_CONSECUTIVE_FAILURES {
+                continue; // Already tried in first pass
+            }
+
+            tracing::info!(
+                url = %conductor.conductor_url(),
+                "Retrying unhealthy conductor as last resort"
+            );
+
+            match conductor.call_zome(role, zome, fn_name, payload.clone()).await {
+                Ok(result) => return Ok(result),
+                Err(e) => {
+                    last_error = Some(e);
+                }
+            }
+        }
+
+        Err(last_error.unwrap_or_else(|| {
+            BridgeError::AllConductorsUnhealthy(format!(
+                "All {} conductors failed for {}.{}.{}",
+                self.conductors.len(),
+                role,
+                zome,
+                fn_name,
+            ))
+        }))
+    }
+
+    /// Connect to the primary conductor.
+    pub async fn connect(&self) -> Result<()> {
+        if let Some(primary) = self.conductors.first() {
+            primary.connect().await
+        } else {
+            Err(BridgeError::NotConnected)
+        }
+    }
+
+    /// Returns the number of configured conductors.
+    pub fn conductor_count(&self) -> usize {
+        self.conductors.len()
+    }
+
+    /// Returns the number of currently healthy conductors.
+    pub fn healthy_count(&self) -> usize {
+        self.conductors
+            .iter()
+            .filter(|c| c.consecutive_failures() < MAX_CONSECUTIVE_FAILURES)
+            .count()
+    }
+
+    /// Returns the app ID.
+    pub fn app_id(&self) -> &str {
+        &self.app_id
+    }
+
+    /// Get a reference to the primary conductor.
+    pub fn primary(&self) -> &HolochainConductor {
+        &self.conductors[0]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -277,5 +432,30 @@ mod tests {
         assert_eq!(BACKOFF_MAX_SECS, 300);
         assert_eq!(MAX_CONSECUTIVE_FAILURES, 5);
         assert!(BACKOFF_BASE_SECS < BACKOFF_MAX_SECS);
+    }
+
+    #[test]
+    fn test_multi_conductor_creation() {
+        let mc = MultiConductor::from_urls(
+            &["ws://localhost:8888", "ws://backup:8888"],
+            "mycelix-unified",
+        );
+        assert_eq!(mc.conductor_count(), 2);
+        assert_eq!(mc.healthy_count(), 2);
+        assert_eq!(mc.app_id(), "mycelix-unified");
+        assert_eq!(mc.primary().conductor_url(), "ws://localhost:8888");
+    }
+
+    #[test]
+    fn test_multi_conductor_single() {
+        let mc = MultiConductor::single("ws://localhost:8888", "test");
+        assert_eq!(mc.conductor_count(), 1);
+        assert_eq!(mc.healthy_count(), 1);
+    }
+
+    #[test]
+    #[should_panic(expected = "At least one conductor URL is required")]
+    fn test_multi_conductor_empty_panics() {
+        let _mc = MultiConductor::from_urls(&[], "test");
     }
 }

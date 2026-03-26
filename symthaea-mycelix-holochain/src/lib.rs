@@ -1,4 +1,6 @@
-//! Holochain conductor bridge for Symthaea.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Holochain conductor bridge for Symthaea.
 //!
 //! This crate provides async connectivity to a running Holochain conductor
 //! via WebSocket, enabling Symthaea's cognitive loop to dispatch real zome
@@ -39,7 +41,7 @@ pub mod error;
 pub mod types;
 
 // Re-exports for ergonomic usage.
-pub use conductor::HolochainConductor;
+pub use conductor::{HolochainConductor, MultiConductor};
 pub use dispatch_loop::{run_dispatch_loop, GovernanceDispatchCommand};
 pub use dispatcher::{FinanceDispatcher, GovernanceDispatcher};
 pub use error::{BridgeError, Result};
