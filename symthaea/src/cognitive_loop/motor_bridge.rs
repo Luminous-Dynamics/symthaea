@@ -109,7 +109,7 @@ pub enum EmbodimentPlatform {
 ///
 /// Any robotics platform that wants to close the proprioceptive loop
 /// with the cognitive loop must implement this trait.
-pub trait EmbodimentBridge: Send {
+pub trait EmbodimentBridge: Send + Sync {
     /// Translate thought → motor commands, step physics, return result.
     /// `phi` is the current consciousness level for safety gating.
     fn step(&mut self, thought_hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult;
