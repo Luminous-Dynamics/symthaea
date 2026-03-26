@@ -205,12 +205,14 @@
             export RUST_BACKTRACE=1
             export RUST_LOG=info
 
-            # Preserve CARGO_TARGET_DIR from parent shell (Claude session hook sets this
-            # to .claude/targets/<session-id>/ for build isolation between sessions).
-            # Without this line, nix develop clears the env var and cargo falls back
-            # to ./target/, causing lock contention between concurrent sessions.
-            if [[ -n "''${CARGO_TARGET_DIR:-}" ]]; then
-              export CARGO_TARGET_DIR="''${CARGO_TARGET_DIR}"
+            # Preserve CARGO_TARGET_DIR from parent shell for build isolation.
+            # nix develop creates a clean env, but the parent's CARGO_TARGET_DIR
+            # is readable from /proc/$PPID/environ (Linux-specific).
+            if [[ -z "''${CARGO_TARGET_DIR:-}" ]] && [[ -r "/proc/$PPID/environ" ]]; then
+              _parent_target=$(tr '\0' '\n' < /proc/$PPID/environ 2>/dev/null | grep '^CARGO_TARGET_DIR=' | head -1 | cut -d= -f2-)
+              if [[ -n "$_parent_target" ]] && [[ -d "$_parent_target" ]]; then
+                export CARGO_TARGET_DIR="$_parent_target"
+              fi
             fi
 
             # Python path for PyPhi
