@@ -868,6 +868,55 @@ impl CognitiveLoopService {
         self.swarm_event_tx.clone()
     }
 
+    /// Enable network attestation for the cognitive loop.
+    ///
+    /// Creates a `NetworkService`, initializes Ed25519 attestation, and spawns
+    /// an attestation-aware bridge that feeds verified swarm events into the
+    /// cognitive loop's Phase B drain.
+    ///
+    /// This is the **production wiring point** for P2P consciousness sharing
+    /// with cryptographic verification. Call once after CLS construction.
+    ///
+    /// # Requirements
+    /// - `identity` feature must be enabled
+    /// - `swarm` feature must be enabled for real networking (stub without)
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let mut cls = CognitiveLoopService::new(config)?;
+    /// let rt = tokio::runtime::Handle::current();
+    /// rt.block_on(cls.enable_network_attestation())?;
+    /// ```
+    #[cfg(feature = "identity")]
+    pub async fn enable_network_attestation(
+        &self,
+    ) -> anyhow::Result<()> {
+        use crate::swarm::{NetworkService, SwarmConfig};
+        use super::super::managers::network_service_bridge::NetworkServiceBridge;
+
+        let swarm_config = SwarmConfig::production();
+        let mut service = NetworkService::new(swarm_config).await
+            .map_err(|e| anyhow::anyhow!("NetworkService init failed: {e}"))?;
+
+        let attestation_mgr = service.initialize_attestation()
+            .map_err(|e| anyhow::anyhow!("Attestation init failed: {e}"))?;
+
+        let tx = self.swarm_event_sender();
+        let _bridge = NetworkServiceBridge::spawn_with_attestation(
+            &service,
+            tx,
+            Some(attestation_mgr.clone()),
+        );
+
+        let pubkey = attestation_mgr.read().public_key_hex().to_string();
+        tracing::info!(
+            pubkey = %&pubkey[..16],
+            "Network attestation enabled — verified CV exchange active"
+        );
+
+        Ok(())
+    }
+
     /// Take the mesh outbound receiver (one-shot — returns None after first call).
     ///
     /// ContinuousMind calls this once during wiring to drain CLS-generated
