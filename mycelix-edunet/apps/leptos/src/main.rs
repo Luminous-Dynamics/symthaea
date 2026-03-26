@@ -10,6 +10,7 @@ mod consciousness;
 mod holochain;
 mod learning_engine;
 mod pages;
+mod role;
 
 fn main() {
     console_error_panic_hook::set_once();

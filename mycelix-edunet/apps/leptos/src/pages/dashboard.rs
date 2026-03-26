@@ -10,7 +10,6 @@
 
 use leptos::prelude::*;
 
-use crate::consciousness::ConsciousnessCard;
 use crate::holochain::use_holochain;
 
 // ---------------------------------------------------------------------------
@@ -106,30 +105,30 @@ fn mock_due_reviews() -> DueReviews {
 
 fn mock_skills() -> Vec<SkillMastery> {
     vec![
-        SkillMastery { name: "Rust Ownership".into(), level: 0.85, domain: "Programming".into() },
-        SkillMastery { name: "Consensus Algorithms".into(), level: 0.72, domain: "Distributed Systems".into() },
-        SkillMastery { name: "Soil Chemistry".into(), level: 0.63, domain: "Agriculture".into() },
-        SkillMastery { name: "DHT Fundamentals".into(), level: 0.58, domain: "Networking".into() },
-        SkillMastery { name: "Cooperative Governance".into(), level: 0.45, domain: "Economics".into() },
+        SkillMastery { name: "Multiplication".into(), level: 0.85, domain: "Math".into() },
+        SkillMastery { name: "Fractions".into(), level: 0.72, domain: "Math".into() },
+        SkillMastery { name: "Word Problems".into(), level: 0.63, domain: "Math".into() },
+        SkillMastery { name: "Geometry".into(), level: 0.58, domain: "Math".into() },
+        SkillMastery { name: "Rounding".into(), level: 0.45, domain: "Math".into() },
     ]
 }
 
 fn mock_recommendations() -> Vec<Recommendation> {
     vec![
         Recommendation {
-            title: "Async Rust Patterns".into(),
-            reason: "Your Rust Ownership mastery is high — ready for async".into(),
-            course_domain: "Programming".into(),
+            title: "Division Practice".into(),
+            reason: "You're great at multiplication — try dividing next!".into(),
+            course_domain: "Math".into(),
         },
         Recommendation {
-            title: "Soil Microbiome Lab".into(),
-            reason: "Complements your Soil Chemistry progress".into(),
-            course_domain: "Agriculture".into(),
+            title: "Fraction Fun".into(),
+            reason: "Keep practicing fractions with pizza and pie slices".into(),
+            course_domain: "Math".into(),
         },
         Recommendation {
-            title: "Byzantine Fault Tolerance".into(),
-            reason: "Builds on Consensus Algorithms knowledge".into(),
-            course_domain: "Distributed Systems".into(),
+            title: "Shape Explorer".into(),
+            reason: "Learn about triangles, circles, and more shapes".into(),
+            course_domain: "Math".into(),
         },
     ]
 }
@@ -137,27 +136,27 @@ fn mock_recommendations() -> Vec<Recommendation> {
 fn mock_activity() -> Vec<ActivityEvent> {
     vec![
         ActivityEvent {
-            description: "Completed 'Ownership & Borrowing' module".into(),
+            description: "Finished the Multiplication quiz".into(),
             timestamp: "2 hours ago".into(),
             kind: ActivityKind::CourseProgress,
         },
         ActivityEvent {
-            description: "Reviewed 12 SRS cards (92% correct)".into(),
+            description: "Reviewed 12 flashcards (11 correct!)".into(),
             timestamp: "5 hours ago".into(),
             kind: ActivityKind::ReviewCompleted,
         },
         ActivityEvent {
-            description: "Earned 'Soil Scholar' badge".into(),
+            description: "Earned the 'Fraction Star' badge".into(),
             timestamp: "Yesterday".into(),
             kind: ActivityKind::BadgeEarned,
         },
         ActivityEvent {
-            description: "Reached Level 7".into(),
+            description: "Reached Level 7!".into(),
             timestamp: "2 days ago".into(),
             kind: ActivityKind::LevelUp,
         },
         ActivityEvent {
-            description: "10-day learning streak!".into(),
+            description: "10 days in a row! Amazing!".into(),
             timestamp: "4 days ago".into(),
             kind: ActivityKind::StreakMilestone,
         },
@@ -172,9 +171,12 @@ fn mock_activity() -> Vec<ActivityEvent> {
 pub fn DashboardPage() -> impl IntoView {
     view! {
         <div class="dashboard">
-            <h2>"Learner Dashboard"</h2>
+            <h2>"My Learning"</h2>
+            <p class="dashboard-encouragement">
+                "You're doing great! 3 skills improving this week."
+            </p>
             <div class="dashboard-grid">
-                <ConsciousnessCard />
+                <LearningReadinessCard />
                 <XpLevelCard />
                 <StreakCard />
                 <DueReviewsCard />
@@ -182,6 +184,122 @@ pub fn DashboardPage() -> impl IntoView {
             </div>
             <RecommendationsSection />
             <RecentActivitySection />
+        </div>
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Learning Readiness card (kid-friendly consciousness wrapper)
+// ---------------------------------------------------------------------------
+
+#[component]
+fn LearningReadinessCard() -> impl IntoView {
+    let ctx = crate::consciousness::use_consciousness();
+    let (show_details, set_show_details) = signal(false);
+
+    view! {
+        <div class="dash-card readiness-card">
+            <h3>"Learning Readiness"</h3>
+            <div class="readiness-display">
+                {move || {
+                    let s = ctx.state.get();
+                    // Map consciousness state to kid-friendly readiness
+                    let (indicator, status_text, hint, css_class) = if s.phi > 0.5 && s.neuromod_norepinephrine < 0.7 {
+                        ("\u{1f7e2}", "Ready to learn!", "Your brain is warmed up and ready for new challenges", "readiness-green")
+                    } else if s.phi > 0.3 {
+                        ("\u{1f7e1}", "Warming up...", "Almost there! Try a quick review to get going", "readiness-yellow")
+                    } else if s.neuromod_norepinephrine > 0.7 || s.neuromod_dopamine < 0.3 {
+                        ("\u{1f7e0}", "Time for a break", "Maybe stretch, get some water, or take a walk", "readiness-orange")
+                    } else {
+                        ("\u{1f534}", "Let's rest", "It's okay to take a break and come back later", "readiness-red")
+                    };
+
+                    // Focus bar: map phi (0-1) to a simple percentage
+                    let focus_pct = ((s.phi * 100.0) as u32).min(100);
+                    let focus_label = if focus_pct > 70 { "Great" }
+                        else if focus_pct > 50 { "Good" }
+                        else if focus_pct > 30 { "Okay" }
+                        else { "Low" };
+
+                    view! {
+                        <div class=format!("readiness-status {}", css_class)>
+                            <span class="readiness-indicator">{indicator}</span>
+                            <span class="readiness-text">{status_text}</span>
+                        </div>
+                        <div class="readiness-focus">
+                            <div class="readiness-focus-bar-container">
+                                <div class="readiness-focus-bar"
+                                    style=format!("width: {}%", focus_pct)>
+                                </div>
+                            </div>
+                            <span class="readiness-focus-label">"Focus: " {focus_label}</span>
+                        </div>
+                        <p class="readiness-hint">{hint}</p>
+                    }
+                }}
+            </div>
+
+            // Toggle for teacher/advanced view
+            <button
+                class="details-toggle"
+                on:click=move |_| set_show_details.update(|v| *v = !*v)
+            >
+                {move || if show_details.get() { "Hide details" } else { "Show details" }}
+            </button>
+
+            // Advanced panel (hidden by default)
+            {move || {
+                if show_details.get() {
+                    let s = ctx.state.get();
+                    view! {
+                        <div class="readiness-details">
+                            <div class="detail-metric">
+                                <span class="detail-metric-label">"Phi"</span>
+                                <span class="detail-metric-value">{format!("{:.3}", s.phi)}</span>
+                            </div>
+                            <div class="detail-metric">
+                                <span class="detail-metric-label">"Coherence"</span>
+                                <span class="detail-metric-value">{format!("{:.3}", s.coherence)}</span>
+                            </div>
+                            <div class="detail-metric">
+                                <span class="detail-metric-label">"Free Energy"</span>
+                                <span class="detail-metric-value">{format!("{:.3}", s.free_energy)}</span>
+                            </div>
+                            <div class="detail-metric">
+                                <span class="detail-metric-label">"DA"</span>
+                                <span class="detail-metric-value">{format!("{:.2}", s.neuromod_dopamine)}</span>
+                            </div>
+                            <div class="detail-metric">
+                                <span class="detail-metric-label">"NE"</span>
+                                <span class="detail-metric-value">{format!("{:.2}", s.neuromod_norepinephrine)}</span>
+                            </div>
+                            <div class="detail-metric">
+                                <span class="detail-metric-label">"5-HT"</span>
+                                <span class="detail-metric-value">{format!("{:.2}", s.neuromod_serotonin)}</span>
+                            </div>
+                            <div class="detail-metric">
+                                <span class="detail-metric-label">"Workspace"</span>
+                                <span class="detail-metric-value">
+                                    {if s.workspace_ignited { "Ignited" } else { "Sub-threshold" }}
+                                </span>
+                            </div>
+                            <div class="detail-metric">
+                                <span class="detail-metric-label">"Harmony"</span>
+                                <span class="detail-metric-value">{s.dominant_harmony.clone()}</span>
+                            </div>
+                            <div class="detail-metric">
+                                <span class="detail-metric-label">"Cycle"</span>
+                                <span class="detail-metric-value">{s.cycle_count}</span>
+                            </div>
+                            <div class="consciousness-disclaimer">
+                                <small>"Simulated \u{2014} real Spore WASM integration pending"</small>
+                            </div>
+                        </div>
+                    }.into_any()
+                } else {
+                    view! { <div></div> }.into_any()
+                }
+            }}
         </div>
     }
 }
@@ -352,7 +470,7 @@ fn SkillsCard() -> impl IntoView {
 
     view! {
         <div class="dash-card skills-card">
-            <h3>"Top Skills"</h3>
+            <h3>"What I'm Learning"</h3>
             <Suspense fallback=move || view! { <CardLoading /> }>
                 {move || {
                     skills.get().map(|data| {
@@ -412,7 +530,7 @@ fn RecommendationsSection() -> impl IntoView {
 
     view! {
         <div class="dash-section recommendations">
-            <h3>"Recommendations"</h3>
+            <h3>"What's Next"</h3>
             <Suspense fallback=move || view! { <CardLoading /> }>
                 {move || {
                     recs.get().map(|data| {
@@ -464,7 +582,7 @@ fn RecentActivitySection() -> impl IntoView {
 
     view! {
         <div class="dash-section activity">
-            <h3>"Recent Activity"</h3>
+            <h3>"What I Did Today"</h3>
             <Suspense fallback=move || view! { <CardLoading /> }>
                 {move || {
                     activity.get().map(|data| {

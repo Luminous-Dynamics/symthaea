@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
-//! Governance page — proposal creation, voting, and community decision-making.
+//! Suggest Topics page — simplified governance for teachers, parents, and students.
+//! Advanced governance features (voting modes, proposal types, quadratic voting)
+//! are accessible via an "Advanced view" toggle.
 
 use leptos::prelude::*;
 
@@ -32,76 +34,105 @@ pub struct ProposalView {
 }
 
 // ---------------------------------------------------------------------------
-// Mock data
+// Mock data (teacher/parent friendly examples)
 // ---------------------------------------------------------------------------
 
 fn mock_proposals() -> Vec<ProposalView> {
     vec![
         ProposalView {
             proposal_id: "prop_001".into(),
-            title: "Add Rust Programming Track".into(),
-            description: "Propose a comprehensive Rust programming track covering ownership, \
-                          borrowing, lifetimes, async, and systems programming. The track would \
-                          include 12 modules with spaced repetition cards and hands-on projects."
+            title: "Add more fraction practice problems".into(),
+            description: "Our 4th graders need extra practice with adding and subtracting \
+                          fractions. Can we add a set of 20 new problems with visual aids \
+                          like fraction bars and pie charts?"
                 .into(),
-            proposer: "did:key:z6Mkf5rG...".into(),
+            proposer: "Ms. Rivera".into(),
             proposal_type: "Normal".into(),
-            category: "Curriculum".into(),
+            category: "Mathematics".into(),
             status: "Active".into(),
-            for_votes: 12,
-            against_votes: 3,
-            abstain_votes: 2,
-            weighted_for: 450,
-            weighted_against: 120,
-            voting_mode: "Quadratic".into(),
+            for_votes: 25,
+            against_votes: 2,
+            abstain_votes: 1,
+            weighted_for: 0,
+            weighted_against: 0,
+            voting_mode: "Simple".into(),
             voting_deadline: "3 days remaining".into(),
             created_at: "2026-03-20".into(),
         },
         ProposalView {
             proposal_id: "prop_002".into(),
-            title: "Extend Review Session Limit to 200 Cards".into(),
-            description: "Currently the daily review session cap is 100 cards. Power users \
-                          report wanting more. Proposal to raise the limit to 200 while keeping \
-                          the default at 100."
+            title: "Start a school garden science unit".into(),
+            description: "Students could learn about plant biology, ecosystems, and \
+                          measurement through a hands-on garden project. We'd need \
+                          a small raised bed and basic supplies."
                 .into(),
-            proposer: "did:key:z6MkpT9...".into(),
-            proposal_type: "Fast".into(),
-            category: "Policy".into(),
+            proposer: "Mr. Thompson".into(),
+            proposal_type: "Normal".into(),
+            category: "Science".into(),
             status: "Active".into(),
-            for_votes: 8,
-            against_votes: 5,
-            abstain_votes: 1,
+            for_votes: 18,
+            against_votes: 3,
+            abstain_votes: 2,
             weighted_for: 0,
             weighted_against: 0,
             voting_mode: "Simple".into(),
-            voting_deadline: "18 hours remaining".into(),
-            created_at: "2026-03-24".into(),
+            voting_deadline: "5 days remaining".into(),
+            created_at: "2026-03-22".into(),
         },
         ProposalView {
             proposal_id: "prop_003".into(),
-            title: "Community Mentorship Program".into(),
-            description: "Establish a peer mentorship program where experienced learners \
-                          can guide newcomers. Mentors earn reputation and XP. Includes \
-                          matching algorithm based on skill domains and availability."
+            title: "Add a typing practice module".into(),
+            description: "Many students are hunt-and-peck typing. A fun typing practice \
+                          module with games would help them build this essential skill \
+                          before middle school."
                 .into(),
-            proposer: "did:key:z6MkqR7...".into(),
-            proposal_type: "Slow".into(),
-            category: "Community".into(),
+            proposer: "Mrs. Chen".into(),
+            proposal_type: "Normal".into(),
+            category: "Computer Science".into(),
             status: "Active".into(),
-            for_votes: 25,
-            against_votes: 2,
-            abstain_votes: 4,
+            for_votes: 30,
+            against_votes: 1,
+            abstain_votes: 0,
             weighted_for: 0,
             weighted_against: 0,
             voting_mode: "Simple".into(),
-            voting_deadline: "12 days remaining".into(),
+            voting_deadline: "7 days remaining".into(),
             created_at: "2026-03-18".into(),
         },
     ]
 }
 
 // ---------------------------------------------------------------------------
-// Governance page (layout)
+// Friendly category label
+// ---------------------------------------------------------------------------
+
+fn friendly_category(cat: &str) -> &str {
+    match cat {
+        "Curriculum" => "Lessons & Content",
+        "Policy" => "Rules & Guidelines",
+        "Community" => "Community",
+        "Finance" => "Resources",
+        "Technical" => "Tools & Technology",
+        _ => cat,
+    }
+}
+
+fn category_css(cat: &str) -> &str {
+    match cat.to_lowercase().as_str() {
+        "mathematics" => "cat-curriculum",
+        "science" => "cat-community",
+        "computer science" => "cat-technical",
+        "lessons & content" | "curriculum" => "cat-curriculum",
+        "rules & guidelines" | "policy" => "cat-policy",
+        "community" => "cat-community",
+        "resources" | "finance" => "cat-finance",
+        "tools & technology" | "technical" => "cat-technical",
+        _ => "cat-curriculum",
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Suggest Topics page (layout)
 // ---------------------------------------------------------------------------
 
 #[component]
@@ -128,16 +159,16 @@ pub fn GovernancePage() -> impl IntoView {
         <div class="governance-page">
             <div class="governance-header">
                 <div>
-                    <h2>"Community Governance"</h2>
+                    <h2>"Suggest Topics"</h2>
                     <p class="governance-subtitle">
-                        "Participate in curriculum decisions through democratic voting."
+                        "Have an idea for something we should learn? Suggest it here and vote on ideas from others."
                     </p>
                 </div>
                 <button
                     class="btn-primary"
                     on:click=move |_| set_show_form.update(|v| *v = !*v)
                 >
-                    {move || if show_form.get() { "Cancel" } else { "New Proposal" }}
+                    {move || if show_form.get() { "Cancel" } else { "Suggest a Topic" }}
                 </button>
             </div>
 
@@ -157,15 +188,37 @@ pub fn GovernancePage() -> impl IntoView {
 
                         if let Some(idx) = selected_val {
                             let proposal = data[idx].clone();
+                            let (show_advanced, set_show_advanced) = signal(false);
                             view! {
                                 <div>
                                     <button
                                         class="btn-back"
                                         on:click=move |_| set_selected.set(None)
                                     >
-                                        "< Back to proposals"
+                                        "< Back to suggestions"
                                     </button>
-                                    <ProposalDetail proposal=proposal />
+                                    <SimpleTopicDetail proposal=proposal.clone() />
+
+                                    // Advanced view toggle
+                                    <div class="advanced-toggle-section">
+                                        <button
+                                            class="advanced-toggle-btn"
+                                            on:click=move |_| set_show_advanced.update(|v| *v = !*v)
+                                        >
+                                            {move || if show_advanced.get() {
+                                                "Hide advanced view"
+                                            } else {
+                                                "Advanced view"
+                                            }}
+                                        </button>
+                                        {move || {
+                                            if show_advanced.get() {
+                                                Some(view! { <ProposalDetail proposal=proposal.clone() /> })
+                                            } else {
+                                                None
+                                            }
+                                        }}
+                                    </div>
                                 </div>
                             }
                             .into_any()
@@ -175,7 +228,7 @@ pub fn GovernancePage() -> impl IntoView {
                                 .enumerate()
                                 .map(|(idx, proposal)| {
                                     view! {
-                                        <ProposalCard
+                                        <SimpleProposalCard
                                             proposal=proposal
                                             on_select=move || set_selected.set(Some(idx))
                                         />
@@ -185,7 +238,7 @@ pub fn GovernancePage() -> impl IntoView {
 
                             view! {
                                 <div class="proposals-section">
-                                    <h3 class="section-label">"Active Proposals"</h3>
+                                    <h3 class="section-label">"Current Suggestions"</h3>
                                     <div class="proposals-list">{cards}</div>
                                 </div>
                             }
@@ -199,11 +252,11 @@ pub fn GovernancePage() -> impl IntoView {
 }
 
 // ---------------------------------------------------------------------------
-// ProposalCard
+// SimpleProposalCard — teacher/parent friendly
 // ---------------------------------------------------------------------------
 
 #[component]
-fn ProposalCard(proposal: ProposalView, on_select: impl Fn() + 'static) -> impl IntoView {
+fn SimpleProposalCard(proposal: ProposalView, on_select: impl Fn() + 'static) -> impl IntoView {
     let total = proposal.for_votes + proposal.against_votes;
     let for_pct = if total > 0 {
         (proposal.for_votes as f64 / total as f64 * 100.0) as u32
@@ -211,43 +264,92 @@ fn ProposalCard(proposal: ProposalView, on_select: impl Fn() + 'static) -> impl 
         50
     };
 
-    let category = proposal.category.clone();
-    let category_lower = category.to_lowercase();
-    let category_display = category.clone();
-    let voting_mode = proposal.voting_mode.clone();
-    let proposal_type = proposal.proposal_type.clone();
-    let ptype_lower = proposal_type.to_lowercase();
-    let ptype_display = proposal_type.clone();
-    let deadline = proposal.voting_deadline.clone();
+    let cat_css = category_css(&proposal.category);
+    let category_display = proposal.category.clone();
+    let proposer = proposal.proposer.clone();
     let for_v = proposal.for_votes;
     let against_v = proposal.against_votes;
 
     view! {
         <div class="proposal-card" on:click=move |_| on_select()>
-            <div class="proposal-card-header">
-                <h4 class="proposal-title">{proposal.title}</h4>
-                <div class="proposal-badges">
-                    <span class=format!("category-badge cat-{}", category_lower)>
-                        {category_display}
-                    </span>
-                    <span class=format!("type-badge type-{}", ptype_lower)>
-                        {ptype_display}
-                    </span>
-                    <VotingModeIndicator mode=voting_mode />
-                </div>
-            </div>
-            <p class="proposal-excerpt">{proposal.description}</p>
+            <h4 class="proposal-title">{proposal.title}</h4>
+            <p class="proposal-byline">
+                "by " {proposer}
+                " · "
+                <span class=format!("category-badge {}", cat_css)>{category_display}</span>
+            </p>
             <VoteBar for_pct=for_pct for_count=for_v against_count=against_v />
-            <div class="proposal-card-footer">
-                <span class="deadline-text">{deadline}</span>
-                <span class="total-votes">{total} " votes"</span>
+        </div>
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SimpleTopicDetail — friendly detail view with simple voting
+// ---------------------------------------------------------------------------
+
+#[component]
+fn SimpleTopicDetail(proposal: ProposalView) -> impl IntoView {
+    let (user_vote, set_user_vote) = signal::<Option<String>>(None);
+    let for_v = proposal.for_votes;
+    let against_v = proposal.against_votes;
+    let total = for_v + against_v;
+    let for_pct = if total > 0 {
+        (for_v as f64 / total as f64 * 100.0) as u32
+    } else {
+        50
+    };
+    let cat_css = category_css(&proposal.category);
+    let category_display = proposal.category.clone();
+
+    view! {
+        <div class="simple-topic-detail">
+            <h3>{proposal.title.clone()}</h3>
+            <p class="proposal-byline">
+                "Suggested by " {proposal.proposer.clone()}
+                " · "
+                <span class=format!("category-badge {}", cat_css)>{category_display}</span>
+            </p>
+            <p class="topic-description">{proposal.description.clone()}</p>
+
+            <VoteBar for_pct=for_pct for_count=for_v against_count=against_v />
+
+            <div class="simple-vote-section">
+                {move || {
+                    if let Some(ref choice) = user_vote.get() {
+                        view! {
+                            <div class="vote-confirmation">
+                                <span>"You voted: "</span>
+                                <strong>{choice.clone()}</strong>
+                            </div>
+                        }
+                        .into_any()
+                    } else {
+                        view! {
+                            <div class="simple-vote-buttons">
+                                <button
+                                    class="vote-btn vote-btn-for"
+                                    on:click=move |_| set_user_vote.set(Some("Yes".into()))
+                                >
+                                    "Yes"
+                                </button>
+                                <button
+                                    class="vote-btn vote-btn-against"
+                                    on:click=move |_| set_user_vote.set(Some("No".into()))
+                                >
+                                    "No"
+                                </button>
+                            </div>
+                        }
+                        .into_any()
+                    }
+                }}
             </div>
         </div>
     }
 }
 
 // ---------------------------------------------------------------------------
-// VoteBar
+// VoteBar — simplified labels
 // ---------------------------------------------------------------------------
 
 #[component]
@@ -255,8 +357,8 @@ fn VoteBar(for_pct: u32, for_count: u32, against_count: u32) -> impl IntoView {
     view! {
         <div class="vote-bar-wrap">
             <div class="vote-bar-labels">
-                <span class="vote-for-label">{for_count} " For"</span>
-                <span class="vote-against-label">{against_count} " Against"</span>
+                <span class="vote-for-label">"Yes " {for_count}</span>
+                <span class="vote-against-label">"No " {against_count}</span>
             </div>
             <div class="vote-bar-container">
                 <div class="vote-bar-for" style=format!("width: {}%", for_pct)></div>
@@ -266,7 +368,7 @@ fn VoteBar(for_pct: u32, for_count: u32, against_count: u32) -> impl IntoView {
 }
 
 // ---------------------------------------------------------------------------
-// VotingModeIndicator
+// VotingModeIndicator (kept for Advanced view)
 // ---------------------------------------------------------------------------
 
 #[component]
@@ -283,7 +385,7 @@ fn VotingModeIndicator(mode: String) -> impl IntoView {
 }
 
 // ---------------------------------------------------------------------------
-// ProposalDetail
+// ProposalDetail (full advanced view, hidden by default)
 // ---------------------------------------------------------------------------
 
 #[component]
@@ -306,8 +408,6 @@ fn ProposalDetail(proposal: ProposalView) -> impl IntoView {
     };
 
     let is_quadratic = proposal.voting_mode == "Quadratic";
-    let (user_vote, set_user_vote) = signal::<Option<String>>(None);
-    let (rep_alloc, set_rep_alloc) = signal(10_u32);
 
     view! {
         <div class="proposal-detail">
@@ -344,6 +444,14 @@ fn ProposalDetail(proposal: ProposalView) -> impl IntoView {
                     <div class="meta-row">
                         <span class="meta-label">"Deadline"</span>
                         <span class="meta-value deadline-text">{proposal.voting_deadline.clone()}</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">"Voting Mode"</span>
+                        <span class="meta-value">{proposal.voting_mode.clone()}</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">"Proposal Track"</span>
+                        <span class="meta-value">{proposal.proposal_type.clone()}</span>
                     </div>
                 </div>
 
@@ -396,83 +504,13 @@ fn ProposalDetail(proposal: ProposalView) -> impl IntoView {
                         None
                     }}
                 </div>
-
-                <div class="cast-vote-section">
-                    <h4>"Cast Your Vote"</h4>
-
-                    {move || {
-                        if let Some(ref choice) = user_vote.get() {
-                            view! {
-                                <div class="vote-confirmation">
-                                    <span>"You voted: "</span>
-                                    <strong>{choice.clone()}</strong>
-                                </div>
-                            }
-                            .into_any()
-                        } else {
-                            let is_q = is_quadratic;
-                            view! {
-                                <div class="vote-actions">
-                                    <div class="vote-buttons">
-                                        <button
-                                            class="vote-btn vote-btn-for"
-                                            on:click=move |_| set_user_vote.set(Some("For".into()))
-                                        >
-                                            "For"
-                                        </button>
-                                        <button
-                                            class="vote-btn vote-btn-against"
-                                            on:click=move |_| set_user_vote.set(Some("Against".into()))
-                                        >
-                                            "Against"
-                                        </button>
-                                        <button
-                                            class="vote-btn vote-btn-abstain"
-                                            on:click=move |_| set_user_vote.set(Some("Abstain".into()))
-                                        >
-                                            "Abstain"
-                                        </button>
-                                    </div>
-
-                                    {if is_q {
-                                        Some(view! {
-                                            <div class="rep-allocation">
-                                                <label>"Reputation to allocate: " {move || rep_alloc.get()}</label>
-                                                <input
-                                                    type="range"
-                                                    min="1"
-                                                    max="100"
-                                                    prop:value=move || rep_alloc.get().to_string()
-                                                    on:input=move |ev| {
-                                                        if let Ok(v) = event_target_value(&ev).parse::<u32>() {
-                                                            set_rep_alloc.set(v);
-                                                        }
-                                                    }
-                                                />
-                                                <p class="rep-note">
-                                                    "Quadratic voting: your vote weight = sqrt(reputation). "
-                                                    "Allocating " {move || rep_alloc.get()} " rep gives "
-                                                    {move || format!("{:.1}", (rep_alloc.get() as f64).sqrt())}
-                                                    " vote weight."
-                                                </p>
-                                            </div>
-                                        })
-                                    } else {
-                                        None
-                                    }}
-                                </div>
-                            }
-                            .into_any()
-                        }
-                    }}
-                </div>
             </div>
         </div>
     }
 }
 
 // ---------------------------------------------------------------------------
-// CreateProposalForm
+// CreateProposalForm — simplified for teachers/parents
 // ---------------------------------------------------------------------------
 
 #[component]
@@ -480,14 +518,12 @@ fn CreateProposalForm(on_close: impl Fn() + Send + Sync + 'static) -> impl IntoV
     let on_close = std::sync::Arc::new(on_close);
     let (title, set_title) = signal(String::new());
     let (description, set_description) = signal(String::new());
-    let (category, set_category) = signal("Curriculum".to_string());
-    let (proposal_type, set_proposal_type) = signal("Normal".to_string());
-    let (voting_mode, set_voting_mode) = signal("Simple".to_string());
+    let (category, set_category) = signal("Mathematics".to_string());
     let (submitted, set_submitted) = signal(false);
 
     view! {
         <div class="create-proposal-form">
-            <h3>"Create New Proposal"</h3>
+            <h3>"Suggest a Topic"</h3>
 
             {move || {
                 let on_close_done = on_close.clone();
@@ -495,7 +531,7 @@ fn CreateProposalForm(on_close: impl Fn() + Send + Sync + 'static) -> impl IntoV
                 if submitted.get() {
                     view! {
                         <div class="form-success">
-                            <p>"Proposal submitted successfully (mock)."</p>
+                            <p>"Your suggestion has been submitted! Others can now vote on it."</p>
                             <button class="btn-primary" on:click=move |_| on_close_done()>
                                 "Done"
                             </button>
@@ -506,10 +542,10 @@ fn CreateProposalForm(on_close: impl Fn() + Send + Sync + 'static) -> impl IntoV
                     view! {
                         <div class="form-fields">
                             <div class="form-group">
-                                <label>"Title"</label>
+                                <label>"What would you like to add?"</label>
                                 <input
                                     type="text"
-                                    placeholder="Proposal title (max 200 characters)"
+                                    placeholder="e.g. More fraction practice problems"
                                     maxlength="200"
                                     prop:value=move || title.get()
                                     on:input=move |ev| set_title.set(event_target_value(&ev))
@@ -517,59 +553,28 @@ fn CreateProposalForm(on_close: impl Fn() + Send + Sync + 'static) -> impl IntoV
                             </div>
 
                             <div class="form-group">
-                                <label>"Description"</label>
+                                <label>"Tell us more about your idea"</label>
                                 <textarea
-                                    placeholder="Describe your proposal in detail..."
-                                    rows="5"
+                                    placeholder="Why is this important? How would it help students learn?"
+                                    rows="4"
                                     maxlength="10000"
                                     prop:value=move || description.get()
                                     on:input=move |ev| set_description.set(event_target_value(&ev))
                                 ></textarea>
                             </div>
 
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label>"Category"</label>
-                                    <select
-                                        prop:value=move || category.get()
-                                        on:change=move |ev| set_category.set(event_target_value(&ev))
-                                    >
-                                        <option value="Curriculum">"Curriculum"</option>
-                                        <option value="Policy">"Policy"</option>
-                                        <option value="Community">"Community"</option>
-                                        <option value="Finance">"Finance"</option>
-                                        <option value="Technical">"Technical"</option>
-                                    </select>
-                                </div>
-
-                                <div class="form-group">
-                                    <label>"Proposal Track"</label>
-                                    <select
-                                        prop:value=move || proposal_type.get()
-                                        on:change=move |ev| {
-                                            set_proposal_type.set(event_target_value(&ev))
-                                        }
-                                    >
-                                        <option value="Fast">"Fast (24-72h)"</option>
-                                        <option value="Normal">"Normal (3-14 days)"</option>
-                                        <option value="Slow">"Slow (14-30 days)"</option>
-                                    </select>
-                                </div>
-
-                                <div class="form-group">
-                                    <label>"Voting Mode"</label>
-                                    <select
-                                        prop:value=move || voting_mode.get()
-                                        on:change=move |ev| {
-                                            set_voting_mode.set(event_target_value(&ev))
-                                        }
-                                    >
-                                        <option value="Simple">"Simple (1 person = 1 vote)"</option>
-                                        <option value="Quadratic">
-                                            "Quadratic (sqrt reputation)"
-                                        </option>
-                                    </select>
-                                </div>
+                            <div class="form-group">
+                                <label>"Subject Area"</label>
+                                <select
+                                    prop:value=move || category.get()
+                                    on:change=move |ev| set_category.set(event_target_value(&ev))
+                                >
+                                    <option value="Mathematics">"Mathematics"</option>
+                                    <option value="English Language Arts">"English Language Arts"</option>
+                                    <option value="Science">"Science"</option>
+                                    <option value="Social Studies">"Social Studies"</option>
+                                    <option value="Computer Science">"Computer Science"</option>
+                                </select>
                             </div>
 
                             <div class="form-actions">
@@ -581,7 +586,7 @@ fn CreateProposalForm(on_close: impl Fn() + Send + Sync + 'static) -> impl IntoV
                                         }
                                     }
                                 >
-                                    "Submit Proposal"
+                                    "Submit Suggestion"
                                 </button>
                                 <button class="btn-secondary" on:click=move |_| on_close_cancel()>
                                     "Cancel"

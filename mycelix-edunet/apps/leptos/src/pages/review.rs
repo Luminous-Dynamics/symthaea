@@ -35,50 +35,45 @@ struct MockFlashcard {
 
 const MOCK_CARDS: &[MockFlashcard] = &[
     MockFlashcard {
-        front: "What is the SM-2 algorithm?",
-        back: "A spaced repetition algorithm by Piotr Wozniak that calculates \
-               optimal review intervals using an ease factor (EF) adjusted by \
-               recall quality ratings (0-5).",
-        tags: "Learning Science",
+        front: "4 \u{00d7} 7 = ?",
+        back: "28",
+        tags: "Multiplication",
     },
     MockFlashcard {
-        front: "What is the spacing effect?",
-        back: "The phenomenon where learning is more effective when study sessions \
-               are distributed over time rather than massed together. Can improve \
-               retention by 200-400%.",
-        tags: "Cognitive Psychology",
+        front: "What is 1/4 of a pizza?",
+        back: "One slice if cut into 4 equal pieces",
+        tags: "Fractions",
     },
     MockFlashcard {
-        front: "In Holochain, what is a zome?",
-        back: "A zome (short for chromosome) is a module within a DNA that defines \
-               entry types, link types, and validation rules. Each zome compiles to \
-               WASM and runs in the Holochain conductor.",
-        tags: "Holochain",
+        front: "Round 67 to the nearest ten",
+        back: "70",
+        tags: "Rounding",
     },
     MockFlashcard {
-        front: "What does BKT stand for in adaptive learning?",
-        back: "Bayesian Knowledge Tracing - a probabilistic model that estimates a \
-               learner's knowledge state using prior knowledge, learning rate, guess \
-               probability, and slip probability.",
-        tags: "Adaptive Learning",
+        front: "Sara has 3 bags with 5 apples each. How many apples?",
+        back: "15 apples (3 \u{00d7} 5 = 15)",
+        tags: "Word Problems",
     },
     MockFlashcard {
-        front: "What is the Zone of Proximal Development (ZPD)?",
-        back: "Vygotsky's concept describing the gap between what a learner can do \
-               independently and what they can achieve with guidance. Optimal learning \
-               occurs within this zone.",
-        tags: "Education Theory",
+        front: "What is the area of a rectangle that is 4 units wide and 3 units tall?",
+        back: "12 square units (4 \u{00d7} 3 = 12)",
+        tags: "Geometry",
     },
 ];
 
-/// Quality rating labels for the SM-2 scale (0-5).
-const QUALITY_LABELS: &[(&str, &str)] = &[
-    ("0", "Blackout"),
-    ("1", "Wrong"),
-    ("2", "Wrong (easy)"),
-    ("3", "Hard"),
-    ("4", "Hesitant"),
-    ("5", "Perfect"),
+/// Kid-friendly rating options: emoji, label, and mapped SM-2 quality value.
+struct KidRating {
+    emoji: &'static str,
+    label: &'static str,
+    quality: u8,
+    css_class: &'static str,
+}
+
+const KID_RATINGS: &[KidRating] = &[
+    KidRating { emoji: "\u{1f61f}", label: "I don't know this yet", quality: 1, css_class: "kid-rate-red" },
+    KidRating { emoji: "\u{1f914}", label: "I'm still learning", quality: 2, css_class: "kid-rate-orange" },
+    KidRating { emoji: "\u{1f60a}", label: "I got it!", quality: 4, css_class: "kid-rate-green" },
+    KidRating { emoji: "\u{1f31f}", label: "Too easy!", quality: 5, css_class: "kid-rate-gold" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -90,9 +85,9 @@ pub fn ReviewPage() -> impl IntoView {
     // State signals
     let (state, set_state) = signal(ReviewState::Loading);
     let (ratings, set_ratings) = signal(Vec::<u8>::new());
-    let (start_time, set_start_time) = signal(0.0_f64);
+    let (_start_time, set_start_time) = signal(0.0_f64);
     let (card_start_time, set_card_start_time) = signal(0.0_f64);
-    let (total_time_secs, set_total_time_secs) = signal(0.0_f64);
+    let (_total_time_secs, set_total_time_secs) = signal(0.0_f64);
 
     // Simulate loading -> show first card (or NoDueCards if empty)
     // In a real implementation this would be a Resource fetching due cards.
@@ -240,18 +235,20 @@ pub fn ReviewPage() -> impl IntoView {
                                     </div>
                                 </div>
                                 <div class="rating-buttons">
-                                    <p class="rating-prompt">"How well did you recall?"</p>
-                                    <div class="rating-grid">
-                                        {QUALITY_LABELS.iter().enumerate().map(|(i, (num, label))| {
-                                            let q = i as u8;
-                                            let class = format!("rate-btn rate-{}", i);
+                                    <p class="rating-prompt">"How did you do?"</p>
+                                    <div class="kid-rating-grid">
+                                        {KID_RATINGS.iter().map(|r| {
+                                            let q = r.quality;
+                                            let class = format!("kid-rate-btn {}", r.css_class);
+                                            let emoji = r.emoji;
+                                            let label = r.label;
                                             view! {
                                                 <button
                                                     class=class
                                                     on:click=move |_| rate(q)
                                                 >
-                                                    <span class="rate-num">{*num}</span>
-                                                    <span class="rate-label">{*label}</span>
+                                                    <span class="kid-rate-emoji">{emoji}</span>
+                                                    <span class="kid-rate-label">{label}</span>
                                                 </button>
                                             }
                                         }).collect_view()}
@@ -262,50 +259,30 @@ pub fn ReviewPage() -> impl IntoView {
                     }
 
                     ReviewState::SessionComplete { reviewed, correct } => {
-                        let accuracy = if reviewed > 0 {
-                            ((correct as f64 / reviewed as f64) * 100.0) as u32
-                        } else {
-                            0
-                        };
-                        let avg_time = if reviewed > 0 {
-                            total_time_secs.get() / reviewed as f64
-                        } else {
-                            0.0
-                        };
                         let xp = correct * 10 + (reviewed - correct) * 2;
+                        // Build star display: filled stars for correct, empty for rest
+                        let stars_filled = "\u{2b50}".repeat(correct.min(reviewed));
+                        let stars_empty = "\u{2606}".repeat(reviewed.saturating_sub(correct));
                         view! {
-                            <div class="review-complete">
-                                <h2>"Session Complete"</h2>
-                                <div class="session-summary">
-                                    <div class="summary-stat">
-                                        <span class="summary-value">{reviewed}</span>
-                                        <span class="summary-label">"Cards Reviewed"</span>
-                                    </div>
-                                    <div class="summary-stat">
-                                        <span class="summary-value">{format!("{}%", accuracy)}</span>
-                                        <span class="summary-label">"Accuracy"</span>
-                                    </div>
-                                    <div class="summary-stat">
-                                        <span class="summary-value">{format!("{:.1}s", avg_time)}</span>
-                                        <span class="summary-label">"Avg Time"</span>
-                                    </div>
-                                    <div class="summary-stat summary-xp">
-                                        <span class="summary-value">{format!("+{}", xp)}</span>
-                                        <span class="summary-label">"XP Earned"</span>
-                                    </div>
+                            <div class="review-complete kid-complete">
+                                <div class="kid-celebration">"\u{1f389}"</div>
+                                <h2>"Great job!"</h2>
+                                <p class="kid-summary-text">
+                                    "You reviewed " {reviewed} " cards"
+                                </p>
+                                <div class="kid-stars">
+                                    <span class="kid-stars-filled">{stars_filled}</span>
+                                    <span class="kid-stars-empty">{stars_empty}</span>
                                 </div>
-                                <div class="session-ratings">
-                                    <h3>"Rating Breakdown"</h3>
-                                    <div class="rating-breakdown">
-                                        {ratings.get().iter().enumerate().map(|(i, &q)| {
-                                            let class = format!("breakdown-dot rate-bg-{}", q);
-                                            view! {
-                                                <span class=class title=format!("Card {}: quality {}", i + 1, q)>
-                                                    {q.to_string()}
-                                                </span>
-                                            }
-                                        }).collect_view()}
-                                    </div>
+                                <p class="kid-stars-label">
+                                    {correct} " out of " {reviewed} " correct"
+                                </p>
+                                <div class="kid-xp-earned">
+                                    <span class="kid-xp-badge">{format!("+{} XP earned!", xp)}</span>
+                                </div>
+                                <div class="kid-complete-actions">
+                                    <a href="/review" class="btn-primary kid-btn">"Keep Going"</a>
+                                    <a href="/" class="btn-secondary kid-btn">"Done for now"</a>
                                 </div>
                             </div>
                         }.into_any()
