@@ -201,7 +201,7 @@ impl CognitiveLoopService {
             .temporal
             .classify_state()
             .0;
-        let prior_valence = self.behavior.emotion_contagion.prosody_valence();
+        let prior_valence = self.unification_engine.emotional.state().valence as f32;
         let prior_error = self.stats.avg_prediction_error;
         self.cognitive_depth =
             self.behavior.thalamic_router

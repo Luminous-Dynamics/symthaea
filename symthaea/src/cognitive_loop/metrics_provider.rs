@@ -26,8 +26,8 @@ impl MetricsProvider for CognitiveLoopService {
             strategy: format!("{:?}", self.fep.closed_learning_loop.current_strategy),
             in_flow: self.behavior.flow_state.in_flow,
             prediction_error: self.stats.avg_prediction_error,
-            emotional_valence: self.behavior.emotion_contagion.prosody_valence(),
-            emotional_arousal: self.behavior.emotion_contagion.prosody_arousal(),
+            emotional_valence: self.unification_engine.emotional.state().valence as f32,
+            emotional_arousal: self.unification_engine.emotional.state().arousal as f32,
             timestamp_ms: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
