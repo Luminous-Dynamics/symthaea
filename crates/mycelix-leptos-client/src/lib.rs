@@ -50,6 +50,8 @@ pub mod types;
 pub mod transport;
 #[cfg(feature = "browser")]
 pub mod browser;
+#[cfg(feature = "tauri")]
+pub mod tauri;
 pub mod client;
 
 // Re-exports for convenience
@@ -60,3 +62,6 @@ pub use types::{ConnectionStatus, ZomeCallRequest, ZomeCallResponse, encode, dec
 
 #[cfg(feature = "browser")]
 pub use browser::BrowserWsTransport;
+
+#[cfg(feature = "tauri")]
+pub use tauri::TauriIpcTransport;

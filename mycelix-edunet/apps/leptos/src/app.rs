@@ -8,32 +8,36 @@ use leptos_router::{
     path,
 };
 
+use crate::holochain::{ConnectionBadge, HolochainProvider};
 use crate::pages::*;
 
 #[component]
 pub fn App() -> impl IntoView {
     view! {
-        <Router>
-            <nav class="navbar">
-                <a href="/" class="logo">"EduNet"</a>
-                <div class="nav-links">
-                    <A href="/courses">"Courses"</A>
-                    <A href="/review">"Review"</A>
-                    <A href="/dashboard">"Dashboard"</A>
-                    <A href="/governance">"Governance"</A>
-                    <A href="/credentials">"Credentials"</A>
-                </div>
-            </nav>
-            <main>
-                <Routes fallback=|| view! { <p>"Page not found"</p> }>
-                    <Route path=path!("/") view=HomePage />
-                    <Route path=path!("/courses") view=CoursesPage />
-                    <Route path=path!("/review") view=ReviewPage />
-                    <Route path=path!("/dashboard") view=DashboardPage />
-                    <Route path=path!("/governance") view=GovernancePage />
-                    <Route path=path!("/credentials") view=CredentialsPage />
-                </Routes>
-            </main>
-        </Router>
+        <HolochainProvider>
+            <Router>
+                <nav class="navbar">
+                    <a href="/" class="logo">"EduNet"</a>
+                    <div class="nav-links">
+                        <A href="/courses">"Courses"</A>
+                        <A href="/review">"Review"</A>
+                        <A href="/dashboard">"Dashboard"</A>
+                        <A href="/governance">"Governance"</A>
+                        <A href="/credentials">"Credentials"</A>
+                    </div>
+                    <ConnectionBadge />
+                </nav>
+                <main>
+                    <Routes fallback=|| view! { <p>"Page not found"</p> }>
+                        <Route path=path!("/") view=HomePage />
+                        <Route path=path!("/courses") view=CoursesPage />
+                        <Route path=path!("/review") view=ReviewPage />
+                        <Route path=path!("/dashboard") view=DashboardPage />
+                        <Route path=path!("/governance") view=GovernancePage />
+                        <Route path=path!("/credentials") view=CredentialsPage />
+                    </Routes>
+                </main>
+            </Router>
+        </HolochainProvider>
     }
 }

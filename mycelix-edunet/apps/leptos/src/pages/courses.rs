@@ -4,57 +4,117 @@
 
 use leptos::prelude::*;
 
-/// Mock course data until HolochainClient is wired.
-struct MockCourse {
-    title: &'static str,
-    description: &'static str,
-    domain: &'static str,
+use crate::holochain::use_holochain;
+
+// ---------------------------------------------------------------------------
+// Course data types
+// ---------------------------------------------------------------------------
+
+/// A course as returned by the learning_zome or mock fallback.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct Course {
+    pub title: String,
+    pub description: String,
+    pub domain: String,
 }
 
-const MOCK_COURSES: &[MockCourse] = &[
-    MockCourse {
-        title: "Rust Fundamentals",
-        description: "Learn systems programming with Rust",
-        domain: "Programming",
-    },
-    MockCourse {
-        title: "Distributed Systems",
-        description: "P2P architecture and consensus",
-        domain: "Computer Science",
-    },
-    MockCourse {
-        title: "Regenerative Agriculture",
-        description: "Soil science and permaculture",
-        domain: "Agriculture",
-    },
-    MockCourse {
-        title: "Cooperative Economics",
-        description: "Mutual aid, commons governance, and solidarity economy",
-        domain: "Economics",
-    },
-];
+/// Static mock courses used when no conductor is connected.
+fn mock_courses() -> Vec<Course> {
+    vec![
+        Course {
+            title: "Rust Fundamentals".into(),
+            description: "Learn systems programming with Rust".into(),
+            domain: "Programming".into(),
+        },
+        Course {
+            title: "Distributed Systems".into(),
+            description: "P2P architecture and consensus".into(),
+            domain: "Computer Science".into(),
+        },
+        Course {
+            title: "Regenerative Agriculture".into(),
+            description: "Soil science and permaculture".into(),
+            domain: "Agriculture".into(),
+        },
+        Course {
+            title: "Cooperative Economics".into(),
+            description: "Mutual aid, commons governance, and solidarity economy".into(),
+            domain: "Economics".into(),
+        },
+    ]
+}
+
+// ---------------------------------------------------------------------------
+// Courses page
+// ---------------------------------------------------------------------------
 
 #[component]
 pub fn CoursesPage() -> impl IntoView {
-    // TODO: Wire to HolochainClient once mycelix-leptos-client is ready.
-    // The React version uses useCourses() which calls client.learning.list_courses().
-    // The Leptos equivalent will use a Resource + Signal pattern:
-    //   let courses = Resource::new(|| (), |_| async { fetch_courses().await });
+    let hc = use_holochain();
+
+    // Fetch courses from the conductor, falling back to mock data.
+    let courses = LocalResource::new(move || {
+        let hc = hc.clone();
+        async move {
+            match hc.call_zome::<(), Vec<Course>>("learning", "list_courses", &()).await {
+                Ok(c) => c,
+                Err(_) => mock_courses(),
+            }
+        }
+    });
 
     view! {
         <div class="courses-page">
-            <h2>"Courses"</h2>
-            <div class="course-grid">
-                {MOCK_COURSES.iter().map(|course| {
-                    view! {
-                        <div class="course-card">
-                            <h3>{course.title}</h3>
-                            <p>{course.description}</p>
-                            <span class="domain-tag">{course.domain}</span>
-                        </div>
-                    }
-                }).collect_view()}
+            <div class="page-header">
+                <h2>"Courses"</h2>
+                <ConnectionStatusTag />
             </div>
+            <Suspense fallback=move || view! { <CoursesLoading /> }>
+                {move || {
+                    courses.get().map(|data| {
+                        let data: Vec<Course> = (*data).clone();
+                        view! {
+                            <div class="course-grid">
+                                {data.into_iter().map(|course| {
+                                    view! {
+                                        <div class="course-card">
+                                            <h3>{course.title}</h3>
+                                            <p>{course.description}</p>
+                                            <span class="domain-tag">{course.domain}</span>
+                                        </div>
+                                    }
+                                }).collect_view()}
+                            </div>
+                        }
+                    })
+                }}
+            </Suspense>
         </div>
+    }
+}
+
+/// Loading skeleton for the courses grid.
+#[component]
+fn CoursesLoading() -> impl IntoView {
+    view! {
+        <div class="course-grid">
+            <div class="course-card skeleton"></div>
+            <div class="course-card skeleton"></div>
+            <div class="course-card skeleton"></div>
+        </div>
+    }
+}
+
+/// Small inline tag showing whether data is live or mocked.
+#[component]
+fn ConnectionStatusTag() -> impl IntoView {
+    let hc = use_holochain();
+    view! {
+        <span class=move || {
+            let status = hc.status.get();
+            format!("connection-tag {}", status.css_class())
+        }>
+            {move || hc.status.get().label()}
+        </span>
     }
 }

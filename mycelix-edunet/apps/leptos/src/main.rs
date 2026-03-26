@@ -6,6 +6,7 @@ use leptos::prelude::*;
 
 mod app;
 mod components;
+mod holochain;
 mod pages;
 
 fn main() {
