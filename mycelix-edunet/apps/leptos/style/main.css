@@ -1933,3 +1933,638 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     opacity: 0.6;
     font-style: italic;
 }
+
+/* ===========================================================================
+   Skill Map Page
+   =========================================================================== */
+
+.skill-map-page {
+    padding: 1rem 0;
+}
+
+.skill-map-page h2 {
+    margin-bottom: 0.25rem;
+}
+
+.skill-map-page .subtitle {
+    margin-bottom: 1.5rem;
+}
+
+/* --- Filter Bar --- */
+
+.skillmap-filters {
+    display: flex;
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+    padding: 0.75rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    flex-wrap: wrap;
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.filter-group label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.filter-group select {
+    padding: 0.35rem 0.75rem;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.filter-group select:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+/* --- Skill Map Tree --- */
+
+.skill-map-tree {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    position: relative;
+    margin-bottom: 1.5rem;
+}
+
+.skill-tier {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 0;
+    position: relative;
+}
+
+/* Arrow between tiers */
+.skill-tier:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    bottom: -2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2px;
+    height: 12px;
+    background: var(--border);
+}
+
+.skill-tier-arrow {
+    display: none; /* hidden, we use ::after pseudo */
+}
+
+.skill-tier-label {
+    flex: 0 0 100px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    text-align: right;
+    padding-right: 0.5rem;
+}
+
+.skill-tier-nodes {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    flex: 1;
+}
+
+/* --- Skill Node Card --- */
+
+.skill-node {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.65rem 1rem;
+    min-width: 140px;
+    max-width: 180px;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: border-color 0.2s, transform 0.15s;
+    font-family: inherit;
+    color: var(--text);
+    text-align: left;
+}
+
+.skill-node:hover:not(:disabled) {
+    transform: translateY(-2px);
+}
+
+.skill-node:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.skill-node-selected {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.3);
+}
+
+/* Mastery color-coding via border */
+.mastery-gold   { border-color: #eab308; }
+.mastery-green  { border-color: #22c55e; }
+.mastery-yellow { border-color: #f59e0b; }
+.mastery-red    { border-color: #ef4444; }
+.mastery-locked { border-color: var(--border); background: rgba(255,255,255,0.02); }
+
+.skill-node-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.skill-node-bar-container {
+    height: 5px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 3px;
+    overflow: hidden;
+    flex: 1;
+    min-width: 60px;
+}
+
+.skill-node-bar {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.6s ease;
+    background: linear-gradient(90deg, var(--primary), #a78bfa);
+}
+
+/* Color the bar by mastery class */
+.mastery-gold .skill-node-bar   { background: linear-gradient(90deg, #eab308, #fbbf24); }
+.mastery-green .skill-node-bar  { background: linear-gradient(90deg, #22c55e, #4ade80); }
+.mastery-yellow .skill-node-bar { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.mastery-red .skill-node-bar    { background: linear-gradient(90deg, #ef4444, #f87171); }
+
+.skill-node-pct {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    text-align: right;
+}
+
+/* --- Node Detail Panel --- */
+
+.node-detail {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin-top: 1rem;
+    animation: slideUp 0.2s ease;
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.node-detail-header {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.node-detail-header h3 {
+    font-size: 1.25rem;
+}
+
+.node-detail-meta {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.node-detail-desc {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+    line-height: 1.6;
+}
+
+.node-detail-mastery {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.node-detail-mastery-label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    flex: 0 0 60px;
+}
+
+.node-detail-mastery .progress-bar-container {
+    flex: 1;
+}
+
+.node-detail-mastery-pct {
+    font-size: 0.9rem;
+    font-weight: 600;
+    flex: 0 0 40px;
+    text-align: right;
+}
+
+.node-detail-row {
+    display: flex;
+    gap: 1rem;
+    padding: 0.4rem 0;
+    font-size: 0.85rem;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.node-detail-label {
+    flex: 0 0 100px;
+    color: var(--text-secondary);
+}
+
+.node-detail-value {
+    color: var(--text);
+}
+
+.node-detail-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+}
+
+.btn-secondary {
+    display: inline-block;
+    padding: 0.5rem 1.25rem;
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: border-color 0.2s;
+    cursor: pointer;
+}
+
+.btn-secondary:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+/* --- Skill List View --- */
+
+.skill-list-view {
+    margin-bottom: 1.5rem;
+}
+
+.skill-list-section {
+    margin-bottom: 1rem;
+}
+
+.skill-list-tier-label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.25rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.skill-list-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius);
+    border-left: 3px solid var(--border);
+    margin-bottom: 0.35rem;
+    background: var(--surface);
+}
+
+.skill-list-item.mastery-gold   { border-left-color: #eab308; }
+.skill-list-item.mastery-green  { border-left-color: #22c55e; }
+.skill-list-item.mastery-yellow { border-left-color: #f59e0b; }
+.skill-list-item.mastery-red    { border-left-color: #ef4444; }
+.skill-list-item.mastery-locked { opacity: 0.5; }
+
+.skill-list-name {
+    flex: 0 0 160px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.skill-list-bloom {
+    flex: 0 0 80px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.skill-list-standard {
+    flex: 0 0 180px;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    font-family: monospace;
+}
+
+.skill-list-pct {
+    flex: 0 0 40px;
+    text-align: right;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+/* ===========================================================================
+   Teacher Dashboard
+   =========================================================================== */
+
+.teacher-dashboard {
+    padding: 1rem 0;
+}
+
+/* --- Class Header --- */
+
+.teacher-class-header {
+    margin-bottom: 1.5rem;
+}
+
+.teacher-class-header h2 {
+    margin-bottom: 0.25rem;
+}
+
+.class-header-meta {
+    display: flex;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.meta-sep {
+    opacity: 0.3;
+}
+
+/* --- Mastery Heatmap --- */
+
+.teacher-heatmap-section {
+    margin-bottom: 1.25rem;
+}
+
+.heatmap-scroll {
+    overflow-x: auto;
+    margin-bottom: 0.75rem;
+}
+
+.heatmap-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+}
+
+.heatmap-table th {
+    padding: 0.5rem 0.6rem;
+    text-align: center;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+
+.heatmap-name-col {
+    text-align: left !important;
+    min-width: 80px;
+}
+
+.heatmap-skill-col {
+    min-width: 60px;
+}
+
+.heatmap-avg-col {
+    min-width: 50px;
+}
+
+.heatmap-table td {
+    padding: 0.45rem 0.6rem;
+    text-align: center;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.heatmap-name {
+    text-align: left !important;
+    font-weight: 500;
+    font-size: 0.85rem;
+}
+
+.heatmap-cell {
+    border-radius: 4px;
+    font-weight: 500;
+    font-size: 0.75rem;
+}
+
+/* Heatmap color classes */
+.heatmap-gold   { background: rgba(234, 179, 8, 0.25); color: #eab308; }
+.heatmap-green  { background: rgba(34, 197, 94, 0.20); color: #4ade80; }
+.heatmap-yellow { background: rgba(245, 158, 11, 0.18); color: #fbbf24; }
+.heatmap-red    { background: rgba(239, 68, 68, 0.20); color: #f87171; }
+.heatmap-empty  { background: rgba(255,255,255,0.03); color: var(--text-secondary); opacity: 0.5; }
+
+.heatmap-legend {
+    display: flex;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.legend-swatch {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+}
+
+.legend-swatch.heatmap-gold   { background: rgba(234, 179, 8, 0.5); }
+.legend-swatch.heatmap-green  { background: rgba(34, 197, 94, 0.4); }
+.legend-swatch.heatmap-yellow { background: rgba(245, 158, 11, 0.4); }
+.legend-swatch.heatmap-red    { background: rgba(239, 68, 68, 0.4); }
+.legend-swatch.heatmap-empty  { background: rgba(255,255,255,0.08); }
+
+/* --- Bottom Grid (At-Risk + Stats) --- */
+
+.teacher-bottom-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    margin-bottom: 1.25rem;
+}
+
+@media (max-width: 720px) {
+    .teacher-bottom-grid { grid-template-columns: 1fr; }
+}
+
+/* --- At-Risk Panel --- */
+
+.at-risk-panel h3 {
+    color: #f59e0b;
+}
+
+.at-risk-empty {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.at-risk-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.at-risk-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    padding: 0.65rem 0.75rem;
+    border-radius: var(--radius);
+    background: rgba(255,255,255,0.02);
+    border-left: 3px solid var(--border);
+}
+
+.at-risk-item.alert-critical { border-left-color: #ef4444; }
+.at-risk-item.alert-warning  { border-left-color: #f59e0b; }
+
+.at-risk-icon {
+    flex: 0 0 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.alert-critical .at-risk-icon {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+.alert-warning .at-risk-icon {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+}
+
+.at-risk-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.at-risk-student {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.at-risk-reason {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+/* --- Class Stats Card --- */
+
+.class-stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.class-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.5rem;
+    background: rgba(255,255,255,0.02);
+    border-radius: var(--radius);
+}
+
+.class-stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.stat-on-track { color: #22c55e !important; }
+.stat-ahead    { color: #3b82f6 !important; }
+.stat-behind   { color: #ef4444 !important; }
+
+.class-stat-label {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* --- Skill Breakdown --- */
+
+.teacher-skill-breakdown {
+    margin-bottom: 1.25rem;
+}
+
+.skill-breakdown-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.skill-breakdown-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.skill-breakdown-name {
+    flex: 0 0 130px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.skill-breakdown-pct {
+    flex: 0 0 40px;
+    text-align: right;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+/* Colored bars for skill breakdown */
+.skill-breakdown-row .heatmap-gold   { background: linear-gradient(90deg, #eab308, #fbbf24); }
+.skill-breakdown-row .heatmap-green  { background: linear-gradient(90deg, #22c55e, #4ade80); }
+.skill-breakdown-row .heatmap-yellow { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.skill-breakdown-row .heatmap-red    { background: linear-gradient(90deg, #ef4444, #f87171); }
+
+/* --- Teacher Actions --- */
+
+.teacher-actions-grid {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}

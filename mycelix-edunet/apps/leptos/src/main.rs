@@ -8,6 +8,7 @@ mod app;
 mod components;
 mod consciousness;
 mod holochain;
+mod learning_engine;
 mod pages;
 
 fn main() {

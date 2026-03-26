@@ -1,0 +1,883 @@
+{
+  "metadata": {
+    "title": "Common Core Grade 3 Mathematics",
+    "framework": "CommonCore",
+    "source": "https://www.thecorestandards.org/Math/Content/3/introduction/",
+    "grade_level": "Grade3",
+    "subject_area": "Mathematics",
+    "domain": "Mathematics",
+    "version": "2010",
+    "total_standards": 25,
+    "domains": [
+      "Operations & Algebraic Thinking",
+      "Number & Operations in Base Ten",
+      "Number & Operations - Fractions",
+      "Measurement & Data",
+      "Geometry"
+    ],
+    "created_at": "2026-03-26",
+    "notes": "All 25 Grade 3 Math standards from the Common Core State Standards Initiative. Node structure matches KnowledgeNode in knowledge_zome/integrity/src/lib.rs."
+  },
+  "nodes": [
+    {
+      "id": "3.OA.A.1",
+      "title": "Interpret products of whole numbers",
+      "description": "Interpret products of whole numbers, e.g., interpret 5 x 7 as the total number of objects in 5 groups of 7 objects each. For example, describe a context in which a total number of objects can be expressed as 5 x 7.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Operations & Algebraic Thinking",
+      "tags": ["multiplication", "groups", "arrays", "equal-groups", "repeated-addition"],
+      "estimated_hours": 8,
+      "grade_levels": ["Grade3"],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CommonCore",
+          "code": "CCSS.MATH.CONTENT.3.OA.A.1",
+          "description": "Interpret products of whole numbers, e.g., interpret 5 x 7 as the total number of objects in 5 groups of 7 objects each.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "3.OA.A.2",
+      "title": "Interpret whole-number quotients",
+      "description": "Interpret whole-number quotients of whole numbers, e.g., interpret 56 / 8 as the number of objects in each share when 56 objects are partitioned equally into 8 shares, or as a number of shares when 56 objects are partitioned into equal shares of 8 objects each.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Operations & Algebraic Thinking",
+      "tags": ["division", "partitioning", "sharing", "equal-groups", "quotient"],
+      "estimated_hours": 8,
+      "grade_levels": ["Grade3"],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CommonCore",
+          "code": "CCSS.MATH.CONTENT.3.OA.A.2",
+          "description": "Interpret whole-number quotients of whole numbers.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "3.OA.A.3",
+      "title": "Multiply and divide to solve word problems",
+      "description": "Use multiplication and division within 100 to solve word problems in situations involving equal groups, arrays, and measurement quantities, e.g., by using drawings and equations with a symbol for the unknown number to represent the problem.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Operations & Algebraic Thinking",
+      "tags": ["word-problems", "multiplication", "division", "equal-groups", "arrays", "equations"],
+      "estimated_hours": 12,
+      "grade_levels": ["Grade3"],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CommonCore",
+          "code": "CCSS.MATH.CONTENT.3.OA.A.3",
+          "description": "Use multiplication and division within 100 to solve word problems in situations involving equal groups, arrays, and measurement quantities.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "3.OA.A.4",
+      "title": "Determine unknown number in multiplication/division equation",
+      "description": "Determine the unknown whole number in a multiplication or division equation relating three whole numbers. For example, determine the unknown number that makes the equation true in each of the equations 8 x ? = 48, 5 = _ / 3, 6 x 6 = ?.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Operations & Algebraic Thinking",
+      "tags": ["unknown", "equations", "multiplication", "division", "missing-factor"],
+      "estimated_hours": 8,
+      "grade_levels": ["Grade3"],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CommonCore",
+          "code": "CCSS.MATH.CONTENT.3.OA.A.4",
+          "description": "Determine the unknown whole number in a multiplication or division equation relating three whole numbers.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "3.OA.B.5",
+      "title": "Apply properties of operations",
+      "description": "Apply properties of operations as strategies to multiply and divide. Examples: If 6 x 4 = 24 is known, then 4 x 6 = 24 is also known (commutative property). 3 x 5 x 2 can be found by 3 x 5 = 15, then 15 x 2 = 30, or by 5 x 2 = 10, then 3 x 10 = 30 (associative property). Knowing that 8 x 5 = 40 and 8 x 2 = 16, one can find 8 x 7 as 8 x (5 + 2) = (8 x 5) + (8 x 2) = 40 + 16 = 56 (distributive property).",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Operations & Algebraic Thinking",
+      "tags": ["commutative", "associative", "distributive", "properties", "multiplication", "strategies"],
+      "estimated_hours": 10,
+      "grade_levels": ["Grade3"],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CommonCore",
+          "code": "CCSS.MATH.CONTENT.3.OA.B.5",
+          "description": "Apply properties of operations as strategies to multiply and divide.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "3.OA.B.6",
+      "title": "Understand division as unknown-factor problem",
+      "description": "Understand division as an unknown-factor problem. For example, find 32 / 8 by finding the number that makes 32 when multiplied by 8.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Operations & Algebraic Thinking",
+      "tags": ["division", "multiplication", "inverse-operations", "unknown-factor", "fact-families"],
+      "estimated_hours": 6,
+      "grade_levels": ["Grade3"],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CommonCore",
+          "code": "CCSS.MATH.CONTENT.3.OA.B.6",
+          "description": "Understand division as an unknown-factor problem.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "3.OA.C.7",
+      "title": "Fluently multiply and divide within 100",
+      "description": "Fluently multiply and divide within 100, using strategies such as the relationship between multiplication and division (e.g., knowing that 8 x 5 = 40, one knows 40 / 5 = 8) or properties of operations. By the end of Grade 3, know from memory all products of two one-digit numbers.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Operations & Algebraic Thinking",
+      "tags": ["fluency", "multiplication-facts", "division-facts", "automaticity", "memorization"],
+      "estimated_hours": 30,
+      "grade_levels": ["Grade3"],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CommonCore",
+          "code": "CCSS.MATH.CONTENT.3.OA.C.7",
+          "description": "Fluently multiply and divide within 100, using strategies such as the relationship between multiplication and division or properties of operations. By the end of Grade 3, know from memory all products of two one-digit numbers.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "3.OA.D.8",
+      "title": "Solve two-step word problems using four operations",
+      "description": "Solve two-step word problems using the four operations. Represent these problems using equations with a letter standing for the unknown quantity. Assess the reasonableness of answers using mental computation and estimation strategies including rounding.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Operations & Algebraic Thinking",
+      "tags": ["word-problems", "two-step", "four-operations", "estimation", "rounding", "reasonableness"],
+      "estimated_hours": 14,
+      "grade_levels": ["Grade3"],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CommonCore",
+          "code": "CCSS.MATH.CONTENT.3.OA.D.8",
+          "description": "Solve two-step word problems using the four operations. Represent these problems using equations with a letter standing for the unknown quantity. Assess the reasonableness of answers using mental computation and estimation strategies including rounding.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "3.OA.D.9",
+      "title": "Identify arithmetic patterns",
+      "description": "Identify arithmetic patterns (including patterns in the addition table or multiplication table), and explain them using properties of operations. For example, observe that 4 times a number is always even, or that the sum of two odd numbers is always even.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Operations & Algebraic Thinking",
+      "tags": ["patterns", "addition-table", "multiplication-table", "even-odd", "properties"],
+      "estimated_hours": 8,
+      "grade_levels": ["Grade3"],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CommonCore",
+          "code": "CCSS.MATH.CONTENT.3.OA.D.9",
+          "description": "Identify arithmetic patterns (including patterns in the addition table or multiplication table), and explain them using properties of operations.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "3.NBT.A.1",
+      "title": "Round whole numbers to nearest 10 or 100",
+      "description": "Use place value understanding to round whole numbers to the nearest 10 or 100.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number & Operations in Base Ten",
+      "tags": ["place-value", "rounding", "estimation", "tens", "hundreds"],
+      "estimated_hours": 6,
+      "grade_levels": ["Grade3"],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CommonCore",
+          "code": "CCSS.MATH.CONTENT.3.NBT.A.1",
+          "description": "Use place value understanding to round whole numbers to the nearest 10 or 100.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "3.NBT.A.2",
+      "title": "Fluently add and subtract within 1000",
+      "description": "Fluently add and subtract within 1000 using strategies and algorithms based on place value, properties of operations, and/or the relationship between addition and subtraction.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number & Operations in Base Ten",
+      "tags": ["addition", "subtraction", "fluency", "place-value", "algorithms", "within-1000"],
+      "estimated_hours": 20,
+      "grade_levels": ["Grade3"],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CommonCore",
+          "code": "CCSS.MATH.CONTENT.3.NBT.A.2",
+          "description": "Fluently add and subtract within 1000 using strategies and algorithms based on place value, properties of operations, and/or the relationship between addition and subtraction.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "3.NBT.A.3",
+      "title": "Multiply one-digit numbers by multiples of 10",
+      "description": "Multiply one-digit whole numbers by multiples of 10 in the range 10-90 (e.g., 9 x 80, 5 x 60) using strategies based on place value and properties of operations.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number & Operations in Base Ten",
+      "tags": ["multiplication", "multiples-of-10", "place-value", "mental-math"],
+      "estimated_hours": 6,
+      "grade_levels": ["Grade3"],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CommonCore",
+          "code": "CCSS.MATH.CONTENT.3.NBT.A.3",
+          "description": "Multiply one-digit whole numbers by multiples of 10 in the range 10-90 using strategies based on place value and properties of operations.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "3.NF.A.1",
+      "title": "Understand a fraction as part of a whole",
+      "description": "Understand a fraction 1/b as the quantity formed by 1 part when a whole is partitioned into b equal parts; understand a fraction a/b as the quantity formed by a parts of size 1/b.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number & Operations - Fractions",
+      "tags": ["fractions", "unit-fraction", "numerator", "denominator", "equal-parts", "partitioning"],
+      "estimated_hours": 10,
+      "grade_levels": ["Grade3"],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CommonCore",
+          "code": "CCSS.MATH.CONTENT.3.NF.A.1",
+          "description": "Understand a fraction 1/b as the quantity formed by 1 part when a whole is partitioned into b equal parts; understand a fraction a/b as the quantity formed by a parts of size 1/b.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "3.NF.A.2",
+      "title": "Understand a fraction on a number line",
+      "description": "Understand a fraction as a number on the number line; represent fractions on a number line diagram. a) Represent a fraction 1/b on a number line diagram by defining the interval from 0 to 1 as the whole and partitioning it into b equal parts. b) Represent a fraction a/b on a number line diagram by marking off a lengths 1/b from 0.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number & Operations - Fractions",
+      "tags": ["fractions", "number-line", "unit-fraction", "intervals", "representation"],
+      "estimated_hours": 10,
+      "grade_levels": ["Grade3"],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CommonCore",
+          "code": "CCSS.MATH.CONTENT.3.NF.A.2",
+          "description": "Understand a fraction as a number on the number line; represent fractions on a number line diagram.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "3.NF.A.3",
+      "title": "Explain equivalence and compare fractions",
+      "description": "Explain equivalence of fractions in special cases, and compare fractions by reasoning about their size. a) Understand two fractions as equivalent if they are the same size or same point on a number line. b) Recognize and generate simple equivalent fractions. c) Express whole numbers as fractions, and recognize fractions that are equivalent to whole numbers. d) Compare two fractions with the same numerator or the same denominator by reasoning about their size, using the symbols >, =, or <.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Number & Operations - Fractions",
+      "tags": ["fractions", "equivalence", "comparison", "number-line", "greater-than", "less-than"],
+      "estimated_hours": 14,
+      "grade_levels": ["Grade3"],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CommonCore",
+          "code": "CCSS.MATH.CONTENT.3.NF.A.3",
+          "description": "Explain equivalence of fractions in special cases, and compare fractions by reasoning about their size.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "3.MD.A.1",
+      "title": "Tell and write time; solve time problems",
+      "description": "Tell and write time to the nearest minute and measure time intervals in minutes. Solve word problems involving addition and subtraction of time intervals in minutes, e.g., by representing the problem on a number line diagram.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Measurement & Data",
+      "tags": ["time", "clock", "minutes", "elapsed-time", "number-line", "word-problems"],
+      "estimated_hours": 8,
+      "grade_levels": ["Grade3"],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CommonCore",
+          "code": "CCSS.MATH.CONTENT.3.MD.A.1",
+          "description": "Tell and write time to the nearest minute and measure time intervals in minutes. Solve word problems involving addition and subtraction of time intervals in minutes.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "3.MD.A.2",
+      "title": "Measure and estimate liquid volumes and masses",
+      "description": "Measure and estimate liquid volumes and masses of objects using standard units of grams (g), kilograms (kg), and liters (l). Add, subtract, multiply, or divide to solve one-step word problems involving masses or volumes that are given in the same units.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Measurement & Data",
+      "tags": ["measurement", "mass", "volume", "grams", "kilograms", "liters", "estimation"],
+      "estimated_hours": 10,
+      "grade_levels": ["Grade3"],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CommonCore",
+          "code": "CCSS.MATH.CONTENT.3.MD.A.2",
+          "description": "Measure and estimate liquid volumes and masses of objects using standard units of grams (g), kilograms (kg), and liters (l).",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "3.MD.B.3",
+      "title": "Draw scaled picture and bar graphs",
+      "description": "Draw a scaled picture graph and a scaled bar graph to represent a data set with several categories. Solve one- and two-step 'how many more' and 'how many less' problems using information presented in scaled bar graphs.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Measurement & Data",
+      "tags": ["graphs", "picture-graph", "bar-graph", "data", "scale", "categories"],
+      "estimated_hours": 8,
+      "grade_levels": ["Grade3"],
+      "bloom_level": "Create",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CommonCore",
+          "code": "CCSS.MATH.CONTENT.3.MD.B.3",
+          "description": "Draw a scaled picture graph and a scaled bar graph to represent a data set with several categories. Solve one- and two-step 'how many more' and 'how many less' problems using information presented in scaled bar graphs.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "3.MD.B.4",
+      "title": "Generate measurement data and make line plots",
+      "description": "Generate measurement data by measuring lengths using rulers marked with halves and fourths of an inch. Show the data by making a line plot, where the horizontal scale is marked off in appropriate units -- whole numbers, halves, or quarters.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Measurement & Data",
+      "tags": ["measurement", "line-plot", "data", "fractions", "halves", "fourths", "ruler"],
+      "estimated_hours": 8,
+      "grade_levels": ["Grade3"],
+      "bloom_level": "Create",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CommonCore",
+          "code": "CCSS.MATH.CONTENT.3.MD.B.4",
+          "description": "Generate measurement data by measuring lengths using rulers marked with halves and fourths of an inch. Show the data by making a line plot.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "3.MD.C.5",
+      "title": "Recognize area as attribute of plane figures",
+      "description": "Recognize area as an attribute of plane figures and understand concepts of area measurement. a) A square with side length 1 unit, called a 'unit square,' is said to have 'one square unit' of area, and can be used to measure area. b) A plane figure which can be covered without gaps or overlaps by n unit squares is said to have an area of n square units.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Measurement & Data",
+      "tags": ["area", "plane-figures", "unit-square", "square-units", "measurement"],
+      "estimated_hours": 6,
+      "grade_levels": ["Grade3"],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CommonCore",
+          "code": "CCSS.MATH.CONTENT.3.MD.C.5",
+          "description": "Recognize area as an attribute of plane figures and understand concepts of area measurement.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "3.MD.C.6",
+      "title": "Measure area by counting unit squares",
+      "description": "Measure areas by counting unit squares (square cm, square m, square in, square ft, and improvised units).",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Measurement & Data",
+      "tags": ["area", "counting", "unit-squares", "square-centimeters", "square-meters", "measurement"],
+      "estimated_hours": 6,
+      "grade_levels": ["Grade3"],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CommonCore",
+          "code": "CCSS.MATH.CONTENT.3.MD.C.6",
+          "description": "Measure areas by counting unit squares (square cm, square m, square in, square ft, and improvised units).",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "3.MD.C.7",
+      "title": "Relate area to multiplication and addition",
+      "description": "Relate area to the operations of multiplication and addition. a) Find the area of a rectangle with whole-number side lengths by tiling it, and show that the area is the same as would be found by multiplying the side lengths. b) Multiply side lengths to find areas of rectangles. c) Use tiling to show that the area of a rectangle with whole-number side lengths a and b + c is the sum of a x b and a x c. Use area models to represent the distributive property. d) Recognize area as additive. Find areas of rectilinear figures by decomposing them into non-overlapping rectangles.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Measurement & Data",
+      "tags": ["area", "multiplication", "rectangles", "tiling", "distributive-property", "decomposition"],
+      "estimated_hours": 14,
+      "grade_levels": ["Grade3"],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CommonCore",
+          "code": "CCSS.MATH.CONTENT.3.MD.C.7",
+          "description": "Relate area to the operations of multiplication and addition.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "3.MD.D.8",
+      "title": "Solve real world perimeter problems",
+      "description": "Solve real world and mathematical problems involving perimeters of polygons, including finding the perimeter given the side lengths, finding an unknown side length, and exhibiting rectangles with the same perimeter and different areas or with the same area and different perimeters.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Measurement & Data",
+      "tags": ["perimeter", "polygons", "rectangles", "side-lengths", "area-vs-perimeter"],
+      "estimated_hours": 10,
+      "grade_levels": ["Grade3"],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CommonCore",
+          "code": "CCSS.MATH.CONTENT.3.MD.D.8",
+          "description": "Solve real world and mathematical problems involving perimeters of polygons, including finding the perimeter given the side lengths, finding an unknown side length, and exhibiting rectangles with the same perimeter and different areas or with the same area and different perimeters.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "3.G.A.1",
+      "title": "Understand shapes and their attributes",
+      "description": "Understand that shapes in different categories (e.g., rhombuses, rectangles, and others) may share attributes (e.g., having four sides), and that the shared attributes can define a larger category (e.g., quadrilaterals). Recognize rhombuses, rectangles, and squares as examples of quadrilaterals, and draw examples of quadrilaterals that do not belong to any of these subcategories.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": ["shapes", "quadrilaterals", "rhombus", "rectangle", "square", "attributes", "categories"],
+      "estimated_hours": 8,
+      "grade_levels": ["Grade3"],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CommonCore",
+          "code": "CCSS.MATH.CONTENT.3.G.A.1",
+          "description": "Understand that shapes in different categories may share attributes, and that the shared attributes can define a larger category. Recognize rhombuses, rectangles, and squares as examples of quadrilaterals.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "3.G.A.2",
+      "title": "Partition shapes into equal areas as unit fractions",
+      "description": "Partition shapes into parts with equal areas. Express the area of each part as a unit fraction of the whole. For example, partition a shape into 4 parts with equal area, and describe the area of each part as 1/4 of the area of the shape.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": ["partitioning", "equal-areas", "unit-fraction", "shapes", "fractions-geometry"],
+      "estimated_hours": 8,
+      "grade_levels": ["Grade3"],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CommonCore",
+          "code": "CCSS.MATH.CONTENT.3.G.A.2",
+          "description": "Partition shapes into parts with equal areas. Express the area of each part as a unit fraction of the whole.",
+          "grade_level": "Grade3"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "3.OA.A.1",
+      "to": "3.OA.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Must understand products as groups of objects before solving multiplication word problems."
+    },
+    {
+      "from": "3.OA.A.2",
+      "to": "3.OA.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Must understand quotients before solving division word problems."
+    },
+    {
+      "from": "3.OA.A.1",
+      "to": "3.OA.A.4",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Understanding products is needed before finding unknown factors in multiplication equations."
+    },
+    {
+      "from": "3.OA.A.2",
+      "to": "3.OA.A.4",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Understanding quotients is needed before finding unknowns in division equations."
+    },
+    {
+      "from": "3.OA.A.1",
+      "to": "3.OA.B.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Must understand what multiplication means before applying its properties."
+    },
+    {
+      "from": "3.OA.A.1",
+      "to": "3.OA.B.6",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Understanding multiplication is prerequisite to seeing division as an unknown-factor problem."
+    },
+    {
+      "from": "3.OA.A.2",
+      "to": "3.OA.B.6",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Understanding division is prerequisite to connecting it to unknown-factor multiplication."
+    },
+    {
+      "from": "3.OA.B.5",
+      "to": "3.OA.C.7",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Properties of operations provide strategies needed to build fluency with multiplication and division facts."
+    },
+    {
+      "from": "3.OA.B.6",
+      "to": "3.OA.C.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Understanding the multiplication-division relationship supports fluency with both operations."
+    },
+    {
+      "from": "3.OA.A.3",
+      "to": "3.OA.D.8",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Must solve one-step multiplication/division word problems before tackling two-step problems with all four operations."
+    },
+    {
+      "from": "3.NBT.A.1",
+      "to": "3.OA.D.8",
+      "edge_type": "Requires",
+      "strength_permille": 750,
+      "rationale": "Rounding is needed to assess reasonableness of answers in two-step word problems."
+    },
+    {
+      "from": "3.NBT.A.2",
+      "to": "3.OA.D.8",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Fluent addition and subtraction within 1000 is needed for multi-step problems involving all four operations."
+    },
+    {
+      "from": "3.OA.B.5",
+      "to": "3.OA.D.9",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Understanding properties of operations is necessary to explain arithmetic patterns."
+    },
+    {
+      "from": "3.OA.C.7",
+      "to": "3.OA.D.9",
+      "edge_type": "Recommends",
+      "strength_permille": 700,
+      "rationale": "Fluency with multiplication facts helps students identify patterns in the multiplication table."
+    },
+    {
+      "from": "3.OA.C.7",
+      "to": "3.NBT.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Fluent single-digit multiplication is prerequisite to multiplying by multiples of 10."
+    },
+    {
+      "from": "3.OA.B.5",
+      "to": "3.NBT.A.3",
+      "edge_type": "Recommends",
+      "strength_permille": 700,
+      "rationale": "Properties of operations (especially place value strategies) support multiplying by multiples of 10."
+    },
+    {
+      "from": "3.NF.A.1",
+      "to": "3.NF.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 950,
+      "rationale": "Must understand fractions as parts of a whole before representing them on a number line."
+    },
+    {
+      "from": "3.NF.A.1",
+      "to": "3.NF.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Must understand what fractions represent before comparing them or finding equivalences."
+    },
+    {
+      "from": "3.NF.A.2",
+      "to": "3.NF.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Number line representation supports reasoning about fraction equivalence and comparison."
+    },
+    {
+      "from": "3.NF.A.1",
+      "to": "3.G.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Understanding fractions as equal parts is prerequisite to expressing partitioned shape areas as unit fractions."
+    },
+    {
+      "from": "3.NF.A.1",
+      "to": "3.MD.B.4",
+      "edge_type": "Requires",
+      "strength_permille": 750,
+      "rationale": "Understanding fractions is needed to measure with rulers marked in halves and fourths."
+    },
+    {
+      "from": "3.NBT.A.2",
+      "to": "3.MD.A.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Adding and subtracting within 1000 supports solving elapsed time word problems."
+    },
+    {
+      "from": "3.OA.A.3",
+      "to": "3.MD.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 750,
+      "rationale": "Solving word problems with multiplication/division transfers to measurement word problems with masses and volumes."
+    },
+    {
+      "from": "3.OA.C.7",
+      "to": "3.MD.B.3",
+      "edge_type": "Recommends",
+      "strength_permille": 650,
+      "rationale": "Multiplication fluency helps when interpreting scaled graphs where each symbol represents multiple units."
+    },
+    {
+      "from": "3.MD.C.5",
+      "to": "3.MD.C.6",
+      "edge_type": "Requires",
+      "strength_permille": 950,
+      "rationale": "Must understand the concept of area and unit squares before measuring area by counting them."
+    },
+    {
+      "from": "3.MD.C.6",
+      "to": "3.MD.C.7",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Must be able to measure area by counting before relating area to multiplication formulas."
+    },
+    {
+      "from": "3.OA.A.1",
+      "to": "3.MD.C.7",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Understanding multiplication as groups/arrays is essential for connecting area to multiplication (rows x columns)."
+    },
+    {
+      "from": "3.OA.B.5",
+      "to": "3.MD.C.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "The distributive property is directly used in area models for decomposing rectangles."
+    },
+    {
+      "from": "3.NBT.A.2",
+      "to": "3.MD.D.8",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Adding side lengths to find perimeter requires fluent addition."
+    },
+    {
+      "from": "3.MD.C.7",
+      "to": "3.MD.D.8",
+      "edge_type": "Recommends",
+      "strength_permille": 750,
+      "rationale": "Understanding area supports comparing rectangles with the same perimeter but different areas, and vice versa."
+    },
+    {
+      "from": "3.G.A.1",
+      "to": "3.MD.D.8",
+      "edge_type": "Recommends",
+      "strength_permille": 650,
+      "rationale": "Understanding shape attributes (sides, angles) supports perimeter problem solving with polygons."
+    },
+    {
+      "from": "3.MD.C.5",
+      "to": "3.G.A.2",
+      "edge_type": "Recommends",
+      "strength_permille": 700,
+      "rationale": "Understanding area concepts supports partitioning shapes into parts with equal areas."
+    }
+  ],
+  "learning_paths": [
+    {
+      "title": "Multiplication & Division Mastery",
+      "description": "Core pathway from conceptual understanding through fluency to application in word problems and patterns.",
+      "sequence": [
+        "3.OA.A.1",
+        "3.OA.A.2",
+        "3.OA.B.5",
+        "3.OA.B.6",
+        "3.OA.A.4",
+        "3.OA.C.7",
+        "3.OA.A.3",
+        "3.OA.D.8",
+        "3.OA.D.9"
+      ],
+      "total_hours": 104
+    },
+    {
+      "title": "Fractions Foundation",
+      "description": "Build fraction understanding from parts-of-a-whole through number line representation to equivalence and comparison.",
+      "sequence": [
+        "3.NF.A.1",
+        "3.NF.A.2",
+        "3.NF.A.3"
+      ],
+      "total_hours": 34
+    },
+    {
+      "title": "Area & Perimeter",
+      "description": "Geometric measurement pathway connecting area concepts to multiplication and then to perimeter problem solving.",
+      "sequence": [
+        "3.MD.C.5",
+        "3.MD.C.6",
+        "3.MD.C.7",
+        "3.MD.D.8"
+      ],
+      "total_hours": 36
+    },
+    {
+      "title": "Data & Measurement",
+      "description": "Practical measurement and data representation skills including time, mass/volume, graphs, and line plots.",
+      "sequence": [
+        "3.MD.A.1",
+        "3.MD.A.2",
+        "3.MD.B.3",
+        "3.MD.B.4"
+      ],
+      "total_hours": 34
+    }
+  ],
+  "grade2_prerequisites": [
+    {
+      "description": "Fluently add and subtract within 100 (2.OA.B.2)",
+      "supports": ["3.NBT.A.2", "3.OA.D.8"]
+    },
+    {
+      "description": "Work with equal groups of objects to gain foundations for multiplication (2.OA.C.3, 2.OA.C.4)",
+      "supports": ["3.OA.A.1", "3.OA.A.2"]
+    },
+    {
+      "description": "Understand place value to 1000 (2.NBT.A.1-4)",
+      "supports": ["3.NBT.A.1", "3.NBT.A.2", "3.NBT.A.3"]
+    },
+    {
+      "description": "Partition circles and rectangles into halves, thirds, fourths (2.G.A.3)",
+      "supports": ["3.NF.A.1", "3.G.A.2"]
+    },
+    {
+      "description": "Tell and write time to nearest 5 minutes (2.MD.C.7)",
+      "supports": ["3.MD.A.1"]
+    },
+    {
+      "description": "Measure length in standard units (2.MD.A.1-4)",
+      "supports": ["3.MD.A.2", "3.MD.B.4"]
+    },
+    {
+      "description": "Draw picture and bar graphs (2.MD.D.10)",
+      "supports": ["3.MD.B.3"]
+    },
+    {
+      "description": "Recognize and draw shapes with specified attributes (2.G.A.1)",
+      "supports": ["3.G.A.1"]
+    }
+  ]
+}

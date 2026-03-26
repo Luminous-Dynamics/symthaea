@@ -10,6 +10,7 @@ use leptos_router::{
 
 use crate::consciousness::ConsciousnessProvider;
 use crate::holochain::{ConnectionBadge, HolochainProvider};
+use crate::learning_engine::LearningEngineProvider;
 use crate::pages::*;
 
 #[component]
@@ -17,6 +18,7 @@ pub fn App() -> impl IntoView {
     view! {
         <HolochainProvider>
         <ConsciousnessProvider>
+        <LearningEngineProvider>
             <Router>
                 <nav class="navbar">
                     <a href="/" class="logo">"EduNet"</a>
@@ -24,6 +26,8 @@ pub fn App() -> impl IntoView {
                         <A href="/courses">"Courses"</A>
                         <A href="/review">"Review"</A>
                         <A href="/dashboard">"Dashboard"</A>
+                        <A href="/skill-map">"Skill Map"</A>
+                        <A href="/teacher">"Teacher"</A>
                         <A href="/governance">"Governance"</A>
                         <A href="/credentials">"Credentials"</A>
                     </div>
@@ -35,11 +39,14 @@ pub fn App() -> impl IntoView {
                         <Route path=path!("/courses") view=CoursesPage />
                         <Route path=path!("/review") view=ReviewPage />
                         <Route path=path!("/dashboard") view=DashboardPage />
+                        <Route path=path!("/skill-map") view=SkillMapPage />
+                        <Route path=path!("/teacher") view=TeacherDashboardPage />
                         <Route path=path!("/governance") view=GovernancePage />
                         <Route path=path!("/credentials") view=CredentialsPage />
                     </Routes>
                 </main>
             </Router>
+        </LearningEngineProvider>
         </ConsciousnessProvider>
         </HolochainProvider>
     }
