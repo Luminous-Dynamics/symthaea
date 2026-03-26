@@ -217,22 +217,35 @@ pub fn compose_from_patterns(
     memory: &ProgramMemory,
     k: usize,
 ) -> Option<(ProgramNode, f32)> {
-    let target_enc = target.encode();
+    use crate::periodic_table::encode_structural;
+    let target_structural = encode_structural(target);
     let oracle = TriOracle::with_defaults();
 
-    // 1. Get top-K nearest patterns
-    let top_k = memory.nearest_k(&target_enc, k);
+    // 1. Get top-K nearest patterns using STRUCTURAL encoding
+    // This finds patterns with similar STRUCTURE regardless of variable names.
+    let top_k = memory.nearest_k(&target_structural, k);
     if top_k.is_empty() {
         return None;
     }
 
-    // 2. Collect ALL sub-trees from all K patterns
+    // 2. Collect ALL sub-trees from ALL patterns (not just top-K).
+    // The sub-tree matching uses structural encoding, so even distant
+    // patterns may have relevant sub-trees (e.g., find_max's Iterate
+    // sub-tree matches second_largest's Iterate at ~1.0 structural).
     let mut all_subs: Vec<(String, ProgramNode, BinaryHV)> = Vec::new();
+    for entry in memory.as_library().iter() {
+        // Re-encode sub-patterns using structural encoding
+        all_subs.push((
+            String::new(),
+            entry.0.clone(),
+            encode_structural(&entry.0),
+        ));
+    }
+    // Also add decomposed sub-trees from top-K patterns
     for (entry, _sim) in &top_k {
-        // Add the pattern's own sub-trees
-        all_subs.extend(entry.sub_patterns.iter().cloned());
-        // Also add the full pattern as a candidate sub-tree
-        all_subs.push((entry.name.clone(), entry.node.clone(), entry.encoding));
+        for (name, node, _old_enc) in &entry.sub_patterns {
+            all_subs.push((name.clone(), node.clone(), encode_structural(node)));
+        }
     }
 
     if all_subs.is_empty() {
