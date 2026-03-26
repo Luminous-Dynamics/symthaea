@@ -1,4 +1,6 @@
-//! Minimal Viable Bridge Demo
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Minimal Viable Bridge Demo
 //!
 //! Demonstrates the full Symthaea → Mycelix governance pipeline:
 //!   C_unified → ConsciousnessProfile → ConsciousnessCredential → evaluate_governance → audit log
@@ -93,6 +95,7 @@ fn demo_agent(name: &str, c_unified: f64, identity: f64, reputation: f64, commun
                 required_tier: format!("{:?}", req.min_tier),
                 weight_bp: result.weight_bp,
                 correlation_id: Some(format!("mvb_demo:{}:{}", name, now)),
+                credential_source: Some("demo".into()),
             };
             let json = serde_json::to_string(&audit).unwrap();
             println!("        audit: {}", json);

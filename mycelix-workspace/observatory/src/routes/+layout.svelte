@@ -1,4 +1,8 @@
-<script lang="ts">
+<!--
+  Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+  SPDX-License-Identifier: AGPL-3.0-or-later
+  Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+--><script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { conductorStatus } from '$lib/stores';
@@ -119,6 +123,9 @@
       items: [
         { href: '/admin', label: 'Operator' },
         { href: '/governance', label: 'Governance' },
+        { href: '/budgets', label: 'Budgets' },
+        { href: '/sagas', label: 'Workflows' },
+        { href: '/notifications', label: 'Notifications' },
         { href: '/network', label: 'Network' },
         { href: '/analytics', label: 'Analytics' },
         { href: '/attribution', label: 'Attribution' },
