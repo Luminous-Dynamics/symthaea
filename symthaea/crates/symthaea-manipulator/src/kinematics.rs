@@ -356,7 +356,8 @@ mod tests {
     #[test]
     fn test_joint_limits() {
         let kin = ManipulatorKinematics::default_7dof();
-        let q_valid = vec![0.0; 7];
+        // Valid: within all joint ranges (J4 elbow is [-3.07, -0.07])
+        let q_valid = vec![0.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0];
         assert!(kin.within_limits(&q_valid));
 
         let q_invalid = vec![10.0; 7]; // Way out of range
