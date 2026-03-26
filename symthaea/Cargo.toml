@@ -30,6 +30,7 @@ members = [
     "crates/symthaea-flight",
     "crates/symthaea-helicopter",
     "crates/symthaea-auv",
+    "crates/symthaea-manipulator",
     "crates/symthaea-humanoid",
     "crates/symthaea-physics",
     "crates/symthaea-physics-bridge",
@@ -731,6 +732,11 @@ name = "code-gen-smoke"
 path = "src/bin/code_gen_smoke.rs"
 required-features = ["code_generation"]
 
+[[bin]]
+name = "symthaea-holon"
+path = "src/bin/symthaea-holon.rs"
+required-features = ["api_module"]
+
 # Examples
 # Examples that need cfg-gated modules are marked with required-features
 # They won't be built by default until the required modules are fixed
@@ -780,6 +786,10 @@ required-features = ["humanoid"]
 [[test]]
 name = "embodiment_integration"
 required-features = ["humanoid"]
+
+[[example]]
+name = "helicopter_phi_benchmark"
+required-features = ["helicopter"]
 
 [[example]]
 name = "dmc_humanoid_stand"
