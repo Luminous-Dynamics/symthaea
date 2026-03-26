@@ -38,7 +38,7 @@ members = [
 # - tests: full holochain conductor (tokio/mio)
 # - edunet-agg, mycelix-governance: statrs/nalgebra (rand -> getrandom 0.2)
 # Run tests with: cargo test --manifest-path tests/Cargo.toml
-exclude = ["tests", "crates/edunet-agg", "crates/mycelix-governance", "apps/leptos"]
+exclude = ["tests", "crates/edunet-agg", "crates/edunet-content-gen", "crates/mycelix-governance", "apps/leptos"]
 
 [workspace.package]
 version = "0.1.0"
