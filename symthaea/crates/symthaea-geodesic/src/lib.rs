@@ -36,6 +36,7 @@ pub mod manifold;
 pub mod manifold_bootstrap;
 pub mod noise;
 pub mod pdg;
+pub mod periodic_table;
 pub mod program_emitter;
 pub mod program_memory;
 pub mod resonant_explorer;
