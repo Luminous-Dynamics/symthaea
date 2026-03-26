@@ -45,6 +45,7 @@ pub mod skeleton_synthesis;
 pub mod synthesis;
 pub mod token_codebook;
 pub mod topology;
+pub mod understanding;
 pub mod tri_oracle;
 pub mod verification;
 
