@@ -15,6 +15,7 @@ Full details: @.claude/rules/CREDENTIALS.md
 | 5491 | Luminous Nix (EXCLUSIVE) |
 | 3001/3333/3338 | Weave/Core/Visualizer |
 | 7777 | Sacred Bridge |
+| 7778 | Holon (Soma mobile bridge) |
 
 Full allocation: @.claude/rules/PORTS.md
 
@@ -66,9 +67,10 @@ Full rules: @.claude/rules/DEVELOPMENT.md
 - **Build**: `cargo test --lib` (default features), `cargo test --all-features`
 - **CI**: `symthaea-ci.yml` (GREEN) — fmt, clippy, test, docs, 49 feature matrix, 52 sub-crates
 - **Features**: 100 feature flags (default=[]), key flags: `reasoning_engine`, `identity`, `neural-bridge`, `lancedb-backend`, `ssm_language`, `integrity`, `safety-agents`, `sentinel`
-- **Broca language pipeline**: Native CfC-HDC thought-to-text generation (`crates/symthaea-broca/`, 21K LOC, 229+ tests). 20-channel ThoughtEncoder → 16,384D HDC binding → autoregressive generation with epistemic gating (physically prevents hallucination at logit level), semantic veto (mid-sentence self-correction), Liquid-Mamba fusion backend. Feature: `ssm_language`
+- **Broca language pipeline**: Native CfC-HDC thought-to-text generation (`crates/symthaea-broca/`, 21K+ LOC, 229+ tests). 43-channel ThoughtEncoder (15 Epistemic Cube channels: E[5]+N[4]+M[4]+H+quality) → 16,384D HDC binding → autoregressive generation with per-axis EpistemicCubeGate (E=assertion, N=social framing, M=temporal, H=depth), epistemic gating (physically prevents hallucination at logit level), NSM grounding (`EpistemicNSMGrounding`), semantic veto, Liquid-Mamba fusion backend. GPU training via candle CUDA (`gpu_cfc.rs`: GpuTrainer, 10+ pairs/sec on RTX 2070, val_loss 1.75 at epoch 22). Feature: `ssm_language`
 - **Immune system**: Decentralized defensive force (`safety-agents` + `sentinel` features). SafetyAgent (NRC 4-tier: Green/Yellow/Orange/Red) → graduated defense cascade → moral algebra filter → guardian posture. SentinelManager (7 threat types, interval 67), ThreatMemory (32D HDV, dream consolidation), CollectiveImmunity (coherence-adjusted severity). 80 defense tests, Pulse immune pane. Reputation decay/slash/blacklist in Mycelix bridge-common.
-- **Integration status**: Core pipeline fully wired with surprise exploration, prefrontal gating, meta-cognition, reasoning engine (7-step cycle with Phi/gating/planning), moral algebra, CycleMetadata telemetry, social coherence (ToM in Mind module), Broca language center (adaptive cadence, quality EMA, consciousness-gated generation), safety enforcement (Phase 3.5: LR/exploration/neuromod gates). ~25% of `src/` modules remain structural/disconnected (iroh P2P, some consciousness subsystems).
+- **Thermodynamic unification** (Mar 2026): Unified thermodynamic framework across 6+ modules. `ThermodynamicManager` (`CognitiveSubsystem` interval 43) owns `ThermodynamicIntegration` → `UnifiedThermodynamicState` + `ThermodynamicPhysicsBridge`. Cross-couples DissipativeConsciousness, ConsciousnessThermodynamicsAnalyzer, HierarchicalFreeEnergy, SubstrateManager. Physics bridge: Maxwell Demon (attention), Landauer (memory cost), Carnot (efficiency), Onsager (coupling health), Jarzynski (FE validation), Prigogine (entropy enforcement). 6 active feedback loops, 18 named constants with scientific citations. 5 new files (~1,400 LOC), 41 tests. `ThermodynamicDashboard` (23 fields) in CycleMetadata.
+- **Integration status**: Core pipeline fully wired with surprise exploration, prefrontal gating, meta-cognition, reasoning engine (7-step cycle with Phi/gating/planning), moral algebra, CycleMetadata telemetry, social coherence (ToM in Mind module), Broca language center (adaptive cadence, quality EMA, consciousness-gated generation), safety enforcement (Phase 3.5: LR/exploration/neuromod gates), thermodynamic unification (6 feedback loops, physics bridge). ~25% of `src/` modules remain structural/disconnected (iroh P2P, some consciousness subsystems).
 - **Psych-Bench**: 136+ benchmarks across 26 cognitive domains (`crates/symthaea-psych-bench/`, 202 modules). External validation: Hendrycks ETHICS 94.5% (4 domains, 2K samples; 84.7% composite across 5 datasets; `examples/benchmark_moral_unified.rs`), Sleep-EDF 70-80% (PhysioNet clinical EEG, `examples/benchmark_sleepstage.rs`), ARC-AGI 2-AFC+strict (`examples/benchmark_arc_reasoning.rs`), DMC Humanoid vs SAC/TD3/D4PG baselines. 294 example files.
 - **Sub-crate pattern**: `pub use symthaea_X as module_name;` in consciousness/mod.rs for zero API changes
 
@@ -80,7 +82,7 @@ Fractal CivOS with 5 tiers, consolidated into cluster DNAs (single DNA = cross-d
 | Cluster | Path | Domains | Zomes | Tests |
 |---------|------|---------|-------|-------|
 | **mycelix-commons** | `mycelix-commons/` | property, housing, care, mutualaid, water, food, transport, mesh-time, resource-mesh | 39 (38 domain + 1 bridge) | 5,276 |
-| **mycelix-civic** | `mycelix-civic/` | justice, emergency, media, resonance-feed | 18 (17 domain + 1 bridge) | 2,273 |
+| **mycelix-civic** | `mycelix-civic/` | justice, emergency, media (+ visual art/gallery/exhibition), resonance-feed | 18 (17 domain + 1 bridge) | 2,273 |
 | **mycelix-hearth** | `mycelix-hearth/` | kinship, gratitude, care, autonomy, decisions, stories, milestones, rhythms, emergency, resources | 12 (11 domain + 1 bridge) | 1,023 |
 | **mycelix-identity** | `mycelix-identity/` | DID registry, MFA, trust credentials, verifiable credentials, recovery, name-registry, web-of-trust | 13 | 23+ unit, 100+ sweettest |
 | **mycelix-governance** | `mycelix-governance/` | proposals, voting, threshold-signing (DKG), councils, constitution, execution | 7 | 44+ unit, 156+ sweettest |
@@ -100,14 +102,14 @@ Fractal CivOS with 5 tiers, consolidated into cluster DNAs (single DNA = cross-d
 | **mycelix-edunet** | `mycelix-edunet/` | 10 | Built |
 | **mycelix-energy** | `mycelix-energy/` | 5 (projects, investments, regenerative, grid, bridge) | Built |
 | **mycelix-climate** | `mycelix-climate/` | 3 (carbon, projects, bridge) | Built |
-| **mycelix-music** | `mycelix-music/` | 4 + 14 support crates (balances, catalog, plays, trust) | Built |
+| **mycelix-music** | `mycelix-music/` | 5 + 14 support crates (catalog, plays, balances, trust, music-bridge) | Built, WASM verified, DNA/hApp packed |
 | **mycelix-space** | `mycelix-space/` | 5 + orbital-mechanics lib (orbital objects, observations, conjunctions, debris bounties, traffic control) | Built |
 | **mycelix-desci** | `mycelix-desci/` | REST API (Actix-web) | 141 integration tests |
 | **mycelix-core** | `mycelix-core/` | 0TML federated learning research | 62 FL tests |
 
-- **Total**: 133+ zomes, ~785K lines Rust (~643K code, tokei-verified), 14 built hApp bundles
+- **Total**: 134+ zomes, ~785K lines Rust (~643K code, tokei-verified), 15 built hApp bundles
 - **Shared types**: `crates/mycelix-bridge-entry-types/` (DHT entries + error_messages), `crates/mycelix-bridge-common/` (coordinator dispatch + cross-cluster + consciousness gating + routing_registry, 450+ tests)
-- **Cross-cluster bridge**: All clusters via `CallTargetCell::OtherRole` (unified hApp: `mycelix-workspace/happs/mycelix-unified-happ.yaml`). Centralized routing in `routing_registry.rs` (13 routes, 35 tests)
+- **Cross-cluster bridge**: All clusters via `CallTargetCell::OtherRole` (unified hApp: `mycelix-workspace/happs/mycelix-unified-happ.yaml`). Centralized routing in `routing_registry.rs` (13 routes, 35 tests). `CrossClusterRole`: Commons, Civic, Identity, Hearth, Personal, Finance, Governance, Music
 - **Consciousness gating**: 4D profile (identity/reputation/community/engagement) → 5 tiers (Observer→Guardian) → configurable vote weights (`VoteWeightConfig`: default/constitutional/budget/emergency presets)
 - **Sub-Passport**: Automatic effective_tier recovery (6h cooldown, 3:1 correction ratio, gradual one-tier-per-cooldown)
 - **SDKs**: Rust (18 modules, ~50K LOC, 1,036+ tests), TypeScript (37 modules, ~226K LOC, 6,316 tests), Python, WASM
@@ -162,6 +164,7 @@ Quick guide: @.claude/guides/SERVICES.md
 **Tristan (tstoltz)** - Richardson, TX (Central)
 - NixOS 26.05 (Yarara) | Neovim | Alacritty | Zellij
 - Email: tristan.stoltz@evolvingresonantcocreationism.com
+- **Test device**: Pixel 8 Pro (Android) — available for Soma testing
 
 ---
 
