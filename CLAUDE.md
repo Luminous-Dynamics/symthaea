@@ -74,6 +74,24 @@ Full rules: @.claude/rules/DEVELOPMENT.md
 - **Psych-Bench**: 136+ benchmarks across 26 cognitive domains (`crates/symthaea-psych-bench/`, 202 modules). External validation: Hendrycks ETHICS 94.5% (4 domains, 2K samples; 84.7% composite across 5 datasets; `examples/benchmark_moral_unified.rs`), Sleep-EDF 70-80% (PhysioNet clinical EEG, `examples/benchmark_sleepstage.rs`), ARC-AGI 2-AFC+strict (`examples/benchmark_arc_reasoning.rs`), DMC Humanoid vs SAC/TD3/D4PG baselines. 294 example files.
 - **Sub-crate pattern**: `pub use symthaea_X as module_name;` in consciousness/mod.rs for zero API changes
 
+### Symthaea Robotics (Consciousness-Coupled Platforms)
+Consciousness-first robotics via `EmbodimentBridge` trait: thought → motor → physics → proprioception → next cycle.
+
+| Crate | Platform | State/Command | Tests | Key Physics |
+|-------|----------|---------------|-------|-------------|
+| `symthaea-helicopter` | SAR helicopter | 18D/6D | 79 | Rotor dynamics (RPM lag, gyroscopic precession, autorotation), wind model (Dryden gusts, ground effect) |
+| `symthaea-auv` | Water steward AUV | 32D/8D | 47 | 6DOF hydrodynamics (added mass, quadratic drag, buoyancy), 8 chemical sensors (WHO compliance) |
+| `symthaea-manipulator` | Industrial arm | 21D/8D | 12 | 7-DOF DH kinematics, DLS inverse kinematics (Wampler 1986), joint limits |
+| `symthaea-humanoid` | Bipedal (DMC) | 72D/21D | 113 | Contact dynamics, gait analysis, PD curriculum |
+| `symthaea-flight` | Quadrotor | 13D/4D | 179 | Ballistic + MuJoCo, formation control, swarm training |
+| `symthaea-vehicle` | Autonomous car | 20D/3D | 164 | Bicycle model, Pacejka tires, mesh swarm |
+
+- **EmbodimentBridge trait**: `motor_bridge.rs` — `step(thought_hv, dt, phi)`, `encode_perception()`, `reset()`, 4-tier safety (Green/Yellow/Orange/Red from Phi)
+- **Proprioceptive loop**: Phase 2.5 in `cycle.rs` — blends body state into perception at configurable weight (default 0.2)
+- **Dispatch zome**: `mycelix-civic/zomes/robotics-dispatch/` — RoboticAsset, DispatchOrder, TelemetryReport with 24h authority expiry
+- **Features**: `humanoid`, `helicopter`, `flight` — each enables its platform in the cognitive loop constructor
+- **Build**: `cargo test -p symthaea-helicopter --lib` (each crate independently testable)
+
 ### Mycelix Fractal Architecture (16-cluster unified hApp)
 Fractal CivOS with 5 tiers, consolidated into cluster DNAs (single DNA = cross-domain `call(CallTargetCell::Local, ...)`):
 

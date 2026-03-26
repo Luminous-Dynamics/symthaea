@@ -41,6 +41,7 @@
 
 pub mod chemical_sensors;
 pub mod controller;
+pub mod embodiment;
 pub mod encoder;
 pub mod fep_agent;
 pub mod hydrodynamics;
