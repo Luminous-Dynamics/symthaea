@@ -1,0 +1,58 @@
+[package]
+name = "mycelix-fl"
+version = "0.1.0"
+edition = "2021"
+authors = ["Luminous Dynamics <contact@luminousdynamics.org>"]
+description = "Rust-native federated learning with Byzantine fault tolerance — 45% BFT via PoGQ"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/mycelix"
+keywords = ["federated-learning", "byzantine", "machine-learning", "privacy", "consensus"]
+categories = ["algorithms", "science"]
+readme = "README.md"
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+tokio = { version = "1", features = ["sync", "time", "macros", "rt"], optional = true }
+pyo3 = { version = "0.24", features = ["extension-module"], optional = true }
+tonic = { version = "0.12", optional = true }
+prost = { version = "0.13", optional = true }
+tokio-stream = { version = "0.1", optional = true }
+http = { version = "1", optional = true }
+http-body = { version = "1", optional = true }
+tower-service = { version = "0.3", optional = true }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt", "macros", "sync", "time"] }
+
+[[bench]]
+name = "defenses"
+harness = false
+required-features = ["std"]
+
+[[bench]]
+name = "pogq"
+harness = false
+required-features = ["std"]
+
+[[bin]]
+name = "mycelix-fl-coordinator"
+path = "src/bin/coordinator.rs"
+required-features = ["std"]
+
+[[bin]]
+name = "mycelix-fl-node"
+path = "src/bin/node.rs"
+required-features = ["grpc"]
+
+[features]
+default = ["std"]
+std = ["tokio"]
+wasm = []
+python = ["pyo3", "std"]
+grpc = ["std", "tonic", "prost", "tokio-stream", "http", "http-body", "tower-service", "tokio/net", "tokio/rt-multi-thread"]
