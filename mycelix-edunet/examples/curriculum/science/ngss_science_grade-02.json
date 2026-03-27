@@ -1,0 +1,1490 @@
+{
+  "metadata": {
+    "title": "Grade 2",
+    "framework": "Next Generation Science Standards",
+    "source": "http://www.nextgenscience.org/sites/ngss/files/NGSS%20DCI%20Combined%2011.6.13.pdf",
+    "grade_level": "Grade2",
+    "subject_area": "Science",
+    "domain": "Science",
+    "version": "2013",
+    "total_standards": 46,
+    "domains": [
+      "Crosscutting Concepts",
+      "Disciplinary Core Ideas",
+      "Science and Engineering Practices",
+      "Engineering Design",
+      "Earth's Systems",
+      "Earth's Place in the Universe",
+      "Biological Evolution: Unity and Diversity",
+      "Ecosystems: Interactions, Energy, and Dynamics",
+      "Matter and its Interactions"
+    ],
+    "created_at": "2026-03-27",
+    "notes": "Auto-ingested from Common Standards Project (set 71E5AA409D894EB0B43A8CD82F727BFE_D2454348_grade-02). Node structure matches KnowledgeNode in knowledge_zome/integrity/src/lib.rs."
+  },
+  "nodes": [
+    {
+      "id": "CCC.10.K-2.1",
+      "title": "Scientists study the natural and material world",
+      "description": "Scientists study the natural and material world.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Crosscutting Concepts",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "CCC.10.K-2.1",
+          "description": "Scientists study the natural and material world.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCC.8.K-2.3",
+      "title": "Developing and using technology has impacts on the natural world",
+      "description": "Developing and using technology has impacts on the natural world.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Crosscutting Concepts",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "CCC.8.K-2.3",
+          "description": "Developing and using technology has impacts on the natural world.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCC.8.K-2.2",
+      "title": "Every human-made product is designed by applying some knowledge of the natura...",
+      "description": "Every human-made product is designed by applying some knowledge of the natural world and is built using materials derived from the natural world.",
+      "node_type": "Project",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Crosscutting Concepts",
+      "tags": [],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "CCC.8.K-2.2",
+          "description": "Every human-made product is designed by applying some knowledge of the natural world and is built using materials derived from the natural world.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCC.7.K-2.1",
+      "title": "Things may change slowly or rapidly",
+      "description": "Things may change slowly or rapidly.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Crosscutting Concepts",
+      "tags": [],
+      "estimated_hours": 4,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Remember",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "CCC.7.K-2.1",
+          "description": "Things may change slowly or rapidly.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCC.6.K-2.1",
+      "title": "The shape and stability of structures of natural and designed objects are rel...",
+      "description": "The shape and stability of structures of natural and designed objects are related to their function(s).",
+      "node_type": "Project",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Crosscutting Concepts",
+      "tags": [],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "CCC.6.K-2.1",
+          "description": "The shape and stability of structures of natural and designed objects are related to their function(s).",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCC.5.K-2.1",
+      "title": "Objects may break into smaller pieces and be put together into larger pieces,...",
+      "description": "Objects may break into smaller pieces and be put together into larger pieces, or change shapes.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Crosscutting Concepts",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "CCC.5.K-2.1",
+          "description": "Objects may break into smaller pieces and be put together into larger pieces, or change shapes.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCC.2.K-2.2",
+      "title": "Events have causes that generate observable patterns",
+      "description": "Events have causes that generate observable patterns.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Crosscutting Concepts",
+      "tags": [
+        "patterns"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "CCC.2.K-2.2",
+          "description": "Events have causes that generate observable patterns.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCC.2.K-2.1",
+      "title": "Simple tests can be designed to gather evidence to support or refute student ...",
+      "description": "Simple tests can be designed to gather evidence to support or refute student ideas about causes.",
+      "node_type": "Project",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Crosscutting Concepts",
+      "tags": [
+        "evidence"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "CCC.2.K-2.1",
+          "description": "Simple tests can be designed to gather evidence to support or refute student ideas about causes.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCC.1.K-2.4",
+      "title": "Patterns in the natural world can be observed",
+      "description": "Patterns in the natural world can be observed.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Crosscutting Concepts",
+      "tags": [
+        "patterns"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "CCC.1.K-2.4",
+          "description": "Patterns in the natural world can be observed.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCC.1.K-2.3",
+      "title": "Patterns in the natural and human designed world can be observed",
+      "description": "Patterns in the natural and human designed world can be observed.",
+      "node_type": "Project",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Crosscutting Concepts",
+      "tags": [
+        "patterns"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "CCC.1.K-2.3",
+          "description": "Patterns in the natural and human designed world can be observed.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "DCI.ETS1.C.K-2.1",
+      "title": "Because there is always more than one possible solution to a problem, it is u...",
+      "description": "Because there is always more than one possible solution to a problem, it is useful to compare and test designs.",
+      "node_type": "Project",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.ETS1.C.K-2.1",
+          "description": "Because there is always more than one possible solution to a problem, it is useful to compare and test designs.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "DCI.ETS1.A.K-2.3",
+      "title": "Before beginning to design a solution, it is important to clearly understand ...",
+      "description": "Before beginning to design a solution, it is important to clearly understand the problem.",
+      "node_type": "Project",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.ETS1.A.K-2.3",
+          "description": "Before beginning to design a solution, it is important to clearly understand the problem.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "DCI.ETS1.A.K-2.2",
+      "title": "A situation that people want to change or create can be approached as a probl...",
+      "description": "A situation that people want to change or create can be approached as a problem to be solved through engineering.",
+      "node_type": "Project",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.ETS1.A.K-2.2",
+          "description": "A situation that people want to change or create can be approached as a problem to be solved through engineering.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "DCI.ETS1.A.K-2.1",
+      "title": "Asking questions, making observations, and gathering information are helpful ...",
+      "description": "Asking questions, making observations, and gathering information are helpful in thinking about problems.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [
+        "observation"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.ETS1.A.K-2.1",
+          "description": "Asking questions, making observations, and gathering information are helpful in thinking about problems.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "DCI.ESS2.C.K-2.1",
+      "title": "Water is found in the ocean, rivers, lakes, and ponds",
+      "description": "Water is found in the ocean, rivers, lakes, and ponds. Water exists as solid ice and in liquid form.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.ESS2.C.K-2.1",
+          "description": "Water is found in the ocean, rivers, lakes, and ponds. Water exists as solid ice and in liquid form.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "DCI.ESS2.B.K-2.1",
+      "title": "Maps show where things are located",
+      "description": "Maps show where things are located. One can map the shapes and kinds of land and water in any area.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [
+        "area"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.ESS2.B.K-2.1",
+          "description": "Maps show where things are located. One can map the shapes and kinds of land and water in any area.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "DCI.ESS2.A.K-2.1",
+      "title": "Wind and water can change the shape of the land",
+      "description": "Wind and water can change the shape of the land.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.ESS2.A.K-2.1",
+          "description": "Wind and water can change the shape of the land.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "DCI.ESS1.C.K-2.1",
+      "title": "Some events happen very quickly",
+      "description": "Some events happen very quickly; others occur very slowly, over a time period much longer than one can observe.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.ESS1.C.K-2.1",
+          "description": "Some events happen very quickly; others occur very slowly, over a time period much longer than one can observe.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "DCI.LS4.D.K-2.1",
+      "title": "There are many different kinds of living things in any area, and they exist i...",
+      "description": "There are many different kinds of living things in any area, and they exist in different places on land and in water.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [
+        "area"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.LS4.D.K-2.1",
+          "description": "There are many different kinds of living things in any area, and they exist in different places on land and in water.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "DCI.LS2.A.K-2.2",
+      "title": "Plants depend on animals for pollination or to move their seeds around",
+      "description": "Plants depend on animals for pollination or to move their seeds around.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.LS2.A.K-2.2",
+          "description": "Plants depend on animals for pollination or to move their seeds around.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "DCI.LS2.A.K-2.1",
+      "title": "Plants depend on water and light to grow",
+      "description": "Plants depend on water and light to grow.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.LS2.A.K-2.1",
+          "description": "Plants depend on water and light to grow.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "DCI.PS1.B.K-2.1",
+      "title": "Heating or cooling a substance may cause changes that can be observed",
+      "description": "Heating or cooling a substance may cause changes that can be observed. Sometimes these changes are reversible, and sometimes they are not.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.PS1.B.K-2.1",
+          "description": "Heating or cooling a substance may cause changes that can be observed. Sometimes these changes are reversible, and sometimes they are not.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "DCI.PS1.A.K-2.3",
+      "title": "A great variety of objects can be built up from a small set of pieces",
+      "description": "A great variety of objects can be built up from a small set of pieces.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.PS1.A.K-2.3",
+          "description": "A great variety of objects can be built up from a small set of pieces.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "DCI.PS1.A.K-2.2",
+      "title": "Different properties are suited to different purposes",
+      "description": "Different properties are suited to different purposes.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.PS1.A.K-2.2",
+          "description": "Different properties are suited to different purposes.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "DCI.PS1.A.K-2.1",
+      "title": "Different kinds of matter exist and many of them can be either solid or liqui...",
+      "description": "Different kinds of matter exist and many of them can be either solid or liquid, depending on temperature. Matter can be described and classified by its observable properties.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [
+        "matter"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.PS1.A.K-2.1",
+          "description": "Different kinds of matter exist and many of them can be either solid or liquid, depending on temperature. Matter can be described and classified by its observable properties.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "SEP.11.1",
+      "title": "Scientists search for cause and effect relationships to explain natural events",
+      "description": "Scientists search for cause and effect relationships to explain natural events.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.11.1",
+          "description": "Scientists search for cause and effect relationships to explain natural events.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "SEP.9.1",
+      "title": "Scientists look for patterns and order when making observations about the world",
+      "description": "Scientists look for patterns and order when making observations about the world.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "patterns",
+        "observation"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.9.1",
+          "description": "Scientists look for patterns and order when making observations about the world.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "SEP.7.K-2.5",
+      "title": "Make observations (firsthand or from media) to collect data which can be used...",
+      "description": "Make observations (firsthand or from media) to collect data which can be used to make comparisons.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "data",
+        "observation"
+      ],
+      "estimated_hours": 4,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Remember",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.7.K-2.5",
+          "description": "Make observations (firsthand or from media) to collect data which can be used to make comparisons.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "SEP.7.K-2.4",
+      "title": "Plan and conduct an investigation collaboratively to produce data to serve as...",
+      "description": "Plan and conduct an investigation collaboratively to produce data to serve as the basis for evidence to answer a question.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "data",
+        "evidence"
+      ],
+      "estimated_hours": 4,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Remember",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.7.K-2.4",
+          "description": "Plan and conduct an investigation collaboratively to produce data to serve as the basis for evidence to answer a question.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "SEP.7.K-2",
+      "title": "Planning and carrying out investigations to answer questions or test solution...",
+      "description": "Planning and carrying out investigations to answer questions or test solutions to problems in K–2 builds on prior experiences and progresses to simple investigations, based on fair tests, which provide data to support explanations or design solutions.",
+      "node_type": "Project",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "data"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.7.K-2",
+          "description": "Planning and carrying out investigations to answer questions or test solutions to problems in K–2 builds on prior experiences and progresses to simple investigations, based on fair tests, which provide data to support explanations or design solutions.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "SEP.6.K-2.4",
+      "title": "Obtain information using various texts, text features (e",
+      "description": "Obtain information using various texts, text features (e.g., headings, tables of contents, glossaries, electronic menus, icons), and other media that will be useful in answering a scientific question.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "scientific"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.6.K-2.4",
+          "description": "Obtain information using various texts, text features (e.g., headings, tables of contents, glossaries, electronic menus, icons), and other media that will be useful in answering a scientific question.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "SEP.6.K-2",
+      "title": "Obtaining, evaluating, and communicating information in K–2 builds on prior...",
+      "description": "Obtaining, evaluating, and communicating information in K–2 builds on prior experiences and uses observations and texts to communicate new information.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "observation"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.6.K-2",
+          "description": "Obtaining, evaluating, and communicating information in K–2 builds on prior experiences and uses observations and texts to communicate new information.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "SEP.5.K-2.1",
+      "title": "Construct an argument with evidence to support a claim",
+      "description": "Construct an argument with evidence to support a claim.",
+      "node_type": "Project",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "argument",
+        "evidence"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.5.K-2.1",
+          "description": "Construct an argument with evidence to support a claim.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "SEP.5.K-2",
+      "title": "Engaging in argument from evidence in K–2 builds on prior experiences and p...",
+      "description": "Engaging in argument from evidence in K–2 builds on prior experiences and progresses to comparing ideas and representations about the natural and designed world(s).",
+      "node_type": "Project",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "argument",
+        "evidence"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.5.K-2",
+          "description": "Engaging in argument from evidence in K–2 builds on prior experiences and progresses to comparing ideas and representations about the natural and designed world(s).",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "SEP.4.K-2.3",
+      "title": "Develop a model to represent patterns in the natural world",
+      "description": "Develop a model to represent patterns in the natural world.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "patterns"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.4.K-2.3",
+          "description": "Develop a model to represent patterns in the natural world.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "SEP.4.K-2.2",
+      "title": "Develop a simple model based on evidence to represent a proposed object or tool",
+      "description": "Develop a simple model based on evidence to represent a proposed object or tool.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "evidence"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.4.K-2.2",
+          "description": "Develop a simple model based on evidence to represent a proposed object or tool.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "SEP.4.K-2",
+      "title": "Modeling in K–2 builds on prior experiences and progresses to include using...",
+      "description": "Modeling in K–2 builds on prior experiences and progresses to include using and developing models (i.e., diagram, drawing, physical replica, diorama, dramatization, storyboard) that represent concrete events or design solutions.",
+      "node_type": "Project",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.4.K-2",
+          "description": "Modeling in K–2 builds on prior experiences and progresses to include using and developing models (i.e., diagram, drawing, physical replica, diorama, dramatization, storyboard) that represent concrete events or design solutions.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "SEP.3.K-2.6",
+      "title": "Compare multiple solutions to a problem",
+      "description": "Compare multiple solutions to a problem.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.3.K-2.6",
+          "description": "Compare multiple solutions to a problem.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "SEP.3.K-2.5",
+      "title": "Make observations from several sources to construct an evidence-based account...",
+      "description": "Make observations from several sources to construct an evidence-based account for natural phenomena.",
+      "node_type": "Project",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "evidence",
+        "observation"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.3.K-2.5",
+          "description": "Make observations from several sources to construct an evidence-based account for natural phenomena.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "SEP.3.K-2.2",
+      "title": "Make observations (firsthand or from media) to construct an evidence-based ac...",
+      "description": "Make observations (firsthand or from media) to construct an evidence-based account for natural phenomena.",
+      "node_type": "Project",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "evidence",
+        "observation"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.3.K-2.2",
+          "description": "Make observations (firsthand or from media) to construct an evidence-based account for natural phenomena.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "SEP.3.K-2",
+      "title": "Constructing explanations and designing solutions in K–2 builds on prior ex...",
+      "description": "Constructing explanations and designing solutions in K–2 builds on prior experiences and progresses to the use of evidence and ideas in constructing evidence-based accounts of natural phenomena and designing solutions.",
+      "node_type": "Project",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "evidence"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.3.K-2",
+          "description": "Constructing explanations and designing solutions in K–2 builds on prior experiences and progresses to the use of evidence and ideas in constructing evidence-based accounts of natural phenomena and designing solutions.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "SEP.2.K-2.3",
+      "title": "Define a simple problem that can be solved through the development of a new o...",
+      "description": "Define a simple problem that can be solved through the development of a new or improved object or tool.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.2.K-2.3",
+          "description": "Define a simple problem that can be solved through the development of a new or improved object or tool.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "SEP.2.K-2.2",
+      "title": "Ask questions based on observations to find more information about the natura...",
+      "description": "Ask questions based on observations to find more information about the natural and/or designed world(s).",
+      "node_type": "Project",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "observation"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.2.K-2.2",
+          "description": "Ask questions based on observations to find more information about the natural and/or designed world(s).",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "SEP.2.K-2",
+      "title": "Asking questions and defining problems in grades K–2 builds on prior experi...",
+      "description": "Asking questions and defining problems in grades K–2 builds on prior experiences and progresses to simple descriptive questions that can be tested.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.2.K-2",
+          "description": "Asking questions and defining problems in grades K–2 builds on prior experiences and progresses to simple descriptive questions that can be tested.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "SEP.1.K-2.1",
+      "title": "Analyze data from tests of an object or tool to determine if it works as inte...",
+      "description": "Analyze data from tests of an object or tool to determine if it works as intended.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "data"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.1.K-2.1",
+          "description": "Analyze data from tests of an object or tool to determine if it works as intended.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "SEP.1.K-2",
+      "title": "Analyzing data in K–2 builds on prior experiences and progresses to collect...",
+      "description": "Analyzing data in K–2 builds on prior experiences and progresses to collecting, recording, and sharing observations.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "data",
+        "observation"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.1.K-2",
+          "description": "Analyzing data in K–2 builds on prior experiences and progresses to collecting, recording, and sharing observations.",
+          "grade_level": "Grade2"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "CCC.1.K-2.3",
+      "to": "CCC.1.K-2.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCC.1.K-2.3 is a prerequisite for CCC.1.K-2.4 within the same domain."
+    },
+    {
+      "from": "CCC.1.K-2.4",
+      "to": "CCC.2.K-2.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCC.1.K-2.4 is a prerequisite for CCC.2.K-2.1 within the same domain."
+    },
+    {
+      "from": "CCC.2.K-2.1",
+      "to": "CCC.2.K-2.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCC.2.K-2.1 is a prerequisite for CCC.2.K-2.2 within the same domain."
+    },
+    {
+      "from": "CCC.2.K-2.2",
+      "to": "CCC.5.K-2.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCC.2.K-2.2 is a prerequisite for CCC.5.K-2.1 within the same domain."
+    },
+    {
+      "from": "CCC.5.K-2.1",
+      "to": "CCC.6.K-2.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCC.5.K-2.1 is a prerequisite for CCC.6.K-2.1 within the same domain."
+    },
+    {
+      "from": "CCC.6.K-2.1",
+      "to": "CCC.7.K-2.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCC.6.K-2.1 is a prerequisite for CCC.7.K-2.1 within the same domain."
+    },
+    {
+      "from": "CCC.7.K-2.1",
+      "to": "CCC.8.K-2.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCC.7.K-2.1 is a prerequisite for CCC.8.K-2.2 within the same domain."
+    },
+    {
+      "from": "CCC.8.K-2.2",
+      "to": "CCC.8.K-2.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCC.8.K-2.2 is a prerequisite for CCC.8.K-2.3 within the same domain."
+    },
+    {
+      "from": "CCC.8.K-2.3",
+      "to": "CCC.10.K-2.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCC.8.K-2.3 is a prerequisite for CCC.10.K-2.1 within the same domain."
+    },
+    {
+      "from": "DCI.PS1.A.K-2.1",
+      "to": "DCI.PS1.A.K-2.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.PS1.A.K-2.1 is a prerequisite for DCI.PS1.A.K-2.2 within the same domain."
+    },
+    {
+      "from": "DCI.PS1.A.K-2.2",
+      "to": "DCI.PS1.A.K-2.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.PS1.A.K-2.2 is a prerequisite for DCI.PS1.A.K-2.3 within the same domain."
+    },
+    {
+      "from": "DCI.PS1.A.K-2.3",
+      "to": "DCI.PS1.B.K-2.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.PS1.A.K-2.3 is a prerequisite for DCI.PS1.B.K-2.1 within the same domain."
+    },
+    {
+      "from": "DCI.PS1.B.K-2.1",
+      "to": "DCI.LS2.A.K-2.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.PS1.B.K-2.1 is a prerequisite for DCI.LS2.A.K-2.1 within the same domain."
+    },
+    {
+      "from": "DCI.LS2.A.K-2.1",
+      "to": "DCI.LS2.A.K-2.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.LS2.A.K-2.1 is a prerequisite for DCI.LS2.A.K-2.2 within the same domain."
+    },
+    {
+      "from": "DCI.LS2.A.K-2.2",
+      "to": "DCI.LS4.D.K-2.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.LS2.A.K-2.2 is a prerequisite for DCI.LS4.D.K-2.1 within the same domain."
+    },
+    {
+      "from": "DCI.LS4.D.K-2.1",
+      "to": "DCI.ESS1.C.K-2.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.LS4.D.K-2.1 is a prerequisite for DCI.ESS1.C.K-2.1 within the same domain."
+    },
+    {
+      "from": "DCI.ESS1.C.K-2.1",
+      "to": "DCI.ESS2.A.K-2.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.ESS1.C.K-2.1 is a prerequisite for DCI.ESS2.A.K-2.1 within the same domain."
+    },
+    {
+      "from": "DCI.ESS2.A.K-2.1",
+      "to": "DCI.ESS2.B.K-2.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.ESS2.A.K-2.1 is a prerequisite for DCI.ESS2.B.K-2.1 within the same domain."
+    },
+    {
+      "from": "DCI.ESS2.B.K-2.1",
+      "to": "DCI.ESS2.C.K-2.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.ESS2.B.K-2.1 is a prerequisite for DCI.ESS2.C.K-2.1 within the same domain."
+    },
+    {
+      "from": "DCI.ESS2.C.K-2.1",
+      "to": "DCI.ETS1.A.K-2.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.ESS2.C.K-2.1 is a prerequisite for DCI.ETS1.A.K-2.1 within the same domain."
+    },
+    {
+      "from": "DCI.ETS1.A.K-2.1",
+      "to": "DCI.ETS1.A.K-2.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.ETS1.A.K-2.1 is a prerequisite for DCI.ETS1.A.K-2.2 within the same domain."
+    },
+    {
+      "from": "DCI.ETS1.A.K-2.2",
+      "to": "DCI.ETS1.A.K-2.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.ETS1.A.K-2.2 is a prerequisite for DCI.ETS1.A.K-2.3 within the same domain."
+    },
+    {
+      "from": "DCI.ETS1.A.K-2.3",
+      "to": "DCI.ETS1.C.K-2.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.ETS1.A.K-2.3 is a prerequisite for DCI.ETS1.C.K-2.1 within the same domain."
+    },
+    {
+      "from": "SEP.1.K-2",
+      "to": "SEP.1.K-2.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.1.K-2 is a prerequisite for SEP.1.K-2.1 within the same domain."
+    },
+    {
+      "from": "SEP.1.K-2.1",
+      "to": "SEP.2.K-2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.1.K-2.1 is a prerequisite for SEP.2.K-2 within the same domain."
+    },
+    {
+      "from": "SEP.2.K-2",
+      "to": "SEP.2.K-2.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.2.K-2 is a prerequisite for SEP.2.K-2.2 within the same domain."
+    },
+    {
+      "from": "SEP.2.K-2.2",
+      "to": "SEP.2.K-2.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.2.K-2.2 is a prerequisite for SEP.2.K-2.3 within the same domain."
+    },
+    {
+      "from": "SEP.2.K-2.3",
+      "to": "SEP.3.K-2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.2.K-2.3 is a prerequisite for SEP.3.K-2 within the same domain."
+    },
+    {
+      "from": "SEP.3.K-2",
+      "to": "SEP.3.K-2.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.3.K-2 is a prerequisite for SEP.3.K-2.2 within the same domain."
+    },
+    {
+      "from": "SEP.3.K-2.2",
+      "to": "SEP.3.K-2.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.3.K-2.2 is a prerequisite for SEP.3.K-2.5 within the same domain."
+    },
+    {
+      "from": "SEP.3.K-2.5",
+      "to": "SEP.3.K-2.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.3.K-2.5 is a prerequisite for SEP.3.K-2.6 within the same domain."
+    },
+    {
+      "from": "SEP.3.K-2.6",
+      "to": "SEP.4.K-2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.3.K-2.6 is a prerequisite for SEP.4.K-2 within the same domain."
+    },
+    {
+      "from": "SEP.4.K-2",
+      "to": "SEP.4.K-2.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.4.K-2 is a prerequisite for SEP.4.K-2.2 within the same domain."
+    },
+    {
+      "from": "SEP.4.K-2.2",
+      "to": "SEP.4.K-2.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.4.K-2.2 is a prerequisite for SEP.4.K-2.3 within the same domain."
+    },
+    {
+      "from": "SEP.4.K-2.3",
+      "to": "SEP.5.K-2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.4.K-2.3 is a prerequisite for SEP.5.K-2 within the same domain."
+    },
+    {
+      "from": "SEP.5.K-2",
+      "to": "SEP.5.K-2.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.5.K-2 is a prerequisite for SEP.5.K-2.1 within the same domain."
+    },
+    {
+      "from": "SEP.5.K-2.1",
+      "to": "SEP.6.K-2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.5.K-2.1 is a prerequisite for SEP.6.K-2 within the same domain."
+    },
+    {
+      "from": "SEP.6.K-2",
+      "to": "SEP.6.K-2.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.6.K-2 is a prerequisite for SEP.6.K-2.4 within the same domain."
+    },
+    {
+      "from": "SEP.6.K-2.4",
+      "to": "SEP.7.K-2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.6.K-2.4 is a prerequisite for SEP.7.K-2 within the same domain."
+    },
+    {
+      "from": "SEP.7.K-2",
+      "to": "SEP.7.K-2.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.7.K-2 is a prerequisite for SEP.7.K-2.4 within the same domain."
+    },
+    {
+      "from": "SEP.7.K-2.4",
+      "to": "SEP.7.K-2.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.7.K-2.4 is a prerequisite for SEP.7.K-2.5 within the same domain."
+    },
+    {
+      "from": "SEP.7.K-2.5",
+      "to": "SEP.9.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.7.K-2.5 is a prerequisite for SEP.9.1 within the same domain."
+    },
+    {
+      "from": "SEP.9.1",
+      "to": "SEP.11.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.9.1 is a prerequisite for SEP.11.1 within the same domain."
+    }
+  ]
+}

@@ -1,0 +1,857 @@
+{
+  "metadata": {
+    "title": "Grade 5",
+    "framework": "Common Core State Standards",
+    "source": "http://www.corestandards.org/assets/CCSSI_Math%20Standards.pdf",
+    "grade_level": "Grade5",
+    "subject_area": "Mathematics",
+    "domain": "Mathematics",
+    "version": "2010",
+    "total_standards": 26,
+    "domains": [
+      "Number and Operations—Fractions",
+      "Geometry",
+      "Measurement and Data",
+      "Number and Operations in Base Ten",
+      "Operations and Algebraic Thinking",
+      "Standards for Mathematical Practice"
+    ],
+    "created_at": "2026-03-27",
+    "notes": "Auto-ingested from Common Standards Project (set 67810E9EF6944F9383DCC602A3484C23_D10003FB_grade-05). Node structure matches KnowledgeNode in knowledge_zome/integrity/src/lib.rs."
+  },
+  "nodes": [
+    {
+      "id": "CCSS.Math.Content.5.NF.B.7",
+      "title": "Apply and extend previous understandings of division to divide unit fractions...",
+      "description": "Apply and extend previous understandings of division to divide unit fractions by whole numbers and whole numbers by unit fractions.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations—Fractions",
+      "tags": [
+        "division",
+        "fractions"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.5.NF.B.7",
+          "description": "Apply and extend previous understandings of division to divide unit fractions by whole numbers and whole numbers by unit fractions.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.5.NF.B.6",
+      "title": "Solve real world problems involving multiplication of fractions and mixed num...",
+      "description": "Solve real world problems involving multiplication of fractions and mixed numbers, e.g., by using visual fraction models or equations to represent the problem.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations—Fractions",
+      "tags": [
+        "multiplication",
+        "fractions",
+        "equations"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.5.NF.B.6",
+          "description": "Solve real world problems involving multiplication of fractions and mixed numbers, e.g., by using visual fraction models or equations to represent the problem.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.5.NF.B.5",
+      "title": "Interpret multiplication as scaling (resizing), by:",
+      "description": "Interpret multiplication as scaling (resizing), by:",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations—Fractions",
+      "tags": [
+        "multiplication"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.5.NF.B.5",
+          "description": "Interpret multiplication as scaling (resizing), by:",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.5.NF.B.4",
+      "title": "Apply and extend previous understandings of multiplication to multiply a frac...",
+      "description": "Apply and extend previous understandings of multiplication to multiply a fraction or whole number by a fraction.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations—Fractions",
+      "tags": [
+        "multiplication"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.5.NF.B.4",
+          "description": "Apply and extend previous understandings of multiplication to multiply a fraction or whole number by a fraction.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.5.NF.B.3",
+      "title": "Interpret a fraction as division of the numerator by the denominator (a/b = a...",
+      "description": "Interpret a fraction as division of the numerator by the denominator (a/b = a ÷ b). Solve word problems involving division of whole numbers leading to answers in the form of fractions or mixed numbers, e.g., by using visual fraction models or equations to represent the problem.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations—Fractions",
+      "tags": [
+        "division",
+        "fractions",
+        "equations"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.5.NF.B.3",
+          "description": "Interpret a fraction as division of the numerator by the denominator (a/b = a ÷ b). Solve word problems involving division of whole numbers leading to answers in the form of fractions or mixed numbers, e.g., by using visual fraction models or equations to represent the problem.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.5.NF.A.2",
+      "title": "Solve word problems involving addition and subtraction of fractions referring...",
+      "description": "Solve word problems involving addition and subtraction of fractions referring to the same whole, including cases of unlike denominators, e.g., by using visual fraction models or equations to represent the problem. Use benchmark fractions and number sense of fractions to estimate mentally and assess the reasonableness of answers.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations—Fractions",
+      "tags": [
+        "addition",
+        "subtraction",
+        "fractions",
+        "equations"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.5.NF.A.2",
+          "description": "Solve word problems involving addition and subtraction of fractions referring to the same whole, including cases of unlike denominators, e.g., by using visual fraction models or equations to represent the problem. Use benchmark fractions and number sense of fractions to estimate mentally and assess the reasonableness of answers.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.5.NF.A.1",
+      "title": "Add and subtract fractions with unlike denominators (including mixed numbers)...",
+      "description": "Add and subtract fractions with unlike denominators (including mixed numbers) by replacing given fractions with equivalent fractions in such a way as to produce an equivalent sum or difference of fractions with like denominators.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations—Fractions",
+      "tags": [
+        "fractions"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.5.NF.A.1",
+          "description": "Add and subtract fractions with unlike denominators (including mixed numbers) by replacing given fractions with equivalent fractions in such a way as to produce an equivalent sum or difference of fractions with like denominators.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.5.G.B.4",
+      "title": "Classify two-dimensional figures in a hierarchy based on properties",
+      "description": "Classify two-dimensional figures in a hierarchy based on properties.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.5.G.B.4",
+          "description": "Classify two-dimensional figures in a hierarchy based on properties.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.5.G.B.3",
+      "title": "Understand that attributes belonging to a category of two-dimensional figures...",
+      "description": "Understand that attributes belonging to a category of two-dimensional figures also belong to all subcategories of that category.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.5.G.B.3",
+          "description": "Understand that attributes belonging to a category of two-dimensional figures also belong to all subcategories of that category.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.5.G.A.2",
+      "title": "Represent real world and mathematical problems by graphing points in the firs...",
+      "description": "Represent real world and mathematical problems by graphing points in the first quadrant of the coordinate plane, and interpret coordinate values of points in the context of the situation.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.5.G.A.2",
+          "description": "Represent real world and mathematical problems by graphing points in the first quadrant of the coordinate plane, and interpret coordinate values of points in the context of the situation.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.5.G.A.1",
+      "title": "Use a pair of perpendicular number lines, called axes, to define a coordinate...",
+      "description": "Use a pair of perpendicular number lines, called axes, to define a coordinate system, with the intersection of the lines (the origin) arranged to coincide with the 0 on each line and a given point in the plane located by using an ordered pair of numbers, called its coordinates. Understand that the first number indicates how far to travel from the origin in the direction of one axis, and the second number indicates how far to travel in the direction of the second axis, with the convention that the names of the two axes and the coordinates correspond (e.g., x-axis and x-coordinate, y-axis and y-coordinate).",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "coordinates"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.5.G.A.1",
+          "description": "Use a pair of perpendicular number lines, called axes, to define a coordinate system, with the intersection of the lines (the origin) arranged to coincide with the 0 on each line and a given point in the plane located by using an ordered pair of numbers, called its coordinates. Understand that the first number indicates how far to travel from the origin in the direction of one axis, and the second number indicates how far to travel in the direction of the second axis, with the convention that the names of the two axes and the coordinates correspond (e.g., x-axis and x-coordinate, y-axis and y-coordinate).",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.5.MD.C.5",
+      "title": "Relate volume to the operations of multiplication and addition and solve real...",
+      "description": "Relate volume to the operations of multiplication and addition and solve real world and mathematical problems involving volume.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [
+        "addition",
+        "multiplication",
+        "volume"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.5.MD.C.5",
+          "description": "Relate volume to the operations of multiplication and addition and solve real world and mathematical problems involving volume.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.5.MD.C.4",
+      "title": "Measure volumes by counting unit cubes, using cubic cm, cubic in, cubic ft, a...",
+      "description": "Measure volumes by counting unit cubes, using cubic cm, cubic in, cubic ft, and improvised units.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [
+        "volume"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.5.MD.C.4",
+          "description": "Measure volumes by counting unit cubes, using cubic cm, cubic in, cubic ft, and improvised units.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.5.MD.C.3",
+      "title": "Recognize volume as an attribute of solid figures and understand concepts of ...",
+      "description": "Recognize volume as an attribute of solid figures and understand concepts of volume measurement.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [
+        "measurement",
+        "volume"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.5.MD.C.3",
+          "description": "Recognize volume as an attribute of solid figures and understand concepts of volume measurement.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.5.MD.B.2",
+      "title": "Make a line plot to display a data set of measurements in fractions of a unit...",
+      "description": "Make a line plot to display a data set of measurements in fractions of a unit (1/2, 1/4, 1/8). Use operations on fractions for this grade to solve problems involving information presented in line plots.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [
+        "fractions",
+        "measurement",
+        "data"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.5.MD.B.2",
+          "description": "Make a line plot to display a data set of measurements in fractions of a unit (1/2, 1/4, 1/8). Use operations on fractions for this grade to solve problems involving information presented in line plots.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.5.MD.A.1",
+      "title": "Convert among different-sized standard measurement units within a given measu...",
+      "description": "Convert among different-sized standard measurement units within a given measurement system (e.g., convert 5 cm to 0.05 m), and use these conversions in solving multi-step, real world problems.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [
+        "measurement"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.5.MD.A.1",
+          "description": "Convert among different-sized standard measurement units within a given measurement system (e.g., convert 5 cm to 0.05 m), and use these conversions in solving multi-step, real world problems.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.5.NBT.B.7",
+      "title": "Add, subtract, multiply, and divide decimals to hundredths, using concrete mo...",
+      "description": "Add, subtract, multiply, and divide decimals to hundredths, using concrete models or drawings and strategies based on place value, properties of operations, and/or the relationship between addition and subtraction; relate the strategy to a written method and explain the reasoning used.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations in Base Ten",
+      "tags": [
+        "addition",
+        "subtraction",
+        "decimals"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.5.NBT.B.7",
+          "description": "Add, subtract, multiply, and divide decimals to hundredths, using concrete models or drawings and strategies based on place value, properties of operations, and/or the relationship between addition and subtraction; relate the strategy to a written method and explain the reasoning used.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.5.NBT.B.6",
+      "title": "Find whole-number quotients of whole numbers with up to four-digit dividends ...",
+      "description": "Find whole-number quotients of whole numbers with up to four-digit dividends and two-digit divisors, using strategies based on place value, the properties of operations, and/or the relationship between multiplication and division. Illustrate and explain the calculation by using equations, rectangular arrays, and/or area models.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations in Base Ten",
+      "tags": [
+        "multiplication",
+        "division",
+        "equations",
+        "area"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.5.NBT.B.6",
+          "description": "Find whole-number quotients of whole numbers with up to four-digit dividends and two-digit divisors, using strategies based on place value, the properties of operations, and/or the relationship between multiplication and division. Illustrate and explain the calculation by using equations, rectangular arrays, and/or area models.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.5.NBT.B.5",
+      "title": "Fluently multiply multi-digit whole numbers using the standard algorithm",
+      "description": "Fluently multiply multi-digit whole numbers using the standard algorithm.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations in Base Ten",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.5.NBT.B.5",
+          "description": "Fluently multiply multi-digit whole numbers using the standard algorithm.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.5.NBT.A.4",
+      "title": "Use place value understanding to round decimals to any place",
+      "description": "Use place value understanding to round decimals to any place.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations in Base Ten",
+      "tags": [
+        "decimals"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.5.NBT.A.4",
+          "description": "Use place value understanding to round decimals to any place.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.5.NBT.A.3",
+      "title": "Read, write, and compare decimals to thousandths",
+      "description": "Read, write, and compare decimals to thousandths.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations in Base Ten",
+      "tags": [
+        "decimals"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.5.NBT.A.3",
+          "description": "Read, write, and compare decimals to thousandths.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.5.NBT.A.2",
+      "title": "Explain patterns in the number of zeros of the product when multiplying a num...",
+      "description": "Explain patterns in the number of zeros of the product when multiplying a number by powers of 10, and explain patterns in the placement of the decimal point when a decimal is multiplied or divided by a power of 10. Use whole-number exponents to denote powers of 10.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations in Base Ten",
+      "tags": [
+        "patterns"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.5.NBT.A.2",
+          "description": "Explain patterns in the number of zeros of the product when multiplying a number by powers of 10, and explain patterns in the placement of the decimal point when a decimal is multiplied or divided by a power of 10. Use whole-number exponents to denote powers of 10.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.5.NBT.A.1",
+      "title": "Recognize that in a multi-digit number, a digit in one place represents 10 ti...",
+      "description": "Recognize that in a multi-digit number, a digit in one place represents 10 times as much as it represents in the place to its right and 1/10 of what it represents in the place to its left.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations in Base Ten",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.5.NBT.A.1",
+          "description": "Recognize that in a multi-digit number, a digit in one place represents 10 times as much as it represents in the place to its right and 1/10 of what it represents in the place to its left.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.5.OA.B.3",
+      "title": "Generate two numerical patterns using two given rules",
+      "description": "Generate two numerical patterns using two given rules. Identify apparent relationships between corresponding terms. Form ordered pairs consisting of corresponding terms from the two patterns, and graph the ordered pairs on a coordinate plane.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Operations and Algebraic Thinking",
+      "tags": [
+        "patterns"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.5.OA.B.3",
+          "description": "Generate two numerical patterns using two given rules. Identify apparent relationships between corresponding terms. Form ordered pairs consisting of corresponding terms from the two patterns, and graph the ordered pairs on a coordinate plane.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.5.OA.A.2",
+      "title": "Write simple expressions that record calculations with numbers, and interpret...",
+      "description": "Write simple expressions that record calculations with numbers, and interpret numerical expressions without evaluating them.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Operations and Algebraic Thinking",
+      "tags": [
+        "expressions"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.5.OA.A.2",
+          "description": "Write simple expressions that record calculations with numbers, and interpret numerical expressions without evaluating them.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.5.OA.A.1",
+      "title": "Use parentheses, brackets, or braces in numerical expressions, and evaluate e...",
+      "description": "Use parentheses, brackets, or braces in numerical expressions, and evaluate expressions with these symbols.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Operations and Algebraic Thinking",
+      "tags": [
+        "expressions"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.5.OA.A.1",
+          "description": "Use parentheses, brackets, or braces in numerical expressions, and evaluate expressions with these symbols.",
+          "grade_level": "Grade5"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "CCSS.Math.Content.5.OA.A.1",
+      "to": "CCSS.Math.Content.5.OA.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.5.OA.A.1 is a prerequisite for CCSS.Math.Content.5.OA.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.5.OA.A.2",
+      "to": "CCSS.Math.Content.5.OA.B.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.5.OA.A.2 is a prerequisite for CCSS.Math.Content.5.OA.B.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.5.MD.A.1",
+      "to": "CCSS.Math.Content.5.MD.B.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.5.MD.A.1 is a prerequisite for CCSS.Math.Content.5.MD.B.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.5.MD.B.2",
+      "to": "CCSS.Math.Content.5.MD.C.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.5.MD.B.2 is a prerequisite for CCSS.Math.Content.5.MD.C.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.5.MD.C.3",
+      "to": "CCSS.Math.Content.5.MD.C.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.5.MD.C.3 is a prerequisite for CCSS.Math.Content.5.MD.C.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.5.MD.C.4",
+      "to": "CCSS.Math.Content.5.MD.C.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.5.MD.C.4 is a prerequisite for CCSS.Math.Content.5.MD.C.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.5.G.A.1",
+      "to": "CCSS.Math.Content.5.G.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.5.G.A.1 is a prerequisite for CCSS.Math.Content.5.G.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.5.G.A.2",
+      "to": "CCSS.Math.Content.5.G.B.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.5.G.A.2 is a prerequisite for CCSS.Math.Content.5.G.B.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.5.G.B.3",
+      "to": "CCSS.Math.Content.5.G.B.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.5.G.B.3 is a prerequisite for CCSS.Math.Content.5.G.B.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.5.NF.A.1",
+      "to": "CCSS.Math.Content.5.NF.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.5.NF.A.1 is a prerequisite for CCSS.Math.Content.5.NF.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.5.NF.A.2",
+      "to": "CCSS.Math.Content.5.NF.B.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.5.NF.A.2 is a prerequisite for CCSS.Math.Content.5.NF.B.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.5.NF.B.3",
+      "to": "CCSS.Math.Content.5.NF.B.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.5.NF.B.3 is a prerequisite for CCSS.Math.Content.5.NF.B.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.5.NF.B.4",
+      "to": "CCSS.Math.Content.5.NF.B.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.5.NF.B.4 is a prerequisite for CCSS.Math.Content.5.NF.B.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.5.NF.B.5",
+      "to": "CCSS.Math.Content.5.NF.B.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.5.NF.B.5 is a prerequisite for CCSS.Math.Content.5.NF.B.6 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.5.NF.B.6",
+      "to": "CCSS.Math.Content.5.NF.B.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.5.NF.B.6 is a prerequisite for CCSS.Math.Content.5.NF.B.7 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.5.NBT.A.1",
+      "to": "CCSS.Math.Content.5.NBT.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.5.NBT.A.1 is a prerequisite for CCSS.Math.Content.5.NBT.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.5.NBT.A.2",
+      "to": "CCSS.Math.Content.5.NBT.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.5.NBT.A.2 is a prerequisite for CCSS.Math.Content.5.NBT.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.5.NBT.A.3",
+      "to": "CCSS.Math.Content.5.NBT.A.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.5.NBT.A.3 is a prerequisite for CCSS.Math.Content.5.NBT.A.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.5.NBT.A.4",
+      "to": "CCSS.Math.Content.5.NBT.B.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.5.NBT.A.4 is a prerequisite for CCSS.Math.Content.5.NBT.B.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.5.NBT.B.5",
+      "to": "CCSS.Math.Content.5.NBT.B.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.5.NBT.B.5 is a prerequisite for CCSS.Math.Content.5.NBT.B.6 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.5.NBT.B.6",
+      "to": "CCSS.Math.Content.5.NBT.B.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.5.NBT.B.6 is a prerequisite for CCSS.Math.Content.5.NBT.B.7 within the same domain."
+    }
+  ]
+}

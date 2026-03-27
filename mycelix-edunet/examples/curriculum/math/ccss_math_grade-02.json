@@ -1,0 +1,833 @@
+{
+  "metadata": {
+    "title": "Grade 2",
+    "framework": "Common Core State Standards",
+    "source": "http://www.corestandards.org/assets/CCSSI_Math%20Standards.pdf",
+    "grade_level": "Grade2",
+    "subject_area": "Mathematics",
+    "domain": "Mathematics",
+    "version": "2010",
+    "total_standards": 26,
+    "domains": [
+      "Geometry",
+      "Measurement and Data",
+      "Number and Operations in Base Ten",
+      "Operations and Algebraic Thinking",
+      "Standards for Mathematical Practice"
+    ],
+    "created_at": "2026-03-27",
+    "notes": "Auto-ingested from Common Standards Project (set 67810E9EF6944F9383DCC602A3484C23_D10003FB_grade-02). Node structure matches KnowledgeNode in knowledge_zome/integrity/src/lib.rs."
+  },
+  "nodes": [
+    {
+      "id": "CCSS.Math.Content.2.G.A.3",
+      "title": "Partition circles and rectangles into two, three, or four equal shares, descr...",
+      "description": "Partition circles and rectangles into two, three, or four equal shares, describe the shares using the words halves, thirds, half of, a third of, etc., and describe the whole as two halves, three thirds, four fourths. Recognize that equal shares of identical wholes need not have the same shape.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "angles"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.2.G.A.3",
+          "description": "Partition circles and rectangles into two, three, or four equal shares, describe the shares using the words halves, thirds, half of, a third of, etc., and describe the whole as two halves, three thirds, four fourths. Recognize that equal shares of identical wholes need not have the same shape.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.2.G.A.2",
+      "title": "Partition a rectangle into rows and columns of same-size squares and count to...",
+      "description": "Partition a rectangle into rows and columns of same-size squares and count to find the total number of them.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.2.G.A.2",
+          "description": "Partition a rectangle into rows and columns of same-size squares and count to find the total number of them.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.2.G.A.1",
+      "title": "Recognize and draw shapes having specified attributes, such as a given number...",
+      "description": "Recognize and draw shapes having specified attributes, such as a given number of angles or a given number of equal faces. Identify triangles, quadrilaterals, pentagons, hexagons, and cubes.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "angles"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.2.G.A.1",
+          "description": "Recognize and draw shapes having specified attributes, such as a given number of angles or a given number of equal faces. Identify triangles, quadrilaterals, pentagons, hexagons, and cubes.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.2.MD.D.10",
+      "title": "Draw a picture graph and a bar graph (with single-unit scale) to represent a ...",
+      "description": "Draw a picture graph and a bar graph (with single-unit scale) to represent a data set with up to four categories. Solve simple put-together, take-apart, and compare problems using information presented in a bar graph.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [
+        "data"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.2.MD.D.10",
+          "description": "Draw a picture graph and a bar graph (with single-unit scale) to represent a data set with up to four categories. Solve simple put-together, take-apart, and compare problems using information presented in a bar graph.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.2.MD.D.9",
+      "title": "Generate measurement data by measuring lengths of several objects to the near...",
+      "description": "Generate measurement data by measuring lengths of several objects to the nearest whole unit, or by making repeated measurements of the same object. Show the measurements by making a line plot, where the horizontal scale is marked off in whole-number units.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [
+        "measurement",
+        "data"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.2.MD.D.9",
+          "description": "Generate measurement data by measuring lengths of several objects to the nearest whole unit, or by making repeated measurements of the same object. Show the measurements by making a line plot, where the horizontal scale is marked off in whole-number units.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.2.MD.C.8",
+      "title": "Solve word problems involving dollar bills, quarters, dimes, nickels, and pen...",
+      "description": "Solve word problems involving dollar bills, quarters, dimes, nickels, and pennies, using $ and ¢ symbols appropriately.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.2.MD.C.8",
+          "description": "Solve word problems involving dollar bills, quarters, dimes, nickels, and pennies, using $ and ¢ symbols appropriately.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.2.MD.C.7",
+      "title": "Tell and write time from analog and digital clocks to the nearest five minute...",
+      "description": "Tell and write time from analog and digital clocks to the nearest five minutes, using a.m. and p.m.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [],
+      "estimated_hours": 4,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Remember",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.2.MD.C.7",
+          "description": "Tell and write time from analog and digital clocks to the nearest five minutes, using a.m. and p.m.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.2.MD.B.6",
+      "title": "Represent whole numbers as lengths from 0 on a number line diagram with equal...",
+      "description": "Represent whole numbers as lengths from 0 on a number line diagram with equally spaced points corresponding to the numbers 0, 1, 2, …, and represent whole-number sums and differences within 100 on a number line diagram.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.2.MD.B.6",
+          "description": "Represent whole numbers as lengths from 0 on a number line diagram with equally spaced points corresponding to the numbers 0, 1, 2, …, and represent whole-number sums and differences within 100 on a number line diagram.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.2.MD.B.5",
+      "title": "Use addition and subtraction within 100 to solve word problems involving leng...",
+      "description": "Use addition and subtraction within 100 to solve word problems involving lengths that are given in the same units, e.g., by using drawings (such as drawings of rulers) and equations with a symbol for the unknown number to represent the problem.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [
+        "addition",
+        "subtraction",
+        "equations"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.2.MD.B.5",
+          "description": "Use addition and subtraction within 100 to solve word problems involving lengths that are given in the same units, e.g., by using drawings (such as drawings of rulers) and equations with a symbol for the unknown number to represent the problem.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.2.MD.A.4",
+      "title": "Measure to determine how much longer one object is than another, expressing t...",
+      "description": "Measure to determine how much longer one object is than another, expressing the length difference in terms of a standard length unit.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.2.MD.A.4",
+          "description": "Measure to determine how much longer one object is than another, expressing the length difference in terms of a standard length unit.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.2.MD.A.3",
+      "title": "Estimate lengths using units of inches, feet, centimeters, and meters",
+      "description": "Estimate lengths using units of inches, feet, centimeters, and meters.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.2.MD.A.3",
+          "description": "Estimate lengths using units of inches, feet, centimeters, and meters.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.2.MD.A.2",
+      "title": "Measure the length of an object twice, using length units of different length...",
+      "description": "Measure the length of an object twice, using length units of different lengths for the two measurements; describe how the two measurements relate to the size of the unit chosen.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [
+        "measurement"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.2.MD.A.2",
+          "description": "Measure the length of an object twice, using length units of different lengths for the two measurements; describe how the two measurements relate to the size of the unit chosen.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.2.MD.A.1",
+      "title": "Measure the length of an object by selecting and using appropriate tools such...",
+      "description": "Measure the length of an object by selecting and using appropriate tools such as rulers, yardsticks, meter sticks, and measuring tapes.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.2.MD.A.1",
+          "description": "Measure the length of an object by selecting and using appropriate tools such as rulers, yardsticks, meter sticks, and measuring tapes.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.2.NBT.B.9",
+      "title": "Explain why addition and subtraction strategies work, using place value and t...",
+      "description": "Explain why addition and subtraction strategies work, using place value and the properties of operations.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations in Base Ten",
+      "tags": [
+        "addition",
+        "subtraction"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.2.NBT.B.9",
+          "description": "Explain why addition and subtraction strategies work, using place value and the properties of operations.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.2.NBT.B.8",
+      "title": "Mentally add 10 or 100 to a given number 100—900, and mentally subtract 10 ...",
+      "description": "Mentally add 10 or 100 to a given number 100—900, and mentally subtract 10 or 100 from a given number 100—900.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations in Base Ten",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.2.NBT.B.8",
+          "description": "Mentally add 10 or 100 to a given number 100—900, and mentally subtract 10 or 100 from a given number 100—900.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.2.NBT.B.7",
+      "title": "Add and subtract within 1000, using concrete models or drawings and strategie...",
+      "description": "Add and subtract within 1000, using concrete models or drawings and strategies based on place value, properties of operations, and/or the relationship between addition and subtraction; relate the strategy to a written method. Understand that in adding or subtracting three-digit numbers, one adds or subtracts hundreds and hundreds, tens and tens, ones and ones; and sometimes it is necessary to compose or decompose tens or hundreds.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations in Base Ten",
+      "tags": [
+        "addition",
+        "subtraction"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.2.NBT.B.7",
+          "description": "Add and subtract within 1000, using concrete models or drawings and strategies based on place value, properties of operations, and/or the relationship between addition and subtraction; relate the strategy to a written method. Understand that in adding or subtracting three-digit numbers, one adds or subtracts hundreds and hundreds, tens and tens, ones and ones; and sometimes it is necessary to compose or decompose tens or hundreds.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.2.NBT.B.6",
+      "title": "Add up to four two-digit numbers using strategies based on place value and pr...",
+      "description": "Add up to four two-digit numbers using strategies based on place value and properties of operations.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations in Base Ten",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.2.NBT.B.6",
+          "description": "Add up to four two-digit numbers using strategies based on place value and properties of operations.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.2.NBT.B.5",
+      "title": "Fluently add and subtract within 100 using strategies based on place value, p...",
+      "description": "Fluently add and subtract within 100 using strategies based on place value, properties of operations, and/or the relationship between addition and subtraction.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations in Base Ten",
+      "tags": [
+        "addition",
+        "subtraction"
+      ],
+      "estimated_hours": 4,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Remember",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.2.NBT.B.5",
+          "description": "Fluently add and subtract within 100 using strategies based on place value, properties of operations, and/or the relationship between addition and subtraction.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.2.NBT.A.4",
+      "title": "Compare two three-digit numbers based on meanings of the hundreds, tens, and ...",
+      "description": "Compare two three-digit numbers based on meanings of the hundreds, tens, and ones digits, using >, =, and < symbols to record the results of comparisons.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations in Base Ten",
+      "tags": [],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.2.NBT.A.4",
+          "description": "Compare two three-digit numbers based on meanings of the hundreds, tens, and ones digits, using >, =, and < symbols to record the results of comparisons.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.2.NBT.A.3",
+      "title": "Read and write numbers to 1000 using base-ten numerals, number names, and exp...",
+      "description": "Read and write numbers to 1000 using base-ten numerals, number names, and expanded form.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations in Base Ten",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.2.NBT.A.3",
+          "description": "Read and write numbers to 1000 using base-ten numerals, number names, and expanded form.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.2.NBT.A.2",
+      "title": "Count within 1000",
+      "description": "Count within 1000; skip-count by 5s, 10s, and 100s.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations in Base Ten",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.2.NBT.A.2",
+          "description": "Count within 1000; skip-count by 5s, 10s, and 100s.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.2.NBT.A.1",
+      "title": "Understand that the three digits of a three-digit number represent amounts of...",
+      "description": "Understand that the three digits of a three-digit number represent amounts of hundreds, tens, and ones; e.g., 706 equals 7 hundreds, 0 tens, and 6 ones. Understand the following as special cases:",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations in Base Ten",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.2.NBT.A.1",
+          "description": "Understand that the three digits of a three-digit number represent amounts of hundreds, tens, and ones; e.g., 706 equals 7 hundreds, 0 tens, and 6 ones. Understand the following as special cases:",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.2.OA.C.4",
+      "title": "Use addition to find the total number of objects arranged in rectangular arra...",
+      "description": "Use addition to find the total number of objects arranged in rectangular arrays with up to 5 rows and up to 5 columns; write an equation to express the total as a sum of equal addends.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Operations and Algebraic Thinking",
+      "tags": [
+        "addition"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.2.OA.C.4",
+          "description": "Use addition to find the total number of objects arranged in rectangular arrays with up to 5 rows and up to 5 columns; write an equation to express the total as a sum of equal addends.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.2.OA.C.3",
+      "title": "Determine whether a group of objects (up to 20) has an odd or even number of ...",
+      "description": "Determine whether a group of objects (up to 20) has an odd or even number of members, e.g., by pairing objects or counting them by 2s; write an equation to express an even number as a sum of two equal addends.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Operations and Algebraic Thinking",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.2.OA.C.3",
+          "description": "Determine whether a group of objects (up to 20) has an odd or even number of members, e.g., by pairing objects or counting them by 2s; write an equation to express an even number as a sum of two equal addends.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.2.OA.B.2",
+      "title": "Fluently add and subtract within 20 using mental strategies",
+      "description": "Fluently add and subtract within 20 using mental strategies. By end of Grade 2, know from memory all sums of two one-digit numbers.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Operations and Algebraic Thinking",
+      "tags": [],
+      "estimated_hours": 4,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Remember",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.2.OA.B.2",
+          "description": "Fluently add and subtract within 20 using mental strategies. By end of Grade 2, know from memory all sums of two one-digit numbers.",
+          "grade_level": "Grade2"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.2.OA.A.1",
+      "title": "Use addition and subtraction within 100 to solve one- and two-step word probl...",
+      "description": "Use addition and subtraction within 100 to solve one- and two-step word problems involving situations of adding to, taking from, putting together, taking apart, and comparing, with unknowns in all positions, e.g., by using drawings and equations with a symbol for the unknown number to represent the problem.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Operations and Algebraic Thinking",
+      "tags": [
+        "addition",
+        "subtraction",
+        "equations"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.2.OA.A.1",
+          "description": "Use addition and subtraction within 100 to solve one- and two-step word problems involving situations of adding to, taking from, putting together, taking apart, and comparing, with unknowns in all positions, e.g., by using drawings and equations with a symbol for the unknown number to represent the problem.",
+          "grade_level": "Grade2"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "CCSS.Math.Content.2.NBT.A.1",
+      "to": "CCSS.Math.Content.2.NBT.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.2.NBT.A.1 is a prerequisite for CCSS.Math.Content.2.NBT.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.2.NBT.A.2",
+      "to": "CCSS.Math.Content.2.NBT.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.2.NBT.A.2 is a prerequisite for CCSS.Math.Content.2.NBT.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.2.NBT.A.3",
+      "to": "CCSS.Math.Content.2.NBT.A.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.2.NBT.A.3 is a prerequisite for CCSS.Math.Content.2.NBT.A.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.2.NBT.A.4",
+      "to": "CCSS.Math.Content.2.NBT.B.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.2.NBT.A.4 is a prerequisite for CCSS.Math.Content.2.NBT.B.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.2.NBT.B.5",
+      "to": "CCSS.Math.Content.2.NBT.B.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.2.NBT.B.5 is a prerequisite for CCSS.Math.Content.2.NBT.B.6 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.2.NBT.B.6",
+      "to": "CCSS.Math.Content.2.NBT.B.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.2.NBT.B.6 is a prerequisite for CCSS.Math.Content.2.NBT.B.7 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.2.NBT.B.7",
+      "to": "CCSS.Math.Content.2.NBT.B.8",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.2.NBT.B.7 is a prerequisite for CCSS.Math.Content.2.NBT.B.8 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.2.NBT.B.8",
+      "to": "CCSS.Math.Content.2.NBT.B.9",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.2.NBT.B.8 is a prerequisite for CCSS.Math.Content.2.NBT.B.9 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.2.G.A.1",
+      "to": "CCSS.Math.Content.2.G.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.2.G.A.1 is a prerequisite for CCSS.Math.Content.2.G.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.2.G.A.2",
+      "to": "CCSS.Math.Content.2.G.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.2.G.A.2 is a prerequisite for CCSS.Math.Content.2.G.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.2.OA.A.1",
+      "to": "CCSS.Math.Content.2.OA.B.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.2.OA.A.1 is a prerequisite for CCSS.Math.Content.2.OA.B.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.2.OA.B.2",
+      "to": "CCSS.Math.Content.2.OA.C.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.2.OA.B.2 is a prerequisite for CCSS.Math.Content.2.OA.C.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.2.OA.C.3",
+      "to": "CCSS.Math.Content.2.OA.C.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.2.OA.C.3 is a prerequisite for CCSS.Math.Content.2.OA.C.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.2.MD.A.1",
+      "to": "CCSS.Math.Content.2.MD.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.2.MD.A.1 is a prerequisite for CCSS.Math.Content.2.MD.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.2.MD.A.2",
+      "to": "CCSS.Math.Content.2.MD.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.2.MD.A.2 is a prerequisite for CCSS.Math.Content.2.MD.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.2.MD.A.3",
+      "to": "CCSS.Math.Content.2.MD.A.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.2.MD.A.3 is a prerequisite for CCSS.Math.Content.2.MD.A.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.2.MD.A.4",
+      "to": "CCSS.Math.Content.2.MD.B.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.2.MD.A.4 is a prerequisite for CCSS.Math.Content.2.MD.B.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.2.MD.B.5",
+      "to": "CCSS.Math.Content.2.MD.B.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.2.MD.B.5 is a prerequisite for CCSS.Math.Content.2.MD.B.6 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.2.MD.B.6",
+      "to": "CCSS.Math.Content.2.MD.C.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.2.MD.B.6 is a prerequisite for CCSS.Math.Content.2.MD.C.7 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.2.MD.C.7",
+      "to": "CCSS.Math.Content.2.MD.C.8",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.2.MD.C.7 is a prerequisite for CCSS.Math.Content.2.MD.C.8 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.2.MD.C.8",
+      "to": "CCSS.Math.Content.2.MD.D.9",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.2.MD.C.8 is a prerequisite for CCSS.Math.Content.2.MD.D.9 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.2.MD.D.9",
+      "to": "CCSS.Math.Content.2.MD.D.10",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.2.MD.D.9 is a prerequisite for CCSS.Math.Content.2.MD.D.10 within the same domain."
+    }
+  ]
+}

@@ -38,6 +38,7 @@
 //! ```
 
 pub mod channels;
+pub mod ingest;
 pub mod mock;
 pub mod pipeline;
 pub mod templates;
