@@ -666,3 +666,213 @@ fn test_multiscale_hodge_sweep_bound_vs_symmetric() {
         );
     }
 }
+
+// ═════════════════════════════════════════════════════════════════════════
+// Vertex-Signal Hodge Decomposition (L₀)
+// ═════════════════════════════════════════════════════════════════════════
+//
+// Instead of decomposing similarity values on edges (L₁), decompose the
+// *harmony coordinate values* on vertices (L₀). This measures:
+// - Gradient: hierarchical flow of moral meaning between connected scenarios
+// - Harmonic: moral meaning isolated in disconnected clusters (β₀ > 1)
+//
+// The vertex signal is a single harmony dimension projected onto each node.
+// We decompose each of the 8 harmony dimensions separately and aggregate.
+
+/// Compute vertex-signal Hodge decomposition at a given scale.
+/// `vertex_signal` is one value per vertex (e.g., one harmony coordinate).
+/// Returns (gradient_frac, harmonic_frac) or None if complex has < 2 vertices.
+fn vertex_hodge_at_scale(
+    sim: &[f64],
+    n: usize,
+    scale: f64,
+    vertex_signal: &[f64],
+) -> Option<(f64, f64, f64)> {
+    if n < 2 || vertex_signal.len() != n {
+        return None;
+    }
+
+    let mut complex = SimplicialComplex::new();
+    for i in 0..n {
+        complex.add_simplex(vec![i]);
+    }
+    for i in 0..n {
+        for j in (i + 1)..n {
+            if sim[i * n + j] >= scale {
+                complex.add_simplex(vec![i, j]);
+            }
+        }
+    }
+
+    if complex.count(0) < 2 {
+        return None;
+    }
+
+    // Center the vertex signal
+    let mean = vertex_signal.iter().sum::<f64>() / vertex_signal.len() as f64;
+    let centered: Vec<f64> = vertex_signal.iter().map(|v| v - mean).collect();
+
+    let laplacian = HodgeLaplacian::new(complex);
+    let decomp = laplacian.hodge_decompose(0, &centered)?;
+    let (g, c, h) = decomp.fractions();
+    Some((g, c, h))
+}
+
+#[test]
+fn test_vertex_hodge_harmony_coordinates() {
+    // Decompose the 8D harmony coordinates on vertices (L₀).
+    // Each harmony dimension becomes a separate vertex signal.
+    //
+    // For L₀:
+    // - Gradient = moral meaning flowing hierarchically between connected scenarios
+    // - Coexact = N/A for 0-simplices (always 0)
+    // - Harmonic = moral meaning trapped in disconnected clusters (β₀ > 1)
+    //
+    // At low scale threshold: fully connected → β₀=1 → harmonic=0, all gradient
+    // At high scale threshold: disconnected → β₀>1 → harmonic emerges
+    // The TRANSITION reveals how moral coherence fragments with strictness.
+
+    let basis_size = 8;
+    let basis: Vec<ContinuousHV> = (0..basis_size)
+        .map(|i| ContinuousHV::random(TEST_DIM, 5000 + i as u64))
+        .collect();
+
+    let n = 16;
+    let hvs: Vec<ContinuousHV> = (0..n)
+        .map(|i| {
+            let noise = ContinuousHV::random(TEST_DIM, 5100 + i as u64);
+            let b1 = &basis[i % basis_size];
+            let b2 = &basis[(i * 3 + 1) % basis_size];
+            ContinuousHV::bundle(&[b1, b2, &noise])
+        })
+        .collect();
+
+    let sim = similarity_matrix(&hvs);
+
+    // Project HVs to 8D harmony coordinates using a simple basis projection
+    // (In production, HarmonyBasis does this; here we approximate with cosine
+    // similarity to 8 basis vectors as harmony dimensions)
+    let harmony_coords: Vec<[f64; 8]> = hvs
+        .iter()
+        .map(|hv| {
+            let mut coords = [0.0f64; 8];
+            for (d, b) in basis.iter().enumerate().take(8) {
+                coords[d] = hv.similarity(b) as f64;
+            }
+            coords
+        })
+        .collect();
+
+    println!("\n=== Vertex-Signal Hodge Decomposition (L₀) ===");
+    println!("Decomposing 8 harmony dimensions on {} vertices\n", n);
+
+    let num_scales = 15;
+    println!(
+        "{:<8} {:>8} {:>8} {:>8} | {:>8} {:>8} {:>8} | {:>8} {:>8} {:>8}",
+        "Scale", "H0:Grad", "H0:Curl", "H0:Harm",
+        "H3:Grad", "H3:Curl", "H3:Harm",
+        "H7:Grad", "H7:Curl", "H7:Harm"
+    );
+    println!("{}", "-".repeat(90));
+
+    let mut found_vertex_harmonic = false;
+    let mut found_vertex_gradient = false;
+
+    for s in 0..num_scales {
+        let scale = s as f64 / (num_scales - 1) as f64;
+
+        // Decompose harmony dimensions 0, 3, and 7 as representative samples
+        let dims = [0, 3, 7];
+        let mut results: Vec<Option<(f64, f64, f64)>> = Vec::new();
+
+        for &d in &dims {
+            let signal: Vec<f64> = harmony_coords.iter().map(|c| c[d]).collect();
+            results.push(vertex_hodge_at_scale(&sim, n, scale, &signal));
+        }
+
+        for r in &results {
+            if let Some((g, _, h)) = r {
+                if *g > 0.01 { found_vertex_gradient = true; }
+                if *h > 0.01 { found_vertex_harmonic = true; }
+            }
+        }
+
+        let fmt = |r: &Option<(f64, f64, f64)>| -> String {
+            match r {
+                Some((g, c, h)) => format!("{:>8.4} {:>8.4} {:>8.4}", g, c, h),
+                None => format!("{:>8} {:>8} {:>8}", "---", "---", "---"),
+            }
+        };
+
+        println!(
+            "{:<8.3} {} | {} | {}",
+            scale,
+            fmt(&results[0]),
+            fmt(&results[1]),
+            fmt(&results[2]),
+        );
+    }
+
+    println!();
+    println!("Vertex gradient observed: {found_vertex_gradient}");
+    println!("Vertex harmonic observed: {found_vertex_harmonic}");
+
+    // At high thresholds (sparse complex), we expect disconnected components
+    // which produce vertex harmonics — moral meaning trapped in clusters.
+    // This is the fragmentation signal.
+}
+
+#[test]
+fn test_vertex_vs_edge_hodge_comparison() {
+    // Direct comparison: vertex L₀ vs edge L₁ decomposition at same scales.
+    // Shows which level of the Hodge hierarchy captures more structure.
+
+    let basis_size = 6;
+    let basis: Vec<ContinuousHV> = (0..basis_size)
+        .map(|i| ContinuousHV::random(TEST_DIM, 6000 + i as u64))
+        .collect();
+
+    let n = 16;
+    let hvs: Vec<ContinuousHV> = (0..n)
+        .map(|i| {
+            let noise = ContinuousHV::random(TEST_DIM, 6100 + i as u64);
+            let b1 = &basis[i % basis_size];
+            let b2 = &basis[(i * 3 + 1) % basis_size];
+            ContinuousHV::bundle(&[b1, b2, &noise])
+        })
+        .collect();
+
+    let sim = similarity_matrix(&hvs);
+
+    // Use first harmony dimension as vertex signal
+    let vertex_signal: Vec<f64> = hvs
+        .iter()
+        .map(|hv| hv.similarity(&basis[0]) as f64)
+        .collect();
+
+    println!("\n=== Vertex (L₀) vs Edge (L₁) Hodge Comparison ===\n");
+    println!(
+        "{:<8} {:>10} {:>10} {:>10} | {:>10} {:>10} {:>10}",
+        "Scale", "V:Grad", "V:Curl", "V:Harm", "E:Grad", "E:Curl", "E:Harm"
+    );
+    println!("{}", "-".repeat(72));
+
+    let num_scales = 15;
+    for s in 0..num_scales {
+        let scale = s as f64 / (num_scales - 1) as f64;
+
+        let v = vertex_hodge_at_scale(&sim, n, scale, &vertex_signal);
+        let e = hodge_at_scale(&sim, n, scale);
+
+        let vfmt = match v {
+            Some((g, c, h)) => format!("{:>10.4} {:>10.4} {:>10.4}", g, c, h),
+            None => format!("{:>10} {:>10} {:>10}", "---", "---", "---"),
+        };
+        let efmt = match e {
+            Some((g, c, h, _)) => format!("{:>10.4} {:>10.4} {:>10.4}", g, c, h),
+            None => format!("{:>10} {:>10} {:>10}", "---", "---", "---"),
+        };
+
+        println!("{:<8.3} {} | {}", scale, vfmt, efmt);
+    }
+}

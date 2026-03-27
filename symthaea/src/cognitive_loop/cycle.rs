@@ -327,6 +327,19 @@ impl CognitiveLoopService {
                 self.stats.total_cycles as usize,
             );
 
+            // ── Gate 5: Embodiment motor halt carry-forward ──────────────
+            #[cfg(feature = "humanoid")]
+            if let Some(ref mut bridge) = self.sensorimotor.embodiment_bridge {
+                use crate::cognitive_loop::motor_bridge::MotorSafetyLevel;
+                if safety_result.motor_halt {
+                    bridge.set_safety_override(MotorSafetyLevel::Red);
+                } else if safety_result.motor_readonly {
+                    bridge.set_safety_override(MotorSafetyLevel::Orange);
+                } else {
+                    bridge.clear_safety_override();
+                }
+            }
+
             // ── Defense Cascade: propose → moral filter → apply ──────────
             // Propose graduated defense actions based on assessed safety level.
             // Each action goes through moral algebra before application.
