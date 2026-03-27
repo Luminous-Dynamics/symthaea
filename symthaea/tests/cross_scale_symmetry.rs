@@ -51,7 +51,8 @@ fn make_topology(window_size: usize) -> MoralTopology {
         min_persistence: 0.1,
         pga_components: 3,
         dim: TEST_DIM,
-        exact_betti: true, // Enable Hodge decomposition
+        exact_betti: true,
+        adaptive_rips_enabled: false, // Tests use full sweep for reproducibility
     })
 }
 
