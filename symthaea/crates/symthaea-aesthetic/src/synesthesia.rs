@@ -303,6 +303,77 @@ pub fn blend_feedbacks(feedbacks: &[AestheticFeedback]) -> AestheticFeedback {
     result
 }
 
+// ── Cross-Modal Coherence ────────────────────────────────────────────────────
+
+/// Score cross-modal coherence between music and visual art.
+///
+/// Measures whether the emotional/aesthetic qualities expressed in the music
+/// align with those in the visual output. High coherence = the system is
+/// "emotionally honest" across modalities. Low coherence = the system is
+/// producing sad music with happy visuals (or vice versa).
+///
+/// Returns a score in [0, 1] where 1.0 = perfectly aligned.
+///
+/// # Dimensions Checked
+///
+/// 1. **Hue-valence alignment**: warm musical hues (red/yellow, low pitch) should
+///    match positive visual valence, cool hues (blue/violet, high pitch) should
+///    match negative/contemplative visual qualities
+/// 2. **Energy alignment**: high-tempo music (motion) should correspond to
+///    high-arousal visuals (complexity, contrast)
+/// 3. **Texture-timbre alignment**: rough timbres should produce rough textures,
+///    pure tones should produce smooth surfaces
+pub fn coherence_score(
+    syn_frames: &[SynestheticFrame],
+    visual_valence: f32,
+    visual_arousal: f32,
+    visual_complexity: f32,
+) -> f32 {
+    if syn_frames.is_empty() {
+        return 0.5; // neutral when no music
+    }
+
+    let n = syn_frames.len() as f32;
+
+    // Average musical features
+    let avg_hue: f32 = syn_frames.iter().map(|f| f.hue).sum::<f32>() / n;
+    let avg_lightness: f32 = syn_frames.iter().map(|f| f.lightness).sum::<f32>() / n;
+    let avg_motion: f32 = syn_frames.iter().map(|f| f.motion).sum::<f32>() / n;
+    let avg_roughness: f32 = syn_frames.iter().map(|f| f.texture.roughness).sum::<f32>() / n;
+
+    // 1. Hue-valence alignment
+    // Warm hues (0-120°) → positive valence expected
+    // Cool hues (180-360°) → negative/contemplative valence expected
+    let music_warmth = if avg_hue < 180.0 {
+        1.0 - avg_hue / 180.0 // 1.0 at red, 0.0 at cyan
+    } else {
+        -(avg_hue - 180.0) / 180.0 // -1.0 at rose, 0.0 at cyan
+    };
+    // Visual valence in [-1, 1]: positive = warm, negative = cool
+    let hue_valence_alignment = 1.0 - (music_warmth - visual_valence).abs();
+
+    // 2. Energy alignment
+    // High motion (tempo) → high visual arousal expected
+    let energy_alignment = 1.0 - (avg_motion - visual_arousal).abs();
+
+    // 3. Lightness-complexity alignment
+    // Loud music (bright) → visually complex expected
+    let lightness_complexity_alignment = 1.0 - (avg_lightness - visual_complexity).abs();
+
+    // 4. Texture roughness alignment
+    // This is a softer signal — not all visual styles expose roughness
+    let texture_alignment = 1.0 - (avg_roughness - visual_complexity * 0.5).abs();
+
+    // Weighted composite
+    let composite = (0.35 * hue_valence_alignment
+        + 0.30 * energy_alignment
+        + 0.20 * lightness_complexity_alignment
+        + 0.15 * texture_alignment)
+        .clamp(0.0, 1.0);
+
+    composite
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -492,5 +563,80 @@ mod tests {
     fn pitch_to_hue_negative_freq() {
         assert_eq!(pitch_to_hue(0.0), 0.0);
         assert_eq!(pitch_to_hue(-100.0), 0.0);
+    }
+
+    // ── Coherence tests ──
+
+    #[test]
+    fn warm_music_warm_visuals_coherent() {
+        // Low pitch (warm hue) + positive valence = high coherence
+        let frames = vec![SynestheticFrame {
+            hue: 30.0,       // warm (orange)
+            lightness: 0.7,
+            texture: TextureParams { grain_size: 0.5, roughness: 0.3, warmth: 0.8 },
+            motion: 0.6,
+            time: 0.0,
+        }];
+        let score = coherence_score(&frames, 0.7, 0.6, 0.5);
+        assert!(score > 0.6, "warm music + warm visuals should be coherent: {score}");
+    }
+
+    #[test]
+    fn cool_music_warm_visuals_incoherent() {
+        // High pitch (cool hue) + positive valence = mismatch
+        let frames = vec![SynestheticFrame {
+            hue: 270.0,      // cool (violet)
+            lightness: 0.3,
+            texture: TextureParams { grain_size: 0.8, roughness: 0.7, warmth: 0.2 },
+            motion: 0.2,
+            time: 0.0,
+        }];
+        let score = coherence_score(&frames, 0.8, 0.8, 0.8);
+        // Mismatch: cool music but very warm/active visuals
+        assert!(score < 0.7, "cool music + hot visuals should be less coherent: {score}");
+    }
+
+    #[test]
+    fn no_frames_neutral() {
+        let score = coherence_score(&[], 0.5, 0.5, 0.5);
+        assert_eq!(score, 0.5);
+    }
+
+    #[test]
+    fn coherence_bounded() {
+        for hue in [0.0, 90.0, 180.0, 270.0, 359.0] {
+            for val in [-1.0, -0.5, 0.0, 0.5, 1.0] {
+                let frames = vec![SynestheticFrame {
+                    hue,
+                    lightness: 0.5,
+                    texture: TextureParams { grain_size: 0.5, roughness: 0.5, warmth: 0.5 },
+                    motion: 0.5,
+                    time: 0.0,
+                }];
+                let score = coherence_score(&frames, val, 0.5, 0.5);
+                assert!(
+                    score >= 0.0 && score <= 1.0,
+                    "hue={hue}, val={val}: coherence={score}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn high_energy_alignment() {
+        // Fast tempo (high motion) should align with high arousal visuals
+        let frames = vec![SynestheticFrame {
+            hue: 60.0,
+            lightness: 0.8,
+            texture: TextureParams { grain_size: 0.3, roughness: 0.2, warmth: 0.6 },
+            motion: 0.9,  // very fast
+            time: 0.0,
+        }];
+        let high_arousal = coherence_score(&frames, 0.3, 0.9, 0.7);
+        let low_arousal = coherence_score(&frames, 0.3, 0.1, 0.2);
+        assert!(
+            high_arousal > low_arousal,
+            "fast music should align better with high arousal: {high_arousal} vs {low_arousal}"
+        );
     }
 }
