@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Voting Integrity Zome
 //! Defines entry types and validation for governance voting
 //!
@@ -482,6 +485,15 @@ pub struct PhiWeightedTally {
     /// Whether the vote margin is below 2% (narrow outcome warning).
     #[serde(default)]
     pub narrow_margin_warning: bool,
+    /// Whether the ethics engine flagged this proposal as Caution or Blocked.
+    #[serde(default)]
+    pub ethics_caution_flagged: bool,
+    /// Whether the ethics engine flagged Blocked (escalated quorum).
+    #[serde(default)]
+    pub ethics_blocked_flagged: bool,
+    /// If escalated, the original tier before escalation.
+    #[serde(default)]
+    pub ethics_escalated_from: Option<String>,
 }
 
 /// Breakdown of votes by voter Φ tier
@@ -1224,6 +1236,59 @@ impl CircuitBreakerOutcome {
     }
 }
 
+// ============================================================================
+// ETHICS-GOVERNANCE BINDING
+// ============================================================================
+
+/// Ethics verdict from Symthaea's moral algebra, mirrored for governance use.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GovernanceEthicsVerdict {
+    /// No concerns detected
+    Safe,
+    /// Concerns flagged — transparent flag, no threshold change
+    Caution,
+    /// Clear violation — mandatory disclosure + escalated quorum
+    Blocked,
+}
+
+/// On-chain disclosure of an ethics assessment for a proposal.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct EthicsDisclosure {
+    pub id: String,
+    pub proposal_id: String,
+    pub verdict: GovernanceEthicsVerdict,
+    pub concerns: Vec<String>,
+    pub disclosed_at: Timestamp,
+    pub disclosure_source: String,
+}
+
+/// Check ethics disclosure creation invariants.
+pub fn check_create_ethics_disclosure(disclosure: &EthicsDisclosure) -> Result<(), String> {
+    if disclosure.proposal_id.is_empty() {
+        return Err("Proposal ID is required for ethics disclosure".into());
+    }
+    if disclosure.verdict == GovernanceEthicsVerdict::Blocked && disclosure.concerns.is_empty() {
+        return Err("Blocked verdict must include at least one concern".into());
+    }
+    if disclosure.disclosure_source.is_empty() {
+        return Err("Disclosure source is required".into());
+    }
+    Ok(())
+}
+
+// ============================================================================
+// DELEGATION CYCLE PREVENTION
+// ============================================================================
+
+/// Check that a delegation does not create a self-cycle.
+pub fn check_delegation_no_self_cycle(delegator: &str, delegate: &str) -> Result<(), String> {
+    if delegator == delegate {
+        return Err("Cannot delegate to self — creates a governance cycle".into());
+    }
+    Ok(())
+}
+
 #[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
@@ -1246,6 +1311,8 @@ pub enum EntryTypes {
     ProposalReflection(ProposalReflection),
     /// Cross-proposal voting bloc detection result
     BlocDetection(BlocDetection),
+    /// Ethics engine disclosure for a proposal
+    EthicsDisclosure(EthicsDisclosure),
 }
 
 #[hdk_link_types]
@@ -1284,6 +1351,8 @@ pub enum LinkTypes {
     VoterToVotingHistory,
     /// Bloc detection results
     BlocDetectionAnchor,
+    /// Proposal to ethics disclosure
+    ProposalToEthicsDisclosure,
 }
 
 /// HDI 0.7 single validation callback using FlatOp pattern
@@ -1316,6 +1385,12 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::BlocDetection(_) => {
                     // Bloc detections are informational — always valid to create
                     Ok(ValidateCallbackResult::Valid)
+                }
+                EntryTypes::EthicsDisclosure(disclosure) => {
+                    match check_create_ethics_disclosure(&disclosure) {
+                        Ok(()) => Ok(ValidateCallbackResult::Valid),
+                        Err(msg) => Ok(ValidateCallbackResult::Invalid(msg)),
+                    }
                 }
             },
             OpEntry::UpdateEntry {
@@ -1362,6 +1437,11 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                         "Bloc detections cannot be updated".into(),
                     ))
                 }
+                EntryTypes::EthicsDisclosure(_) => {
+                    Ok(ValidateCallbackResult::Invalid(
+                        "Ethics disclosures cannot be updated".into(),
+                    ))
+                }
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
@@ -1389,6 +1469,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             LinkTypes::ProposalToReflection => Ok(ValidateCallbackResult::Valid),
             LinkTypes::VoterToVotingHistory => Ok(ValidateCallbackResult::Valid),
             LinkTypes::BlocDetectionAnchor => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::ProposalToEthicsDisclosure => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterDeleteLink {
             link_type,

@@ -1960,6 +1960,9 @@ pub fn tally_phi_votes(input: TallyPhiVotesInput) -> ExternResult<Record> {
         concentration_warning,
         vote_margin,
         narrow_margin_warning,
+        ethics_caution_flagged: false,
+        ethics_blocked_flagged: false,
+        ethics_escalated_from: None,
     };
 
     let action_hash = create_entry(&EntryTypes::PhiWeightedTally(tally))?;

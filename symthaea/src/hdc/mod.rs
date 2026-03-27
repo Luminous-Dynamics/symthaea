@@ -1,4 +1,6 @@
-//! Hyperdimensional Computing (HDC) Module
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Hyperdimensional Computing (HDC) Module
 //!
 //! This module provides the core HDC/VSA (Vector Symbolic Architecture) primitives
 //! and consciousness-related computations for Symthaea. It re-exports fundamental
@@ -379,6 +381,12 @@ pub mod moral_prototypes;
 
 /// Shared Eight Harmonies basis vectors and moral free energy (FEP).
 pub mod harmony_basis;
+
+/// Manifold-based moral classifier using 8D harmony basis centroids.
+pub mod manifold_classifier;
+
+/// CfC-based non-linear moral classifier using HdcLtcUnifiedNetwork.
+pub mod cfc_moral_classifier;
 
 /// Persistent homology on moral scenario hypervectors.
 pub mod moral_topology;

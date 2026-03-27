@@ -1,4 +1,6 @@
-//! Dual-channel HDC text encoder (character trigrams + word-level).
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Dual-channel HDC text encoder (character trigrams + word-level).
 //!
 //! Encodes arbitrary text strings into hyperdimensional vectors using two
 //! complementary channels:
@@ -54,6 +56,14 @@ pub struct TextHdcEncoder {
     /// When these co-occur with bad_words, the negative contribution is halved
     /// to prevent false positives in technical discourse.
     technical_context: HashSet<String>,
+    /// Positive framing words (e.g., "okay", "fine", "acceptable")
+    framing_positive: HashSet<String>,
+    /// Negative framing words (e.g., "rude", "wrong", "bad")
+    framing_negative: HashSet<String>,
+    /// Seed HV for framing channel — sign determines polarity
+    framing_seed: ContinuousHV,
+    /// Weight for framing channel (0.0 = off). NOT stolen from sentiment.
+    framing_weight: f32,
 }
 
 /// Maximum number of distinct word positions tracked.
@@ -320,6 +330,32 @@ impl TextHdcEncoder {
         .map(|s| s.to_string())
         .collect();
 
+        let framing_positive: HashSet<String> = [
+            "okay", "fine", "acceptable", "expected", "normal", "reasonable",
+            "understandable", "healthy", "appropriate", "smart", "wise", "helpful",
+            "thoughtful", "responsible", "important", "necessary", "right", "proper",
+            "fair", "respectful", "polite", "natural", "sensible", "mature",
+            "admirable", "commendable", "justified", "valid", "legitimate",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+
+        let framing_negative: HashSet<String> = [
+            "rude", "wrong", "bad", "mean", "selfish", "cruel", "unfair",
+            "inappropriate", "unacceptable", "offensive", "disrespectful", "immoral",
+            "unethical", "nasty", "terrible", "awful", "horrible", "disgusting",
+            "shameful", "toxic", "manipulative", "abusive", "cowardly", "petty",
+            "childish", "irresponsible", "inconsiderate", "ungrateful", "unreasonable",
+            "dangerous", "foolish", "obnoxious", "annoying", "tacky", "sketchy",
+            "shady", "creepy", "gross", "pathetic", "careless",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+
+        let framing_seed = ContinuousHV::random(dim, 80000001);
+
         Self {
             dim,
             ngram_size,
@@ -333,7 +369,28 @@ impl TextHdcEncoder {
             good_words,
             bad_words,
             technical_context,
+            framing_positive,
+            framing_negative,
+            framing_seed,
+            framing_weight: 0.0,
         }
+    }
+
+    /// Create with explicit trigram, word, sentiment, and framing channel weights.
+    ///
+    /// The framing channel detects evaluative words like "rude", "fine", "acceptable"
+    /// that signal moral polarity independently of sentiment. The framing weight is
+    /// additive — it takes budget from ALL other channels proportionally.
+    pub fn with_framing(
+        dim: usize,
+        ngram_size: usize,
+        trigram_weight: f32,
+        sentiment_weight: f32,
+        framing_weight: f32,
+    ) -> Self {
+        let mut enc = Self::with_sentiment(dim, ngram_size, trigram_weight, sentiment_weight);
+        enc.framing_weight = framing_weight;
+        enc
     }
 
     /// Get the output dimension.
@@ -359,7 +416,31 @@ impl TextHdcEncoder {
 
         let mut combined = vec![0.0f32; self.dim];
 
-        if sw > 0.0 {
+        let fw = self.framing_weight;
+
+        if fw > 0.0 {
+            // Four-channel blend: framing takes budget from ALL other channels proportionally
+            let remaining = 1.0 - fw;
+            let framing_hv = self.encode_framing(text);
+
+            if sw > 0.0 {
+                let sentiment_hv = self.encode_sentiment(text);
+                let tw_scaled = tw * (1.0 - sw) * remaining;
+                let ww_scaled = ww * (1.0 - sw) * remaining;
+                let sw_scaled = sw * remaining;
+                for i in 0..self.dim {
+                    combined[i] = tw_scaled * trigram_hv.values[i]
+                        + ww_scaled * word_hv.values[i]
+                        + sw_scaled * sentiment_hv.values[i]
+                        + fw * framing_hv.values[i];
+                }
+            } else {
+                for i in 0..self.dim {
+                    combined[i] = remaining * (tw * trigram_hv.values[i] + ww * word_hv.values[i])
+                        + fw * framing_hv.values[i];
+                }
+            }
+        } else if sw > 0.0 {
             // Three-channel blend: tw*(1-sw)*trigram + ww*(1-sw)*word + sw*sentiment
             let sentiment_hv = self.encode_sentiment(text);
             let tw_scaled = tw * (1.0 - sw);
@@ -441,6 +522,49 @@ impl TextHdcEncoder {
         ContinuousHV::from_vec(accumulator)
     }
 
+    /// Framing channel: accumulate framing_seed for evaluative words.
+    ///
+    /// For each word in the text, if it's in framing_positive, add framing_seed
+    /// scaled by a position boost (3x for first 6 words). If in framing_negative,
+    /// subtract framing_seed. The result is L2-normalized.
+    fn encode_framing(&self, text: &str) -> ContinuousHV {
+        let mut accumulator = vec![0.0f32; self.dim];
+        let text_lower = text.to_lowercase();
+        let mut found_any = false;
+
+        for (word_idx, word) in text_lower.split_whitespace().enumerate() {
+            let clean: &str = word.trim_matches(|c: char| !c.is_alphanumeric());
+            if clean.is_empty() {
+                continue;
+            }
+
+            let position_boost: f32 = if word_idx < 6 { 3.0 } else { 1.0 };
+
+            if self.framing_positive.contains(clean) {
+                found_any = true;
+                for (acc, &val) in accumulator.iter_mut().zip(self.framing_seed.values.iter()) {
+                    *acc += val * position_boost;
+                }
+            } else if self.framing_negative.contains(clean) {
+                found_any = true;
+                for (acc, &val) in accumulator.iter_mut().zip(self.framing_seed.values.iter()) {
+                    *acc -= val * position_boost;
+                }
+            }
+        }
+
+        if found_any {
+            let norm: f32 = accumulator.iter().map(|x| x * x).sum::<f32>().sqrt();
+            if norm > 0.0 {
+                for v in &mut accumulator {
+                    *v /= norm;
+                }
+            }
+        }
+
+        ContinuousHV::from_vec(accumulator)
+    }
+
     /// Character trigram encoding channel.
     ///
     /// Optimized to avoid per-trigram ContinuousHV allocations — works directly
@@ -500,14 +624,42 @@ impl TextHdcEncoder {
     ///
     /// Each word is hashed to a deterministic HV (via its bytes), then bound
     /// with a word-position HV. All word-position-bound HVs are accumulated.
+    /// Negation words ("not", "no", "never", etc.) rotate the *next* word's HV
+    /// by 1 position (circular shift) before binding, so "wrong" and "not wrong"
+    /// produce dissimilar encodings.
     /// Optimized: reuses buffer for bind results to reduce allocations.
     fn encode_words(&self, text: &str) -> ContinuousHV {
         let mut accumulator = vec![0.0f32; self.dim];
         let text_lower = text.to_lowercase();
         let mut bound_buf = vec![0.0f32; self.dim];
 
+        let negation_set: HashSet<&str> = [
+            "not", "no", "never", "don't", "doesn't", "didn't", "isn't", "aren't",
+            "wasn't", "weren't", "won't", "can't", "couldn't", "shouldn't", "wouldn't",
+            "without",
+        ]
+        .into_iter()
+        .collect();
+
+        let mut negate_next = false;
+
         for (word_idx, word) in text_lower.split_whitespace().enumerate() {
-            let word_hv = self.hash_word(word);
+            // Strip punctuation for negation check
+            let clean: &str = word.trim_matches(|c: char| !c.is_alphanumeric());
+
+            if negation_set.contains(clean) {
+                negate_next = true;
+                continue; // Don't encode the negation word itself
+            }
+
+            let mut word_hv = self.hash_word(word);
+
+            if negate_next {
+                // Rotate HV by 1 position (circular shift) to encode negation
+                word_hv.values.rotate_right(1);
+                negate_next = false;
+            }
+
             let pos_idx = word_idx.min(MAX_WORD_POSITIONS - 1);
             let pos_vals = &self.word_pos_hvs[pos_idx].values;
 
@@ -682,5 +834,27 @@ mod tests {
             sim_sent,
             sim_no_sent
         );
+    }
+
+    #[test]
+    fn test_negation_dissimilarity() {
+        let enc = TextHdcEncoder::with_sentiment(4096, 3, 0.5, 0.2);
+        let wrong = enc.encode("it is wrong to steal");
+        let not_wrong = enc.encode("it is not wrong to steal");
+        // Negated should be less similar than identical
+        assert!(
+            wrong.similarity(&not_wrong) < 0.85,
+            "Negated text should be dissimilar, got {}",
+            wrong.similarity(&not_wrong)
+        );
+    }
+
+    #[test]
+    fn test_framing_separates_polarity() {
+        let enc = TextHdcEncoder::with_framing(4096, 3, 0.5, 0.2, 0.15);
+        let rude = enc.encode("it is rude to interrupt");
+        let fine = enc.encode("it is fine to interrupt");
+        let sim = rude.similarity(&fine);
+        assert!(sim < 0.9, "Framing should separate polarity, got {}", sim);
     }
 }

@@ -1,4 +1,6 @@
-//! Moral Semantic Parser
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Moral Semantic Parser
 //!
 //! Extracts moral primitives (AGENT, PATIENT, ACTION, INTENT, CONSENT, etc.)
 //! from natural language text using pattern matching and keyword analysis.
@@ -1124,7 +1126,9 @@ impl MoralParser {
                 let start = pos + pattern.len();
                 let rest = text[start..].trim_start();
                 let end = rest.find(['.', ';']).unwrap_or(rest.len());
-                let clause = rest[..end.min(120)].trim();
+                let mut limit = end.min(120);
+                while limit > 0 && !rest.is_char_boundary(limit) { limit -= 1; }
+                let clause = rest[..limit].trim();
                 if !clause.is_empty() {
                     return Some(clause.to_string());
                 }

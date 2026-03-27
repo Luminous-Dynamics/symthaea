@@ -1,4 +1,6 @@
-//! Unified Moral Reasoning Benchmark
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Unified Moral Reasoning Benchmark
 //!
 //! Tests the moral algebra and parser against 5 priority datasets:
 //! 1. ETHICS (Hendrycks) - Commonsense, Deontology, Justice, Virtue
@@ -192,13 +194,31 @@ struct UnifiedResults {
 // ============================================================================
 
 fn main() {
+    let ablation_mode = std::env::var("ABLATION").unwrap_or_default();
+
     println!("╔══════════════════════════════════════════════════════════════╗");
     println!("║       Unified Moral Reasoning Benchmark                      ║");
     println!("║   Testing HDC Moral Algebra on 5 Priority Datasets           ║");
-    println!("╚══════════════════════════════════════════════════════════════╝\n");
+    println!("╚══════════════════════════════════════════════════════════════╝");
+    if !ablation_mode.is_empty() && ablation_mode != "full" {
+        println!("  ABLATION MODE: {}", ablation_mode);
+        println!("    base     = pure HDC + intent + deonto (no sentiment/learned/manifold/cfc)");
+        println!("    sentiment= base + sentiment channel");
+        println!("    learned  = base + learned prototypes");
+        println!("    manifold = base + manifold classifier");
+        println!("    cfc      = base + CfC classifier");
+        println!("    full     = everything (default)");
+    }
+    println!();
 
     let mut algebra = MoralAlgebra::default_dim();
     let parser = MoralParser::new();
+
+    // Ablation: only load learned prototypes when mode allows
+    let use_learned = matches!(ablation_mode.as_str(), "" | "full" | "learned");
+    let _use_cfc = matches!(ablation_mode.as_str(), "" | "full" | "cfc");
+    let _use_sentiment = matches!(ablation_mode.as_str(), "" | "full" | "sentiment");
+    let _use_manifold = matches!(ablation_mode.as_str(), "" | "full" | "manifold");
 
     // Load Social Chemistry prototypes for direct classifier and ensemble signal.
     // v3 (8192D) prototypes have 66.9% training accuracy — better than v4 (16384D, 59.2%).
@@ -211,7 +231,9 @@ fn main() {
     let sentiment_weight = 0.15;
 
     // Prefer v3 (8192D) prototypes — they classify better due to denser representations
-    if prototypes_v3_path.exists() {
+    if !use_learned {
+        println!("  Ablation: skipping learned prototypes (mode={})\n", ablation_mode);
+    } else if prototypes_v3_path.exists() {
         println!(
             "Loading cached v3 learned prototypes from {}...",
             prototypes_v3_path.display()
@@ -292,17 +314,55 @@ fn main() {
 
     // Train per-category ETHICS prototypes (#2 improvement)
     let ethics_path = format!("{}/ethics.json", DATASETS_PATH);
-    let per_category_classifiers = if Path::new(&ethics_path).exists() {
+    let per_category_classifiers = if use_learned && Path::new(&ethics_path).exists() {
         train_per_category_ethics_prototypes(&ethics_path)
     } else {
         HashMap::new()
     };
 
     // Train virtue match classifier (#3 improvement)
-    let virtue_classifier = if Path::new(&ethics_path).exists() {
+    let virtue_classifier = if use_learned && Path::new(&ethics_path).exists() {
         train_virtue_classifier(&ethics_path)
     } else {
         None
+    };
+
+    // Train CfC moral classifier (non-linear HDC, 256D neurons)
+    let mut cfc_classifier = {
+        use std::sync::Arc;
+        use symthaea::hdc::cfc_moral_classifier::CfcMoralClassifier;
+        use symthaea::hdc::harmony_basis::HarmonyBasis;
+
+        let basis = Arc::new(HarmonyBasis::new(MORAL_PROTO_DIM));
+        let mut cfc = CfcMoralClassifier::new(basis, MORAL_PROTO_DIM);
+
+        if dataset_292k_path.exists() {
+            if let Ok(file) = File::open(&dataset_292k_path) {
+                let reader = BufReader::new(file);
+                if let Ok(data) = serde_json::from_reader::<_, SocialChem292kFile>(reader) {
+                    let train_start = Instant::now();
+                    let samples: Vec<(String, MoralLabel)> = data
+                        .examples
+                        .iter()
+                        .filter(|ex| !ex.split.contains("test"))
+                        .take(2000)
+                        .filter_map(|ex| {
+                            let text = if !ex.rot.is_empty() { ex.rot.clone() }
+                                else if !ex.action.is_empty() { ex.action.clone() }
+                                else { return None; };
+                            let judgment: i32 = ex.rot_judgment.parse().unwrap_or(0);
+                            Some((text, MoralLabel::from_rot_judgment(judgment)))
+                        })
+                        .collect();
+                    cfc.train(&samples);
+                    println!(
+                        "  CfC classifier trained on {} samples in {:.1}s\n",
+                        samples.len(), train_start.elapsed().as_secs_f64()
+                    );
+                }
+            }
+        }
+        cfc
     };
 
     let start = Instant::now();
@@ -332,7 +392,7 @@ fn main() {
             results.push(r);
         }
         if let Some(r) =
-            benchmark_social_chemistry(&algebra, &parser, direct_social_chem_classifier.as_ref())
+            benchmark_social_chemistry(&algebra, &parser, direct_social_chem_classifier.as_ref(), Some(&mut cfc_classifier))
         {
             results.push(r);
         }
@@ -391,7 +451,10 @@ fn benchmark_ethics(
         let mut total = 0;
         let mut errors = Vec::new();
 
-        for ex in examples.iter().take(MAX_SAMPLES) {
+        for (idx, ex) in examples.iter().enumerate().take(MAX_SAMPLES * 2) {
+            // Positional split: evaluate on odd-indexed examples only
+            // (even-indexed used for training in per-category classifiers)
+            if idx % 2 == 0 { continue; }
             if let Some(expected) = ex.label {
                 let per_cat = per_cat_classifiers.get(&category);
                 let predicted = predict_ethics_with_classifier(
@@ -597,7 +660,8 @@ fn benchmark_scruples(algebra: &MoralAlgebra, parser: &MoralParser) -> Option<Be
 fn benchmark_social_chemistry(
     algebra: &MoralAlgebra,
     parser: &MoralParser,
-    direct_classifier: Option<&MoralPrototypeClassifier>,
+    _direct_classifier: Option<&MoralPrototypeClassifier>,
+    mut cfc: Option<&mut symthaea::hdc::cfc_moral_classifier::CfcMoralClassifier>,
 ) -> Option<BenchmarkResult> {
     // Prefer the 292K dataset if available (larger, real data)
     let path_292k = format!("{}/social_chemistry_292k.json", DATASETS_PATH);
@@ -631,16 +695,25 @@ fn benchmark_social_chemistry(
     let mut total = 0;
     let mut errors = Vec::new();
 
-    for ex in data.examples.iter().take(MAX_SAMPLES) {
+    let mut eval_count = 0;
+    for ex in data.examples.iter() {
+        // Only evaluate on test/test-extra split (proper train/test separation)
+        if !ex.split.contains("test") { continue; }
+        if eval_count >= MAX_SAMPLES { break; }
+        eval_count += 1;
         // Use rule-of-thumb judgment if available
         if !ex.rot_judgment.is_empty() {
             // rot_judgment is typically "-1" (bad), "0" (neutral), "1" (good)
             let expected = ex.rot_judgment.parse::<i32>().unwrap_or(0);
 
-            // Use direct classifier if available (trained on this dataset),
-            // otherwise fall back to ensemble judge
-            let predicted = if let Some(clf) = direct_classifier {
-                clf.classify(&ex.rot).0.to_rot_judgment()
+            // Use CfC classifier if available, otherwise ensemble
+            let predicted = if let Some(ref mut c) = cfc {
+                let (verdict, _) = c.classify(&ex.rot);
+                match verdict {
+                    MoralVerdict::Good => 1,
+                    MoralVerdict::Bad | MoralVerdict::ConsentViolation => -1,
+                    MoralVerdict::Neutral => 0,
+                }
             } else {
                 let judgment = judge_text(algebra, parser, &ex.rot);
                 match judgment.final_verdict {
@@ -1359,11 +1432,17 @@ fn train_prototypes_from_292k(
         data.examples.len()
     );
 
-    // Convert to MoralSamples, using rot (rule-of-thumb) as the text
+    // Convert to MoralSamples, using rot (rule-of-thumb) as the text.
+    // ONLY train on non-test split to avoid data leakage.
     let samples: Vec<MoralSample> = data
         .examples
         .iter()
         .filter_map(|ex| {
+            // Never train on test/test-extra split
+            if ex.split.contains("test") {
+                return None;
+            }
+
             let text = if !ex.rot.is_empty() {
                 ex.rot.clone()
             } else if !ex.action.is_empty() {
@@ -1485,9 +1564,12 @@ fn train_per_category_ethics_prototypes(
     let sentiment_weight = 0.15;
 
     for (category, examples) in &by_category {
+        // Positional split: train on even-indexed only (odd reserved for eval)
         let samples: Vec<MoralSample> = examples
             .iter()
-            .filter_map(|ex| {
+            .enumerate()
+            .filter_map(|(idx, ex)| {
+                if idx % 2 != 0 { return None; }
                 let label_val = ex.label?;
                 let label = match category.as_str() {
                     // commonsense: 0=acceptable(Good), 1=wrong(Bad)
@@ -1577,10 +1659,13 @@ fn train_virtue_classifier(ethics_path: &str) -> Option<VirtueMatchClassifier> {
     let reader = BufReader::new(file);
     let data: DatasetFile<EthicsExample> = serde_json::from_reader(reader).ok()?;
 
+    // Positional split: train on even-indexed virtue examples
     let samples: Vec<VirtueSample> = data
         .examples
         .iter()
-        .filter(|ex| ex.category == "virtue")
+        .enumerate()
+        .filter(|(idx, ex)| ex.category == "virtue" && idx % 2 == 0)
+        .map(|(_, ex)| ex)
         .filter_map(|ex| {
             let label_val = ex.label?;
             // Split on " [SEP] " to get scenario + trait_word

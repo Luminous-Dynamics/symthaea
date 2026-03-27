@@ -1323,3 +1323,54 @@ pub const MATH_SYMBOLIC_EXACT_CONFIDENCE: f64 = 1.0;
 
 /// Tolerance for symbolic-numeric cross-validation agreement.
 pub const MATH_SYMBOLIC_NUMERIC_AGREEMENT_TOL: f64 = 1e-8;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// THERMODYNAMIC INTEGRATION (Physics bridge constants)
+// Science: Landauer (1961), Carnot (1824), Onsager (1931), Jarzynski (1997),
+//          Prigogine (1977), Maxwell demon (Szilard 1929)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// EMA smoothing for unified thermodynamic state (slow adaptation).
+pub const THERMO_UNIFIED_EMA_ALPHA: f32 = 0.05;
+
+/// Onsager reciprocal coupling window (cycles).
+pub const THERMO_ONSAGER_WINDOW: usize = 50;
+
+/// Jarzynski free energy estimation window (cycles).
+pub const THERMO_JARZYNSKI_WINDOW: usize = 100;
+
+/// Boltzmann-like constant for consciousness temperature scaling.
+pub const K_CONSCIOUSNESS_BOLTZMANN: f64 = 0.01;
+
+/// Maxwell demon attention efficiency baseline (Szilard 1929).
+pub const THERMO_ATTENTION_DEMON_EFFICIENCY: f64 = 0.5;
+
+/// Carnot cold reservoir temperature (dimensionless, relative to hot=1.0).
+pub const THERMO_CARNOT_T_COLD: f64 = 0.3;
+
+/// Insight probability threshold for learning rate boost.
+pub const THERMO_INSIGHT_PROBABILITY_THRESHOLD: f64 = 0.7;
+
+/// HFE (Hierarchical Free Energy) blend weight in consciousness score.
+pub const THERMO_HFE_BLEND_WEIGHT: f32 = 0.15;
+
+/// Learning rate boost when insight probability exceeds threshold.
+pub const THERMO_INSIGHT_LR_BOOST: f32 = 1.2;
+
+/// Jarzynski free energy divergence threshold for anomaly detection.
+pub const THERMO_JARZYNSKI_DIVERGENCE_THRESHOLD: f64 = 2.0;
+
+/// Onsager asymmetry threshold (coupling imbalance alarm).
+pub const THERMO_ONSAGER_ASYMMETRY_THRESHOLD: f64 = 0.3;
+
+/// Onsager coherence damping factor when asymmetry detected.
+pub const THERMO_ONSAGER_COHERENCE_DAMPING: f32 = 0.9;
+
+/// Efficiency below which system enters low-efficiency regime.
+pub const THERMO_LOW_EFFICIENCY_THRESHOLD: f64 = 0.2;
+
+/// Landauer memory pressure threshold (bits erased per cycle).
+pub const THERMO_LANDAUER_MEMORY_PRESSURE_THRESHOLD: f64 = 0.8;
+
+/// Prigogine entropy production violation damping.
+pub const THERMO_PRIGOGINE_VIOLATION_DAMPING: f32 = 0.95;
