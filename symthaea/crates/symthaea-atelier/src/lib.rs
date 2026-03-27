@@ -27,6 +27,7 @@
 
 pub mod color_field;
 pub mod composition;
+pub mod critic;
 pub mod curves;
 pub mod harmony_shapes;
 pub mod iterate;
