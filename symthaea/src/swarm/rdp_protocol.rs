@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! PQC-Secured Remote Display Protocol (RDP) for Symthaea.
 //!
 //! Enables screen sharing and remote control between Symthaea instances
@@ -176,6 +179,13 @@ pub enum ControlMessage {
         state_hash: [u8; 32],
         /// Ed25519 signature over (phi || state_hash).
         signature: Vec<u8>,
+    },
+    /// Clipboard content update (bidirectional sync).
+    ClipboardUpdate {
+        /// Clipboard content as UTF-8 text.
+        content: String,
+        /// Sequence number for ordering.
+        sequence: u64,
     },
 }
 
