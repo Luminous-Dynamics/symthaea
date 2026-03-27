@@ -70,3 +70,7 @@ fn log_renderer_info() {
     eprintln!("[symtropy] Renderer initialized successfully");
     eprintln!("[symtropy] Window should be visible — if black, check GPU drivers");
 }
+
+// Window icon: use symtropy.desktop file for Linux desktop integration.
+// Bevy 0.18 doesn't expose winit window icon API directly.
+// Install: cp symtropy.desktop ~/.local/share/applications/

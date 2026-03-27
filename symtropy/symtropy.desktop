@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Symtropy
+Comment=Consciousness-driven survival — The First Room
+Exec=/srv/luminous-dynamics/symtropy/target/debug/symtropy
+Icon=/srv/luminous-dynamics/symtropy/icon.png
+Terminal=false
+Type=Application
+Categories=Game;
