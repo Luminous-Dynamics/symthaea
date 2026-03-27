@@ -54,10 +54,69 @@ impl Plugin for SymtropyPlugin {
             .add_systems(
                 Update,
                 auto_start.run_if(in_state(GamePhase::Loading)),
+            )
+            // GameOver: log and allow restart with R
+            .add_systems(
+                Update,
+                game_over_system.run_if(in_state(GamePhase::GameOver)),
+            )
+            // Victory: log and allow restart with R
+            .add_systems(
+                Update,
+                victory_system.run_if(in_state(GamePhase::Victory)),
             );
     }
 }
 
 fn auto_start(mut next_state: ResMut<NextState<GamePhase>>) {
     next_state.set(GamePhase::Playing);
+}
+
+fn game_over_system(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut next_state: ResMut<NextState<GamePhase>>,
+    mut leviathan: ResMut<LeviathanState>,
+    mut biometrics: ResMut<BiometricsCtx>,
+    mut logged: Local<bool>,
+) {
+    if !*logged {
+        warn!("=== THE LEVIATHAN HAS CAUGHT YOU ===");
+        warn!("Press R to restart, Escape to quit");
+        *logged = true;
+    }
+    if keyboard.just_pressed(KeyCode::KeyR) {
+        *leviathan = LeviathanState::default();
+        biometrics.encoder.reset();
+        biometrics.model.reset();
+        *logged = false;
+        next_state.set(GamePhase::Playing);
+        info!("Restarting...");
+    }
+    if keyboard.just_pressed(KeyCode::Escape) {
+        std::process::exit(0);
+    }
+}
+
+fn victory_system(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut next_state: ResMut<NextState<GamePhase>>,
+    mut leviathan: ResMut<LeviathanState>,
+    mut biometrics: ResMut<BiometricsCtx>,
+    mut logged: Local<bool>,
+) {
+    if !*logged {
+        info!("=== FUSION CORE EXTRACTED — YOU SURVIVED ===");
+        info!("Press R to play again, Escape to quit");
+        *logged = true;
+    }
+    if keyboard.just_pressed(KeyCode::KeyR) {
+        *leviathan = LeviathanState::default();
+        biometrics.encoder.reset();
+        biometrics.model.reset();
+        *logged = false;
+        next_state.set(GamePhase::Playing);
+    }
+    if keyboard.just_pressed(KeyCode::Escape) {
+        std::process::exit(0);
+    }
 }
