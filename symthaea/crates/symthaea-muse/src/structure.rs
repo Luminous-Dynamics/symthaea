@@ -8,6 +8,8 @@
 //! - Convergent: repeat and develop the best motif
 //! - Incubation: ambient drone / sparse texture
 
+use serde::{Deserialize, Serialize};
+
 use crate::MusicalState;
 use serde::{Deserialize, Serialize};
 

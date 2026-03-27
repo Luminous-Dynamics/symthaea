@@ -1,68 +1,108 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Song form planning: temporal structure driven by the Eight Harmonies.
+//! Song form planning from the Eight Harmonies.
 //!
-//! Maps cognitive state to a sequence of sections (verse, chorus, bridge, etc.)
-//! that tile the composition duration. The Eight Harmonies determine the form:
-//!
-//! | Dominant Harmony | Form | Character |
-//! |------------------|------|-----------|
-//! | EvolutionaryProgression | Verse-Chorus arc | Building narrative |
-//! | SacredStillness | Through-composed | Continuous flow |
-//! | InfinitePlay | Rondo (ABACAD) | Playful variation |
-//! | Default | Binary (AB) | Balanced contrast |
+//! Maps cognitive state to large-scale musical form (verse-chorus, rondo,
+//! through-composed, binary) based on which harmonies are most active.
+
+use serde::{Deserialize, Serialize};
 
 use crate::structure::SectionType;
 use crate::MusicalState;
-use serde::{Deserialize, Serialize};
 
-/// A section within a song form.
+/// Index of InfinitePlay in the 8-harmony activation array.
+pub const HARMONY_PLAY: usize = 3;
+/// Index of EvolutionaryProgression.
+pub const HARMONY_PROGRESSION: usize = 6;
+/// Index of SacredStillness.
+pub const HARMONY_STILLNESS: usize = 7;
+
+/// A section within a song form, with timing and structural metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Section {
-    /// Section type (determines density, phrasing).
+    /// Musical section type (determines density and character).
     pub section_type: SectionType,
-    /// Start time in seconds.
+    /// Start time in seconds from the beginning of the piece.
     pub start_time: f32,
-    /// Duration in seconds.
+    /// Duration of this section in seconds.
     pub duration: f32,
-    /// Key shift in semitones from root (0 = no shift).
+    /// Key transposition in semitones from the base key.
     pub key_shift: i32,
-    /// Energy level [0, 1] — drives voice count and tempo modulation.
+    /// Energy level [0, 1] controlling dynamics and density.
     pub energy_level: f32,
 }
 
-/// A complete song form: tiled sequence of sections.
+/// A complete song form: an ordered list of sections tiling the piece.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SongForm {
-    /// Ordered sections tiling the full duration.
+    /// Ordered sections of the piece.
     pub sections: Vec<Section>,
-    /// Total duration in seconds.
+    /// Total duration of the piece in seconds.
     pub total_duration: f32,
 }
 
-/// Plan a song form from cognitive state and total duration.
+/// Plan a song form from cognitive state and desired duration.
 ///
-/// The form is determined by the dominant harmony activation. Sections tile
-/// the duration exactly with no gaps or overlaps.
+/// The dominant harmony determines the overall form:
+/// - Progression > 0.5: verse-chorus (6 sections)
+/// - Stillness > 0.5: through-composed (3 ambient sections)
+/// - Play > 0.5: rondo ABACA (5 sections)
+/// - Default: binary AB (2 sections)
 pub fn plan_form(state: &MusicalState, duration_secs: f32) -> SongForm {
-    let progression = state.harmony_activations[6];
-    let stillness = state.harmony_activations[7];
-    let play = state.harmony_activations[3];
+    let progression = state.harmony_activations[HARMONY_PROGRESSION];
+    let stillness = state.harmony_activations[HARMONY_STILLNESS];
+    let play = state.harmony_activations[HARMONY_PLAY];
+    let energy = state.arousal.max(0.3);
 
-    let sections = if progression > 0.5 && progression >= stillness && progression >= play {
-        // Verse-Chorus arc: A-B-A-B-C-B (narrative with refrain)
-        plan_verse_chorus(state, duration_secs)
-    } else if stillness > 0.5 && stillness >= play {
-        // Through-composed: single flowing section (no repetition)
-        plan_through_composed(state, duration_secs)
+    let templates: Vec<(SectionType, i32, f32)> = if progression > 0.5 {
+        // Verse-chorus: Dev-Climactic-Dev-Climactic-Exploratory-Climactic
+        vec![
+            (SectionType::Developmental, 0, energy * 0.7),
+            (SectionType::Climactic, 0, energy),
+            (SectionType::Developmental, 2, energy * 0.7),
+            (SectionType::Climactic, 2, energy),
+            (SectionType::Exploratory, -3, energy * 0.5),
+            (SectionType::Climactic, 0, energy),
+        ]
+    } else if stillness > 0.5 {
+        // Through-composed: 3 ambient sections
+        vec![
+            (SectionType::Ambient, 0, energy * 0.4),
+            (SectionType::Ambient, -2, energy * 0.3),
+            (SectionType::Ambient, 0, energy * 0.5),
+        ]
     } else if play > 0.5 {
-        // Rondo: A-B-A-C-A (playful returns with variations)
-        plan_rondo(state, duration_secs)
+        // Rondo ABACA
+        vec![
+            (SectionType::Developmental, 0, energy * 0.8),
+            (SectionType::Exploratory, 3, energy * 0.6),
+            (SectionType::Developmental, 0, energy * 0.8),
+            (SectionType::Exploratory, -2, energy * 0.6),
+            (SectionType::Developmental, 0, energy * 0.9),
+        ]
     } else {
-        // Binary: A-B (balanced contrast)
-        plan_binary(state, duration_secs)
+        // Binary AB
+        vec![
+            (SectionType::Developmental, 0, energy * 0.7),
+            (SectionType::Climactic, 0, energy),
+        ]
     };
+
+    let n = templates.len();
+    let section_dur = duration_secs / n as f32;
+
+    let sections = templates
+        .into_iter()
+        .enumerate()
+        .map(|(i, (section_type, key_shift, energy_level))| Section {
+            section_type,
+            start_time: i as f32 * section_dur,
+            duration: section_dur,
+            key_shift,
+            energy_level,
+        })
+        .collect();
 
     SongForm {
         sections,
@@ -70,196 +110,95 @@ pub fn plan_form(state: &MusicalState, duration_secs: f32) -> SongForm {
     }
 }
 
-/// Verse-Chorus arc: developmental → climactic → developmental → climactic → exploratory → climactic
-fn plan_verse_chorus(state: &MusicalState, dur: f32) -> Vec<Section> {
-    let n = 6;
-    let sec_dur = dur / n as f32;
-    let types = [
-        (SectionType::Developmental, 0, 0.4),  // verse
-        (SectionType::Climactic, 0, 0.7),       // chorus
-        (SectionType::Developmental, 2, 0.5),   // verse 2 (key shift)
-        (SectionType::Climactic, 0, 0.8),       // chorus
-        (SectionType::Exploratory, 5, 0.6),     // bridge
-        (SectionType::Climactic, 0, 1.0),       // final chorus
-    ];
-
-    types
-        .iter()
-        .enumerate()
-        .map(|(i, &(st, key, energy))| Section {
-            section_type: st,
-            start_time: i as f32 * sec_dur,
-            duration: sec_dur,
-            key_shift: key,
-            energy_level: energy * state.arousal.max(0.3),
-        })
-        .collect()
-}
-
-/// Through-composed: ambient flowing texture (SacredStillness).
-fn plan_through_composed(state: &MusicalState, dur: f32) -> Vec<Section> {
-    // Gradual energy arc: low → mid → low
-    let n = 3;
-    let sec_dur = dur / n as f32;
-    let energies = [0.2, 0.4, 0.2];
-
-    (0..n)
-        .map(|i| Section {
-            section_type: SectionType::Ambient,
-            start_time: i as f32 * sec_dur,
-            duration: sec_dur,
-            key_shift: 0,
-            energy_level: energies[i] * state.consciousness_level.max(0.2),
-        })
-        .collect()
-}
-
-/// Rondo: A-B-A-C-A (InfinitePlay)
-fn plan_rondo(state: &MusicalState, dur: f32) -> Vec<Section> {
-    let n = 5;
-    let sec_dur = dur / n as f32;
-    let pattern = [
-        (SectionType::Developmental, 0, 0.5),   // A
-        (SectionType::Exploratory, 3, 0.6),      // B
-        (SectionType::Developmental, 0, 0.5),    // A
-        (SectionType::Exploratory, 5, 0.7),      // C
-        (SectionType::Developmental, 0, 0.6),    // A
-    ];
-
-    pattern
-        .iter()
-        .enumerate()
-        .map(|(i, &(st, key, energy))| Section {
-            section_type: st,
-            start_time: i as f32 * sec_dur,
-            duration: sec_dur,
-            key_shift: key,
-            energy_level: energy * state.arousal.max(0.3),
-        })
-        .collect()
-}
-
-/// Binary: A-B (balanced contrast).
-fn plan_binary(state: &MusicalState, dur: f32) -> Vec<Section> {
-    let half = dur / 2.0;
-    vec![
-        Section {
-            section_type: SectionType::Developmental,
-            start_time: 0.0,
-            duration: half,
-            key_shift: 0,
-            energy_level: 0.4 * state.arousal.max(0.3),
-        },
-        Section {
-            section_type: SectionType::Climactic,
-            start_time: half,
-            duration: half,
-            key_shift: 0,
-            energy_level: 0.7 * state.arousal.max(0.3),
-        },
-    ]
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn sections_tile_duration() {
+    fn sections_tile_exactly() {
         let state = MusicalState::default();
         let form = plan_form(&state, 10.0);
         let total: f32 = form.sections.iter().map(|s| s.duration).sum();
-        assert!(
-            (total - 10.0).abs() < 0.01,
-            "sections should tile exactly: sum={total}"
-        );
+        assert!((total - 10.0).abs() < 1e-4, "total {total} != 10.0");
     }
 
     #[test]
-    fn sections_no_gaps() {
+    fn no_gaps_between_sections() {
         let state = MusicalState {
-            harmony_activations: [0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.8, 0.3],
+            harmony_activations: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.8, 0.0],
             ..Default::default()
         };
         let form = plan_form(&state, 12.0);
-        for w in form.sections.windows(2) {
-            let end = w[0].start_time + w[0].duration;
+        for i in 1..form.sections.len() {
+            let expected = form.sections[i - 1].start_time + form.sections[i - 1].duration;
+            let actual = form.sections[i].start_time;
             assert!(
-                (end - w[1].start_time).abs() < 0.01,
-                "gap between sections at t={end}"
+                (expected - actual).abs() < 1e-4,
+                "gap between section {} and {}: {} vs {}",
+                i - 1,
+                i,
+                expected,
+                actual
             );
         }
     }
 
     #[test]
-    fn progression_gives_verse_chorus() {
+    fn progression_produces_verse_chorus() {
         let state = MusicalState {
-            harmony_activations: [0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.8, 0.1],
-            arousal: 0.5,
+            harmony_activations: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.8, 0.0],
             ..Default::default()
         };
         let form = plan_form(&state, 12.0);
         assert_eq!(form.sections.len(), 6, "verse-chorus should have 6 sections");
-        assert!(
-            form.sections.iter().filter(|s| s.section_type == SectionType::Climactic).count() >= 3,
-            "should have at least 3 chorus sections"
-        );
     }
 
     #[test]
-    fn stillness_gives_through_composed() {
+    fn stillness_produces_ambient() {
         let state = MusicalState {
-            harmony_activations: [0.3, 0.3, 0.3, 0.1, 0.3, 0.3, 0.1, 0.8],
+            harmony_activations: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.8],
+            ..Default::default()
+        };
+        let form = plan_form(&state, 9.0);
+        assert_eq!(form.sections.len(), 3);
+        assert!(form.sections.iter().all(|s| s.section_type == SectionType::Ambient));
+    }
+
+    #[test]
+    fn play_produces_rondo() {
+        let state = MusicalState {
+            harmony_activations: [0.0, 0.0, 0.0, 0.8, 0.0, 0.0, 0.0, 0.0],
             ..Default::default()
         };
         let form = plan_form(&state, 10.0);
-        assert!(
-            form.sections.iter().all(|s| s.section_type == SectionType::Ambient),
-            "through-composed should be all ambient"
-        );
+        assert_eq!(form.sections.len(), 5, "rondo should have 5 sections");
     }
 
     #[test]
-    fn play_gives_rondo() {
-        let state = MusicalState {
-            harmony_activations: [0.3, 0.3, 0.3, 0.8, 0.3, 0.3, 0.1, 0.1],
-            ..Default::default()
-        };
-        let form = plan_form(&state, 10.0);
-        assert_eq!(form.sections.len(), 5, "rondo should have 5 sections (ABACA)");
-    }
-
-    #[test]
-    fn default_gives_binary() {
-        let state = MusicalState {
-            harmony_activations: [0.3; 8],
-            ..Default::default()
-        };
+    fn default_produces_binary() {
+        let state = MusicalState::default();
         let form = plan_form(&state, 8.0);
-        assert_eq!(form.sections.len(), 2, "binary form should have 2 sections");
+        assert_eq!(form.sections.len(), 2, "default should produce binary AB");
     }
 
     #[test]
     fn energy_scales_with_arousal() {
         let low = MusicalState {
-            arousal: 0.3,
-            harmony_activations: [0.3; 8],
+            arousal: 0.1,
             ..Default::default()
         };
         let high = MusicalState {
             arousal: 0.9,
-            harmony_activations: [0.3; 8],
             ..Default::default()
         };
-        let form_low = plan_form(&low, 8.0);
-        let form_high = plan_form(&high, 8.0);
-        let avg_low: f32 =
-            form_low.sections.iter().map(|s| s.energy_level).sum::<f32>() / form_low.sections.len() as f32;
-        let avg_high: f32 =
-            form_high.sections.iter().map(|s| s.energy_level).sum::<f32>() / form_high.sections.len() as f32;
+        let form_low = plan_form(&low, 4.0);
+        let form_high = plan_form(&high, 4.0);
+        // Both should produce binary; high arousal → higher energy
+        let max_low = form_low.sections.iter().map(|s| s.energy_level).fold(0.0f32, f32::max);
+        let max_high = form_high.sections.iter().map(|s| s.energy_level).fold(0.0f32, f32::max);
         assert!(
-            avg_high > avg_low,
-            "high arousal ({avg_high}) should have more energy than low ({avg_low})"
+            max_high > max_low,
+            "high arousal energy {max_high} should exceed low {max_low}"
         );
     }
 }

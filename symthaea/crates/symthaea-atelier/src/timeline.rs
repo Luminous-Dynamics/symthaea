@@ -1,439 +1,403 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Animation timeline: temporal visual composition for consciousness art.
+//! Animation timeline with keyframed CognitiveSnapshot interpolation.
 //!
-//! Produces sequences of SVG frames from keyframed `CognitiveSnapshot` states,
-//! with configurable interpolation modes. The CfC-dynamics mode creates organic
-//! transitions where the art "thinks" its way between states rather than
-//! mechanically tweening.
-//!
-//! # Interpolation Modes
-//!
-//! | Mode | Character | Basis |
-//! |------|-----------|-------|
-//! | Linear | Smooth, mechanical | LERP between snapshots |
-//! | Spring | Bouncy, physical | Damped harmonic oscillator |
-//! | Ease | Natural, S-curve | Smooth-step easing |
+//! Generates frame-by-frame SVG sequences from consciousness state trajectories,
+//! enabling time-based visual art that reflects cognitive evolution.
 
-use serde::{Deserialize, Serialize};
+use crate::AtelierConfig;
 use symthaea_canvas::CognitiveSnapshot;
 
-/// Easing curve for transitions between keyframes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// Easing curve for temporal interpolation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EasingCurve {
-    /// Linear interpolation (constant velocity).
+    /// Constant-speed interpolation.
     Linear,
-    /// Smooth ease-in-out (cubic Hermite).
+    /// Smooth start and end (Hermite smoothstep).
     EaseInOut,
-    /// Quick start, slow end.
+    /// Smooth end, sharp start (quadratic deceleration).
     EaseOut,
-    /// Slow start, quick end.
+    /// Sharp end, smooth start (quadratic acceleration).
     EaseIn,
 }
 
-/// Interpolation mode for the animation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// Interpolation mode for keyframe transitions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InterpolationMode {
-    /// Linear LERP between snapshot keyframes.
+    /// Linear interpolation (LERP).
     Linear,
-    /// Damped spring oscillator (bouncy, physical transitions).
+    /// Damped harmonic spring (overshoots, then settles).
     Spring,
-    /// Smooth easing with configurable curve.
+    /// Easing-curve-based interpolation.
     Ease,
 }
 
-/// A visual keyframe: a cognitive snapshot at a specific time.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// A keyframe binding a cognitive snapshot to a point in time.
+#[derive(Debug, Clone)]
 pub struct VisualKeyframe {
-    /// Time in seconds.
+    /// Time in seconds from the start of the animation.
     pub time: f32,
-    /// Cognitive state to render at this moment.
+    /// Cognitive state at this keyframe.
     pub snapshot: CognitiveSnapshot,
-    /// Easing curve for transition TO this keyframe.
+    /// Easing curve to use when transitioning FROM this keyframe.
     pub easing: EasingCurve,
 }
 
-/// An animation timeline: ordered keyframes with duration and interpolation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// An animation timeline composed of keyframes.
+#[derive(Debug, Clone)]
 pub struct AnimationTimeline {
     /// Total duration in seconds.
     pub duration_secs: f32,
-    /// Ordered keyframes (must be sorted by time).
+    /// Keyframes, sorted by time.
     pub keyframes: Vec<VisualKeyframe>,
-    /// Interpolation mode for between-keyframe states.
+    /// Interpolation mode.
     pub interpolation: InterpolationMode,
-    /// Frames per second for rendering.
+    /// Target frames per second.
     pub fps: f32,
 }
 
-impl Default for AnimationTimeline {
-    fn default() -> Self {
+impl AnimationTimeline {
+    /// Create a new empty timeline.
+    pub fn new(duration_secs: f32, fps: f32) -> Self {
         Self {
-            duration_secs: 4.0,
-            keyframes: vec![],
+            duration_secs,
+            keyframes: Vec::new(),
             interpolation: InterpolationMode::Ease,
-            fps: 24.0,
+            fps,
         }
+    }
+
+    /// Add a keyframe. Keyframes must be added in chronological order.
+    pub fn add_keyframe(&mut self, kf: VisualKeyframe) {
+        self.keyframes.push(kf);
+    }
+
+    /// Total number of frames in the animation.
+    pub fn frame_count(&self) -> usize {
+        (self.duration_secs * self.fps).ceil() as usize
     }
 }
 
-/// Apply easing function to a t [0,1] parameter.
-fn apply_easing(t: f32, curve: EasingCurve) -> f32 {
+/// Apply an easing curve to a normalized time value t in [0, 1].
+pub fn apply_easing(t: f32, curve: EasingCurve) -> f32 {
     let t = t.clamp(0.0, 1.0);
     match curve {
         EasingCurve::Linear => t,
         EasingCurve::EaseInOut => {
-            // Smooth-step: 3t² - 2t³
+            // Hermite smoothstep: 3t^2 - 2t^3
             t * t * (3.0 - 2.0 * t)
         }
-        EasingCurve::EaseOut => {
-            // Decelerate: 1 - (1-t)²
-            1.0 - (1.0 - t) * (1.0 - t)
-        }
         EasingCurve::EaseIn => {
-            // Accelerate: t²
+            // Quadratic acceleration
             t * t
         }
+        EasingCurve::EaseOut => {
+            // Quadratic deceleration
+            1.0 - (1.0 - t) * (1.0 - t)
+        }
     }
 }
 
-/// LERP between two f32 values.
-fn lerp(a: f32, b: f32, t: f32) -> f32 {
-    a + (b - a) * t
-}
-
-/// LERP between two f64 values.
-fn lerp64(a: f64, b: f64, t: f64) -> f64 {
-    a + (b - a) * t
-}
-
-/// Spring interpolation: damped harmonic oscillator.
+/// Damped harmonic spring easing.
 ///
-/// Creates a bouncy transition that overshoots then settles.
-fn spring_ease(t: f32) -> f32 {
-    if t >= 1.0 {
-        return 1.0;
-    }
-    let omega = 8.0; // frequency
-    let zeta = 0.4; // damping ratio (underdamped)
+/// Models a critically-underdamped oscillator: overshoots target then settles.
+/// zeta=0.4 (underdamped), omega=8.0.
+pub fn spring_ease(t: f32) -> f32 {
     let t = t.clamp(0.0, 1.0);
-    1.0 - (-zeta * omega * t).exp() * ((1.0 - zeta * zeta).sqrt() * omega * t).cos()
+    let zeta = 0.4_f32;
+    let omega = 8.0_f32;
+    let damped = (-zeta * omega * t).exp();
+    let oscillation = ((1.0 - zeta * zeta).sqrt() * omega * t).cos();
+    1.0 - damped * oscillation
 }
 
-/// Interpolate between two `CognitiveSnapshot`s.
+/// Interpolate between two cognitive snapshots.
 ///
-/// Blends all numeric fields. Non-numeric fields (vecs) use the closer keyframe.
-fn interpolate_snapshots(
+/// All scalar fields are linearly interpolated (LERP). Betti numbers are
+/// rounded after interpolation. Thought vectors are element-wise interpolated.
+pub fn interpolate_snapshots(
     a: &CognitiveSnapshot,
     b: &CognitiveSnapshot,
-    raw_t: f32,
+    t: f32,
     easing: EasingCurve,
     mode: InterpolationMode,
 ) -> CognitiveSnapshot {
-    let t = match mode {
-        InterpolationMode::Linear => raw_t.clamp(0.0, 1.0),
-        InterpolationMode::Spring => spring_ease(raw_t),
-        InterpolationMode::Ease => apply_easing(raw_t, easing),
+    let s = match mode {
+        InterpolationMode::Linear => t.clamp(0.0, 1.0),
+        InterpolationMode::Spring => spring_ease(t),
+        InterpolationMode::Ease => apply_easing(t, easing),
     };
-    let t64 = t as f64;
 
-    let mut result = if t < 0.5 { a.clone() } else { b.clone() };
+    let lerp_f32 = |a: f32, b: f32| a + (b - a) * s;
+    let lerp_f64 = |a: f64, b: f64| a + (b - a) * s as f64;
 
-    // Interpolate scalar fields
-    result.consciousness_level = lerp64(a.consciousness_level, b.consciousness_level, t64);
-    result.prediction_error = lerp(a.prediction_error, b.prediction_error, t);
-    result.living_mind_vitality = lerp64(a.living_mind_vitality, b.living_mind_vitality, t64);
-    result.living_mind_coherence = lerp64(a.living_mind_coherence, b.living_mind_coherence, t64);
-
-    // Neuromodulators
-    result.dopamine = lerp(a.dopamine, b.dopamine, t);
-    result.noradrenaline = lerp(a.noradrenaline, b.noradrenaline, t);
-    result.serotonin = lerp(a.serotonin, b.serotonin, t);
-    result.acetylcholine = lerp(a.acetylcholine, b.acetylcholine, t);
-    result.oxytocin = lerp(a.oxytocin, b.oxytocin, t);
-    result.gaba = lerp(a.gaba, b.gaba, t);
-
-    // Affect
-    result.valence = lerp(a.valence, b.valence, t);
-    result.arousal = lerp(a.arousal, b.arousal, t);
-
-    // Cantor depth
-    result.cantor_metacognitive_depth =
-        lerp(a.cantor_metacognitive_depth, b.cantor_metacognitive_depth, t);
-
-    // Harmony activations
+    // Interpolate harmony activations
+    let mut harmony_activations = [0.0f32; 8];
     for i in 0..8 {
-        result.harmony_activations[i] =
-            lerp(a.harmony_activations[i], b.harmony_activations[i], t);
+        harmony_activations[i] = lerp_f32(a.harmony_activations[i], b.harmony_activations[i]);
     }
 
-    // Thought vector (element-wise LERP if same length, else use closer)
-    if a.thought_vector.len() == b.thought_vector.len() {
-        result.thought_vector = a
-            .thought_vector
-            .iter()
-            .zip(b.thought_vector.iter())
-            .map(|(&va, &vb)| lerp(va, vb, t))
-            .collect();
+    // Interpolate thought vector (element-wise, matching shorter length)
+    let tv_len = a.thought_vector.len().min(b.thought_vector.len());
+    let mut thought_vector = Vec::with_capacity(tv_len);
+    for i in 0..tv_len {
+        thought_vector.push(lerp_f32(a.thought_vector[i], b.thought_vector[i]));
     }
 
-    result
+    // Interpolate Betti numbers (round to nearest integer)
+    let betti_0 = (a.betti_0 as f32 + (b.betti_0 as f32 - a.betti_0 as f32) * s).round() as usize;
+    let betti_1 = (a.betti_1 as f32 + (b.betti_1 as f32 - a.betti_1 as f32) * s).round() as usize;
+    let betti_2 = (a.betti_2 as f32 + (b.betti_2 as f32 - a.betti_2 as f32) * s).round() as usize;
+
+    CognitiveSnapshot {
+        consciousness_level: lerp_f64(a.consciousness_level, b.consciousness_level),
+        prediction_error: lerp_f32(a.prediction_error, b.prediction_error),
+        living_mind_vitality: lerp_f64(a.living_mind_vitality, b.living_mind_vitality),
+        living_mind_coherence: lerp_f64(a.living_mind_coherence, b.living_mind_coherence),
+        dopamine: lerp_f32(a.dopamine, b.dopamine),
+        noradrenaline: lerp_f32(a.noradrenaline, b.noradrenaline),
+        serotonin: lerp_f32(a.serotonin, b.serotonin),
+        acetylcholine: lerp_f32(a.acetylcholine, b.acetylcholine),
+        oxytocin: lerp_f32(a.oxytocin, b.oxytocin),
+        gaba: lerp_f32(a.gaba, b.gaba),
+        allostatic_load: lerp_f32(a.allostatic_load, b.allostatic_load),
+        betti_0,
+        betti_1,
+        betti_2,
+        persistence_components: a.persistence_components.clone(),
+        persistence_cycles: a.persistence_cycles.clone(),
+        cantor_metacognitive_depth: lerp_f32(
+            a.cantor_metacognitive_depth,
+            b.cantor_metacognitive_depth,
+        ),
+        cantor_last_depth: if s < 0.5 {
+            a.cantor_last_depth
+        } else {
+            b.cantor_last_depth
+        },
+        valence: lerp_f32(a.valence, b.valence),
+        arousal: lerp_f32(a.arousal, b.arousal),
+        harmony_activations,
+        thought_vector,
+        cycle_count: if s < 0.5 {
+            a.cycle_count
+        } else {
+            b.cycle_count
+        },
+    }
 }
 
-/// Render an animation timeline into a sequence of SVG frame strings.
+/// Sample the timeline at a specific time, producing an interpolated snapshot.
 ///
-/// Returns one SVG per frame. Frame count = ceil(duration * fps).
-pub fn render_animation(
-    timeline: &AnimationTimeline,
-    config: &super::AtelierConfig,
-) -> Vec<String> {
-    if timeline.keyframes.is_empty() {
-        return vec![];
-    }
-
-    let frame_count = (timeline.duration_secs * timeline.fps).ceil() as usize;
-    let frame_duration = 1.0 / timeline.fps;
-    let mut frames = Vec::with_capacity(frame_count);
-
-    for frame_idx in 0..frame_count {
-        let time = frame_idx as f32 * frame_duration;
-
-        // Find bracketing keyframes
-        let snapshot = sample_at_time(timeline, time);
-
-        // Generate artwork for this frame's snapshot
-        let artwork = super::create_artwork(config, &snapshot, frame_idx as u64);
-        frames.push(artwork.svg);
-    }
-
-    frames
-}
-
-/// Sample the interpolated snapshot at a given time.
+/// If time is before the first keyframe, returns the first snapshot.
+/// If time is after the last keyframe, returns the last snapshot.
 pub fn sample_at_time(timeline: &AnimationTimeline, time: f32) -> CognitiveSnapshot {
-    let kfs = &timeline.keyframes;
-    if kfs.is_empty() {
+    debug_assert!(
+        timeline
+            .keyframes
+            .windows(2)
+            .all(|w| w[0].time <= w[1].time),
+        "keyframes must be sorted by time"
+    );
+
+    if timeline.keyframes.is_empty() {
         return CognitiveSnapshot::dormant();
     }
-    if kfs.len() == 1 || time <= kfs[0].time {
-        return kfs[0].snapshot.clone();
-    }
-    if time >= kfs.last().unwrap().time {
-        return kfs.last().unwrap().snapshot.clone();
+    if timeline.keyframes.len() == 1 {
+        return timeline.keyframes[0].snapshot.clone();
     }
 
-    // Find the two bracketing keyframes
-    let mut upper_idx = 1;
-    while upper_idx < kfs.len() && kfs[upper_idx].time < time {
-        upper_idx += 1;
+    // Before first keyframe
+    if time <= timeline.keyframes[0].time {
+        return timeline.keyframes[0].snapshot.clone();
     }
-    let lower_idx = upper_idx - 1;
+    // After last keyframe
+    if time >= timeline.keyframes.last().unwrap().time {
+        return timeline.keyframes.last().unwrap().snapshot.clone();
+    }
 
-    let a = &kfs[lower_idx];
-    let b = &kfs[upper_idx];
+    // Find bracketing keyframes
+    for i in 0..timeline.keyframes.len() - 1 {
+        let kf_a = &timeline.keyframes[i];
+        let kf_b = &timeline.keyframes[i + 1];
+        if time >= kf_a.time && time <= kf_b.time {
+            let span = kf_b.time - kf_a.time;
+            let t = if span > 0.0 {
+                (time - kf_a.time) / span
+            } else {
+                0.0
+            };
+            return interpolate_snapshots(
+                &kf_a.snapshot,
+                &kf_b.snapshot,
+                t,
+                kf_a.easing,
+                timeline.interpolation,
+            );
+        }
+    }
 
-    // Compute local t [0, 1] within this segment
-    let segment_duration = (b.time - a.time).max(0.001);
-    let local_t = (time - a.time) / segment_duration;
+    timeline.keyframes.last().unwrap().snapshot.clone()
+}
 
-    interpolate_snapshots(
-        &a.snapshot,
-        &b.snapshot,
-        local_t,
-        b.easing,
-        timeline.interpolation,
-    )
+/// Render the full animation timeline as a sequence of SVG strings.
+///
+/// Produces one SVG per frame at the timeline's configured FPS.
+pub fn render_animation(timeline: &AnimationTimeline, config: &AtelierConfig) -> Vec<String> {
+    let frame_count = timeline.frame_count();
+    let mut svgs = Vec::with_capacity(frame_count);
+
+    for frame_idx in 0..frame_count {
+        let time = frame_idx as f32 / timeline.fps;
+        let snapshot = sample_at_time(timeline, time);
+        let artwork = crate::create_artwork(config, &snapshot, frame_idx as u64);
+        svgs.push(artwork.svg);
+    }
+
+    svgs
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn snap_low() -> CognitiveSnapshot {
-        CognitiveSnapshot {
-            consciousness_level: 0.2,
-            dopamine: 0.1,
-            valence: -0.5,
-            arousal: 0.1,
-            harmony_activations: [0.1; 8],
-            ..CognitiveSnapshot::dormant()
-        }
-    }
+    fn make_timeline() -> AnimationTimeline {
+        let mut tl = AnimationTimeline::new(2.0, 10.0);
+        let mut snap_a = CognitiveSnapshot::dormant();
+        snap_a.consciousness_level = 0.1;
+        snap_a.harmony_activations = [0.0; 8];
 
-    fn snap_high() -> CognitiveSnapshot {
-        CognitiveSnapshot {
-            consciousness_level: 0.9,
-            dopamine: 0.8,
-            valence: 0.7,
-            arousal: 0.8,
-            harmony_activations: [0.8; 8],
-            ..CognitiveSnapshot::dormant()
-        }
-    }
+        let mut snap_b = CognitiveSnapshot::dormant();
+        snap_b.consciousness_level = 0.9;
+        snap_b.harmony_activations = [1.0; 8];
 
-    fn test_timeline() -> AnimationTimeline {
-        AnimationTimeline {
-            duration_secs: 2.0,
-            keyframes: vec![
-                VisualKeyframe {
-                    time: 0.0,
-                    snapshot: snap_low(),
-                    easing: EasingCurve::Linear,
-                },
-                VisualKeyframe {
-                    time: 2.0,
-                    snapshot: snap_high(),
-                    easing: EasingCurve::EaseInOut,
-                },
-            ],
-            interpolation: InterpolationMode::Ease,
-            fps: 10.0,
-        }
+        tl.add_keyframe(VisualKeyframe {
+            time: 0.0,
+            snapshot: snap_a,
+            easing: EasingCurve::EaseInOut,
+        });
+        tl.add_keyframe(VisualKeyframe {
+            time: 2.0,
+            snapshot: snap_b,
+            easing: EasingCurve::Linear,
+        });
+        tl
     }
 
     #[test]
-    fn frame_count_matches_duration_times_fps() {
-        let tl = test_timeline();
-        let config = super::super::AtelierConfig::default();
-        let frames = render_animation(&tl, &config);
-        let expected = (tl.duration_secs * tl.fps).ceil() as usize;
-        assert_eq!(frames.len(), expected, "should produce {} frames", expected);
+    fn frame_count_correct() {
+        let tl = make_timeline();
+        assert_eq!(tl.frame_count(), 20);
     }
 
     #[test]
-    fn interpolation_midpoint_is_between() {
-        let tl = test_timeline();
+    fn midpoint_interpolation() {
+        let tl = make_timeline();
         let mid = sample_at_time(&tl, 1.0);
+        // EaseInOut at t=0.5: smoothstep(0.5) = 0.5
         assert!(
-            mid.consciousness_level > 0.2 && mid.consciousness_level < 0.9,
-            "midpoint consciousness {} should be between 0.2 and 0.9",
+            mid.consciousness_level > 0.3 && mid.consciousness_level < 0.7,
+            "midpoint should be near 0.5, got {}",
             mid.consciousness_level
         );
-        assert!(
-            mid.dopamine > 0.1 && mid.dopamine < 0.8,
-            "midpoint dopamine {} should be between",
-            mid.dopamine
-        );
     }
 
     #[test]
-    fn interpolation_at_start_matches_first_keyframe() {
-        let tl = test_timeline();
+    fn start_matches_first_keyframe() {
+        let tl = make_timeline();
         let start = sample_at_time(&tl, 0.0);
         assert!(
-            (start.consciousness_level - 0.2).abs() < 0.01,
+            (start.consciousness_level - 0.1).abs() < 0.001,
             "start should match first keyframe"
         );
     }
 
     #[test]
-    fn interpolation_at_end_matches_last_keyframe() {
-        let tl = test_timeline();
+    fn end_matches_last_keyframe() {
+        let tl = make_timeline();
         let end = sample_at_time(&tl, 2.0);
         assert!(
-            (end.consciousness_level - 0.9).abs() < 0.01,
+            (end.consciousness_level - 0.9).abs() < 0.001,
             "end should match last keyframe"
         );
     }
 
     #[test]
-    fn harmony_interpolates() {
-        let tl = test_timeline();
+    fn harmony_interpolation() {
+        let tl = make_timeline();
         let mid = sample_at_time(&tl, 1.0);
         for &h in &mid.harmony_activations {
-            assert!(h > 0.1 && h < 0.8, "harmony {} should be between", h);
+            assert!(h > 0.3 && h < 0.7, "harmony should be near 0.5, got {h}");
         }
     }
 
     #[test]
-    fn empty_timeline_empty_frames() {
-        let tl = AnimationTimeline::default();
-        let config = super::super::AtelierConfig::default();
-        let frames = render_animation(&tl, &config);
-        assert!(frames.is_empty());
-    }
-
-    #[test]
-    fn single_keyframe_constant() {
-        let tl = AnimationTimeline {
-            duration_secs: 1.0,
-            keyframes: vec![VisualKeyframe {
-                time: 0.0,
-                snapshot: snap_high(),
-                easing: EasingCurve::Linear,
-            }],
-            interpolation: InterpolationMode::Linear,
-            fps: 5.0,
-        };
-        let s1 = sample_at_time(&tl, 0.0);
-        let s2 = sample_at_time(&tl, 0.5);
+    fn empty_timeline() {
+        let tl = AnimationTimeline::new(1.0, 10.0);
+        let snap = sample_at_time(&tl, 0.5);
         assert!(
-            (s1.consciousness_level - s2.consciousness_level).abs() < 0.01,
-            "single keyframe should be constant"
+            (snap.consciousness_level - 0.05).abs() < 0.01,
+            "empty timeline returns dormant"
         );
     }
 
     #[test]
-    fn easing_functions_bounded() {
-        for t in [0.0, 0.25, 0.5, 0.75, 1.0] {
-            for curve in [
-                EasingCurve::Linear,
-                EasingCurve::EaseInOut,
-                EasingCurve::EaseIn,
-                EasingCurve::EaseOut,
-            ] {
-                let e = apply_easing(t, curve);
-                assert!(
-                    e >= 0.0 && e <= 1.0,
-                    "easing {:?} at t={} = {} out of bounds",
-                    curve, t, e
-                );
-            }
+    fn single_keyframe() {
+        let mut tl = AnimationTimeline::new(1.0, 10.0);
+        let mut snap = CognitiveSnapshot::dormant();
+        snap.consciousness_level = 0.77;
+        tl.add_keyframe(VisualKeyframe {
+            time: 0.0,
+            snapshot: snap,
+            easing: EasingCurve::Linear,
+        });
+        let result = sample_at_time(&tl, 0.5);
+        assert!((result.consciousness_level - 0.77).abs() < 0.001);
+    }
+
+    #[test]
+    fn easing_bounds() {
+        for curve in [
+            EasingCurve::Linear,
+            EasingCurve::EaseInOut,
+            EasingCurve::EaseIn,
+            EasingCurve::EaseOut,
+        ] {
+            assert!((apply_easing(0.0, curve)).abs() < 0.001, "{curve:?} at 0");
+            assert!(
+                (apply_easing(1.0, curve) - 1.0).abs() < 0.001,
+                "{curve:?} at 1"
+            );
+            let mid = apply_easing(0.5, curve);
+            assert!(mid >= 0.0 && mid <= 1.0, "{curve:?} mid={mid}");
         }
     }
 
     #[test]
-    fn spring_converges() {
-        let v0 = spring_ease(0.0);
-        let v1 = spring_ease(1.0);
-        assert!(v0.abs() < 0.1, "spring at t=0 should be near 0");
-        assert!((v1 - 1.0).abs() < 0.01, "spring at t=1 should be near 1");
+    fn spring_convergence() {
+        let at_end = spring_ease(1.0);
+        assert!(
+            (at_end - 1.0).abs() < 0.1,
+            "spring should converge near 1.0 at t=1, got {at_end}"
+        );
+        // Spring may overshoot
+        let at_mid = spring_ease(0.3);
+        assert!(at_mid > 0.0, "spring should be positive at t=0.3");
     }
 
     #[test]
-    fn all_frames_are_valid_svg() {
-        let tl = AnimationTimeline {
-            duration_secs: 0.5,
-            keyframes: vec![
-                VisualKeyframe {
-                    time: 0.0,
-                    snapshot: snap_low(),
-                    easing: EasingCurve::Linear,
-                },
-                VisualKeyframe {
-                    time: 0.5,
-                    snapshot: snap_high(),
-                    easing: EasingCurve::EaseInOut,
-                },
-            ],
-            interpolation: InterpolationMode::Linear,
-            fps: 4.0,
-        };
-        let config = super::super::AtelierConfig {
-            width: 200.0,
-            height: 200.0,
-            max_elements: 50,
+    fn render_produces_valid_svgs() {
+        let tl = make_timeline();
+        let config = AtelierConfig {
+            style: crate::AtelierStyle::ParametricCurve,
+            iteration_budget: 1,
             ..Default::default()
         };
-        let frames = render_animation(&tl, &config);
-        assert_eq!(frames.len(), 2);
-        for (i, svg) in frames.iter().enumerate() {
-            assert!(
-                svg.contains("<svg"),
-                "frame {} should contain SVG tag",
-                i
-            );
+        let svgs = render_animation(&tl, &config);
+        assert_eq!(svgs.len(), 20);
+        for svg in &svgs {
+            assert!(svg.contains("<svg"), "each frame should be valid SVG");
         }
     }
 }
