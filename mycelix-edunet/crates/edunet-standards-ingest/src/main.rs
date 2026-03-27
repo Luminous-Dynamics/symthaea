@@ -136,6 +136,24 @@ enum Commands {
         output: Option<PathBuf>,
     },
 
+    /// Fetch a K-12 subject source (c3, iste, arts, pe, cefr)
+    IngestK12 {
+        /// Source ID: c3-k2, c3-35, c3-68, c3-912, iste-students, arts-elementary, arts-secondary, pe-elementary, pe-secondary, cefr
+        source_id: String,
+        /// Output file path (default: stdout)
+        #[arg(long, short = 'o')]
+        output: Option<PathBuf>,
+    },
+
+    /// Fetch Luminous Dynamics curriculum (symthaea, mycelix, programming)
+    IngestLuminous {
+        /// Source ID: symthaea, mycelix, programming
+        source_id: String,
+        /// Output file path (default: stdout)
+        #[arg(long, short = 'o')]
+        output: Option<PathBuf>,
+    },
+
     /// List MIT OCW departments
     ListOcw,
 
@@ -400,6 +418,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 eprintln!("{} milestones", doc.nodes.len());
             }
             eprintln!("Done.");
+        }
+
+        // ============================================================
+        // K-12 Subject Sources
+        // ============================================================
+        Commands::IngestK12 { source_id, output } => {
+            use edunet_standards_ingest::sources::k12_subjects::*;
+
+            let doc = match source_id.as_str() {
+                s if s.starts_with("c3-") => C3Source::new().fetch(s)?,
+                "iste-students" => IsteSource::new().fetch("iste-students")?,
+                s if s.starts_with("arts-") => ArtsSource::new().fetch(s)?,
+                s if s.starts_with("pe-") => PeSource::new().fetch(s)?,
+                "cefr" => CefrSource::new().fetch("cefr")?,
+                _ => return Err(format!("Unknown K-12 source: {source_id}. Options: c3-k2, c3-35, c3-68, c3-912, iste-students, arts-elementary, arts-secondary, pe-elementary, pe-secondary, cefr").into()),
+            };
+            eprintln!("Generated {} nodes for {}", doc.nodes.len(), doc.metadata.title);
+            write_document(&doc, output.as_deref(), true)?;
+        }
+
+        // ============================================================
+        // Luminous Dynamics Curriculum
+        // ============================================================
+        Commands::IngestLuminous { source_id, output } => {
+            let source = edunet_standards_ingest::sources::luminous::LuminousSource::new();
+            eprintln!("Generating Luminous Dynamics curriculum: {}...", source_id);
+            let doc = source.fetch(&source_id)?;
+            write_document(&doc, output.as_deref(), true)?;
         }
 
         // ============================================================

@@ -1,0 +1,412 @@
+{
+  "metadata": {
+    "title": "Programming Languages for AI & Humans",
+    "framework": "Luminous Dynamics",
+    "source": "https://luminousdynamics.org",
+    "grade_level": "Undergraduate",
+    "subject_area": "Computer Science",
+    "domain": "Computer Science",
+    "version": "2026",
+    "total_standards": 10,
+    "domains": [
+      "Mycelix"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Self-referential curriculum about Programming Languages for AI & Humans. ISCED-F Field 11: Meta-Learning.",
+    "academic_level": "Undergraduate",
+    "institution": "Luminous Dynamics"
+  },
+  "nodes": [
+    {
+      "id": "RUST-101",
+      "title": "Rust Fundamentals",
+      "description": "Ownership, borrowing, lifetimes. Structs, enums, pattern matching. Error handling with Result/Option. Traits and generics. The type system as a correctness tool. Cargo, crates.io, module system. Designed for both human learners and Symthaea's School/Broca code generation pipeline.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Computer Science",
+      "subdomain": "Mycelix",
+      "tags": [
+        "rust",
+        "ownership",
+        "borrowing",
+        "traits",
+        "cargo"
+      ],
+      "estimated_hours": 90,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "RUST-101",
+          "description": "Rust Fundamentals",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 2,
+      "course_level": "200-300"
+    },
+    {
+      "id": "RUST-201",
+      "title": "Rust Systems Programming",
+      "description": "Unsafe Rust and FFI. Concurrency with async/await and tokio. Smart pointers (Box, Rc, Arc, RefCell). Interior mutability. Trait objects vs generics. Procedural macros. Performance optimization with criterion benchmarks.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "Mycelix",
+      "tags": [
+        "rust",
+        "async",
+        "concurrency",
+        "unsafe",
+        "macros",
+        "tokio"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "RUST-201",
+          "description": "Rust Systems Programming",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 3,
+      "course_level": "200-300"
+    },
+    {
+      "id": "RUST-301",
+      "title": "Rust for Consciousness Computing",
+      "description": "Building HDC systems in Rust. SIMD-optimized hypervector operations. Rayon parallelism. serde serialization for neural state. candle GPU compute. WASM compilation targets. The symthaea-core architecture as a case study.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Mycelix",
+      "tags": [
+        "rust",
+        "hdc",
+        "simd",
+        "rayon",
+        "wasm",
+        "candle",
+        "symthaea"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "RUST-301",
+          "description": "Rust for Consciousness Computing",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 3,
+      "course_level": "200-300"
+    },
+    {
+      "id": "NIX-101",
+      "title": "Nix Language Fundamentals",
+      "description": "The Nix expression language: pure functional, lazy evaluation. Attribute sets, let-in bindings, functions, imports. Derivations as the build primitive. Nix store and content-addressable storage. Reproducibility guarantees.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Computer Science",
+      "subdomain": "Mycelix",
+      "tags": [
+        "nix",
+        "functional",
+        "derivations",
+        "reproducibility",
+        "nix-store"
+      ],
+      "estimated_hours": 60,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "NIX-101",
+          "description": "Nix Language Fundamentals",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 1,
+      "course_level": "200-300"
+    },
+    {
+      "id": "NIX-201",
+      "title": "NixOS System Configuration",
+      "description": "Declarative system configuration with configuration.nix. Module system: options, config, imports. Flakes for reproducible project environments. Overlays and overrides. Cross-compilation. NixOS containers and systemd integration.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "Mycelix",
+      "tags": [
+        "nixos",
+        "flakes",
+        "modules",
+        "overlays",
+        "systemd"
+      ],
+      "estimated_hours": 90,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "NIX-201",
+          "description": "NixOS System Configuration",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 2,
+      "course_level": "200-300"
+    },
+    {
+      "id": "NIX-301",
+      "title": "Nix for Infrastructure",
+      "description": "Building development environments with nix develop. CI/CD with Nix (Hydra, GitHub Actions). Multi-platform builds. Nix for Rust projects (mold, sccache, cargo target isolation). The Luminous Nix causal graph learning system as case study.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Mycelix",
+      "tags": [
+        "nix",
+        "ci-cd",
+        "infrastructure",
+        "hydra",
+        "luminous-nix"
+      ],
+      "estimated_hours": 90,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "NIX-301",
+          "description": "Nix for Infrastructure",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 2,
+      "course_level": "200-300"
+    },
+    {
+      "id": "PY-101",
+      "title": "Python Fundamentals",
+      "description": "Variables, types, control flow, functions. Lists, dicts, sets, comprehensions. Classes and OOP basics. File I/O, exceptions. Virtual environments and pip. Designed for rapid prototyping and data science pipelines.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Computer Science",
+      "subdomain": "Mycelix",
+      "tags": [
+        "python",
+        "oop",
+        "data-structures",
+        "pip"
+      ],
+      "estimated_hours": 60,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "PY-101",
+          "description": "Python Fundamentals",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 1,
+      "course_level": "200-300"
+    },
+    {
+      "id": "PY-201",
+      "title": "Python for Data Science",
+      "description": "NumPy arrays and vectorized operations. Pandas DataFrames. Matplotlib and seaborn visualization. Scikit-learn for ML fundamentals. Jupyter notebooks for exploration. Statistical analysis with scipy.stats.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "Mycelix",
+      "tags": [
+        "python",
+        "numpy",
+        "pandas",
+        "scikit-learn",
+        "data-science",
+        "jupyter"
+      ],
+      "estimated_hours": 90,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "PY-201",
+          "description": "Python for Data Science",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 2,
+      "course_level": "200-300"
+    },
+    {
+      "id": "PY-301",
+      "title": "Python for Consciousness Research",
+      "description": "PyPhi for IIT computation. PyTorch for neural network experiments. HDC libraries (torchhd). Federated learning with mycelix-fl Python bindings. Moral training data generation. Benchmarking with Hendrycks ETHICS dataset.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Mycelix",
+      "tags": [
+        "python",
+        "pyphi",
+        "pytorch",
+        "hdc",
+        "federated-learning",
+        "ethics"
+      ],
+      "estimated_hours": 90,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "PY-301",
+          "description": "Python for Consciousness Research",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 2,
+      "course_level": "200-300"
+    },
+    {
+      "id": "LANG-401",
+      "title": "Polyglot Systems Architecture",
+      "description": "Designing systems that span Rust (performance core), Python (research/ML), and Nix (reproducibility). FFI boundaries. WASM as a universal compile target. The Symthaea workspace: 55 Rust crates + Python bindings + Nix flake as the canonical example.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Mycelix",
+      "tags": [
+        "polyglot",
+        "ffi",
+        "wasm",
+        "architecture",
+        "rust",
+        "python",
+        "nix"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "LANG-401",
+          "description": "Polyglot Systems Architecture",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 3,
+      "course_level": "500-600"
+    }
+  ],
+  "edges": [
+    {
+      "from": "RUST-101",
+      "to": "RUST-201",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Rust Systems Programming requires RUST-101"
+    },
+    {
+      "from": "RUST-201",
+      "to": "RUST-301",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Rust for Consciousness Computing requires RUST-201"
+    },
+    {
+      "from": "NIX-101",
+      "to": "NIX-201",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "NixOS System Configuration requires NIX-101"
+    },
+    {
+      "from": "NIX-201",
+      "to": "NIX-301",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Nix for Infrastructure requires NIX-201"
+    },
+    {
+      "from": "PY-101",
+      "to": "PY-201",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Python for Data Science requires PY-101"
+    },
+    {
+      "from": "PY-201",
+      "to": "PY-301",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Python for Consciousness Research requires PY-201"
+    },
+    {
+      "from": "RUST-301",
+      "to": "LANG-401",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Polyglot Systems Architecture requires RUST-301"
+    },
+    {
+      "from": "NIX-301",
+      "to": "LANG-401",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Polyglot Systems Architecture requires NIX-301"
+    },
+    {
+      "from": "PY-301",
+      "to": "LANG-401",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Polyglot Systems Architecture requires PY-301"
+    }
+  ]
+}

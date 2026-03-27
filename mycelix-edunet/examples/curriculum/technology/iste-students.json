@@ -1,0 +1,239 @@
+{
+  "metadata": {
+    "title": "ISTE Standards for Students",
+    "framework": "ISTE",
+    "source": "https://www.iste.org/standards/iste-standards-for-students",
+    "grade_level": "Grade6",
+    "subject_area": "Technology",
+    "domain": "Technology",
+    "version": "2016",
+    "total_standards": 7,
+    "domains": [
+      "Digital Literacy",
+      "Computational Thinking",
+      "Digital Citizenship"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "ISTE Standards for Students (2016 revision). K-12 technology competencies."
+  },
+  "nodes": [
+    {
+      "id": "ISTE.S.1",
+      "title": "Empowered Learner",
+      "description": "Students leverage technology to take an active role in choosing, achieving, and demonstrating competency in their learning goals",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Technology",
+      "subdomain": "Digital Literacy",
+      "tags": [
+        "technology",
+        "digital-literacy",
+        "iste",
+        "empowered-learner"
+      ],
+      "estimated_hours": 20,
+      "grade_levels": [
+        "Grade3",
+        "Grade6",
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Technology",
+      "academic_standards": [
+        {
+          "framework": "ISTE",
+          "code": "ISTE.S.1",
+          "description": "Students leverage technology to take an active role in choosing, achieving, and demonstrating competency in their learning goals",
+          "grade_level": "K-12"
+        }
+      ]
+    },
+    {
+      "id": "ISTE.S.2",
+      "title": "Digital Citizen",
+      "description": "Students recognize the rights, responsibilities, and opportunities of living, learning, and working in an interconnected digital world",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Technology",
+      "subdomain": "Digital Literacy",
+      "tags": [
+        "technology",
+        "digital-literacy",
+        "iste",
+        "digital-citizen"
+      ],
+      "estimated_hours": 20,
+      "grade_levels": [
+        "Grade3",
+        "Grade6",
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Technology",
+      "academic_standards": [
+        {
+          "framework": "ISTE",
+          "code": "ISTE.S.2",
+          "description": "Students recognize the rights, responsibilities, and opportunities of living, learning, and working in an interconnected digital world",
+          "grade_level": "K-12"
+        }
+      ]
+    },
+    {
+      "id": "ISTE.S.3",
+      "title": "Knowledge Constructor",
+      "description": "Students critically curate a variety of resources using digital tools to construct knowledge and produce creative artifacts",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Technology",
+      "subdomain": "Digital Literacy",
+      "tags": [
+        "technology",
+        "digital-literacy",
+        "iste",
+        "knowledge-constructor"
+      ],
+      "estimated_hours": 20,
+      "grade_levels": [
+        "Grade3",
+        "Grade6",
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Technology",
+      "academic_standards": [
+        {
+          "framework": "ISTE",
+          "code": "ISTE.S.3",
+          "description": "Students critically curate a variety of resources using digital tools to construct knowledge and produce creative artifacts",
+          "grade_level": "K-12"
+        }
+      ]
+    },
+    {
+      "id": "ISTE.S.4",
+      "title": "Innovative Designer",
+      "description": "Students use a variety of technologies within a design process to identify and solve problems by creating new, useful, or imaginative solutions",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Technology",
+      "subdomain": "Digital Literacy",
+      "tags": [
+        "technology",
+        "digital-literacy",
+        "iste",
+        "innovative-designer"
+      ],
+      "estimated_hours": 20,
+      "grade_levels": [
+        "Grade3",
+        "Grade6",
+        "Grade9"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Technology",
+      "academic_standards": [
+        {
+          "framework": "ISTE",
+          "code": "ISTE.S.4",
+          "description": "Students use a variety of technologies within a design process to identify and solve problems by creating new, useful, or imaginative solutions",
+          "grade_level": "K-12"
+        }
+      ]
+    },
+    {
+      "id": "ISTE.S.5",
+      "title": "Computational Thinker",
+      "description": "Students develop and employ strategies for understanding and solving problems in ways that leverage the power of technological methods",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Technology",
+      "subdomain": "Digital Literacy",
+      "tags": [
+        "technology",
+        "digital-literacy",
+        "iste",
+        "computational-thinker"
+      ],
+      "estimated_hours": 20,
+      "grade_levels": [
+        "Grade3",
+        "Grade6",
+        "Grade9"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Technology",
+      "academic_standards": [
+        {
+          "framework": "ISTE",
+          "code": "ISTE.S.5",
+          "description": "Students develop and employ strategies for understanding and solving problems in ways that leverage the power of technological methods",
+          "grade_level": "K-12"
+        }
+      ]
+    },
+    {
+      "id": "ISTE.S.6",
+      "title": "Creative Communicator",
+      "description": "Students communicate clearly and express themselves creatively using platforms, tools, styles, formats, and digital media",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Technology",
+      "subdomain": "Digital Literacy",
+      "tags": [
+        "technology",
+        "digital-literacy",
+        "iste",
+        "creative-communicator"
+      ],
+      "estimated_hours": 20,
+      "grade_levels": [
+        "Grade3",
+        "Grade6",
+        "Grade9"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Technology",
+      "academic_standards": [
+        {
+          "framework": "ISTE",
+          "code": "ISTE.S.6",
+          "description": "Students communicate clearly and express themselves creatively using platforms, tools, styles, formats, and digital media",
+          "grade_level": "K-12"
+        }
+      ]
+    },
+    {
+      "id": "ISTE.S.7",
+      "title": "Global Collaborator",
+      "description": "Students use digital tools to broaden their perspectives and enrich their learning by collaborating with others locally and globally",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Technology",
+      "subdomain": "Digital Literacy",
+      "tags": [
+        "technology",
+        "digital-literacy",
+        "iste",
+        "global-collaborator"
+      ],
+      "estimated_hours": 20,
+      "grade_levels": [
+        "Grade3",
+        "Grade6",
+        "Grade9"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Technology",
+      "academic_standards": [
+        {
+          "framework": "ISTE",
+          "code": "ISTE.S.7",
+          "description": "Students use digital tools to broaden their perspectives and enrich their learning by collaborating with others locally and globally",
+          "grade_level": "K-12"
+        }
+      ]
+    }
+  ],
+  "edges": []
+}

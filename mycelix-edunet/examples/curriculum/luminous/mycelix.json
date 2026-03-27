@@ -1,0 +1,299 @@
+{
+  "metadata": {
+    "title": "Mycelix: Decentralized Civic Infrastructure",
+    "framework": "Luminous Dynamics",
+    "source": "https://luminousdynamics.org",
+    "grade_level": "Undergraduate",
+    "subject_area": "Decentralized Systems",
+    "domain": "Decentralized Systems",
+    "version": "2026",
+    "total_standards": 7,
+    "domains": [
+      "Mycelix"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Self-referential curriculum about Mycelix: Decentralized Civic Infrastructure. ISCED-F Field 11: Meta-Learning.",
+    "academic_level": "Undergraduate",
+    "institution": "Luminous Dynamics"
+  },
+  "nodes": [
+    {
+      "id": "MYC-101",
+      "title": "Introduction to Decentralized Civic Infrastructure",
+      "description": "Why decentralize? The limits of centralized governance and data ownership. Agent-centric vs data-centric architectures. The 16-cluster Mycelix fractal design. Community-owned infrastructure as a public good.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Decentralized Systems",
+      "subdomain": "Mycelix",
+      "tags": [
+        "decentralization",
+        "civic-infrastructure",
+        "public-good"
+      ],
+      "estimated_hours": 45,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Decentralized Systems",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "MYC-101",
+          "description": "Introduction to Decentralized Civic Infrastructure",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 1,
+      "course_level": "200-300"
+    },
+    {
+      "id": "MYC-201",
+      "title": "Holochain Fundamentals",
+      "description": "Agent-centric distributed hash tables. Source chains, validation, warrants. DNA, zomes, entries, links. Conductor architecture. WASM compilation. Difference from blockchain: no global consensus, no mining, no tokens required.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Decentralized Systems",
+      "subdomain": "Mycelix",
+      "tags": [
+        "holochain",
+        "dht",
+        "agent-centric",
+        "wasm",
+        "validation"
+      ],
+      "estimated_hours": 90,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Decentralized Systems",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "MYC-201",
+          "description": "Holochain Fundamentals",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 2,
+      "course_level": "200-300"
+    },
+    {
+      "id": "MYC-202",
+      "title": "Mycelix Knowledge Graph",
+      "description": "The knowledge_zome: KnowledgeNode, LearningEdge, LearningPath, SkillTree. Community-governed curriculum via edge voting. BFS pathfinding. Grade-level and subject indexing. Prerequisite checking. AI-powered recommendations.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Decentralized Systems",
+      "subdomain": "Mycelix",
+      "tags": [
+        "knowledge-graph",
+        "curriculum",
+        "prerequisites",
+        "recommendations"
+      ],
+      "estimated_hours": 90,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Decentralized Systems",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "MYC-202",
+          "description": "Mycelix Knowledge Graph",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 2,
+      "course_level": "200-300"
+    },
+    {
+      "id": "MYC-301",
+      "title": "Mycelix Governance",
+      "description": "Proposals, voting, threshold signing (DKG). Three-tier proposal speeds. Quorum-based decisions. Constitutional amendments. Anti-tyranny shields: participation insurance, term limits, recall mechanisms. WorldGovernance multi-world simulation results.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Decentralized Systems",
+      "subdomain": "Mycelix",
+      "tags": [
+        "governance",
+        "voting",
+        "dkg",
+        "anti-tyranny",
+        "constitution"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Decentralized Systems",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "MYC-301",
+          "description": "Mycelix Governance",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 3,
+      "course_level": "200-300"
+    },
+    {
+      "id": "MYC-302",
+      "title": "Identity, Credentials, and Trust",
+      "description": "DID registry, MFA, trust credentials. W3C Verifiable Credentials with Ed25519 signatures. Recovery mechanisms. Name registry. Web-of-trust. Sub-Passport system with effective_tier recovery.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Decentralized Systems",
+      "subdomain": "Mycelix",
+      "tags": [
+        "identity",
+        "did",
+        "verifiable-credentials",
+        "trust",
+        "recovery"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Decentralized Systems",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "MYC-302",
+          "description": "Identity, Credentials, and Trust",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 3,
+      "course_level": "200-300"
+    },
+    {
+      "id": "MYC-501",
+      "title": "Consciousness Gating",
+      "description": "4D consciousness profile (identity/reputation/community/engagement). 5 trust tiers (Observer → Guardian). Configurable vote weights for default, constitutional, budget, and emergency contexts. Phi-coupled governance: how consciousness scores affect civic participation rights.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Decentralized Systems",
+      "subdomain": "Mycelix",
+      "tags": [
+        "consciousness-gating",
+        "trust-tiers",
+        "phi",
+        "vote-weights"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Decentralized Systems",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "MYC-501",
+          "description": "Consciousness Gating",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 3,
+      "course_level": "500-600"
+    },
+    {
+      "id": "MYC-502",
+      "title": "Decentralized Education Systems",
+      "description": "The full EduNet stack: federated learning, spaced repetition (SM-2), gamification, BKT/ZPD/VARK adaptive learning, 29 learning science frameworks. Privacy-preserving progress tracking. DAO-governed curriculum. Cross-cluster bridges between education and civic participation.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Decentralized Systems",
+      "subdomain": "Mycelix",
+      "tags": [
+        "edunet",
+        "federated-learning",
+        "adaptive-learning",
+        "privacy",
+        "dao"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Decentralized Systems",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "MYC-502",
+          "description": "Decentralized Education Systems",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 4,
+      "course_level": "500-600"
+    }
+  ],
+  "edges": [
+    {
+      "from": "MYC-101",
+      "to": "MYC-201",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Holochain Fundamentals requires MYC-101"
+    },
+    {
+      "from": "MYC-201",
+      "to": "MYC-202",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Mycelix Knowledge Graph requires MYC-201"
+    },
+    {
+      "from": "MYC-201",
+      "to": "MYC-301",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Mycelix Governance requires MYC-201"
+    },
+    {
+      "from": "MYC-201",
+      "to": "MYC-302",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Identity, Credentials, and Trust requires MYC-201"
+    },
+    {
+      "from": "MYC-301",
+      "to": "MYC-501",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Consciousness Gating requires MYC-301"
+    },
+    {
+      "from": "MYC-302",
+      "to": "MYC-501",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Consciousness Gating requires MYC-302"
+    },
+    {
+      "from": "MYC-202",
+      "to": "MYC-502",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Decentralized Education Systems requires MYC-202"
+    },
+    {
+      "from": "MYC-501",
+      "to": "MYC-502",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Decentralized Education Systems requires MYC-501"
+    }
+  ]
+}
