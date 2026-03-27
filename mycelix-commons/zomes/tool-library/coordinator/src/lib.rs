@@ -405,3 +405,63 @@ pub fn mark_available(tool_hash: ActionHash) -> ExternResult<ActionHash> {
     let updated = update_entry(tool_hash, &tool)?;
     Ok(updated)
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_tool_condition_variants() {
+        use tool_library_integrity::ToolCondition;
+        let variants = vec![
+            ToolCondition::New,
+            ToolCondition::Good,
+            ToolCondition::Fair,
+            ToolCondition::NeedsRepair,
+        ];
+        for v in variants {
+            let json = serde_json::to_string(&v).unwrap();
+            let back: ToolCondition = serde_json::from_str(&json).unwrap();
+            assert_eq!(v, back);
+        }
+    }
+
+    #[test]
+    fn test_lending_status_flow() {
+        use tool_library_integrity::LendingStatus;
+        // Verify all variants serialize/deserialize and represent valid states
+        let flow = vec![
+            LendingStatus::Active,
+            LendingStatus::Returned,
+            LendingStatus::Overdue,
+            LendingStatus::Disputed,
+        ];
+        for status in &flow {
+            let json = serde_json::to_string(status).unwrap();
+            let back: LendingStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(*status, back);
+        }
+        // Verify the typical happy-path transition is representable
+        assert_ne!(LendingStatus::Active, LendingStatus::Returned);
+        // Verify overdue is distinct from disputed
+        assert_ne!(LendingStatus::Overdue, LendingStatus::Disputed);
+    }
+
+    #[test]
+    fn test_tool_category_variants() {
+        use tool_library_integrity::ToolCategory;
+        let variants = vec![
+            ToolCategory::HandTool,
+            ToolCategory::PowerTool,
+            ToolCategory::Garden,
+            ToolCategory::Kitchen,
+            ToolCategory::Workshop,
+            ToolCategory::Electronics,
+            ToolCategory::Other,
+        ];
+        assert_eq!(variants.len(), 7);
+        for v in variants {
+            let json = serde_json::to_string(&v).unwrap();
+            let back: ToolCategory = serde_json::from_str(&json).unwrap();
+            assert_eq!(v, back);
+        }
+    }
+}

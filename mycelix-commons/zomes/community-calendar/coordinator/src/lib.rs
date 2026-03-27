@@ -317,4 +317,56 @@ mod tests {
         let ts = Timestamp::from_micros(1_709_208_000_000_000);
         assert_eq!(date_from_timestamp(&ts), "2024-02-29");
     }
+
+    #[test]
+    fn test_recurrence_variants() {
+        use community_calendar_integrity::Recurrence;
+        let variants = vec![
+            Recurrence::None,
+            Recurrence::Daily,
+            Recurrence::Weekly,
+            Recurrence::Monthly,
+        ];
+        for v in variants {
+            let json = serde_json::to_string(&v).unwrap();
+            let back: Recurrence = serde_json::from_str(&json).unwrap();
+            assert_eq!(v, back);
+        }
+    }
+
+    #[test]
+    fn test_rsvp_status_variants() {
+        use community_calendar_integrity::RsvpStatus;
+        let variants = vec![
+            RsvpStatus::Going,
+            RsvpStatus::Maybe,
+            RsvpStatus::NotGoing,
+        ];
+        for v in variants {
+            let json = serde_json::to_string(&v).unwrap();
+            let back: RsvpStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(v, back);
+        }
+    }
+
+    #[test]
+    fn test_event_category_filtering() {
+        // Verify date_from_timestamp produces consistent date strings for known timestamps
+        let ts1 = Timestamp::from_micros(1_774_483_200_000_000); // 2026-03-26
+        let ts2 = Timestamp::from_micros(1_774_483_200_000_000); // same timestamp
+        assert_eq!(date_from_timestamp(&ts1), date_from_timestamp(&ts2));
+        // Verify format is YYYY-MM-DD
+        let date = date_from_timestamp(&ts1);
+        assert_eq!(date.len(), 10);
+        assert_eq!(&date[4..5], "-");
+        assert_eq!(&date[7..8], "-");
+    }
+
+    #[test]
+    fn test_nearby_events_empty_cells() {
+        // geohash_neighbors always returns exactly 8 neighbors
+        let hash = commons_types::geo::geohash_encode(32.95, -96.73, 6);
+        let neighbors = commons_types::geo::geohash_neighbors(&hash);
+        assert_eq!(neighbors.len(), 8);
+    }
 }

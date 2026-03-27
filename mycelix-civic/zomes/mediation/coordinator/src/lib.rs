@@ -391,3 +391,67 @@ pub fn get_mediator_sessions(mediator_did: String) -> ExternResult<Vec<Record>> 
     }
     Ok(records)
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_mediation_status_flow() {
+        use mediation_integrity::MediationStatus;
+        // Verify all status variants serialize/deserialize
+        let statuses = vec![
+            MediationStatus::Requested,
+            MediationStatus::Accepted,
+            MediationStatus::InProgress,
+            MediationStatus::Resolved,
+            MediationStatus::Escalated,
+            MediationStatus::Withdrawn,
+        ];
+        for s in &statuses {
+            let json = serde_json::to_string(s).unwrap();
+            let back: MediationStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(*s, back);
+        }
+        // Verify valid state transitions are representable
+        assert_ne!(MediationStatus::Requested, MediationStatus::Accepted);
+        assert_ne!(MediationStatus::InProgress, MediationStatus::Resolved);
+        assert_ne!(MediationStatus::InProgress, MediationStatus::Escalated);
+    }
+
+    #[test]
+    fn test_urgency_levels() {
+        use mediation_integrity::MediationUrgency;
+        let levels = vec![
+            MediationUrgency::Low,
+            MediationUrgency::Medium,
+            MediationUrgency::High,
+        ];
+        for level in &levels {
+            let json = serde_json::to_string(level).unwrap();
+            let back: MediationUrgency = serde_json::from_str(&json).unwrap();
+            assert_eq!(*level, back);
+        }
+        // Verify all three levels are distinct
+        assert_ne!(MediationUrgency::Low, MediationUrgency::Medium);
+        assert_ne!(MediationUrgency::Medium, MediationUrgency::High);
+        assert_ne!(MediationUrgency::Low, MediationUrgency::High);
+    }
+
+    #[test]
+    fn test_category_variants() {
+        use mediation_integrity::MediationCategory;
+        let categories = vec![
+            MediationCategory::Neighbor,
+            MediationCategory::Property,
+            MediationCategory::Noise,
+            MediationCategory::SharedSpace,
+            MediationCategory::Financial,
+            MediationCategory::Other,
+        ];
+        assert_eq!(categories.len(), 6);
+        for c in &categories {
+            let json = serde_json::to_string(c).unwrap();
+            let back: MediationCategory = serde_json::from_str(&json).unwrap();
+            assert_eq!(*c, back);
+        }
+    }
+}
