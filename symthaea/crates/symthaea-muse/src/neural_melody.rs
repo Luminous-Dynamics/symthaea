@@ -157,7 +157,6 @@ impl NeuralMelody {
                     start_time: time,
                     duration: dur.min(max_time - time),
                     velocity,
-                    ..Default::default()
                 });
 
                 pitch_selector = pitch_sel;

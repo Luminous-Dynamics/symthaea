@@ -29,6 +29,8 @@
 
 #![deny(unsafe_code)]
 
+pub mod audio_feedback;
+pub mod binaural;
 pub mod choreography;
 pub mod critic;
 pub mod export;
@@ -44,9 +46,13 @@ pub mod pitch;
 pub mod rhythm;
 pub mod stream;
 pub mod streaming;
+pub mod sidechain;
 pub mod structure;
+pub mod substrate_timbre;
 pub mod synth;
 pub mod voice;
+pub mod wavetable;
+pub mod consciousness_reverb;
 
 use serde::{Deserialize, Serialize};
 
