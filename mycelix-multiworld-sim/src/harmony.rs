@@ -165,11 +165,12 @@ impl HarmonyTracker {
         self.current_scores[1] =
             (base_flourishing * (1.0 - inputs.mean_allostatic_load * 0.3)).clamp(0.0, 1.0);
 
-        // 3. Integral Wisdom = tech_level * education * mean_phi * 0.5 (clamped 0-1)
-        self.current_scores[2] = (inputs.mean_tech_level
-            * inputs.mean_education
-            * consciousness.mean_phi
-            * 0.5)
+        // 3. Integral Wisdom = weighted average of tech, education, and phi.
+        // Previous formula (product of three) collapsed near zero. Weighted average
+        // allows partial credit: a colony with high education but low tech still has wisdom.
+        self.current_scores[2] = (0.3 * inputs.mean_tech_level
+            + 0.4 * inputs.mean_education
+            + 0.3 * consciousness.mean_phi)
             .clamp(0.0, 1.0);
 
         // 4. Infinite Play = art_per_capita * innovation_rate

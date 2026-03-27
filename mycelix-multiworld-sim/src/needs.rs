@@ -50,7 +50,8 @@ const LOAD_DECAY_RATE: f64 = 0.008;
 
 /// Care worker load reduction per worker per 100 recipients.
 /// Models the TEND ServiceCategory::CareWork effect from mycelix-finance.
-const CARE_LOAD_REDUCTION: f64 = 0.02;
+/// Tuned down from 0.02: with even a few medicine workers, 0.02 drove load to zero.
+const CARE_LOAD_REDUCTION: f64 = 0.005;
 
 /// Burnout threshold: allostatic_load above this caps consciousness growth.
 /// Ref: symthaea-psych-bench burnout regime at load > 0.8.
@@ -78,8 +79,8 @@ const ESCAPISM_DECAY_RATE: f64 = 0.02;
 const ENGAGEMENT_RECOVERY_RATE: f64 = 0.005;
 
 /// Thrill-seeking health risk probability per tick for eligible agents.
-/// Eligibility: engagement > 0.7 AND social_satiation < 0.3 AND age 15-45.
-const THRILL_RISK_PROBABILITY: f64 = 0.005;
+/// Tuned down from 0.005: was producing ~5000 incidents over 150 years.
+const THRILL_RISK_PROBABILITY: f64 = 0.002;
 
 /// Thrill-seeking health cost per incident.
 const THRILL_HEALTH_COST: f64 = 0.1;
@@ -176,6 +177,8 @@ impl PsychNeedsEngine {
         mean_tech_level: f64,
         governance_stability: f64,
         worker_ratio: f64,
+        care_effectiveness: f64,
+        deep_space_mult: f64,
         rng: &mut StochasticEngine,
     ) -> (Vec<CivEvent>, NeedsWorldSummary) {
         let mut events = Vec::new();
@@ -184,7 +187,7 @@ impl PsychNeedsEngine {
             current_epoch >= DEEP_SPACE_EPOCH_START && current_epoch <= DEEP_SPACE_EPOCH_END;
 
         let pop = world.population().max(1) as f64;
-        let care_ratio = care_worker_count as f64 / (pop / 100.0).max(1.0);
+        let care_ratio = care_worker_count as f64 / (pop / 100.0).max(1.0) * care_effectiveness;
 
         let mut total_load = 0.0;
         let mut total_social = 0.0;
@@ -205,7 +208,7 @@ impl PsychNeedsEngine {
             // --- 1. Social satiation decay ---
             let mut decay = SOCIAL_DECAY_RATE;
             if is_off_earth && is_deep_space_epoch {
-                decay *= DEEP_SPACE_SOCIAL_DECAY_MULT;
+                decay *= deep_space_mult;
             }
             n.social_satiation = (n.social_satiation - decay).max(0.0);
 
@@ -231,19 +234,18 @@ impl PsychNeedsEngine {
             n.allostatic_load = (n.allostatic_load - care_decay).max(0.0);
 
             // --- 5. Engagement dynamics (digital escapism) ---
-            if n.allostatic_load > 0.5 && n.social_satiation < ISOLATION_THRESHOLD {
+            // Threshold lowered from 0.5: even moderate stress + isolation triggers withdrawal.
+            if n.allostatic_load > 0.3 && n.social_satiation < ISOLATION_THRESHOLD {
                 n.engagement = (n.engagement - ESCAPISM_DECAY_RATE).max(0.0);
             } else {
                 n.engagement = (n.engagement + ENGAGEMENT_RECOVERY_RATE).min(1.0);
             }
 
             // --- 6. Thrill-seeking eligibility (checked after needs borrow ends) ---
-            // Thrill-seeking occurs when agents are physically active (engagement > 0.5)
-            // but socially unfulfilled (social < 0.5) — seeking intensity through risk.
-            // Previous condition (engagement > 0.7 AND social < 0.3) was nearly unreachable
-            // because engagement decays under the same conditions that trigger isolation.
-            let thrill_eligible = n.engagement > 0.5
-                && n.social_satiation < 0.5
+            // Thrill-seeking occurs when agents are physically active (engagement > 0.6)
+            // but socially unfulfilled (social < 0.4) — seeking intensity through risk.
+            let thrill_eligible = n.engagement > 0.6
+                && n.social_satiation < 0.4
                 && agent_age >= 15.0
                 && agent_age <= 45.0;
 
@@ -412,7 +414,7 @@ mod tests {
         let mut world = make_world(agents);
         let mut rng = StochasticEngine::new(42);
 
-        PsychNeedsEngine::tick_needs(&mut world, tick, 1, 0, 0.3, 0.8, 0.5, &mut rng);
+        PsychNeedsEngine::tick_needs(&mut world, tick, 1, 0, 0.3, 0.8, 0.5, 1.0, 1.5, &mut rng);
 
         let with_partner = world.agents[0].needs.social_satiation;
         let without_partner = world.agents[1].needs.social_satiation;
@@ -433,7 +435,7 @@ mod tests {
         let mut world = make_world(agents);
         let mut rng = StochasticEngine::new(42);
 
-        PsychNeedsEngine::tick_needs(&mut world, tick, 1, 0, 0.3, 0.8, 0.5, &mut rng);
+        PsychNeedsEngine::tick_needs(&mut world, tick, 1, 0, 0.3, 0.8, 0.5, 1.0, 1.5, &mut rng);
 
         // Load should increase due to isolation, minus care decay
         // Net: +ISOLATION_LOAD_RATE - LOAD_DECAY_RATE = 0.015 - 0.008 = +0.007
@@ -454,7 +456,7 @@ mod tests {
         agents_with[0].needs.social_satiation = 0.5; // above isolation threshold
         let mut world_with = make_world(agents_with);
         let mut rng1 = StochasticEngine::new(42);
-        PsychNeedsEngine::tick_needs(&mut world_with, tick, 1, 5, 0.3, 0.8, 0.5, &mut rng1);
+        PsychNeedsEngine::tick_needs(&mut world_with, tick, 1, 5, 0.3, 0.8, 0.5, 1.0, 1.5, &mut rng1);
         let load_with_care = world_with.agents[0].needs.allostatic_load;
 
         // World without care workers
@@ -463,7 +465,7 @@ mod tests {
         agents_without[0].needs.social_satiation = 0.5;
         let mut world_without = make_world(agents_without);
         let mut rng2 = StochasticEngine::new(42);
-        PsychNeedsEngine::tick_needs(&mut world_without, tick, 1, 0, 0.3, 0.8, 0.5, &mut rng2);
+        PsychNeedsEngine::tick_needs(&mut world_without, tick, 1, 0, 0.3, 0.8, 0.5, 1.0, 1.5, &mut rng2);
         let load_without_care = world_without.agents[0].needs.allostatic_load;
 
         assert!(
@@ -483,7 +485,7 @@ mod tests {
         let mut world = make_world(agents);
         let mut rng = StochasticEngine::new(42);
 
-        PsychNeedsEngine::tick_needs(&mut world, tick, 1, 0, 0.3, 0.8, 0.5, &mut rng);
+        PsychNeedsEngine::tick_needs(&mut world, tick, 1, 0, 0.3, 0.8, 0.5, 1.0, 1.5, &mut rng);
 
         assert!(
             world.agents[0].needs.engagement < 0.6,
@@ -503,7 +505,7 @@ mod tests {
         let mut world = make_world(agents);
         let mut rng = StochasticEngine::new(42);
 
-        PsychNeedsEngine::tick_needs(&mut world, tick, 1, 0, 0.3, 0.8, 0.5, &mut rng);
+        PsychNeedsEngine::tick_needs(&mut world, tick, 1, 0, 0.3, 0.8, 0.5, 1.0, 1.5, &mut rng);
 
         assert!(
             world.agents[0].needs.engagement > 0.5,
@@ -533,7 +535,7 @@ mod tests {
 
         // Run many ticks to give probability a chance
         for t in tick..tick + 100 {
-            PsychNeedsEngine::tick_needs(&mut world, t, 1, 0, 0.3, 0.8, 0.5, &mut rng);
+            PsychNeedsEngine::tick_needs(&mut world, t, 1, 0, 0.3, 0.8, 0.5, 1.0, 1.5, &mut rng);
         }
         // Child health should be untouched by thrill-seeking
         assert!(
@@ -552,7 +554,7 @@ mod tests {
 
         // Good governance, low tech — should NOT trigger
         for t in tick..tick + 500 {
-            PsychNeedsEngine::tick_needs(&mut world, t, 1, 0, 0.3, 0.8, 0.5, &mut rng);
+            PsychNeedsEngine::tick_needs(&mut world, t, 1, 0, 0.3, 0.8, 0.5, 1.0, 1.5, &mut rng);
         }
         assert!(
             world.epidemics.is_empty(),
@@ -569,7 +571,7 @@ mod tests {
         agents_deep[0].needs.social_satiation = 0.7;
         let mut world_deep = make_world(agents_deep);
         let mut rng1 = StochasticEngine::new(42);
-        PsychNeedsEngine::tick_needs(&mut world_deep, tick, 2, 0, 0.3, 0.8, 0.5, &mut rng1);
+        PsychNeedsEngine::tick_needs(&mut world_deep, tick, 2, 0, 0.3, 0.8, 0.5, 1.0, 1.5, &mut rng1);
         let social_deep = world_deep.agents[0].needs.social_satiation;
 
         // Epoch 1 (Roots), same world
@@ -577,7 +579,7 @@ mod tests {
         agents_normal[0].needs.social_satiation = 0.7;
         let mut world_normal = make_world(agents_normal);
         let mut rng2 = StochasticEngine::new(42);
-        PsychNeedsEngine::tick_needs(&mut world_normal, tick, 1, 0, 0.3, 0.8, 0.5, &mut rng2);
+        PsychNeedsEngine::tick_needs(&mut world_normal, tick, 1, 0, 0.3, 0.8, 0.5, 1.0, 1.5, &mut rng2);
         let social_normal = world_normal.agents[0].needs.social_satiation;
 
         assert!(
@@ -593,7 +595,7 @@ mod tests {
         let mut world = make_world(agents);
         let mut rng = StochasticEngine::new(42);
 
-        let (_, summary) = PsychNeedsEngine::tick_needs(&mut world, tick, 1, 0, 0.3, 0.8, 0.5, &mut rng);
+        let (_, summary) = PsychNeedsEngine::tick_needs(&mut world, tick, 1, 0, 0.3, 0.8, 0.5, 1.0, 1.5, &mut rng);
 
         assert!(summary.mean_allostatic_load >= 0.0 && summary.mean_allostatic_load <= 1.0);
         assert!(summary.mean_social_satiation >= 0.0 && summary.mean_social_satiation <= 1.0);
@@ -614,7 +616,7 @@ mod tests {
         let mut rng = StochasticEngine::new(42);
 
         for t in tick..tick + 50 {
-            PsychNeedsEngine::tick_needs(&mut world, t, 1, 0, 0.3, 0.8, 0.5, &mut rng);
+            PsychNeedsEngine::tick_needs(&mut world, t, 1, 0, 0.3, 0.8, 0.5, 1.0, 1.5, &mut rng);
         }
 
         for a in &world.agents {

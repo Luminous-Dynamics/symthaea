@@ -26,6 +26,7 @@ impl PopulationEngine {
         world: &mut World,
         rng: &mut StochasticEngine,
         current_tick: u32,
+        pair_bond_rate: f64,
     ) {
         // Collect unpaired eligible males and females
         let mut unpaired_males: Vec<u64> = Vec::new();
@@ -48,7 +49,7 @@ impl PopulationEngine {
         // Shuffle and pair probabilistically
         let pairs = unpaired_males.len().min(unpaired_females.len());
         for i in 0..pairs {
-            if rng.bernoulli(PAIR_BOND_PROBABILITY) {
+            if rng.bernoulli(pair_bond_rate) {
                 let male_id = unpaired_males[i];
                 let female_id = unpaired_females[i];
 
@@ -251,31 +252,49 @@ impl PopulationEngine {
         world.adults(current_tick) >= 20
     }
 
-    /// Simplified heterozygosity proxy: H(t) = H0 * (1 - 1/(2*Ne))^generations
-    /// where Ne = effective population (roughly 0.7 * census for small pops).
+    /// Genetic diversity proxy incorporating both founder effect and immigration.
+    ///
+    /// H(t) = H0 * (1 - 1/(2*Ne))^generations + immigration_boost
+    ///
+    /// where Ne = effective population (0.7 * census for small pops),
+    /// H0 = 1 - 1/founders, and immigration_boost accounts for gene flow
+    /// from immigrants arriving after founding (each immigrant contributes
+    /// diversity proportional to 1/Ne).
     pub fn genetic_diversity_index(world: &World, current_tick: u32) -> f64 {
         let pop = world.population().max(1);
         let ne = (pop as f64 * 0.7).max(1.0);
         let generations_elapsed =
             (current_tick.saturating_sub(world.founded_tick)) as f64 / 300.0;
 
-        // H0 depends on founder diversity.
-        // Initial colonists have birth_tick set via wrapping_sub (before tick 0),
-        // so they appear as very large u32 values. Count them as founders too.
+        // Count founders: born at or before founding, or pre-founding (wrapped birth_tick).
+        // Also count immigrants as genetic contributors (they bring outside alleles).
         let founder_count = world
             .agents
             .iter()
             .filter(|a| {
-                // Normal case: born at or just after founding
                 a.birth_tick <= world.founded_tick + 1
-                // Wrapped case: birth_tick > current_tick means pre-founding birth
                 || a.birth_tick > current_tick
             })
-            .count()
-            .max(1) as f64;
-        let h0 = 1.0 - 1.0 / founder_count;
+            .count();
+        let immigrant_count = world
+            .agents
+            .iter()
+            .filter(|a| a.is_alive() && a.is_immigrant)
+            .count();
 
-        h0 * (1.0 - 1.0 / (2.0 * ne)).powf(generations_elapsed)
+        // Effective genetic contributors: founders + living immigrants
+        let contributors = (founder_count + immigrant_count).max(2) as f64;
+        let h0 = 1.0 - 1.0 / contributors;
+
+        // Base heterozygosity decay
+        let base = h0 * (1.0 - 1.0 / (2.0 * ne)).powf(generations_elapsed);
+
+        // Immigration gene flow boost: m * (1 - H) where m = immigrant fraction.
+        // Each immigrant generation restores some diversity toward panmictic equilibrium.
+        let m = immigrant_count as f64 / pop.max(1) as f64;
+        let boosted = base + m * (1.0 - base);
+
+        boosted.clamp(0.0, 1.0)
     }
 
     /// Inbreeding coefficient: F = 1 - H(t)/H(0).
