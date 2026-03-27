@@ -44,8 +44,24 @@ const MEDIUM_STRESS_THRESHOLD: f64 = 0.3;
 const TEACHING_SKILL_GAP: f64 = 0.2; // Minimum gap for teaching to be useful
 const LEARNER_SKILL_GAIN: f64 = 0.015; // Per interaction
 const TEACHER_CONSOLIDATION: f64 = 0.003; // Protégé effect
-const TEACHING_SOCIAL_BOOST: f64 = 0.02; // Both parties
+const TEACHING_SOCIAL_BOOST: f64 = 0.02; // Both parties (per interaction)
 const TEACHING_TEND_REWARD: f64 = 5.0; // Teaching is care work
+
+/// Epistemic friction — the thermodynamic cost of updating priors.
+/// Rewiring neural pathways is biologically stressful (Lupien et al., 2009).
+/// Learning MUST cost energy, or the model collapses to a Utopian Attractor.
+const LEARNER_EPISTEMIC_COST: f64 = 0.015; // Allostatic load spike from learning
+const FORAGING_EPISTEMIC_COST: f64 = 0.008; // Self-directed is less stressful than peer
+
+/// Teacher cognitive fatigue — projecting knowledge outward costs bandwidth.
+/// The teacher's own FEP loop takes a hit from externalizing their model
+/// (Kalyuga, 2007: expertise reversal effect applied to teaching load).
+const TEACHER_FATIGUE_COST: f64 = 0.01; // Allostatic load per teaching event
+
+/// Social satiation cap from education per tick.
+/// The 5th teaching interaction cannot provide the same dopamine hit as the 1st.
+/// Logarithmic diminishing returns on social bonding from repeated interactions.
+const MAX_EDUCATION_SOCIAL_BOOST_PER_TICK: f64 = 0.04; // Cap per agent per tick
 
 /// Epistemic foraging parameters.
 /// Curiosity = expected information gain (Friston et al., 2017).
@@ -171,11 +187,15 @@ impl EducationEngine {
                     learning_targets[i] = weakest_sector;
 
                     // Self-directed learning (slower than peer teaching)
+                    // Epistemic friction: learning costs energy (Lupien et al., 2009)
                     if weakest_sector.is_some() {
                         let sector = weakest_sector.unwrap();
                         agent.skills.learn(sector, FORAGING_SKILL_GAIN);
                         agent.education_level =
                             (agent.education_level + EDUCATION_LEVEL_GAIN).min(1.0);
+                        // Learning is work — updating priors costs allostatic energy
+                        agent.needs.allostatic_load =
+                            (agent.needs.allostatic_load + FORAGING_EPISTEMIC_COST).min(1.0);
                     }
                 }
                 LearningMode::Review => {
@@ -259,25 +279,54 @@ impl EducationEngine {
             }
         }
 
+        // Track cumulative social boost per agent this tick (for diminishing returns)
+        let mut social_boost_this_tick: Vec<f64> = vec![0.0; world.agents.len()];
+
         // Apply teaching interactions
         for m in &matches {
-            // Learner gains skill
+            // --- Learner ---
+            // Skill gain
             world.agents[m.learner_idx]
                 .skills
                 .learn(m.sector, LEARNER_SKILL_GAIN);
             world.agents[m.learner_idx].education_level =
                 (world.agents[m.learner_idx].education_level + 0.002).min(1.0);
-            world.agents[m.learner_idx].needs.social_satiation =
-                (world.agents[m.learner_idx].needs.social_satiation + TEACHING_SOCIAL_BOOST)
+
+            // Epistemic cost: updating priors is biologically stressful.
+            // Learning is exhausting. A guild must balance education with rest.
+            world.agents[m.learner_idx].needs.allostatic_load =
+                (world.agents[m.learner_idx].needs.allostatic_load + LEARNER_EPISTEMIC_COST)
                     .min(1.0);
 
-            // Teacher consolidates and earns TEND
+            // Social boost with diminishing returns (capped per tick)
+            let learner_remaining = MAX_EDUCATION_SOCIAL_BOOST_PER_TICK
+                - social_boost_this_tick[m.learner_idx];
+            let learner_boost = TEACHING_SOCIAL_BOOST.min(learner_remaining.max(0.0));
+            world.agents[m.learner_idx].needs.social_satiation =
+                (world.agents[m.learner_idx].needs.social_satiation + learner_boost).min(1.0);
+            social_boost_this_tick[m.learner_idx] += learner_boost;
+
+            // --- Teacher ---
+            // Consolidation (protégé effect)
             world.agents[m.teacher_idx]
                 .skills
                 .learn(m.sector, TEACHER_CONSOLIDATION);
-            world.agents[m.teacher_idx].needs.social_satiation =
-                (world.agents[m.teacher_idx].needs.social_satiation + TEACHING_SOCIAL_BOOST)
+
+            // Teacher cognitive fatigue: projecting knowledge outward costs bandwidth.
+            // Teaching is care work, and care work is real work.
+            world.agents[m.teacher_idx].needs.allostatic_load =
+                (world.agents[m.teacher_idx].needs.allostatic_load + TEACHER_FATIGUE_COST)
                     .min(1.0);
+
+            // Social boost with diminishing returns
+            let teacher_remaining = MAX_EDUCATION_SOCIAL_BOOST_PER_TICK
+                - social_boost_this_tick[m.teacher_idx];
+            let teacher_boost = TEACHING_SOCIAL_BOOST.min(teacher_remaining.max(0.0));
+            world.agents[m.teacher_idx].needs.social_satiation =
+                (world.agents[m.teacher_idx].needs.social_satiation + teacher_boost).min(1.0);
+            social_boost_this_tick[m.teacher_idx] += teacher_boost;
+
+            // TEND reward
             world.agents[m.teacher_idx].tend_balance += TEACHING_TEND_REWARD;
 
             summary.teaching_interactions += 1;

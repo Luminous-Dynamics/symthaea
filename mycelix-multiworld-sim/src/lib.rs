@@ -932,6 +932,18 @@ impl MultiWorldSimulator {
                     self.current_tick
                 ),
             ));
+
+            // Activate LCF breakthrough probability in Epochs 3-4.
+            // 0.005 per tick = ~30% chance over a 25-year epoch.
+            // Models the possibility that lattice confinement fusion
+            // (spark-engine physics) is validated and scaled.
+            if new_epoch == epoch::EPOCH_BRANCHES || new_epoch == epoch::EPOCH_CANOPY {
+                for world in &mut self.worlds {
+                    if world.knowledge.lcf_probability == 0.0 {
+                        world.knowledge.lcf_probability = 0.005;
+                    }
+                }
+            }
         }
     }
 
@@ -1367,13 +1379,13 @@ mod tests {
     /// should show lower allostatic load, higher consciousness, and better
     /// survival rates than communities without it.
     ///
-    /// Run 50 years (600 ticks) — enough for the education feedback loop to
-    /// manifest but fast enough for CI.
+    /// Run full 150 years (1800 ticks) — the crucible.
+    /// With epistemic friction, teacher fatigue, and diminishing social returns,
+    /// the guild advantage should be real but not magical.
     #[test]
     fn test_education_guild_ab_comparison() {
         // === Scenario A: Education enabled (guild model) ===
         let mut config_a = SimulationConfig::default_150_year();
-        config_a.total_ticks = 600; // 50 years
         config_a.seed = 42;
         config_a.policy.education_enabled = true;
 
@@ -1382,7 +1394,6 @@ mod tests {
 
         // === Scenario B: Education disabled (1602 model — no peer teaching) ===
         let mut config_b = SimulationConfig::default_150_year();
-        config_b.total_ticks = 600;
         config_b.seed = 42; // Same seed for fair comparison
         config_b.policy.education_enabled = false;
 
@@ -1390,7 +1401,7 @@ mod tests {
         let report_b = sim_b.run();
 
         // === Print comparison ===
-        eprintln!("\n=== EDUCATION GUILD A/B COMPARISON (50 years) ===");
+        eprintln!("\n=== EDUCATION GUILD A/B COMPARISON (150 years, with epistemic friction) ===");
         eprintln!("                          WITH guild    WITHOUT guild");
         eprintln!("Population:              {:>10}    {:>10}", report_a.final_population, report_b.final_population);
         eprintln!("Survived:                {:>10}    {:>10}", report_a.survived, report_b.survived);
