@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Symthaea Facade
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! # Symthaea Facade
 //!
 //! The primary entry point for the Symthaea consciousness system.
 //! Wraps [`ContinuousMind`] and [`ConsciousnessLanguageCore`] into a
@@ -2671,6 +2672,10 @@ impl Symthaea {
                     GDC::QueryActiveProposals => DispatchCommand::QueryActiveProposals,
                     GDC::EvaluateAsset { .. } => {
                         // EvaluateAsset handled directly in the bridge — not dispatched to conductor
+                        continue;
+                    }
+                    GDC::DeclareCrisis { .. } => {
+                        // DeclareCrisis handled directly in the bridge — maps to civic::create_incident
                         continue;
                     }
                 };

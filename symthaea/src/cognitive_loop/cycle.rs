@@ -98,6 +98,18 @@ impl CognitiveLoopService {
                 // safety precheck and downstream SafetyAgent consumers see it.
                 // Attestation failure = consciousness metrics untrustworthy.
                 self.carryover.quality.last_epistemic_confidence = 0.0;
+
+                // Alert human operators — integrity failure requires investigation
+                super::safety_alert::emit_alert(
+                    &self.safety_alert_tx,
+                    super::safety_alert::SafetyAlertKind::IntegrityCritical,
+                    format!(
+                        "Integrity critical anomaly — {} anomalies detected",
+                        self.integrity_manager.status.anomalies.len()
+                    ),
+                    self.stats.total_cycles as u64,
+                    self.carryover.history.consciousness_level,
+                );
             }
         }
         let mut module_timings = super::ModuleTimings::default();
@@ -249,6 +261,29 @@ impl CognitiveLoopService {
             }
         }
 
+        // ── Distress emission: broadcast when embodiment is in trouble ────
+        // Conditions: energy depleted + high prediction error + safety degraded.
+        // Cooldown: max 1 per 100 cycles. Basis: de Waal (2008) social alarm.
+        #[cfg(feature = "muse")]
+        if self.stats.total_cycles % 100 == 0 {
+            let psi = self.carryover.history.consciousness_level;
+            let load = self.neuromod.bath.allostatic_load;
+            let energy_critical = !self.substrate_manager.consciousness_viable;
+            let safety_degraded = psi < 0.3;
+
+            if energy_critical && load > 0.7 && safety_degraded {
+                let distress = super::managers::swarm_manager::SwarmEvent::DistressSignal {
+                    peer_id: String::new(),
+                    prediction_error: load, // allostatic load as proxy for distress severity
+                    energy_depletion: 0.95,
+                    safety_level: if psi < 0.1 { 3 } else { 2 },
+                    allostatic_load: load,
+                    consciousness_level: psi as f32,
+                };
+                let _ = self.swarm_event_tx.send(distress);
+            }
+        }
+
         // ═══════════════════════════════════════════════════════════════════
         // PHASE 3: FEEDBACK
         // Consciousness metrics, quality gating, homeostasis, dream engine
@@ -290,6 +325,37 @@ impl CognitiveLoopService {
                     }
                 },
             );
+
+            // ── Propagate motor safety flags to carryover ──────────────
+            // These are checked in cycle_phase_dynamics MotorOutput arm
+            // to enforce motor halt/readonly across ALL motor paths.
+            self.carryover.quality.safety_motor_halt = safety_result.motor_halt;
+            self.carryover.quality.safety_motor_readonly = safety_result.motor_readonly;
+
+            // ── Emit human-facing safety alerts ──────────────────────
+            if safety_result.motor_halt {
+                super::safety_alert::emit_alert(
+                    &self.safety_alert_tx,
+                    super::safety_alert::SafetyAlertKind::MotorHalt,
+                    format!(
+                        "Motor output HALTED — safety Red (Phi={:.3})",
+                        feedback.consciousness.consciousness_level
+                    ),
+                    self.stats.total_cycles as u64,
+                    feedback.consciousness.consciousness_level,
+                );
+            } else if safety_result.motor_readonly {
+                super::safety_alert::emit_alert(
+                    &self.safety_alert_tx,
+                    super::safety_alert::SafetyAlertKind::MotorReadOnly,
+                    format!(
+                        "Motor output restricted to read-only — safety Orange (Phi={:.3})",
+                        feedback.consciousness.consciousness_level
+                    ),
+                    self.stats.total_cycles as u64,
+                    feedback.consciousness.consciousness_level,
+                );
+            }
 
             // Gate 1: Learning rate — Arnsten (2009)
             if safety_result.lr_multiplier < 1.0 {
@@ -428,11 +494,54 @@ impl CognitiveLoopService {
                     signals = crisis_event.trigger_signals.len(),
                     "Civic crisis detected — forwarding to Mycelix emergency-incidents"
                 );
-                // TODO(blocked:conductor): Forward crisis_event to Mycelix civic bridge.
-                // Blocker: Holochain conductor API for event forwarding.
-                // Gate: #[cfg(feature = "mycelix")] — ready when conductor supports CallTargetCell::OtherRole from async.
-                // Requires: Holochain conductor connected + civic::create_incident zome call.
-                // Workaround: event logged + counted in security_telemetry.crisis_events_emitted.
+                // Queue for external dispatch to Mycelix civic bridge.
+                // The host application drains this via drain_pending_crisis_events()
+                // and forwards to MycelixBridge::dispatch_crisis().
+                self.pending_crisis_events.push(crisis_event);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // PHASE 3.5b: MINIMAL SAFETY BASELINE (when safety-agents feature is OFF)
+        // Consciousness-gated motor halt is a thermodynamic necessity, not optional.
+        // Even without the full SafetyAgent cascade, the physical boundary must hold:
+        // Phi < 0.1 → halt all motors, Phi < 0.35 → read-only.
+        // ═══════════════════════════════════════════════════════════════════
+        #[cfg(not(feature = "safety-agents"))]
+        {
+            let phi = feedback.consciousness.consciousness_level as f32;
+            // Red: consciousness collapse — halt everything
+            if phi < super::thresholds::SAFETY_MINIMAL_RED_THRESHOLD {
+                self.carryover.quality.safety_motor_halt = true;
+                self.carryover.quality.safety_motor_readonly = true;
+                tracing::warn!(
+                    phi = phi,
+                    "Minimal safety baseline: motor HALT (Phi < {})",
+                    super::thresholds::SAFETY_MINIMAL_RED_THRESHOLD,
+                );
+                super::safety_alert::emit_alert(
+                    &self.safety_alert_tx,
+                    super::safety_alert::SafetyAlertKind::MotorHalt,
+                    format!("Motor HALT (minimal safety) — Phi={phi:.3}"),
+                    self.stats.total_cycles as u64,
+                    phi as f64,
+                );
+            }
+            // Orange: severe degradation — read-only
+            else if phi < super::thresholds::SAFETY_MINIMAL_ORANGE_THRESHOLD {
+                self.carryover.quality.safety_motor_readonly = true;
+                tracing::warn!(
+                    phi = phi,
+                    "Minimal safety baseline: motor READ-ONLY (Phi < {})",
+                    super::thresholds::SAFETY_MINIMAL_ORANGE_THRESHOLD,
+                );
+                super::safety_alert::emit_alert(
+                    &self.safety_alert_tx,
+                    super::safety_alert::SafetyAlertKind::MotorReadOnly,
+                    format!("Motor read-only (minimal safety) — Phi={phi:.3}"),
+                    self.stats.total_cycles as u64,
+                    phi as f64,
+                );
             }
         }
 

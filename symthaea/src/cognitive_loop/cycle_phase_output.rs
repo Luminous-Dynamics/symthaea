@@ -1164,6 +1164,12 @@ impl CognitiveLoopService {
             }
         }
 
+        // ── Muse telemetry ──
+        #[cfg(feature = "muse")]
+        {
+            metadata.muse = self.muse_manager.telemetry();
+        }
+
         // ── Substrate & convergence telemetry ──
         metadata.substrate = self.substrate_manager.telemetry(&self.config);
         // Populate flat substrate fields for backward-compatible access
@@ -1536,10 +1542,8 @@ impl CognitiveLoopService {
         {
             metadata.defense_actions_proposed = self.defense_actions_proposed;
             metadata.defense_actions_approved = self.defense_actions_approved;
-            metadata.immune_motor_halt = self.carryover.quality.subsystem_veto
-                || self.sensorimotor.embodiment_bridge.as_ref().map_or(false, |b| {
-                    b.safety_level() == crate::cognitive_loop::motor_bridge::MotorSafetyLevel::Red
-                });
+            metadata.immune_motor_halt = self.carryover.quality.safety_motor_halt
+                || self.carryover.quality.subsystem_veto;
         }
 
         // ── End-of-cycle stats ──
