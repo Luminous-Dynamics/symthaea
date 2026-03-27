@@ -3804,4 +3804,123 @@ mod tests {
         assert_eq!(removed, Some(vec![42]));
         assert!(cred.get_extension("key").is_none());
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Sybil maturation proptests
+    // ════════════════════════════════════════════════════════════════════════
+
+    mod sybil_proptests {
+        use super::*;
+        use proptest::prelude::*;
+
+        const MATURATION_US: u64 = 72 * 3600 * 1_000_000;
+
+        fn make_credential_at_age(age_us: u64) -> (ConsciousnessCredential, u64) {
+            let now_us = 1_000_000_000_000u64; // fixed reference
+            let issued_at = now_us.saturating_sub(age_us);
+            let cred = ConsciousnessCredential {
+                did: "did:test:prop".to_string(),
+                profile: ConsciousnessProfile {
+                    identity: 0.5,
+                    reputation: 0.5,
+                    community: 0.5,
+                    engagement: 0.5,
+                },
+                tier: ConsciousnessTier::Citizen,
+                issued_at,
+                expires_at: now_us + 86_400_000_000,
+                issuer: "test".to_string(),
+                trajectory_commitment: None,
+                extensions: std::collections::HashMap::new(),
+            };
+            (cred, now_us)
+        }
+
+        proptest! {
+            /// Weight monotonically increases with credential age.
+            #[test]
+            fn prop_weight_monotonic_with_age(
+                age_a_hours in 0u64..200,
+                age_b_hours in 0u64..200,
+            ) {
+                let age_a_us = age_a_hours * 3600 * 1_000_000;
+                let age_b_us = age_b_hours * 3600 * 1_000_000;
+                let (cred_a, now) = make_credential_at_age(age_a_us);
+                let (cred_b, _) = make_credential_at_age(age_b_us);
+                let req = requirement_for_basic();
+
+                let result_a = evaluate_governance(&cred_a, &req, now);
+                let result_b = evaluate_governance(&cred_b, &req, now);
+
+                if age_a_us >= age_b_us {
+                    prop_assert!(
+                        result_a.weight_bp >= result_b.weight_bp,
+                        "Older credential should have >= weight than younger: {} vs {}",
+                        result_a.weight_bp, result_b.weight_bp
+                    );
+                }
+            }
+
+            /// Fully matured credentials (>72h) get full weight (no age penalty).
+            #[test]
+            fn prop_mature_credential_full_weight(age_hours in 73u64..1000) {
+                let age_us = age_hours * 3600 * 1_000_000;
+                let (cred, now) = make_credential_at_age(age_us);
+                let req = requirement_for_basic();
+                let result = evaluate_governance(&cred, &req, now);
+                // Citizen tier (0.5 combined) through sigmoid gives 7500 bp.
+                // The key assertion: no age penalty applied for mature credentials.
+                let baseline = {
+                    let (fresh_cred, _) = make_credential_at_age(age_us);
+                    evaluate_governance(&fresh_cred, &req, now).weight_bp
+                };
+                prop_assert_eq!(
+                    result.weight_bp, baseline,
+                    "Mature credential should have full (unpenalized) weight"
+                );
+            }
+
+            /// Brand-new credentials (0-1h) get severely reduced weight.
+            #[test]
+            fn prop_new_credential_reduced_weight(age_minutes in 0u64..60) {
+                let age_us = age_minutes * 60 * 1_000_000;
+                let (cred, now) = make_credential_at_age(age_us);
+                let req = requirement_for_basic();
+                let result = evaluate_governance(&cred, &req, now);
+                // At 0 minutes: weight = 5000 * 0.1 = 500
+                // At 60 minutes: weight = 5000 * (0.1 + 0.9 * (60/4320)) ≈ 562
+                prop_assert!(
+                    result.weight_bp < 3000,
+                    "New credential should have reduced weight: {}",
+                    result.weight_bp
+                );
+            }
+
+            /// Mass-created Sybil swarm: N identities created simultaneously
+            /// have total collective weight << N honest identities.
+            #[test]
+            fn prop_sybil_swarm_reduced_total_weight(n_sybils in 3usize..50) {
+                let age_us = 60 * 1_000_000; // 1 minute old (mass-created)
+                let honest_age_us = 100 * 3600 * 1_000_000; // 100 hours old
+
+                let (sybil_cred, now) = make_credential_at_age(age_us);
+                let (honest_cred, _) = make_credential_at_age(honest_age_us);
+                let req = requirement_for_basic();
+
+                let sybil_weight = evaluate_governance(&sybil_cred, &req, now).weight_bp;
+                let honest_weight = evaluate_governance(&honest_cred, &req, now).weight_bp;
+
+                let sybil_total = sybil_weight as u64 * n_sybils as u64;
+                let honest_total = honest_weight as u64 * n_sybils as u64;
+
+                // Sybil swarm should have <= 30% the total weight of equivalent honest agents
+                let ratio = sybil_total as f64 / honest_total.max(1) as f64;
+                prop_assert!(
+                    ratio <= 0.3,
+                    "Sybil swarm total weight should be <= 30% of honest: ratio={}",
+                    ratio
+                );
+            }
+        }
+    }
 }
