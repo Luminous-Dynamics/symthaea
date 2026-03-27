@@ -65,6 +65,7 @@ members = [
     "crates/symthaea-aesthetic",
     "crates/symthaea-atelier",
     "crates/symthaea-muse",
+    "crates/symthaea-biometrics",
     "crates/symthaea-gallery",
     "crates/symthaea-circular",
     "crates/symthaea-clinical",
@@ -251,6 +252,9 @@ symthaea-physics-bridge = { path = "crates/symthaea-physics-bridge", optional = 
 
 # Symthaea Broca - SSM Language Center: CfC-HDC autoregressive thought-to-text generation
 symthaea-broca = { path = "crates/symthaea-broca", optional = true }
+
+# Symthaea Muse - Consciousness-driven music synthesis (streaming PCM for cognitive loop)
+symthaea-muse = { path = "crates/symthaea-muse", optional = true }
 
 # Symthaea Geodesic - Topology-aware code verification (PDG, Betti numbers, execution oracle)
 symthaea-geodesic = { path = "crates/symthaea-geodesic", optional = true }
@@ -482,6 +486,7 @@ vocal-tract = ["hound", "symthaea-vocal-tract/hound"]  # LTC-driven articulatory
 neural-vocoder = ["ort", "vocal-tract", "symthaea-vocal-tract/mel-conversion"]  # BigVGAN ONNX neural vocoder (Path A)
 neural-vocoder-gpu = ["neural-vocoder"]                  # UNTESTED: not in CI matrix; GPU-accelerated neural vocoder (CUDA/CoreML execution providers)
 live-voice = ["cpal", "ringbuf", "vocal-tract"]         # Real-time speaker output (cpal + ringbuf + vocal tract pipeline)
+muse = ["dep:symthaea-muse"]                             # Consciousness-driven music synthesis in cognitive loop (streaming PCM)
 
 # ── Perception & Embeddings ─────────────────────────────────────────
 embeddings = ["tokenizers", "hf-hub", "symthaea-embeddings/burn-hub"]  # Qwen3/BGE text embeddings via Burn + HF Hub
