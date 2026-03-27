@@ -57,6 +57,9 @@ pub struct PolicyConfig {
     pub outer_system_fission_enabled: bool,
     pub speciation_friction_enabled: bool,
     pub hostile_guardian: bool,
+    /// Enable the probabilistic disaster engine (7 categories, 40 event types).
+    /// Default true. Set false for A/B comparison (disasters OFF).
+    pub disasters_enabled: bool,
 }
 
 impl Default for PolicyConfig {
@@ -75,6 +78,7 @@ impl Default for PolicyConfig {
             outer_system_fission_enabled: true,
             speciation_friction_enabled: true,
             hostile_guardian: false,
+            disasters_enabled: true,
         }
     }
 }

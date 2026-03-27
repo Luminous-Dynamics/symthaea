@@ -28,6 +28,7 @@
 pub mod agent;
 pub mod config;
 pub mod consciousness;
+pub mod disasters;
 pub mod economy;
 pub mod education;
 pub mod epoch;
@@ -87,6 +88,8 @@ pub struct MultiWorldSimulator {
     pub faction_engine: factions::FactionEngine,
     /// Per-world governance state.
     governance: Vec<governance::WorldGovernance>,
+    /// Probabilistic disaster engine (solar, impacts, ECLSS, psych, tech tree, Tainter/Turchin).
+    pub disaster_engine: disasters::DisasterEngine,
 }
 
 impl MultiWorldSimulator {
@@ -108,6 +111,7 @@ impl MultiWorldSimulator {
             needs_summaries: Vec::new(),
             faction_engine: factions::FactionEngine::new(),
             governance: Vec::new(),
+            disaster_engine: disasters::DisasterEngine::new(),
         }
     }
 
@@ -905,6 +909,148 @@ impl MultiWorldSimulator {
         }
     }
 
+    /// Phase 9.5: Probabilistic disaster engine — solar weather, impacts, ECLSS
+    /// failures, psychological events, tech milestones, and Tainter/Turchin dynamics.
+    fn tick_disasters(&mut self) {
+        if !self.config.policy.disasters_enabled {
+            return;
+        }
+
+        let policy = self.config.policy.clone();
+        let disaster_results =
+            self.disaster_engine
+                .tick(&self.worlds, self.current_tick, &mut self.rng, &policy);
+
+        for (effects, world_id, event) in disaster_results {
+            // Apply effects to targeted world(s)
+            let target_ids: Vec<u32> = match world_id {
+                Some(id) => vec![id],
+                None => self.worlds.iter().map(|w| w.id).collect(),
+            };
+
+            for &wid in &target_ids {
+                if let Some(world) = self.worlds.iter_mut().find(|w| w.id == wid) {
+                    // Population loss: kill a fraction of living agents (random selection)
+                    if effects.population_loss_fraction > 0.0 {
+                        let living_count = world.population();
+                        let to_kill =
+                            (living_count as f64 * effects.population_loss_fraction).round()
+                                as usize;
+                        if to_kill > 0 {
+                            // Collect living agent ids, then kill the first `to_kill`
+                            // (deterministic for reproducibility with the same RNG state)
+                            let mut living_ids: Vec<u64> = world
+                                .agents
+                                .iter()
+                                .filter(|a| a.is_alive())
+                                .map(|a| a.id)
+                                .collect();
+                            // Shuffle using RNG for randomness
+                            for i in (1..living_ids.len()).rev() {
+                                let j = (self.rng.next_u64() as usize) % (i + 1);
+                                living_ids.swap(i, j);
+                            }
+                            for &kill_id in living_ids.iter().take(to_kill) {
+                                if let Some(agent) =
+                                    world.agents.iter_mut().find(|a| a.id == kill_id)
+                                {
+                                    agent.death_tick = Some(self.current_tick);
+                                }
+                            }
+                        }
+                    }
+
+                    // Infrastructure damage
+                    if effects.infrastructure_damage > 0.0 {
+                        world.infrastructure_level = (world.infrastructure_level
+                            - effects.infrastructure_damage)
+                            .max(0.0);
+                    }
+
+                    // Resource production penalty: reduce production_rate temporarily
+                    // by multiplying by (1 - penalty). We apply to current stocks as proxy
+                    // since production_rate is static and the penalty is per-tick from active disasters.
+                    if effects.resource_production_penalty > 0.0 {
+                        let factor = 1.0 - effects.resource_production_penalty;
+                        for name in &["food", "water", "energy", "materials", "oxygen"] {
+                            if let Some(stock) = world.resources.get_mut(name) {
+                                // Reduce production output this tick
+                                stock.current =
+                                    (stock.current * factor).max(0.0);
+                            }
+                        }
+                    }
+
+                    // Solar power penalty: additional reduction to energy
+                    if effects.solar_power_penalty > 0.0 {
+                        if let Some(energy) = world.resources.get_mut("energy") {
+                            energy.current =
+                                (energy.current * (1.0 - effects.solar_power_penalty)).max(0.0);
+                        }
+                    }
+
+                    // Consciousness shock: reduce all living agents' consciousness level
+                    if effects.consciousness_shock > 0.0 {
+                        for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
+                            agent.consciousness.level = (agent.consciousness.level
+                                - effects.consciousness_shock)
+                                .max(0.0);
+                        }
+                    }
+
+                    // Allostatic load increase
+                    if effects.allostatic_load_increase > 0.0 {
+                        for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
+                            agent.needs.allostatic_load = (agent.needs.allostatic_load
+                                + effects.allostatic_load_increase)
+                                .min(1.0);
+                        }
+                    }
+
+                    // Morale impact: affects engagement
+                    if effects.morale_impact != 0.0 {
+                        for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
+                            agent.needs.engagement = (agent.needs.engagement
+                                + effects.morale_impact)
+                                .clamp(0.0, 1.0);
+                        }
+                    }
+                }
+            }
+
+            // Push the event
+            self.events.push(event);
+        }
+
+        // Apply tech milestone effects: check for newly achieved milestones this tick
+        for milestone in &self.disaster_engine.tech_tree.milestones {
+            if milestone.achieved && milestone.achieved_tick == Some(self.current_tick) {
+                // Apply tech effects to all worlds
+                for world in &mut self.worlds {
+                    for &(sector, boost) in &milestone.effects.tech_level_boost {
+                        if sector < 8 {
+                            world.knowledge.technology_levels[sector] += boost;
+                        }
+                    }
+                    // Power multiplier (boosts energy production rate)
+                    if milestone.effects.power_multiplier > 1.0 {
+                        if let Some(energy) = world.resources.get_mut("energy") {
+                            energy.production_rate *= milestone.effects.power_multiplier;
+                        }
+                    }
+                    // Resource efficiency (boosts all production rates)
+                    if milestone.effects.resource_efficiency > 1.0 {
+                        for name in &["food", "water", "energy", "materials", "oxygen"] {
+                            if let Some(stock) = world.resources.get_mut(name) {
+                                stock.production_rate *= milestone.effects.resource_efficiency;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     fn tick_emergencies(&mut self) {
         // Tick existing epidemics (index-iterate to allow &mut self.rng)
         let world_count_epi = self.worlds.len();
@@ -1193,6 +1339,9 @@ impl MultiWorldSimulator {
             // Phase 9: Harmony scoring
             self.tick_harmony_scoring();
 
+            // Phase 9.5: Disasters (before emergencies — disasters can trigger emergencies)
+            self.tick_disasters();
+
             // Phase 10: Emergencies
             self.tick_emergencies();
 
@@ -1324,6 +1473,17 @@ impl MultiWorldSimulator {
             mean_allostatic_load,
             mean_engagement,
         );
+
+        // Populate disaster statistics from the disaster engine
+        report.total_disasters = self.disaster_engine.total_disasters;
+        report.carrington_events = self.disaster_engine.carrington_events;
+        report.tech_milestones_achieved = self
+            .disaster_engine
+            .tech_tree
+            .milestones
+            .iter()
+            .filter(|m| m.achieved)
+            .count();
 
         // Populate extended observable fields from snapshots
         report.max_elite_persistence = snapshots.iter()

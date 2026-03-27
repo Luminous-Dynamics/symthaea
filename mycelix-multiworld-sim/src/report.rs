@@ -74,6 +74,11 @@ pub struct CivilizationReport {
     pub max_trauma: f64,
     pub speciation_events: usize,
     pub constitutional_calcification_events: usize,
+
+    // Disaster statistics
+    pub total_disasters: u64,
+    pub carrington_events: u32,
+    pub tech_milestones_achieved: usize,
 }
 
 impl CivilizationReport {
@@ -223,6 +228,10 @@ FACTION ANALYSIS:
 ", self.speciation_events));
             s.push_str(&format!("  Calcification events:   {}
 ", self.constitutional_calcification_events));
+            s.push_str("\nDISASTER ENGINE:\n");
+            s.push_str(&format!("  Total disasters:        {}\n", self.total_disasters));
+            s.push_str(&format!("  Carrington events:      {}\n", self.carrington_events));
+            s.push_str(&format!("  Tech milestones:        {}\n", self.tech_milestones_achieved));
         }
         s
     }
@@ -322,6 +331,9 @@ FACTION ANALYSIS:
             max_trauma: 0.0,
             speciation_events: events.iter().filter(|e| e.event_type == CivEventType::GeneticSpeciation).count(),
             constitutional_calcification_events: events.iter().filter(|e| e.event_type == CivEventType::ConstitutionalCalcification).count(),
+            total_disasters: 0,
+            carrington_events: 0,
+            tech_milestones_achieved: 0,
         }
     }
 }
@@ -400,6 +412,9 @@ mod tests {
             max_trauma: 0.15,
             speciation_events: 0,
             constitutional_calcification_events: 1,
+            total_disasters: 42,
+            carrington_events: 0,
+            tech_milestones_achieved: 3,
         }
     }
 

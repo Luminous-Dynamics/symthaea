@@ -102,6 +102,7 @@ fn main() {
             outer_system_fission_enabled: true,
             speciation_friction_enabled: true,
             hostile_guardian: false,
+            disasters_enabled: true,
         }),
     ];
 
