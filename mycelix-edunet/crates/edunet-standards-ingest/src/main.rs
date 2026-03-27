@@ -169,6 +169,30 @@ enum Commands {
         output: Option<PathBuf>,
     },
 
+    /// List ESCO career fields
+    ListEsco,
+
+    /// Fetch ESCO career pathway (occupations + skills)
+    IngestEsco {
+        /// Career field (e.g., "software", "data-science", "healthcare")
+        field: String,
+        /// Maximum occupations to fetch (default: 5)
+        #[arg(long, default_value_t = 5)]
+        limit: usize,
+        /// Output file path (default: stdout)
+        #[arg(long, short = 'o')]
+        output: Option<PathBuf>,
+    },
+
+    /// Analyze a curriculum JSON file and print statistics
+    Stats {
+        /// Curriculum JSON file to analyze
+        file: PathBuf,
+        /// Output as JSON instead of human-readable
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Merge multiple curriculum documents + bridge files into a unified graph
     ///
     /// Combines all nodes, edges, and bridge connections into a single
@@ -519,6 +543,47 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 eprintln!("\nWrote bridge to {}", path.display());
             } else {
                 println!("{json}");
+            }
+        }
+
+        // ============================================================
+        // ESCO Career Pathways
+        // ============================================================
+        Commands::ListEsco => {
+            let source = edunet_standards_ingest::sources::esco::EscoSource::new()?;
+            let entries = source.list_available()?;
+            eprintln!("Available ESCO career fields:");
+            println!("{:<20} {}", "ID", "FIELD");
+            println!("{}", "-".repeat(50));
+            for e in &entries {
+                println!("{:<20} {}", e.id, e.subject);
+            }
+        }
+
+        Commands::IngestEsco {
+            field,
+            limit,
+            output,
+        } => {
+            let source = edunet_standards_ingest::sources::esco::EscoSource::new()?;
+            eprintln!("Fetching ESCO career pathway for '{}'...", field);
+            let doc = source.fetch_career_pathway(&field, limit).await?;
+            eprintln!("Got {} nodes ({} occupations + skills)", doc.nodes.len(), limit);
+            write_document(&doc, output.as_deref(), true)?;
+        }
+
+        // ============================================================
+        // Statistics
+        // ============================================================
+        Commands::Stats { file, json } => {
+            let content = std::fs::read_to_string(&file)?;
+            let doc: converter::CurriculumDocument = serde_json::from_str(&content)?;
+            let stats = edunet_standards_ingest::stats::analyze(&doc);
+
+            if json {
+                println!("{}", serde_json::to_string_pretty(&stats)?);
+            } else {
+                edunet_standards_ingest::stats::print_stats(&stats);
             }
         }
 

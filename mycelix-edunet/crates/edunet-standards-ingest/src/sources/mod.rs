@@ -9,6 +9,7 @@
 pub mod acm;
 pub mod cip;
 pub mod csp;
+pub mod esco;
 pub mod k12_subjects;
 pub mod luminous;
 pub mod ocw;
