@@ -20,6 +20,7 @@
 pub mod curation;
 pub mod evolution;
 pub mod storage;
+pub mod style;
 
 use serde::{Deserialize, Serialize};
 use symthaea_aesthetic::AestheticScore;
