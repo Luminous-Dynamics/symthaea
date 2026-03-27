@@ -47,6 +47,8 @@ pub struct TradeRoute {
     pub transport_cost_per_kg: f64,
     /// One-way light delay in seconds.
     pub light_delay_secs: f64,
+    /// Probability of disruption per tick (based on distance + conflict).
+    pub route_vulnerability: f64,
 }
 
 /// Record of a migration event.
@@ -121,6 +123,9 @@ impl InterWorldEngine {
 
         let transport_cost_per_kg = delta_v * delta_v * 0.001;
 
+        // Route vulnerability: higher for longer distances
+        let route_vulnerability = (light_delay / 10000.0).clamp(0.001, 0.05);
+
         let route = TradeRoute {
             from_world: from,
             to_world: to,
@@ -130,6 +135,7 @@ impl InterWorldEngine {
             primary_import: String::new(),
             transport_cost_per_kg,
             light_delay_secs: light_delay,
+            route_vulnerability,
         };
 
         self.trade_routes.push(route);
@@ -457,12 +463,62 @@ impl InterWorldEngine {
             knowledge: crate::knowledge::WorldKnowledge::new(),
             economy: crate::economy::WorldEconomy::new(),
             harmony: crate::harmony::HarmonyTracker::new(),
+            governance: crate::governance::WorldGovernance::new(),
         };
 
         // Establish trade route with parent (assume Moon-Earth-class delay)
         self.establish_route(parent_world.id, new_world_id, tick, 1.3);
 
         new_world
+    }
+
+    /// Speciation friction: after 400+ years of isolation, cross-world fertility reduces.
+    ///
+    /// Returns fertility reduction factor (0.0 = no reduction, up to 0.5 max).
+    /// Only applies when worlds have been isolated for > 400 years (4800 ticks).
+    pub fn speciation_friction(world_a_founded: u32, world_b_founded: u32, current_tick: u32) -> f64 {
+        // Isolation years = min age of the two worlds (proxy for divergence time)
+        let age_a = current_tick.saturating_sub(world_a_founded) as f64 / 12.0;
+        let age_b = current_tick.saturating_sub(world_b_founded) as f64 / 12.0;
+        let isolation_years = age_a.min(age_b);
+
+        if isolation_years <= 400.0 {
+            return 0.0;
+        }
+
+        ((isolation_years - 400.0) / 600.0).clamp(0.0, 0.5)
+    }
+
+    /// Check if outer system fission should occur.
+    ///
+    /// When total off-earth pop > 5000 AND mean tech > 0.3, found Europa or Titan.
+    /// Returns (should_found_europa, should_found_titan).
+    pub fn check_outer_system_fission(
+        worlds: &[World],
+        current_tick: u32,
+    ) -> (bool, bool) {
+        let off_earth_pop: usize = worlds
+            .iter()
+            .filter(|w| w.location != "Earth")
+            .map(|w| w.population())
+            .sum();
+
+        let mean_tech: f64 = if worlds.is_empty() {
+            0.0
+        } else {
+            worlds.iter().map(|w| w.knowledge.mean_tech_level()).sum::<f64>() / worlds.len() as f64
+        };
+        // Normalize tech to 0-1 range (starts at 1.0, so (mean-1)/9 maps [1,10]->[0,1])
+        let tech_norm = ((mean_tech - 1.0) / 9.0).clamp(0.0, 1.0);
+
+        if off_earth_pop < 5000 || tech_norm < 0.3 {
+            return (false, false);
+        }
+
+        let has_europa = worlds.iter().any(|w| w.location == "Europa");
+        let has_titan = worlds.iter().any(|w| w.location == "Titan");
+
+        (!has_europa, !has_titan && off_earth_pop > 8000)
     }
 
     /// Connectivity score: number of trade routes involving this world / max possible.
@@ -537,6 +593,7 @@ mod tests {
             knowledge: crate::knowledge::WorldKnowledge::new(),
             economy: crate::economy::WorldEconomy::new(),
             harmony: crate::harmony::HarmonyTracker::new(),
+            governance: crate::governance::WorldGovernance::new(),
         };
         for i in 0..n {
             let birth_tick = 0; // born at tick 0, so at TEST_TICK they are 30 years old
@@ -560,7 +617,11 @@ mod tests {
                 children_ids: vec![],
                 is_immigrant: false,
                 needs: crate::needs::PsychologicalNeeds::new(),
-            tend_balance: 0.0,
+                tend_balance: 0.0,
+                parent_ids: None,
+                faction_id: None,
+                generation: 0,
+                trauma_level: 0.0,
             });
         }
         world.next_agent_id = n as u64;

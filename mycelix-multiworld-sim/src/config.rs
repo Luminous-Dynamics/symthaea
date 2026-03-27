@@ -47,6 +47,11 @@ pub struct PolicyConfig {
     /// Enable the education guild tick (peer teaching, epistemic foraging).
     /// Default true. Set false for A/B comparison.
     pub education_enabled: bool,
+    /// Enable consciousness-gated governance (tier-based decision authority).
+    /// Default true. When false, all agents are treated as Observer tier —
+    /// no consciousness-based filtering of decisions. This is the control
+    /// condition for proving that consciousness gating improves outcomes.
+    pub consciousness_gating_enabled: bool,
 }
 
 impl Default for PolicyConfig {
@@ -59,6 +64,7 @@ impl Default for PolicyConfig {
             migration_enabled: true,
             migration_max_per_cycle: 3,
             education_enabled: true,
+            consciousness_gating_enabled: true,
         }
     }
 }

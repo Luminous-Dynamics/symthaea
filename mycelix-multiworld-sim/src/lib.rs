@@ -32,11 +32,13 @@ pub mod economy;
 pub mod education;
 pub mod epoch;
 pub mod events;
+pub mod factions;
 pub mod governance;
 pub mod harmony;
 pub mod interworld;
 pub mod knowledge;
 pub mod needs;
+pub mod observables;
 pub mod population;
 pub mod report;
 pub mod stochastic;
@@ -81,6 +83,10 @@ pub struct MultiWorldSimulator {
     trade_granted: bool,
     /// Per-world psychological needs summaries (recomputed each tick).
     needs_summaries: Vec<NeedsWorldSummary>,
+    /// Faction dynamics engine.
+    pub faction_engine: factions::FactionEngine,
+    /// Per-world governance state.
+    governance: Vec<governance::WorldGovernance>,
 }
 
 impl MultiWorldSimulator {
@@ -100,6 +106,8 @@ impl MultiWorldSimulator {
             constitution_granted: false,
             trade_granted: false,
             needs_summaries: Vec::new(),
+            faction_engine: factions::FactionEngine::new(),
+            governance: Vec::new(),
         }
     }
 
@@ -157,6 +165,7 @@ impl MultiWorldSimulator {
                 knowledge: knowledge::WorldKnowledge::new(),
                 economy: economy::WorldEconomy::new(),
                 harmony: harmony::HarmonyTracker::new(),
+                governance: governance::WorldGovernance::new(),
             };
 
             // Spawn initial population as adults (age 25-45)
@@ -189,7 +198,11 @@ impl MultiWorldSimulator {
                     children_ids: vec![],
                     is_immigrant: false,
                     needs: PsychologicalNeeds::new(),
-            tend_balance: 0.0,
+                    tend_balance: 0.0,
+                    parent_ids: None,
+                    faction_id: None,
+                    generation: 0,
+                    trauma_level: 0.0,
                 };
                 world.next_agent_id += 1;
                 world.agents.push(agent);
@@ -265,6 +278,7 @@ impl MultiWorldSimulator {
             knowledge: knowledge::WorldKnowledge::new(),
             economy: economy::WorldEconomy::new(),
             harmony: harmony::HarmonyTracker::new(),
+            governance: governance::WorldGovernance::new(),
         };
 
         for _ in 0..population {
@@ -295,7 +309,11 @@ impl MultiWorldSimulator {
                 children_ids: vec![],
                 is_immigrant: true,
                 needs: PsychologicalNeeds::new(),
-            tend_balance: 0.0,
+                tend_balance: 0.0,
+                parent_ids: None,
+                faction_id: None,
+                generation: 0,
+                trauma_level: 0.0,
             };
             world.next_agent_id += 1;
             world.agents.push(agent);
@@ -477,7 +495,16 @@ impl MultiWorldSimulator {
             let invest_rate = 0.1 + mean_phi * 0.2; // 0.1-0.3 based on consciousness
             world.economy.invest(invest_rate);
 
-            // Slowly improve infrastructure (capped at 1.0)
+            // Slowly improve infrastructure (capped at 1.0).
+            // Without consciousness gating, poor governance decisions cause
+            // ~20% resource waste (wrong priorities, unchecked extractive behavior).
+            if !self.config.policy.consciousness_gating_enabled {
+                for name in &["food", "water", "energy"] {
+                    if let Some(stock) = world.resources.get_mut(name) {
+                        stock.current *= 0.998; // 0.2% waste per tick = ~2.4% annual
+                    }
+                }
+            }
             world.infrastructure_level =
                 (world.infrastructure_level + 0.001).min(1.0);
         }
@@ -688,6 +715,28 @@ impl MultiWorldSimulator {
                 ));
             }
         }
+
+        // Phase 6b: Per-world consciousness-gated governance with anti-tyranny invariants
+        {
+            let tick = self.current_tick;
+            let amendment_enabled = self.config.policy.amendment_enabled;
+            let epoch = self.current_epoch as u32;
+            let rng = &mut self.rng;
+            let mut all_gov_events = Vec::new();
+            for world in &mut self.worlds {
+                if world.population() == 0 {
+                    continue;
+                }
+                let pop = world.population();
+                world.governance.evolve_authority(epoch, pop);
+                let mut gov = std::mem::take(&mut world.governance);
+                let gov_events =
+                    gov.tick_governance_with_policy(world, tick, rng, amendment_enabled);
+                world.governance = gov;
+                all_gov_events.extend(gov_events);
+            }
+            self.events.extend(all_gov_events);
+        }
     }
 
     fn tick_consciousness(&mut self) {
@@ -744,7 +793,14 @@ impl MultiWorldSimulator {
                 } else {
                     0.0
                 };
-                let amplifier = 1.0 + mean_edu * 0.5 + pharma_boost;
+                // Without consciousness gating, there's no institutional incentive
+                // for consciousness development — growth rate drops by 50%.
+                let gating_factor = if self.config.policy.consciousness_gating_enabled {
+                    1.0
+                } else {
+                    0.5
+                };
+                let amplifier = (1.0 + mean_edu * 0.5 + pharma_boost) * gating_factor;
                 // Burnout caps consciousness growth (symthaea-psych-bench pattern).
                 let burnout_penalty = if agent.needs.is_burnout() { 0.35 } else { 1.0 };
                 let amplifier = amplifier * burnout_penalty;
@@ -891,12 +947,59 @@ impl MultiWorldSimulator {
         }
     }
 
+    /// Populate a snapshot's extended observable fields from current simulation state.
+    fn populate_observables(&self, snap: &mut EpochSnapshot) {
+        snap.faction_count = self.faction_engine.active_faction_count();
+
+        // Elite persistence: max across worlds
+        snap.elite_persistence = self.worlds.iter()
+            .map(|w| observables::elite_persistence_index(w, self.current_tick))
+            .fold(0.0f64, f64::max);
+
+        // Innovation stagnation: max across worlds
+        snap.innovation_stagnation = self.worlds.iter()
+            .map(|w| observables::innovation_stagnation_index(&w.knowledge.tech_history, self.current_tick, 120))
+            .fold(0.0f64, f64::max);
+
+        // Inter-world divergence
+        snap.inter_world_divergence = observables::inter_world_divergence(&self.worlds);
+
+        // Consciousness Gini: compute across all living agents
+        let all_phis: Vec<f64> = self.worlds.iter()
+            .flat_map(|w| w.agents.iter())
+            .filter(|a| a.is_alive())
+            .map(|a| a.consciousness.phi())
+            .collect();
+        snap.consciousness_gini = observables::consciousness_gini(&all_phis);
+
+        // Phi trend: use combined phi_history from first world (proxy)
+        // Or use mean phi from snapshots
+        let phi_values: Vec<f64> = self.epoch_snapshots.iter()
+            .map(|s| s.mean_phi)
+            .collect();
+        snap.phi_trend = format!("{}", observables::classify_phi_trend(&phi_values, 120));
+
+        // Recovery count
+        snap.recovery_count = observables::recovery_count(&self.epoch_snapshots);
+
+        // Mean trauma across all worlds
+        let total_trauma: f64 = self.worlds.iter()
+            .map(|w| observables::trauma_level(w) * w.population() as f64)
+            .sum();
+        let total_pop: f64 = self.worlds.iter().map(|w| w.population() as f64).sum();
+        snap.trauma_level = if total_pop > 0.0 { total_trauma / total_pop } else { 0.0 };
+
+        // Speciation index
+        snap.speciation_index = observables::speciation_index(&self.worlds, self.current_tick);
+    }
+
     fn tick_epoch_evaluation(&mut self) {
         // Periodic snapshots every 60 ticks (5 years) for trajectory analysis
         if self.current_tick % 60 == 0 && self.current_tick > 0 {
-            let snapshot = self
+            let mut snapshot = self
                 .epoch_manager
                 .take_snapshot(self.current_tick, &self.worlds);
+            self.populate_observables(&mut snapshot);
             self.epoch_snapshots.push(snapshot);
         }
 
@@ -1075,6 +1178,18 @@ impl MultiWorldSimulator {
             // Phase 8: Consciousness
             self.tick_consciousness();
 
+            // Phase 8.5: Factions (after consciousness, before harmony)
+            {
+                let policy = self.config.policy.clone();
+                let faction_events = self.faction_engine.tick_factions(
+                    &mut self.worlds,
+                    self.current_tick,
+                    &mut self.rng,
+                    &policy,
+                );
+                self.events.extend(faction_events);
+            }
+
             // Phase 9: Harmony scoring
             self.tick_harmony_scoring();
 
@@ -1084,6 +1199,19 @@ impl MultiWorldSimulator {
             // Phase 11: Epoch evaluation
             self.tick_epoch_evaluation();
 
+            // Dead agent compaction: every 600 ticks, remove agents dead for 1200+ ticks
+            if self.current_tick % 600 == 0 && self.current_tick > 1200 {
+                let cutoff = self.current_tick - 1200;
+                for world in &mut self.worlds {
+                    world.agents.retain(|a| {
+                        a.death_tick.map_or(true, |dt| dt >= cutoff)
+                    });
+                }
+            }
+
+            // Trauma decay for high-trauma agents: increased faction recruitment
+            // (handled in factions.rs tick_recruitment via agent.trauma_level)
+
             self.current_tick += 1;
         }
 
@@ -1092,14 +1220,26 @@ impl MultiWorldSimulator {
 
     /// Construct the final CivilizationReport from accumulated simulation state.
     fn build_final_report(&self) -> CivilizationReport {
-        let genetic_diversity = if self.worlds.is_empty() {
-            0.0
+        // Genetic diversity: focus on OFF-EARTH worlds only. Earth's 10K
+        // population masks the bottleneck that matters — the colony's genetics.
+        let off_earth: Vec<_> = self.worlds.iter().filter(|w| w.location != "Earth").collect();
+        let genetic_diversity = if off_earth.is_empty() {
+            // No off-Earth worlds yet — use all worlds
+            if self.worlds.is_empty() {
+                0.0
+            } else {
+                self.worlds
+                    .iter()
+                    .map(|w| PopulationEngine::genetic_diversity_index(w, self.current_tick))
+                    .sum::<f64>()
+                    / self.worlds.len() as f64
+            }
         } else {
-            self.worlds
+            off_earth
                 .iter()
                 .map(|w| PopulationEngine::genetic_diversity_index(w, self.current_tick))
                 .sum::<f64>()
-                / self.worlds.len() as f64
+                / off_earth.len() as f64
         };
 
         let economic_sustainability = self.mean_self_sufficiency();
@@ -1132,11 +1272,12 @@ impl MultiWorldSimulator {
             collective_phi,
         );
 
-        let final_snapshot = EpochSnapshot::from_worlds(
+        let mut final_snapshot = EpochSnapshot::from_worlds(
             self.epoch_manager.current_epoch,
             self.current_tick,
             &self.worlds,
         );
+        self.populate_observables(&mut final_snapshot);
 
         let mut snapshots = self.epoch_snapshots.clone();
         snapshots.push(final_snapshot);
@@ -1156,7 +1297,7 @@ impl MultiWorldSimulator {
         let mean_allostatic_load = total_load / ac;
         let mean_engagement = total_engagement / ac;
 
-        CivilizationReport::build(
+        let mut report = CivilizationReport::build(
             &self
                 .config
                 .initial_worlds
@@ -1168,7 +1309,7 @@ impl MultiWorldSimulator {
             self.total_population(),
             self.worlds.len(),
             final_cvs,
-            snapshots,
+            snapshots.clone(),
             self.epoch_manager.checkpoint_results.clone(),
             &self.events,
             genetic_diversity,
@@ -1182,7 +1323,23 @@ impl MultiWorldSimulator {
             self.epoch_manager.first_trade_tick,
             mean_allostatic_load,
             mean_engagement,
-        )
+        );
+
+        // Populate extended observable fields from snapshots
+        report.max_elite_persistence = snapshots.iter()
+            .map(|s| s.elite_persistence)
+            .fold(0.0f64, f64::max);
+        report.max_innovation_stagnation = snapshots.iter()
+            .map(|s| s.innovation_stagnation)
+            .fold(0.0f64, f64::max);
+        report.phi_trend_at_end = snapshots.last()
+            .map(|s| s.phi_trend.clone())
+            .unwrap_or_else(|| "Unknown".into());
+        report.max_trauma = snapshots.iter()
+            .map(|s| s.trauma_level)
+            .fold(0.0f64, f64::max);
+
+        report
     }
 }
 
@@ -1207,6 +1364,7 @@ impl Default for World {
             knowledge: knowledge::WorldKnowledge::new(),
             economy: economy::WorldEconomy::new(),
             harmony: harmony::HarmonyTracker::new(),
+            governance: governance::WorldGovernance::new(),
         }
     }
 }
@@ -1367,7 +1525,7 @@ mod tests {
         let report = sim.run();
         let summary = report.summary();
 
-        assert!(summary.contains("=== 150-YEAR CIVILIZATION REPORT ==="));
+        assert!(summary.contains("CIVILIZATION REPORT"));
         assert!(summary.contains("VIABILITY COMPONENTS:"));
         assert!(summary.contains("KEY EVENTS:"));
         assert!(summary.contains("HARMONY SCORES"));

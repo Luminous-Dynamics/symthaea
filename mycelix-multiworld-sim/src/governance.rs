@@ -31,6 +31,25 @@ const STAGNATION_THRESHOLD: u32 = 120;
 /// Maximum amendments per review period before instability penalty kicks in.
 const MAX_AMENDMENTS_PER_PERIOD: u32 = 3;
 
+// ============================================================================
+// ANTI-TYRANNY INVARIANTS (mirrors mycelix-governance hardening)
+// ============================================================================
+
+/// Veto override threshold: 80% supermajority to reverse a Guardian veto.
+/// Hardcoded — not configurable by governance.
+const VETO_OVERRIDE_THRESHOLD: f64 = 0.80;
+
+/// Veto cooldown per Guardian: 7 ticks (≈7 months at monthly resolution).
+/// Prevents serial veto DoS.
+const VETO_COOLDOWN_TICKS: u32 = 7;
+
+/// Maximum consecutive emergency sessions before mandatory cooldown.
+const MAX_EMERGENCY_SESSIONS: u32 = 3;
+
+/// Council membership term in ticks (365 ticks ≈ 30 years at monthly resolution).
+/// Scaled down from real-world 365 days for simulation time compression.
+const MEMBERSHIP_TERM_TICKS: u32 = 360;
+
 /// Governance authority level, evolving with colony maturity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum GovernanceAuthority {
@@ -42,6 +61,8 @@ pub enum GovernanceAuthority {
     LocalSovereign,
     /// Epoch 4+: Multi-world council.
     Federation,
+    /// Epoch 7+: Loose confederation of autonomous worlds.
+    Confederation,
 }
 
 impl std::fmt::Display for GovernanceAuthority {
@@ -51,6 +72,7 @@ impl std::fmt::Display for GovernanceAuthority {
             Self::LocalWithEarthVeto => write!(f, "LocalWithEarthVeto"),
             Self::LocalSovereign => write!(f, "LocalSovereign"),
             Self::Federation => write!(f, "Federation"),
+            Self::Confederation => write!(f, "Confederation"),
         }
     }
 }
@@ -88,6 +110,23 @@ pub struct WorldGovernance {
     amendments_this_period: u32,
     /// Start tick of the current review period.
     period_start_tick: u32,
+    /// History of amendments: (tick, constitution_version).
+    pub amendment_history: Vec<(u32, u32)>,
+    // --- Anti-tyranny tracking ---
+    /// Total guardian vetoes attempted.
+    pub veto_count: u32,
+    /// Total veto overrides (80% supermajority reversed a veto).
+    pub veto_override_count: u32,
+    /// Total vetoes deterred (Guardian chose not to veto because override exists).
+    pub veto_deterred_count: u32,
+    /// Tick of the last veto (for rate limiting).
+    pub last_veto_tick: Option<u32>,
+    /// Consecutive emergency sessions (resets on cooldown).
+    pub consecutive_emergency_sessions: u32,
+    /// Council membership term start tick (for term limit enforcement).
+    pub membership_term_start: u32,
+    /// Whether membership renewal is due.
+    pub membership_renewal_due: bool,
 }
 
 impl WorldGovernance {
@@ -109,6 +148,14 @@ impl WorldGovernance {
             last_amendment_tick: 0,
             amendments_this_period: 0,
             period_start_tick: 0,
+            amendment_history: Vec::new(),
+            veto_count: 0,
+            veto_override_count: 0,
+            veto_deterred_count: 0,
+            last_veto_tick: None,
+            consecutive_emergency_sessions: 0,
+            membership_term_start: 0,
+            membership_renewal_due: false,
         }
     }
 
@@ -122,6 +169,17 @@ impl WorldGovernance {
         world: &World,
         current_tick: u32,
         rng: &mut StochasticEngine,
+    ) -> Vec<CivEvent> {
+        self.tick_governance_with_policy(world, current_tick, rng, true)
+    }
+
+    /// Run one tick of governance with policy control over amendments.
+    pub fn tick_governance_with_policy(
+        &mut self,
+        world: &World,
+        current_tick: u32,
+        rng: &mut StochasticEngine,
+        amendment_enabled: bool,
     ) -> Vec<CivEvent> {
         let mut events = Vec::new();
         let population = world.population();
@@ -157,7 +215,8 @@ impl WorldGovernance {
         let eligible_fraction = self.eligible_voter_fraction(&tier_dist);
 
         // --- Check for amendments (every review period) ---
-        if current_tick > 0
+        if amendment_enabled
+            && current_tick > 0
             && current_tick % AMENDMENT_REVIEW_PERIOD == 0
             && eligible_fraction > 0.3
         {
@@ -168,6 +227,8 @@ impl WorldGovernance {
                 self.amendments_this_period += 1;
                 self.constitution_version += 1;
                 self.last_amendment_tick = current_tick;
+                self.amendment_history
+                    .push((current_tick, self.constitution_version));
 
                 // Adjust gating thresholds: slight relaxation over time
                 for threshold in &mut self.consciousness_gating_threshold {
@@ -184,6 +245,21 @@ impl WorldGovernance {
                     ),
                 ));
             }
+        }
+
+        // --- Constitutional calcification: stagnation trap ---
+        // If calcification > 0.7, innovation stagnation probability increases 50%.
+        let calcification = self.constitutional_calcification(current_tick);
+        if calcification > 0.7 {
+            events.push(CivEvent::new(
+                current_tick,
+                Some(world.id),
+                CivEventType::ConstitutionalCalcification,
+                format!(
+                    "{}: constitutional calcification at {:.2} — governance rigidity threatens innovation",
+                    world.name, calcification
+                ),
+            ));
         }
 
         // --- Evaluate oppression ---
@@ -235,6 +311,101 @@ impl WorldGovernance {
             }
         }
 
+        // --- Guardian veto dynamics (anti-tyranny invariants) ---
+        // Guardians (tier 4) may attempt a veto. The existence of the
+        // override mechanism creates a deterrence effect: Guardians only
+        // veto when they believe >20% of the community agrees with them.
+        let guardian_fraction = tier_dist[4];
+        if guardian_fraction > 0.0
+            && self.proposal_count > 0
+            && matches!(
+                self.authority_level,
+                GovernanceAuthority::LocalSovereign
+                    | GovernanceAuthority::Federation
+                    | GovernanceAuthority::Confederation
+            )
+        {
+            // Veto attempt probability: Guardians veto when stability is low
+            // AND they haven't vetoed recently (rate limit)
+            let rate_limited = self
+                .last_veto_tick
+                .map_or(false, |t| current_tick < t + VETO_COOLDOWN_TICKS);
+
+            let veto_urge = (1.0 - self.stability_score) * guardian_fraction;
+            if !rate_limited && rng.bernoulli((veto_urge * 0.3).min(0.15)) {
+                // Guardian decides whether to veto based on override awareness
+                // If community support < 20% (override would succeed), deterred
+                let community_opposition = eligible_fraction * self.stability_score;
+                if community_opposition > VETO_OVERRIDE_THRESHOLD {
+                    // Deterred: Guardian knows the override would succeed
+                    self.veto_deterred_count += 1;
+                    events.push(CivEvent::new(
+                        current_tick,
+                        Some(world.id),
+                        CivEventType::GovernanceTransition,
+                        format!(
+                            "{}: Guardian veto DETERRED — override threshold ({:.0}%) would be met (community support {:.1}%)",
+                            world.name,
+                            VETO_OVERRIDE_THRESHOLD * 100.0,
+                            community_opposition * 100.0
+                        ),
+                    ));
+                } else {
+                    // Veto exercised
+                    self.veto_count += 1;
+                    self.last_veto_tick = Some(current_tick);
+                    events.push(CivEvent::new(
+                        current_tick,
+                        Some(world.id),
+                        CivEventType::GovernanceTransition,
+                        format!(
+                            "{}: Guardian VETO #{} exercised — 48-hour override window opens",
+                            world.name, self.veto_count
+                        ),
+                    ));
+
+                    // Override attempt: community votes to reverse
+                    let override_support = eligible_fraction * (1.0 - guardian_fraction);
+                    if override_support >= VETO_OVERRIDE_THRESHOLD {
+                        self.veto_override_count += 1;
+                        events.push(CivEvent::new(
+                            current_tick,
+                            Some(world.id),
+                            CivEventType::GovernanceTransition,
+                            format!(
+                                "{}: Veto OVERRIDDEN by {:.1}% supermajority (threshold: {:.0}%)",
+                                world.name,
+                                override_support * 100.0,
+                                VETO_OVERRIDE_THRESHOLD * 100.0
+                            ),
+                        ));
+                    }
+                }
+            }
+        }
+
+        // --- Membership term limits ---
+        if current_tick > self.membership_term_start + MEMBERSHIP_TERM_TICKS {
+            self.membership_renewal_due = true;
+            // Simulate re-election: stability-dependent success
+            if rng.bernoulli(self.stability_score.max(0.3)) {
+                self.membership_term_start = current_tick;
+                self.membership_renewal_due = false;
+            } else {
+                // Failed re-election reduces stability (leadership vacuum)
+                self.stability_score = (self.stability_score - 0.1).max(0.0);
+                events.push(CivEvent::new(
+                    current_tick,
+                    Some(world.id),
+                    CivEventType::GovernanceTransition,
+                    format!(
+                        "{}: Council membership term expired — re-election failed, leadership vacuum",
+                        world.name
+                    ),
+                ));
+            }
+        }
+
         // --- Update stability ---
         self.stability_score = self.compute_stability(current_tick);
 
@@ -281,11 +452,21 @@ impl WorldGovernance {
         score.clamp(0.0, 1.0)
     }
 
+    /// Constitutional calcification: older constitutions resist change.
+    ///
+    /// Factor = min(1.0, age_ticks / 6000.0). After 500 years, fully calcified
+    /// unless reformed via amendment.
+    pub fn constitutional_calcification(&self, current_tick: u32) -> f64 {
+        let age = current_tick.saturating_sub(self.last_amendment_tick);
+        (age as f64 / 6000.0).min(1.0)
+    }
+
     /// Evolve authority level based on epoch and population.
     ///
     /// Authority can only advance, never regress.
     pub fn evolve_authority(&mut self, epoch: u32, population: usize) {
         let new_authority = match (epoch, population) {
+            (7.., _) => GovernanceAuthority::Confederation,
             (4.., _) => GovernanceAuthority::Federation,
             (3.., _) | (_, 5000..) => GovernanceAuthority::LocalSovereign,
             (2.., _) | (_, 500..) => GovernanceAuthority::LocalWithEarthVeto,
@@ -346,6 +527,7 @@ impl WorldGovernance {
             GovernanceAuthority::LocalWithEarthVeto => 1,
             GovernanceAuthority::LocalSovereign => 2,
             GovernanceAuthority::Federation => 3,
+            GovernanceAuthority::Confederation => 4,
         }
     }
 }
@@ -395,7 +577,11 @@ mod tests {
                     children_ids: vec![],
                     is_immigrant: false,
                     needs: crate::needs::PsychologicalNeeds::new(),
-            tend_balance: 0.0,
+                    tend_balance: 0.0,
+                    parent_ids: None,
+                    faction_id: None,
+                    generation: 0,
+                    trauma_level: 0.0,
                 };
                 agents.push(agent);
                 id += 1;
@@ -420,6 +606,7 @@ mod tests {
             knowledge: crate::knowledge::WorldKnowledge::new(),
             economy: crate::economy::WorldEconomy::new(),
             harmony: crate::harmony::HarmonyTracker::new(),
+            governance: crate::governance::WorldGovernance::new(),
         }
     }
 

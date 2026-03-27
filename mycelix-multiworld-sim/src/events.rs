@@ -45,6 +45,28 @@ pub enum CivEventType {
     TeachingInteraction,
     /// Community skill crisis: mean sector skill below survival threshold.
     SkillCrisis,
+    /// A political faction emerged from inequality or instability.
+    FactionEmerged,
+    /// A faction dissolved due to declining strength.
+    FactionDissolved,
+    /// Armed or political conflict between factions.
+    FactionConflict,
+    /// A faction conflict was resolved (peacefully or by attrition).
+    FactionResolution,
+    /// Innovation stagnation detected (tech growth flatlined).
+    InnovationStagnation,
+    /// Conflict or tension between worlds.
+    InterWorldConflict,
+    /// An outer system colony was established.
+    OuterSystemColony,
+    /// Constitutional calcification: governance rigidity exceeds threshold.
+    ConstitutionalCalcification,
+    /// Genetic speciation divergence between worlds.
+    GeneticSpeciation,
+    /// Collective trauma accumulation in a world.
+    TraumaAccumulation,
+    /// Governance model transition (e.g., authoritarian -> democratic).
+    GovernanceTransition,
 }
 
 impl CivEvent {

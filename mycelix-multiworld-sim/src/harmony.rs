@@ -277,6 +277,50 @@ impl HarmonyTracker {
         totals
     }
 
+    /// Mean pairwise distance of harmony score vectors across worlds.
+    ///
+    /// High values indicate worlds are emphasizing different harmonies.
+    pub fn per_world_emphasis_divergence(trackers: &[HarmonyTracker]) -> f64 {
+        if trackers.len() < 2 {
+            return 0.0;
+        }
+        let mut total_dist = 0.0f64;
+        let mut pairs = 0usize;
+        for i in 0..trackers.len() {
+            for j in (i + 1)..trackers.len() {
+                let diff: f64 = trackers[i]
+                    .current_scores
+                    .iter()
+                    .zip(trackers[j].current_scores.iter())
+                    .map(|(a, b)| (a - b).powi(2))
+                    .sum::<f64>()
+                    .sqrt();
+                total_dist += diff;
+                pairs += 1;
+            }
+        }
+        if pairs == 0 {
+            return 0.0;
+        }
+        total_dist / pairs as f64
+    }
+
+    /// Harmony conflict index: structural conflict when some harmonies are high
+    /// and others low. Formula: max_score - min_score.
+    pub fn harmony_conflict_index(tracker: &HarmonyTracker) -> f64 {
+        let max = tracker
+            .current_scores
+            .iter()
+            .copied()
+            .fold(0.0f64, f64::max);
+        let min = tracker
+            .current_scores
+            .iter()
+            .copied()
+            .fold(1.0f64, f64::min);
+        (max - min).max(0.0)
+    }
+
     /// Mean love coherence across all provided worlds.
     pub fn civilization_love_coherence(worlds: &[HarmonyTracker]) -> f64 {
         if worlds.is_empty() {
@@ -335,6 +379,7 @@ mod tests {
             knowledge: crate::knowledge::WorldKnowledge::new(),
             economy: crate::economy::WorldEconomy::new(),
             harmony: crate::harmony::HarmonyTracker::new(),
+            governance: crate::governance::WorldGovernance::new(),
         };
         for i in 0..pop {
             world.agents.push(CivAgent {
@@ -362,7 +407,11 @@ mod tests {
                 children_ids: vec![],
                 is_immigrant: false,
                 needs: crate::needs::PsychologicalNeeds::new(),
-            tend_balance: 0.0,
+                tend_balance: 0.0,
+                parent_ids: None,
+                faction_id: None,
+                generation: 0,
+                trauma_level: 0.0,
             });
         }
         world.next_agent_id = pop as u64;

@@ -5,6 +5,7 @@
 
 use crate::agent::{CivAgent, LifeStage};
 use crate::economy::WorldEconomy;
+use crate::governance::WorldGovernance;
 use crate::harmony::HarmonyTracker;
 use crate::knowledge::WorldKnowledge;
 use crate::population::SirEpidemic;
@@ -306,6 +307,9 @@ pub struct World {
     pub economy: WorldEconomy,
     /// Eight Harmonies tracker.
     pub harmony: HarmonyTracker,
+    /// Consciousness-gated governance with anti-tyranny invariants.
+    #[serde(default)]
+    pub governance: WorldGovernance,
 }
 
 impl World {
@@ -428,6 +432,7 @@ mod tests {
             knowledge: WorldKnowledge::new(),
             economy: WorldEconomy::new(),
             harmony: HarmonyTracker::new(),
+            governance: WorldGovernance::new(),
         };
 
         for i in 0..n {
@@ -449,7 +454,11 @@ mod tests {
                 children_ids: vec![],
                 is_immigrant: false,
                 needs: crate::needs::PsychologicalNeeds::new(),
-            tend_balance: 0.0,
+                tend_balance: 0.0,
+                parent_ids: None,
+                faction_id: None,
+                generation: 0,
+                trauma_level: 0.0,
             };
             world.agents.push(agent);
         }

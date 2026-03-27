@@ -451,6 +451,10 @@ mod tests {
             is_immigrant: false,
             needs: PsychologicalNeeds::new(),
             tend_balance: 0.0,
+            parent_ids: None,
+            faction_id: None,
+            generation: 0,
+            trauma_level: 0.0,
         }
     }
 
@@ -474,6 +478,7 @@ mod tests {
             knowledge: WorldKnowledge::new(),
             economy: crate::economy::WorldEconomy::new(),
             harmony: crate::harmony::HarmonyTracker::new(),
+            governance: crate::governance::WorldGovernance::new(),
         }
     }
 

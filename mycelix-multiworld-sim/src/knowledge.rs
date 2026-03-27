@@ -92,6 +92,12 @@ pub struct WorldKnowledge {
     pub breakthroughs: Vec<Breakthrough>,
     /// LCF breakthrough probability per tick (configurable, active in Epochs 3-4).
     pub lcf_probability: f64,
+    /// Sampled tech level history: (tick, mean_tech_level), sampled every 12 ticks.
+    pub tech_history: Vec<(u32, f64)>,
+    /// Whether stagnation has been detected.
+    pub stagnation_detected: bool,
+    /// Tick at which stagnation was first detected.
+    pub stagnation_start_tick: Option<u32>,
 }
 
 impl WorldKnowledge {
@@ -107,6 +113,9 @@ impl WorldKnowledge {
             diffusion_received: 0.0,
             breakthroughs: Vec::new(),
             lcf_probability: 0.0,
+            tech_history: Vec::new(),
+            stagnation_detected: false,
+            stagnation_start_tick: None,
         }
     }
 
@@ -249,10 +258,63 @@ impl WorldKnowledge {
         // --- Update specialization vs breadth ---
         self.specialization_vs_breadth(population);
 
+        // --- Sample tech history every 12 ticks ---
+        if current_tick % 12 == 0 {
+            self.tech_history.push((current_tick, self.mean_tech_level()));
+        }
+
+        // --- Detect stagnation ---
+        self.detect_stagnation(current_tick);
+
         // Reset diffusion counter for this tick
         self.diffusion_received = 0.0;
 
         events
+    }
+
+    /// Detect stagnation: if mean tech growth over last 120 entries < 0.005.
+    pub fn detect_stagnation(&mut self, tick: u32) {
+        if self.tech_history.len() < 2 {
+            self.stagnation_detected = false;
+            self.stagnation_start_tick = None;
+            return;
+        }
+
+        let window = 120.min(self.tech_history.len());
+        let start = self.tech_history.len() - window;
+        let recent = &self.tech_history[start..];
+
+        if recent.len() < 2 {
+            return;
+        }
+
+        let first_tech = recent.first().map(|(_, v)| *v).unwrap_or(0.0);
+        let last_tech = recent.last().map(|(_, v)| *v).unwrap_or(0.0);
+        let growth = last_tech - first_tech;
+
+        if growth < 0.005 {
+            if !self.stagnation_detected {
+                self.stagnation_detected = true;
+                self.stagnation_start_tick = Some(tick);
+            }
+        } else {
+            self.stagnation_detected = false;
+            self.stagnation_start_tick = None;
+        }
+    }
+
+    /// Technological lock-in index: specialization_depth / generalist_breadth.
+    /// High values indicate dangerous over-specialization.
+    pub fn technological_lock_in_index(&self) -> f64 {
+        if self.generalist_breadth <= 0.01 {
+            return 10.0; // maximum lock-in
+        }
+        self.specialization_depth / self.generalist_breadth
+    }
+
+    /// Research network effect: sqrt(connections) / 3, minimum 1.0.
+    pub fn research_network_effect(num_connected_worlds: usize) -> f64 {
+        ((num_connected_worlds as f64).sqrt() / 3.0).max(1.0)
     }
 
     /// Receive knowledge diffusion from another world.
@@ -362,7 +424,11 @@ mod tests {
                 children_ids: vec![],
                 is_immigrant: false,
                 needs: crate::needs::PsychologicalNeeds::new(),
-            tend_balance: 0.0,
+                tend_balance: 0.0,
+                parent_ids: None,
+                faction_id: None,
+                generation: 0,
+                trauma_level: 0.0,
             });
             id += 1;
         }
@@ -385,7 +451,11 @@ mod tests {
                 children_ids: vec![],
                 is_immigrant: false,
                 needs: crate::needs::PsychologicalNeeds::new(),
-            tend_balance: 0.0,
+                tend_balance: 0.0,
+                parent_ids: None,
+                faction_id: None,
+                generation: 0,
+                trauma_level: 0.0,
             });
             id += 1;
         }
@@ -408,6 +478,7 @@ mod tests {
             knowledge: WorldKnowledge::new(),
             economy: crate::economy::WorldEconomy::new(),
             harmony: crate::harmony::HarmonyTracker::new(),
+            governance: crate::governance::WorldGovernance::new(),
         }
     }
 
