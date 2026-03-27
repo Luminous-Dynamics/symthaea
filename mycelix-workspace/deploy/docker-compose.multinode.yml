@@ -21,6 +21,31 @@
 
 services:
   # ---------------------------------------------------------------------------
+  # Local Bootstrap Server — Peer Discovery for Docker Network
+  # ---------------------------------------------------------------------------
+  # Holochain conductors need a bootstrap server to discover each other.
+  # The external bootstrap.holo.host doesn't work for Docker-internal IPs
+  # because agents register with their container-local address, unreachable
+  # by peers behind Docker NAT.
+  #
+  # This runs a local bootstrap-srv that all conductors point to via the
+  # Docker network (http://bootstrap:8787). Peers register with their
+  # Docker-internal hostname, which IS resolvable by other containers.
+  bootstrap:
+    image: deploy-conductor:latest
+    container_name: mycelix-bootstrap
+    entrypoint: ["bootstrap-srv"]
+    command: ["--port", "8787"]
+    networks:
+      - mycelix-net
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8787", "||", "true"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  # ---------------------------------------------------------------------------
   # Node 2 — Second Holochain conductor
   # ---------------------------------------------------------------------------
   conductor2:
