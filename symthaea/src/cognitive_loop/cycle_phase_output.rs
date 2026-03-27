@@ -263,6 +263,22 @@ impl CognitiveLoopService {
                 trajectory_best_action: dynamics.fep.trajectory_best_action,
                 trajectory_surprise: dynamics.fep.trajectory_surprise,
                 trajectory_ode_steps: dynamics.fep.trajectory_ode_steps,
+                blanket_sensory_permeability: self
+                    .fep
+                    .enhanced_bridge
+                    .blanket
+                    .permeability()
+                    .sensory,
+                blanket_active_permeability: self.fep.enhanced_bridge.blanket.permeability().active,
+                blanket_effective_permeability: self
+                    .fep
+                    .enhanced_bridge
+                    .blanket
+                    .permeability()
+                    .effective,
+                blanket_trend: self.fep.enhanced_bridge.blanket.trend(),
+                blanket_coalescence_ready: self.fep.enhanced_bridge.blanket.coalescence_ready(0.6),
+                blanket_coalition_count: self.swarm_manager.coalitions().len(),
             },
             hierarchical_total_free_energy: feedback.self_model.hierarchical_total_free_energy,
             primitive_psi: feedback.consciousness.primitive_psi,
@@ -338,8 +354,14 @@ impl CognitiveLoopService {
                     && moral_anomaly_report.anomaly_score > 0.0,
                 harmony_entropy: topo_summary.harmony_entropy,
                 moral_attractor_detected: topo_summary.attractor_detected,
-                hodge_harmonic_fraction: topo_summary.hodge_fractions.map(|f| f.harmonic).unwrap_or(0.0),
-                hodge_gradient_fraction: topo_summary.hodge_fractions.map(|f| f.gradient).unwrap_or(0.0),
+                hodge_harmonic_fraction: topo_summary
+                    .hodge_fractions
+                    .map(|f| f.harmonic)
+                    .unwrap_or(0.0),
+                hodge_gradient_fraction: topo_summary
+                    .hodge_fractions
+                    .map(|f| f.gradient)
+                    .unwrap_or(0.0),
                 hodge_curl_fraction: topo_summary.hodge_fractions.map(|f| f.curl).unwrap_or(0.0),
                 in_active_rest: self.stats.in_active_rest,
                 stillness_dominance_streak: self.stats.stillness_dominance_streak,
@@ -559,10 +581,12 @@ impl CognitiveLoopService {
 
         // ── Social coherence telemetry ──
         metadata.social_trust_current = self.behavior.social_mgr.social.social_trust;
-        metadata.social_cooperation_current = self.behavior.social_mgr.social.social_cooperation_rate;
+        metadata.social_cooperation_current =
+            self.behavior.social_mgr.social.social_cooperation_rate;
         metadata.social_strategy_bias_applied = perception.strategy.social_strategy_bias;
         metadata.social_learning_rate_factor = feedback.social_learning_rate_factor;
-        metadata.social_prediction_accuracy = self.behavior.social_mgr.social.social_prediction_accuracy;
+        metadata.social_prediction_accuracy =
+            self.behavior.social_mgr.social.social_prediction_accuracy;
         metadata.social_models_count = self.behavior.social_mgr.social.social_models_count;
         metadata.social_mean_trust = self.behavior.social_mgr.social.social_mean_trust;
         metadata.tom_prediction_mismatch = self.stats.tom_prediction_mismatch_ema;
@@ -604,8 +628,8 @@ impl CognitiveLoopService {
             < COMPOUND_INSTABILITY_AGREEMENT
             && perception.urgency.error_slope > COMPOUND_INSTABILITY_ERROR_SLOPE
             && self.stats.total_cycles > 30;
-        metadata.modulation.flow_feedback_relaxed =
-            self.behavior.flow_state.in_flow && self.behavior.flow_state.intensity > FLOW_INTENSITY_FEEDBACK;
+        metadata.modulation.flow_feedback_relaxed = self.behavior.flow_state.in_flow
+            && self.behavior.flow_state.intensity > FLOW_INTENSITY_FEEDBACK;
         metadata.homeostasis_efficiency = self.carryover.quality.homeostasis_efficiency;
         // Session 10 telemetry (Session 11: lr_frozen from dynamics phase)
         metadata.modulation.confidence_crash_detected = dynamics.confidence_crash_detected;
@@ -653,8 +677,8 @@ impl CognitiveLoopService {
         metadata.modulation.confidence_rising_dampen = dynamics.neuromod.confidence_velocity
             > CONFIDENCE_VELOCITY_RISING_THRESHOLD
             && self.stats.total_cycles > 15;
-        metadata.modulation.flow_lr_boost =
-            self.behavior.flow_state.in_flow && self.behavior.flow_state.intensity > FLOW_INTENSITY_LR_THRESHOLD;
+        metadata.modulation.flow_lr_boost = self.behavior.flow_state.in_flow
+            && self.behavior.flow_state.intensity > FLOW_INTENSITY_LR_THRESHOLD;
         metadata.modulation.fep_efficiency_boost = dynamics.fep.fep_accuracy
             > FEP_ACCURACY_EFFICIENCY_THRESHOLD
             && dynamics.fep.fep_complexity < FEP_COMPLEXITY_EFFICIENCY_THRESHOLD;
@@ -694,7 +718,8 @@ impl CognitiveLoopService {
         metadata.modulation.crash_binding_relaxed =
             self.carryover.quality.crash_freeze_remaining > 0;
         metadata.modulation.attention_fatigue_broca_gated = self
-            .consciousness.self_model_tier
+            .consciousness
+            .self_model_tier
             .attention_schema
             .as_ref()
             .map_or(false, |a| {
@@ -854,11 +879,13 @@ impl CognitiveLoopService {
 
         // ── GWT handler telemetry ──
         metadata.gwt_memory_consolidation_requested = self
-            .consciousness.gwt_mgr
+            .consciousness
+            .gwt_mgr
             .memory_flag
             .swap(false, std::sync::atomic::Ordering::Relaxed);
         metadata.gwt_perception_broadcasts =
-            self.consciousness.gwt_mgr
+            self.consciousness
+                .gwt_mgr
                 .perception_count
                 .swap(0, std::sync::atomic::Ordering::Relaxed) as u32;
 
@@ -1517,7 +1544,8 @@ impl CognitiveLoopService {
             feedback.memory.codebook_evictions,
             feedback.memory.codebook_diversity,
             dynamics.fep.fep_surprise,
-            self.consciousness.self_model_tier
+            self.consciousness
+                .self_model_tier
                 .self_reflection
                 .get_thresholds()
                 .surprise as f64,
@@ -1732,12 +1760,14 @@ impl CognitiveLoopService {
                 self.adjust_exploration("subsystem_managers", integrated.exploration_delta as f32);
             }
             if integrated.arousal_delta != 0.0 {
-                self.behavior.emotion_contagion.arousal =
-                    (self.behavior.emotion_contagion.arousal + integrated.arousal_delta).clamp(0.0, 1.0);
+                self.behavior.emotion_contagion.arousal = (self.behavior.emotion_contagion.arousal
+                    + integrated.arousal_delta)
+                    .clamp(0.0, 1.0);
             }
             if integrated.valence_delta != 0.0 {
-                self.behavior.emotion_contagion.valence =
-                    (self.behavior.emotion_contagion.valence + integrated.valence_delta).clamp(-1.0, 1.0);
+                self.behavior.emotion_contagion.valence = (self.behavior.emotion_contagion.valence
+                    + integrated.valence_delta)
+                    .clamp(-1.0, 1.0);
             }
 
             // ── Act on subsystem flags ──────────────────────────────────
@@ -1876,13 +1906,18 @@ impl CognitiveLoopService {
         // Final safety clamps — absolute last point in the cycle.
         // Late consciousness phases (integration, monitors) can multiply exploration_factor
         // below bounds set in cycle_quality.rs. Re-clamp here to guarantee invariants.
-        self.behavior.adaptive_behavior.exploration_factor =
-            self.behavior.adaptive_behavior.exploration_factor.clamp(0.1, 3.0);
+        self.behavior.adaptive_behavior.exploration_factor = self
+            .behavior
+            .adaptive_behavior
+            .exploration_factor
+            .clamp(0.1, 3.0);
         self.behavior.adaptive_behavior.learning_rate_multiplier = self
-            .behavior.adaptive_behavior
+            .behavior
+            .adaptive_behavior
             .learning_rate_multiplier
             .clamp(0.1, 2.0);
-        self.behavior.curiosity_drive.boredom = self.behavior.curiosity_drive.boredom.clamp(0.0, 1.5);
+        self.behavior.curiosity_drive.boredom =
+            self.behavior.curiosity_drive.boredom.clamp(0.0, 1.5);
 
         CycleResult {
             output: mem::take(&mut dynamics.core.output),
