@@ -21,6 +21,13 @@ use crate::components::suggestion_overlay::SuggestionOverlay;
 // ---------------------------------------------------------------------------
 
 #[derive(Clone, Debug, PartialEq)]
+enum CardSource {
+    Grade3Math,
+    Grade3Science,
+    SpaceExplorer,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 enum ReviewState {
     Loading,
     NoDueCards,
@@ -131,6 +138,79 @@ fn generate_curriculum_cards() -> Vec<MockFlashcard> {
     ]
 }
 
+/// Generate Grade 3 Science flashcards based on NGSS standards.
+/// Covers Life Science (LS1-LS4), Physical Science (PS2), Earth & Space Science (ESS2-ESS3).
+fn generate_science_cards() -> Vec<MockFlashcard> {
+    vec![
+        // Life Science: 3-LS1 (Inheritance & Variation of Traits)
+        MockFlashcard { front: "Do baby animals always look exactly like their parents?", back: "No! They look similar but not identical. A puppy might have a different fur color than its mom.", tags: "Life Science", mastery_permille: 500 },
+        MockFlashcard { front: "Why do some flowers in a garden look different from each other even though they\u{2019}re the same kind?", back: "Plants (and animals) of the same kind can have different traits. This is called variation.", tags: "Life Science", mastery_permille: 450 },
+
+        // Life Science: 3-LS2 (Ecosystems)
+        MockFlashcard { front: "What would happen to a pond ecosystem if all the frogs disappeared?", back: "The insects frogs eat would increase a lot, and the animals that eat frogs (like herons) would have less food.", tags: "Ecosystems", mastery_permille: 350 },
+        MockFlashcard { front: "Can an animal survive if its environment changes?", back: "Some can adapt or move to a new place. Others might not survive. That\u{2019}s why protecting habitats matters!", tags: "Ecosystems", mastery_permille: 400 },
+
+        // Life Science: 3-LS3 (Heredity)
+        MockFlashcard { front: "Why do you look a bit like your parents?", back: "You inherit traits from both parents! Eye color, hair type, and even how tall you\u{2019}ll grow.", tags: "Heredity", mastery_permille: 500 },
+
+        // Life Science: 3-LS4 (Evolution: Fossils)
+        MockFlashcard { front: "What can fossils tell us about animals that lived long ago?", back: "Fossils show us what ancient animals looked like, what they ate, and how they\u{2019}ve changed over time.", tags: "Fossils", mastery_permille: 300 },
+        MockFlashcard { front: "If you found a fossil of a seashell on top of a mountain, what might that tell you?", back: "That area was probably underwater millions of years ago! The land changed over a very long time.", tags: "Fossils", mastery_permille: 250 },
+
+        // Physical Science: 3-PS2 (Motion and Stability: Forces)
+        MockFlashcard { front: "If you push a ball harder, what happens?", back: "It goes faster and farther! A bigger push (force) means more motion.", tags: "Forces", mastery_permille: 600 },
+        MockFlashcard { front: "Two magnets are near each other. One flips around. What happened?", back: "The magnets\u{2019} poles switched! Like poles (N-N or S-S) push apart, opposite poles (N-S) pull together.", tags: "Forces", mastery_permille: 400 },
+        MockFlashcard { front: "Can something move without being touched?", back: "Yes! Magnets can push or pull without touching. Gravity pulls things down without touching them too.", tags: "Forces", mastery_permille: 350 },
+
+        // Earth & Space Science: 3-ESS2 (Earth's Systems: Weather)
+        MockFlashcard { front: "Is weather the same as climate?", back: "No! Weather is what\u{2019}s happening outside right now. Climate is the typical weather pattern over many years.", tags: "Weather", mastery_permille: 450 },
+        MockFlashcard { front: "What causes wind?", back: "The sun heats the ground unevenly. Warm air rises and cool air rushes in to fill the space. That moving air is wind!", tags: "Weather", mastery_permille: 300 },
+
+        // Earth & Space Science: 3-ESS2 (Earth's Systems: Water)
+        MockFlashcard { front: "Where does rain come from?", back: "Water evaporates from oceans and lakes, forms clouds, and falls back down as rain. This is the water cycle!", tags: "Water Cycle", mastery_permille: 500 },
+
+        // Earth & Space Science: 3-ESS3 (Earth and Human Activity)
+        MockFlashcard { front: "Can people change the land? Give an example.", back: "Yes! Building cities, farming, cutting forests, and mining all change the land. Some changes help, some hurt.", tags: "Human Impact", mastery_permille: 400 },
+        MockFlashcard { front: "What\u{2019}s one way we can reduce the impact of a natural hazard like flooding?", back: "Build levees, plant trees to absorb water, move buildings away from flood zones, or create wetlands.", tags: "Natural Hazards", mastery_permille: 350 },
+    ]
+}
+
+/// Generate Space Explorer pathway cards spanning PreK through university.
+/// Interest-driven pathway crossing Math and Science boundaries.
+fn generate_space_pathway_cards() -> Vec<MockFlashcard> {
+    vec![
+        // Foundational: PreK-Grade 2
+        MockFlashcard { front: "Look up at the sky at night. What do you see?", back: "Stars! They look tiny but they\u{2019}re actually HUGE \u{2014} they\u{2019}re just very, very far away.", tags: "Space \u{00b7} Foundational", mastery_permille: 800 },
+        MockFlashcard { front: "Why is it dark at night and bright during the day?", back: "Earth spins! When our side faces the Sun, it\u{2019}s day. When it faces away, it\u{2019}s night.", tags: "Space \u{00b7} Foundational", mastery_permille: 700 },
+        MockFlashcard { front: "Is the Sun a star?", back: "Yes! The Sun is a star \u{2014} the closest star to Earth. It looks bigger and brighter because it\u{2019}s much closer than other stars.", tags: "Space \u{00b7} Foundational", mastery_permille: 650 },
+        MockFlashcard { front: "How many planets are in our solar system?", back: "8 planets! Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune. (Pluto is a dwarf planet.)", tags: "Space \u{00b7} Foundational", mastery_permille: 600 },
+
+        // Developing: Grade 3-5
+        MockFlashcard { front: "The Moon is about 384,400 km from Earth. Is that more or less than 1 million km?", back: "Less! It\u{2019}s about 384 thousand km \u{2014} not even half a million. But that\u{2019}s still really far!", tags: "Space \u{00b7} Developing", mastery_permille: 450 },
+        MockFlashcard { front: "Jupiter is about 11 times wider than Earth. If Earth is a grape, how big is Jupiter?", back: "About the size of a basketball! Jupiter is the biggest planet in our solar system.", tags: "Space \u{00b7} Developing", mastery_permille: 400 },
+        MockFlashcard { front: "Why don\u{2019}t we float off Earth into space?", back: "Gravity! Earth pulls everything toward its center. The bigger an object, the stronger its pull.", tags: "Space \u{00b7} Developing", mastery_permille: 500 },
+        MockFlashcard { front: "Why does the Moon seem to change shape each month?", back: "It doesn\u{2019}t change shape! We see different amounts of the lit-up side as the Moon orbits Earth. These are called phases.", tags: "Space \u{00b7} Developing", mastery_permille: 350 },
+        MockFlashcard { front: "Why do we have seasons?", back: "Earth is tilted! When your part of Earth tilts toward the Sun, you get summer. When it tilts away, winter.", tags: "Space \u{00b7} Developing", mastery_permille: 400 },
+
+        // Proficient: Grade 6-8
+        MockFlashcard { front: "Light travels at 300,000 km/s. The Sun is 150 million km away. How long does sunlight take to reach Earth?", back: "500 seconds = about 8 minutes and 20 seconds (150,000,000 \u{00f7} 300,000 = 500)", tags: "Space \u{00b7} Proficient", mastery_permille: 250 },
+        MockFlashcard { front: "A light-year is the distance light travels in one year. Why do astronomers use this unit instead of kilometers?", back: "Because space is so vast! The nearest star (Proxima Centauri) is 4.24 light-years away \u{2014} that\u{2019}s about 40 TRILLION km. Light-years are easier to work with.", tags: "Space \u{00b7} Proficient", mastery_permille: 200 },
+        MockFlashcard { front: "How does a rocket work in the vacuum of space where there\u{2019}s nothing to push against?", back: "Newton\u{2019}s 3rd Law! The rocket pushes exhaust gas backward, and the gas pushes the rocket forward. Action and reaction \u{2014} no air needed.", tags: "Space \u{00b7} Proficient", mastery_permille: 200 },
+        MockFlashcard { front: "What\u{2019}s the difference between mass and weight?", back: "Mass is how much stuff you\u{2019}re made of (same everywhere). Weight is the force of gravity on your mass. You\u{2019}d weigh less on the Moon but your mass stays the same!", tags: "Space \u{00b7} Proficient", mastery_permille: 300 },
+
+        // Advanced: Grade 9-12
+        MockFlashcard { front: "The ISS orbits at 408 km altitude and 7.66 km/s. Why doesn\u{2019}t it fall down?", back: "It IS falling \u{2014} but it\u{2019}s moving forward so fast that Earth\u{2019}s surface curves away at the same rate. Orbit = falling around the planet.", tags: "Space \u{00b7} Advanced", mastery_permille: 150 },
+        MockFlashcard { front: "Kepler\u{2019}s 3rd Law says T\u{00b2} \u{221d} a\u{00b3} (period squared is proportional to semi-major axis cubed). Mars is 1.52 AU from the Sun. What\u{2019}s its orbital period?", back: "T\u{00b2} = (1.52)\u{00b3} = 3.51, so T = \u{221a}3.51 \u{2248} 1.87 years (actual: 1.88 years)", tags: "Space \u{00b7} Advanced", mastery_permille: 100 },
+        MockFlashcard { front: "What is the escape velocity from Earth\u{2019}s surface?", back: "About 11.2 km/s. This is the minimum speed needed to escape Earth\u{2019}s gravity without further propulsion. v = \u{221a}(2GM/r)", tags: "Space \u{00b7} Advanced", mastery_permille: 100 },
+
+        // Expert: University
+        MockFlashcard { front: "In the Hertzsprung-Russell diagram, where are main sequence stars located?", back: "Along a diagonal band from hot/bright (upper left) to cool/dim (lower right). Our Sun is a G2V star in the middle.", tags: "Space \u{00b7} Expert", mastery_permille: 50 },
+        MockFlashcard { front: "What is the Schwarzschild radius of a black hole with 10 solar masses?", back: "r\u{209b} = 2GM/c\u{00b2} = 2(6.674\u{00d7}10\u{207b}\u{00b9}\u{00b9})(10\u{00d7}1.989\u{00d7}10\u{00b3}\u{2070})/(3\u{00d7}10\u{2078})\u{00b2} \u{2248} 29.5 km", tags: "Space \u{00b7} Expert", mastery_permille: 30 },
+        MockFlashcard { front: "Why does time pass slower near a massive object?", back: "General Relativity: mass curves spacetime. Clocks in stronger gravitational fields tick slower. GPS satellites correct for this daily!", tags: "Space \u{00b7} Expert", mastery_permille: 50 },
+        MockFlashcard { front: "Explain the twin paradox in special relativity.", back: "A twin traveling near light speed ages less than the twin on Earth. This isn\u{2019}t a paradox \u{2014} the traveling twin accelerated (broke inertial symmetry), making the situation asymmetric.", tags: "Space \u{00b7} Expert", mastery_permille: 30 },
+    ]
+}
+
 /// Kid-friendly rating options: emoji, label, and mapped SM-2 quality value.
 struct KidRating {
     emoji: &'static str,
@@ -181,14 +261,17 @@ fn modality_indicator(modality: &Modality) -> &'static str {
 pub fn ReviewPage() -> impl IntoView {
     let adaptivity = use_adaptivity();
 
-    // Generate curriculum cards and store for the session
-    let cards = StoredValue::new(generate_curriculum_cards());
+    // Cards are populated lazily when a topic is selected
+    let cards = StoredValue::new(Vec::<MockFlashcard>::new());
 
     // Extract signals for closures (signals are Copy)
     let adaptation_sig = adaptivity.adaptation;
     let sovereignty_sig = adaptivity.sovereignty;
-    let adaptivity_for_timeout = adaptivity.clone();
     let adaptivity_for_rate = adaptivity.clone();
+
+    // Topic selection signal — None means show the topic picker
+    let (card_source, set_card_source) = signal(Option::<CardSource>::None);
+
     // State signals
     let (state, set_state) = signal(ReviewState::Loading);
     let (ratings, set_ratings) = signal(Vec::<u8>::new());
@@ -198,27 +281,42 @@ pub fn ReviewPage() -> impl IntoView {
     let (predictions, set_predictions) = signal(Vec::<(Confidence, bool)>::new());
     let (current_prediction, set_current_prediction) = signal(Option::<Confidence>::None);
 
-    // Simulate loading -> show first card (or NoDueCards if empty)
-    set_timeout(
-        {
-            let adaptivity = adaptivity_for_timeout;
-            move || {
-                cards.with_value(|deck| {
-                    if deck.is_empty() {
-                        set_state.set(ReviewState::NoDueCards);
-                    } else {
-                        set_start_time.set(js_sys::Date::now());
-                        set_card_start_time.set(js_sys::Date::now());
-                        // Tell adaptivity about the first card
-                        let card = &deck[0];
-                        adaptivity.set_skill(card.tags, card.mastery_permille);
-                        set_state.set(ReviewState::ShowingFront { card_index: 0 });
-                    }
-                });
-            }
-        },
-        std::time::Duration::from_millis(300),
-    );
+    // Select a topic: populate cards, reset state, and start the loading transition
+    let select_source = {
+        let adaptivity = adaptivity.clone();
+        move |source: CardSource| {
+            let deck = match &source {
+                CardSource::Grade3Math => generate_curriculum_cards(),
+                CardSource::Grade3Science => generate_science_cards(),
+                CardSource::SpaceExplorer => generate_space_pathway_cards(),
+            };
+            cards.set_value(deck);
+            set_card_source.set(Some(source));
+            set_state.set(ReviewState::Loading);
+            set_ratings.set(Vec::new());
+            set_predictions.set(Vec::new());
+            set_current_prediction.set(None);
+
+            // Simulate loading -> show first card
+            let adaptivity = adaptivity.clone();
+            set_timeout(
+                move || {
+                    cards.with_value(|deck| {
+                        if deck.is_empty() {
+                            set_state.set(ReviewState::NoDueCards);
+                        } else {
+                            set_start_time.set(js_sys::Date::now());
+                            set_card_start_time.set(js_sys::Date::now());
+                            let card = &deck[0];
+                            adaptivity.set_skill(card.tags, card.mastery_permille);
+                            set_state.set(ReviewState::ShowingFront { card_index: 0 });
+                        }
+                    });
+                },
+                std::time::Duration::from_millis(300),
+            );
+        }
+    };
 
     // Reveal: go to confidence prediction (or straight to back in sandbox/autonomous)
     let reveal = move |_| {
@@ -291,8 +389,54 @@ pub fn ReviewPage() -> impl IntoView {
             // Suggestion overlay -- slides in from bottom, never blocks
             <SuggestionOverlay />
 
+            {move || {
+                // Show topic selector when no source is selected
+                if card_source.get().is_none() {
+                    let select_math = {
+                        let select_source = select_source.clone();
+                        move |_| select_source(CardSource::Grade3Math)
+                    };
+                    let select_science = {
+                        let select_source = select_source.clone();
+                        move |_| select_source(CardSource::Grade3Science)
+                    };
+                    let select_space = {
+                        let select_source = select_source.clone();
+                        move |_| select_source(CardSource::SpaceExplorer)
+                    };
+                    return view! {
+                        <div class="topic-selector">
+                            <h2>"What do you want to study?"</h2>
+                            <p class="topic-selector-subtitle">"Pick a topic and let\u{2019}s go!"</p>
+                            <div class="source-cards">
+                                <button class="source-card source-math" on:click=select_math>
+                                    <span class="source-icon">"\u{1f522}"</span>
+                                    <span class="source-label">"Grade 3 Math"</span>
+                                    <span class="source-meta">"35 cards"</span>
+                                </button>
+                                <button class="source-card source-science" on:click=select_science>
+                                    <span class="source-icon">"\u{1f52c}"</span>
+                                    <span class="source-label">"Grade 3 Science"</span>
+                                    <span class="source-meta">"15 cards"</span>
+                                </button>
+                                <button class="source-card source-space" on:click=select_space>
+                                    <span class="source-icon">"\u{1f680}"</span>
+                                    <span class="source-label">"Space Explorer"</span>
+                                    <span class="source-meta">"PreK \u{2192} University"</span>
+                                </button>
+                            </div>
+                        </div>
+                    }.into_any();
+                }
+
+                view! { <div></div> }.into_any()
+            }}
+
             // Difficulty/modality indicator bar
             {move || {
+                if card_source.get().is_none() {
+                    return view! { <div></div> }.into_any();
+                }
                 let adapt = adaptation_sig.get();
                 let mod_text = modality_indicator(&adapt.modality);
                 let diff = adapt.difficulty_delta;
@@ -321,6 +465,9 @@ pub fn ReviewPage() -> impl IntoView {
             }}
 
             {move || {
+                if card_source.get().is_none() {
+                    return view! { <div></div> }.into_any();
+                }
                 let current = state.get();
                 match current {
                     ReviewState::Loading => view! {
@@ -582,7 +729,10 @@ pub fn ReviewPage() -> impl IntoView {
                                     </span>
                                 </div>
                                 <div class="kid-complete-actions">
-                                    <a href="/review" class="btn-primary kid-btn">"Keep Going"</a>
+                                    <button class="btn-primary kid-btn"
+                                        on:click=move |_| set_card_source.set(None)>
+                                        "Keep Going"
+                                    </button>
                                     <a href="/" class="btn-secondary kid-btn">"Done for now"</a>
                                 </div>
                             </div>
