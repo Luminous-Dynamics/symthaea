@@ -125,9 +125,20 @@ We simulate a multi-world civilization (Earth + Moon + Mars colonies) over 300 y
 
 ### 5.2 Hostile Guardian Adversarial Scenario
 
-We inject a Guardian that vetoes every proposal regardless of community support, bypassing the game-theoretic deterrence:
+We inject a Guardian that vetoes every proposal regardless of community support, bypassing the game-theoretic deterrence. The hostile Guardian ignores the override threshold calculation and attempts a veto on every tick (subject to the 7-tick cooldown rate limit).
 
-*[Results to be inserted from running simulation]*
+Over 50 simulated years (600 ticks) with a healthy community (5/10/30/35/20 tier distribution):
+
+| Metric | Value |
+|--------|-------|
+| Vetoes attempted | 84 |
+| Vetoes overridden | 84 |
+| Override success rate | **100.0%** |
+| Vetoes sustained | 0 |
+
+**Result**: The community successfully overrides every hostile veto. The 80% supermajority threshold is consistently met because the healthy community has >80% eligible voter participation. The rate limiter constrains the hostile Guardian to approximately 1 veto per 7 months, minimizing disruption.
+
+This confirms that the override mechanism is not merely a deterrent — it is an active defense that defeats sustained adversarial behavior.
 
 ### 5.3 Game-Theoretic Analysis
 

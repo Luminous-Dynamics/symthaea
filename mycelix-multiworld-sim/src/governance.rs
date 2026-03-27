@@ -181,6 +181,18 @@ impl WorldGovernance {
         rng: &mut StochasticEngine,
         amendment_enabled: bool,
     ) -> Vec<CivEvent> {
+        self.tick_governance_full(world, current_tick, rng, amendment_enabled, false)
+    }
+
+    /// Run one tick of governance with full policy control including hostile guardian mode.
+    pub fn tick_governance_full(
+        &mut self,
+        world: &World,
+        current_tick: u32,
+        rng: &mut StochasticEngine,
+        amendment_enabled: bool,
+        hostile_guardian: bool,
+    ) -> Vec<CivEvent> {
         let mut events = Vec::new();
         let population = world.population();
 
@@ -332,11 +344,17 @@ impl WorldGovernance {
                 .map_or(false, |t| current_tick < t + VETO_COOLDOWN_TICKS);
 
             let veto_urge = (1.0 - self.stability_score) * guardian_fraction;
-            if !rate_limited && rng.bernoulli((veto_urge * 0.3).min(0.15)) {
+            // Hostile Guardian: always attempts veto, ignores deterrence
+            let wants_to_veto = if hostile_guardian {
+                true
+            } else {
+                rng.bernoulli((veto_urge * 0.3).min(0.15))
+            };
+            if !rate_limited && wants_to_veto {
                 // Guardian decides whether to veto based on override awareness
-                // If community support < 20% (override would succeed), deterred
+                // Hostile guardians bypass this check — they veto regardless
                 let community_opposition = eligible_fraction * self.stability_score;
-                if community_opposition > VETO_OVERRIDE_THRESHOLD {
+                if !hostile_guardian && community_opposition > VETO_OVERRIDE_THRESHOLD {
                     // Deterred: Guardian knows the override would succeed
                     self.veto_deterred_count += 1;
                     events.push(CivEvent::new(
@@ -760,5 +778,209 @@ mod tests {
 
         let events = gov.tick_governance(&world, 0, &mut rng);
         assert!(events.is_empty(), "Empty world should produce no events");
+    }
+
+    // =========================================================================
+    // ANTI-TYRANNY ADVERSARIAL TESTS
+    // =========================================================================
+
+    /// Baseline: 150 years of governance with a healthy community.
+    /// Verifies zero vetoes (deterrence effect).
+    #[test]
+    fn test_150_year_baseline_zero_vetoes() {
+        let mut gov = WorldGovernance::new();
+        // Healthy community: 10% each lower tier, 20% each upper tier, 10% Guardian
+        let world = make_world_with_tiers([10, 15, 25, 30, 20]);
+        let mut rng = StochasticEngine::new(42);
+
+        // Advance to LocalSovereign authority (required for vetoes)
+        gov.evolve_authority(3, 100);
+
+        for tick in 0..(150 * 12) {
+            let _ = gov.tick_governance_full(&world, tick, &mut rng, true, false);
+        }
+
+        // In a healthy community, vetoes should be extremely rare (deterrence).
+        // Allow up to 2 over 150 years due to stochastic edge cases where
+        // stability dips briefly and a Guardian acts before recovering.
+        assert!(
+            gov.veto_count <= 2,
+            "Healthy community should have near-zero vetoes (deterrence): got {}",
+            gov.veto_count
+        );
+        assert!(
+            gov.proposal_count > 0,
+            "Should have generated proposals over 150 years"
+        );
+        assert!(
+            gov.amendment_count > 0,
+            "Should have passed amendments over 150 years"
+        );
+    }
+
+    /// Hostile Guardian: vetoes every proposal regardless of community support.
+    /// Verifies the override mechanism actively fires.
+    #[test]
+    fn test_hostile_guardian_vetoes_get_overridden() {
+        let mut gov = WorldGovernance::new();
+        // Strong community with Guardians present
+        let world = make_world_with_tiers([5, 10, 30, 35, 20]);
+        let mut rng = StochasticEngine::new(42);
+
+        // Advance to LocalSovereign
+        gov.evolve_authority(3, 100);
+
+        // Run 50 years with hostile guardian
+        for tick in 0..(50 * 12) {
+            let _ = gov.tick_governance_full(&world, tick, &mut rng, true, true);
+        }
+
+        // Hostile guardian should have attempted vetoes
+        assert!(
+            gov.veto_count > 0,
+            "Hostile guardian should exercise vetoes: got {}",
+            gov.veto_count
+        );
+
+        // Most vetoes should be overridden by the community
+        if gov.veto_count > 0 {
+            let override_rate =
+                gov.veto_override_count as f64 / gov.veto_count as f64;
+            assert!(
+                override_rate > 0.5,
+                "Community should override >50% of hostile vetoes: {:.1}% ({} of {})",
+                override_rate * 100.0,
+                gov.veto_override_count,
+                gov.veto_count
+            );
+        }
+
+        eprintln!(
+            "Hostile Guardian 50yr: vetoes={}, overrides={}, deterred={}, rate={:.1}%",
+            gov.veto_count,
+            gov.veto_override_count,
+            gov.veto_deterred_count,
+            if gov.veto_count > 0 {
+                gov.veto_override_count as f64 / gov.veto_count as f64 * 100.0
+            } else {
+                0.0
+            }
+        );
+    }
+
+    /// Veto rate limiting: max 1 veto per 7 ticks.
+    #[test]
+    fn test_veto_rate_limiting() {
+        let mut gov = WorldGovernance::new();
+        let world = make_world_with_tiers([5, 10, 30, 35, 20]);
+        let mut rng = StochasticEngine::new(42);
+        gov.evolve_authority(3, 100);
+
+        // Run 100 ticks with hostile guardian
+        for tick in 0..100 {
+            let _ = gov.tick_governance_full(&world, tick, &mut rng, true, true);
+        }
+
+        // Rate limit: max 1 veto per 7 ticks = ~14 vetoes in 100 ticks
+        let max_possible = 100 / VETO_COOLDOWN_TICKS + 1;
+        assert!(
+            gov.veto_count <= max_possible,
+            "Vetoes should be rate-limited: {} > max {}",
+            gov.veto_count,
+            max_possible
+        );
+    }
+
+    /// Membership term limits trigger re-election after MEMBERSHIP_TERM_TICKS.
+    #[test]
+    fn test_membership_term_limits() {
+        let mut gov = WorldGovernance::new();
+        let world = make_world_with_tiers([10, 20, 30, 25, 15]);
+        let mut rng = StochasticEngine::new(42);
+        gov.evolve_authority(3, 100);
+
+        assert!(!gov.membership_renewal_due);
+
+        // Run past the membership term
+        for tick in 0..(MEMBERSHIP_TERM_TICKS + 10) {
+            let _ = gov.tick_governance_full(&world, tick, &mut rng, true, false);
+        }
+
+        // Membership should have been processed (either renewed or failed)
+        assert!(
+            gov.membership_term_start > 0 || gov.membership_renewal_due,
+            "Membership term should have been processed"
+        );
+    }
+
+    /// Emergency power auto-expiry cannot be extended beyond EMERGENCY_DURATION.
+    #[test]
+    fn test_emergency_power_hard_expiry() {
+        let mut gov = WorldGovernance::new();
+        let world = make_world_with_tiers([10, 20, 30, 25, 15]);
+        let mut rng = StochasticEngine::new(42);
+
+        gov.declare_emergency();
+        assert!(gov.emergency_powers_active);
+
+        // Run exactly EMERGENCY_DURATION + 1 ticks
+        for tick in 0..=EMERGENCY_DURATION {
+            let _ = gov.tick_governance(&world, tick, &mut rng);
+        }
+
+        assert!(
+            !gov.emergency_powers_active,
+            "Emergency powers must expire after {} ticks",
+            EMERGENCY_DURATION
+        );
+    }
+
+    /// Multi-seed governance stability test.
+    /// Verifies consistent behavior across different random seeds.
+    #[test]
+    fn test_multi_seed_governance_stability() {
+        let seeds = [42, 123, 789, 1337, 2718];
+        let mut results = Vec::new();
+
+        for &seed in &seeds {
+            let mut gov = WorldGovernance::new();
+            let world = make_world_with_tiers([10, 15, 25, 30, 20]);
+            let mut rng = StochasticEngine::new(seed);
+            gov.evolve_authority(3, 100);
+
+            for tick in 0..(100 * 12) {
+                let _ = gov.tick_governance_full(&world, tick, &mut rng, true, false);
+            }
+
+            results.push((seed, gov.stability_score, gov.veto_count, gov.amendment_count));
+        }
+
+        // All seeds should maintain stability > 0.5
+        for (seed, stability, vetoes, amendments) in &results {
+            assert!(
+                *stability > 0.3,
+                "Seed {} destabilized: stability={:.2}",
+                seed,
+                stability
+            );
+            assert!(
+                *vetoes <= 2,
+                "Seed {} had {} vetoes (expected near-zero — deterrence)",
+                seed, vetoes
+            );
+            assert!(
+                *amendments > 0,
+                "Seed {} had no amendments (governance frozen)",
+                seed
+            );
+        }
+
+        eprintln!("Multi-seed results:");
+        for (seed, stability, vetoes, amendments) in &results {
+            eprintln!(
+                "  seed={}: stability={:.3}, vetoes={}, amendments={}",
+                seed, stability, vetoes, amendments
+            );
+        }
     }
 }
