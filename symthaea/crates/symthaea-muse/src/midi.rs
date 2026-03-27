@@ -134,9 +134,9 @@ mod tests {
             audio: AudioData::F32(vec![0.0; 100]),
             sample_rate: 44100,
             notes: vec![
-                Note { frequency: 261.63, start_time: 0.0, duration: 0.5, velocity: 0.8 },
-                Note { frequency: 440.0, start_time: 0.5, duration: 0.5, velocity: 0.7 },
-                Note { frequency: 329.63, start_time: 1.0, duration: 0.25, velocity: 0.6 },
+                Note::basic(261.63, 0.0, 0.5, 0.8),
+                Note::basic(440.0, 0.5, 0.5, 0.7),
+                Note::basic(329.63, 1.0, 0.25, 0.6),
             ],
             duration_secs: 2.0,
             section: SectionType::Developmental,

@@ -195,10 +195,10 @@ mod tests {
 
     fn test_notes() -> Vec<Note> {
         vec![
-            Note { frequency: 100.0, start_time: 0.0, duration: 0.5, velocity: 0.7 },
-            Note { frequency: 300.0, start_time: 0.5, duration: 0.5, velocity: 0.6 },
-            Note { frequency: 500.0, start_time: 1.0, duration: 0.5, velocity: 0.8 },
-            Note { frequency: 200.0, start_time: 1.5, duration: 0.5, velocity: 0.5 },
+            Note::basic(100.0, 0.0, 0.5, 0.7),
+            Note::basic(300.0, 0.5, 0.5, 0.6),
+            Note::basic(500.0, 1.0, 0.5, 0.8),
+            Note::basic(200.0, 1.5, 0.5, 0.5),
         ]
     }
 
@@ -236,7 +236,7 @@ mod tests {
 
     #[test]
     fn low_pitch_drives_legs() {
-        let notes = vec![Note { frequency: 100.0, start_time: 0.0, duration: 0.5, velocity: 0.8 }];
+        let notes = vec![Note::basic(100.0, 0.0, 0.5, 0.8)];
         let state = MusicalState::default();
         let phrase = choreograph(&notes, &state, 1.0);
         let kf = &phrase.keyframes[0];
@@ -250,7 +250,7 @@ mod tests {
 
     #[test]
     fn high_pitch_drives_arms() {
-        let notes = vec![Note { frequency: 500.0, start_time: 0.0, duration: 0.5, velocity: 0.8 }];
+        let notes = vec![Note::basic(500.0, 0.0, 0.5, 0.8)];
         let state = MusicalState::default();
         let phrase = choreograph(&notes, &state, 1.0);
         let kf = &phrase.keyframes[0];
@@ -267,8 +267,8 @@ mod tests {
             ..Default::default()
         };
         let notes = vec![
-            Note { frequency: 300.0, start_time: 0.0, duration: 0.5, velocity: 0.5 },
-            Note { frequency: 300.0, start_time: 1.5, duration: 0.5, velocity: 0.5 },
+            Note::basic(300.0, 0.0, 0.5, 0.5),
+            Note::basic(300.0, 1.5, 0.5, 0.5),
         ];
         let phrase = choreograph(&notes, &state, 2.0);
         assert_eq!(phrase.style, DanceStyle::Ascending);

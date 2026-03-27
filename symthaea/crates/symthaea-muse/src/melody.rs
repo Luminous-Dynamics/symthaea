@@ -66,6 +66,7 @@ pub fn generate_melody(
             start_time: time,
             duration,
             velocity,
+            ..Default::default()
         });
 
         time += duration;

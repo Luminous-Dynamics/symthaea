@@ -98,10 +98,11 @@ fn derive_bass(lead: &[Note], state: &MusicalState) -> Voice {
         .iter()
         .step_by(step)
         .map(|n| Note {
-            frequency: (n.frequency * 0.5).max(55.0), // octave below, min A1
+            frequency: (n.frequency * 0.5).max(55.0),
             start_time: n.start_time,
-            duration: n.duration * 1.5, // bass notes sustain longer
+            duration: n.duration * 1.5,
             velocity: n.velocity * 0.8,
+            ..Default::default()
         })
         .collect();
 
@@ -136,6 +137,7 @@ fn derive_harmony(lead: &[Note], state: &MusicalState) -> Voice {
                 start_time: n.start_time,
                 duration: n.duration,
                 velocity: n.velocity * 0.6,
+                ..Default::default()
             }
         })
         .collect();
@@ -191,8 +193,9 @@ fn derive_ostinato(lead: &[Note], state: &MusicalState) -> Voice {
             notes.push(Note {
                 frequency: m.frequency,
                 start_time: time,
-                duration: m.duration * 0.8, // slightly staccato
+                duration: m.duration * 0.8,
                 velocity: m.velocity * 0.4,
+                ..Default::default()
             });
             time += m.duration;
         }
@@ -220,6 +223,9 @@ pub fn flatten_voices(arrangement: &Arrangement) -> Vec<Note> {
                 start_time: n.start_time,
                 duration: n.duration,
                 velocity: n.velocity * v.volume,
+                vibrato_cents: n.vibrato_cents,
+                fm_depth: n.fm_depth,
+                reverb_send: n.reverb_send,
             })
         })
         .collect();
@@ -237,10 +243,10 @@ mod tests {
 
     fn test_lead() -> Vec<Note> {
         vec![
-            Note { frequency: 261.63, start_time: 0.0, duration: 0.5, velocity: 0.8 },
-            Note { frequency: 329.63, start_time: 0.5, duration: 0.5, velocity: 0.7 },
-            Note { frequency: 392.00, start_time: 1.0, duration: 0.5, velocity: 0.9 },
-            Note { frequency: 523.25, start_time: 1.5, duration: 0.5, velocity: 0.6 },
+            Note::basic(261.63, 0.0, 0.5, 0.8),
+            Note::basic(329.63, 0.5, 0.5, 0.7),
+            Note::basic(392.00, 1.0, 0.5, 0.9),
+            Note::basic(523.25, 1.5, 0.5, 0.6),
         ]
     }
 
