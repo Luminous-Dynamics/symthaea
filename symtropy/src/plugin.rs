@@ -19,6 +19,8 @@ impl Plugin for SymtropyPlugin {
             .init_resource::<BiometricsCtx>()
             .init_resource::<LeviathanState>()
             .init_resource::<systems::rendering::TelemetryTimer>()
+            // Dark background — the void outside the Markov blanket
+            .insert_resource(ClearColor(Color::srgb(0.02, 0.02, 0.04)))
             // Startup systems
             .add_systems(Startup, (
                 systems::rendering::setup_world,

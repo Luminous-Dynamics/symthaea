@@ -19,7 +19,7 @@ pub fn setup_world(mut commands: Commands) {
     // Camera
     commands.spawn(Camera2d);
 
-    // Dark tile floor
+    // Dark tile floor — use Sprite::from_color for solid-color rendering
     for y in -MAP_HEIGHT / 2..MAP_HEIGHT / 2 {
         for x in -MAP_WIDTH / 2..MAP_WIDTH / 2 {
             let walkable = !(x == -MAP_WIDTH / 2
@@ -30,32 +30,20 @@ pub fn setup_world(mut commands: Commands) {
             let color = if walkable {
                 Color::srgb(0.08, 0.08, 0.12) // dark floor
             } else {
-                Color::srgb(0.15, 0.12, 0.10) // wall
+                Color::srgb(0.25, 0.20, 0.15) // wall — brighter so visible
             };
 
             commands.spawn((
-                Sprite {
-                    color,
-                    custom_size: Some(Vec2::splat(TILE_SIZE - 1.0)),
-                    ..default()
-                },
+                Sprite::from_color(color, Vec2::splat(TILE_SIZE - 1.0)),
                 Transform::from_xyz(x as f32 * TILE_SIZE, y as f32 * TILE_SIZE, 0.0),
-                Tile {
-                    grid_x: x,
-                    grid_y: y,
-                    walkable,
-                },
+                Tile { grid_x: x, grid_y: y, walkable },
             ));
         }
     }
 
-    // Player — cyan square
+    // Player — bright cyan square
     commands.spawn((
-        Sprite {
-            color: Color::srgb(0.2, 0.8, 0.9),
-            custom_size: Some(Vec2::splat(20.0)),
-            ..default()
-        },
+        Sprite::from_color(Color::srgb(0.2, 0.9, 1.0), Vec2::splat(22.0)),
         Transform::from_xyz(0.0, -100.0, 1.0),
         Player,
         Flashlight::default(),
@@ -70,34 +58,22 @@ pub fn setup_world(mut commands: Commands) {
     ];
     for (i, (name, x, y)) in npc_configs.iter().enumerate() {
         commands.spawn((
-            Sprite {
-                color: Color::srgb(0.3, 0.8, 0.3),
-                custom_size: Some(Vec2::splat(16.0)),
-                ..default()
-            },
+            Sprite::from_color(Color::srgb(0.3, 0.9, 0.3), Vec2::splat(16.0)),
             Transform::from_xyz(*x, *y, 1.0),
             CrewNpc::new(name, i as u64 + 100),
-            MoveTarget {
-                target: None,
-                speed: 60.0,
-            },
+            MoveTarget { target: None, speed: 60.0 },
             NoiseEmitter::default(),
         ));
     }
 
-    // Fusion core — yellow diamond at the far end
+    // Fusion core — bright yellow at the far end
     commands.spawn((
-        Sprite {
-            color: Color::srgb(1.0, 0.9, 0.2),
-            custom_size: Some(Vec2::splat(24.0)),
-            ..default()
-        },
+        Sprite::from_color(Color::srgb(1.0, 0.9, 0.1), Vec2::splat(26.0)),
         Transform::from_xyz(0.0, (MAP_HEIGHT as f32 / 2.0 - 3.0) * TILE_SIZE, 1.0),
-        FusionCore {
-            being_extracted: false,
-            extraction_progress: 0.0,
-        },
+        FusionCore { being_extracted: false, extraction_progress: 0.0 },
     ));
+
+    info!("World spawned: {}x{} tiles, 1 player, 3 NPCs, 1 fusion core", MAP_WIDTH, MAP_HEIGHT);
 }
 
 /// Telemetry logging resource to throttle output.
