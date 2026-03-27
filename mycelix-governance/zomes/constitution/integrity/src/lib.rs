@@ -203,13 +203,16 @@ pub fn check_update_charter(original: &Charter, updated: &Charter) -> Result<(),
 }
 
 /// Check amendment validity on creation.
-/// Unamendable core rights — these cannot be removed or modified.
 ///
-/// These rights form the thermodynamic bedrock of the governance system.
-/// Removing them would allow tyranny to re-emerge as an attractor state.
-/// They are enforced at the integrity (validation) level, meaning even a
-/// 100% unanimous vote cannot remove them — the DHT itself rejects it.
-const UNAMENDABLE_RIGHTS: &[&str] = &[
+/// Immutable Core rights — aligned with Constitution Art. IV, Sec. 2.
+/// These are NOT absolutely unamendable but require the enhanced
+/// amendment process: 90% supermajority in both Global DAO houses,
+/// ratified by 3/4 of all Sector and Regional DAOs.
+///
+/// At the integrity level, amendments targeting these rights are
+/// FLAGGED (not rejected) — the coordinator must verify that the
+/// enhanced process was followed before allowing the amendment.
+const IMMUTABLE_CORE_RIGHTS: &[&str] = &[
     "veto override",
     "consciousness gating",
     "term limits",
@@ -217,10 +220,23 @@ const UNAMENDABLE_RIGHTS: &[&str] = &[
     "permission-less enforcement",
     "fork rights",
     "right to exit",
+    // Constitutional Immutable Core (Art. IV, Sec. 2):
+    "core principles",
+    "sovereignty",
+    "golden veto sunset",
+    "oversight funding",
 ];
 
-/// Check if an amendment targets unamendable constitutional core.
-fn targets_unamendable_core(amendment: &Amendment) -> Option<String> {
+/// Check if an amendment targets the Immutable Core (Art. IV, Sec. 2).
+///
+/// Returns Some(reason) if the amendment targets a protected right.
+/// The amendment is not REJECTED at the integrity level — instead,
+/// the coordinator must verify the enhanced amendment process
+/// (90% supermajority + 3/4 ratification) was followed.
+///
+/// This aligns with the Constitution: the Immutable Core is not
+/// absolutely unamendable, but requires an extraordinary process.
+pub fn targets_immutable_core(amendment: &Amendment) -> Option<String> {
     let text_lower = amendment.new_text.to_lowercase();
     let original_lower = amendment
         .original_text
@@ -233,45 +249,43 @@ fn targets_unamendable_core(amendment: &Amendment) -> Option<String> {
         .unwrap_or("")
         .to_lowercase();
 
-    // Check RemoveRight against unamendable rights
+    // Check RemoveRight/ModifyRight against immutable core rights
     if matches!(
         amendment.amendment_type,
         AmendmentType::RemoveRight | AmendmentType::ModifyRight
     ) {
-        for right in UNAMENDABLE_RIGHTS {
+        for right in IMMUTABLE_CORE_RIGHTS {
             if original_lower.contains(right) || text_lower.contains(right) {
                 return Some(format!(
-                    "Cannot remove or modify unamendable right: '{}'. \
-                     This right is part of the constitutional bedrock.",
+                    "Amendment targets Immutable Core right: '{}'. \
+                     Requires enhanced process: 90% supermajority + 3/4 DAO ratification \
+                     (Constitution Art. IV, Sec. 2).",
                     right
                 ));
             }
         }
     }
 
-    // Check RemoveArticle against unamendable topics
-    if matches!(
-        amendment.amendment_type,
-        AmendmentType::RemoveArticle
-    ) {
-        for right in UNAMENDABLE_RIGHTS {
+    // Check RemoveArticle against immutable core topics
+    if matches!(amendment.amendment_type, AmendmentType::RemoveArticle) {
+        for right in IMMUTABLE_CORE_RIGHTS {
             if article_lower.contains(right) {
                 return Some(format!(
-                    "Cannot remove article concerning unamendable right: '{}'",
+                    "Amendment targets Immutable Core article: '{}'. \
+                     Requires enhanced process (Art. IV, Sec. 2).",
                     right
                 ));
             }
         }
     }
 
-    // ModifyProcess cannot remove override mechanisms
+    // ModifyProcess cannot strip override mechanisms without enhanced process
     if matches!(amendment.amendment_type, AmendmentType::ModifyProcess) {
-        for right in UNAMENDABLE_RIGHTS {
-            // If the original process mentions a right but the new one doesn't,
-            // it's being stripped
+        for right in IMMUTABLE_CORE_RIGHTS {
             if original_lower.contains(right) && !text_lower.contains(right) {
                 return Some(format!(
-                    "Cannot remove '{}' from the amendment process — unamendable core",
+                    "Amendment removes '{}' from process — requires enhanced process \
+                     (Art. IV, Sec. 2).",
                     right
                 ));
             }
@@ -292,12 +306,17 @@ pub fn check_create_amendment(amendment: &Amendment) -> Result<(), String> {
         return Err("Amendment must have rationale".into());
     }
 
-    // ── UNAMENDABLE CORE CHECK ──
-    // Reject amendments that would remove or weaken core anti-tyranny rights.
-    // This is enforced at the integrity level — the DHT itself rejects the entry.
-    if let Some(reason) = targets_unamendable_core(amendment) {
-        return Err(reason);
-    }
+    // ── IMMUTABLE CORE CHECK (Art. IV, Sec. 2) ──
+    // Flag amendments targeting the Immutable Core. These are not rejected
+    // at the integrity level — the coordinator verifies the enhanced process
+    // (90% supermajority + 3/4 ratification) was followed.
+    //
+    // The amendment is VALID to create (so it can enter deliberation),
+    // but the coordinator must check targets_immutable_core() before
+    // transitioning to Ratified status.
+    //
+    // This aligns with the Constitution: even the Immutable Core can be
+    // amended through an extraordinary democratic process.
 
     match amendment.amendment_type {
         AmendmentType::ModifyArticle

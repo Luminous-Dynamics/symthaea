@@ -178,7 +178,7 @@ The 80\% supermajority override creates an asymmetry: an attacker needs only 21\
     \label{eq:insurance}
 \end{equation}
 
-\noindent where $\theta_0 = 0.80$ is the initial threshold, $\delta = 0.05$ is the decay per failed attempt, $k$ is the attempt number, and $\theta_{\min} = 0.67$ (two-thirds supermajority) is the absolute floor. After three failed override attempts, the threshold stabilizes at 67\%, ensuring that sustained voter suppression cannot permanently block collective action.
+\noindent where $\theta_0 = 0.67$ is the initial threshold (aligned with the constitutional two-thirds supermajority, Art.~III, Sec.~5.3), $\delta = 0.05$ is the decay per failed attempt, $k$ is the attempt number, and $\theta_{\min} = 0.60$ is the absolute floor. After two failed override attempts, the threshold stabilizes at 60\%, ensuring that sustained voter suppression cannot permanently block collective action.
 
 % ============================================================================
 \section{Hardcoded Invariants}
@@ -195,10 +195,10 @@ We implement sixteen invariants compiled into the WASM binary. These cannot be m
 \toprule
 \textbf{\#} & \textbf{Invariant} & \textbf{Value} & \textbf{Thermodynamic Role} \\
 \midrule
-1 & Veto override threshold & 80\% & Energy barrier \\
+1 & Veto override threshold & 67\% (2/3) & Energy barrier \\
 2 & Override window & 48h & Temporal buffer \\
 3 & Threshold decay & 5\%/attempt & Adaptive barrier \\
-4 & Threshold floor & 67\% & Minimum legitimacy \\
+4 & Threshold floor & 60\% & Minimum legitimacy \\
 5 & Veto cooldown & 7 days & Rate limit \\
 6 & Guardian $\Phi$ for veto & 0.8 & Consciousness gate \\
 7 & Emergency sessions & 3 max & Isolation limit \\
@@ -471,10 +471,10 @@ All invariants are compiled as Rust constants into the Holochain WASM binary. Th
 \toprule
 \textbf{\#} & \textbf{Constant} & \textbf{Value} & \textbf{Unit} & \textbf{File} \\
 \midrule
-1 & \texttt{VETO\_OVERRIDE\_THRESHOLD} & 0.80 & ratio & exec/integrity \\
+1 & \texttt{VETO\_OVERRIDE\_THRESHOLD} & 0.67 & ratio & exec/integrity \\
 2 & \texttt{VETO\_OVERRIDE\_WINDOW\_US} & $1.73 \times 10^{11}$ & $\mu$s & exec/integrity \\
 3 & \texttt{OVERRIDE\_THRESHOLD\_DECAY} & 0.05 & ratio & exec/integrity \\
-4 & \texttt{OVERRIDE\_THRESHOLD\_FLOOR} & 0.67 & ratio & exec/integrity \\
+4 & \texttt{OVERRIDE\_THRESHOLD\_FLOOR} & 0.60 & ratio & exec/integrity \\
 5 & \texttt{VETO\_COOLDOWN\_US} & $6.05 \times 10^{11}$ & $\mu$s & exec/coord \\
 6 & \texttt{GUARDIAN\_PHI\_THRESHOLD} & 0.80 & $\Phi$ & exec/coord \\
 7 & \texttt{MAX\_EMERGENCY\_SESSIONS} & 3 & count & councils/int \\

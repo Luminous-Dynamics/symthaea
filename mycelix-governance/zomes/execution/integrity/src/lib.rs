@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Execution Integrity Zome
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Execution Integrity Zome
 //! Defines entry types and validation for proposal execution
 //!
 //! Updated to use HDI 0.7 patterns
@@ -68,18 +69,23 @@ pub enum VetoStatus {
 pub const VETO_OVERRIDE_WINDOW_US: i64 = 48 * 3600 * 1_000_000;
 
 /// Supermajority threshold required to override a guardian veto.
-/// Hardcoded at 80% — not configurable by governance.
-pub const VETO_OVERRIDE_THRESHOLD: f64 = 0.80;
+/// Aligned with Constitution Art. III, Sec. 5.3: "two-thirds (2/3)
+/// majority in both houses." Hardcoded — not configurable by governance.
+pub const VETO_OVERRIDE_THRESHOLD: f64 = 0.67;
 
 /// Participation insurance: if override quorum fails, the threshold
 /// decreases by this amount per failed attempt.
-/// 80% -> 75% -> 70% -> 67% (floor). Prevents the 21% boycott attack
+/// 67% -> 62% -> 60% (floor). Prevents the 34% boycott attack
 /// where a minority sustains a veto by suppressing participation.
 pub const OVERRIDE_THRESHOLD_DECAY_PER_ATTEMPT: f64 = 0.05;
 
 /// Absolute floor for the adaptive override threshold.
-/// Never goes below 2/3 supermajority — preserving democratic legitimacy.
-pub const OVERRIDE_THRESHOLD_FLOOR: f64 = 0.67;
+/// Never goes below 60% — preserving supermajority legitimacy.
+pub const OVERRIDE_THRESHOLD_FLOOR: f64 = 0.60;
+
+/// Maximum vetoes per Guardian per 12-month period before probation.
+/// Aligned with Constitution Art. III, Sec. 5.4.
+pub const VETO_YEARLY_LIMIT: u32 = 3;
 
 /// Compute the adaptive override threshold based on failed attempts.
 ///
@@ -815,7 +821,7 @@ mod tests {
             override_votes_for: 8.0,
             override_votes_against: 2.0,
             total_eligible_voters: 10,
-            override_threshold: 0.80,
+            override_threshold: 0.67,
             override_succeeded: true,
             resolved_at: ts(3_000_000),
         };
@@ -836,7 +842,7 @@ mod tests {
             override_votes_for: 5.0,
             override_votes_against: 5.0,
             total_eligible_voters: 10,
-            override_threshold: 0.80,
+            override_threshold: 0.67,
             override_succeeded: false,
             resolved_at: ts(3_000_000),
         };
@@ -846,7 +852,8 @@ mod tests {
     #[test]
     fn test_veto_override_threshold_constant() {
         // Verify the threshold is exactly 0.80 — this is a governance invariant
-        assert!((VETO_OVERRIDE_THRESHOLD - 0.80).abs() < f64::EPSILON);
+        // Constitutional threshold: 2/3 (Art. III, Sec. 5.3)
+        assert!((VETO_OVERRIDE_THRESHOLD - 0.67).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -858,22 +865,22 @@ mod tests {
 
     #[test]
     fn test_adaptive_threshold_initial() {
-        assert!((adaptive_override_threshold(0) - 0.80).abs() < f64::EPSILON);
+        // Constitutional threshold: 2/3 (Art. III, Sec. 5.3)
+        assert!((adaptive_override_threshold(0) - 0.67).abs() < f64::EPSILON);
     }
 
     #[test]
     fn test_adaptive_threshold_decays() {
-        assert!((adaptive_override_threshold(1) - 0.75).abs() < f64::EPSILON);
-        assert!((adaptive_override_threshold(2) - 0.70).abs() < f64::EPSILON);
+        assert!((adaptive_override_threshold(1) - 0.62).abs() < f64::EPSILON);
+        assert!((adaptive_override_threshold(2) - 0.60).abs() < 0.001);
     }
 
     #[test]
     fn test_adaptive_threshold_floor() {
-        // 3 attempts: 0.80 - 0.15 = 0.65, but floored at 0.67
-        assert!((adaptive_override_threshold(3) - 0.67).abs() < f64::EPSILON);
-        // Further attempts stay at floor
-        assert!((adaptive_override_threshold(10) - 0.67).abs() < f64::EPSILON);
-        assert!((adaptive_override_threshold(100) - 0.67).abs() < f64::EPSILON);
+        // Floor at 60%
+        assert!((adaptive_override_threshold(3) - 0.60).abs() < 0.001);
+        assert!((adaptive_override_threshold(10) - 0.60).abs() < 0.001);
+        assert!((adaptive_override_threshold(100) - 0.60).abs() < 0.001);
     }
 
     #[test]
