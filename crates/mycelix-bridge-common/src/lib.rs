@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Mycelix Bridge Common — Shared dispatch types and utilities
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Mycelix Bridge Common — Shared dispatch types and utilities
 //!
 //! Provides the cross-domain dispatch primitives used by both the
 //! Commons and Civic cluster bridge zomes. Each cluster's bridge
