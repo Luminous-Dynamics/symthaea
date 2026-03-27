@@ -41,38 +41,78 @@ struct MockFlashcard {
     mastery_permille: u16,
 }
 
-const MOCK_CARDS: &[MockFlashcard] = &[
-    MockFlashcard {
-        front: "4 \u{00d7} 7 = ?",
-        back: "28",
-        tags: "Multiplication",
-        mastery_permille: 700,
-    },
-    MockFlashcard {
-        front: "What is 1/4 of a pizza?",
-        back: "One slice if cut into 4 equal pieces",
-        tags: "Fractions",
-        mastery_permille: 400,
-    },
-    MockFlashcard {
-        front: "Round 67 to the nearest ten",
-        back: "70",
-        tags: "Rounding",
-        mastery_permille: 550,
-    },
-    MockFlashcard {
-        front: "Sara has 3 bags with 5 apples each. How many apples?",
-        back: "15 apples (3 \u{00d7} 5 = 15)",
-        tags: "Word Problems",
-        mastery_permille: 350,
-    },
-    MockFlashcard {
-        front: "What is the area of a rectangle that is 4 units wide and 3 units tall?",
-        back: "12 square units (4 \u{00d7} 3 = 12)",
-        tags: "Geometry",
-        mastery_permille: 250,
-    },
-];
+/// Generate real flashcards from Common Core Grade 3 Math standards.
+/// Covers all 5 domains: OA, NBT, NF, MD, G.
+fn generate_curriculum_cards() -> Vec<MockFlashcard> {
+    vec![
+        // === Operations & Algebraic Thinking (3.OA) ===
+        // 3.OA.A.1: Interpret products
+        MockFlashcard { front: "3 \u{00d7} 6 means 3 groups of 6. How many total?", back: "18", tags: "Multiplication", mastery_permille: 700 },
+        MockFlashcard { front: "Draw an array for 4 \u{00d7} 5", back: "4 rows of 5 = 20", tags: "Multiplication", mastery_permille: 650 },
+        // 3.OA.A.2: Interpret quotients
+        MockFlashcard { front: "24 \u{00f7} 6 = ? (How many groups of 6 make 24?)", back: "4", tags: "Division", mastery_permille: 400 },
+        MockFlashcard { front: "Share 15 stickers equally among 3 friends. How many each?", back: "5 stickers each (15 \u{00f7} 3 = 5)", tags: "Division", mastery_permille: 450 },
+        // 3.OA.A.3: Multiply and divide word problems
+        MockFlashcard { front: "A garden has 5 rows with 7 flowers in each row. How many flowers?", back: "35 flowers (5 \u{00d7} 7 = 35)", tags: "Word Problems", mastery_permille: 350 },
+        MockFlashcard { front: "Mom bought 32 cookies for 8 children. How many each?", back: "4 cookies each (32 \u{00f7} 8 = 4)", tags: "Word Problems", mastery_permille: 300 },
+        // 3.OA.A.4: Unknown in multiplication
+        MockFlashcard { front: "? \u{00d7} 8 = 48", back: "6 (because 6 \u{00d7} 8 = 48)", tags: "Multiplication", mastery_permille: 500 },
+        MockFlashcard { front: "7 \u{00d7} ? = 56", back: "8 (because 7 \u{00d7} 8 = 56)", tags: "Multiplication", mastery_permille: 480 },
+        // 3.OA.B.5: Properties of multiplication
+        MockFlashcard { front: "If 3 \u{00d7} 5 \u{00d7} 2 is hard, can you rearrange? Try (3 \u{00d7} 2) \u{00d7} 5", back: "6 \u{00d7} 5 = 30. Same answer! (Associative property)", tags: "Multiplication", mastery_permille: 400 },
+        // 3.OA.B.6: Division as unknown factor
+        MockFlashcard { front: "56 \u{00f7} 8 = ? Think: 8 \u{00d7} ? = 56", back: "7", tags: "Division", mastery_permille: 420 },
+        // 3.OA.C.7: Fluently multiply/divide within 100
+        MockFlashcard { front: "9 \u{00d7} 7 = ?", back: "63", tags: "Multiplication", mastery_permille: 600 },
+        MockFlashcard { front: "8 \u{00d7} 6 = ?", back: "48", tags: "Multiplication", mastery_permille: 620 },
+        MockFlashcard { front: "72 \u{00f7} 9 = ?", back: "8", tags: "Division", mastery_permille: 380 },
+        MockFlashcard { front: "7 \u{00d7} 4 = ?", back: "28", tags: "Multiplication", mastery_permille: 700 },
+        // 3.OA.D.8: Two-step word problems
+        MockFlashcard { front: "You have $20. You buy 3 books at $4 each. How much left?", back: "$8 (3 \u{00d7} $4 = $12, $20 - $12 = $8)", tags: "Word Problems", mastery_permille: 250 },
+        MockFlashcard { front: "A baker makes 6 trays of 8 muffins, then eats 3. How many left?", back: "45 (6 \u{00d7} 8 = 48, 48 - 3 = 45)", tags: "Word Problems", mastery_permille: 200 },
+        // 3.OA.D.9: Patterns in addition/multiplication tables
+        MockFlashcard { front: "Look at the pattern: 4, 8, 12, 16, 20. What comes next?", back: "24 (adding 4 each time \u{2014} the 4\u{00d7} table!)", tags: "Patterns", mastery_permille: 550 },
+
+        // === Number & Operations in Base Ten (3.NBT) ===
+        // 3.NBT.A.1: Round to nearest 10/100
+        MockFlashcard { front: "Round 67 to the nearest ten", back: "70", tags: "Rounding", mastery_permille: 600 },
+        MockFlashcard { front: "Round 345 to the nearest hundred", back: "300", tags: "Rounding", mastery_permille: 500 },
+        MockFlashcard { front: "Round 851 to the nearest hundred", back: "900", tags: "Rounding", mastery_permille: 480 },
+        // 3.NBT.A.2: Fluently add/subtract within 1000
+        MockFlashcard { front: "456 + 237 = ?", back: "693", tags: "Addition", mastery_permille: 750 },
+        MockFlashcard { front: "803 - 256 = ?", back: "547", tags: "Subtraction", mastery_permille: 680 },
+        // 3.NBT.A.3: Multiply one-digit x multiples of 10
+        MockFlashcard { front: "6 \u{00d7} 70 = ?", back: "420 (6 \u{00d7} 7 = 42, then add a zero)", tags: "Multiplication", mastery_permille: 350 },
+
+        // === Number & Operations -- Fractions (3.NF) ===
+        // 3.NF.A.1: Understand fractions
+        MockFlashcard { front: "A pizza is cut into 8 equal slices. You eat 3. What fraction did you eat?", back: "3/8", tags: "Fractions", mastery_permille: 400 },
+        MockFlashcard { front: "What does the 4 mean in 3/4?", back: "The whole is divided into 4 equal parts", tags: "Fractions", mastery_permille: 350 },
+        // 3.NF.A.2: Fractions on number line
+        MockFlashcard { front: "Where does 1/2 go on a number line from 0 to 1?", back: "Exactly in the middle, halfway between 0 and 1", tags: "Fractions", mastery_permille: 450 },
+        // 3.NF.A.3: Equivalent fractions, comparing
+        MockFlashcard { front: "Which is bigger: 1/3 or 1/4?", back: "1/3 is bigger (fewer parts = bigger pieces)", tags: "Fractions", mastery_permille: 300 },
+        MockFlashcard { front: "Are 2/4 and 1/2 the same?", back: "Yes! 2/4 = 1/2 (equivalent fractions)", tags: "Fractions", mastery_permille: 320 },
+
+        // === Measurement & Data (3.MD) ===
+        // 3.MD.C.5-7: Area
+        MockFlashcard { front: "A rectangle is 4 units wide and 3 units tall. What's the area?", back: "12 square units (4 \u{00d7} 3 = 12)", tags: "Geometry", mastery_permille: 250 },
+        MockFlashcard { front: "A square has sides of 5. What's its area?", back: "25 square units (5 \u{00d7} 5 = 25)", tags: "Geometry", mastery_permille: 280 },
+        // 3.MD.A.1: Tell time
+        MockFlashcard { front: "What time is 15 minutes after 2:45?", back: "3:00", tags: "Time", mastery_permille: 550 },
+        // 3.MD.B.3: Picture graphs/bar graphs
+        MockFlashcard { front: "A bar graph shows: Red=5, Blue=8, Green=3. How many more blue than green?", back: "5 more (8 - 3 = 5)", tags: "Data", mastery_permille: 500 },
+        // 3.MD.D.8: Perimeter
+        MockFlashcard { front: "A rectangle is 6 long and 4 wide. What's the perimeter?", back: "20 units (6 + 4 + 6 + 4 = 20)", tags: "Geometry", mastery_permille: 300 },
+
+        // === Geometry (3.G) ===
+        // 3.G.A.1: Shapes and attributes
+        MockFlashcard { front: "How many sides does a hexagon have?", back: "6 sides", tags: "Geometry", mastery_permille: 600 },
+        MockFlashcard { front: "A rhombus has 4 equal sides. Is it always a square?", back: "No \u{2014} a square has 4 equal sides AND 4 right angles. A rhombus might not.", tags: "Geometry", mastery_permille: 220 },
+        // 3.G.A.2: Partition shapes into equal parts
+        MockFlashcard { front: "Split a rectangle into 4 equal parts. What fraction is each part?", back: "1/4 (each part is one-fourth of the whole)", tags: "Fractions", mastery_permille: 380 },
+    ]
+}
 
 /// Kid-friendly rating options: emoji, label, and mapped SM-2 quality value.
 struct KidRating {
@@ -124,6 +164,9 @@ fn modality_indicator(modality: &Modality) -> &'static str {
 pub fn ReviewPage() -> impl IntoView {
     let adaptivity = use_adaptivity();
 
+    // Generate curriculum cards and store for the session
+    let cards = StoredValue::new(generate_curriculum_cards());
+
     // Extract signals for closures (signals are Copy)
     let adaptation_sig = adaptivity.adaptation;
     let sovereignty_sig = adaptivity.sovereignty;
@@ -141,16 +184,18 @@ pub fn ReviewPage() -> impl IntoView {
         {
             let adaptivity = adaptivity_for_timeout;
             move || {
-                if MOCK_CARDS.is_empty() {
-                    set_state.set(ReviewState::NoDueCards);
-                } else {
-                    set_start_time.set(js_sys::Date::now());
-                    set_card_start_time.set(js_sys::Date::now());
-                    // Tell adaptivity about the first card
-                    let card = &MOCK_CARDS[0];
-                    adaptivity.set_skill(card.tags, card.mastery_permille);
-                    set_state.set(ReviewState::ShowingFront { card_index: 0 });
-                }
+                cards.with_value(|deck| {
+                    if deck.is_empty() {
+                        set_state.set(ReviewState::NoDueCards);
+                    } else {
+                        set_start_time.set(js_sys::Date::now());
+                        set_card_start_time.set(js_sys::Date::now());
+                        // Tell adaptivity about the first card
+                        let card = &deck[0];
+                        adaptivity.set_skill(card.tags, card.mastery_permille);
+                        set_state.set(ReviewState::ShowingFront { card_index: 0 });
+                    }
+                });
             }
         },
         std::time::Duration::from_millis(300),
@@ -181,20 +226,22 @@ pub fn ReviewPage() -> impl IntoView {
             set_total_time_secs.update(|t| *t += elapsed);
 
             let next_index = card_index + 1;
-            if next_index < MOCK_CARDS.len() {
-                set_card_start_time.set(js_sys::Date::now());
-                // Tell adaptivity about the new card
-                let card = &MOCK_CARDS[next_index];
-                rate_ctx.with_value(|ctx| ctx.set_skill(card.tags, card.mastery_permille));
-                set_state.set(ReviewState::ShowingFront { card_index: next_index });
-            } else {
-                // Session complete
-                let r = ratings.get();
-                let correct = r.iter().filter(|&&q| q >= 3).count();
-                let correct = if quality >= 3 { correct.max(1) } else { correct };
-                let reviewed = r.len();
-                set_state.set(ReviewState::SessionComplete { reviewed, correct });
-            }
+            cards.with_value(|deck| {
+                if next_index < deck.len() {
+                    set_card_start_time.set(js_sys::Date::now());
+                    // Tell adaptivity about the new card
+                    let card = &deck[next_index];
+                    rate_ctx.with_value(|ctx| ctx.set_skill(card.tags, card.mastery_permille));
+                    set_state.set(ReviewState::ShowingFront { card_index: next_index });
+                } else {
+                    // Session complete
+                    let r = ratings.get();
+                    let correct_count = r.iter().filter(|&&q| q >= 3).count();
+                    let correct_count = if quality >= 3 { correct_count.max(1) } else { correct_count };
+                    let reviewed = r.len();
+                    set_state.set(ReviewState::SessionComplete { reviewed, correct: correct_count });
+                }
+            });
         }
     };
 
@@ -265,14 +312,16 @@ pub fn ReviewPage() -> impl IntoView {
                     }.into_any(),
 
                     ReviewState::ShowingFront { card_index } => {
-                        let card = &MOCK_CARDS[card_index];
-                        let total = MOCK_CARDS.len();
+                        let (card_front, card_tags, total) = cards.with_value(|deck| {
+                            let card = &deck[card_index];
+                            (card.front.to_string(), card.tags.to_string(), deck.len())
+                        });
                         let progress_pct = ((card_index as f64 / total as f64) * 100.0) as u32;
 
                         // Apply text complexity adaptation to card content
                         let adapt = adaptation_sig.get();
                         let sov = sovereignty_sig.get();
-                        let adapted_front = adapt_card_text(card.front, &adapt, &sov);
+                        let adapted_front = adapt_card_text(&card_front, &adapt, &sov);
 
                         view! {
                             <div class="review-session">
@@ -288,7 +337,7 @@ pub fn ReviewPage() -> impl IntoView {
                                 </div>
                                 <div class="flashcard">
                                     <div class="flashcard-inner flashcard-front">
-                                        <span class="card-tag">{card.tags}</span>
+                                        <span class="card-tag">{card_tags}</span>
                                         <div class="card-content">
                                             <p>{adapted_front}</p>
                                         </div>
@@ -317,8 +366,10 @@ pub fn ReviewPage() -> impl IntoView {
                     }
 
                     ReviewState::ShowingBack { card_index } => {
-                        let card = &MOCK_CARDS[card_index];
-                        let total = MOCK_CARDS.len();
+                        let (card_front, card_back, card_tags, total) = cards.with_value(|deck| {
+                            let card = &deck[card_index];
+                            (card.front.to_string(), card.back.to_string(), card.tags.to_string(), deck.len())
+                        });
                         let progress_pct = (((card_index + 1) as f64 / total as f64) * 100.0) as u32;
                         view! {
                             <div class="review-session">
@@ -334,16 +385,16 @@ pub fn ReviewPage() -> impl IntoView {
                                 </div>
                                 <div class="flashcard">
                                     <div class="flashcard-inner flashcard-back">
-                                        <span class="card-tag">{card.tags}</span>
+                                        <span class="card-tag">{card_tags}</span>
                                         <div class="card-content card-content-split">
                                             <div class="card-question">
                                                 <span class="label">"Q: "</span>
-                                                {card.front}
+                                                {card_front}
                                             </div>
                                             <hr class="card-divider" />
                                             <div class="card-answer">
                                                 <span class="label">"A: "</span>
-                                                {card.back}
+                                                {card_back}
                                             </div>
                                         </div>
                                     </div>

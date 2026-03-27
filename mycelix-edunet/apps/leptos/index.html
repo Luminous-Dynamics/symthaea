@@ -6,5 +6,14 @@
     <title>Mycelix EduNet</title>
     <link data-trunk rel="css" href="style/main.css" />
 </head>
-<body></body>
+<body>
+    <!-- Spore WASM integration (loaded when available) -->
+    <script id="spore-loader">
+        window.__SPORE_AVAILABLE = false;
+        // When Spore WASM is deployed to /spore/, this will detect and load it
+        fetch('/spore/symthaea_spore_bg.wasm', { method: 'HEAD' })
+            .then(r => { if (r.ok) window.__SPORE_AVAILABLE = true; })
+            .catch(() => {});
+    </script>
+</body>
 </html>

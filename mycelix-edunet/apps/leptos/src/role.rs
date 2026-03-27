@@ -3,18 +3,39 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
 use leptos::prelude::*;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+use crate::persistence;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum UserRole {
     Teacher,
     Student,
     Parent,
 }
 
+const ROLE_KEY: &str = "edunet_role";
+
 /// Provide the selected role as a context signal.
 /// Returns (read, write) signals for the optional role.
+///
+/// Initializes from localStorage if a previously selected role exists.
+/// Wraps the write signal to persist on every change.
 pub fn provide_role_context() -> (ReadSignal<Option<UserRole>>, WriteSignal<Option<UserRole>>) {
-    let (role, set_role) = signal(None::<UserRole>);
+    // Restore persisted role (if any)
+    let initial: Option<UserRole> = persistence::load(ROLE_KEY);
+    let (role, set_role) = signal(initial);
+
+    // Persist whenever role changes
+    Effect::new(move |_| {
+        let current = role.get();
+        if let Some(r) = current {
+            persistence::save(ROLE_KEY, &r);
+        } else {
+            persistence::remove(ROLE_KEY);
+        }
+    });
+
     provide_context(role);
     provide_context(set_role);
     (role, set_role)

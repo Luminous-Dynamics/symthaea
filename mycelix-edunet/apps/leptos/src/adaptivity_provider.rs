@@ -12,6 +12,7 @@ use leptos::prelude::*;
 
 use crate::cognitive_adaptivity::*;
 use crate::consciousness::use_consciousness;
+use crate::persistence;
 
 // ---------------------------------------------------------------------------
 // Context
@@ -128,7 +129,9 @@ pub fn AdaptivityProvider(children: Children) -> impl IntoView {
     let consciousness = use_consciousness();
 
     // -- Core state signals --
-    let (sovereignty, set_sovereignty) = signal(SovereigntyLevel::new());
+    let initial_sovereignty = persistence::load::<SovereigntyLevel>("edunet_sovereignty")
+        .unwrap_or_else(SovereigntyLevel::new);
+    let (sovereignty, set_sovereignty) = signal(initial_sovereignty);
     let (current_skill, set_current_skill) = signal("multiplication".to_string());
     let (mastery, set_mastery) = signal(500u16);
     let (consecutive_failures, set_consecutive_failures) = signal(0u32);
@@ -237,6 +240,12 @@ pub fn AdaptivityProvider(children: Children) -> impl IntoView {
                 );
             });
         }
+    });
+
+    // -- Effect: persist sovereignty to localStorage on every change --
+    Effect::new(move |_| {
+        let sov = sovereignty.get();
+        persistence::save("edunet_sovereignty", &sov);
     });
 
     // -- Effect: handle suggestion dismiss --

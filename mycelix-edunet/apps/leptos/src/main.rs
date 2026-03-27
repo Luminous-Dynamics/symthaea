@@ -12,6 +12,7 @@ mod consciousness;
 mod holochain;
 mod learning_engine;
 mod pages;
+mod persistence;
 mod role;
 
 fn main() {

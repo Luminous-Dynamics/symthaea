@@ -280,8 +280,31 @@ impl SimulatedEngine {
 ///
 /// Place around the `<Router>` (or inside `HolochainProvider`) to give all
 /// pages access to live consciousness metrics via `use_consciousness()`.
+///
+/// Checks for Spore WASM availability at `/spore/` and logs the result.
+/// When Spore is deployed, this will use the real consciousness engine;
+/// until then it falls back to the coupled-oscillator simulation.
 #[component]
 pub fn ConsciousnessProvider(children: Children) -> impl IntoView {
+    // Check if Spore WASM is available (set by loader script in index.html)
+    let spore_available = js_sys::Reflect::get(
+        &web_sys::window().unwrap(),
+        &"__SPORE_AVAILABLE".into(),
+    )
+    .ok()
+    .and_then(|v| v.as_bool())
+    .unwrap_or(false);
+
+    if spore_available {
+        web_sys::console::log_1(
+            &"[EduNet] Spore WASM detected \u{2014} real consciousness engine available".into(),
+        );
+    } else {
+        web_sys::console::log_1(
+            &"[EduNet] Spore WASM not found \u{2014} using simulation".into(),
+        );
+    }
+
     let (state, set_state) = signal(ConsciousnessState::default());
     let (running, set_running) = signal(true);
     let (last_input, set_last_input) = signal(String::new());
