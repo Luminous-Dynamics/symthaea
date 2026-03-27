@@ -158,28 +158,24 @@ fn test_h1_symmetric_vs_asymmetric_binding_harmonic_fraction() {
     println!("=== Hypothesis 1: Binding Symmetry → Topological Harmonics ===");
     println!(
         "Symmetric binding:  gradient={:.4} curl={:.4} harmonic={:.4} (edges={})",
-        fracs_sym.gradient, fracs_sym.curl, fracs_sym.harmonic, fracs_sym.edge_count
+        fracs_sym.gradient, fracs_sym.curl, fracs_sym.harmonic, fracs_sym.scales_sampled
     );
     println!(
         "Asymmetric binding: gradient={:.4} curl={:.4} harmonic={:.4} (edges={})",
-        fracs_asym.gradient, fracs_asym.curl, fracs_asym.harmonic, fracs_asym.edge_count
+        fracs_asym.gradient, fracs_asym.curl, fracs_asym.harmonic, fracs_asym.scales_sampled
     );
 
     // The fractions should differ — binding symmetry should affect topology
     let harmonic_diff = (fracs_sym.harmonic - fracs_asym.harmonic).abs();
     println!("Harmonic fraction difference: {harmonic_diff:.6}");
 
-    // Verify fractions are valid (sum to ~1.0)
+    // Verify fractions are valid (each in [0,1], sum ≤ 1.0).
+    // Persistence-weighted fractions may not sum to exactly 1.0 because
+    // the weighting averages across scales with varying signal energy.
     let sum_sym = fracs_sym.gradient + fracs_sym.curl + fracs_sym.harmonic;
     let sum_asym = fracs_asym.gradient + fracs_asym.curl + fracs_asym.harmonic;
-    assert!(
-        (sum_sym - 1.0).abs() < 0.01,
-        "Symmetric fractions should sum to ~1.0, got {sum_sym}"
-    );
-    assert!(
-        (sum_asym - 1.0).abs() < 0.01,
-        "Asymmetric fractions should sum to ~1.0, got {sum_asym}"
-    );
+    assert!(sum_sym <= 1.01, "Symmetric fractions sum {sum_sym} exceeds 1.0");
+    assert!(sum_asym <= 1.01, "Asymmetric fractions sum {sum_asym} exceeds 1.0");
 
     // Both should have non-trivial harmonic content (moral manifolds have cycles)
     assert!(
@@ -208,7 +204,7 @@ fn test_h1_random_scenarios_have_measurable_harmonics() {
     println!("=== Random Scenarios Hodge Fractions ===");
     println!(
         "gradient={:.4} curl={:.4} harmonic={:.4} (edges={})",
-        fracs.gradient, fracs.curl, fracs.harmonic, fracs.edge_count
+        fracs.gradient, fracs.curl, fracs.harmonic, fracs.scales_sampled
     );
 
     // Random scenarios should have some structure (not all zero)
@@ -298,7 +294,7 @@ fn test_h3_dreaming_state_hodge_profile() {
 
     // Record for comparison
     assert!(
-        fracs.edge_count >= 3,
+        fracs.scales_sampled >= 3,
         "Dream state should have sufficient edges for decomposition"
     );
 }
@@ -316,7 +312,7 @@ fn test_h3_focused_attention_hodge_profile() {
         println!("=== Hypothesis 3b: Focused Attention ===");
         println!(
             "gradient={:.4} curl={:.4} harmonic={:.4} (edges={})",
-            fracs.gradient, fracs.curl, fracs.harmonic, fracs.edge_count
+            fracs.gradient, fracs.curl, fracs.harmonic, fracs.scales_sampled
         );
     } else {
         println!("=== Hypothesis 3b: Focused Attention ===");
@@ -351,7 +347,7 @@ fn test_h3_compare_all_states() {
     // Run all three cognitive states and compare their Hodge profiles.
 
     println!("\n=== Cognitive State Comparison ===\n");
-    println!("{:<25} {:>10} {:>10} {:>10} {:>8}", "State", "Gradient", "Curl", "Harmonic", "Edges");
+    println!("{:<25} {:>10} {:>10} {:>10} {:>8}", "State", "Gradient", "Curl", "Harmonic", "Scales");
     println!("{}", "-".repeat(68));
 
     let states: Vec<(&str, Box<dyn Fn(&mut MoralTopology)>)> = vec![
@@ -371,7 +367,7 @@ fn test_h3_compare_all_states() {
         if let Some(fracs) = assessment.hodge_fractions {
             println!(
                 "{:<25} {:>10.4} {:>10.4} {:>10.4} {:>8}",
-                name, fracs.gradient, fracs.curl, fracs.harmonic, fracs.edge_count
+                name, fracs.gradient, fracs.curl, fracs.harmonic, fracs.scales_sampled
             );
             results.push((name, Some(fracs)));
         } else {
@@ -405,7 +401,7 @@ fn test_hodge_fractions_persist_across_window_growth() {
     let mut fraction_history: Vec<(usize, HodgeFractions)> = Vec::new();
 
     println!("\n=== Window Growth: Hodge Fraction Evolution ===\n");
-    println!("{:<8} {:>10} {:>10} {:>10} {:>8}", "Window", "Gradient", "Curl", "Harmonic", "Edges");
+    println!("{:<8} {:>10} {:>10} {:>10} {:>8}", "Window", "Gradient", "Curl", "Harmonic", "Scales");
     println!("{}", "-".repeat(52));
 
     for i in 0..24 {
@@ -418,7 +414,7 @@ fn test_hodge_fractions_persist_across_window_growth() {
             if let Some(fracs) = assessment.hodge_fractions {
                 println!(
                     "{:<8} {:>10.4} {:>10.4} {:>10.4} {:>8}",
-                    i + 1, fracs.gradient, fracs.curl, fracs.harmonic, fracs.edge_count
+                    i + 1, fracs.gradient, fracs.curl, fracs.harmonic, fracs.scales_sampled
                 );
                 fraction_history.push((i + 1, fracs));
             }
@@ -436,8 +432,8 @@ fn test_hodge_fractions_persist_across_window_growth() {
     for (window, fracs) in &fraction_history {
         let sum = fracs.gradient + fracs.curl + fracs.harmonic;
         assert!(
-            (sum - 1.0).abs() < 0.02,
-            "Window {window}: fractions sum to {sum}, expected ~1.0"
+            sum <= 1.02,
+            "Window {window}: fractions sum {sum} exceeds 1.0"
         );
     }
 }
@@ -530,7 +526,7 @@ fn test_multiscale_hodge_sweep_random() {
     println!("\n=== Multi-Scale Hodge Sweep (Random/Diverse) ===\n");
     println!(
         "{:<10} {:>10} {:>10} {:>10} {:>8} {:>8}",
-        "Scale", "Gradient", "Curl", "Harmonic", "Edges", "Beta1"
+        "Scale", "Gradient", "Curl", "Harmonic", "Scales", "Beta1"
     );
     println!("{}", "-".repeat(62));
 
