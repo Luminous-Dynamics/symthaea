@@ -44,19 +44,40 @@ use serde::{Deserialize, Serialize};
 // Sovereignty system
 // ---------------------------------------------------------------------------
 
-/// Sovereignty level -- how much autonomy the student has earned.
-/// Grows through demonstrated self-regulation, never decreases from failure.
+/// Sovereignty level — the student's relationship with the system.
+///
+/// # Philosophy: Trust by default
+///
+/// Sovereignty starts HIGH (600 — Mirror mode). The system must earn the
+/// right to guide, not the child earn the right to be free. The student
+/// begins as a trusted agent with the system available as a tool they
+/// pick up when they want it.
+///
+/// The system can offer more structure if the student *asks* for help
+/// or if a teacher/parent has configured a support level. But it never
+/// imposes structure uninvited.
+///
+/// Sovereignty still never decreases from failure — failure is data,
+/// not punishment.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct SovereigntyLevel {
     /// Overall sovereignty (0-1000 permille).
-    /// 0-200: Guardian mode (system leads)
-    /// 201-500: Guide mode (system suggests)
-    /// 501-800: Mirror mode (system shows)
+    /// 0-200: Guardian mode (system leads, explains)
+    /// 201-500: Guide mode (system suggests, student chooses)
+    /// 501-800: Mirror mode (system shows state, student decides)
     /// 801-1000: Autonomous (system available on request)
     pub level: u16,
 
     /// How sovereignty was earned (audit trail for transparency).
     pub growth_events: Vec<SovereigntyEvent>,
+
+    /// Whether the student has entered sandbox mode (no tracking).
+    pub sandbox_active: bool,
+
+    /// Whether the student has explicitly requested more support.
+    /// When true, the system temporarily operates one mode lower
+    /// than their earned level, until they dismiss the support.
+    pub support_requested: bool,
 }
 
 /// A record of sovereignty growth, visible to student and teacher.
@@ -91,21 +112,63 @@ pub enum SovereigntyGrowthType {
 }
 
 impl SovereigntyLevel {
+    /// Create a new sovereignty level. Trust by default — starts at 600
+    /// (Mirror mode). The system is a tool the child picks up, not a
+    /// monitor they can't turn off.
     pub fn new() -> Self {
         Self {
-            level: 100, // Start in Guardian with some base autonomy
+            level: 600, // Trust by default: Mirror mode
             growth_events: Vec::new(),
+            sandbox_active: false,
+            support_requested: false,
         }
     }
 
     /// What interaction mode should the system use?
+    ///
+    /// If the student has requested support, operates one mode lower
+    /// than their earned level — because they asked, not because the
+    /// system decided.
     pub fn mode(&self) -> InteractionMode {
-        match self.level {
+        if self.sandbox_active {
+            return InteractionMode::Autonomous; // No tracking in sandbox
+        }
+
+        let effective = if self.support_requested {
+            self.level.saturating_sub(300) // One mode lower
+        } else {
+            self.level
+        };
+
+        match effective {
             0..=200 => InteractionMode::Guardian,
             201..=500 => InteractionMode::Guide,
             501..=800 => InteractionMode::Mirror,
             _ => InteractionMode::Autonomous,
         }
+    }
+
+    /// Enter sandbox mode — exploration without measurement.
+    /// No mastery tracking, no sovereignty events, no adaptivity.
+    /// Just content to explore. The child can leave at any time.
+    pub fn enter_sandbox(&mut self) {
+        self.sandbox_active = true;
+    }
+
+    /// Leave sandbox mode — return to normal tracking.
+    pub fn leave_sandbox(&mut self) {
+        self.sandbox_active = false;
+    }
+
+    /// Student explicitly requests more structure/support.
+    /// This is NOT the system imposing — the student chose this.
+    pub fn request_support(&mut self) {
+        self.support_requested = true;
+    }
+
+    /// Student dismisses extra support, returns to earned level.
+    pub fn dismiss_support(&mut self) {
+        self.support_requested = false;
     }
 
     /// Record a positive sovereignty event.
@@ -140,14 +203,173 @@ impl SovereigntyLevel {
 /// Interaction mode determines how the system surfaces information.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum InteractionMode {
-    /// System leads, explains after. For students still building self-awareness.
+    /// System leads, explains after. Only when the student *asks* for help
+    /// or a teacher/parent configures this level.
     Guardian,
-    /// System suggests, student chooses. Most students spend the longest here.
+    /// System suggests, student chooses.
     Guide,
-    /// System shows cognitive state, student decides. Developing metacognition.
+    /// System shows learning state, student decides. The default starting mode.
+    /// Uses honest language: "engagement estimate" not "consciousness level."
     Mirror,
-    /// System available on request. Self-directed learner.
+    /// System available on request only. No unsolicited anything.
     Autonomous,
+}
+
+impl InteractionMode {
+    /// Honest, kid-friendly label for this mode.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Guardian => "Helper",
+            Self::Guide => "Guide",
+            Self::Mirror => "Mirror",
+            Self::Autonomous => "Independent",
+        }
+    }
+
+    /// Description that explains the relationship honestly.
+    pub fn description(&self) -> &'static str {
+        match self {
+            Self::Guardian => "I'll help guide you and explain what I'm doing. You asked for extra support — you can stop anytime.",
+            Self::Guide => "I'll suggest options when you might want them. You always choose.",
+            Self::Mirror => "I'll show you how your learning is going. You decide what to do.",
+            Self::Autonomous => "You're in charge. I'm here if you need me.",
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Honest measurement language
+// ---------------------------------------------------------------------------
+
+/// What we actually measure, described honestly.
+/// We don't call it "consciousness" — we call it what it is.
+pub struct HonestMetrics {
+    pub engagement_estimate: f32,       // was "Phi" / "consciousness level"
+    pub confusion_estimate: f32,        // was "free energy"
+    pub mood_estimate: f32,             // was "valence"
+    pub energy_estimate: f32,           // was "arousal"
+    pub focus_estimate: f32,            // was "acetylcholine proxy"
+    pub motivation_estimate: f32,       // was "dopamine"
+    pub stress_estimate: f32,           // was "cortisol proxy"
+}
+
+impl HonestMetrics {
+    /// Convert from internal CognitiveState to honest labels.
+    pub fn from_cognitive_state(state: &CognitiveState) -> Self {
+        Self {
+            engagement_estimate: state.phi,
+            confusion_estimate: state.free_energy,
+            mood_estimate: state.valence,
+            energy_estimate: state.arousal,
+            focus_estimate: state.focus,
+            motivation_estimate: state.motivation,
+            stress_estimate: state.stress,
+        }
+    }
+
+    /// Kid-friendly summary: one sentence about how they're doing.
+    pub fn summary(&self) -> &'static str {
+        if self.stress_estimate > 0.6 {
+            "You seem a bit stressed. It's OK to take a break if you want."
+        } else if self.engagement_estimate > 0.6 && self.focus_estimate > 0.5 {
+            "You're focused and doing great work."
+        } else if self.motivation_estimate < 0.3 {
+            "Feeling low energy? That's normal. You could try something different, or come back later."
+        } else if self.confusion_estimate > 0.7 {
+            "This is tricky! Being confused means your brain is working hard."
+        } else {
+            "You're doing fine. Keep going at your own pace."
+        }
+    }
+
+    /// Disclaimer shown to parents/teachers.
+    pub fn measurement_disclaimer() -> &'static str {
+        "These are estimates based on interaction patterns, not direct brain \
+         measurements. They help personalize the experience but are not \
+         diagnostic. If you have concerns about your child's learning, \
+         please consult an educator or specialist."
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Curiosity-driven exploration
+// ---------------------------------------------------------------------------
+
+/// A curiosity prompt — asks what the student wants to explore.
+/// The curriculum is a map, not a road.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct CuriosityPrompt {
+    pub question: String,
+    pub options: Vec<CuriosityOption>,
+    pub free_text_enabled: bool,
+}
+
+/// An option in the curiosity prompt.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct CuriosityOption {
+    pub label: String,
+    pub topic: String,
+    pub icon: String,
+}
+
+/// Generate a curiosity prompt based on what the student has been learning.
+/// Shows related topics they could explore — or lets them type anything.
+pub fn curiosity_prompt(
+    recent_topics: &[String],
+    grade_ordinal: u8,
+) -> CuriosityPrompt {
+    let mut options = Vec::new();
+
+    // Suggest related but unexplored areas
+    if recent_topics.iter().any(|t| t.contains("Multiplication")) {
+        options.push(CuriosityOption {
+            label: "How does multiplication work with really big numbers?".into(),
+            topic: "Multiplication".into(),
+            icon: "\u{1f522}".into(), // 🔢
+        });
+        options.push(CuriosityOption {
+            label: "What are patterns in the times tables?".into(),
+            topic: "Patterns".into(),
+            icon: "\u{1f3b5}".into(), // 🎵
+        });
+    }
+
+    if recent_topics.iter().any(|t| t.contains("Fractions")) {
+        options.push(CuriosityOption {
+            label: "Why do we need fractions in real life?".into(),
+            topic: "Fractions".into(),
+            icon: "\u{1f355}".into(), // 🍕
+        });
+    }
+
+    if recent_topics.iter().any(|t| t.contains("Geometry")) {
+        options.push(CuriosityOption {
+            label: "What shapes can you find in buildings?".into(),
+            topic: "Geometry".into(),
+            icon: "\u{1f3db}\u{fe0f}".into(), // 🏛️
+        });
+    }
+
+    // Always offer open-ended exploration
+    if grade_ordinal <= 5 {
+        options.push(CuriosityOption {
+            label: "I want to explore something totally different!".into(),
+            topic: "explore".into(),
+            icon: "\u{1f30d}".into(), // 🌍
+        });
+    } else {
+        options.push(CuriosityOption {
+            label: "I have my own question".into(),
+            topic: "explore".into(),
+            icon: "\u{2753}".into(), // ❓
+        });
+    }
+
+    CuriosityPrompt {
+        question: "What are you curious about?".into(),
+        options,
+        free_text_enabled: true,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -366,6 +588,19 @@ pub fn adapt_content(
     student_interests: &[String],
     safety_threshold: f32,
 ) -> ContentAdaptation {
+    // === SANDBOX MODE: no adaptation, no tracking ===
+    // The student chose to explore freely. Respect that completely.
+    if sovereignty.sandbox_active {
+        return ContentAdaptation {
+            text_complexity: TextComplexity::Standard,
+            modality: Modality::MultiModal,
+            difficulty_delta: 0.0,
+            suggestion: None,
+            peer_suggestion: None,
+            reasoning: "Sandbox mode — exploring freely, no adaptation".into(),
+        };
+    }
+
     let mode = sovereignty.mode();
 
     // === SAFETY CHECK (the ONE exception to pure suggestion) ===
@@ -408,13 +643,24 @@ pub fn adapt_content(
         };
     }
 
-    // === FRUSTRATION DETECTION ===
+    // === STRUGGLE CLASSIFICATION ===
+    // Distinguish productive struggle (confused but engaged) from
+    // distress (confused and withdrawing). Productive struggle is
+    // where the deepest learning happens — leave them alone.
     let frustration_score = (-state.valence).max(0.0)
         * state.arousal
         * (consecutive_failures as f32 / 3.0).min(1.0);
 
+    // Productive struggle: wrong answers but still engaged (high Phi, moderate arousal)
+    // The system does NOT intervene here — this is where growth happens.
+    let is_productive_struggle = consecutive_failures >= 2
+        && state.phi > 0.4          // still engaged
+        && state.arousal < 0.7      // not panicking
+        && state.stress < 0.5;      // not distressed
+
     // === TEXT COMPLEXITY ===
-    let text_complexity = if consecutive_failures >= 2 && recent_accuracy < 0.4 {
+    // Only simplify if the student is in distress, NOT productive struggle
+    let text_complexity = if !is_productive_struggle && consecutive_failures >= 2 && recent_accuracy < 0.4 {
         if !student_interests.is_empty() {
             TextComplexity::Personalized {
                 interest_topic: student_interests[0].clone(),
@@ -460,15 +706,21 @@ pub fn adapt_content(
     let effective_difficulty = difficulty_delta * state.permeability;
 
     // === SUGGESTION (sovereignty-aware) ===
-    let suggestion = build_suggestion(
-        state,
-        &mode,
-        current_skill,
-        current_mastery_permille,
-        frustration_score,
-        consecutive_failures,
-        grade_ordinal,
-    );
+    // During productive struggle, the system stays quiet. The student is
+    // learning through difficulty — interrupting would rob them of that.
+    let suggestion = if is_productive_struggle {
+        None // Silence is support
+    } else {
+        build_suggestion(
+            state,
+            &mode,
+            current_skill,
+            current_mastery_permille,
+            frustration_score,
+            consecutive_failures,
+            grade_ordinal,
+        )
+    };
 
     // === PEER SUGGESTION (always an offer, never an assignment) ===
     let peer_suggestion = if state.social_readiness > 0.6
@@ -707,12 +959,20 @@ fn grounding_message(grade_ordinal: u8) -> String {
 // ---------------------------------------------------------------------------
 
 /// Generate an optional metacognitive prompt based on sovereignty mode.
+///
+/// Respects sandbox mode (no prompts) and productive struggle (no
+/// interruption when the student is engaged with difficulty).
 pub fn metacognitive_prompt(
     sovereignty: &SovereigntyLevel,
     recent_result: bool,
     consecutive_correct: u32,
     skill: &str,
 ) -> Option<String> {
+    // Sandbox: no prompts at all
+    if sovereignty.sandbox_active {
+        return None;
+    }
+
     match sovereignty.mode() {
         InteractionMode::Guardian => {
             if consecutive_correct >= 3 {
@@ -721,9 +981,10 @@ pub fn metacognitive_prompt(
                     consecutive_correct, skill
                 ))
             } else if !recent_result {
+                // Normalize struggle — don't treat wrong answers as problems
                 Some(
-                    "That's OK! Mistakes help your brain grow. Want to try a \
-                     different way?"
+                    "That was a tough one! Being stuck means your brain is \
+                     working on it. Want to try again or try something different?"
                         .into(),
                 )
             } else {
@@ -741,6 +1002,7 @@ pub fn metacognitive_prompt(
             }
         }),
         // Mirror and Autonomous: no unsolicited prompts.
+        // The student reflects on their own — we trust them.
         InteractionMode::Mirror | InteractionMode::Autonomous => None,
     }
 }
