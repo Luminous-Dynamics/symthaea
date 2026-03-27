@@ -11,13 +11,14 @@
 
 use leptos::prelude::*;
 use serde::{de::DeserializeOwned, Serialize};
+use wasm_bindgen::JsValue;
 
 // ---------------------------------------------------------------------------
 // Connection status (UI-facing, simpler than the transport-level enum)
 // ---------------------------------------------------------------------------
 
 /// Connection status for the UI status indicator.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ConnectionStatus {
     /// No connection attempt has been made.
     Disconnected,
@@ -102,13 +103,57 @@ impl HolochainCtx {
 // Provider component
 // ---------------------------------------------------------------------------
 
+/// Read `window.__HC_STATUS` set by the inline JS bridge in `index.html`.
+fn read_js_conductor_status() -> ConnectionStatus {
+    let window = match web_sys::window() {
+        Some(w) => w,
+        None => return ConnectionStatus::Mock,
+    };
+    let val = js_sys::Reflect::get(&window, &JsValue::from_str("__HC_STATUS"))
+        .ok()
+        .and_then(|v| v.as_string())
+        .unwrap_or_else(|| "mock".to_string());
+    match val.as_str() {
+        "connected" => ConnectionStatus::Connected,
+        "connecting" => ConnectionStatus::Connecting,
+        "disconnected" => ConnectionStatus::Disconnected,
+        _ => ConnectionStatus::Mock,
+    }
+}
+
 /// Wraps children with a [`HolochainCtx`] in Leptos context.
 ///
 /// Place this around the `<Router>` in `App` so every page can call
 /// [`use_holochain()`].
+///
+/// On mount, checks the `window.__HC_STATUS` value set by the inline JS
+/// bridge in `index.html`. If a Holochain conductor was detected on
+/// `ws://localhost:8888`, the status will be `Connected`; otherwise `Mock`.
 #[component]
 pub fn HolochainProvider(children: Children) -> impl IntoView {
-    let (status, set_status) = signal(ConnectionStatus::Mock);
+    // Start with whatever the JS bridge has already determined (it runs
+    // synchronously before Trunk injects the WASM bundle).
+    let initial = read_js_conductor_status();
+    let (status, set_status) = signal(initial);
+
+    // The JS probe has a 3 s timeout, so it may still be in "connecting"
+    // state when the WASM app mounts.  Re-check after a short delay.
+    if status.get_untracked() == ConnectionStatus::Connecting {
+        set_timeout(
+            move || {
+                let resolved = read_js_conductor_status();
+                set_status.set(resolved);
+                web_sys::console::log_1(
+                    &format!("[EduNet] Conductor status resolved: {:?}", resolved).into(),
+                );
+            },
+            std::time::Duration::from_millis(3500),
+        );
+    } else {
+        web_sys::console::log_1(
+            &format!("[EduNet] Conductor status: {:?}", initial).into(),
+        );
+    }
 
     let ctx = HolochainCtx {
         status,

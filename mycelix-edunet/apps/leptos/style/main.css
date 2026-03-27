@@ -141,10 +141,10 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     background: var(--text-secondary);
 }
 
-.status-connected .status-dot { background: #22c55e; }
+.status-connected .status-dot { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
 .status-connecting .status-dot { background: #eab308; animation: pulse-dot 1.2s infinite; }
 .status-disconnected .status-dot { background: #ef4444; }
-.status-mock .status-dot { background: #3b82f6; }
+.status-mock .status-dot { background: #64748b; }
 
 @keyframes pulse-dot {
     0%, 100% { opacity: 1; }
