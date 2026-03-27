@@ -1748,17 +1748,20 @@ pub fn execute_saga(mut saga: mycelix_bridge_common::saga::SagaDefinition) -> Ex
         }
     }
 
-    // Store saga result on DHT
+    // Store saga result on DHT as a BridgeEventEntry
     let saga_json = serde_json::to_string(&saga)
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
     let caller = agent_info()?.agent_initial_pubkey;
-    let entry = mycelix_bridge_entry_types::SagaEntry {
+    let event = mycelix_bridge_entry_types::BridgeEventEntry {
         schema_version: 1,
-        saga_json,
-        initiator: format!("{:?}", caller),
+        domain: "saga".into(),
+        event_type: saga.name.clone(),
+        source_agent: caller.clone(),
+        payload: saga_json,
         created_at: sys_time()?,
+        related_hashes: vec![],
     };
-    let action_hash = create_entry(&EntryTypes::SagaEntry(entry))?;
+    let action_hash = create_entry(&EntryTypes::Event(event))?;
 
     // Index by agent
     let agent_anchor = ensure_anchor(&format!("sagas:{:?}", caller))?;
@@ -1781,7 +1784,8 @@ pub fn get_my_sagas(_: ()) -> ExternResult<Vec<Record>> {
     let caller = agent_info()?.agent_initial_pubkey;
     let agent_anchor = ensure_anchor(&format!("sagas:{:?}", caller))?;
     let links = get_links(
-        GetLinksInputBuilder::try_new(agent_anchor, LinkTypes::AgentToSaga)?.build(),
+        LinkQuery::try_new(agent_anchor, LinkTypes::AgentToSaga)?,
+        GetStrategy::Local,
     )?;
 
     let mut records = Vec::new();

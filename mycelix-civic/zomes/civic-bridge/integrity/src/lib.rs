@@ -35,7 +35,6 @@ pub enum EntryTypes {
     Event(BridgeEventEntry),
     CachedCredential(CachedCredentialEntry),
     Notification(CrossClusterNotification),
-    SagaEntry(mycelix_bridge_entry_types::SagaEntry),
 }
 
 #[hdk_link_types]

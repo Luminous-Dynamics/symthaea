@@ -85,7 +85,8 @@ pub fn get_composite_reputation(agent_b64: String) -> ExternResult<AggregatedRep
     // Check for existing recent reputation
     let agent_anchor = ensure_anchor(&format!("agent_rep:{}", agent_b64))?;
     let links = get_links(
-        GetLinksInputBuilder::try_new(agent_anchor.clone(), LinkTypes::AgentToReputation)?.build(),
+        LinkQuery::try_new(agent_anchor.clone(), LinkTypes::AgentToReputation)?,
+        GetStrategy::Local,
     )?;
 
     if let Some(link) = links.last() {
@@ -168,7 +169,8 @@ pub fn refresh_reputation(agent_b64: String) -> ExternResult<AggregatedReputatio
 pub fn get_reputation_history(input: PaginatedAgentInput) -> ExternResult<Vec<Record>> {
     let agent_anchor = ensure_anchor(&format!("agent_rep:{}", input.agent_pubkey_b64))?;
     let links = get_links(
-        GetLinksInputBuilder::try_new(agent_anchor, LinkTypes::AgentToReputation)?.build(),
+        LinkQuery::try_new(agent_anchor, LinkTypes::AgentToReputation)?,
+        GetStrategy::Local,
     )?;
 
     let limit = input.limit.unwrap_or(20).min(100);
@@ -242,7 +244,8 @@ pub fn get_consciousness_profile_enriched(agent_b64: String) -> ExternResult<Con
 pub fn get_aggregator_metrics(_: ()) -> ExternResult<AggregatorMetrics> {
     let all_anchor = ensure_anchor("all_reputations")?;
     let rep_links = get_links(
-        GetLinksInputBuilder::try_new(all_anchor, LinkTypes::AllReputations)?.build(),
+        LinkQuery::try_new(all_anchor, LinkTypes::AllReputations)?,
+        GetStrategy::Local,
     )?;
 
     Ok(AggregatorMetrics {
@@ -297,7 +300,8 @@ fn get_cross_cluster_mycel(agent_b64: &str) -> Result<f64, ()> {
 fn get_domain_scores(agent_b64: &str) -> ExternResult<Vec<(String, f64)>> {
     let agent_anchor = ensure_anchor(&format!("domain_scores:{}", agent_b64))?;
     let links = get_links(
-        GetLinksInputBuilder::try_new(agent_anchor, LinkTypes::AgentToDomainScore)?.build(),
+        LinkQuery::try_new(agent_anchor, LinkTypes::AgentToDomainScore)?,
+        GetStrategy::Local,
     )?;
 
     let mut scores: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
