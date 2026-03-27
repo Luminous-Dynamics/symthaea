@@ -21,6 +21,7 @@ impl Plugin for SymtropyPlugin {
             .init_resource::<systems::rendering::TelemetryTimer>()
             // Dark background — the void outside the Markov blanket
             .insert_resource(ClearColor(Color::srgb(0.02, 0.02, 0.04)))
+            .init_resource::<FrameCounter>()
             // Startup systems
             .add_systems(Startup, (
                 systems::rendering::setup_world,
@@ -52,6 +53,8 @@ impl Plugin for SymtropyPlugin {
                     .chain()
                     .run_if(in_state(GamePhase::Playing)),
             )
+            // Frame counter for startup diagnostics
+            .add_systems(Update, frame_counter_system)
             // Auto-transition Loading → Playing after one frame
             .add_systems(
                 Update,
@@ -70,7 +73,24 @@ impl Plugin for SymtropyPlugin {
     }
 }
 
+#[derive(Resource, Default)]
+struct FrameCounter(u64);
+
+fn frame_counter_system(mut counter: ResMut<FrameCounter>, time: Res<Time>) {
+    counter.0 += 1;
+    // Log first 10 frames and every 60 frames after that
+    if counter.0 <= 10 || counter.0 % 60 == 0 {
+        eprintln!(
+            "[symtropy] frame={} dt={:.1}ms elapsed={:.1}s",
+            counter.0,
+            time.delta_secs() * 1000.0,
+            time.elapsed_secs(),
+        );
+    }
+}
+
 fn auto_start(mut next_state: ResMut<NextState<GamePhase>>) {
+    eprintln!("[symtropy] Loading → Playing");
     next_state.set(GamePhase::Playing);
 }
 
