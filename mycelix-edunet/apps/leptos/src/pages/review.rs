@@ -25,8 +25,25 @@ enum ReviewState {
     Loading,
     NoDueCards,
     ShowingFront { card_index: usize },
+    Predicting { card_index: usize },
     ShowingBack { card_index: usize },
     SessionComplete { reviewed: usize, correct: usize },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+enum Confidence {
+    KnowIt,
+    Maybe,
+    NoIdea,
+}
+
+impl Confidence {
+    fn is_calibrated(self, correct: bool) -> bool {
+        match (self, correct) {
+            (Confidence::KnowIt, true) | (Confidence::NoIdea, false) | (Confidence::Maybe, _) => true,
+            _ => false,
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -178,6 +195,8 @@ pub fn ReviewPage() -> impl IntoView {
     let (_start_time, set_start_time) = signal(0.0_f64);
     let (card_start_time, set_card_start_time) = signal(0.0_f64);
     let (_total_time_secs, set_total_time_secs) = signal(0.0_f64);
+    let (predictions, set_predictions) = signal(Vec::<(Confidence, bool)>::new());
+    let (current_prediction, set_current_prediction) = signal(Option::<Confidence>::None);
 
     // Simulate loading -> show first card (or NoDueCards if empty)
     set_timeout(
@@ -201,9 +220,27 @@ pub fn ReviewPage() -> impl IntoView {
         std::time::Duration::from_millis(300),
     );
 
-    // Reveal back of current card
+    // Reveal: go to confidence prediction (or straight to back in sandbox/autonomous)
     let reveal = move |_| {
         if let ReviewState::ShowingFront { card_index } = state.get() {
+            let sov = sovereignty_sig.get();
+            if sov.sandbox_active || sov.mode() == InteractionMode::Autonomous {
+                set_current_prediction.set(None);
+                set_state.set(ReviewState::ShowingBack { card_index });
+            } else {
+                set_state.set(ReviewState::Predicting { card_index });
+            }
+        }
+    };
+    let predict = move |confidence: Confidence| {
+        if let ReviewState::Predicting { card_index } = state.get() {
+            set_current_prediction.set(Some(confidence));
+            set_state.set(ReviewState::ShowingBack { card_index });
+        }
+    };
+    let skip_predict = move |_| {
+        if let ReviewState::Predicting { card_index } = state.get() {
+            set_current_prediction.set(None);
             set_state.set(ReviewState::ShowingBack { card_index });
         }
     };
@@ -220,6 +257,10 @@ pub fn ReviewPage() -> impl IntoView {
             // Tell adaptivity engine about the attempt
             let correct = quality >= 3;
             rate_ctx.with_value(|ctx| ctx.record_attempt(correct));
+            if let Some(pred) = current_prediction.get() {
+                set_predictions.update(|p| p.push((pred, correct)));
+            }
+            set_current_prediction.set(None);
 
             // Accumulate time for this card
             let elapsed = (js_sys::Date::now() - card_start_time.get()) / 1000.0;
@@ -365,6 +406,55 @@ pub fn ReviewPage() -> impl IntoView {
                         }.into_any()
                     }
 
+                    ReviewState::Predicting { card_index } => {
+                        let (card_front, card_tags, total) = cards.with_value(|deck| {
+                            let card = &deck[card_index];
+                            (card.front.to_string(), card.tags.to_string(), deck.len())
+                        });
+                        let progress_pct = ((card_index as f64 / total as f64) * 100.0) as u32;
+                        let adapt = adaptation_sig.get();
+                        let sov = sovereignty_sig.get();
+                        let adapted_front = adapt_card_text(&card_front, &adapt, &sov);
+
+                        view! {
+                            <div class="review-session">
+                                <div class="review-progress">
+                                    <span class="progress-text">{format!("Card {} of {}", card_index + 1, total)}</span>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style:width=format!("{}%", progress_pct)></div>
+                                    </div>
+                                </div>
+                                <div class="flashcard">
+                                    <div class="flashcard-inner flashcard-front">
+                                        <span class="card-tag">{card_tags}</span>
+                                        <div class="card-content"><p>{adapted_front}</p></div>
+                                    </div>
+                                </div>
+                                <div class="confidence-prediction">
+                                    <p class="confidence-prompt">"Before you look \u{2014} how sure are you?"</p>
+                                    <div class="confidence-grid">
+                                        <button class="confidence-btn confidence-know"
+                                            on:click=move |_| predict(Confidence::KnowIt)>
+                                            <span class="confidence-emoji">"\u{1f4aa}"</span>
+                                            <span class="confidence-label">"I know this!"</span>
+                                        </button>
+                                        <button class="confidence-btn confidence-maybe"
+                                            on:click=move |_| predict(Confidence::Maybe)>
+                                            <span class="confidence-emoji">"\u{1f914}"</span>
+                                            <span class="confidence-label">"Maybe..."</span>
+                                        </button>
+                                        <button class="confidence-btn confidence-noidea"
+                                            on:click=move |_| predict(Confidence::NoIdea)>
+                                            <span class="confidence-emoji">"\u{1f937}"</span>
+                                            <span class="confidence-label">"No idea"</span>
+                                        </button>
+                                    </div>
+                                    <button class="confidence-skip" on:click=skip_predict>"Just show me"</button>
+                                </div>
+                            </div>
+                        }.into_any()
+                    }
+
                     ReviewState::ShowingBack { card_index } => {
                         let (card_front, card_back, card_tags, total) = cards.with_value(|deck| {
                             let card = &deck[card_index];
@@ -454,6 +544,36 @@ pub fn ReviewPage() -> impl IntoView {
                                 <div class="kid-xp-earned">
                                     <span class="kid-xp-badge">{format!("+{} XP earned!", xp)}</span>
                                 </div>
+                                // Calibration: "Do you know what you know?"
+                                {move || {
+                                    let preds = predictions.get();
+                                    if preds.is_empty() {
+                                        return view! { <div></div> }.into_any();
+                                    }
+                                    let total = preds.len();
+                                    let calibrated = preds.iter()
+                                        .filter(|(p, c)| p.is_calibrated(*c))
+                                        .count();
+                                    let underconfident = preds.iter()
+                                        .filter(|(p, c)| *p == Confidence::NoIdea && *c)
+                                        .count();
+                                    let overconfident = preds.iter()
+                                        .filter(|(p, c)| *p == Confidence::KnowIt && !*c)
+                                        .count();
+                                    let msg = if calibrated as f64 / total as f64 >= 0.8 {
+                                        format!("You predicted {} out of {} right! You really know what you know.", calibrated, total)
+                                    } else if underconfident > overconfident {
+                                        format!("You predicted {} out of {}. You know more than you think!", calibrated, total)
+                                    } else {
+                                        format!("You predicted {} out of {}. Some tricky ones surprised you!", calibrated, total)
+                                    };
+                                    view! {
+                                        <div class="calibration-summary">
+                                            <span class="calibration-icon">"\u{1f52e}"</span>
+                                            <p class="calibration-message">{msg}</p>
+                                        </div>
+                                    }.into_any()
+                                }}
                                 // Sovereignty status
                                 <div class="sovereignty-summary">
                                     <span class="sovereignty-badge">{mode_label}</span>
