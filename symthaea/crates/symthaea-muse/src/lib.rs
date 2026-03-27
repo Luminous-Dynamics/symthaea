@@ -310,40 +310,67 @@ pub struct Note {
 // ─── Top-Level API ───────────────────────────────────────────────────────────
 
 /// Generate a musical composition from a cognitive state.
+///
+/// Pipeline: plan song form → generate per-section melodies (with key shifts
+/// and density modulation) → arrange polyphonic voices → synthesize audio.
 pub fn compose(config: &MuseConfig, state: &MusicalState, seed: u64) -> Composition {
-    // 1. Determine musical structure (section type modulates density/phrasing)
-    let section = structure::determine_section(state);
-    let density = structure::density_multiplier(section);
+    // 1. Plan song form — multi-section structure from Eight Harmonies
+    let song_form = form::plan_form(state, config.duration_secs);
+    let overall_section = structure::determine_section(state);
 
-    // 2. Determine rhythm (tempo, beat grid)
+    // 2. Determine base rhythm
     let tempo = rhythm::compute_tempo(config, state);
     let beat_duration = 60.0 / tempo;
+    let base_scale = pitch::build_scale(state);
 
-    // 3. Modulate max_notes by section density
-    let effective_max_notes = ((config.max_notes as f32) * density).round() as usize;
-    let effective_config = MuseConfig {
-        max_notes: effective_max_notes.max(2),
-        ..config.clone()
-    };
+    // 3. Generate melody per section with key shifts and density modulation
+    let notes_per_section = config.max_notes
+        .max(2)
+        .checked_div(song_form.sections.len().max(1))
+        .unwrap_or(config.max_notes)
+        .max(2);
 
-    // 4. Generate melody (note sequence) — Classic or Neural mode
-    let scale = pitch::build_scale(state);
-    let notes = match config.melody_mode {
-        MelodyMode::Classic => {
-            melody::generate_melody(&effective_config, state, &scale, beat_duration, seed)
+    let mut all_notes: Vec<Note> = Vec::new();
+
+    for (sec_idx, section) in song_form.sections.iter().enumerate() {
+        let density = structure::density_multiplier(section.section_type);
+        let sec_max = ((notes_per_section as f32) * density * section.energy_level.max(0.3))
+            .round() as usize;
+
+        let sec_config = MuseConfig {
+            max_notes: sec_max.max(1),
+            duration_secs: section.duration,
+            ..config.clone()
+        };
+
+        // Apply key shift: transpose the scale
+        let key_ratio = 2.0_f32.powf(section.key_shift as f32 / 12.0);
+        let sec_scale: Vec<f32> = base_scale.iter().map(|&f| f * key_ratio).collect();
+
+        let sec_seed = seed.wrapping_add(sec_idx as u64);
+        let mut sec_notes = match config.melody_mode {
+            MelodyMode::Classic => {
+                melody::generate_melody(&sec_config, state, &sec_scale, beat_duration, sec_seed)
+            }
+            MelodyMode::Neural => {
+                use symthaea_core::genesis::GenesisSeed;
+                let genesis = GenesisSeed::from_phrase(&format!("muse-neural-{sec_seed}"));
+                let mut neural = neural_melody::NeuralMelody::new(&genesis, config);
+                neural.generate(&sec_config, state, &sec_scale, beat_duration)
+            }
+        };
+
+        // Offset note times to this section's position
+        for note in &mut sec_notes {
+            note.start_time += section.start_time;
         }
-        MelodyMode::Neural => {
-            use symthaea_core::genesis::GenesisSeed;
-            let genesis = GenesisSeed::from_phrase(&format!("muse-neural-{seed}"));
-            let mut neural = neural_melody::NeuralMelody::new(&genesis, config);
-            neural.generate(&effective_config, state, &scale, beat_duration)
-        }
-    };
+        all_notes.extend(sec_notes);
+    }
 
-    // 5. Arrange voices (polyphony gated by consciousness level)
-    let arrangement = voice::arrange(&notes, state);
+    // 4. Arrange voices (polyphony gated by consciousness level)
+    let arrangement = voice::arrange(&all_notes, state);
 
-    // 6. Synthesize audio
+    // 5. Synthesize audio
     let total_samples = (config.duration_secs * config.sample_rate as f32) as usize;
     let audio = synth::render_arrangement(
         &arrangement,
@@ -356,9 +383,9 @@ pub fn compose(config: &MuseConfig, state: &MusicalState, seed: u64) -> Composit
     Composition {
         audio,
         sample_rate: config.sample_rate,
-        notes,
+        notes: all_notes,
         duration_secs: config.duration_secs,
-        section,
+        section: overall_section,
     }
 }
 

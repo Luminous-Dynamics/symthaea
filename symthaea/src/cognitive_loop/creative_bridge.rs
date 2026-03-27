@@ -54,10 +54,14 @@ pub struct CreativeTelemetry {
 pub struct CreativeOutput {
     /// Generated SVG artwork, if any.
     pub artwork_svg: Option<String>,
-    /// Generated audio data, if any.
-    pub music_audio: Option<symthaea_muse::AudioData>,
+    /// Generated PCM audio samples, if any.
+    pub music_samples: Option<Vec<i16>>,
     /// Generated poem/creative text, if any.
     pub poem: Option<String>,
+    /// Dance choreography keyframes, if any.
+    pub dance_keyframes: Option<Vec<symthaea_muse::choreography::DanceKeyframe>>,
+    /// Score notation SVG, if any.
+    pub score_svg: Option<String>,
     /// Aesthetic feedback to inject into neuromodulator bath.
     pub feedback: AestheticFeedback,
 }
@@ -67,8 +71,10 @@ impl Default for CreativeOutput {
     fn default() -> Self {
         Self {
             artwork_svg: None,
-            music_audio: None,
+            music_samples: None,
             poem: None,
+            dance_keyframes: None,
+            score_svg: None,
             feedback: AestheticFeedback::neutral(),
         }
     }
@@ -98,7 +104,7 @@ pub(crate) struct CreativeManager {
     last_telemetry: CreativeTelemetry,
     /// Which modality to produce next (rotates: visual → music → synesthetic → live)
     next_modality: CreativeModality,
-    /// Persistent streaming improvisation engine (created on first LivePerformance tick).
+    /// Persistent streaming improvisation engine.
     live_stream: Option<symthaea_muse::stream::MuseStream>,
 }
 
@@ -199,19 +205,14 @@ impl CreativeManager {
             }
             CreativeModality::Music => {
                 let musical_state = snapshot_to_musical_state(snap);
-                // Use neural melody at higher consciousness for richer phrases
-                let mut music_config = self.muse_config.clone();
-                if musical_state.consciousness_level > 0.5 {
-                    music_config.melody_mode = symthaea_muse::MelodyMode::Neural;
-                }
                 let composition =
-                    symthaea_muse::compose(&music_config, &musical_state, self.seed_counter);
+                    symthaea_muse::compose(&self.muse_config, &musical_state, self.seed_counter);
 
                 // Score music using harmony alignment as a proxy
                 let music_score = score_composition(&composition, snap);
                 let feedback =
                     self.tracker.process(&music_score, &snap.harmony_activations);
-                output.music_audio = Some(composition.audio);
+                output.music_samples = Some(composition.samples);
                 output.feedback = feedback;
                 modality_name = "music";
 
@@ -226,55 +227,63 @@ impl CreativeManager {
                 self.next_modality = CreativeModality::Synesthetic;
             }
             CreativeModality::Synesthetic => {
-                // Generate music first (it has a natural timeline)
                 let musical_state = snapshot_to_musical_state(snap);
-                let mut music_config = self.muse_config.clone();
-                if musical_state.consciousness_level > 0.5 {
-                    music_config.melody_mode = symthaea_muse::MelodyMode::Neural;
-                }
                 let composition =
-                    symthaea_muse::compose(&music_config, &musical_state, self.seed_counter);
+                    symthaea_muse::compose(&self.muse_config, &musical_state, self.seed_counter);
 
-                // Extract synesthetic features from the composition
+                // Extract synesthetic features (correct tuple order: freq, vel, start, dur)
                 let note_tuples: Vec<(f32, f32, f32, f32)> = composition
                     .notes
                     .iter()
-                    .map(|n| (n.frequency, n.start_time, n.duration, n.velocity))
+                    .map(|n| (n.frequency, n.velocity, n.start_time, n.duration))
                     .collect();
                 let tempo =
-                    symthaea_muse::rhythm::compute_tempo(&music_config, &musical_state);
-                let _syn_frames = symthaea_aesthetic::synesthesia::extract_synesthetic_features(
+                    symthaea_muse::rhythm::compute_tempo(&self.muse_config, &musical_state);
+                let syn_frames = symthaea_aesthetic::synesthesia::extract_synesthetic_features(
                     &note_tuples,
                     tempo,
                     composition.duration_secs,
                 );
 
-                // Generate visual art driven by the same cognitive state
-                // (synesthetic frames can modulate the snapshot in future iterations)
+                // Modulate snapshot with synesthetic features from the music
+                let mut syn_snap = snap.clone();
+                if !syn_frames.is_empty() {
+                    let avg_hue: f32 =
+                        syn_frames.iter().map(|f| f.hue).sum::<f32>() / syn_frames.len() as f32;
+                    let avg_motion: f32 =
+                        syn_frames.iter().map(|f| f.motion).sum::<f32>() / syn_frames.len() as f32;
+                    // Warm hues → positive valence, cool → negative
+                    let hue_valence = if avg_hue < 180.0 {
+                        (1.0 - avg_hue / 180.0) * 0.3
+                    } else {
+                        -((avg_hue - 180.0) / 180.0) * 0.3
+                    };
+                    syn_snap.valence = (syn_snap.valence + hue_valence).clamp(-1.0, 1.0);
+                    syn_snap.arousal = (syn_snap.arousal + avg_motion * 0.15).clamp(0.0, 1.0);
+                }
+
+                // Generate visual art modulated by musical synesthesia
                 let artwork = symthaea_atelier::create_artwork_iterative(
                     &self.atelier_config,
-                    snap,
+                    &syn_snap,
                     self.seed_counter,
                 );
 
-                // Score both modalities and blend
+                // Blend scores from both modalities
                 let music_score = score_composition(&composition, snap);
                 let visual_score = artwork.aesthetic_score;
-                let music_feedback =
-                    self.tracker.process(&music_score, &snap.harmony_activations);
-                let visual_feedback =
-                    self.tracker.process(&visual_score, &snap.harmony_activations);
+                let music_fb = self.tracker.process(&music_score, &snap.harmony_activations);
+                let visual_fb = self.tracker.process(&visual_score, &snap.harmony_activations);
                 let blended = symthaea_aesthetic::synesthesia::blend_feedbacks(
-                    &[music_feedback, visual_feedback],
+                    &[music_fb, visual_fb],
                 );
 
                 output.artwork_svg = Some(artwork.svg);
-                output.music_audio = Some(composition.audio);
+                output.music_samples = Some(composition.samples);
                 output.feedback = blended;
                 modality_name = "synesthetic";
 
-                // Use blended score for telemetry
-                let combined_score = symthaea_aesthetic::AestheticScore {
+                let combined = AestheticScore {
                     order: (music_score.order + visual_score.order) / 2.0,
                     complexity: (music_score.complexity + visual_score.complexity) / 2.0,
                     surprise: (music_score.surprise + visual_score.surprise) / 2.0,
@@ -283,11 +292,8 @@ impl CreativeManager {
                     composite: (music_score.composite + visual_score.composite) / 2.0,
                 };
                 self.record_telemetry(
-                    &combined_score,
-                    &blended,
-                    modality_name,
-                    artwork.generation_cycles + 1,
-                    start.elapsed(),
+                    &combined, &blended, modality_name,
+                    artwork.generation_cycles + 1, start.elapsed(),
                 );
 
                 self.next_modality = CreativeModality::LivePerformance;
@@ -305,51 +311,47 @@ impl CreativeManager {
                 let musical_state = snapshot_to_musical_state(snap);
                 stream.update_state(&musical_state);
 
-                // Generate a batch of notes for this tick
                 let notes = stream.generate_batch(4);
 
                 if !notes.is_empty() {
-                    // Extract synesthetic features from generated notes
+                    // Choreography from live notes
+                    let dance = symthaea_muse::choreography::choreograph(
+                        &notes, &musical_state, 4.0,
+                    );
+                    output.dance_keyframes = Some(dance.keyframes);
+
+                    // Synesthetic modulation (correct tuple order)
                     let note_tuples: Vec<(f32, f32, f32, f32)> = notes
                         .iter()
-                        .map(|n| (n.frequency, n.start_time, n.duration, n.velocity))
+                        .map(|n| (n.frequency, n.velocity, n.start_time, n.duration))
                         .collect();
-                    let _syn_frames =
+                    let syn_frames =
                         symthaea_aesthetic::synesthesia::extract_synesthetic_features(
-                            &note_tuples,
-                            stream.tempo(),
-                            4.0,
+                            &note_tuples, stream.tempo(), 4.0,
                         );
 
-                    // Generate choreography from the live notes
-                    let _dance = symthaea_muse::choreography::choreograph(
-                        &notes,
-                        &musical_state,
-                        4.0,
-                    );
+                    let mut syn_snap = snap.clone();
+                    if let Some(frame) = syn_frames.first() {
+                        let hue_v = if frame.hue < 180.0 { 0.2 } else { -0.2 };
+                        syn_snap.valence = (syn_snap.valence + hue_v).clamp(-1.0, 1.0);
+                        syn_snap.arousal = (syn_snap.arousal + frame.motion * 0.15).clamp(0.0, 1.0);
+                    }
 
-                    // Generate visual art driven by consciousness
                     let artwork = symthaea_atelier::create_artwork(
-                        &self.atelier_config,
-                        snap,
+                        &self.atelier_config, &syn_snap,
                         self.seed_counter + stream.notes_generated(),
                     );
 
-                    // Score and blend all modalities
                     let visual_score = artwork.aesthetic_score;
                     let feedback =
                         self.tracker.process(&visual_score, &snap.harmony_activations);
-
                     output.artwork_svg = Some(artwork.svg);
                     output.feedback = feedback;
                     modality_name = "live-performance";
 
                     self.record_telemetry(
-                        &visual_score,
-                        &feedback,
-                        modality_name,
-                        notes.len(),
-                        start.elapsed(),
+                        &visual_score, &feedback, modality_name,
+                        notes.len(), start.elapsed(),
                     );
                 } else {
                     modality_name = "live-performance";
@@ -361,7 +363,6 @@ impl CreativeManager {
                     };
                 }
 
-                // Live performance stays in this mode continuously
                 self.next_modality = CreativeModality::Visual;
             }
         }
@@ -545,10 +546,10 @@ mod tests {
 
         let first = manager.tick(&snap).unwrap();
         assert!(first.artwork_svg.is_some()); // visual first
-        assert!(first.music_audio.is_none());
+        assert!(first.music_samples.is_none());
 
         let second = manager.tick(&snap).unwrap();
-        assert!(second.music_audio.is_some()); // music second
+        assert!(second.music_samples.is_some()); // music second
         assert!(second.artwork_svg.is_none());
 
         let third = manager.tick(&snap).unwrap();

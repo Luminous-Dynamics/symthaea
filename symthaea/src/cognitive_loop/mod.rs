@@ -192,6 +192,9 @@ pub mod broca_bridge;
 #[cfg(feature = "canvas")]
 pub(crate) mod canvas_bridge;
 
+#[cfg(feature = "creative")]
+pub(crate) mod creative_bridge;
+
 #[cfg(feature = "physics-bridge")]
 pub(crate) mod physics_integration;
 #[cfg(feature = "physics-bridge")]
