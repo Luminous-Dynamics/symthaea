@@ -1,0 +1,25 @@
+[package]
+name = "symtropy"
+version = "0.1.0"
+edition = "2021"
+description = "Symtropy: consciousness-driven survival game — The First Room"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+# Game engine — disable wayland for now (X11 only on NixOS dev)
+bevy = { version = "0.18", default-features = false, features = [
+    "bevy_asset", "bevy_core_pipeline", "bevy_render", "bevy_sprite",
+    "bevy_text", "bevy_ui", "bevy_winit", "bevy_color", "bevy_state",
+    "bevy_log", "multi_threaded", "x11",
+] }
+
+# Consciousness engine
+symthaea-fep = { path = "../symthaea/crates/symthaea-fep" }
+symthaea-biometrics = { path = "../symthaea/crates/symthaea-biometrics", features = ["muse-bridge"] }
+symthaea-muse = { path = "../symthaea/crates/symthaea-muse" }
+
+# Utilities
+rand = "0.8"
+
+[lints.clippy]
+all = "warn"

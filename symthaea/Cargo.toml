@@ -133,6 +133,8 @@ nalgebra = "0.34"
 rustfft = "6.2"
 clap = { version = "4.4", features = ["derive"] }
 hound = "3.5"
+flacenc = "0.4"
+rubato = "0.14"
 petgraph = { version = "0.6", features = ["serde-1"] }
 regex = "1.10"
 strsim = "0.11"
@@ -414,6 +416,7 @@ rodio = { version = "0.19", default-features = false, optional = true }  # Audio
 cpal = { version = "0.17", optional = true }      # Low-level audio I/O (live-voice)
 ringbuf = { version = "0.4", optional = true }    # Lock-free ring buffer (live-voice)
 hound = { workspace = true, optional = true }
+rubato = { workspace = true }
 lz4_flex = { version = "0.11", default-features = false, optional = true }
 chacha20poly1305 = { version = "0.10", optional = true }
 zeroize = { version = "1.8", features = ["derive"], optional = true }
@@ -470,6 +473,14 @@ gui = ["eframe", "egui"]                    # symthaea-gui binary
 demo = ["clap", "ctrlc"]                    # Demo binaries (CLI args + signal handling)
 full = ["service", "shell", "gui", "demo"]  # All binaries
 api_module = ["axum", "tower-http"]         # HTTP API binary + module
+
+# ── Sovereign RDP ──────────────────────────────────────────────────
+rdp = []                                   # Core RDP protocol + codec + session
+rdp-server = ["rdp"]                       # RDP server with screen capture
+rdp-x11 = ["rdp-server", "dep:x11rb"]     # X11 SHM capture + XTest injection
+rdp-client = ["rdp"]                       # RDP client with frame reconstruction
+rdp-support = ["rdp"]                      # Mycelix support integration
+rdp-full = ["rdp-server", "rdp-client", "rdp-support"]  # Everything
 
 # ── Voice & Audio ───────────────────────────────────────────────────
 # Voice Pipeline (hierarchy):
