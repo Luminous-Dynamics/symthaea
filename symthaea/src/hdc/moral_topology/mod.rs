@@ -435,12 +435,26 @@ pub struct HodgeFractions {
     /// Persistence-weighted curl fraction (0.0–1.0).
     pub curl: f64,
     /// Persistence-weighted harmonic fraction (0.0–1.0).
-    /// High = topologically-protected global resonance across scales.
+    /// High = moral meaning trapped in disconnected clusters (fragmentation).
+    /// Low = unified moral reasoning across all scenarios.
     pub harmonic: f64,
     /// Number of scales where decomposition was computed.
     pub scales_sampled: usize,
     /// Total persistence weight (sum of scale interval widths with valid decompositions).
     pub total_weight: f64,
+    /// Critical scale: the Rips threshold where harmonic fraction first exceeds 0.5.
+    /// This is the moral coherence phase transition — below this scale, reasoning
+    /// is unified (curl-dominated); above it, meaning fragments (harmonic-dominated).
+    /// NaN if no transition was detected.
+    /// Science: Criticality / edge-of-chaos (Beggs & Plenz 2003, Shew & Plenz 2013).
+    #[serde(default)]
+    pub critical_scale: f64,
+    /// Whether the system is currently in the critical zone (harmonic ∈ [0.2, 0.8]).
+    /// This is the "Goldilocks zone" — neither fully synchronized (seizure/echo chamber)
+    /// nor fully fragmented (coma/isolation). Brains operate here.
+    /// Science: Beggs & Plenz (2003) — neuronal avalanches at criticality.
+    #[serde(default)]
+    pub at_criticality: bool,
 }
 
 /// Full topological assessment of the moral scenario window.
@@ -969,17 +983,6 @@ impl MoralTopology {
             Self::compute_betti(&similarities, n, char_scale)
         };
 
-        // ── Step 3b: Persistence-weighted Hodge decomposition ──────────
-        let hodge_fractions = if self.config.exact_betti {
-            Self::compute_persistent_hodge_fractions(
-                &similarities,
-                n,
-                self.config.num_scales,
-            )
-        } else {
-            None
-        };
-
         // ── Step 4: Multi-scale persistent features ─────────────────────
         let persistent_features = self.persistent_features(&similarities, n);
 
@@ -989,6 +992,22 @@ impl MoralTopology {
             .iter()
             .map(|hv| self.basis.project(hv))
             .collect();
+
+        // ── Step 5b: Persistence-weighted vertex Hodge decomposition (L₀) ─
+        // Decomposes harmony coordinates on vertices across multi-scale Rips
+        // filtration. Measures moral fragmentation: harmonic fraction rises
+        // when β₀ > 1 (disconnected clusters trap moral meaning).
+        // Science: Hodge (1941), Tononi (2004) — consciousness requires integration.
+        let hodge_fractions = if self.config.exact_betti {
+            Self::compute_persistent_hodge_fractions(
+                &similarities,
+                n,
+                self.config.num_scales,
+                &harmony_coordinates,
+            )
+        } else {
+            None
+        };
 
         // ── Step 6: Per-harmony variance ────────────────────────────────
         let harmony_variance = Self::harmony_variance(&harmony_coordinates);

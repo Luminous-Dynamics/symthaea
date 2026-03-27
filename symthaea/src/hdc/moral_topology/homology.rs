@@ -253,25 +253,34 @@ impl MoralTopology {
         }
     }
 
-    /// Compute persistence-weighted Hodge decomposition fractions.
+    /// Compute persistence-weighted vertex Hodge decomposition (L₀).
     ///
-    /// Sweeps the Rips threshold across `num_scales` values from 0 to 1,
-    /// computes the Hodge decomposition at each scale that has enough edges,
-    /// and returns the integral weighted by the scale interval width.
+    /// Decomposes the *harmony coordinates* on vertices (0-simplices) across
+    /// a multi-scale Rips filtration. This measures how moral meaning fragments
+    /// into disconnected clusters as the connectivity threshold tightens.
     ///
-    /// This captures the *persistent* harmonic structure — harmonics that
-    /// survive across many thresholds are topologically robust, while
-    /// transient ones at a single scale are noise.
+    /// For the vertex Laplacian L₀:
+    /// - **Gradient**: moral meaning flowing hierarchically between connected scenarios
+    /// - **Harmonic**: moral meaning trapped in disconnected clusters (β₀ > 1)
+    /// - The transition from curl-dominated to harmonic-dominated reveals the
+    ///   **moral coherence phase transition** — the critical scale at which
+    ///   unified reasoning fragments into isolated echo chambers.
     ///
-    /// Science: Hodge (1941); persistence-weighted integration extends
-    /// standard persistent homology (Edelsbrunner & Harer 2010) into
-    /// the Hodge signal processing domain.
+    /// The function averages across all 8 harmony dimensions to produce a single
+    /// composite fraction, weighted by each scale's interval width (persistence).
+    ///
+    /// Science: Hodge (1941); Tononi (2004) — integrated information collapses
+    /// when β₀ > 1 (disconnected components cannot integrate). The harmonic
+    /// fraction directly measures this topological disintegration.
+    ///
+    /// `vertex_signals` is an N×D array of harmony coordinates (one D-vector per scenario).
     pub(super) fn compute_persistent_hodge_fractions(
         sim: &[f64],
         n: usize,
         num_scales: usize,
+        vertex_signals: &[[f64; N_HARMONIES]],
     ) -> Option<HodgeFractions> {
-        if n < 4 || num_scales < 3 {
+        if n < 4 || num_scales < 3 || vertex_signals.len() != n {
             return None;
         }
 
@@ -284,6 +293,8 @@ impl MoralTopology {
         let mut weighted_harmonic = 0.0_f64;
         let mut total_weight = 0.0_f64;
         let mut scales_sampled = 0_usize;
+        let mut critical_scale = f64::NAN;
+        let mut found_critical = false;
 
         for w in 0..(num_scales - 1) {
             let scale = scales[w];
@@ -291,8 +302,6 @@ impl MoralTopology {
 
             // Build Rips complex at this scale
             let mut complex = SimplicialComplex::new();
-            let mut edge_signal: Vec<f64> = Vec::new();
-
             for i in 0..n {
                 complex.add_simplex(vec![i]);
             }
@@ -300,33 +309,52 @@ impl MoralTopology {
                 for j in (i + 1)..n {
                     if sim[i * n + j] >= scale {
                         complex.add_simplex(vec![i, j]);
-                        edge_signal.push(sim[i * n + j]);
-                        for k in (j + 1)..n {
-                            if sim[i * n + k] >= scale && sim[j * n + k] >= scale {
-                                complex.add_simplex(vec![i, j, k]);
-                            }
-                        }
                     }
                 }
             }
 
-            let edge_count = complex.count(1);
-            if edge_count < 3 {
+            // Need at least 2 vertices with edges for meaningful L₀ decomposition
+            if complex.count(0) < 2 || complex.count(1) == 0 {
                 continue;
             }
 
-            // Center the edge signal
-            let mean = edge_signal.iter().sum::<f64>() / edge_signal.len() as f64;
-            let centered: Vec<f64> = edge_signal.iter().map(|s| s - mean).collect();
-
             let laplacian = HodgeLaplacian::new(complex);
-            if let Some(decomp) = laplacian.hodge_decompose(1, &centered) {
-                let (g, c, h) = decomp.fractions();
-                weighted_gradient += g * interval_width;
-                weighted_curl += c * interval_width;
-                weighted_harmonic += h * interval_width;
+
+            // Decompose each harmony dimension on vertices, then average
+            let mut dim_gradient = 0.0_f64;
+            let mut dim_harmonic = 0.0_f64;
+            let mut dim_curl = 0.0_f64;
+            let mut dim_count = 0_usize;
+
+            for d in 0..N_HARMONIES {
+                let signal: Vec<f64> = vertex_signals.iter().map(|c| c[d]).collect();
+                // Center the signal
+                let mean = signal.iter().sum::<f64>() / signal.len() as f64;
+                let centered: Vec<f64> = signal.iter().map(|v| v - mean).collect();
+
+                if let Some(decomp) = laplacian.hodge_decompose(0, &centered) {
+                    let (g, c, h) = decomp.fractions();
+                    dim_gradient += g;
+                    dim_curl += c;
+                    dim_harmonic += h;
+                    dim_count += 1;
+                }
+            }
+
+            if dim_count > 0 {
+                let inv = 1.0 / dim_count as f64;
+                let scale_harmonic = dim_harmonic * inv;
+                weighted_gradient += dim_gradient * inv * interval_width;
+                weighted_curl += dim_curl * inv * interval_width;
+                weighted_harmonic += scale_harmonic * interval_width;
                 total_weight += interval_width;
                 scales_sampled += 1;
+
+                // Detect the critical scale: first scale where harmonic > 0.5
+                if !found_critical && scale_harmonic > 0.5 {
+                    critical_scale = scale;
+                    found_critical = true;
+                }
             }
         }
 
@@ -335,12 +363,17 @@ impl MoralTopology {
         }
 
         // Normalize by total weight to get persistence-weighted averages
+        let harmonic_avg = weighted_harmonic / total_weight;
         Some(HodgeFractions {
             gradient: weighted_gradient / total_weight,
             curl: weighted_curl / total_weight,
-            harmonic: weighted_harmonic / total_weight,
+            harmonic: harmonic_avg,
             scales_sampled,
             total_weight,
+            critical_scale,
+            // At criticality: harmonic fraction in the "Goldilocks zone" [0.2, 0.8]
+            // where the system is neither fully synchronized nor fully fragmented.
+            at_criticality: harmonic_avg >= 0.2 && harmonic_avg <= 0.8,
         })
     }
 

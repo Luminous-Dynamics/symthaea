@@ -9,9 +9,10 @@
 //! - Incubation: ambient drone / sparse texture
 
 use crate::MusicalState;
+use serde::{Deserialize, Serialize};
 
 /// Musical section type, derived from creative mode.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SectionType {
     /// Exploratory: many short varied phrases.
     Exploratory,

@@ -363,6 +363,8 @@ impl CognitiveLoopService {
                     .map(|f| f.gradient)
                     .unwrap_or(0.0),
                 hodge_curl_fraction: topo_summary.hodge_fractions.map(|f| f.curl).unwrap_or(0.0),
+                hodge_critical_scale: topo_summary.hodge_fractions.map(|f| f.critical_scale).unwrap_or(f64::NAN),
+                hodge_at_criticality: topo_summary.hodge_fractions.map(|f| f.at_criticality).unwrap_or(false),
                 in_active_rest: self.stats.in_active_rest,
                 stillness_dominance_streak: self.stats.stillness_dominance_streak,
                 unified_verdict: self
@@ -1534,15 +1536,7 @@ impl CognitiveLoopService {
         {
             metadata.defense_actions_proposed = self.defense_actions_proposed;
             metadata.defense_actions_approved = self.defense_actions_approved;
-            metadata.immune_motor_halt = self.carryover.quality.subsystem_veto
-                || self
-                    .sensorimotor
-                    .embodiment_bridge
-                    .as_ref()
-                    .map_or(false, |b| {
-                        b.safety_level()
-                            == crate::cognitive_loop::motor_bridge::MotorSafetyLevel::Red
-                    });
+            metadata.immune_motor_halt = self.carryover.quality.subsystem_veto;
         }
 
         // ── End-of-cycle stats ──

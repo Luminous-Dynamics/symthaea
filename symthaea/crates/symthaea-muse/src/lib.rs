@@ -29,11 +29,22 @@
 
 #![deny(unsafe_code)]
 
+pub mod choreography;
+pub mod export;
+pub mod form;
+#[cfg(feature = "muse-live")]
+pub mod live_output;
 pub mod melody;
+pub mod midi;
+pub mod neural_melody;
+pub mod notation;
 pub mod pitch;
 pub mod rhythm;
+pub mod stream;
+pub mod streaming;
 pub mod structure;
 pub mod synth;
+pub mod voice;
 
 use serde::{Deserialize, Serialize};
 
@@ -68,18 +79,81 @@ impl Default for MusicalState {
 }
 
 /// A single musical frame (one time-step of synthesis parameters).
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MusicalFrame {
     /// Fundamental frequency in Hz (20-4000 range).
     pub pitch_hz: f32,
     /// Note velocity/loudness [0, 1].
     pub velocity: f32,
-    /// Harmonic partial amplitudes (fundamental + 3 overtones).
-    pub timbre: [f32; 4],
+    /// Harmonic partial amplitudes (variable length, one per partial).
+    pub timbre: Vec<f32>,
     /// Attack probability [0, 1] — new note trigger.
     pub onset: f32,
     /// Note sustain signal [0, 1].
     pub sustain: f32,
+    /// FM modulation depth [0, 1] (CfC-controlled).
+    pub fm_depth: f32,
+    /// FM carrier:modulator ratio [0, 1] (CfC-controlled).
+    pub fm_ratio: f32,
+    /// Stereo pan position [-1, 1] (CfC-controlled).
+    pub pan: f32,
+    /// Reverb send amount [0, 1] (CfC-controlled).
+    pub reverb_send: f32,
+    /// Vibrato depth [0, 1] (CfC-controlled).
+    pub vibrato_depth: f32,
+}
+
+/// Melody generation mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MelodyMode {
+    /// Original rand-based melody: fast, deterministic with seed.
+    Classic,
+    /// CfC neural melody: temporal coherence creates phrases, motifs, contours.
+    Neural,
+}
+
+impl Default for MelodyMode {
+    fn default() -> Self {
+        Self::Classic
+    }
+}
+
+/// Audio output format for compositions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum OutputFormat {
+    /// Mono 16-bit PCM (legacy, compact).
+    Mono16,
+    /// Mono 32-bit float [-1.0, 1.0].
+    MonoF32,
+    /// Stereo 32-bit float with per-voice panning.
+    StereoF32,
+}
+
+impl Default for OutputFormat {
+    fn default() -> Self {
+        Self::StereoF32
+    }
+}
+
+/// Reverb configuration.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct ReverbConfig {
+    /// Room size [0, 1] — controls feedback coefficient.
+    pub room_size: f32,
+    /// Damping [0, 1] — high-frequency absorption.
+    pub damping: f32,
+    /// Stereo width [0, 1] — decorrelation between L/R.
+    pub width: f32,
+}
+
+impl Default for ReverbConfig {
+    fn default() -> Self {
+        Self {
+            room_size: 0.5,
+            damping: 0.5,
+            width: 0.8,
+        }
+    }
 }
 
 /// Configuration for music generation.
@@ -93,6 +167,26 @@ pub struct MuseConfig {
     pub base_tempo_bpm: f32,
     /// Number of notes to generate.
     pub max_notes: usize,
+    /// Melody generation mode.
+    pub melody_mode: MelodyMode,
+    /// Output audio format.
+    pub output_format: OutputFormat,
+    /// Number of harmonic partials for additive synthesis (1-16).
+    pub num_partials: usize,
+    /// Enable PolyBLEP anti-aliasing for alias-free oscillators.
+    pub enable_antialiasing: bool,
+    /// Reverb configuration.
+    pub reverb: ReverbConfig,
+    /// CfC network layer sizes for neural melody mode.
+    pub cfc_layer_sizes: Vec<usize>,
+    /// Maximum FM modulation depth in radians (default 3.0, horror uses 8.0).
+    pub max_fm_depth: f32,
+    /// Enable sub-bass oscillator one octave below fundamental.
+    pub enable_sub_bass: bool,
+    /// Unison detune amount (0.0 = off, 0.01 = heavy chorus).
+    pub unison_detune: f32,
+    /// Filtered white noise mix level (0.0 = off, 0.2 = heavy).
+    pub noise_mix: f32,
 }
 
 impl Default for MuseConfig {
@@ -102,21 +196,102 @@ impl Default for MuseConfig {
             duration_secs: 8.0,
             base_tempo_bpm: 80.0,
             max_notes: 32,
+            melody_mode: MelodyMode::Classic,
+            output_format: OutputFormat::StereoF32,
+            num_partials: 8,
+            enable_antialiasing: true,
+            reverb: ReverbConfig::default(),
+            cfc_layer_sizes: vec![16, 16, 8],
+            max_fm_depth: 3.0,
+            enable_sub_bass: false,
+            unison_detune: 0.0,
+            noise_mix: 0.0,
         }
+    }
+}
+
+impl MuseConfig {
+    /// Configuration for horror/high-tension audio.
+    ///
+    /// Deep FM modulation (8 rad), sub-bass, detuned unison, noise texture,
+    /// large reverb with low damping. Designed to make players sweat.
+    pub fn horror() -> Self {
+        Self {
+            max_fm_depth: 8.0,
+            enable_sub_bass: true,
+            unison_detune: 0.005,
+            noise_mix: 0.1,
+            num_partials: 12,
+            reverb: ReverbConfig {
+                room_size: 0.85,
+                damping: 0.3,
+                width: 1.0,
+            },
+            ..Default::default()
+        }
+    }
+
+    /// Configuration for the Lunar Elite's sterile aesthetic.
+    ///
+    /// Pure sine tones, minimal partials, tight reverb, no sub-bass.
+    /// Quantization-locked perfection. Cold and expensive.
+    pub fn elite_sterile() -> Self {
+        Self {
+            max_fm_depth: 0.5,
+            enable_sub_bass: false,
+            unison_detune: 0.0,
+            noise_mix: 0.0,
+            num_partials: 2,
+            reverb: ReverbConfig {
+                room_size: 0.2,
+                damping: 0.8,
+                width: 0.3,
+            },
+            ..Default::default()
+        }
+    }
+}
+
+/// Audio sample data in various formats.
+#[derive(Debug, Clone)]
+pub enum AudioData {
+    /// Mono 16-bit PCM samples.
+    I16(Vec<i16>),
+    /// Mono 32-bit float samples [-1.0, 1.0].
+    F32(Vec<f32>),
+    /// Stereo 32-bit float samples [left, right].
+    StereoF32(Vec<[f32; 2]>),
+}
+
+impl AudioData {
+    /// Number of sample frames (mono samples or stereo pairs).
+    pub fn len(&self) -> usize {
+        match self {
+            Self::I16(v) => v.len(),
+            Self::F32(v) => v.len(),
+            Self::StereoF32(v) => v.len(),
+        }
+    }
+
+    /// True if the audio data is empty.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 
 /// A generated musical composition.
 #[derive(Debug, Clone)]
 pub struct Composition {
-    /// PCM samples (mono, i16).
-    pub samples: Vec<i16>,
+    /// Audio sample data.
+    pub audio: AudioData,
     /// Sample rate.
     pub sample_rate: u32,
     /// Generated note sequence.
     pub notes: Vec<Note>,
     /// Duration in seconds.
     pub duration_secs: f32,
+    /// Musical section type (derived from cognitive state).
+    pub section: structure::SectionType,
 }
 
 /// A discrete musical note.
@@ -136,23 +311,54 @@ pub struct Note {
 
 /// Generate a musical composition from a cognitive state.
 pub fn compose(config: &MuseConfig, state: &MusicalState, seed: u64) -> Composition {
-    // 1. Determine rhythm (tempo, beat grid)
+    // 1. Determine musical structure (section type modulates density/phrasing)
+    let section = structure::determine_section(state);
+    let density = structure::density_multiplier(section);
+
+    // 2. Determine rhythm (tempo, beat grid)
     let tempo = rhythm::compute_tempo(config, state);
     let beat_duration = 60.0 / tempo;
 
-    // 2. Generate melody (note sequence)
-    let scale = pitch::build_scale(state);
-    let notes = melody::generate_melody(config, state, &scale, beat_duration, seed);
+    // 3. Modulate max_notes by section density
+    let effective_max_notes = ((config.max_notes as f32) * density).round() as usize;
+    let effective_config = MuseConfig {
+        max_notes: effective_max_notes.max(2),
+        ..config.clone()
+    };
 
-    // 3. Synthesize audio
+    // 4. Generate melody (note sequence) — Classic or Neural mode
+    let scale = pitch::build_scale(state);
+    let notes = match config.melody_mode {
+        MelodyMode::Classic => {
+            melody::generate_melody(&effective_config, state, &scale, beat_duration, seed)
+        }
+        MelodyMode::Neural => {
+            use symthaea_core::genesis::GenesisSeed;
+            let genesis = GenesisSeed::from_phrase(&format!("muse-neural-{seed}"));
+            let mut neural = neural_melody::NeuralMelody::new(&genesis, config);
+            neural.generate(&effective_config, state, &scale, beat_duration)
+        }
+    };
+
+    // 5. Arrange voices (polyphony gated by consciousness level)
+    let arrangement = voice::arrange(&notes, state);
+
+    // 6. Synthesize audio
     let total_samples = (config.duration_secs * config.sample_rate as f32) as usize;
-    let samples = synth::render_notes(&notes, config.sample_rate, total_samples, state);
+    let audio = synth::render_arrangement(
+        &arrangement,
+        config.sample_rate,
+        total_samples,
+        state,
+        config,
+    );
 
     Composition {
-        samples,
+        audio,
         sample_rate: config.sample_rate,
         notes,
         duration_secs: config.duration_secs,
+        section,
     }
 }
 
@@ -169,7 +375,7 @@ mod tests {
         };
         let state = MusicalState::default();
         let comp = compose(&config, &state, 42);
-        assert!(!comp.samples.is_empty());
+        assert!(!comp.audio.is_empty());
         assert!(!comp.notes.is_empty());
         assert_eq!(comp.sample_rate, 44100);
     }
@@ -184,7 +390,7 @@ mod tests {
         let state = MusicalState::default();
         let c1 = compose(&config, &state, 42);
         let c2 = compose(&config, &state, 42);
-        assert_eq!(c1.samples, c2.samples);
+        assert_eq!(c1.audio.len(), c2.audio.len());
         assert_eq!(c1.notes.len(), c2.notes.len());
     }
 
@@ -224,8 +430,128 @@ mod tests {
             ..Default::default()
         };
         let comp = compose(&config, &state, 42);
-        for &s in &comp.samples {
-            assert!(s >= i16::MIN && s <= i16::MAX);
+        match &comp.audio {
+            AudioData::StereoF32(samples) => {
+                for s in samples {
+                    assert!(s[0].is_finite(), "left NaN/Inf");
+                    assert!(s[1].is_finite(), "right NaN/Inf");
+                }
+            }
+            AudioData::F32(samples) => {
+                for &s in samples {
+                    assert!(s.is_finite(), "NaN/Inf");
+                }
+            }
+            AudioData::I16(samples) => {
+                for &s in samples {
+                    assert!(s >= i16::MIN && s <= i16::MAX);
+                }
+            }
         }
+    }
+
+    #[test]
+    fn neural_mode_produces_audio() {
+        let config = MuseConfig {
+            duration_secs: 2.0,
+            max_notes: 8,
+            melody_mode: MelodyMode::Neural,
+            ..Default::default()
+        };
+        let state = MusicalState::default();
+        let comp = compose(&config, &state, 42);
+        assert!(!comp.audio.is_empty());
+        assert!(!comp.notes.is_empty());
+    }
+
+    #[test]
+    fn neural_differs_from_classic() {
+        let state = MusicalState::default();
+        let classic = compose(
+            &MuseConfig {
+                duration_secs: 2.0,
+                max_notes: 8,
+                melody_mode: MelodyMode::Classic,
+                ..Default::default()
+            },
+            &state,
+            42,
+        );
+        let neural = compose(
+            &MuseConfig {
+                duration_secs: 2.0,
+                max_notes: 8,
+                melody_mode: MelodyMode::Neural,
+                ..Default::default()
+            },
+            &state,
+            42,
+        );
+        let freqs_c: Vec<i32> = classic
+            .notes
+            .iter()
+            .map(|n| (n.frequency * 10.0) as i32)
+            .collect();
+        let freqs_n: Vec<i32> = neural
+            .notes
+            .iter()
+            .map(|n| (n.frequency * 10.0) as i32)
+            .collect();
+        assert_ne!(freqs_c, freqs_n, "neural and classic should differ");
+    }
+
+    #[test]
+    fn structure_modulates_density() {
+        let ambient_state = MusicalState {
+            harmony_activations: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.8],
+            arousal: 0.1,
+            ..Default::default()
+        };
+        let climactic_state = MusicalState {
+            harmony_activations: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.8, 0.0],
+            arousal: 0.7,
+            ..Default::default()
+        };
+        let config = MuseConfig {
+            duration_secs: 4.0,
+            max_notes: 16,
+            ..Default::default()
+        };
+        let ambient = compose(&config, &ambient_state, 42);
+        let climactic = compose(&config, &climactic_state, 42);
+        assert!(
+            ambient.notes.len() <= climactic.notes.len(),
+            "ambient {} should have <= climactic {} notes",
+            ambient.notes.len(),
+            climactic.notes.len()
+        );
+        assert_eq!(ambient.section, structure::SectionType::Ambient);
+        assert_eq!(climactic.section, structure::SectionType::Climactic);
+    }
+
+    #[test]
+    fn stereo_output_format() {
+        let config = MuseConfig {
+            duration_secs: 1.0,
+            max_notes: 4,
+            output_format: OutputFormat::StereoF32,
+            ..Default::default()
+        };
+        let state = MusicalState::default();
+        let comp = compose(&config, &state, 42);
+        assert!(matches!(comp.audio, AudioData::StereoF32(_)));
+    }
+
+    #[test]
+    fn mono16_backward_compat() {
+        let config = MuseConfig {
+            duration_secs: 1.0,
+            max_notes: 4,
+            output_format: OutputFormat::Mono16,
+            ..Default::default()
+        };
+        let state = MusicalState::default();
+        let comp = compose(&config, &state, 42);
+        assert!(matches!(comp.audio, AudioData::I16(_)));
     }
 }

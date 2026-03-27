@@ -206,20 +206,35 @@ impl CognitiveLoopService {
         let neuromod_consciousness_mod = self.neuromod.bath.consciousness_modulation();
         let unified_psi = (unified_psi * neuromod_consciousness_mod as f64).clamp(0.0, 1.0);
 
-        // ── Hodge harmonic fraction → consciousness coherence modulation ─────
-        // High harmonic fraction indicates topologically-protected global resonance
-        // on the moral manifold — symmetric information coupling across the
-        // simplicial complex. This correlates with unified conscious experience.
-        // Modulation: ±3% (clamped), centered at harmonic=0.33 (equipartition).
-        // Science: Hodge (1941) — harmonics are cohomology representatives;
-        // Tononi (2004) — integrated information requires global coupling.
-        const HODGE_HARMONIC_CONSCIOUSNESS_SCALE: f64 = 0.03;
-        const HODGE_HARMONIC_BASELINE: f64 = 0.33; // Equipartition (1/3 each)
+        // ── Hodge vertex harmonic → consciousness fragmentation modulation ──
+        // Vertex L₀ harmonic fraction measures moral FRAGMENTATION: high harmonic
+        // means moral meaning is trapped in disconnected clusters (β₀ > 1).
+        // This is the opposite of integration — it DAMPENS consciousness.
+        //
+        // At criticality (harmonic ∈ [0.2, 0.8]): the system is at the edge of
+        // chaos — maximally flexible and creative. We give a small BOOST here.
+        //
+        // Modulation:
+        //   harmonic < 0.2 (unified)     → +1% (good integration)
+        //   harmonic ∈ [0.2, 0.8] (critical) → +2% (edge-of-chaos creativity boost)
+        //   harmonic > 0.8 (fragmented)  → -5% (moral disintegration dampens consciousness)
+        //
+        // Science: Tononi (2004) — Phi collapses when components disconnect;
+        // Beggs & Plenz (2003) — criticality maximizes dynamic range;
+        // Shew & Plenz (2013) — neural systems optimize at criticality.
+        const HODGE_UNIFIED_BOOST: f64 = 0.01;
+        const HODGE_CRITICAL_BOOST: f64 = 0.02;
+        const HODGE_FRAGMENTED_DAMPING: f64 = 0.05;
         let hodge_mod = {
             let summary = self.ethics_engine.moral_topology().last_summary();
             if let Some(ref fracs) = summary.hodge_fractions {
-                let delta = fracs.harmonic - HODGE_HARMONIC_BASELINE;
-                1.0 + delta * HODGE_HARMONIC_CONSCIOUSNESS_SCALE / 0.67 // Normalize: max delta is 0.67
+                if fracs.at_criticality {
+                    1.0 + HODGE_CRITICAL_BOOST // Edge-of-chaos: creativity boost
+                } else if fracs.harmonic < 0.2 {
+                    1.0 + HODGE_UNIFIED_BOOST // Unified reasoning: mild boost
+                } else {
+                    1.0 - HODGE_FRAGMENTED_DAMPING // Fragmented: consciousness drops
+                }
             } else {
                 1.0 // No fractions available — neutral
             }

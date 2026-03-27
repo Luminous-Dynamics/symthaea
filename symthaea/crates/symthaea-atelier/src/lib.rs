@@ -32,6 +32,7 @@ pub mod harmony_shapes;
 pub mod iterate;
 pub mod lsystem;
 pub mod persistence;
+pub mod timeline;
 
 use rand::rngs::StdRng;
 use rand::SeedableRng;

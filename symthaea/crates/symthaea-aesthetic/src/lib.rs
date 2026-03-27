@@ -32,6 +32,7 @@ pub mod golden;
 pub mod information;
 pub mod novelty;
 pub mod session;
+pub mod synesthesia;
 
 use serde::{Deserialize, Serialize};
 

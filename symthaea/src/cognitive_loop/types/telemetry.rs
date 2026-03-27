@@ -2365,6 +2365,14 @@ pub struct EthicalTelemetry {
     /// Curl fraction: recurrent, rotational information cycling (0.0–1.0).
     #[serde(default)]
     pub hodge_curl_fraction: f64,
+    /// Critical Rips scale where harmonic fraction exceeds 0.5 (moral coherence
+    /// phase transition). NaN if no transition detected. Lower = more fragile.
+    #[serde(default)]
+    pub hodge_critical_scale: f64,
+    /// Whether the system is at criticality (harmonic ∈ [0.2, 0.8]).
+    /// The "Goldilocks zone" between echo chamber and isolation.
+    #[serde(default)]
+    pub hodge_at_criticality: bool,
 
     /// Whether the system is in Sacred Stillness active rest mode.
     #[serde(default)]

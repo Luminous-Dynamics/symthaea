@@ -39,6 +39,23 @@ pub enum ArtModality {
     },
     /// Poetry/creative text (stored inline).
     Poetry { text: String },
+    /// Synesthetic: simultaneous visual + audio, cross-linked via Scriabin mapping.
+    Synesthetic {
+        visual_filename: String,
+        audio_filename: String,
+        /// Which synesthetic mapping profile was used (e.g. "scriabin").
+        mapping_profile: String,
+    },
+    /// Dance choreography (stored as keyframe JSON).
+    Dance {
+        filename: String,
+        duration_secs: u32,
+    },
+    /// Musical score notation (MusicXML + optional SVG).
+    Score {
+        musicxml_filename: String,
+        score_svg: Option<String>,
+    },
 }
 
 impl ArtModality {
@@ -47,6 +64,9 @@ impl ArtModality {
             ArtModality::Visual { .. } => "visual",
             ArtModality::Music { .. } => "music",
             ArtModality::Poetry { .. } => "poetry",
+            ArtModality::Synesthetic { .. } => "synesthetic",
+            ArtModality::Dance { .. } => "dance",
+            ArtModality::Score { .. } => "score",
         }
     }
 }
