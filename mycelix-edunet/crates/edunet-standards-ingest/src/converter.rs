@@ -249,6 +249,10 @@ fn build_domain_map(standards: &[Standard]) -> HashMap<String, String> {
 /// Convert a higher-ed program descriptor into a CurriculumDocument.
 pub fn convert_program(program: &ProgramDescriptor) -> CurriculumDocument {
     let grade_level = program.level.to_grade_level().to_string();
+    let subject_area = program
+        .subject_area
+        .clone()
+        .unwrap_or_else(|| program.title.clone());
     let mut nodes = Vec::new();
     let mut edges = Vec::new();
 
@@ -268,7 +272,7 @@ pub fn convert_program(program: &ProgramDescriptor) -> CurriculumDocument {
             description: course.description.clone(),
             node_type: "Course".to_string(),
             difficulty,
-            domain: program.title.clone(),
+            domain: subject_area.clone(),
             subdomain: course
                 .topics
                 .first()
@@ -278,7 +282,7 @@ pub fn convert_program(program: &ProgramDescriptor) -> CurriculumDocument {
             estimated_hours: course.total_hours(),
             grade_levels: vec![grade_level.clone()],
             bloom_level: bloom,
-            subject_area: program.title.clone(),
+            subject_area: subject_area.clone(),
             academic_standards: vec![],
             credit_hours: course.credits,
             course_level: Some(course.level.number_range().to_string()),
@@ -568,7 +572,14 @@ fn make_title(description: &str) -> String {
     if first_sentence.len() <= 80 {
         first_sentence.to_string()
     } else {
-        format!("{}...", &first_sentence[..77])
+        // Find a char boundary at or before position 77
+        let truncate_at = first_sentence
+            .char_indices()
+            .take_while(|(i, _)| *i <= 77)
+            .last()
+            .map(|(i, _)| i)
+            .unwrap_or(77);
+        format!("{}...", &first_sentence[..truncate_at])
     }
 }
 

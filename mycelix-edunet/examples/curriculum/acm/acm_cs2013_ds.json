@@ -9,14 +9,14 @@
     "version": "2024",
     "total_standards": 6,
     "domains": [
-      "probability",
-      "propositional logic",
       "directed graphs",
-      "direct proof",
+      "sets",
+      "propositional logic",
+      "probability",
       "counting",
-      "sets"
+      "direct proof"
     ],
-    "created_at": "2026-03-27",
+    "created_at": "2026-03-28",
     "notes": "Higher-education program: CS2013: Discrete Structures. Level: Undergraduate.",
     "academic_level": "Undergraduate",
     "cip_code": "11.0701",
@@ -29,7 +29,7 @@
       "description": "Sets, Relations, and Functions (Tier1, 4 hours)",
       "node_type": "Course",
       "difficulty": "Intermediate",
-      "domain": "CS2013: Discrete Structures",
+      "domain": "Computer Science",
       "subdomain": "sets",
       "tags": [
         "sets",
@@ -43,7 +43,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Analyze",
-      "subject_area": "CS2013: Discrete Structures",
+      "subject_area": "Computer Science",
       "academic_standards": [],
       "credit_hours": 1,
       "course_level": "100",
@@ -56,7 +56,7 @@
       "description": "Basic Logic (Tier1, 9 hours)",
       "node_type": "Course",
       "difficulty": "Intermediate",
-      "domain": "CS2013: Discrete Structures",
+      "domain": "Computer Science",
       "subdomain": "propositional logic",
       "tags": [
         "propositional logic",
@@ -70,7 +70,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Apply",
-      "subject_area": "CS2013: Discrete Structures",
+      "subject_area": "Computer Science",
       "academic_standards": [],
       "credit_hours": 1,
       "course_level": "100",
@@ -83,7 +83,7 @@
       "description": "Proof Techniques (Tier1, 10 hours)",
       "node_type": "Course",
       "difficulty": "Intermediate",
-      "domain": "CS2013: Discrete Structures",
+      "domain": "Computer Science",
       "subdomain": "direct proof",
       "tags": [
         "direct proof",
@@ -96,7 +96,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Create",
-      "subject_area": "CS2013: Discrete Structures",
+      "subject_area": "Computer Science",
       "academic_standards": [],
       "credit_hours": 1,
       "course_level": "100",
@@ -109,7 +109,7 @@
       "description": "Basics of Counting (Tier1, 5 hours)",
       "node_type": "Course",
       "difficulty": "Intermediate",
-      "domain": "CS2013: Discrete Structures",
+      "domain": "Computer Science",
       "subdomain": "counting",
       "tags": [
         "counting",
@@ -123,7 +123,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Apply",
-      "subject_area": "CS2013: Discrete Structures",
+      "subject_area": "Computer Science",
       "academic_standards": [],
       "credit_hours": 1,
       "course_level": "100",
@@ -136,7 +136,7 @@
       "description": "Graphs and Trees (Tier1, 4 hours)",
       "node_type": "Course",
       "difficulty": "Intermediate",
-      "domain": "CS2013: Discrete Structures",
+      "domain": "Computer Science",
       "subdomain": "directed graphs",
       "tags": [
         "directed graphs",
@@ -150,7 +150,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Analyze",
-      "subject_area": "CS2013: Discrete Structures",
+      "subject_area": "Computer Science",
       "academic_standards": [],
       "credit_hours": 1,
       "course_level": "100",
@@ -163,7 +163,7 @@
       "description": "Discrete Probability (Tier1, 5 hours)",
       "node_type": "Course",
       "difficulty": "Intermediate",
-      "domain": "CS2013: Discrete Structures",
+      "domain": "Computer Science",
       "subdomain": "probability",
       "tags": [
         "probability",
@@ -177,7 +177,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Apply",
-      "subject_area": "CS2013: Discrete Structures",
+      "subject_area": "Computer Science",
       "academic_standards": [],
       "credit_hours": 1,
       "course_level": "100",

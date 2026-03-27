@@ -9,12 +9,12 @@
     "version": "2024",
     "total_standards": 4,
     "domains": [
-      "brute-force",
+      "finite automata",
       "arrays",
       "asymptotic analysis",
-      "finite automata"
+      "brute-force"
     ],
-    "created_at": "2026-03-27",
+    "created_at": "2026-03-28",
     "notes": "Higher-education program: CS2013: Algorithms and Complexity. Level: Undergraduate.",
     "academic_level": "Undergraduate",
     "cip_code": "11.0701",
@@ -27,7 +27,7 @@
       "description": "Basic Analysis (Tier1, 4 hours)",
       "node_type": "Course",
       "difficulty": "Intermediate",
-      "domain": "CS2013: Algorithms and Complexity",
+      "domain": "Computer Science",
       "subdomain": "asymptotic analysis",
       "tags": [
         "asymptotic analysis",
@@ -40,7 +40,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Analyze",
-      "subject_area": "CS2013: Algorithms and Complexity",
+      "subject_area": "Computer Science",
       "academic_standards": [],
       "credit_hours": 1,
       "course_level": "100",
@@ -53,7 +53,7 @@
       "description": "Algorithmic Strategies (Tier1, 5 hours)",
       "node_type": "Course",
       "difficulty": "Intermediate",
-      "domain": "CS2013: Algorithms and Complexity",
+      "domain": "Computer Science",
       "subdomain": "brute-force",
       "tags": [
         "brute-force",
@@ -67,7 +67,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Analyze",
-      "subject_area": "CS2013: Algorithms and Complexity",
+      "subject_area": "Computer Science",
       "academic_standards": [],
       "credit_hours": 1,
       "course_level": "100",
@@ -80,7 +80,7 @@
       "description": "Fundamental Data Structures and Algorithms (Tier1, 9 hours)",
       "node_type": "Course",
       "difficulty": "Intermediate",
-      "domain": "CS2013: Algorithms and Complexity",
+      "domain": "Computer Science",
       "subdomain": "arrays",
       "tags": [
         "arrays",
@@ -98,7 +98,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Apply",
-      "subject_area": "CS2013: Algorithms and Complexity",
+      "subject_area": "Computer Science",
       "academic_standards": [],
       "credit_hours": 1,
       "course_level": "100",
@@ -111,7 +111,7 @@
       "description": "Automata Theory (Elective, 6 hours)",
       "node_type": "Course",
       "difficulty": "Advanced",
-      "domain": "CS2013: Algorithms and Complexity",
+      "domain": "Computer Science",
       "subdomain": "finite automata",
       "tags": [
         "finite automata",
@@ -125,7 +125,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Create",
-      "subject_area": "CS2013: Algorithms and Complexity",
+      "subject_area": "Computer Science",
       "academic_standards": [],
       "credit_hours": 1,
       "course_level": "300-400",

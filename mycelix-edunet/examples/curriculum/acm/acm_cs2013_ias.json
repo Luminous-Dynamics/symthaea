@@ -12,7 +12,7 @@
       "symmetric encryption",
       "confidentiality"
     ],
-    "created_at": "2026-03-27",
+    "created_at": "2026-03-28",
     "notes": "Higher-education program: CS2013: Information Assurance and Security. Level: Undergraduate.",
     "academic_level": "Undergraduate",
     "cip_code": "11.0701",
@@ -25,7 +25,7 @@
       "description": "Foundational Concepts in Security (Tier1, 1 hours)",
       "node_type": "Course",
       "difficulty": "Intermediate",
-      "domain": "CS2013: Information Assurance and Security",
+      "domain": "Computer Science",
       "subdomain": "confidentiality",
       "tags": [
         "confidentiality",
@@ -39,7 +39,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Understand",
-      "subject_area": "CS2013: Information Assurance and Security",
+      "subject_area": "Computer Science",
       "academic_standards": [],
       "credit_hours": 1,
       "course_level": "100",
@@ -52,7 +52,7 @@
       "description": "Cryptography (Tier2, 3 hours)",
       "node_type": "Course",
       "difficulty": "Intermediate",
-      "domain": "CS2013: Information Assurance and Security",
+      "domain": "Computer Science",
       "subdomain": "symmetric encryption",
       "tags": [
         "symmetric encryption",
@@ -66,7 +66,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Apply",
-      "subject_area": "CS2013: Information Assurance and Security",
+      "subject_area": "Computer Science",
       "academic_standards": [],
       "credit_hours": 1,
       "course_level": "200-300",

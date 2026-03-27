@@ -96,6 +96,7 @@ impl CipSource {
         Some(ProgramDescriptor {
             id: format!("CIP:{}", family.code),
             title: family.title.clone(),
+            subject_area: None, // falls back to title
             level: AcademicLevel::Undergraduate,
             cip_code: Some(family.code.clone()),
             institution: None,

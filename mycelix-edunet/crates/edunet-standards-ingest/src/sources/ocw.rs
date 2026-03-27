@@ -450,7 +450,14 @@ fn truncate_desc(s: &str, max: usize) -> String {
     if s.len() <= max {
         s.to_string()
     } else {
-        format!("{}...", &s[..max.saturating_sub(3)])
+        let target = max.saturating_sub(3);
+        let truncate_at = s
+            .char_indices()
+            .take_while(|(i, _)| *i <= target)
+            .last()
+            .map(|(i, _)| i)
+            .unwrap_or(target);
+        format!("{}...", &s[..truncate_at])
     }
 }
 

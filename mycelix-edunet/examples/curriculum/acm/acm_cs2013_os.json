@@ -9,12 +9,12 @@
     "version": "2024",
     "total_standards": 4,
     "domains": [
+      "OS role",
       "threads",
       "file systems",
-      "OS role",
       "virtual memory"
     ],
-    "created_at": "2026-03-27",
+    "created_at": "2026-03-28",
     "notes": "Higher-education program: CS2013: Operating Systems. Level: Undergraduate.",
     "academic_level": "Undergraduate",
     "cip_code": "11.0701",
@@ -27,7 +27,7 @@
       "description": "Overview of Operating Systems (Tier1, 2 hours)",
       "node_type": "Course",
       "difficulty": "Intermediate",
-      "domain": "CS2013: Operating Systems",
+      "domain": "Computer Science",
       "subdomain": "OS role",
       "tags": [
         "OS role",
@@ -40,7 +40,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Understand",
-      "subject_area": "CS2013: Operating Systems",
+      "subject_area": "Computer Science",
       "academic_standards": [],
       "credit_hours": 1,
       "course_level": "100",
@@ -53,7 +53,7 @@
       "description": "Concurrency (Tier2, 3 hours)",
       "node_type": "Course",
       "difficulty": "Intermediate",
-      "domain": "CS2013: Operating Systems",
+      "domain": "Computer Science",
       "subdomain": "threads",
       "tags": [
         "threads",
@@ -67,7 +67,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Analyze",
-      "subject_area": "CS2013: Operating Systems",
+      "subject_area": "Computer Science",
       "academic_standards": [],
       "credit_hours": 1,
       "course_level": "200-300",
@@ -80,7 +80,7 @@
       "description": "Memory Management (Tier2, 4 hours)",
       "node_type": "Course",
       "difficulty": "Intermediate",
-      "domain": "CS2013: Operating Systems",
+      "domain": "Computer Science",
       "subdomain": "virtual memory",
       "tags": [
         "virtual memory",
@@ -94,7 +94,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Evaluate",
-      "subject_area": "CS2013: Operating Systems",
+      "subject_area": "Computer Science",
       "academic_standards": [],
       "credit_hours": 1,
       "course_level": "200-300",
@@ -107,7 +107,7 @@
       "description": "File Systems (Tier2, 2 hours)",
       "node_type": "Course",
       "difficulty": "Intermediate",
-      "domain": "CS2013: Operating Systems",
+      "domain": "Computer Science",
       "subdomain": "file systems",
       "tags": [
         "file systems",
@@ -120,7 +120,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Understand",
-      "subject_area": "CS2013: Operating Systems",
+      "subject_area": "Computer Science",
       "academic_standards": [],
       "credit_hours": 1,
       "course_level": "200-300",

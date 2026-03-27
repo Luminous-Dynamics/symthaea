@@ -12,7 +12,7 @@
       "OSI model",
       "sockets"
     ],
-    "created_at": "2026-03-27",
+    "created_at": "2026-03-28",
     "notes": "Higher-education program: CS2013: Networking and Communication. Level: Undergraduate.",
     "academic_level": "Undergraduate",
     "cip_code": "11.0701",
@@ -25,7 +25,7 @@
       "description": "Introduction to Networking (Tier1, 1 hours)",
       "node_type": "Course",
       "difficulty": "Intermediate",
-      "domain": "CS2013: Networking and Communication",
+      "domain": "Computer Science",
       "subdomain": "OSI model",
       "tags": [
         "OSI model",
@@ -38,7 +38,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Understand",
-      "subject_area": "CS2013: Networking and Communication",
+      "subject_area": "Computer Science",
       "academic_standards": [],
       "credit_hours": 1,
       "course_level": "100",
@@ -51,7 +51,7 @@
       "description": "Networked Applications (Tier2, 3 hours)",
       "node_type": "Course",
       "difficulty": "Intermediate",
-      "domain": "CS2013: Networking and Communication",
+      "domain": "Computer Science",
       "subdomain": "sockets",
       "tags": [
         "sockets",
@@ -65,7 +65,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Apply",
-      "subject_area": "CS2013: Networking and Communication",
+      "subject_area": "Computer Science",
       "academic_standards": [],
       "credit_hours": 1,
       "course_level": "200-300",

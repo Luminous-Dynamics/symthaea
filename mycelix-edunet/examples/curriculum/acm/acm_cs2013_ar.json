@@ -9,11 +9,11 @@
     "version": "2024",
     "total_standards": 3,
     "domains": [
-      "logic gates",
       "binary representation",
+      "logic gates",
       "instruction set architecture"
     ],
-    "created_at": "2026-03-27",
+    "created_at": "2026-03-28",
     "notes": "Higher-education program: CS2013: Architecture and Organization. Level: Undergraduate.",
     "academic_level": "Undergraduate",
     "cip_code": "11.0701",
@@ -26,7 +26,7 @@
       "description": "Digital Logic and Digital Systems (Tier2, 6 hours)",
       "node_type": "Course",
       "difficulty": "Intermediate",
-      "domain": "CS2013: Architecture and Organization",
+      "domain": "Computer Science",
       "subdomain": "logic gates",
       "tags": [
         "logic gates",
@@ -40,7 +40,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Create",
-      "subject_area": "CS2013: Architecture and Organization",
+      "subject_area": "Computer Science",
       "academic_standards": [],
       "credit_hours": 1,
       "course_level": "200-300",
@@ -53,7 +53,7 @@
       "description": "Machine Level Representation of Data (Tier2, 3 hours)",
       "node_type": "Course",
       "difficulty": "Intermediate",
-      "domain": "CS2013: Architecture and Organization",
+      "domain": "Computer Science",
       "subdomain": "binary representation",
       "tags": [
         "binary representation",
@@ -66,7 +66,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Apply",
-      "subject_area": "CS2013: Architecture and Organization",
+      "subject_area": "Computer Science",
       "academic_standards": [],
       "credit_hours": 1,
       "course_level": "200-300",
@@ -79,7 +79,7 @@
       "description": "Assembly Level Machine Organization (Tier2, 7 hours)",
       "node_type": "Course",
       "difficulty": "Intermediate",
-      "domain": "CS2013: Architecture and Organization",
+      "domain": "Computer Science",
       "subdomain": "instruction set architecture",
       "tags": [
         "instruction set architecture",
@@ -92,7 +92,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Apply",
-      "subject_area": "CS2013: Architecture and Organization",
+      "subject_area": "Computer Science",
       "academic_standards": [],
       "credit_hours": 1,
       "course_level": "200-300",

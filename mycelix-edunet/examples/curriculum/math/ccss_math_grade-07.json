@@ -1,0 +1,788 @@
+{
+  "metadata": {
+    "title": "Grade 7",
+    "framework": "Common Core State Standards",
+    "source": "http://www.corestandards.org/assets/CCSSI_Math%20Standards.pdf",
+    "grade_level": "Grade7",
+    "subject_area": "Mathematics",
+    "domain": "Mathematics",
+    "version": "2010",
+    "total_standards": 24,
+    "domains": [
+      "Statistics and Probability",
+      "Expressions and Equations",
+      "The Number System",
+      "Ratios and Proportional Relationships",
+      "Geometry",
+      "Standards for Mathematical Practice"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Auto-ingested from Common Standards Project (set 67810E9EF6944F9383DCC602A3484C23_D10003FB_grade-07). Node structure matches KnowledgeNode in knowledge_zome/integrity/src/lib.rs."
+  },
+  "nodes": [
+    {
+      "id": "CCSS.Math.Content.7.SP.C.8",
+      "title": "Find probabilities of compound events using organized lists, tables, tree dia...",
+      "description": "Find probabilities of compound events using organized lists, tables, tree diagrams, and simulation.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Statistics and Probability",
+      "tags": [
+        "simulation"
+      ],
+      "estimated_hours": 4,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Remember",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.7.SP.C.8",
+          "description": "Find probabilities of compound events using organized lists, tables, tree diagrams, and simulation.",
+          "grade_level": "Grade7"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.7.SP.C.7",
+      "title": "Develop a probability model and use it to find probabilities of events",
+      "description": "Develop a probability model and use it to find probabilities of events. Compare probabilities from a model to observed frequencies; if the agreement is not good, explain possible sources of the discrepancy.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Statistics and Probability",
+      "tags": [
+        "probability"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.7.SP.C.7",
+          "description": "Develop a probability model and use it to find probabilities of events. Compare probabilities from a model to observed frequencies; if the agreement is not good, explain possible sources of the discrepancy.",
+          "grade_level": "Grade7"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.7.SP.C.6",
+      "title": "Approximate the probability of a chance event by collecting data on the chanc...",
+      "description": "Approximate the probability of a chance event by collecting data on the chance process that produces it and observing its long-run relative frequency, and predict the approximate relative frequency given the probability.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Statistics and Probability",
+      "tags": [
+        "data",
+        "probability"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.7.SP.C.6",
+          "description": "Approximate the probability of a chance event by collecting data on the chance process that produces it and observing its long-run relative frequency, and predict the approximate relative frequency given the probability.",
+          "grade_level": "Grade7"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.7.SP.C.5",
+      "title": "Understand that the probability of a chance event is a number between 0 and 1...",
+      "description": "Understand that the probability of a chance event is a number between 0 and 1 that expresses the likelihood of the event occurring. Larger numbers indicate greater likelihood. A probability near 0 indicates an unlikely event, a probability around 1/2 indicates an event that is neither unlikely nor likely, and a probability near 1 indicates a likely event.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Statistics and Probability",
+      "tags": [
+        "probability"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.7.SP.C.5",
+          "description": "Understand that the probability of a chance event is a number between 0 and 1 that expresses the likelihood of the event occurring. Larger numbers indicate greater likelihood. A probability near 0 indicates an unlikely event, a probability around 1/2 indicates an event that is neither unlikely nor likely, and a probability near 1 indicates a likely event.",
+          "grade_level": "Grade7"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.7.SP.B.4",
+      "title": "Use measures of center and measures of variability for numerical data from ra...",
+      "description": "Use measures of center and measures of variability for numerical data from random samples to draw informal comparative inferences about two populations.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Statistics and Probability",
+      "tags": [
+        "data",
+        "inference"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.7.SP.B.4",
+          "description": "Use measures of center and measures of variability for numerical data from random samples to draw informal comparative inferences about two populations.",
+          "grade_level": "Grade7"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.7.SP.B.3",
+      "title": "Informally assess the degree of visual overlap of two numerical data distribu...",
+      "description": "Informally assess the degree of visual overlap of two numerical data distributions with similar variabilities, measuring the difference between the centers by expressing it as a multiple of a measure of variability.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Statistics and Probability",
+      "tags": [
+        "data"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.7.SP.B.3",
+          "description": "Informally assess the degree of visual overlap of two numerical data distributions with similar variabilities, measuring the difference between the centers by expressing it as a multiple of a measure of variability.",
+          "grade_level": "Grade7"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.7.SP.A.2",
+      "title": "Use data from a random sample to draw inferences about a population with an u...",
+      "description": "Use data from a random sample to draw inferences about a population with an unknown characteristic of interest. Generate multiple samples (or simulated samples) of the same size to gauge the variation in estimates or predictions.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Statistics and Probability",
+      "tags": [
+        "data",
+        "inference"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.7.SP.A.2",
+          "description": "Use data from a random sample to draw inferences about a population with an unknown characteristic of interest. Generate multiple samples (or simulated samples) of the same size to gauge the variation in estimates or predictions.",
+          "grade_level": "Grade7"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.7.SP.A.1",
+      "title": "Understand that statistics can be used to gain information about a population...",
+      "description": "Understand that statistics can be used to gain information about a population by examining a sample of the population; generalizations about a population from a sample are valid only if the sample is representative of that population. Understand that random sampling tends to produce representative samples and support valid inferences.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Statistics and Probability",
+      "tags": [
+        "inference",
+        "statistics"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.7.SP.A.1",
+          "description": "Understand that statistics can be used to gain information about a population by examining a sample of the population; generalizations about a population from a sample are valid only if the sample is representative of that population. Understand that random sampling tends to produce representative samples and support valid inferences.",
+          "grade_level": "Grade7"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.7.EE.B.4",
+      "title": "Use variables to represent quantities in a real-world or mathematical problem...",
+      "description": "Use variables to represent quantities in a real-world or mathematical problem, and construct simple equations and inequalities to solve problems by reasoning about the quantities.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Expressions and Equations",
+      "tags": [
+        "equations"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.7.EE.B.4",
+          "description": "Use variables to represent quantities in a real-world or mathematical problem, and construct simple equations and inequalities to solve problems by reasoning about the quantities.",
+          "grade_level": "Grade7"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.7.EE.B.3",
+      "title": "Solve multi-step real-life and mathematical problems posed with positive and ...",
+      "description": "Solve multi-step real-life and mathematical problems posed with positive and negative rational numbers in any form (whole numbers, fractions, and decimals), using tools strategically. Apply properties of operations to calculate with numbers in any form; convert between forms as appropriate; and assess the reasonableness of answers using mental computation and estimation strategies.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Expressions and Equations",
+      "tags": [
+        "fractions",
+        "decimals"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.7.EE.B.3",
+          "description": "Solve multi-step real-life and mathematical problems posed with positive and negative rational numbers in any form (whole numbers, fractions, and decimals), using tools strategically. Apply properties of operations to calculate with numbers in any form; convert between forms as appropriate; and assess the reasonableness of answers using mental computation and estimation strategies.",
+          "grade_level": "Grade7"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.7.EE.A.2",
+      "title": "Understand that rewriting an expression in different forms in a problem conte...",
+      "description": "Understand that rewriting an expression in different forms in a problem context can shed light on the problem and how the quantities in it are related.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Expressions and Equations",
+      "tags": [
+        "writing"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.7.EE.A.2",
+          "description": "Understand that rewriting an expression in different forms in a problem context can shed light on the problem and how the quantities in it are related.",
+          "grade_level": "Grade7"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.7.EE.A.1",
+      "title": "Apply properties of operations as strategies to add, subtract, factor, and ex...",
+      "description": "Apply properties of operations as strategies to add, subtract, factor, and expand linear expressions with rational coefficients.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Expressions and Equations",
+      "tags": [
+        "expressions"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.7.EE.A.1",
+          "description": "Apply properties of operations as strategies to add, subtract, factor, and expand linear expressions with rational coefficients.",
+          "grade_level": "Grade7"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.7.NS.A.3",
+      "title": "Solve real-world and mathematical problems involving the four operations with...",
+      "description": "Solve real-world and mathematical problems involving the four operations with rational numbers.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "The Number System",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.7.NS.A.3",
+          "description": "Solve real-world and mathematical problems involving the four operations with rational numbers.",
+          "grade_level": "Grade7"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.7.NS.A.2",
+      "title": "Apply and extend previous understandings of multiplication and division and o...",
+      "description": "Apply and extend previous understandings of multiplication and division and of fractions to multiply and divide rational numbers.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "The Number System",
+      "tags": [
+        "multiplication",
+        "division",
+        "fractions"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.7.NS.A.2",
+          "description": "Apply and extend previous understandings of multiplication and division and of fractions to multiply and divide rational numbers.",
+          "grade_level": "Grade7"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.7.NS.A.1",
+      "title": "Apply and extend previous understandings of addition and subtraction to add a...",
+      "description": "Apply and extend previous understandings of addition and subtraction to add and subtract rational numbers; represent addition and subtraction on a horizontal or vertical number line diagram.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "The Number System",
+      "tags": [
+        "addition",
+        "subtraction"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.7.NS.A.1",
+          "description": "Apply and extend previous understandings of addition and subtraction to add and subtract rational numbers; represent addition and subtraction on a horizontal or vertical number line diagram.",
+          "grade_level": "Grade7"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.7.RP.A.3",
+      "title": "Use proportional relationships to solve multistep ratio and percent problems",
+      "description": "Use proportional relationships to solve multistep ratio and percent problems.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Ratios and Proportional Relationships",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.7.RP.A.3",
+          "description": "Use proportional relationships to solve multistep ratio and percent problems.",
+          "grade_level": "Grade7"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.7.RP.A.2",
+      "title": "Recognize and represent proportional relationships between quantities",
+      "description": "Recognize and represent proportional relationships between quantities.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Ratios and Proportional Relationships",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.7.RP.A.2",
+          "description": "Recognize and represent proportional relationships between quantities.",
+          "grade_level": "Grade7"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.7.RP.A.1",
+      "title": "Compute unit rates associated with ratios of fractions, including ratios of l...",
+      "description": "Compute unit rates associated with ratios of fractions, including ratios of lengths, areas and other quantities measured in like or different units.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Ratios and Proportional Relationships",
+      "tags": [
+        "fractions",
+        "area",
+        "ratios"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.7.RP.A.1",
+          "description": "Compute unit rates associated with ratios of fractions, including ratios of lengths, areas and other quantities measured in like or different units.",
+          "grade_level": "Grade7"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.7.G.B.6",
+      "title": "Solve real-world and mathematical problems involving area, volume and surface...",
+      "description": "Solve real-world and mathematical problems involving area, volume and surface area of two- and three-dimensional objects composed of triangles, quadrilaterals, polygons, cubes, and right prisms.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "area",
+        "volume",
+        "angles"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.7.G.B.6",
+          "description": "Solve real-world and mathematical problems involving area, volume and surface area of two- and three-dimensional objects composed of triangles, quadrilaterals, polygons, cubes, and right prisms.",
+          "grade_level": "Grade7"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.7.G.B.5",
+      "title": "Use facts about supplementary, complementary, vertical, and adjacent angles i...",
+      "description": "Use facts about supplementary, complementary, vertical, and adjacent angles in a multi-step problem to write and solve simple equations for an unknown angle in a figure.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "equations",
+        "angles"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.7.G.B.5",
+          "description": "Use facts about supplementary, complementary, vertical, and adjacent angles in a multi-step problem to write and solve simple equations for an unknown angle in a figure.",
+          "grade_level": "Grade7"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.7.G.B.4",
+      "title": "Know the formulas for the area and circumference of a circle and use them to ...",
+      "description": "Know the formulas for the area and circumference of a circle and use them to solve problems; give an informal derivation of the relationship between the circumference and area of a circle.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "area"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.7.G.B.4",
+          "description": "Know the formulas for the area and circumference of a circle and use them to solve problems; give an informal derivation of the relationship between the circumference and area of a circle.",
+          "grade_level": "Grade7"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.7.G.A.3",
+      "title": "Describe the two-dimensional figures that result from slicing three-dimension...",
+      "description": "Describe the two-dimensional figures that result from slicing three-dimensional figures, as in plane sections of right rectangular prisms and right rectangular pyramids.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.7.G.A.3",
+          "description": "Describe the two-dimensional figures that result from slicing three-dimensional figures, as in plane sections of right rectangular prisms and right rectangular pyramids.",
+          "grade_level": "Grade7"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.7.G.A.2",
+      "title": "Draw (freehand, with ruler and protractor, and with technology) geometric sha...",
+      "description": "Draw (freehand, with ruler and protractor, and with technology) geometric shapes with given conditions. Focus on constructing triangles from three measures of angles or sides, noticing when the conditions determine a unique triangle, more than one triangle, or no triangle.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "angles"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.7.G.A.2",
+          "description": "Draw (freehand, with ruler and protractor, and with technology) geometric shapes with given conditions. Focus on constructing triangles from three measures of angles or sides, noticing when the conditions determine a unique triangle, more than one triangle, or no triangle.",
+          "grade_level": "Grade7"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.7.G.A.1",
+      "title": "Solve problems involving scale drawings of geometric figures, including compu...",
+      "description": "Solve problems involving scale drawings of geometric figures, including computing actual lengths and areas from a scale drawing and reproducing a scale drawing at a different scale.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "area"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.7.G.A.1",
+          "description": "Solve problems involving scale drawings of geometric figures, including computing actual lengths and areas from a scale drawing and reproducing a scale drawing at a different scale.",
+          "grade_level": "Grade7"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "CCSS.Math.Content.7.NS.A.1",
+      "to": "CCSS.Math.Content.7.NS.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.7.NS.A.1 is a prerequisite for CCSS.Math.Content.7.NS.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.7.NS.A.2",
+      "to": "CCSS.Math.Content.7.NS.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.7.NS.A.2 is a prerequisite for CCSS.Math.Content.7.NS.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.7.RP.A.1",
+      "to": "CCSS.Math.Content.7.RP.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.7.RP.A.1 is a prerequisite for CCSS.Math.Content.7.RP.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.7.RP.A.2",
+      "to": "CCSS.Math.Content.7.RP.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.7.RP.A.2 is a prerequisite for CCSS.Math.Content.7.RP.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.7.SP.A.1",
+      "to": "CCSS.Math.Content.7.SP.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.7.SP.A.1 is a prerequisite for CCSS.Math.Content.7.SP.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.7.SP.A.2",
+      "to": "CCSS.Math.Content.7.SP.B.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.7.SP.A.2 is a prerequisite for CCSS.Math.Content.7.SP.B.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.7.SP.B.3",
+      "to": "CCSS.Math.Content.7.SP.B.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.7.SP.B.3 is a prerequisite for CCSS.Math.Content.7.SP.B.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.7.SP.B.4",
+      "to": "CCSS.Math.Content.7.SP.C.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.7.SP.B.4 is a prerequisite for CCSS.Math.Content.7.SP.C.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.7.SP.C.5",
+      "to": "CCSS.Math.Content.7.SP.C.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.7.SP.C.5 is a prerequisite for CCSS.Math.Content.7.SP.C.6 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.7.SP.C.6",
+      "to": "CCSS.Math.Content.7.SP.C.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.7.SP.C.6 is a prerequisite for CCSS.Math.Content.7.SP.C.7 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.7.SP.C.7",
+      "to": "CCSS.Math.Content.7.SP.C.8",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.7.SP.C.7 is a prerequisite for CCSS.Math.Content.7.SP.C.8 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.7.EE.A.1",
+      "to": "CCSS.Math.Content.7.EE.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.7.EE.A.1 is a prerequisite for CCSS.Math.Content.7.EE.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.7.EE.A.2",
+      "to": "CCSS.Math.Content.7.EE.B.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.7.EE.A.2 is a prerequisite for CCSS.Math.Content.7.EE.B.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.7.EE.B.3",
+      "to": "CCSS.Math.Content.7.EE.B.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.7.EE.B.3 is a prerequisite for CCSS.Math.Content.7.EE.B.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.7.G.A.1",
+      "to": "CCSS.Math.Content.7.G.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.7.G.A.1 is a prerequisite for CCSS.Math.Content.7.G.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.7.G.A.2",
+      "to": "CCSS.Math.Content.7.G.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.7.G.A.2 is a prerequisite for CCSS.Math.Content.7.G.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.7.G.A.3",
+      "to": "CCSS.Math.Content.7.G.B.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.7.G.A.3 is a prerequisite for CCSS.Math.Content.7.G.B.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.7.G.B.4",
+      "to": "CCSS.Math.Content.7.G.B.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.7.G.B.4 is a prerequisite for CCSS.Math.Content.7.G.B.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.7.G.B.5",
+      "to": "CCSS.Math.Content.7.G.B.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.7.G.B.5 is a prerequisite for CCSS.Math.Content.7.G.B.6 within the same domain."
+    }
+  ]
+}

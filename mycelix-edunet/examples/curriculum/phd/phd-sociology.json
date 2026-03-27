@@ -1,0 +1,326 @@
+{
+  "metadata": {
+    "title": "PhD in Sociology",
+    "framework": "CIP:45.1101",
+    "source": "",
+    "grade_level": "Doctoral",
+    "subject_area": "Sociology",
+    "domain": "Sociology",
+    "version": "2024",
+    "total_standards": 10,
+    "domains": [
+      "Coursework",
+      "Examination",
+      "Research"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "PhD progression template for Sociology. Milestones represent canonical doctoral program stages.",
+    "academic_level": "Doctoral",
+    "cip_code": "45.1101",
+    "duration_semesters": 10
+  },
+  "nodes": [
+    {
+      "id": "phd-sociology/coursework",
+      "title": "Core Coursework",
+      "description": "Complete required doctoral-level courses in the field. Typically 4-6 courses covering foundational theory, research methods, and specialized topics.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Sociology",
+      "subdomain": "Year 1",
+      "tags": [
+        "sociology",
+        "phd",
+        "year-1"
+      ],
+      "estimated_hours": 810,
+      "grade_levels": [
+        "Doctoral"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Sociology",
+      "academic_standards": [],
+      "course_level": "900",
+      "cip_code": "45.1101"
+    },
+    {
+      "id": "phd-sociology/seminar",
+      "title": "Research Seminar Participation",
+      "description": "Attend and present in departmental research seminars. Develop ability to critically analyze current research.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Sociology",
+      "subdomain": "Year 1",
+      "tags": [
+        "sociology",
+        "phd",
+        "year-1"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Doctoral"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Sociology",
+      "academic_standards": [],
+      "course_level": "900",
+      "cip_code": "45.1101"
+    },
+    {
+      "id": "phd-sociology/teaching",
+      "title": "Teaching Requirement",
+      "description": "Serve as teaching assistant for undergraduate courses. Develop pedagogy skills and demonstrate mastery of foundational material.",
+      "node_type": "Skill",
+      "difficulty": "Expert",
+      "domain": "Sociology",
+      "subdomain": "Year 2",
+      "tags": [
+        "sociology",
+        "phd",
+        "year-2"
+      ],
+      "estimated_hours": 360,
+      "grade_levels": [
+        "Doctoral"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Sociology",
+      "academic_standards": [],
+      "course_level": "900",
+      "cip_code": "45.1101"
+    },
+    {
+      "id": "phd-sociology/qualifying-exam",
+      "title": "Qualifying Examination",
+      "description": "Pass written and/or oral comprehensive examinations demonstrating breadth and depth of knowledge in the field. Advancement to candidacy upon passing.",
+      "node_type": "Assessment",
+      "difficulty": "Expert",
+      "domain": "Sociology",
+      "subdomain": "Year 2",
+      "tags": [
+        "sociology",
+        "phd",
+        "year-2"
+      ],
+      "estimated_hours": 450,
+      "grade_levels": [
+        "Doctoral"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Sociology",
+      "academic_standards": [],
+      "course_level": "900",
+      "cip_code": "45.1101"
+    },
+    {
+      "id": "phd-sociology/literature-review",
+      "title": "Comprehensive Literature Review",
+      "description": "Survey and synthesize existing research to identify gaps and position the dissertation within the scholarly landscape.",
+      "node_type": "Project",
+      "difficulty": "Expert",
+      "domain": "Sociology",
+      "subdomain": "Year 2",
+      "tags": [
+        "sociology",
+        "phd",
+        "year-2"
+      ],
+      "estimated_hours": 360,
+      "grade_levels": [
+        "Doctoral"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Sociology",
+      "academic_standards": [],
+      "course_level": "900",
+      "cip_code": "45.1101"
+    },
+    {
+      "id": "phd-sociology/proposal",
+      "title": "Dissertation Proposal Defense",
+      "description": "Present and defend the dissertation proposal before the committee. Define research questions, methodology, and expected contributions.",
+      "node_type": "Assessment",
+      "difficulty": "Expert",
+      "domain": "Sociology",
+      "subdomain": "Year 3",
+      "tags": [
+        "sociology",
+        "phd",
+        "year-3"
+      ],
+      "estimated_hours": 270,
+      "grade_levels": [
+        "Doctoral"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Sociology",
+      "academic_standards": [],
+      "course_level": "900",
+      "cip_code": "45.1101"
+    },
+    {
+      "id": "phd-sociology/research",
+      "title": "Independent Research",
+      "description": "Conduct original research contributing new knowledge to the field. Design and execute experiments, collect and analyze data, iterate on methodology.",
+      "node_type": "Project",
+      "difficulty": "Expert",
+      "domain": "Sociology",
+      "subdomain": "Year 4",
+      "tags": [
+        "sociology",
+        "phd",
+        "year-4"
+      ],
+      "estimated_hours": 2700,
+      "grade_levels": [
+        "Doctoral"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Sociology",
+      "academic_standards": [],
+      "course_level": "900",
+      "cip_code": "45.1101"
+    },
+    {
+      "id": "phd-sociology/publication",
+      "title": "Peer-Reviewed Publication",
+      "description": "Publish research findings in peer-reviewed journals or top-tier conference proceedings. Demonstrate ability to contribute to the scholarly record.",
+      "node_type": "Project",
+      "difficulty": "Expert",
+      "domain": "Sociology",
+      "subdomain": "Year 4",
+      "tags": [
+        "sociology",
+        "phd",
+        "year-4"
+      ],
+      "estimated_hours": 360,
+      "grade_levels": [
+        "Doctoral"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Sociology",
+      "academic_standards": [],
+      "course_level": "900",
+      "cip_code": "45.1101"
+    },
+    {
+      "id": "phd-sociology/dissertation-writing",
+      "title": "Dissertation Writing",
+      "description": "Write the doctoral dissertation: introduction, literature review, methodology, results, discussion, and conclusions. Integrate all research into a coherent scholarly work.",
+      "node_type": "Project",
+      "difficulty": "Expert",
+      "domain": "Sociology",
+      "subdomain": "Year 5",
+      "tags": [
+        "sociology",
+        "phd",
+        "year-5"
+      ],
+      "estimated_hours": 900,
+      "grade_levels": [
+        "Doctoral"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Sociology",
+      "academic_standards": [],
+      "course_level": "900",
+      "cip_code": "45.1101"
+    },
+    {
+      "id": "phd-sociology/defense",
+      "title": "Dissertation Defense",
+      "description": "Present and defend the completed dissertation before the committee and academic community. Respond to questions and demonstrate mastery of the research.",
+      "node_type": "Assessment",
+      "difficulty": "Expert",
+      "domain": "Sociology",
+      "subdomain": "Year 5",
+      "tags": [
+        "sociology",
+        "phd",
+        "year-5"
+      ],
+      "estimated_hours": 90,
+      "grade_levels": [
+        "Doctoral"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Sociology",
+      "academic_standards": [],
+      "course_level": "900",
+      "cip_code": "45.1101"
+    }
+  ],
+  "edges": [
+    {
+      "from": "phd-sociology/coursework",
+      "to": "phd-sociology/teaching",
+      "edge_type": "LeadsTo",
+      "strength_permille": 950,
+      "rationale": "phd-sociology/coursework must be completed before Teaching Requirement."
+    },
+    {
+      "from": "phd-sociology/coursework",
+      "to": "phd-sociology/qualifying-exam",
+      "edge_type": "LeadsTo",
+      "strength_permille": 950,
+      "rationale": "phd-sociology/coursework must be completed before Qualifying Examination."
+    },
+    {
+      "from": "phd-sociology/qualifying-exam",
+      "to": "phd-sociology/literature-review",
+      "edge_type": "LeadsTo",
+      "strength_permille": 950,
+      "rationale": "phd-sociology/qualifying-exam must be completed before Comprehensive Literature Review."
+    },
+    {
+      "from": "phd-sociology/qualifying-exam",
+      "to": "phd-sociology/proposal",
+      "edge_type": "LeadsTo",
+      "strength_permille": 950,
+      "rationale": "phd-sociology/qualifying-exam must be completed before Dissertation Proposal Defense."
+    },
+    {
+      "from": "phd-sociology/literature-review",
+      "to": "phd-sociology/proposal",
+      "edge_type": "LeadsTo",
+      "strength_permille": 950,
+      "rationale": "phd-sociology/literature-review must be completed before Dissertation Proposal Defense."
+    },
+    {
+      "from": "phd-sociology/proposal",
+      "to": "phd-sociology/research",
+      "edge_type": "LeadsTo",
+      "strength_permille": 950,
+      "rationale": "phd-sociology/proposal must be completed before Independent Research."
+    },
+    {
+      "from": "phd-sociology/research",
+      "to": "phd-sociology/publication",
+      "edge_type": "LeadsTo",
+      "strength_permille": 950,
+      "rationale": "phd-sociology/research must be completed before Peer-Reviewed Publication."
+    },
+    {
+      "from": "phd-sociology/research",
+      "to": "phd-sociology/dissertation-writing",
+      "edge_type": "LeadsTo",
+      "strength_permille": 950,
+      "rationale": "phd-sociology/research must be completed before Dissertation Writing."
+    },
+    {
+      "from": "phd-sociology/publication",
+      "to": "phd-sociology/dissertation-writing",
+      "edge_type": "LeadsTo",
+      "strength_permille": 950,
+      "rationale": "phd-sociology/publication must be completed before Dissertation Writing."
+    },
+    {
+      "from": "phd-sociology/dissertation-writing",
+      "to": "phd-sociology/defense",
+      "edge_type": "LeadsTo",
+      "strength_permille": 950,
+      "rationale": "phd-sociology/dissertation-writing must be completed before Dissertation Defense."
+    }
+  ]
+}

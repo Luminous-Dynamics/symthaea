@@ -1,0 +1,732 @@
+{
+  "metadata": {
+    "title": "MIT OCW: Linguistics and Philosophy",
+    "framework": "MIT OpenCourseWare",
+    "source": "https://ocw.mit.edu/search/?d=24&s=department_course_numbers.sort_coursenum",
+    "grade_level": "Undergraduate",
+    "subject_area": "Linguistics and Philosophy",
+    "domain": "Linguistics and Philosophy",
+    "version": "2024",
+    "total_standards": 20,
+    "domains": [
+      "Mathematics",
+      "Sociology",
+      "History",
+      "Health Care Management",
+      "Physics",
+      "Visual Arts",
+      "Law",
+      "Art, Design & Architecture",
+      "User Experience",
+      "Policy and Administration"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Auto-ingested from MIT Learn API (department 24). Prerequisites inferred from course numbering.",
+    "academic_level": "Undergraduate",
+    "institution": "Massachusetts Institute of Technology",
+    "cip_code": "38"
+  },
+  "nodes": [
+    {
+      "id": "24.01",
+      "title": "Classics of Western Philosophy",
+      "description": "This course will introduce you to the Western philosophical tradition through the study of thinkers such as Plato, Aristotle, Descartes, Cavendish, Hume, and Kant. You’ll grapple with questions that have been significant to philosophy from its beginnings: Questions about the nature of the mind, the existence of God, the foundations of knowledge, and the good life. You’ll also observe changes of intellectual outlook over time, and the effect of scientific, religious, and political concerns...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Linguistics and Philosophy",
+      "subdomain": "Humanities",
+      "tags": [
+        "humanities",
+        "history",
+        "literature",
+        "philosophy"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Linguistics and Philosophy",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "24.01",
+          "description": "Classics of Western Philosophy",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "38"
+    },
+    {
+      "id": "24.111",
+      "title": "Philosophy of Quantum Mechanics",
+      "description": "<p>Quantum mechanics–even in the ordinary, non-relativistic, “particle” formulation that will be the primary focus of this course–has been a staggeringly successful physical theory, surely one of the crowning achievements of 20th century science. It’s also rather bizarre–bizarre enough to lead very intelligent and otherwise sensible people to make such claims as that the universe is perpetually splitting into many copies of itself, that conscious minds have the power to make physi...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Linguistics and Philosophy",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "philosophy",
+        "humanities",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Linguistics and Philosophy",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "24.111",
+          "description": "Philosophy of Quantum Mechanics",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "38"
+    },
+    {
+      "id": "24.118",
+      "title": "Paradox and Infinity",
+      "description": "This course presents highlights of the more technical side of philosophy. It studies a cluster of puzzles, paradoxes, and intellectual wonders&nbsp;— from the higher infinite to Gödel’s Theorem&nbsp;— and discusses their philosophical implications.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Linguistics and Philosophy",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "economics",
+        "philosophy",
+        "humanities",
+        "social sciences",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Linguistics and Philosophy",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "24.118",
+          "description": "Paradox and Infinity",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "38"
+    },
+    {
+      "id": "24.131",
+      "title": "Ethics of Technology ",
+      "description": "This course introduces the tools of philosophical ethics through application to contemporary issues concerning technology. It takes up current debates on topics such as privacy and surveillance, algorithmic bias, the promise and peril of artificial intelligence, automation and the future of work, and threats to democracy in the digital age from the perspective of users, practitioners, and regulatory/governing bodies.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Linguistics and Philosophy",
+      "subdomain": "Policy and Administration",
+      "tags": [
+        "policy and administration",
+        "philosophy",
+        "law",
+        "computer science",
+        "humanities",
+        "user experience",
+        "engineering",
+        "data science, analytics & computer technology",
+        "social sciences"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Linguistics and Philosophy",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "24.131",
+          "description": "Ethics of Technology ",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "38"
+    },
+    {
+      "id": "24.213",
+      "title": "Philosophy of Film",
+      "description": "This course is a seminar on the philosophical analysis of film art, with an emphasis on the ways in which it creates meaning through techniques that define a formal structure. There is a particular focus on aesthetic problems about appearance and reality, literary and visual effects, communication and alienation through film technology.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Linguistics and Philosophy",
+      "subdomain": "Visual Arts",
+      "tags": [
+        "visual arts",
+        "philosophy",
+        "art, design & architecture",
+        "humanities"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Linguistics and Philosophy",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "24.213",
+          "description": "Philosophy of Film",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "38"
+    },
+    {
+      "id": "24.235J",
+      "title": "Philosophy of Law",
+      "description": "This course examines fundamental issues in the philosophy of law, including the nature and content of law, its relation to morality, theories of legal interpretation, and the obligation to obey the law, as well as philosophical issues and problems associated with punishment and responsibility, liberty, and legal ethics.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Linguistics and Philosophy",
+      "subdomain": "Humanities",
+      "tags": [
+        "humanities",
+        "philosophy",
+        "law",
+        "social sciences"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Linguistics and Philosophy",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "24.235J",
+          "description": "Philosophy of Law",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "38"
+    },
+    {
+      "id": "24.244",
+      "title": "Modal Logic",
+      "description": "Modal logic is the logic of necessity and possibility, and by extension of analogously paired notions like validity and consistency, obligation and permission, the known and the not-ruled-out. This a first course in the area. A solid background in first-order logic is essential. Topics to be covered include (some or all of) the main systems of propositional modal logic, Kripkean “possible world” semantics, strict implication, contingent identity, intensional objects, counterpart theory, t...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Linguistics and Philosophy",
+      "subdomain": "Linguistics",
+      "tags": [
+        "linguistics",
+        "philosophy",
+        "humanities"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Linguistics and Philosophy",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "24.244",
+          "description": "Modal Logic",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "38"
+    },
+    {
+      "id": "24.900",
+      "title": "Introduction to Linguistics",
+      "description": "This course studies what is language and what does knowledge of a language consist of. It asks how do children learn languages and is language unique to humans; why are there many languages; how do languages change; is any language or dialect superior to another; and how are speech and writing related. Context for these and similar questions is provided by basic examination of internal organization of sentences, words, and sound systems. No prior training in linguistics is assumed.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Linguistics and Philosophy",
+      "subdomain": "Language",
+      "tags": [
+        "language",
+        "linguistics",
+        "humanities"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Linguistics and Philosophy",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "24.900",
+          "description": "Introduction to Linguistics",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "38"
+    },
+    {
+      "id": "24.902",
+      "title": "Language and its Structure II: Syntax",
+      "description": "<p>This course will acquaint you with some of the important results and ideas of the last half - century of research in syntax. We will explore a large number of issues and a large amount of data so that you can learn something of what this field is all about. From time to time, we will discuss related work in language acquisition and processing. The class will emphasize ideas and arguments for these ideas in addition to the the details of particular analyses. At the same time, you will learn...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Linguistics and Philosophy",
+      "subdomain": "Linguistics",
+      "tags": [
+        "linguistics",
+        "philosophy",
+        "humanities"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Linguistics and Philosophy",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "24.902",
+          "description": "Language and its Structure II: Syntax",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "38"
+    },
+    {
+      "id": "24.902",
+      "title": "Language and its Structure II: Syntax",
+      "description": "This course covers some of the basic ideas in the subfield syntax, within the framework often referred to as “Generative Grammar”.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Linguistics and Philosophy",
+      "subdomain": "Linguistics",
+      "tags": [
+        "linguistics",
+        "humanities"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Linguistics and Philosophy",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "24.902",
+          "description": "Language and its Structure II: Syntax",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "38"
+    },
+    {
+      "id": "24.903",
+      "title": "Language and its Structure III: Semantics and Pragmatics",
+      "description": "This course gives an introduction to the science of linguistic meaning. There are two branches to this discipline: semantics, the study of conventional, “compositional meaning”, and pragmatics, the study of interactional meaning. There are other contributaries: philosophy, logic, syntax, and psychology. We will try to give you an understanding of the concepts of semantics and pragmatics and of some of the technical tools that we use.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Linguistics and Philosophy",
+      "subdomain": "Humanities",
+      "tags": [
+        "humanities",
+        "linguistics",
+        "philosophy"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Linguistics and Philosophy",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "24.903",
+          "description": "Language and its Structure III: Semantics and Pragmatics",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "38"
+    },
+    {
+      "id": "24.908",
+      "title": "Creole Languages and Caribbean Identities",
+      "description": "Caribbean Creole languages result from language contact via colonization and the slave trade. In this course we explore the history of Creole languages from cognitive, historical and comparative perspectives. We evaluate popular theories about “Creole genesis” and the role of language acquisition. Then we explore the non-linguistic aspects of Creole formation, using sources from literature, religion and music. We also look into issues of Caribbean identities as we examine Creole speakers...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Linguistics and Philosophy",
+      "subdomain": "Sociology",
+      "tags": [
+        "sociology",
+        "linguistics",
+        "humanities",
+        "social sciences"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Linguistics and Philosophy",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "24.908",
+          "description": "Creole Languages and Caribbean Identities",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "38"
+    },
+    {
+      "id": "24.912",
+      "title": "Black Matters: Introduction to Black Studies",
+      "description": "Interdisciplinary survey of people of African descent that draws on the overlapping approaches of history, literature, anthropology, legal studies, media studies, performance, linguistics, and creative writing. This course connects the experiences of African-Americans and of other American minorities, focusing on social, political, and cultural histories, and on linguistic patterns.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Linguistics and Philosophy",
+      "subdomain": "Language",
+      "tags": [
+        "language",
+        "literature",
+        "philosophy",
+        "humanities"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Linguistics and Philosophy",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "24.912",
+          "description": "Black Matters: Introduction to Black Studies",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "38"
+    },
+    {
+      "id": "24.914",
+      "title": "Language Variation and Change",
+      "description": "All languages vary across geographic space and between social groups, and languages are always changing. It makes sense to study these phenomena together because they are intimately related: language change is the basic source of language variation. So studying language change can help us to understand variation, and the nature of linguistic variation provides evidence as to how language changes. Both illuminate the nature of grammar. The course will focus largely on variation and change in p...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Linguistics and Philosophy",
+      "subdomain": "Linguistics",
+      "tags": [
+        "linguistics",
+        "humanities"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Linguistics and Philosophy",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "24.914",
+          "description": "Language Variation and Change",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "38"
+    },
+    {
+      "id": "24.946",
+      "title": "Linguistic Theory and the Japanese Language",
+      "description": "This course is a detailed examination of the grammar of Japanese and its structure which is significantly different from English, with special emphasis on problems of interest in the study of linguistic universals. Data from a broad group of languages is studied for comparison with Japanese. This course assumes familiarity with linguistic theory.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Linguistics and Philosophy",
+      "subdomain": "Language",
+      "tags": [
+        "language",
+        "linguistics",
+        "humanities"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Linguistics and Philosophy",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "24.946",
+          "description": "Linguistic Theory and the Japanese Language",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "38"
+    },
+    {
+      "id": "24.954",
+      "title": "Pragmatics in Linguistic Theory",
+      "description": "This course is the third and final part of our graduate introduction to semantics. The other two classes are <em>24.970 Introduction to Semantics</em> and <em>24.973 Advanced Semantics</em>. The semester will be divided into somewhat independent units. One unit will be devoted to conversational implicatures (mainly scalar implicatures) and another to presupposition. In each unit, we will discuss basic concepts and technical tools and then devote some time to recent work which illustrates thei...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Linguistics and Philosophy",
+      "subdomain": "Humanities",
+      "tags": [
+        "humanities",
+        "linguistics"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Linguistics and Philosophy",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "24.954",
+          "description": "Pragmatics in Linguistic Theory",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "38"
+    },
+    {
+      "id": "24.973",
+      "title": "Advanced Semantics",
+      "description": "<p>This course is the second of the three parts of our graduate introduction to semantics. The others are <em>24.970 Introduction to Semantics</em> and <em>24.954 Pragmatics in Linguistic Theory</em>. Like the other courses, this one is not meant as an overview of the field and its current developments. Our aim is to help you to develop the ability for semantic analysis, and we think that exploring a few topics in detail together with hands-on practical work is more effective than offering a ...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Linguistics and Philosophy",
+      "subdomain": "Linguistics",
+      "tags": [
+        "linguistics",
+        "humanities"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Linguistics and Philosophy",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "24.973",
+          "description": "Advanced Semantics",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "38"
+    },
+    {
+      "id": "9.56J",
+      "title": "Abnormal Language",
+      "description": "Introduction to the linguistic study of language pathology, concentrating on experimental approaches and theoretical explanations. Discussion of Specific Language Impairment, autism, Down syndrome, Williams syndrome, normal aging, Parkinson’s disease, Alzheimer’s disease, hemispherectomy and aphasia. Focuses on the comparison of linguistic abilities among these syndromes, while drawing clear comparisons with first and second language acquisition. Topics include the lexicon, morphology, sy...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Linguistics and Philosophy",
+      "subdomain": "Health Care Management",
+      "tags": [
+        "health care management",
+        "linguistics",
+        "cognitive science",
+        "humanities",
+        "science & math",
+        "health & medicine"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Linguistics and Philosophy",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "9.56J",
+          "description": "Abnormal Language",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "38"
+    },
+    {
+      "id": "9.591J",
+      "title": "Language Processing",
+      "description": "This course is a seminar in real-time language comprehension. It considers models of sentence and discourse comprehension from the linguistic, psychology, and artificial intelligence literature, including symbolic and connectionist models. Topics include ambiguity resolution and linguistic complexity; the use of lexical, syntactic, semantic, pragmatic, contextual and prosodic information in language comprehension; the relationship between the computational resources available in working memor...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Linguistics and Philosophy",
+      "subdomain": "Linguistics",
+      "tags": [
+        "linguistics",
+        "cognitive science",
+        "humanities",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Linguistics and Philosophy",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "9.591J",
+          "description": "Language Processing",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "500-600",
+      "cip_code": "38"
+    },
+    {
+      "id": "9.59J",
+      "title": "Lab in Psycholinguistics",
+      "description": "Hands-on experience designing, conducting, analyzing, and presenting experiments on the structure and processing of human language. Focuses on constructing, conducting, analyzing, and presenting an original and independent experimental project of publishable quality. Develops skills in reading and writing scientific research reports in cognitive science, including evaluating the methods section of a published paper, reading and understanding graphical displays and statistical claims about dat...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Linguistics and Philosophy",
+      "subdomain": "Linguistics",
+      "tags": [
+        "linguistics",
+        "cognitive science",
+        "humanities",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Linguistics and Philosophy",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "9.59J",
+          "description": "Lab in Psycholinguistics",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "38"
+    }
+  ],
+  "edges": [
+    {
+      "from": "24.01",
+      "to": "24.111",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 24.01 typically precedes 24.111."
+    },
+    {
+      "from": "24.01",
+      "to": "24.118",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 24.01 typically precedes 24.118."
+    },
+    {
+      "from": "24.01",
+      "to": "24.131",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 24.01 typically precedes 24.131."
+    },
+    {
+      "from": "9.56J",
+      "to": "24.111",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 9.56J typically precedes 24.111."
+    },
+    {
+      "from": "9.56J",
+      "to": "24.118",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 9.56J typically precedes 24.118."
+    },
+    {
+      "from": "9.56J",
+      "to": "24.131",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 9.56J typically precedes 24.131."
+    },
+    {
+      "from": "9.59J",
+      "to": "24.111",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 9.59J typically precedes 24.111."
+    },
+    {
+      "from": "9.59J",
+      "to": "24.118",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 9.59J typically precedes 24.118."
+    },
+    {
+      "from": "9.59J",
+      "to": "24.131",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 9.59J typically precedes 24.131."
+    }
+  ]
+}

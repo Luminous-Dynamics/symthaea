@@ -92,6 +92,7 @@ impl AcmSource {
         ProgramDescriptor {
             id: format!("ACM:CS2013:{}", ka.id),
             title: format!("CS2013: {}", ka.title),
+            subject_area: Some("Computer Science".to_string()),
             level: AcademicLevel::Undergraduate,
             cip_code: Some("11.0701".to_string()),
             institution: None,

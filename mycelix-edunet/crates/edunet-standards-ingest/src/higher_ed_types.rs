@@ -109,6 +109,9 @@ pub struct ProgramDescriptor {
     pub id: String,
     /// Program title (e.g., "Computer Science, BS")
     pub title: String,
+    /// Subject area for classification (e.g., "Computer Science").
+    /// If None, falls back to title.
+    pub subject_area: Option<String>,
     /// Academic level
     pub level: AcademicLevel,
     /// CIP code if applicable

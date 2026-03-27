@@ -304,6 +304,107 @@ fn embedded_phd_templates() -> Vec<PhDTemplate> {
             cip_code: Some("45.0601".into()),
             milestones: core_milestones("phd-economics"),
         },
+        // ---- Humanities & Social Sciences ----
+        PhDTemplate {
+            id: "phd-literature".into(),
+            discipline: "Literature".into(),
+            cip_code: Some("23.0101".into()),
+            milestones: {
+                let mut m = core_milestones("phd-literature");
+                m.push(PhDMilestone {
+                    id: "phd-literature/language-exam".into(),
+                    title: "Foreign Language Examination".to_string(),
+                    description: "Demonstrate reading proficiency in one or two foreign \
+                                  languages relevant to the research area."
+                        .to_string(),
+                    milestone_type: PhDMilestoneType::QualifyingExam,
+                    typical_year: 2,
+                    estimated_hours: 180,
+                    prerequisites: vec!["phd-literature/coursework".into()],
+                });
+                m
+            },
+        },
+        PhDTemplate {
+            id: "phd-philosophy".into(),
+            discipline: "Philosophy".into(),
+            cip_code: Some("38.0101".into()),
+            milestones: core_milestones("phd-philosophy"),
+        },
+        PhDTemplate {
+            id: "phd-history".into(),
+            discipline: "History".into(),
+            cip_code: Some("54.0101".into()),
+            milestones: {
+                let mut m = core_milestones("phd-history");
+                m.push(PhDMilestone {
+                    id: "phd-history/archival-research".into(),
+                    title: "Archival Research".to_string(),
+                    description: "Conduct primary source research in archives. Travel to \
+                                  relevant collections and develop expertise in paleography \
+                                  and source analysis."
+                        .to_string(),
+                    milestone_type: PhDMilestoneType::Research,
+                    typical_year: 3,
+                    estimated_hours: 720,
+                    prerequisites: vec!["phd-history/proposal".into()],
+                });
+                m
+            },
+        },
+        PhDTemplate {
+            id: "phd-linguistics".into(),
+            discipline: "Linguistics".into(),
+            cip_code: Some("16.0102".into()),
+            milestones: {
+                let mut m = core_milestones("phd-linguistics");
+                m.push(PhDMilestone {
+                    id: "phd-linguistics/fieldwork".into(),
+                    title: "Linguistic Fieldwork".to_string(),
+                    description: "Conduct fieldwork with language communities. Collect and \
+                                  analyze primary linguistic data using appropriate ethical \
+                                  frameworks."
+                        .to_string(),
+                    milestone_type: PhDMilestoneType::Research,
+                    typical_year: 3,
+                    estimated_hours: 540,
+                    prerequisites: vec!["phd-linguistics/proposal".into()],
+                });
+                m
+            },
+        },
+        PhDTemplate {
+            id: "phd-political-science".into(),
+            discipline: "Political Science".into(),
+            cip_code: Some("45.1001".into()),
+            milestones: core_milestones("phd-political-science"),
+        },
+        PhDTemplate {
+            id: "phd-sociology".into(),
+            discipline: "Sociology".into(),
+            cip_code: Some("45.1101".into()),
+            milestones: core_milestones("phd-sociology"),
+        },
+        PhDTemplate {
+            id: "phd-chemistry".into(),
+            discipline: "Chemistry".into(),
+            cip_code: Some("40.0501".into()),
+            milestones: {
+                let mut m = core_milestones("phd-chemistry");
+                m.push(PhDMilestone {
+                    id: "phd-chemistry/lab-rotation".into(),
+                    title: "Laboratory Rotations".to_string(),
+                    description: "Complete 2-3 rotations in different research groups \
+                                  to identify dissertation advisor and research area."
+                        .to_string(),
+                    milestone_type: PhDMilestoneType::Research,
+                    typical_year: 1,
+                    estimated_hours: 360,
+                    prerequisites: vec![],
+                });
+                m
+            },
+        },
     ]
 }
 

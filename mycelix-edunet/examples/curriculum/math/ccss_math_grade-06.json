@@ -1,0 +1,941 @@
+{
+  "metadata": {
+    "title": "Grade 6",
+    "framework": "Common Core State Standards",
+    "source": "http://www.corestandards.org/assets/CCSSI_Math%20Standards.pdf",
+    "grade_level": "Grade6",
+    "subject_area": "Mathematics",
+    "domain": "Mathematics",
+    "version": "2010",
+    "total_standards": 29,
+    "domains": [
+      "Statistics and Probability",
+      "Expressions and Equations",
+      "The Number System",
+      "Ratios and Proportional Relationships",
+      "Geometry",
+      "Standards for Mathematical Practice"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Auto-ingested from Common Standards Project (set 67810E9EF6944F9383DCC602A3484C23_D10003FB_grade-06). Node structure matches KnowledgeNode in knowledge_zome/integrity/src/lib.rs."
+  },
+  "nodes": [
+    {
+      "id": "CCSS.Math.Content.6.SP.B.5",
+      "title": "Summarize numerical data sets in relation to their context, such as by:",
+      "description": "Summarize numerical data sets in relation to their context, such as by:",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Statistics and Probability",
+      "tags": [
+        "data"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.SP.B.5",
+          "description": "Summarize numerical data sets in relation to their context, such as by:",
+          "grade_level": "Grade6"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.6.SP.B.4",
+      "title": "Display numerical data in plots on a number line, including dot plots, histog...",
+      "description": "Display numerical data in plots on a number line, including dot plots, histograms, and box plots.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Statistics and Probability",
+      "tags": [
+        "data"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.SP.B.4",
+          "description": "Display numerical data in plots on a number line, including dot plots, histograms, and box plots.",
+          "grade_level": "Grade6"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.6.SP.A.3",
+      "title": "Recognize that a measure of center for a numerical data set summarizes all of...",
+      "description": "Recognize that a measure of center for a numerical data set summarizes all of its values with a single number, while a measure of variation describes how its values vary with a single number.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Statistics and Probability",
+      "tags": [
+        "data"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.SP.A.3",
+          "description": "Recognize that a measure of center for a numerical data set summarizes all of its values with a single number, while a measure of variation describes how its values vary with a single number.",
+          "grade_level": "Grade6"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.6.SP.A.2",
+      "title": "Understand that a set of data collected to answer a statistical question has ...",
+      "description": "Understand that a set of data collected to answer a statistical question has a distribution which can be described by its center, spread, and overall shape.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Statistics and Probability",
+      "tags": [
+        "data"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.SP.A.2",
+          "description": "Understand that a set of data collected to answer a statistical question has a distribution which can be described by its center, spread, and overall shape.",
+          "grade_level": "Grade6"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.6.SP.A.1",
+      "title": "Recognize a statistical question as one that anticipates variability in the d...",
+      "description": "Recognize a statistical question as one that anticipates variability in the data related to the question and accounts for it in the answers.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Statistics and Probability",
+      "tags": [
+        "data"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.SP.A.1",
+          "description": "Recognize a statistical question as one that anticipates variability in the data related to the question and accounts for it in the answers.",
+          "grade_level": "Grade6"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.6.EE.C.9",
+      "title": "Use variables to represent two quantities in a real-world problem that change...",
+      "description": "Use variables to represent two quantities in a real-world problem that change in relationship to one another; write an equation to express one quantity, thought of as the dependent variable, in terms of the other quantity, thought of as the independent variable. Analyze the relationship between the dependent and independent variables using graphs and tables, and relate these to the equation.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Expressions and Equations",
+      "tags": [
+        "graphs"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.EE.C.9",
+          "description": "Use variables to represent two quantities in a real-world problem that change in relationship to one another; write an equation to express one quantity, thought of as the dependent variable, in terms of the other quantity, thought of as the independent variable. Analyze the relationship between the dependent and independent variables using graphs and tables, and relate these to the equation.",
+          "grade_level": "Grade6"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.6.EE.B.8",
+      "title": "Write an inequality of the form x > c or x < c to represent a constraint or c...",
+      "description": "Write an inequality of the form x > c or x < c to represent a constraint or condition in a real-world or mathematical problem. Recognize that inequalities of the form x > c or x < c have infinitely many solutions; represent solutions of such inequalities on number line diagrams.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Expressions and Equations",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.EE.B.8",
+          "description": "Write an inequality of the form x > c or x < c to represent a constraint or condition in a real-world or mathematical problem. Recognize that inequalities of the form x > c or x < c have infinitely many solutions; represent solutions of such inequalities on number line diagrams.",
+          "grade_level": "Grade6"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.6.EE.B.7",
+      "title": "Solve real-world and mathematical problems by writing and solving equations o...",
+      "description": "Solve real-world and mathematical problems by writing and solving equations of the form x + p = q and px = q for cases in which p, q and x are all nonnegative rational numbers.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Expressions and Equations",
+      "tags": [
+        "equations",
+        "writing"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.EE.B.7",
+          "description": "Solve real-world and mathematical problems by writing and solving equations of the form x + p = q and px = q for cases in which p, q and x are all nonnegative rational numbers.",
+          "grade_level": "Grade6"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.6.EE.B.6",
+      "title": "Use variables to represent numbers and write expressions when solving a real-...",
+      "description": "Use variables to represent numbers and write expressions when solving a real-world or mathematical problem; understand that a variable can represent an unknown number, or, depending on the purpose at hand, any number in a specified set.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Expressions and Equations",
+      "tags": [
+        "expressions"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.EE.B.6",
+          "description": "Use variables to represent numbers and write expressions when solving a real-world or mathematical problem; understand that a variable can represent an unknown number, or, depending on the purpose at hand, any number in a specified set.",
+          "grade_level": "Grade6"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.6.EE.B.5",
+      "title": "Understand solving an equation or inequality as a process of answering a ques...",
+      "description": "Understand solving an equation or inequality as a process of answering a question: which values from a specified set, if any, make the equation or inequality true? Use substitution to determine whether a given number in a specified set makes an equation or inequality true.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Expressions and Equations",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.EE.B.5",
+          "description": "Understand solving an equation or inequality as a process of answering a question: which values from a specified set, if any, make the equation or inequality true? Use substitution to determine whether a given number in a specified set makes an equation or inequality true.",
+          "grade_level": "Grade6"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.6.EE.A.4",
+      "title": "Identify when two expressions are equivalent (i",
+      "description": "Identify when two expressions are equivalent (i.e., when the two expressions name the same number regardless of which value is substituted into them).",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Expressions and Equations",
+      "tags": [
+        "expressions"
+      ],
+      "estimated_hours": 4,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Remember",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.EE.A.4",
+          "description": "Identify when two expressions are equivalent (i.e., when the two expressions name the same number regardless of which value is substituted into them).",
+          "grade_level": "Grade6"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.6.EE.A.3",
+      "title": "Apply the properties of operations to generate equivalent expressions",
+      "description": "Apply the properties of operations to generate equivalent expressions.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Expressions and Equations",
+      "tags": [
+        "expressions"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.EE.A.3",
+          "description": "Apply the properties of operations to generate equivalent expressions.",
+          "grade_level": "Grade6"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.6.EE.A.2",
+      "title": "Write, read, and evaluate expressions in which letters stand for numbers",
+      "description": "Write, read, and evaluate expressions in which letters stand for numbers.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Expressions and Equations",
+      "tags": [
+        "expressions"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.EE.A.2",
+          "description": "Write, read, and evaluate expressions in which letters stand for numbers.",
+          "grade_level": "Grade6"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.6.EE.A.1",
+      "title": "Write and evaluate numerical expressions involving whole-number exponents",
+      "description": "Write and evaluate numerical expressions involving whole-number exponents.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Expressions and Equations",
+      "tags": [
+        "expressions"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.EE.A.1",
+          "description": "Write and evaluate numerical expressions involving whole-number exponents.",
+          "grade_level": "Grade6"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.6.NS.C.8",
+      "title": "Solve real-world and mathematical problems by graphing points in all four qua...",
+      "description": "Solve real-world and mathematical problems by graphing points in all four quadrants of the coordinate plane. Include use of coordinates and absolute value to find distances between points with the same first coordinate or the same second coordinate.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "The Number System",
+      "tags": [
+        "coordinates"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.NS.C.8",
+          "description": "Solve real-world and mathematical problems by graphing points in all four quadrants of the coordinate plane. Include use of coordinates and absolute value to find distances between points with the same first coordinate or the same second coordinate.",
+          "grade_level": "Grade6"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.6.NS.C.7",
+      "title": "Understand ordering and absolute value of rational numbers",
+      "description": "Understand ordering and absolute value of rational numbers.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "The Number System",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.NS.C.7",
+          "description": "Understand ordering and absolute value of rational numbers.",
+          "grade_level": "Grade6"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.6.NS.C.6",
+      "title": "Understand a rational number as a point on the number line",
+      "description": "Understand a rational number as a point on the number line. Extend number line diagrams and coordinate axes familiar from previous grades to represent points on the line and in the plane with negative number coordinates.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "The Number System",
+      "tags": [
+        "coordinates"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.NS.C.6",
+          "description": "Understand a rational number as a point on the number line. Extend number line diagrams and coordinate axes familiar from previous grades to represent points on the line and in the plane with negative number coordinates.",
+          "grade_level": "Grade6"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.6.NS.C.5",
+      "title": "Understand that positive and negative numbers are used together to describe q...",
+      "description": "Understand that positive and negative numbers are used together to describe quantities having opposite directions or values (e.g., temperature above/below zero, elevation above/below sea level, credits/debits, positive/negative electric charge); use positive and negative numbers to represent quantities in real-world contexts, explaining the meaning of 0 in each situation.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "The Number System",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.NS.C.5",
+          "description": "Understand that positive and negative numbers are used together to describe quantities having opposite directions or values (e.g., temperature above/below zero, elevation above/below sea level, credits/debits, positive/negative electric charge); use positive and negative numbers to represent quantities in real-world contexts, explaining the meaning of 0 in each situation.",
+          "grade_level": "Grade6"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.6.NS.B.4",
+      "title": "Find the greatest common factor of two whole numbers less than or equal to 10...",
+      "description": "Find the greatest common factor of two whole numbers less than or equal to 100 and the least common multiple of two whole numbers less than or equal to 12. Use the distributive property to express a sum of two whole numbers 1—100 with a common factor as a multiple of a sum of two whole numbers with no common factor.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "The Number System",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.NS.B.4",
+          "description": "Find the greatest common factor of two whole numbers less than or equal to 100 and the least common multiple of two whole numbers less than or equal to 12. Use the distributive property to express a sum of two whole numbers 1—100 with a common factor as a multiple of a sum of two whole numbers with no common factor.",
+          "grade_level": "Grade6"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.6.NS.B.3",
+      "title": "Fluently add, subtract, multiply, and divide multi-digit decimals using the s...",
+      "description": "Fluently add, subtract, multiply, and divide multi-digit decimals using the standard algorithm for each operation.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "The Number System",
+      "tags": [
+        "decimals",
+        "algorithm"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.NS.B.3",
+          "description": "Fluently add, subtract, multiply, and divide multi-digit decimals using the standard algorithm for each operation.",
+          "grade_level": "Grade6"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.6.NS.B.2",
+      "title": "Fluently divide multi-digit numbers using the standard algorithm",
+      "description": "Fluently divide multi-digit numbers using the standard algorithm.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "The Number System",
+      "tags": [
+        "algorithm"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.NS.B.2",
+          "description": "Fluently divide multi-digit numbers using the standard algorithm.",
+          "grade_level": "Grade6"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.6.NS.A.1",
+      "title": "Interpret and compute quotients of fractions, and solve word problems involvi...",
+      "description": "Interpret and compute quotients of fractions, and solve word problems involving division of fractions by fractions, e.g., by using visual fraction models and equations to represent the problem.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "The Number System",
+      "tags": [
+        "division",
+        "fractions",
+        "equations"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.NS.A.1",
+          "description": "Interpret and compute quotients of fractions, and solve word problems involving division of fractions by fractions, e.g., by using visual fraction models and equations to represent the problem.",
+          "grade_level": "Grade6"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.6.RP.A.3",
+      "title": "Use ratio and rate reasoning to solve real-world and mathematical problems, e",
+      "description": "Use ratio and rate reasoning to solve real-world and mathematical problems, e.g., by reasoning about tables of equivalent ratios, tape diagrams, double number line diagrams, or equations.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Ratios and Proportional Relationships",
+      "tags": [
+        "equations",
+        "ratios"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.RP.A.3",
+          "description": "Use ratio and rate reasoning to solve real-world and mathematical problems, e.g., by reasoning about tables of equivalent ratios, tape diagrams, double number line diagrams, or equations.",
+          "grade_level": "Grade6"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.6.RP.A.2",
+      "title": "Understand the concept of a unit rate a/b associated with a ratio a:b with b ...",
+      "description": "Understand the concept of a unit rate a/b associated with a ratio a:b with b ≠ 0, and use rate language in the context of a ratio relationship.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Ratios and Proportional Relationships",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.RP.A.2",
+          "description": "Understand the concept of a unit rate a/b associated with a ratio a:b with b ≠ 0, and use rate language in the context of a ratio relationship.",
+          "grade_level": "Grade6"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.6.RP.A.1",
+      "title": "Understand the concept of a ratio and use ratio language to describe a ratio ...",
+      "description": "Understand the concept of a ratio and use ratio language to describe a ratio relationship between two quantities.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Ratios and Proportional Relationships",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.RP.A.1",
+          "description": "Understand the concept of a ratio and use ratio language to describe a ratio relationship between two quantities.",
+          "grade_level": "Grade6"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.6.G.A.4",
+      "title": "Represent three-dimensional figures using nets made up of rectangles and tria...",
+      "description": "Represent three-dimensional figures using nets made up of rectangles and triangles, and use the nets to find the surface area of these figures. Apply these techniques in the context of solving real-world and mathematical problems.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "area",
+        "angles"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.G.A.4",
+          "description": "Represent three-dimensional figures using nets made up of rectangles and triangles, and use the nets to find the surface area of these figures. Apply these techniques in the context of solving real-world and mathematical problems.",
+          "grade_level": "Grade6"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.6.G.A.3",
+      "title": "Draw polygons in the coordinate plane given coordinates for the vertices",
+      "description": "Draw polygons in the coordinate plane given coordinates for the vertices; use coordinates to find the length of a side joining points with the same first coordinate or the same second coordinate. Apply these techniques in the context of solving real-world and mathematical problems.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "coordinates"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.G.A.3",
+          "description": "Draw polygons in the coordinate plane given coordinates for the vertices; use coordinates to find the length of a side joining points with the same first coordinate or the same second coordinate. Apply these techniques in the context of solving real-world and mathematical problems.",
+          "grade_level": "Grade6"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.6.G.A.2",
+      "title": "Find the volume of a right rectangular prism with fractional edge lengths by ...",
+      "description": "Find the volume of a right rectangular prism with fractional edge lengths by packing it with unit cubes of the appropriate unit fraction edge lengths, and show that the volume is the same as would be found by multiplying the edge lengths of the prism. Apply the formulas V = l w h and V = b h to find volumes of right rectangular prisms with fractional edge lengths in the context of solving real-world and mathematical problems.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "volume"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.G.A.2",
+          "description": "Find the volume of a right rectangular prism with fractional edge lengths by packing it with unit cubes of the appropriate unit fraction edge lengths, and show that the volume is the same as would be found by multiplying the edge lengths of the prism. Apply the formulas V = l w h and V = b h to find volumes of right rectangular prisms with fractional edge lengths in the context of solving real-world and mathematical problems.",
+          "grade_level": "Grade6"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.6.G.A.1",
+      "title": "Find the area of right triangles, other triangles, special quadrilaterals, an...",
+      "description": "Find the area of right triangles, other triangles, special quadrilaterals, and polygons by composing into rectangles or decomposing into triangles and other shapes; apply these techniques in the context of solving real-world and mathematical problems.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "area",
+        "angles"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade6"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.6.G.A.1",
+          "description": "Find the area of right triangles, other triangles, special quadrilaterals, and polygons by composing into rectangles or decomposing into triangles and other shapes; apply these techniques in the context of solving real-world and mathematical problems.",
+          "grade_level": "Grade6"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "CCSS.Math.Content.6.G.A.1",
+      "to": "CCSS.Math.Content.6.G.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.6.G.A.1 is a prerequisite for CCSS.Math.Content.6.G.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.6.G.A.2",
+      "to": "CCSS.Math.Content.6.G.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.6.G.A.2 is a prerequisite for CCSS.Math.Content.6.G.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.6.G.A.3",
+      "to": "CCSS.Math.Content.6.G.A.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.6.G.A.3 is a prerequisite for CCSS.Math.Content.6.G.A.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.6.RP.A.1",
+      "to": "CCSS.Math.Content.6.RP.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.6.RP.A.1 is a prerequisite for CCSS.Math.Content.6.RP.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.6.RP.A.2",
+      "to": "CCSS.Math.Content.6.RP.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.6.RP.A.2 is a prerequisite for CCSS.Math.Content.6.RP.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.6.NS.A.1",
+      "to": "CCSS.Math.Content.6.NS.B.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.6.NS.A.1 is a prerequisite for CCSS.Math.Content.6.NS.B.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.6.NS.B.2",
+      "to": "CCSS.Math.Content.6.NS.B.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.6.NS.B.2 is a prerequisite for CCSS.Math.Content.6.NS.B.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.6.NS.B.3",
+      "to": "CCSS.Math.Content.6.NS.B.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.6.NS.B.3 is a prerequisite for CCSS.Math.Content.6.NS.B.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.6.NS.B.4",
+      "to": "CCSS.Math.Content.6.NS.C.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.6.NS.B.4 is a prerequisite for CCSS.Math.Content.6.NS.C.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.6.NS.C.5",
+      "to": "CCSS.Math.Content.6.NS.C.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.6.NS.C.5 is a prerequisite for CCSS.Math.Content.6.NS.C.6 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.6.NS.C.6",
+      "to": "CCSS.Math.Content.6.NS.C.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.6.NS.C.6 is a prerequisite for CCSS.Math.Content.6.NS.C.7 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.6.NS.C.7",
+      "to": "CCSS.Math.Content.6.NS.C.8",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.6.NS.C.7 is a prerequisite for CCSS.Math.Content.6.NS.C.8 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.6.SP.A.1",
+      "to": "CCSS.Math.Content.6.SP.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.6.SP.A.1 is a prerequisite for CCSS.Math.Content.6.SP.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.6.SP.A.2",
+      "to": "CCSS.Math.Content.6.SP.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.6.SP.A.2 is a prerequisite for CCSS.Math.Content.6.SP.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.6.SP.A.3",
+      "to": "CCSS.Math.Content.6.SP.B.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.6.SP.A.3 is a prerequisite for CCSS.Math.Content.6.SP.B.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.6.SP.B.4",
+      "to": "CCSS.Math.Content.6.SP.B.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.6.SP.B.4 is a prerequisite for CCSS.Math.Content.6.SP.B.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.6.EE.A.1",
+      "to": "CCSS.Math.Content.6.EE.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.6.EE.A.1 is a prerequisite for CCSS.Math.Content.6.EE.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.6.EE.A.2",
+      "to": "CCSS.Math.Content.6.EE.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.6.EE.A.2 is a prerequisite for CCSS.Math.Content.6.EE.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.6.EE.A.3",
+      "to": "CCSS.Math.Content.6.EE.A.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.6.EE.A.3 is a prerequisite for CCSS.Math.Content.6.EE.A.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.6.EE.A.4",
+      "to": "CCSS.Math.Content.6.EE.B.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.6.EE.A.4 is a prerequisite for CCSS.Math.Content.6.EE.B.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.6.EE.B.5",
+      "to": "CCSS.Math.Content.6.EE.B.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.6.EE.B.5 is a prerequisite for CCSS.Math.Content.6.EE.B.6 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.6.EE.B.6",
+      "to": "CCSS.Math.Content.6.EE.B.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.6.EE.B.6 is a prerequisite for CCSS.Math.Content.6.EE.B.7 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.6.EE.B.7",
+      "to": "CCSS.Math.Content.6.EE.B.8",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.6.EE.B.7 is a prerequisite for CCSS.Math.Content.6.EE.B.8 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.6.EE.B.8",
+      "to": "CCSS.Math.Content.6.EE.C.9",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.6.EE.B.8 is a prerequisite for CCSS.Math.Content.6.EE.C.9 within the same domain."
+    }
+  ]
+}
