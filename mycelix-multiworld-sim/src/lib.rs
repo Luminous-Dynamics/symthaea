@@ -930,11 +930,17 @@ impl MultiWorldSimulator {
 
             for &wid in &target_ids {
                 if let Some(world) = self.worlds.iter_mut().find(|w| w.id == wid) {
+                    // Mechanism 4 — Consciousness-Gated Evacuation: high-consciousness
+                    // colonies lose up to 50% fewer people to disasters. Mean Phi acts
+                    // as a collective awareness multiplier for evacuation efficiency.
+                    let mean_phi = world.mean_phi();
+                    let effective_loss = effects.population_loss_fraction * (1.0 - mean_phi * 0.5);
+
                     // Population loss: kill a fraction of living agents (random selection)
-                    if effects.population_loss_fraction > 0.0 {
+                    if effective_loss > 0.0 {
                         let living_count = world.population();
                         let to_kill =
-                            (living_count as f64 * effects.population_loss_fraction).round()
+                            (living_count as f64 * effective_loss).round()
                                 as usize;
                         if to_kill > 0 {
                             // Collect living agent ids, then kill the first `to_kill`
@@ -966,6 +972,16 @@ impl MultiWorldSimulator {
                             - effects.infrastructure_damage)
                             .max(0.0);
                     }
+
+                    // Mechanism 3 — Sacred Stillness Recovery Bonus: harmony index 7
+                    // (Sacred Stillness) accelerates infrastructure recovery after damage.
+                    // Stillness 0.0 → 0.2%/tick (~42 years full rebuild)
+                    // Stillness 0.5 → 0.7%/tick (~12 years)
+                    // Stillness 1.0 → 1.2%/tick (~7 years)
+                    let stillness_score = world.harmony.current_scores[7];
+                    let recovery_rate = 0.002 + stillness_score * 0.01;
+                    world.infrastructure_level =
+                        (world.infrastructure_level + recovery_rate).min(1.0);
 
                     // Resource production penalty: reduce production_rate temporarily
                     // by multiplying by (1 - penalty). We apply to current stocks as proxy

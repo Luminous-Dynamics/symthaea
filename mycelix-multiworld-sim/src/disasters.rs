@@ -26,6 +26,7 @@ use crate::stochastic::StochasticEngine;
 use crate::world::World;
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 // ---------------------------------------------------------------------------
 // Constants: monthly probabilities derived from published annualized rates
@@ -535,6 +536,10 @@ pub struct DisasterEngine {
     pub high_load_ticks: Vec<(u32, u32)>, // (world_id, consecutive_ticks)
     /// Configurable tech tree.
     pub tech_tree: TechTree,
+    /// Mechanism 5 — Collective Memory Inoculation: disaster kinds the civilization
+    /// has survived (remaining_ticks reached 0). Subsequent occurrences of the same
+    /// kind have severity reduced by 30% (institutional learning).
+    pub survived_disaster_types: HashSet<String>,
     // --- Statistics ---
     pub total_disasters: u64,
     pub carrington_events: u32,
@@ -555,6 +560,7 @@ impl DisasterEngine {
             last_failure_ticks: Vec::new(),
             high_load_ticks: Vec::new(),
             tech_tree: TechTree::default_tree(),
+            survived_disaster_types: HashSet::new(),
             total_disasters: 0,
             carrington_events: 0,
             faction_crises: 0,
@@ -659,17 +665,29 @@ impl DisasterEngine {
 
         // X-class flare
         if rng.bernoulli(P_X_CLASS_FLARE * mult) {
+            // Mechanism 2 — Milestone Shielding: smaller reductions for X-class
+            // (40% for fission, 20% for manufacturing).
+            let mut xclass_severity = 1.0_f64;
+            if self.tech_tree.is_achieved("Fission Surface Power") {
+                xclass_severity *= 0.6; // 40% reduction
+            }
+            if self.tech_tree.is_achieved("Manufacturing Breakthrough") {
+                xclass_severity *= 0.8; // additional 20% reduction
+            }
+            xclass_severity *= self.inoculation_factor(
+                DisasterKind::Solar(SolarEventKind::XClassFlare),
+            );
             let effects = DisasterEffects {
-                solar_power_penalty: 0.15,
-                electronics_damage: 0.05,
-                allostatic_load_increase: 0.08,
-                consciousness_shock: 0.03,
-                morale_impact: -0.1,
+                solar_power_penalty: 0.15 * xclass_severity,
+                electronics_damage: 0.05 * xclass_severity,
+                allostatic_load_increase: 0.08 * xclass_severity,
+                consciousness_shock: 0.03 * xclass_severity,
+                morale_impact: -0.1 * xclass_severity,
                 ..Default::default()
             };
             self.active_disasters.push(ActiveDisaster {
                 kind: DisasterKind::Solar(SolarEventKind::XClassFlare),
-                severity: 0.6,
+                severity: 0.6 * xclass_severity,
                 remaining_ticks: 2,
                 world_id: None,
                 effects: effects.clone(),
@@ -678,26 +696,41 @@ impl DisasterEngine {
                 effects,
                 None,
                 CivEvent::new(tick, None, CivEventType::EmergencyDeclared,
-                    "X-class solar flare: 100x SEU rate, radiation shelter advised"),
+                    format!("X-class solar flare: 100x SEU rate, radiation shelter advised (severity {:.0}%)",
+                        xclass_severity * 100.0)),
             ));
             self.total_disasters += 1;
         }
 
         // Carrington event
         if rng.bernoulli(P_CARRINGTON) {
+            // Mechanism 2 — Milestone Shielding (Carrington Defense): fission power
+            // provides hardened electronics + nuclear backup (60% reduction), and
+            // manufacturing capability enables local rebuild (additional 30% reduction).
+            let mut carrington_severity = 1.0_f64;
+            if self.tech_tree.is_achieved("Fission Surface Power") {
+                carrington_severity *= 0.4; // 60% reduction
+            }
+            if self.tech_tree.is_achieved("Manufacturing Breakthrough") {
+                carrington_severity *= 0.7; // additional 30% reduction
+            }
+            // Mechanism 5 — Collective Memory Inoculation
+            carrington_severity *= self.inoculation_factor(
+                DisasterKind::Solar(SolarEventKind::CarringtonEvent),
+            );
             let effects = DisasterEffects {
-                solar_power_penalty: 0.9,
-                electronics_damage: 0.6,
-                infrastructure_damage: 0.3,
-                resource_production_penalty: 0.5,
-                consciousness_shock: 0.15,
-                allostatic_load_increase: 0.3,
-                morale_impact: -0.4,
+                solar_power_penalty: 0.9 * carrington_severity,
+                electronics_damage: 0.6 * carrington_severity,
+                infrastructure_damage: 0.3 * carrington_severity,
+                resource_production_penalty: 0.5 * carrington_severity,
+                consciousness_shock: 0.15 * carrington_severity,
+                allostatic_load_increase: 0.3 * carrington_severity,
+                morale_impact: -0.4 * carrington_severity,
                 ..Default::default()
             };
             self.active_disasters.push(ActiveDisaster {
                 kind: DisasterKind::Solar(SolarEventKind::CarringtonEvent),
-                severity: 0.95,
+                severity: 0.95 * carrington_severity,
                 remaining_ticks: 4, // weeks of recovery
                 world_id: None,
                 effects: effects.clone(),
@@ -706,7 +739,8 @@ impl DisasterEngine {
                 effects,
                 None,
                 CivEvent::new(tick, None, CivEventType::EmergencyDeclared,
-                    "CARRINGTON-CLASS EVENT: catastrophic electronics damage, weeks of recovery"),
+                    format!("CARRINGTON-CLASS EVENT: catastrophic electronics damage (severity {:.0}%)",
+                        carrington_severity * 100.0)),
             ));
             self.total_disasters += 1;
             self.carrington_events += 1;
@@ -714,16 +748,27 @@ impl DisasterEngine {
 
         // Major SPE
         if rng.bernoulli(P_MAJOR_SPE * mult) {
+            // Mechanism 2 — Milestone Shielding: 40% fission, 20% manufacturing.
+            let mut spe_severity = 1.0_f64;
+            if self.tech_tree.is_achieved("Fission Surface Power") {
+                spe_severity *= 0.6; // 40% reduction
+            }
+            if self.tech_tree.is_achieved("Manufacturing Breakthrough") {
+                spe_severity *= 0.8; // additional 20% reduction
+            }
+            spe_severity *= self.inoculation_factor(
+                DisasterKind::Solar(SolarEventKind::SolarProtonEvent),
+            );
             let effects = DisasterEffects {
-                population_loss_fraction: 0.01, // lethal dose for unshielded
-                allostatic_load_increase: 0.15,
-                consciousness_shock: 0.05,
-                morale_impact: -0.2,
+                population_loss_fraction: 0.01 * spe_severity,
+                allostatic_load_increase: 0.15 * spe_severity,
+                consciousness_shock: 0.05 * spe_severity,
+                morale_impact: -0.2 * spe_severity,
                 ..Default::default()
             };
             self.active_disasters.push(ActiveDisaster {
                 kind: DisasterKind::Solar(SolarEventKind::SolarProtonEvent),
-                severity: 0.7,
+                severity: 0.7 * spe_severity,
                 remaining_ticks: 1,
                 world_id: None,
                 effects: effects.clone(),
@@ -732,7 +777,8 @@ impl DisasterEngine {
                 effects,
                 None,
                 CivEvent::new(tick, None, CivEventType::EmergencyDeclared,
-                    "Major solar proton event: acute radiation hazard for unshielded personnel"),
+                    format!("Major solar proton event: acute radiation hazard (severity {:.0}%)",
+                        spe_severity * 100.0)),
             ));
             self.total_disasters += 1;
         }
@@ -925,9 +971,17 @@ impl DisasterEngine {
                 continue; // Earth doesn't depend on ECLSS
             }
 
+            // Mechanism 1 — Tech-to-MTBF (Infrastructure Shield): higher technology
+            // extends mean time between failures, and mature colonies (infra > 0.7)
+            // get an additional 50% MTBF bonus from built-in redundancy.
+            let tech_multiplier = 1.0 + world.knowledge.mean_tech_level() * 2.0;
+            let infra_redundancy = if world.infrastructure_level > 0.7 { 1.5 } else { 1.0 };
+            let effective_mtbf_scale = tech_multiplier * infra_redundancy;
             // Scale failure probability by inverse of infrastructure level
-            // Better infrastructure = more redundancy
+            // Better infrastructure = more redundancy (original factor)
             let infra_factor = 1.0 / (0.5 + world.infrastructure_level);
+            // Combined: divide base probability by MTBF scale
+            let mtbf_factor = infra_factor / effective_mtbf_scale;
 
             let eclss_failures: &[(f64, InfrastructureFailureKind, &str, DisasterEffects)] = &[
                 (
@@ -1001,7 +1055,7 @@ impl DisasterEngine {
             ];
 
             for (prob, kind, desc, effects) in eclss_failures {
-                if rng.bernoulli(prob * infra_factor) {
+                if rng.bernoulli(prob * mtbf_factor) {
                     self.last_failure_ticks.push(tick);
                     results.push((
                         effects.clone(),
@@ -1475,7 +1529,31 @@ impl DisasterEngine {
         for disaster in &mut self.active_disasters {
             disaster.remaining_ticks = disaster.remaining_ticks.saturating_sub(1);
         }
+        // Mechanism 5 — Collective Memory Inoculation: record disaster kinds
+        // that have fully resolved (remaining_ticks == 0) so that subsequent
+        // occurrences of the same kind receive a 30% severity reduction.
+        for d in &self.active_disasters {
+            if d.remaining_ticks == 0 {
+                self.survived_disaster_types
+                    .insert(Self::disaster_kind_key(d.kind));
+            }
+        }
         self.active_disasters.retain(|d| d.remaining_ticks > 0);
+    }
+
+    /// Stable string key for a disaster kind, used for collective memory inoculation.
+    fn disaster_kind_key(kind: DisasterKind) -> String {
+        format!("{:?}", kind)
+    }
+
+    /// Apply collective memory inoculation: reduce severity by 30% if the
+    /// civilization has survived this disaster kind before (Mechanism 5).
+    fn inoculation_factor(&self, kind: DisasterKind) -> f64 {
+        if self.survived_disaster_types.contains(&Self::disaster_kind_key(kind)) {
+            0.7
+        } else {
+            1.0
+        }
     }
 
     /// Get the total ongoing effects from all active disasters for a given world.
