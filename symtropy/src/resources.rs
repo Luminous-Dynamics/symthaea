@@ -5,10 +5,7 @@
 use bevy::prelude::*;
 use symthaea_biometrics::input_telemetry::InputTelemetryEncoder;
 use symthaea_biometrics::stress_model::PlayerStressModel;
-use symthaea_muse::MuseConfig;
-
-#[cfg(feature = "audio")]
-use symthaea_muse::live_output::LiveMuseOutput;
+// MuseConfig and LiveMuseOutput will be used when cpal audio is wired in.
 
 /// Player behavioral biometrics state.
 #[derive(Resource)]
