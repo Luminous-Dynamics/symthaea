@@ -253,6 +253,97 @@ impl MoralTopology {
         }
     }
 
+    /// Compute persistence-weighted Hodge decomposition fractions.
+    ///
+    /// Sweeps the Rips threshold across `num_scales` values from 0 to 1,
+    /// computes the Hodge decomposition at each scale that has enough edges,
+    /// and returns the integral weighted by the scale interval width.
+    ///
+    /// This captures the *persistent* harmonic structure — harmonics that
+    /// survive across many thresholds are topologically robust, while
+    /// transient ones at a single scale are noise.
+    ///
+    /// Science: Hodge (1941); persistence-weighted integration extends
+    /// standard persistent homology (Edelsbrunner & Harer 2010) into
+    /// the Hodge signal processing domain.
+    pub(super) fn compute_persistent_hodge_fractions(
+        sim: &[f64],
+        n: usize,
+        num_scales: usize,
+    ) -> Option<HodgeFractions> {
+        if n < 4 || num_scales < 3 {
+            return None;
+        }
+
+        let scales: Vec<f64> = (0..num_scales)
+            .map(|i| i as f64 / (num_scales - 1).max(1) as f64)
+            .collect();
+
+        let mut weighted_gradient = 0.0_f64;
+        let mut weighted_curl = 0.0_f64;
+        let mut weighted_harmonic = 0.0_f64;
+        let mut total_weight = 0.0_f64;
+        let mut scales_sampled = 0_usize;
+
+        for w in 0..(num_scales - 1) {
+            let scale = scales[w];
+            let interval_width = scales[w + 1] - scales[w];
+
+            // Build Rips complex at this scale
+            let mut complex = SimplicialComplex::new();
+            let mut edge_signal: Vec<f64> = Vec::new();
+
+            for i in 0..n {
+                complex.add_simplex(vec![i]);
+            }
+            for i in 0..n {
+                for j in (i + 1)..n {
+                    if sim[i * n + j] >= scale {
+                        complex.add_simplex(vec![i, j]);
+                        edge_signal.push(sim[i * n + j]);
+                        for k in (j + 1)..n {
+                            if sim[i * n + k] >= scale && sim[j * n + k] >= scale {
+                                complex.add_simplex(vec![i, j, k]);
+                            }
+                        }
+                    }
+                }
+            }
+
+            let edge_count = complex.count(1);
+            if edge_count < 3 {
+                continue;
+            }
+
+            // Center the edge signal
+            let mean = edge_signal.iter().sum::<f64>() / edge_signal.len() as f64;
+            let centered: Vec<f64> = edge_signal.iter().map(|s| s - mean).collect();
+
+            let laplacian = HodgeLaplacian::new(complex);
+            if let Some(decomp) = laplacian.hodge_decompose(1, &centered) {
+                let (g, c, h) = decomp.fractions();
+                weighted_gradient += g * interval_width;
+                weighted_curl += c * interval_width;
+                weighted_harmonic += h * interval_width;
+                total_weight += interval_width;
+                scales_sampled += 1;
+            }
+        }
+
+        if total_weight < 1e-15 || scales_sampled == 0 {
+            return None;
+        }
+
+        // Normalize by total weight to get persistence-weighted averages
+        Some(HodgeFractions {
+            gradient: weighted_gradient / total_weight,
+            curl: weighted_curl / total_weight,
+            harmonic: weighted_harmonic / total_weight,
+            scales_sampled,
+            total_weight,
+        })
+    }
+
     /// Compute per-harmony variance across all 8D coordinates.
     pub(super) fn harmony_variance(coords: &[[f64; N_HARMONIES]]) -> [f64; N_HARMONIES] {
         let n = coords.len();

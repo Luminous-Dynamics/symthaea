@@ -1,0 +1,713 @@
+[
+  {
+    "id": "eia:04de750c09b16fce",
+    "content": "Global primary energy consumption was approximately 604 exajoules (EJ) in 2022.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.eia.gov/international/data/world"
+    ],
+    "tags": [
+      "energy",
+      "consumption",
+      "global"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.93,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:285434ed5d8632d0",
+    "content": "Fossil fuels (oil, coal, natural gas) accounted for approximately 82% of global primary energy consumption in 2022.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.eia.gov/international/data/world"
+    ],
+    "tags": [
+      "energy",
+      "fossil-fuels",
+      "global"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.92,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:6ad24ed24adcb37e",
+    "content": "Renewable energy sources accounted for approximately 14% of global primary energy consumption in 2022.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.eia.gov/international/data/world"
+    ],
+    "tags": [
+      "energy",
+      "renewables",
+      "global"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:686b7888bdc8c228",
+    "content": "Global electricity generation was approximately 29,165 terawatt-hours (TWh) in 2022.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.eia.gov/international/data/world/electricity/electricity-generation"
+    ],
+    "tags": [
+      "energy",
+      "electricity",
+      "generation"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.92,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:07deb027277ce824",
+    "content": "Global crude oil production was approximately 93.9 million barrels per day in 2023.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.eia.gov/international/data/world/petroleum-and-other-liquids/annual-crude-and-lease-condensate-reserves"
+    ],
+    "tags": [
+      "energy",
+      "oil",
+      "production"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.93,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:b795b70ccc3380c0",
+    "content": "The United States became the world's largest crude oil producer in 2018, surpassing Russia and Saudi Arabia.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.eia.gov/todayinenergy/"
+    ],
+    "tags": [
+      "energy",
+      "oil",
+      "united-states",
+      "production"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.95,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:629ae2d682cdd52a",
+    "content": "OPEC countries hold approximately 79.4% of the world's proven crude oil reserves.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.eia.gov/international/data/world"
+    ],
+    "tags": [
+      "energy",
+      "oil",
+      "opec",
+      "reserves"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:f96a5adec6a40e66",
+    "content": "Venezuela has the world's largest proven oil reserves at approximately 303 billion barrels.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.eia.gov/international/data/world"
+    ],
+    "tags": [
+      "energy",
+      "oil",
+      "venezuela",
+      "reserves"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.88,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:9e3667999c3155a0",
+    "content": "Global natural gas production was approximately 4.1 trillion cubic meters in 2022.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.eia.gov/international/data/world/natural-gas/dry-natural-gas-production"
+    ],
+    "tags": [
+      "energy",
+      "natural-gas",
+      "production"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.92,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:366c4cbcac68732e",
+    "content": "The United States is the world's largest natural gas producer, followed by Russia.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.eia.gov/international/data/world/natural-gas/dry-natural-gas-production"
+    ],
+    "tags": [
+      "energy",
+      "natural-gas",
+      "united-states"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.94,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:38100735a1ea6ea7",
+    "content": "Russia holds the world's largest proven natural gas reserves at approximately 48 trillion cubic meters.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.eia.gov/international/data/world"
+    ],
+    "tags": [
+      "energy",
+      "natural-gas",
+      "russia",
+      "reserves"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:70a064aa799bafe4",
+    "content": "Global coal production was approximately 8.3 billion metric tons in 2022.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.eia.gov/international/data/world/coal-and-coke/coal-and-coke-production"
+    ],
+    "tags": [
+      "energy",
+      "coal",
+      "production"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.92,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:c4a3c6fb19149531",
+    "content": "China produces approximately 50% of the world's coal.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.eia.gov/international/data/world/coal-and-coke/coal-and-coke-production"
+    ],
+    "tags": [
+      "energy",
+      "coal",
+      "china",
+      "production"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.93,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:ae8dc10765f83775",
+    "content": "The United States has the world's largest recoverable coal reserves at approximately 249 billion short tons.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.eia.gov/energyexplained/coal/how-much-coal-is-left.php"
+    ],
+    "tags": [
+      "energy",
+      "coal",
+      "united-states",
+      "reserves"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.91,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:edcaf80aa48ca4c3",
+    "content": "Nuclear energy provided approximately 10% of global electricity generation in 2022.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.eia.gov/international/data/world/electricity/electricity-generation"
+    ],
+    "tags": [
+      "energy",
+      "nuclear",
+      "electricity"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.93,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:a0f0f0ab4381ab58",
+    "content": "There are approximately 440 operational nuclear power reactors worldwide as of 2023.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.iaea.org/resources/databases/power-reactor-information-system-pris"
+    ],
+    "tags": [
+      "energy",
+      "nuclear",
+      "reactors"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.92,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:f4359d21e728af00",
+    "content": "France generates approximately 70% of its electricity from nuclear power, the highest share of any country.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.eia.gov/international/data/country/FRA/electricity/electricity-generation"
+    ],
+    "tags": [
+      "energy",
+      "nuclear",
+      "france",
+      "electricity"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.95,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:b892bc8b6c9693c3",
+    "content": "Global solar photovoltaic capacity exceeded 1,000 GW in 2022, growing by approximately 230 GW in a single year.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.irena.org/Statistics/View-Data-by-Topic/Capacity-and-Generation/Statistics-Time-Series"
+    ],
+    "tags": [
+      "energy",
+      "solar",
+      "renewables",
+      "capacity"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.92,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:693431ac21e36efb",
+    "content": "Global wind power capacity reached approximately 906 GW by the end of 2022.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.irena.org/Statistics/View-Data-by-Topic/Capacity-and-Generation/Statistics-Time-Series"
+    ],
+    "tags": [
+      "energy",
+      "wind",
+      "renewables",
+      "capacity"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.91,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:d759d4ce6e220015",
+    "content": "Hydroelectric power is the largest source of renewable electricity, generating approximately 4,300 TWh in 2022.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.eia.gov/international/data/world/electricity/electricity-generation"
+    ],
+    "tags": [
+      "energy",
+      "hydroelectric",
+      "renewables",
+      "electricity"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.93,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:58f05c8ce49cc1e8",
+    "content": "The cost of solar photovoltaic electricity has declined by approximately 89% between 2010 and 2022.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.irena.org/publications/2023/Aug/Renewable-Power-Generation-Costs-in-2022"
+    ],
+    "tags": [
+      "energy",
+      "solar",
+      "cost",
+      "renewables"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:0b7bf2a44b6c4aa2",
+    "content": "The cost of onshore wind electricity has declined by approximately 69% between 2010 and 2022.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.irena.org/publications/2023/Aug/Renewable-Power-Generation-Costs-in-2022"
+    ],
+    "tags": [
+      "energy",
+      "wind",
+      "cost",
+      "renewables"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:ce559c7a746da87c",
+    "content": "The United States consumed approximately 100.4 quadrillion BTU of primary energy in 2022.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.eia.gov/totalenergy/data/monthly/"
+    ],
+    "tags": [
+      "energy",
+      "consumption",
+      "united-states"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.94,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:997a32e7a1f58915",
+    "content": "Natural gas is the largest source of US electricity generation at approximately 40% in 2022.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.eia.gov/electricity/monthly/"
+    ],
+    "tags": [
+      "energy",
+      "natural-gas",
+      "electricity",
+      "united-states"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.94,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:2f80cb3db92d629f",
+    "content": "The US transportation sector consumes approximately 28% of total US energy, primarily as petroleum.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.eia.gov/totalenergy/data/monthly/"
+    ],
+    "tags": [
+      "energy",
+      "transportation",
+      "petroleum",
+      "united-states"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.92,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:1dd9c94c5f29e2f4",
+    "content": "Lithium global production was approximately 130,000 metric tons in 2022, with Australia as the leading producer.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://pubs.usgs.gov/periodicals/mcs2023/mcs2023-lithium.pdf"
+    ],
+    "tags": [
+      "minerals",
+      "lithium",
+      "production",
+      "usgs"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:3a401e66e8baefc7",
+    "content": "Rare earth elements global production was approximately 300,000 metric tons in 2022, with China producing about 70%.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://pubs.usgs.gov/periodicals/mcs2023/mcs2023-rare-earths.pdf"
+    ],
+    "tags": [
+      "minerals",
+      "rare-earth",
+      "production",
+      "china",
+      "usgs"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:da9bd335e00c3b42",
+    "content": "Copper global mine production was approximately 22 million metric tons in 2022.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://pubs.usgs.gov/periodicals/mcs2023/mcs2023-copper.pdf"
+    ],
+    "tags": [
+      "minerals",
+      "copper",
+      "production",
+      "usgs"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.91,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:35671e847303b7e7",
+    "content": "Cobalt global mine production was approximately 190,000 metric tons in 2022, with the Democratic Republic of Congo producing about 73%.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://pubs.usgs.gov/periodicals/mcs2023/mcs2023-cobalt.pdf"
+    ],
+    "tags": [
+      "minerals",
+      "cobalt",
+      "production",
+      "congo",
+      "usgs"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "eia:9054f7605ee3c9c9",
+    "content": "Global iron ore production was approximately 2.6 billion metric tons in 2022.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://pubs.usgs.gov/periodicals/mcs2023/mcs2023-iron-ore.pdf"
+    ],
+    "tags": [
+      "minerals",
+      "iron-ore",
+      "production",
+      "usgs"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.92,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  }
+]

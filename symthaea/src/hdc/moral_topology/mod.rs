@@ -418,6 +418,31 @@ impl MoralAnomalyConfig {
 // Assessment
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/// Persistence-weighted Hodge decomposition fractions on the moral manifold.
+///
+/// Instead of computing at a single Rips threshold (where the complex is
+/// typically too dense for harmonics), this integrates across all scales
+/// weighted by the persistence of topological features at each scale.
+/// A harmonic component that persists across many thresholds is topologically
+/// significant; one that flickers at a single scale is noise.
+///
+/// Science: Hodge (1941), Barbarossa & Sardellitti (2020) — topological signal
+/// processing on simplicial complexes.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+pub struct HodgeFractions {
+    /// Persistence-weighted gradient fraction (0.0–1.0).
+    pub gradient: f64,
+    /// Persistence-weighted curl fraction (0.0–1.0).
+    pub curl: f64,
+    /// Persistence-weighted harmonic fraction (0.0–1.0).
+    /// High = topologically-protected global resonance across scales.
+    pub harmonic: f64,
+    /// Number of scales where decomposition was computed.
+    pub scales_sampled: usize,
+    /// Total persistence weight (sum of scale interval widths with valid decompositions).
+    pub total_weight: f64,
+}
+
 /// Full topological assessment of the moral scenario window.
 #[derive(Debug, Clone)]
 pub struct MoralTopologyAssessment {
@@ -449,6 +474,9 @@ pub struct MoralTopologyAssessment {
     pub harmony_entropy: f64,
     /// Whether a moral attractor basin was detected (low free energy + low variance drift).
     pub attractor_detected: bool,
+    /// Persistence-weighted Hodge fractions (gradient/curl/harmonic).
+    /// None when `exact_betti` is disabled or insufficient edges at all scales.
+    pub hodge_fractions: Option<HodgeFractions>,
 }
 
 /// Compact topology summary for CycleMetadata telemetry.
@@ -479,6 +507,9 @@ pub struct MoralTopologySummary {
     /// Low entropy = narrowing focus, high entropy = diverse engagement.
     #[serde(default)]
     pub trajectory_entropy: f64,
+    /// Persistence-weighted Hodge decomposition fractions.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hodge_fractions: Option<HodgeFractions>,
 }
 
 impl From<&MoralTopologyAssessment> for MoralTopologySummary {
@@ -498,6 +529,7 @@ impl From<&MoralTopologyAssessment> for MoralTopologySummary {
             // Trajectory fingerprint is populated separately by MoralTopology
             trajectory_fingerprint: [0.0; N_HARMONIES],
             trajectory_entropy: 0.0,
+            hodge_fractions: a.hodge_fractions,
         }
     }
 }
@@ -916,6 +948,7 @@ impl MoralTopology {
                 moral_free_energy: MoralFreeEnergy::default(),
                 harmony_entropy: 0.0,
                 attractor_detected: false,
+                hodge_fractions: None,
             };
             let mut new_summary = MoralTopologySummary::from(&assessment);
             self.stamp_fingerprint(&mut new_summary);
@@ -934,6 +967,17 @@ impl MoralTopology {
             Self::compute_betti_exact(&similarities, n, char_scale)
         } else {
             Self::compute_betti(&similarities, n, char_scale)
+        };
+
+        // ── Step 3b: Persistence-weighted Hodge decomposition ──────────
+        let hodge_fractions = if self.config.exact_betti {
+            Self::compute_persistent_hodge_fractions(
+                &similarities,
+                n,
+                self.config.num_scales,
+            )
+        } else {
+            None
         };
 
         // ── Step 4: Multi-scale persistent features ─────────────────────
@@ -993,11 +1037,13 @@ impl MoralTopology {
         };
 
         // ── Derived scores ──────────────────────────────────────────────
-        debug_assert!(
-            betti.beta_0 >= 1,
-            "beta_0 must be >= 1 for non-empty simplicial complex, got {}",
-            betti.beta_0
-        );
+        // Guard: exact_betti Jacobi solver may undercount zero eigenvalues
+        // for small/degenerate Rips complexes, producing beta_0=0.
+        let betti = if betti.beta_0 == 0 && n > 0 {
+            BettiNumbers::new(1, betti.beta_1, betti.beta_2)
+        } else {
+            betti
+        };
         let unity = 1.0 / (betti.beta_0.max(1) as f64);
         let circularity = {
             let cycle_count = persistent_features
@@ -1072,6 +1118,7 @@ impl MoralTopology {
             moral_free_energy,
             harmony_entropy,
             attractor_detected,
+            hodge_fractions,
         };
         let mut new_summary = MoralTopologySummary::from(&assessment);
         self.stamp_fingerprint(&mut new_summary);

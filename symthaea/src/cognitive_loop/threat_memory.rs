@@ -1,4 +1,6 @@
-//! # Threat Memory — HDV-encoded immune pattern storage
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Threat Memory — HDV-encoded immune pattern storage
 //!
 //! Encodes detected threat patterns as 16,384-dimensional hyperdimensional
 //! vectors for rapid similarity-based threat recognition. Integrates with
@@ -44,10 +46,14 @@ pub enum ThreatSignalKind {
     DispatchLoop,
     /// Attempt to manipulate consciousness metrics (Phi/coherence spoofing).
     ConsciousnessManipulation,
+    /// Coordinated cartel attack (from CartelDetector).
+    CartelAttack,
+    /// Systematic oppression pattern in governance.
+    GovernanceOppression,
 }
 
 impl ThreatSignalKind {
-    /// Return the one-hot index for this threat kind (0-6).
+    /// Return the one-hot index for this threat kind (0-8).
     fn one_hot_index(self) -> usize {
         match self {
             Self::ProposalFlood => 0,
@@ -57,6 +63,8 @@ impl ThreatSignalKind {
             Self::TimingAnomaly => 4,
             Self::DispatchLoop => 5,
             Self::ConsciousnessManipulation => 6,
+            Self::CartelAttack => 7,
+            Self::GovernanceOppression => 8,
         }
     }
 
@@ -75,6 +83,8 @@ impl ThreatSignalKind {
             SK::TimingAnomaly => Self::TimingAnomaly,
             SK::DispatchLoop => Self::DispatchLoop,
             SK::ConsciousnessManipulation => Self::ConsciousnessManipulation,
+            SK::CartelAttack => Self::CartelAttack,
+            SK::GovernanceOppression => Self::GovernanceOppression,
         }
     }
 }

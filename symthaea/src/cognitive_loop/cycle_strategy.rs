@@ -195,9 +195,9 @@ impl CognitiveLoopService {
         // Deep causal understanding → exploit (reduce exploration)
         // High novelty → explore (boost exploration) — Berlyne (1960)
         let knowledge_signals = self
-            .knowledge_manager
+            .memory.knowledge_manager
             .as_ref()
-            .map(|km| (km.signals().causal_depth, km.signals().novelty));
+            .map(|km: &crate::knowledge::KnowledgeManager| (km.signals().causal_depth, km.signals().novelty));
         if let Some((causal_depth, novelty)) = knowledge_signals {
             if causal_depth > super::thresholds::KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD {
                 self.adjust_exploration(
@@ -617,7 +617,7 @@ impl CognitiveLoopService {
         // Query knowledge engine for moral precedent
         // Extracts facts tagged with ethics/social domains for grounded moral reasoning.
         let knowledge_moral_context: Vec<String> = self
-            .episodic_persistence
+            .memory.episodic_persistence
             .last_reasoning_context
             .as_ref()
             .map(|ctx| {
@@ -637,7 +637,7 @@ impl CognitiveLoopService {
         // Knowledge confidence multiplier: scales ethical confidence by knowledge grounding
         // Science: Kahneman (2011) — epistemic uncertainty should constrain decision confidence
         let knowledge_confidence_multiplier = self
-            .episodic_persistence
+            .memory.episodic_persistence
             .last_reasoning_context
             .as_ref()
             .map(|ctx| {
