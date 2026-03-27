@@ -6,11 +6,11 @@
 
 use crate::api_types::{Standard, StandardSet};
 use crate::higher_ed_types::{PhDMilestone, ProgramDescriptor};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Complete curriculum document matching the edunet examples format.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CurriculumDocument {
     pub metadata: CurriculumMetadata,
     pub nodes: Vec<CurriculumNode>,
@@ -18,7 +18,7 @@ pub struct CurriculumDocument {
 }
 
 /// Curriculum metadata block.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CurriculumMetadata {
     pub title: String,
     pub framework: String,
@@ -33,24 +33,24 @@ pub struct CurriculumMetadata {
     pub notes: String,
     // ---- Higher-ed extensions (optional, omitted from K-12 output) ----
     /// Academic level: "Undergraduate", "Graduate", "Doctoral", etc.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub academic_level: Option<String>,
     /// Institution name (None for framework-level curricula).
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub institution: Option<String>,
     /// CIP code for this program.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cip_code: Option<String>,
     /// Total credit hours for degree completion.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub total_credits: Option<u16>,
     /// Duration in semesters.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub duration_semesters: Option<u8>,
 }
 
 /// A curriculum node (maps to KnowledgeNode in knowledge_zome).
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CurriculumNode {
     pub id: String,
     pub title: String,
@@ -67,24 +67,24 @@ pub struct CurriculumNode {
     pub academic_standards: Vec<AcademicStandardRef>,
     // ---- Higher-ed extensions (optional, omitted from K-12 output) ----
     /// Credit hours (US semester credits).
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub credit_hours: Option<u8>,
     /// Course level ("100", "200-300", "500-600", etc.).
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub course_level: Option<String>,
     /// CIP code classification.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cip_code: Option<String>,
     /// Parent program ID.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub program_id: Option<String>,
     /// Corequisite node IDs.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub corequisites: Vec<String>,
 }
 
 /// Academic standard reference within a node.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AcademicStandardRef {
     pub framework: String,
     pub code: String,
@@ -93,7 +93,7 @@ pub struct AcademicStandardRef {
 }
 
 /// A prerequisite edge between nodes.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CurriculumEdge {
     pub from: String,
     pub to: String,

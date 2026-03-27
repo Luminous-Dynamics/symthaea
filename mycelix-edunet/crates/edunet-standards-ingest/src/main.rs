@@ -118,6 +118,23 @@ enum Commands {
         #[arg(long, short = 'o', default_value = ".")]
         output_dir: PathBuf,
     },
+
+    // ---- Cross-Level Bridge ----
+
+    /// Generate cross-level bridge edges between curriculum files
+    ///
+    /// Takes multiple curriculum JSON files (K-12, undergrad, grad, PhD) and
+    /// generates LeadsTo edges that connect terminal nodes at each level to
+    /// entry nodes at the next. This creates a continuous learning pathway
+    /// from any grade through PhD.
+    Bridge {
+        /// Input curriculum JSON files (2 or more at different levels)
+        #[arg(required = true, num_args = 2..)]
+        files: Vec<PathBuf>,
+        /// Output file path (default: stdout)
+        #[arg(long, short = 'o')]
+        output: Option<PathBuf>,
+    },
 }
 
 #[tokio::main]
@@ -352,6 +369,54 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 eprintln!("{} milestones", doc.nodes.len());
             }
             eprintln!("Done.");
+        }
+
+        // ============================================================
+        // Cross-Level Bridge
+        // ============================================================
+        Commands::Bridge { files, output } => {
+            eprintln!("Loading {} curriculum files...", files.len());
+            let mut documents = Vec::new();
+
+            for path in &files {
+                let content = std::fs::read_to_string(path)?;
+                let doc: converter::CurriculumDocument = serde_json::from_str(&content)?;
+                eprintln!(
+                    "  {} — {} ({}, {} nodes)",
+                    path.display(),
+                    doc.metadata.title,
+                    doc.metadata.grade_level,
+                    doc.nodes.len()
+                );
+                documents.push(doc);
+            }
+
+            let bridge = edunet_standards_ingest::bridge::generate_bridge(&documents);
+
+            eprintln!(
+                "\nGenerated {} bridge edges:",
+                bridge.statistics.total_edges
+            );
+            eprintln!(
+                "  K-12 → Undergraduate: {}",
+                bridge.statistics.k12_to_undergrad
+            );
+            eprintln!(
+                "  Undergraduate → Graduate: {}",
+                bridge.statistics.undergrad_to_grad
+            );
+            eprintln!(
+                "  Graduate → Doctoral: {}",
+                bridge.statistics.grad_to_phd
+            );
+
+            let json = serde_json::to_string_pretty(&bridge)?;
+            if let Some(path) = output {
+                std::fs::write(&path, &json)?;
+                eprintln!("\nWrote bridge to {}", path.display());
+            } else {
+                println!("{json}");
+            }
         }
     }
 

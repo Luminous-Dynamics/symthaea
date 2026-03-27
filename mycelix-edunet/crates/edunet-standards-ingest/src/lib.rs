@@ -21,6 +21,7 @@
 //! ```
 
 pub mod api_types;
+pub mod bridge;
 pub mod client;
 pub mod converter;
 pub mod higher_ed_types;
