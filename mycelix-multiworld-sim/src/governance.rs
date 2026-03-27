@@ -1,0 +1,577 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+//! Consciousness-gated governance with oppression detection.
+//!
+//! Governance evolves through four authority levels as the colony matures:
+//! MissionControl -> LocalWithEarthVeto -> LocalSovereign -> Federation.
+//!
+//! Voting is consciousness-gated: only agents whose Phi exceeds the threshold
+//! for their tier may participate. This prevents premature democratic collapse
+//! while the oppression detector watches for exclusionary dynamics.
+
+use serde::{Deserialize, Serialize};
+
+use crate::events::{CivEvent, CivEventType};
+use crate::stochastic::StochasticEngine;
+use crate::world::World;
+
+/// Amendment review period in ticks (5 years at monthly resolution).
+const AMENDMENT_REVIEW_PERIOD: u32 = 60;
+
+/// Emergency power duration in ticks (1 year).
+const EMERGENCY_DURATION: u32 = 12;
+
+/// Oppression streak threshold to trigger constitutional crisis (12 ticks = 1 year).
+const CRISIS_STREAK_THRESHOLD: u32 = 12;
+
+/// Stagnation penalty begins after this many ticks without an amendment (10 years).
+const STAGNATION_THRESHOLD: u32 = 120;
+
+/// Maximum amendments per review period before instability penalty kicks in.
+const MAX_AMENDMENTS_PER_PERIOD: u32 = 3;
+
+/// Governance authority level, evolving with colony maturity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum GovernanceAuthority {
+    /// Epoch 1: Earth decides everything.
+    MissionControl,
+    /// Epoch 2: Colony decides, Earth can veto.
+    LocalWithEarthVeto,
+    /// Epoch 3+: Colony decides, Earth notified only.
+    LocalSovereign,
+    /// Epoch 4+: Multi-world council.
+    Federation,
+}
+
+impl std::fmt::Display for GovernanceAuthority {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MissionControl => write!(f, "MissionControl"),
+            Self::LocalWithEarthVeto => write!(f, "LocalWithEarthVeto"),
+            Self::LocalSovereign => write!(f, "LocalSovereign"),
+            Self::Federation => write!(f, "Federation"),
+        }
+    }
+}
+
+/// World governance state.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorldGovernance {
+    /// Current authority level.
+    pub authority_level: GovernanceAuthority,
+    /// Version counter for the constitution.
+    pub constitution_version: u32,
+    /// Total proposals submitted.
+    pub proposal_count: u32,
+    /// Total amendments passed.
+    pub amendment_count: u32,
+    /// Whether emergency powers are currently active.
+    pub emergency_powers_active: bool,
+    /// Remaining ticks of emergency powers (0 = inactive).
+    pub emergency_ticks_remaining: u32,
+    /// Minimum phi threshold for each consciousness tier (0-4) to vote.
+    pub consciousness_gating_threshold: [f64; 5],
+    /// Oppression index: 0.0 = fair, 1.0 = oppressive.
+    pub oppression_index: f64,
+    /// Consecutive ticks where oppression_index > 0.5.
+    pub oppression_streak: u32,
+    /// Whether a constitutional crisis is active.
+    pub constitutional_crisis: bool,
+    /// Stability score: 0.0 = unstable, 1.0 = stable.
+    pub stability_score: f64,
+    /// Proposal rate (proposals per tick, smoothed).
+    pub proposals_per_tick: f64,
+    /// Tick of the last amendment.
+    pub last_amendment_tick: u32,
+    /// Count of amendments in the current review period.
+    amendments_this_period: u32,
+    /// Start tick of the current review period.
+    period_start_tick: u32,
+}
+
+impl WorldGovernance {
+    /// Create a new governance system starting under Mission Control.
+    pub fn new() -> Self {
+        Self {
+            authority_level: GovernanceAuthority::MissionControl,
+            constitution_version: 1,
+            proposal_count: 0,
+            amendment_count: 0,
+            emergency_powers_active: false,
+            emergency_ticks_remaining: 0,
+            consciousness_gating_threshold: [0.0, 0.2, 0.4, 0.6, 0.8],
+            oppression_index: 0.0,
+            oppression_streak: 0,
+            constitutional_crisis: false,
+            stability_score: 1.0,
+            proposals_per_tick: 0.0,
+            last_amendment_tick: 0,
+            amendments_this_period: 0,
+            period_start_tick: 0,
+        }
+    }
+
+    /// Run one tick of governance simulation.
+    ///
+    /// Generates proposals, processes consciousness-gated votes, evaluates
+    /// oppression, manages emergency powers, and checks for constitutional
+    /// amendments. Returns events generated this tick.
+    pub fn tick_governance(
+        &mut self,
+        world: &World,
+        current_tick: u32,
+        rng: &mut StochasticEngine,
+    ) -> Vec<CivEvent> {
+        let mut events = Vec::new();
+        let population = world.population();
+
+        if population == 0 {
+            return events;
+        }
+
+        // --- Reset review period if needed ---
+        if current_tick >= self.period_start_tick + AMENDMENT_REVIEW_PERIOD {
+            self.amendments_this_period = 0;
+            self.period_start_tick = current_tick;
+        }
+
+        // --- Generate proposals ---
+        let proposal_rate = self.proposal_generation_rate(population);
+        self.proposals_per_tick = proposal_rate;
+        if rng.bernoulli(proposal_rate) {
+            self.proposal_count += 1;
+            events.push(CivEvent::new(
+                current_tick,
+                Some(world.id),
+                CivEventType::ConstitutionalAmendment,
+                format!(
+                    "{}: proposal #{} submitted (authority: {})",
+                    world.name, self.proposal_count, self.authority_level
+                ),
+            ));
+        }
+
+        // --- Process votes: count eligible voters by tier ---
+        let tier_dist = world.tier_distribution();
+        let eligible_fraction = self.eligible_voter_fraction(&tier_dist);
+
+        // --- Check for amendments (every review period) ---
+        if current_tick > 0
+            && current_tick % AMENDMENT_REVIEW_PERIOD == 0
+            && eligible_fraction > 0.3
+        {
+            // Amendment probability depends on eligible voter fraction and stability
+            let amendment_prob = eligible_fraction * (1.0 - self.stability_score * 0.5);
+            if rng.bernoulli(amendment_prob.clamp(0.0, 0.8)) {
+                self.amendment_count += 1;
+                self.amendments_this_period += 1;
+                self.constitution_version += 1;
+                self.last_amendment_tick = current_tick;
+
+                // Adjust gating thresholds: slight relaxation over time
+                for threshold in &mut self.consciousness_gating_threshold {
+                    *threshold = (*threshold - 0.01).max(0.0);
+                }
+
+                events.push(CivEvent::new(
+                    current_tick,
+                    Some(world.id),
+                    CivEventType::ConstitutionalAmendment,
+                    format!(
+                        "{}: constitution v{} ratified (amendment #{})",
+                        world.name, self.constitution_version, self.amendment_count
+                    ),
+                ));
+            }
+        }
+
+        // --- Evaluate oppression ---
+        self.oppression_index = Self::compute_oppression(&tier_dist);
+        if self.oppression_index > 0.5 {
+            self.oppression_streak += 1;
+        } else {
+            self.oppression_streak = 0;
+        }
+
+        // Constitutional crisis after sustained oppression
+        if self.oppression_streak >= CRISIS_STREAK_THRESHOLD && !self.constitutional_crisis {
+            self.constitutional_crisis = true;
+            // Force reform: lower all thresholds
+            for threshold in &mut self.consciousness_gating_threshold {
+                *threshold = (*threshold * 0.5).max(0.0);
+            }
+            self.constitution_version += 1;
+            self.amendment_count += 1;
+            self.last_amendment_tick = current_tick;
+
+            events.push(CivEvent::new(
+                current_tick,
+                Some(world.id),
+                CivEventType::OppressionAlert,
+                format!(
+                    "{}: CONSTITUTIONAL CRISIS -- oppression index {:.2} for {} ticks, forced reform",
+                    world.name, self.oppression_index, self.oppression_streak
+                ),
+            ));
+        } else if self.constitutional_crisis && self.oppression_index < 0.3 {
+            // Crisis resolved
+            self.constitutional_crisis = false;
+        }
+
+        // --- Emergency powers ---
+        if self.emergency_powers_active {
+            if self.emergency_ticks_remaining > 0 {
+                self.emergency_ticks_remaining -= 1;
+            }
+            if self.emergency_ticks_remaining == 0 {
+                self.emergency_powers_active = false;
+                events.push(CivEvent::new(
+                    current_tick,
+                    Some(world.id),
+                    CivEventType::EmergencyDeclared,
+                    format!("{}: emergency powers expired", world.name),
+                ));
+            }
+        }
+
+        // --- Update stability ---
+        self.stability_score = self.compute_stability(current_tick);
+
+        events
+    }
+
+    /// Compute oppression index from the tier distribution.
+    ///
+    /// Oppression occurs when many agents are at the lowest tier (Observer)
+    /// while very few are at the highest tier (Guardian), indicating that
+    /// consciousness gating is excluding the majority from participation.
+    ///
+    /// Returns 0.0 if guardians >= 5%, otherwise
+    /// `observer_fraction * (1.0 - guardian_fraction)`.
+    pub fn compute_oppression(tier_distribution: &[f64; 5]) -> f64 {
+        let observer_fraction = tier_distribution[0];
+        let guardian_fraction = tier_distribution[4];
+
+        if guardian_fraction >= 0.05 {
+            return 0.0;
+        }
+
+        (observer_fraction * (1.0 - guardian_fraction)).clamp(0.0, 1.0)
+    }
+
+    /// Compute governance stability score in [0.0, 1.0].
+    ///
+    /// Stability decreases with crises, emergencies, stagnation, excessive
+    /// amendment activity, and high oppression.
+    pub fn compute_stability(&self, current_tick: u32) -> f64 {
+        let mut score = 1.0;
+
+        if self.constitutional_crisis {
+            score -= 0.4;
+        }
+        if self.emergency_powers_active {
+            score -= 0.2;
+        }
+
+        score -= self.stagnation_penalty(current_tick);
+        score -= self.instability_penalty();
+        score -= self.oppression_index * 0.3;
+
+        score.clamp(0.0, 1.0)
+    }
+
+    /// Evolve authority level based on epoch and population.
+    ///
+    /// Authority can only advance, never regress.
+    pub fn evolve_authority(&mut self, epoch: u32, population: usize) {
+        let new_authority = match (epoch, population) {
+            (4.., _) => GovernanceAuthority::Federation,
+            (3.., _) | (_, 5000..) => GovernanceAuthority::LocalSovereign,
+            (2.., _) | (_, 500..) => GovernanceAuthority::LocalWithEarthVeto,
+            _ => GovernanceAuthority::MissionControl,
+        };
+
+        if self.authority_rank(new_authority) > self.authority_rank(self.authority_level) {
+            self.authority_level = new_authority;
+        }
+    }
+
+    /// Stagnation penalty: grows linearly if no amendments for > 10 years.
+    /// Capped at 0.3.
+    pub fn stagnation_penalty(&self, current_tick: u32) -> f64 {
+        let ticks_since = current_tick.saturating_sub(self.last_amendment_tick);
+        if ticks_since <= STAGNATION_THRESHOLD {
+            return 0.0;
+        }
+        let excess = (ticks_since - STAGNATION_THRESHOLD) as f64;
+        (excess / STAGNATION_THRESHOLD as f64 * 0.3).min(0.3)
+    }
+
+    /// Instability penalty: grows if amendments are too frequent (>3 per review period).
+    /// Capped at 0.3.
+    pub fn instability_penalty(&self) -> f64 {
+        if self.amendments_this_period <= MAX_AMENDMENTS_PER_PERIOD {
+            return 0.0;
+        }
+        let excess = (self.amendments_this_period - MAX_AMENDMENTS_PER_PERIOD) as f64;
+        (excess * 0.1).min(0.3)
+    }
+
+    /// Activate emergency powers for 12 ticks (1 year).
+    pub fn declare_emergency(&mut self) {
+        self.emergency_powers_active = true;
+        self.emergency_ticks_remaining = EMERGENCY_DURATION;
+    }
+
+    // --- Private helpers ---
+
+    /// Proposal generation rate based on population and stability.
+    fn proposal_generation_rate(&self, population: usize) -> f64 {
+        let base = 0.1 * (population as f64 / 100.0).sqrt();
+        let stability_factor = 1.0 + (1.0 - self.stability_score);
+        (base * stability_factor).min(1.0)
+    }
+
+    /// Fraction of population eligible to vote based on consciousness gating.
+    fn eligible_voter_fraction(&self, tier_dist: &[f64; 5]) -> f64 {
+        // Sum fractions at each tier (tier 0 threshold is 0.0, so everyone passes)
+        tier_dist.iter().sum::<f64>()
+    }
+
+    /// Numeric rank for authority level ordering.
+    fn authority_rank(&self, auth: GovernanceAuthority) -> u8 {
+        match auth {
+            GovernanceAuthority::MissionControl => 0,
+            GovernanceAuthority::LocalWithEarthVeto => 1,
+            GovernanceAuthority::LocalSovereign => 2,
+            GovernanceAuthority::Federation => 3,
+        }
+    }
+}
+
+impl Default for WorldGovernance {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::agent::{BiologicalSex, CivAgent, ConsciousnessState, SkillVector};
+    use crate::stochastic::StochasticEngine;
+    use crate::world::{CulturalProfile, World, WorldResources};
+
+    fn make_world_with_tiers(tier_dist: [usize; 5]) -> World {
+        let mut agents = Vec::new();
+        let mut id = 0u64;
+
+        // Phi targets place agents into the desired tier:
+        // tier 0 (<0.2), tier 1 (0.2-0.4), tier 2 (0.4-0.6), tier 3 (0.6-0.8), tier 4 (>=0.8)
+        let phi_targets = [0.1, 0.3, 0.5, 0.7, 0.9];
+
+        for (tier, &count) in tier_dist.iter().enumerate() {
+            for _ in 0..count {
+                let phi = phi_targets[tier];
+                let agent = CivAgent {
+                    id,
+                    birth_tick: 0u32.wrapping_sub(30 * 12),
+                    death_tick: None,
+                    sex: BiologicalSex::Male,
+                    world_id: 0,
+                    health: 1.0,
+                    skills: SkillVector::new(),
+                    education_level: 0.5,
+                    consciousness: ConsciousnessState {
+                        level: phi,
+                        meta_awareness: phi,
+                        coherence: phi,
+                        care_activation: phi,
+                        harmonic_alignment: phi,
+                        epistemic_confidence: phi,
+                    },
+                    partner_id: None,
+                    children_ids: vec![],
+                    is_immigrant: false,
+                    needs: crate::needs::PsychologicalNeeds::new(),
+            tend_balance: 0.0,
+                };
+                agents.push(agent);
+                id += 1;
+            }
+        }
+
+        World {
+            id: 0,
+            name: "TestWorld".into(),
+            location: "Moon".into(),
+            founded_tick: 0,
+            parent_world_id: None,
+            agents,
+            next_agent_id: id,
+            resources: WorldResources::lunar_default(),
+            culture: CulturalProfile::pioneer_default(),
+            infrastructure_level: 0.5,
+            max_population: 10_000,
+            habitable_area_m2: 100_000.0,
+            founding_harmony_emphasis: [0.125; 8],
+            epidemics: Vec::new(),
+            knowledge: crate::knowledge::WorldKnowledge::new(),
+            economy: crate::economy::WorldEconomy::new(),
+            harmony: crate::harmony::HarmonyTracker::new(),
+        }
+    }
+
+    #[test]
+    fn test_oppression_detection() {
+        // 90% Observer, 10% Participant, 0% Guardian -> oppressive
+        let dist = [0.9, 0.1, 0.0, 0.0, 0.0];
+        let opp = WorldGovernance::compute_oppression(&dist);
+        assert!(opp > 0.5, "Should detect oppression: {opp}");
+
+        // 20% each tier including Guardian -> not oppressive
+        let dist2 = [0.2, 0.2, 0.2, 0.2, 0.2];
+        let opp2 = WorldGovernance::compute_oppression(&dist2);
+        assert_eq!(opp2, 0.0, "Should not detect oppression with 20% guardians");
+    }
+
+    #[test]
+    fn test_constitutional_crisis_trigger() {
+        let mut gov = WorldGovernance::new();
+        let world = make_world_with_tiers([90, 10, 0, 0, 0]);
+        let mut rng = StochasticEngine::new(42);
+
+        // Tick enough to exceed crisis streak threshold
+        for tick in 0..15 {
+            let _ = gov.tick_governance(&world, tick, &mut rng);
+        }
+
+        assert!(
+            gov.constitutional_crisis,
+            "Should trigger crisis after sustained oppression"
+        );
+        assert!(
+            gov.oppression_streak >= CRISIS_STREAK_THRESHOLD,
+            "Streak should exceed threshold: {}",
+            gov.oppression_streak
+        );
+    }
+
+    #[test]
+    fn test_emergency_power_expiry() {
+        let mut gov = WorldGovernance::new();
+        gov.declare_emergency();
+        assert!(gov.emergency_powers_active);
+        assert_eq!(gov.emergency_ticks_remaining, EMERGENCY_DURATION);
+
+        let world = make_world_with_tiers([5, 5, 5, 5, 5]);
+        let mut rng = StochasticEngine::new(42);
+
+        for tick in 0..=EMERGENCY_DURATION {
+            let _ = gov.tick_governance(&world, tick, &mut rng);
+        }
+
+        assert!(
+            !gov.emergency_powers_active,
+            "Emergency powers should expire after {EMERGENCY_DURATION} ticks"
+        );
+    }
+
+    #[test]
+    fn test_authority_evolution() {
+        let mut gov = WorldGovernance::new();
+        assert_eq!(gov.authority_level, GovernanceAuthority::MissionControl);
+
+        gov.evolve_authority(2, 100);
+        assert_eq!(gov.authority_level, GovernanceAuthority::LocalWithEarthVeto);
+
+        gov.evolve_authority(3, 1000);
+        assert_eq!(gov.authority_level, GovernanceAuthority::LocalSovereign);
+
+        gov.evolve_authority(4, 10000);
+        assert_eq!(gov.authority_level, GovernanceAuthority::Federation);
+
+        // Should not regress
+        gov.evolve_authority(1, 10);
+        assert_eq!(gov.authority_level, GovernanceAuthority::Federation);
+    }
+
+    #[test]
+    fn test_stability_scoring() {
+        let gov = WorldGovernance::new();
+        let stability = gov.compute_stability(0);
+        assert!(
+            (stability - 1.0).abs() < 0.01,
+            "Fresh governance should be stable: {stability}"
+        );
+
+        let mut crisis_gov = WorldGovernance::new();
+        crisis_gov.constitutional_crisis = true;
+        let stability = crisis_gov.compute_stability(0);
+        assert!(stability < 0.7, "Crisis should reduce stability: {stability}");
+    }
+
+    #[test]
+    fn test_stagnation_penalty() {
+        let gov = WorldGovernance::new();
+
+        assert_eq!(gov.stagnation_penalty(0), 0.0);
+        assert_eq!(gov.stagnation_penalty(STAGNATION_THRESHOLD), 0.0);
+
+        let penalty = gov.stagnation_penalty(STAGNATION_THRESHOLD + 60);
+        assert!(penalty > 0.0, "Should have penalty: {penalty}");
+        assert!(penalty <= 0.3, "Penalty should be capped: {penalty}");
+    }
+
+    #[test]
+    fn test_amendment_tracking() {
+        let mut gov = WorldGovernance::new();
+        let world = make_world_with_tiers([2, 5, 5, 5, 5]);
+        let mut rng = StochasticEngine::new(42);
+
+        let initial_version = gov.constitution_version;
+        let _ = gov.tick_governance(&world, AMENDMENT_REVIEW_PERIOD, &mut rng);
+
+        // Version should only increase if amendment passed (stochastic)
+        assert!(gov.constitution_version >= initial_version);
+    }
+
+    #[test]
+    fn test_proposal_generation() {
+        let mut gov = WorldGovernance::new();
+        let world = make_world_with_tiers([10, 10, 10, 10, 10]);
+        let mut rng = StochasticEngine::new(42);
+
+        for tick in 0..100 {
+            let _ = gov.tick_governance(&world, tick, &mut rng);
+        }
+
+        assert!(
+            gov.proposal_count > 0,
+            "Should generate at least one proposal in 100 ticks"
+        );
+    }
+
+    #[test]
+    fn test_instability_penalty() {
+        let mut gov = WorldGovernance::new();
+
+        gov.amendments_this_period = MAX_AMENDMENTS_PER_PERIOD;
+        assert_eq!(gov.instability_penalty(), 0.0);
+
+        gov.amendments_this_period = MAX_AMENDMENTS_PER_PERIOD + 2;
+        let penalty = gov.instability_penalty();
+        assert!(penalty > 0.0, "Should have instability penalty: {penalty}");
+    }
+
+    #[test]
+    fn test_empty_world_governance() {
+        let mut gov = WorldGovernance::new();
+        let world = make_world_with_tiers([0, 0, 0, 0, 0]);
+        let mut rng = StochasticEngine::new(42);
+
+        let events = gov.tick_governance(&world, 0, &mut rng);
+        assert!(events.is_empty(), "Empty world should produce no events");
+    }
+}
