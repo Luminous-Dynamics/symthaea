@@ -241,6 +241,171 @@ pub fn create_council(input: CreateCouncilInput) -> ExternResult<Record> {
         }
     }
 
+    // Emergency council hard limits enforcement
+    if let CouncilType::Emergency { expires } = &input.council_type {
+        // Validate session duration (max 14 days)
+        let duration_us = expires.as_micros() as i64 - timestamp.as_micros() as i64;
+        if duration_us > councils_integrity::MAX_EMERGENCY_SESSION_DURATION_US {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Emergency session cannot exceed 14 days ({} hours requested)",
+                duration_us / (3600 * 1_000_000)
+            ))));
+        }
+
+        // Check for active cooldown
+        let cooldown_anchor = format!("emergency_cooldown:{}", input.parent_council_id.as_deref().unwrap_or("root"));
+        if let Ok(eh) = anchor_hash(&cooldown_anchor) {
+            if let Ok(links) = get_links(
+                LinkQuery::try_new(eh, LinkTypes::CouncilToCooldown)?,
+                GetStrategy::default(),
+            ) {
+                for link in links {
+                    if let Some(target) = link.target.into_action_hash() {
+                        if let Some(record) = get(target, GetOptions::default())? {
+                            if let Some(cooldown) = record
+                                .entry()
+                                .to_app_option::<EmergencyCooldown>()
+                                .ok()
+                                .flatten()
+                            {
+                                let now_us = timestamp.as_micros() as i64;
+                                let cooldown_end = cooldown.cooldown_ends.as_micros() as i64;
+                                if now_us < cooldown_end && !cooldown.override_approved {
+                                    let days_remaining = (cooldown_end - now_us) / (24 * 3600 * 1_000_000);
+                                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                                        "Emergency council cooldown in effect ({} days remaining). \
+                                         Requires non-emergency council approval to override.",
+                                        days_remaining
+                                    ))));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Count consecutive emergency sessions
+        let session_anchor = format!("emergency_sessions:{}", input.parent_council_id.as_deref().unwrap_or("root"));
+        let mut session_count: u32 = 0;
+        if let Ok(eh) = anchor_hash(&session_anchor) {
+            if let Ok(links) = get_links(
+                LinkQuery::try_new(eh, LinkTypes::CouncilToEmergencySession)?,
+                GetStrategy::default(),
+            ) {
+                for link in links {
+                    if let Some(target) = link.target.into_action_hash() {
+                        if let Some(record) = get(target, GetOptions::default())? {
+                            if let Some(session) = record
+                                .entry()
+                                .to_app_option::<EmergencySession>()
+                                .ok()
+                                .flatten()
+                            {
+                                if matches!(
+                                    session.status,
+                                    EmergencySessionStatus::Active
+                                        | EmergencySessionStatus::ExtendedToNext
+                                ) {
+                                    session_count = session_count.max(session.session_number);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if session_count >= councils_integrity::MAX_CONSECUTIVE_EMERGENCY_SESSIONS {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Maximum {} consecutive emergency sessions reached. \
+                 30-day cooldown required before next emergency council.",
+                councils_integrity::MAX_CONSECUTIVE_EMERGENCY_SESSIONS
+            ))));
+        }
+
+        // Create emergency session tracking entry
+        let next_session_number = session_count + 1;
+        let preceding = if next_session_number > 1 {
+            // Find the previous session ID
+            let prev_anchor = format!("emergency_sessions:{}", input.parent_council_id.as_deref().unwrap_or("root"));
+            let mut prev_id = None;
+            if let Ok(eh) = anchor_hash(&prev_anchor) {
+                if let Ok(links) = get_links(
+                    LinkQuery::try_new(eh, LinkTypes::CouncilToEmergencySession)?,
+                    GetStrategy::default(),
+                ) {
+                    for link in links {
+                        if let Some(target) = link.target.into_action_hash() {
+                            if let Some(record) = get(target, GetOptions::default())? {
+                                if let Some(session) = record
+                                    .entry()
+                                    .to_app_option::<EmergencySession>()
+                                    .ok()
+                                    .flatten()
+                                {
+                                    if session.session_number == next_session_number - 1 {
+                                        prev_id = Some(session.id.clone());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            prev_id
+        } else {
+            None
+        };
+
+        let session_id = format!("emergency_session:{}:{}", id, timestamp.as_micros());
+        let session = EmergencySession {
+            id: session_id,
+            council_id: id.clone(),
+            session_number: next_session_number,
+            started_at: timestamp,
+            expires_at: *expires,
+            preceding_session_id: preceding,
+            status: EmergencySessionStatus::Active,
+        };
+        let session_hash = create_entry(&EntryTypes::EmergencySession(session))?;
+
+        // Link session for tracking
+        let sa = Anchor(session_anchor.clone());
+        create_entry(&EntryTypes::Anchor(sa))?;
+        create_link(
+            anchor_hash(&session_anchor)?,
+            session_hash,
+            LinkTypes::CouncilToEmergencySession,
+            (),
+        )?;
+
+        // If this is the 3rd consecutive session, create a cooldown entry
+        if next_session_number == councils_integrity::MAX_CONSECUTIVE_EMERGENCY_SESSIONS {
+            let cooldown_id = format!("cooldown:{}:{}", id, timestamp.as_micros());
+            let cooldown = EmergencyCooldown {
+                id: cooldown_id,
+                council_id: id.clone(),
+                last_session_id: format!("emergency_session:{}:{}", id, timestamp.as_micros()),
+                cooldown_started: *expires, // Cooldown starts when session expires
+                cooldown_ends: Timestamp::from_micros(
+                    expires.as_micros() as i64 + councils_integrity::EMERGENCY_COOLDOWN_DURATION_US,
+                ),
+                override_approved: false,
+            };
+            let cooldown_hash = create_entry(&EntryTypes::EmergencyCooldown(cooldown))?;
+
+            let ca = Anchor(cooldown_anchor.clone());
+            create_entry(&EntryTypes::Anchor(ca))?;
+            create_link(
+                anchor_hash(&cooldown_anchor)?,
+                cooldown_hash,
+                LinkTypes::CouncilToCooldown,
+                (),
+            )?;
+        }
+    }
+
     let council = Council {
         id: id.clone(),
         name: input.name,
@@ -475,6 +640,9 @@ pub fn join_council(input: JoinCouncilInput) -> ExternResult<Record> {
         status: MembershipStatus::Active,
         joined_at: timestamp,
         last_participation: timestamp,
+        expires_at: Some(Timestamp::from_micros(
+            timestamp.as_micros() as i64 + councils_integrity::DEFAULT_MEMBERSHIP_TERM_US,
+        )),
     };
 
     let action_hash = create_entry(&EntryTypes::CouncilMembership(membership))?;
@@ -1391,6 +1559,288 @@ pub fn get_committee_council(committee_id: String) -> ExternResult<Option<Record
     }
 
     Ok(None)
+}
+
+// ============================================================================
+// EMERGENCY COUNCIL ENFORCEMENT
+// Permission-less — any agent can enforce expiration.
+// ============================================================================
+
+/// Enforce emergency council expiration.
+/// Can be called by ANY agent — permission-less enforcement ensures
+/// no faction can prevent dissolution by withholding action.
+#[hdk_extern]
+pub fn enforce_emergency_expiration(council_id: String) -> ExternResult<bool> {
+    if council_id.is_empty() || council_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Council ID must be 1-256 characters".into()
+        )));
+    }
+
+    let record = get_council_by_id(council_id.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Council not found".into())
+    ))?;
+
+    let council: Council = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid council entry".into()
+        )))?;
+
+    // Only applies to emergency councils
+    let expires = match &council.council_type {
+        CouncilType::Emergency { expires } => *expires,
+        _ => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Council is not an emergency council".into()
+            )));
+        }
+    };
+
+    // Check if expired
+    let now = sys_time()?;
+    if now.as_micros() < expires.as_micros() {
+        return Ok(false); // Not expired yet
+    }
+
+    // Already dissolved?
+    if council.status == CouncilStatus::Dissolved {
+        return Ok(false);
+    }
+
+    // Capture parent scope before moving council
+    let parent_scope = council
+        .parent_council_id
+        .as_deref()
+        .unwrap_or("root")
+        .to_string();
+
+    // Dissolve the council
+    let dissolved = Council {
+        status: CouncilStatus::Dissolved,
+        ..council
+    };
+    update_entry(
+        record.action_address().clone(),
+        &EntryTypes::Council(dissolved),
+    )?;
+
+    // Mark the emergency session as expired
+    let session_anchor = format!("emergency_sessions:{}", &parent_scope);
+    if let Ok(eh) = anchor_hash(&session_anchor) {
+        if let Ok(links) = get_links(
+            LinkQuery::try_new(eh, LinkTypes::CouncilToEmergencySession)?,
+            GetStrategy::default(),
+        ) {
+            for link in links {
+                if let Some(target) = link.target.into_action_hash() {
+                    if let Some(session_record) = get(target.clone(), GetOptions::default())? {
+                        if let Some(session) = session_record
+                            .entry()
+                            .to_app_option::<EmergencySession>()
+                            .ok()
+                            .flatten()
+                        {
+                            if session.council_id == council_id
+                                && session.status == EmergencySessionStatus::Active
+                            {
+                                let expired_session = EmergencySession {
+                                    status: EmergencySessionStatus::Expired,
+                                    ..session
+                                };
+                                update_entry(
+                                    session_record.action_address().clone(),
+                                    &EntryTypes::EmergencySession(expired_session),
+                                )?;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let _ = emit_council_signal(CouncilSignal::CouncilStatusChanged {
+        council_id: council_id.clone(),
+        old_status: "Active".into(),
+        new_status: "Dissolved (emergency expired)".into(),
+    });
+
+    Ok(true)
+}
+
+/// Approve early renewal of emergency council before cooldown expires.
+/// Must be called by a member of a NON-emergency council (parent or root).
+#[hdk_extern]
+pub fn approve_emergency_renewal(input: ApproveEmergencyRenewalInput) -> ExternResult<bool> {
+    if input.cooldown_id.is_empty() || input.cooldown_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Cooldown ID must be 1-256 characters".into()
+        )));
+    }
+    if input.approving_council_id.is_empty() || input.approving_council_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Approving council ID must be 1-256 characters".into()
+        )));
+    }
+
+    // Verify caller is a member of the approving council
+    let _caller = require_council_member(&input.approving_council_id)?;
+
+    // Verify the approving council is NOT an emergency council
+    let approving_record = get_council_by_id(input.approving_council_id.clone())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest(
+            "Approving council not found".into()
+        )),
+    )?;
+    let approving_council: Council = approving_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid approving council".into()
+        )))?;
+
+    if matches!(approving_council.council_type, CouncilType::Emergency { .. }) {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Emergency council renewal must be approved by a non-emergency council".into()
+        )));
+    }
+
+    // Find and update the cooldown entry
+    let parent_scope = approving_council
+        .parent_council_id
+        .as_deref()
+        .unwrap_or("root");
+    let cooldown_anchor = format!("emergency_cooldown:{}", parent_scope);
+    if let Ok(eh) = anchor_hash(&cooldown_anchor) {
+        if let Ok(links) = get_links(
+            LinkQuery::try_new(eh, LinkTypes::CouncilToCooldown)?,
+            GetStrategy::default(),
+        ) {
+            for link in links {
+                if let Some(target) = link.target.into_action_hash() {
+                    if let Some(record) = get(target, GetOptions::default())? {
+                        if let Some(cooldown) = record
+                            .entry()
+                            .to_app_option::<EmergencyCooldown>()
+                            .ok()
+                            .flatten()
+                        {
+                            if cooldown.id == input.cooldown_id {
+                                let approved = EmergencyCooldown {
+                                    override_approved: true,
+                                    ..cooldown
+                                };
+                                update_entry(
+                                    record.action_address().clone(),
+                                    &EntryTypes::EmergencyCooldown(approved),
+                                )?;
+                                return Ok(true);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Err(wasm_error!(WasmErrorInner::Guest(format!(
+        "Cooldown '{}' not found",
+        input.cooldown_id
+    ))))
+}
+
+/// Input for approving emergency renewal
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ApproveEmergencyRenewalInput {
+    /// ID of the cooldown being overridden
+    pub cooldown_id: String,
+    /// ID of the non-emergency council approving the override
+    pub approving_council_id: String,
+}
+
+// ============================================================================
+// MEMBERSHIP TERM LIMITS — No perpetual tenure
+// Permission-less enforcement: any agent can trigger expiration.
+// ============================================================================
+
+/// Enforce membership term limits for a council.
+/// Expires any active memberships past their `expires_at` timestamp.
+/// Permission-less — any agent can call this to enforce term limits.
+/// Returns the list of DIDs whose memberships were expired.
+#[hdk_extern]
+pub fn enforce_membership_expiration(council_id: String) -> ExternResult<Vec<String>> {
+    if council_id.is_empty() || council_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Council ID must be 1-256 characters".into()
+        )));
+    }
+
+    let now = sys_time()?;
+    let mut expired_members = Vec::new();
+
+    let council_record = get_council_by_id(council_id.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Council not found".into())
+    ))?;
+    let council_hash = council_record.action_hashed().hash.clone();
+
+    let links = get_links(
+        LinkQuery::try_new(council_hash, LinkTypes::CouncilToMember)?,
+        GetStrategy::default(),
+    )?;
+
+    for link in links {
+        if let Some(target) = link.target.into_action_hash() {
+            if let Some(record) = get(target, GetOptions::default())? {
+                if let Some(membership) = record
+                    .entry()
+                    .to_app_option::<CouncilMembership>()
+                    .ok()
+                    .flatten()
+                {
+                    if membership.status != MembershipStatus::Active {
+                        continue;
+                    }
+                    // Compute expiry: explicit or legacy fallback
+                    let expiry_us = match membership.expires_at {
+                        Some(t) => t.as_micros() as i64,
+                        None => {
+                            // Legacy memberships: expire DEFAULT_MEMBERSHIP_TERM_US after join
+                            membership.joined_at.as_micros() as i64
+                                + councils_integrity::DEFAULT_MEMBERSHIP_TERM_US
+                        }
+                    };
+                    if now.as_micros() as i64 >= expiry_us {
+                        let expired = CouncilMembership {
+                            status: MembershipStatus::Removed,
+                            ..membership.clone()
+                        };
+                        update_entry(
+                            record.action_address().clone(),
+                            &EntryTypes::CouncilMembership(expired),
+                        )?;
+                        expired_members.push(membership.member_did.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    if !expired_members.is_empty() {
+        let _ = emit_council_signal(CouncilSignal::CouncilStatusChanged {
+            council_id: council_id.clone(),
+            old_status: "Active".into(),
+            new_status: format!(
+                "MembershipsExpired: {} member(s) term-limited",
+                expired_members.len()
+            ),
+        });
+    }
+
+    Ok(expired_members)
 }
 
 #[cfg(test)]
