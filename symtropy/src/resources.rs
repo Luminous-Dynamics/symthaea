@@ -56,7 +56,7 @@ impl Default for LeviathanState {
         Self {
             phase: SleepPhase::Dormant,
             noise_accumulator: 0.0,
-            threshold: 1.0,
+            threshold: 3.0, // raised from 1.0 — NPCs were waking Leviathan too fast
             stirring_duration: 0.0,
             quiet_duration: 0.0,
         }

@@ -64,7 +64,7 @@ pub fn fep_behavior_system(
                     target.target = Some(player_pos + Vec2::new(angle.cos() * 80.0, angle.sin() * 80.0));
                     target.speed = 60.0;
                 }
-                noise.level = 0.15;
+                noise.level = 0.05; // reduced — NPCs are trained to be quiet
             }
             ACTION_ATTENTION_SHIFT => {
                 target.target = Some(player_pos);
@@ -92,7 +92,7 @@ pub fn fep_behavior_system(
             ACTION_MOTOR_OUTPUT => {
                 target.target = Some(player_pos);
                 target.speed = 70.0;
-                noise.level = 0.1;
+                noise.level = 0.03;
             }
             _ => {
                 target.target = None;

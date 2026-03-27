@@ -7,7 +7,8 @@
 //!
 //! Run:
 //! ```sh
-//! PKG_CONFIG_PATH="<alsa-lib-dev>/lib/pkgconfig:$PKG_CONFIG_PATH" cargo run -p symtropy
+//! export LD_LIBRARY_PATH="$(cat /tmp/bevy_ld_library_path.txt)"
+//! RUST_LOG=warn,symtropy=info cargo run
 //! ```
 
 mod components;
@@ -19,6 +20,14 @@ use bevy::prelude::*;
 use plugin::SymtropyPlugin;
 
 fn main() {
+    // Log panics with full backtrace
+    std::panic::set_hook(Box::new(|info| {
+        eprintln!("\n=== SYMTROPY CRASH ===");
+        eprintln!("{info}");
+        eprintln!("Backtrace:\n{}", std::backtrace::Backtrace::force_capture());
+        eprintln!("======================\n");
+    }));
+
     App::new()
         .add_plugins(
             DefaultPlugins

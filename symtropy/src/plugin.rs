@@ -18,6 +18,7 @@ impl Plugin for SymtropyPlugin {
             // Resources
             .init_resource::<BiometricsCtx>()
             .init_resource::<LeviathanState>()
+            .init_resource::<systems::rendering::TelemetryTimer>()
             // Startup systems
             .add_systems(Startup, (
                 systems::rendering::setup_world,

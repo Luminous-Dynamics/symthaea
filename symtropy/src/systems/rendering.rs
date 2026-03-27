@@ -5,7 +5,7 @@
 use bevy::prelude::*;
 
 use crate::components::*;
-use crate::resources::*;
+use crate::resources::{BiometricsCtx, GamePhase, LeviathanState, SleepPhase};
 
 /// Tile size in pixels.
 pub const TILE_SIZE: f32 = 32.0;
@@ -100,27 +100,60 @@ pub fn setup_world(mut commands: Commands) {
     ));
 }
 
-/// HUD: stress meter, Leviathan phase indicator, extraction progress.
+/// Telemetry logging resource to throttle output.
+#[derive(Resource)]
+pub struct TelemetryTimer(pub f32);
+
+impl Default for TelemetryTimer {
+    fn default() -> Self {
+        Self(0.0)
+    }
+}
+
+/// HUD: log telemetry to console every second.
 pub fn hud_system(
     biometrics: Res<BiometricsCtx>,
     leviathan: Res<LeviathanState>,
     cores: Query<&FusionCore>,
     game_phase: Res<State<GamePhase>>,
-    // We'd need a Text entity to update — for now, print to console at low frequency
+    time: Res<Time>,
+    mut timer: ResMut<TelemetryTimer>,
 ) {
-    // This will be replaced with proper Bevy UI text entities
-    // For the prototype, the audio IS the feedback
+    timer.0 += time.delta_secs();
+    if timer.0 < 1.0 {
+        return;
+    }
+    timer.0 = 0.0;
+
+    let stress = biometrics.encoder.compute_stress_vector();
+    let extraction = cores.iter().next().map(|c| c.extraction_progress).unwrap_or(0.0);
+
+    let phase_str = match leviathan.phase {
+        SleepPhase::Dormant => "DORMANT",
+        SleepPhase::Stirring => "STIRRING",
+        SleepPhase::Awake => "AWAKE",
+        SleepPhase::Hunting => "HUNTING",
+    };
+
+    info!(
+        "state={:?} | arousal={:.2} valence={:.2} load={:.3} cortisol={:.3} | leviathan={} noise={:.2} | extract={:.0}%",
+        game_phase.get(),
+        stress.arousal,
+        stress.valence,
+        biometrics.model.allostatic_load,
+        biometrics.model.cortisol_proxy,
+        phase_str,
+        leviathan.noise_accumulator,
+        extraction * 100.0,
+    );
 }
 
-/// Visual stress effect: vignette darkening at screen edges.
-/// (Placeholder — full implementation needs a post-processing shader)
+/// Visual stress effect: placeholder.
 pub fn visual_stress_system(
-    biometrics: Res<BiometricsCtx>,
-    mut camera: Query<&mut Camera>,
+    _biometrics: Res<BiometricsCtx>,
+    _camera: Query<&Camera>,
 ) {
-    let _load = biometrics.model.allostatic_load;
-    // In full implementation: drive post-processing shader uniforms
-    // For prototype: the audio feedback carries the tension
+    // Phase T2.1: post-processing shader for vignette + chromatic aberration
 }
 
 /// Camera follows player.
