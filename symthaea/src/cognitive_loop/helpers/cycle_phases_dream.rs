@@ -179,7 +179,18 @@ impl CognitiveLoopService {
             };
             let dynamic_normal_interval =
                 (dynamic_normal_interval as f32 * stillness_depth_factor) as usize;
-            let dynamic_normal_interval = dynamic_normal_interval.max(3); // never faster than every 3 cycles
+            // Moral fragmentation → dream urgency: high L₀ harmonic = isolated clusters
+            let fragmentation_factor = {
+                let summary = self.ethics_engine.moral_topology().last_summary();
+                match summary.hodge_fractions {
+                    Some(ref f) if f.harmonic > 0.8 => 0.5,
+                    Some(ref f) if f.harmonic > 0.5 => 0.8,
+                    _ => 1.0,
+                }
+            };
+            let dynamic_normal_interval =
+                (dynamic_normal_interval as f64 * fragmentation_factor) as usize;
+            let dynamic_normal_interval = dynamic_normal_interval.max(3);
             if matches!(urgency, super::super::CycleUrgency::Cruise)
                 || urgency.should_run(self.stats.total_cycles, 10, dynamic_normal_interval, 5)
             {
