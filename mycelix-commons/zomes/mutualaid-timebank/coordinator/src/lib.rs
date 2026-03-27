@@ -1,4 +1,6 @@
-//! Timebank Coordinator Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Timebank Coordinator Zome
 //!
 //! This zome provides the coordinator functions for time banking
 //! in the Mycelix Mutual Aid hApp. Core principle: 1 hour = 1 hour.

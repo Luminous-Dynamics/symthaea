@@ -1,4 +1,6 @@
-//! Test Fixtures for Mycelix Identity
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Test Fixtures for Mycelix Identity
 //!
 //! Common test utilities and helpers. Uses local mirror types to avoid
 //! importing zome crates (which cause duplicate symbol linking errors).

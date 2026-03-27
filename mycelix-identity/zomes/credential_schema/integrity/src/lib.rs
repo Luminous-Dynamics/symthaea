@@ -1,4 +1,6 @@
-//! Credential Schema Integrity Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Credential Schema Integrity Zome
 //! Defines entry types and validation for W3C-compatible credential schemas
 //!
 //! Updated to use HDI 0.7 patterns with FlatOp validation

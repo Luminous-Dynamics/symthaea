@@ -1,4 +1,6 @@
-//! Credential Generation and ZK Commitment
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Credential Generation and ZK Commitment
 //!
 //! Generates W3C VC 2.0 compliant academic credentials with
 //! ZK commitments for selective disclosure.

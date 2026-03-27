@@ -1,4 +1,6 @@
-//! Finances Coordinator Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Finances Coordinator Zome
 //! Business logic for charges, payments, reserves, and budgets.
 
 use hdk::prelude::*;

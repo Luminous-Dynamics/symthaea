@@ -1,4 +1,6 @@
-//! Identity Bridge Integrity Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Identity Bridge Integrity Zome
 //!
 //! Entry types and validation for cross-hApp identity operations.
 //! Enables other hApps to query and verify identities via the Bridge protocol.
@@ -106,6 +108,11 @@ pub enum BridgeEventType {
     Custom(String),
 }
 
+/// Anchor entry for deterministic link bases
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct Anchor(pub String);
+
 /// Cross-hApp reputation record
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
@@ -125,6 +132,7 @@ pub struct IdentityReputation {
 #[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
+    Anchor(Anchor),
     HappRegistration(HappRegistration),
     IdentityQuery(IdentityQuery),
     IdentityVerification(IdentityVerification),
@@ -146,6 +154,8 @@ pub enum LinkTypes {
     HappToQueries,
     /// DID to queries about it
     DidToQueries,
+    /// Rate limit tracking: agent → anchor per dispatch call
+    DispatchRateLimit,
 }
 
 /// Genesis self-check - called when app is installed
@@ -160,6 +170,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         FlatOp::StoreEntry(store_entry) => match store_entry {
             OpEntry::CreateEntry { app_entry, action } => match app_entry {
+                EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
                 EntryTypes::HappRegistration(registration) => validate_create_happ_registration(
                     EntryCreationAction::Create(action),
                     registration,
@@ -184,6 +195,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             OpEntry::UpdateEntry {
                 app_entry, action, ..
             } => match app_entry {
+                EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Invalid(
+                    "Anchors cannot be updated".into(),
+                )),
                 EntryTypes::HappRegistration(registration) => {
                     validate_update_happ_registration(action, registration)
                 }
@@ -216,6 +230,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 LinkTypes::EventTypeToEvents => Ok(ValidateCallbackResult::Valid),
                 LinkTypes::HappToQueries => Ok(ValidateCallbackResult::Valid),
                 LinkTypes::DidToQueries => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::DispatchRateLimit => Ok(ValidateCallbackResult::Valid),
             }
         }
         FlatOp::RegisterDeleteLink {

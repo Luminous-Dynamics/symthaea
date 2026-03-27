@@ -1,4 +1,6 @@
-//! Transport Impact Integrity Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Transport Impact Integrity Zome
 //! Entry types and validation for trip logging, emissions tracking, and carbon credits.
 
 use hdi::prelude::*;

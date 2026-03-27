@@ -1,4 +1,6 @@
-//! Arbitration Coordinator Zome
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Arbitration Coordinator Zome
 //!
 //! Manages arbitration panels, deliberations, decisions, and appeals.
 //! Implements Tier 2 (arbitration) and Tier 3 (appeal) of the justice system.

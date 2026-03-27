@@ -1,4 +1,6 @@
-//! Support Types — Shared enums and DHT index helpers for the Support domain
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Support Types — Shared enums and DHT index helpers for the Support domain
 //!
 //! Provides category, priority, status, and sharding helpers used by all three
 //! support zome pairs (knowledge, tickets, diagnostics).

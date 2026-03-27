@@ -1,4 +1,6 @@
-//! Requests Integrity Zome - Aid requests and offers for mutual aid coordination
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Requests Integrity Zome - Aid requests and offers for mutual aid coordination
 //!
 //! This zome defines the data structures and validation rules for aid requests
 //! and offers within the Mycelix mutual aid network.
