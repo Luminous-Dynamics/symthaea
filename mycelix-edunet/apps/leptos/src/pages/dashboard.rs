@@ -2,14 +2,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
-//! Unified learner dashboard — the most valuable page in EduNet.
+//! Unified learner dashboard -- the most valuable page in EduNet.
 //!
 //! Shows XP/level, streak, due reviews, skill mastery, recommendations,
-//! and recent activity. Each section is a reusable component that fetches
-//! data from the conductor (falling back to mocks).
+//! and recent activity. Integrated with the adaptivity engine to show
+//! sovereignty level, cognitive state, and active adaptations.
 
 use leptos::prelude::*;
 
+use crate::adaptivity_provider::use_adaptivity;
+use crate::cognitive_adaptivity::*;
+use crate::components::suggestion_overlay::{SuggestionOverlay, CognitiveStateMirror};
 use crate::holochain::use_holochain;
 
 // ---------------------------------------------------------------------------
@@ -117,7 +120,7 @@ fn mock_recommendations() -> Vec<Recommendation> {
     vec![
         Recommendation {
             title: "Division Practice".into(),
-            reason: "You're great at multiplication — try dividing next!".into(),
+            reason: "You're great at multiplication -- try dividing next!".into(),
             course_domain: "Math".into(),
         },
         Recommendation {
@@ -175,15 +178,205 @@ pub fn DashboardPage() -> impl IntoView {
             <p class="dashboard-encouragement">
                 "You're doing great! 3 skills improving this week."
             </p>
+
+            // Suggestion overlay -- available on dashboard too
+            <SuggestionOverlay />
+
+            // Mirror mode cognitive state display
+            <CognitiveStateMirror />
+
             <div class="dashboard-grid">
+                <SovereigntyCard />
                 <LearningReadinessCard />
                 <XpLevelCard />
                 <StreakCard />
                 <DueReviewsCard />
                 <SkillsCard />
             </div>
+            <ActiveAdaptationSection />
             <RecommendationsSection />
             <RecentActivitySection />
+        </div>
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Sovereignty card (NEW -- shows independence level and growth)
+// ---------------------------------------------------------------------------
+
+#[component]
+fn SovereigntyCard() -> impl IntoView {
+    let adaptivity = use_adaptivity();
+
+    view! {
+        <div class="dash-card sovereignty-card">
+            <h3>"Your Learning Independence"</h3>
+            {move || {
+                let sov = adaptivity.sovereignty.get();
+                let mode = sov.mode();
+                let (mode_label, mode_icon, mode_description) = match mode {
+                    InteractionMode::Guardian => (
+                        "Helper Mode",
+                        "\u{1f6e1}\u{fe0f}",
+                        "I help guide your learning and explain what I'm doing",
+                    ),
+                    InteractionMode::Guide => (
+                        "Guide Mode",
+                        "\u{1f331}",
+                        "I suggest options and you choose what works for you",
+                    ),
+                    InteractionMode::Mirror => (
+                        "Mirror Mode",
+                        "\u{1fa9e}",
+                        "I show you how you're doing -- you decide what to do",
+                    ),
+                    InteractionMode::Autonomous => (
+                        "Independent Mode",
+                        "\u{2b50}",
+                        "You're in charge! I'm here if you need me",
+                    ),
+                };
+
+                let progress_pct = ((sov.level as f64 / 1000.0) * 100.0) as u32;
+
+                // Last few growth events (most recent first)
+                let recent_events: Vec<_> = sov.growth_events.iter().rev().take(3).cloned().collect();
+
+                view! {
+                    <div class="sovereignty-display">
+                        <div class="sovereignty-mode">
+                            <span class="sovereignty-icon">{mode_icon}</span>
+                            <span class="sovereignty-mode-label">{mode_label}</span>
+                        </div>
+                        <p class="sovereignty-description">{mode_description}</p>
+
+                        <div class="sovereignty-progress">
+                            <div class="sovereignty-bar-container">
+                                <div class="sovereignty-bar"
+                                    style=format!("width: {}%", progress_pct)>
+                                </div>
+                            </div>
+                            <span class="sovereignty-level-text">
+                                {format!("{}/1000", sov.level)}
+                            </span>
+                        </div>
+                    </div>
+
+                    // Recent sovereignty growth events
+                    {if !recent_events.is_empty() {
+                        view! {
+                            <div class="sovereignty-history">
+                                <p class="sovereignty-history-label">"How you earned independence:"</p>
+                                <ul class="sovereignty-events">
+                                    {recent_events.into_iter().map(|event| {
+                                        let icon = match event.event_type {
+                                            SovereigntyGrowthType::SelfRegulatedBreak => "\u{1f9d8}",
+                                            SovereigntyGrowthType::PerseveranceSuccess => "\u{1f4aa}",
+                                            SovereigntyGrowthType::AskedForHelp => "\u{1f91d}",
+                                            SovereigntyGrowthType::PlannedAndExecuted => "\u{1f4cb}",
+                                            SovereigntyGrowthType::ReflectiveResponse => "\u{1f4ad}",
+                                            SovereigntyGrowthType::DifficultyCalibration => "\u{1f3af}",
+                                            SovereigntyGrowthType::PeerTeaching => "\u{1f9d1}\u{200d}\u{1f3eb}",
+                                            SovereigntyGrowthType::IndependentSuccess => "\u{1f680}",
+                                        };
+                                        view! {
+                                            <li class="sovereignty-event">
+                                                <span class="event-icon">{icon}</span>
+                                                <span class="event-desc">{event.description.clone()}</span>
+                                                <span class="event-delta">{format!("+{}", event.delta)}</span>
+                                            </li>
+                                        }
+                                    }).collect_view()}
+                                </ul>
+                            </div>
+                        }.into_any()
+                    } else {
+                        view! {
+                            <p class="sovereignty-hint">
+                                <small>"Keep learning and you'll earn more independence!"</small>
+                            </p>
+                        }.into_any()
+                    }}
+                }
+            }}
+        </div>
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Active Adaptation section (NEW -- shows what the system is doing)
+// ---------------------------------------------------------------------------
+
+#[component]
+fn ActiveAdaptationSection() -> impl IntoView {
+    let adaptivity = use_adaptivity();
+
+    view! {
+        <div class="dash-section active-adaptation">
+            {move || {
+                let adapt = adaptivity.adaptation.get();
+                let sov = adaptivity.sovereignty.get();
+                let mode = sov.mode();
+
+                // Only show in Guardian or Guide mode
+                if matches!(mode, InteractionMode::Mirror | InteractionMode::Autonomous) {
+                    return view! { <div class="adaptation-hidden"></div> }.into_any();
+                }
+
+                let complexity_text = match &adapt.text_complexity {
+                    TextComplexity::Standard => "Standard difficulty",
+                    TextComplexity::Simplified => "Simplified wording",
+                    TextComplexity::Minimal => "Numbers only",
+                    TextComplexity::Personalized { interest_topic } => {
+                        // Can't return a &str from a match arm with borrowed data easily,
+                        // so we'll handle this in the view
+                        return view! {
+                            <div class="adaptation-status">
+                                <h3>"How I'm Helping"</h3>
+                                <div class="adaptation-items">
+                                    <div class="adaptation-item">
+                                        <span class="adaptation-label">"Content"</span>
+                                        <span class="adaptation-value">
+                                            {format!("Personalized with {}", interest_topic)}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        }.into_any();
+                    }
+                };
+
+                let diff_text = if adapt.difficulty_delta > 0.1 {
+                    "Making problems a bit harder"
+                } else if adapt.difficulty_delta < -0.1 {
+                    "Making problems a bit easier"
+                } else {
+                    "Just right"
+                };
+
+                let accuracy = adaptivity.recent_accuracy.get();
+                let accuracy_pct = (accuracy * 100.0) as u32;
+
+                view! {
+                    <div class="adaptation-status">
+                        <h3>"How I'm Helping"</h3>
+                        <div class="adaptation-items">
+                            <div class="adaptation-item">
+                                <span class="adaptation-label">"Content"</span>
+                                <span class="adaptation-value">{complexity_text}</span>
+                            </div>
+                            <div class="adaptation-item">
+                                <span class="adaptation-label">"Difficulty"</span>
+                                <span class="adaptation-value">{diff_text}</span>
+                            </div>
+                            <div class="adaptation-item">
+                                <span class="adaptation-label">"Your accuracy"</span>
+                                <span class="adaptation-value">{format!("{}%", accuracy_pct)}</span>
+                            </div>
+                        </div>
+                    </div>
+                }.into_any()
+            }}
         </div>
     }
 }

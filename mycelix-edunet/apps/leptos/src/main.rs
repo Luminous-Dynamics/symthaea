@@ -4,6 +4,7 @@
 
 use leptos::prelude::*;
 
+mod adaptivity_provider;
 mod app;
 mod cognitive_adaptivity;
 mod components;

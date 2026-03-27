@@ -156,7 +156,7 @@ pub enum InteractionMode {
 
 /// A suggestion the student can accept, modify, or decline.
 /// The system NEVER forces an action.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Suggestion {
     pub suggestion_type: SuggestionType,
     pub message: String,
@@ -180,7 +180,7 @@ pub enum SuggestionType {
 }
 
 /// An option presented to the student. There is ALWAYS a "no thanks" option.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct StudentChoice {
     pub label: String,
     pub action: ChoiceAction,
@@ -205,7 +205,7 @@ pub enum ChoiceAction {
 // ---------------------------------------------------------------------------
 
 /// Real-time cognitive state derived from consciousness + neuromodulators.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CognitiveState {
     pub phi: f32,
     pub free_energy: f32,
@@ -237,7 +237,7 @@ pub enum MotorCommand {
 // ---------------------------------------------------------------------------
 
 /// Content adaptation decisions produced by the engine.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ContentAdaptation {
     pub text_complexity: TextComplexity,
     pub modality: Modality,
@@ -268,7 +268,7 @@ pub enum Modality {
 }
 
 /// Suggestion for peer pairing.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PeerSuggestion {
     pub reason: String,
     pub peer_criteria: PeerCriteria,
@@ -277,7 +277,7 @@ pub struct PeerSuggestion {
 }
 
 /// Criteria for selecting a compatible peer.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PeerCriteria {
     pub needs_high_mastery_in: String,
     pub needs_patience: bool,

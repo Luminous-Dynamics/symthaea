@@ -8,6 +8,7 @@ use leptos_router::{
     path,
 };
 
+use crate::adaptivity_provider::AdaptivityProvider;
 use crate::consciousness::ConsciousnessProvider;
 use crate::holochain::{ConnectionBadge, HolochainProvider};
 use crate::learning_engine::LearningEngineProvider;
@@ -20,7 +21,9 @@ pub fn App() -> impl IntoView {
         <HolochainProvider>
         <ConsciousnessProvider>
         <LearningEngineProvider>
+        <AdaptivityProvider>
             <AppInner />
+        </AdaptivityProvider>
         </LearningEngineProvider>
         </ConsciousnessProvider>
         </HolochainProvider>
