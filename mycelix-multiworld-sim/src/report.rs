@@ -66,6 +66,14 @@ pub struct CivilizationReport {
     pub breakthroughs: usize,
     pub worlds_founded: usize,
     pub total_migrants: u64,
+    pub faction_cycles: usize,
+    pub peak_faction_count: usize,
+    pub max_elite_persistence: f64,
+    pub max_innovation_stagnation: f64,
+    pub phi_trend_at_end: String,
+    pub max_trauma: f64,
+    pub speciation_events: usize,
+    pub constitutional_calcification_events: usize,
 }
 
 impl CivilizationReport {
@@ -192,6 +200,33 @@ impl CivilizationReport {
         s
     }
 
+    /// Extended summary for 777+ year reports with faction analysis.
+    pub fn summary_extended(&self) -> String {
+        let mut s = self.summary();
+        if self.duration_years >= 300.0 {
+            s.push_str("
+FACTION ANALYSIS:
+");
+            s.push_str(&format!("  Faction cycles:         {}
+", self.faction_cycles));
+            s.push_str(&format!("  Peak faction count:     {}
+", self.peak_faction_count));
+            s.push_str(&format!("  Max elite persistence:  {:.3}
+", self.max_elite_persistence));
+            s.push_str(&format!("  Max innovation stag:    {:.3}
+", self.max_innovation_stagnation));
+            s.push_str(&format!("  Phi trend at end:       {}
+", self.phi_trend_at_end));
+            s.push_str(&format!("  Max trauma:             {:.3}
+", self.max_trauma));
+            s.push_str(&format!("  Speciation events:      {}
+", self.speciation_events));
+            s.push_str(&format!("  Calcification events:   {}
+", self.constitutional_calcification_events));
+        }
+        s
+    }
+
     /// Build a report from simulation state.
     pub fn build(
         scenario_name: &str,
@@ -279,6 +314,14 @@ impl CivilizationReport {
             breakthroughs,
             worlds_founded,
             total_migrants,
+            faction_cycles: events.iter().filter(|e| e.event_type == CivEventType::FactionDissolved).count(),
+            peak_faction_count: events.iter().filter(|e| e.event_type == CivEventType::FactionEmerged).count(),
+            max_elite_persistence: 0.0,
+            max_innovation_stagnation: 0.0,
+            phi_trend_at_end: String::new(),
+            max_trauma: 0.0,
+            speciation_events: events.iter().filter(|e| e.event_type == CivEventType::GeneticSpeciation).count(),
+            constitutional_calcification_events: events.iter().filter(|e| e.event_type == CivEventType::ConstitutionalCalcification).count(),
         }
     }
 }
@@ -313,6 +356,16 @@ mod tests {
                 civilization_viability_score: cvs,
                 mean_allostatic_load: 0.15,
                 mean_engagement: 0.75,
+                faction_count: 0,
+                elite_persistence: 0.0,
+                amendment_rate: 0.0,
+                innovation_stagnation: 0.0,
+                inter_world_divergence: 0.0,
+                consciousness_gini: 0.0,
+                phi_trend: "Rising".into(),
+                recovery_count: 0,
+                trauma_level: 0.0,
+                speciation_index: 0.0,
             }],
             checkpoint_results: vec![
                 (60, "Base assembled".into(), true, vec![]),
@@ -339,6 +392,14 @@ mod tests {
             breakthroughs: 5,
             worlds_founded: 3,
             total_migrants: 150,
+            faction_cycles: 2,
+            peak_faction_count: 4,
+            max_elite_persistence: 0.1,
+            max_innovation_stagnation: 0.2,
+            phi_trend_at_end: "Rising".into(),
+            max_trauma: 0.15,
+            speciation_events: 0,
+            constitutional_calcification_events: 1,
         }
     }
 

@@ -96,6 +96,12 @@ fn main() {
             deep_space_isolation_mult: 2.0,
             migration_max_per_cycle: 0,
             education_enabled: false,
+            consciousness_gating_enabled: false,
+            faction_enabled: true,
+            amendment_enabled: true,
+            outer_system_fission_enabled: true,
+            speciation_friction_enabled: true,
+            hostile_guardian: false,
         }),
     ];
 

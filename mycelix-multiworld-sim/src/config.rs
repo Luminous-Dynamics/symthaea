@@ -52,6 +52,11 @@ pub struct PolicyConfig {
     /// no consciousness-based filtering of decisions. This is the control
     /// condition for proving that consciousness gating improves outcomes.
     pub consciousness_gating_enabled: bool,
+    pub faction_enabled: bool,
+    pub amendment_enabled: bool,
+    pub outer_system_fission_enabled: bool,
+    pub speciation_friction_enabled: bool,
+    pub hostile_guardian: bool,
 }
 
 impl Default for PolicyConfig {
@@ -65,6 +70,11 @@ impl Default for PolicyConfig {
             migration_max_per_cycle: 3,
             education_enabled: true,
             consciousness_gating_enabled: true,
+            faction_enabled: true,
+            amendment_enabled: true,
+            outer_system_fission_enabled: true,
+            speciation_friction_enabled: true,
+            hostile_guardian: false,
         }
     }
 }
@@ -198,6 +208,68 @@ impl SimulationConfig {
                 },
             ],
         }
+    }
+
+    /// 300-year configuration (3600 ticks).
+    pub fn default_300_year() -> Self {
+        let mut cfg = Self::default_150_year();
+        cfg.total_ticks = 300 * TICKS_PER_YEAR;
+        cfg.epoch_configs.push(EpochConfig {
+            id: 7, name: "Convergence".into(),
+            start_tick: 150 * TICKS_PER_YEAR, end_tick: 200 * TICKS_PER_YEAR,
+            population_trigger: None, self_sufficiency_trigger: None,
+        });
+        cfg.epoch_configs.push(EpochConfig {
+            id: 8, name: "Secondary Growth".into(),
+            start_tick: 200 * TICKS_PER_YEAR, end_tick: 250 * TICKS_PER_YEAR,
+            population_trigger: None, self_sufficiency_trigger: None,
+        });
+        cfg.epoch_configs.push(EpochConfig {
+            id: 9, name: "Legacy".into(),
+            start_tick: 250 * TICKS_PER_YEAR, end_tick: 300 * TICKS_PER_YEAR,
+            population_trigger: None, self_sufficiency_trigger: None,
+        });
+        cfg
+    }
+
+    /// 777-year configuration (9324 ticks).
+    pub fn default_777_year() -> Self {
+        let mut cfg = Self::default_300_year();
+        cfg.total_ticks = 777 * TICKS_PER_YEAR;
+        cfg.initial_worlds.push(WorldSeedConfig {
+            name: "Europa Station".into(), location: "Europa".into(),
+            founding_tick: 2400, initial_population: 30, initial_resources: 0.15,
+        });
+        cfg.initial_worlds.push(WorldSeedConfig {
+            name: "Titan Outpost".into(), location: "Titan".into(),
+            founding_tick: 3600, initial_population: 20, initial_resources: 0.1,
+        });
+        cfg.epoch_configs.push(EpochConfig {
+            id: 10, name: "Millennium".into(),
+            start_tick: 300 * TICKS_PER_YEAR, end_tick: 777 * TICKS_PER_YEAR,
+            population_trigger: None, self_sufficiency_trigger: None,
+        });
+        cfg
+    }
+
+    /// 1000-year configuration (12000 ticks).
+    pub fn default_1000_year() -> Self {
+        let mut cfg = Self::default_300_year();
+        cfg.total_ticks = 1000 * TICKS_PER_YEAR;
+        cfg.initial_worlds.push(WorldSeedConfig {
+            name: "Europa Station".into(), location: "Europa".into(),
+            founding_tick: 2400, initial_population: 30, initial_resources: 0.15,
+        });
+        cfg.initial_worlds.push(WorldSeedConfig {
+            name: "Titan Outpost".into(), location: "Titan".into(),
+            founding_tick: 3600, initial_population: 20, initial_resources: 0.1,
+        });
+        cfg.epoch_configs.push(EpochConfig {
+            id: 10, name: "Millennium".into(),
+            start_tick: 300 * TICKS_PER_YEAR, end_tick: 1000 * TICKS_PER_YEAR,
+            population_trigger: None, self_sufficiency_trigger: None,
+        });
+        cfg
     }
 }
 

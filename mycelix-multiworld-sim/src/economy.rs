@@ -280,6 +280,10 @@ mod tests {
             is_immigrant: false,
             needs: crate::needs::PsychologicalNeeds::new(),
             tend_balance: 0.0,
+                    parent_ids: None,
+                    faction_id: None,
+                    generation: 0,
+                    trauma_level: 0.0,
         }
     }
 
@@ -382,6 +386,10 @@ mod tests {
                 is_immigrant: false,
                 needs: crate::needs::PsychologicalNeeds::new(),
             tend_balance: 0.0,
+                    parent_ids: None,
+                    faction_id: None,
+                    generation: 0,
+                    trauma_level: 0.0,
             };
             diverse_agents.push(a);
         }

@@ -238,6 +238,14 @@ pub struct CivAgent {
     pub needs: PsychologicalNeeds,
     /// TEND balance earned through care work (teaching, mutual aid).
     pub tend_balance: f64,
+    /// Parent agent IDs (mother, father). None for founding colonists.
+    pub parent_ids: Option<(u64, u64)>,
+    /// Faction membership. None if unaffiliated.
+    pub faction_id: Option<u32>,
+    /// Generation number (0 for founders, incremented for births).
+    pub generation: u16,
+    /// Intergenerational trauma level [0.0, 1.0].
+    pub trauma_level: f64,
 }
 
 impl CivAgent {
@@ -332,6 +340,10 @@ mod tests {
             is_immigrant: false,
             needs: PsychologicalNeeds::new(),
             tend_balance: 0.0,
+            parent_ids: None,
+            faction_id: None,
+            generation: 0,
+            trauma_level: 0.0,
         }
     }
 
