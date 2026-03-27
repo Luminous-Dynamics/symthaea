@@ -136,6 +136,21 @@ enum Commands {
         output: Option<PathBuf>,
     },
 
+    /// List MIT OCW departments
+    ListOcw,
+
+    /// Fetch MIT OCW courses for a department
+    IngestOcw {
+        /// Department ID (e.g., "6" for EECS, "18" for Math, "8" for Physics)
+        dept_id: String,
+        /// Maximum courses to fetch (default: 50)
+        #[arg(long, default_value_t = 50)]
+        limit: usize,
+        /// Output file path (default: stdout)
+        #[arg(long, short = 'o')]
+        output: Option<PathBuf>,
+    },
+
     /// Merge multiple curriculum documents + bridge files into a unified graph
     ///
     /// Combines all nodes, edges, and bridge connections into a single
@@ -385,6 +400,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 eprintln!("{} milestones", doc.nodes.len());
             }
             eprintln!("Done.");
+        }
+
+        // ============================================================
+        // MIT OCW Commands
+        // ============================================================
+        Commands::ListOcw => {
+            let source = edunet_standards_ingest::sources::ocw::OcwSource::new()?;
+            let entries = source.list_available()?;
+            eprintln!("Found {} MIT departments", entries.len());
+            println!("{:<6} {:<55} {}", "DEPT", "NAME", "LEVEL");
+            println!("{}", "-".repeat(75));
+            for e in &entries {
+                println!("{:<6} {:<55} {}", e.id, e.title, e.level);
+            }
+        }
+
+        Commands::IngestOcw {
+            dept_id,
+            limit,
+            output,
+        } => {
+            let source = edunet_standards_ingest::sources::ocw::OcwSource::new()?;
+            eprintln!("Fetching up to {} OCW courses for department {}...", limit, dept_id);
+            let (doc, count) = source.fetch_and_convert(&dept_id, limit).await?;
+            eprintln!("Got {} courses from MIT Learn API", count);
+            write_document(&doc, output.as_deref(), true)?;
         }
 
         // ============================================================

@@ -1,0 +1,1230 @@
+{
+  "metadata": {
+    "title": "MIT OCW: Mathematics",
+    "framework": "MIT OpenCourseWare",
+    "source": "https://ocw.mit.edu/search/?d=18&s=department_course_numbers.sort_coursenum",
+    "grade_level": "Undergraduate",
+    "subject_area": "Mathematics",
+    "domain": "Mathematics",
+    "version": "2024",
+    "total_standards": 30,
+    "domains": [
+      "Systems Thinking",
+      "Computer Science",
+      "Biology",
+      "Software Design and Engineering",
+      "Environmental Engineering",
+      "Algorithms and Data Structures",
+      "Mechanical Engineering",
+      "Data Science, Analytics & Computer Technology",
+      "Mathematics",
+      "Biological Engineering"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Auto-ingested from MIT Learn API (department 18). Prerequisites inferred from course numbering.",
+    "academic_level": "Undergraduate",
+    "institution": "Massachusetts Institute of Technology",
+    "cip_code": "27.01"
+  },
+  "nodes": [
+    {
+      "id": "18.01",
+      "title": "Single Variable Calculus",
+      "description": "This introductory calculus course covers differentiation and integration of functions of one variable, with applications.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.01",
+          "description": "Single Variable Calculus",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.024",
+      "title": "Multivariable Calculus with Theory",
+      "description": "This course is a continuation of <em>18.014 Calculus with Theory</em><em>.</em> It covers the same material as <em>18.02 Multivariable Calculus</em>, but at a deeper level, emphasizing careful reasoning and understanding of proofs. There is considerable emphasis on linear algebra and vector integral calculus.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.024",
+          "description": "Multivariable Calculus with Theory",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.02SC",
+      "title": "Multivariable Calculus",
+      "description": "<p>This course covers differential, integral and vector calculus for functions of more than one variable. These mathematical tools and methods are used extensively in the physical sciences, engineering, economics and computer graphics.</p>\n<p>The materials have been organized to support independent study. The website includes all of the materials you will need to understand the concepts covered in this subject. The materials in this course include:</p>\n<ul>\n<li><strong>Lecture Videos</strong>...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.02SC",
+          "description": "Multivariable Calculus",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.03SC",
+      "title": "Differential Equations",
+      "description": "<p>The laws of nature are expressed as differential equations. Scientists and engineers must know how to model the world in terms of differential equations, and how to solve those equations and interpret the solutions. This course focuses on the equations and techniques most useful in science and engineering.</p>\n<p>Course Format</p>\n<p>This course has been designed for independent study. It provides everything you will need to understand the concepts covered in the course. The materials incl...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.03SC",
+          "description": "Differential Equations",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.085",
+      "title": "Computational Science and Engineering I",
+      "description": "This course provides the fundamental computational toolbox for solving science and engineering problems. Topics include review of linear algebra, applications to networks, structures, estimation, finite difference and finite element solutions of differential equations, Laplace’s equation and potential flow, boundary-value problems, Fourier series, the discrete Fourier transform, and convolution. We will also explore many topics in AI and machine learning throughout the course.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "mathematics",
+        "systems engineering",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.085",
+          "description": "Computational Science and Engineering I",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.098",
+      "title": "Street-Fighting Mathematics",
+      "description": "This course teaches the art of guessing results and solving problems without doing a proof or an exact calculation. Techniques include extreme-cases reasoning, dimensional analysis, successive approximation, discretization, generalization, and pictorial analysis. Applications include mental calculation, solid geometry, musical intervals, logarithms, integration, infinite series, solitaire, and differential equations. <strong>(No epsilons or deltas are harmed by taking this course.)</strong> T...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.098",
+          "description": "Street-Fighting Mathematics",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.100A",
+      "title": "Real Analysis",
+      "description": "This course covers the fundamentals of mathematical analysis: convergence of sequences and series, continuity, differentiability, Riemann integral, sequences and series of functions, uniformity, and the interchange of limit operations. It shows the utility of abstract concepts&nbsp;through a study of real numbers, and teaches an understanding and construction of proofs.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.100A",
+          "description": "Real Analysis",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.100B",
+      "title": "Analysis I",
+      "description": "Analysis I covers fundamentals of mathematical analysis: metric spaces, convergence of sequences and series, continuity, differentiability, Riemann integral, sequences and series of functions, uniformity, interchange of limit operations.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.100B",
+          "description": "Analysis I",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.101",
+      "title": "Analysis II",
+      "description": "This course continues from Analysis I (18.100B), in the direction of manifolds and global analysis. The first half of the course covers multivariable calculus. The rest of the course covers the theory of differential forms in n-dimensional vector spaces and manifolds.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.101",
+          "description": "Analysis II",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.152",
+      "title": "Introduction to Partial Differential Equations",
+      "description": "This course provides a solid introduction to Partial Differential Equations for advanced undergraduate students. The focus is on linear second order uniformly elliptic and parabolic equations.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.152",
+          "description": "Introduction to Partial Differential Equations",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.212",
+      "title": "Algebraic Combinatorics",
+      "description": "This course covers the applications of algebra to combinatorics. Topics include enumeration methods, permutations, partitions, partially ordered sets and lattices, Young tableaux, graph theory, matrix tree theorem, electrical networks, convex polytopes, and more.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.212",
+          "description": "Algebraic Combinatorics",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.303",
+      "title": "Linear Partial Differential Equations",
+      "description": "This course covers the classical partial differential equations of applied mathematics: diffusion, Laplace/Poisson, and wave equations. It also includes methods and tools for solving these PDEs, such as separation of variables, Fourier series and transforms, eigenvalue problems, and Green’s functions.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.303",
+          "description": "Linear Partial Differential Equations",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.335J",
+      "title": "Introduction to Numerical Methods ",
+      "description": "This course offers an advanced introduction to numerical analysis, with a focus on accuracy and efficiency of numerical algorithms. Topics include sparse-matrix/iterative and dense-matrix algorithms in numerical linear algebra (for linear systems and eigenproblems), floating-point arithmetic, backwards error analysis, conditioning, and stability. Other computational topics (e.g., numerical integration or nonlinear optimization) are also surveyed.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "systems engineering",
+        "computer science",
+        "engineering",
+        "algorithms and data structures",
+        "data science, analytics & computer technology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.335J",
+          "description": "Introduction to Numerical Methods ",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.337J",
+      "title": "Parallel Computing",
+      "description": "This is an advanced interdisciplinary introduction to applied parallel computing on modern supercomputers. It has a hands-on emphasis on understanding the realities and myths of what is possible on the world’s fastest machines. We will make prominent use of the Julia Language, a free, open-source, high-performance dynamic programming language for technical computing.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Mathematics",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "software design and engineering",
+        "algorithms and data structures",
+        "mathematics",
+        "computer science",
+        "data science, analytics & computer technology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.337J",
+          "description": "Parallel Computing",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.357",
+      "title": "Interfacial Phenomena",
+      "description": "This graduate-level course covers fluid systems dominated by the influence of interfacial tension. The roles of curvature pressure and Marangoni stress are elucidated in a variety of fluid systems. Particular attention is given to drops and bubbles, soap films and minimal surfaces, wetting phenomena, water-repellency, surfactants, Marangoni flows, capillary origami and contact line dynamics.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "mechanical engineering",
+        "engineering",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.357",
+          "description": "Interfacial Phenomena",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.409",
+      "title": "Behavior of Algorithms",
+      "description": "This course is a study of Behavior of Algorithms and covers an area of current interest in theoretical computer science. The topics vary from term to term. During this term, we discuss rigorous approaches to explaining the typical performance of algorithms with a focus on the following approaches:&nbsp;smoothed analysis, condition numbers/parametric analysis, and subclassing inputs.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "computer science",
+        "engineering",
+        "algorithms and data structures",
+        "data science, analytics & computer technology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.409",
+          "description": "Behavior of Algorithms",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.417",
+      "title": "Introduction to Computational Molecular Biology",
+      "description": "This course introduces the basic computational methods used to understand the cell on a molecular level. It covers subjects such as the sequence alignment algorithms: dynamic programming, hashing, suffix trees, and Gibbs sampling. Furthermore, it focuses on computational approaches to: genetic and physical mapping; genome sequencing, assembly, and annotation; RNA expression and secondary structure; protein structure and folding; and molecular interactions and dynamics.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "biology",
+        "biological engineering",
+        "engineering",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.417",
+          "description": "Introduction to Computational Molecular Biology",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.465",
+      "title": "Topics in Statistics: Statistical Learning Theory",
+      "description": "The main goal of this course is to study the generalization ability of a number of popular machine learning algorithms such as boosting, support vector machines and neural networks. Topics include Vapnik-Chervonenkis theory, concentration inequalities in product spaces, and other elements of empirical process theory.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "cognitive science",
+        "computer science",
+        "machine learning",
+        "engineering",
+        "ai",
+        "algorithms and data structures",
+        "data science, analytics & computer technology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.465",
+          "description": "Topics in Statistics: Statistical Learning Theory",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.600",
+      "title": "Probability and Random Variables",
+      "description": "This course introduces students to probability and random variables. Topics include distribution functions, binomial, geometric, hypergeometric, and Poisson distributions. The other topics covered are uniform, exponential, normal, gamma and beta distributions; conditional probability; Bayes theorem; joint distributions; Chebyshev inequality; law of large numbers; and central limit theorem.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.600",
+          "description": "Probability and Random Variables",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "500-600",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.650",
+      "title": "Statistics for Applications ",
+      "description": "This course offers an in-depth the theoretical foundations for statistical methods that are useful in many applications. The goal is to understand the role of mathematics in the research and development of efficient statistical methods.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.650",
+          "description": "Statistics for Applications ",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "500-600",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.704",
+      "title": "Seminar in Algebra and Number Theory: Rational Points on Elliptic Curves",
+      "description": "This is a seminar for mathematics majors, where the students present the lectures. No prior experience giving lectures is necessary.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.704",
+          "description": "Seminar in Algebra and Number Theory: Rational Points on Elliptic Curves",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 3,
+      "course_level": "700+",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.725",
+      "title": "Algebraic Geometry",
+      "description": "This is the first semester of a two-semester sequence on Algebraic Geometry. The goal of the course is to introduce the basic notions and techniques of modern algebraic geometry. It covers fundamental notions and results about algebraic varieties over an algebraically closed field; relations between complex algebraic varieties and complex analytic varieties; and examples with emphasis on algebraic curves and surfaces. This course is an introduction to the language of schemes and properties of...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.725",
+          "description": "Algebraic Geometry",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.905",
+      "title": "Algebraic Topology I",
+      "description": "This is a course on the singular homology of topological spaces. Topics include: Singular homology, CW complexes, Homological algebra, Cohomology, and Poincare duality.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.905",
+          "description": "Algebraic Topology I",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.997",
+      "title": "Topics in Combinatorial Optimization",
+      "description": "In this graduate-level course, we will be covering advanced topics in combinatorial optimization. We will start with non-bipartite matchings and cover many results extending the fundamental results of matchings, flows and matroids. The emphasis is on the derivation of purely combinatorial results, including min-max relations, and not so much on the corresponding algorithmic questions of how to find such objects. The intended audience consists of Ph.D. students interested in optimization, comb...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Mathematics",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "systems thinking",
+        "mathematics",
+        "systems engineering",
+        "computer science",
+        "business & management",
+        "data science, analytics & computer technology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.997",
+          "description": "Topics in Combinatorial Optimization",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "2.062J",
+      "title": "Wave Propagation",
+      "description": "This course discusses theoretical concepts and analysis of wave problems in science and engineering. Examples are chosen from elasticity, acoustics, geophysics, hydrodynamics, blood flow, nondestructive evaluation, and other applications.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Mathematics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "environmental engineering",
+        "ocean engineering",
+        "mechanical engineering",
+        "earth science",
+        "engineering",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "2.062J",
+          "description": "Wave Propagation",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "6.042J",
+      "title": "Mathematics for Computer Science",
+      "description": "This course covers elementary discrete mathematics for computer science and engineering. It emphasizes mathematical definitions and proofs as well as applicable methods. Topics include formal logic notation, proof methods; induction, well-ordering; sets, relations; elementary graph theory; integer congruences; asymptotic notation and growth of functions; permutations and combinations, counting principles; discrete probability. Further selected topics may also be covered, such as recursive def...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "mathematics",
+        "computer science",
+        "data science, analytics & computer technology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.042J",
+          "description": "Mathematics for Computer Science",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "6.854J",
+      "title": "Advanced Algorithms",
+      "description": "This is a graduate course on the design and analysis of algorithms, covering several advanced topics not studied in typical introductory courses on algorithms. It is especially designed for doctoral students interested in theoretical computer science.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Mathematics",
+      "subdomain": "Computer Science",
+      "tags": [
+        "computer science",
+        "engineering",
+        "algorithms and data structures",
+        "data science, analytics & computer technology"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.854J",
+          "description": "Advanced Algorithms",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "6.856J",
+      "title": "Randomized Algorithms",
+      "description": "This course examines how randomization can be used to make algorithms simpler and more efficient via random sampling, random selection of witnesses, symmetry breaking, and Markov chains. Topics covered include: randomized computation; data structures (hash tables, skip lists); graph algorithms (minimum spanning trees, shortest paths, minimum cuts); geometric algorithms (convex hulls, linear programming in fixed or arbitrary dimension); approximate counting; parallel algorithms; online algorit...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Mathematics",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "algorithms and data structures",
+        "mathematics",
+        "computer science",
+        "data science, analytics & computer technology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.856J",
+          "description": "Randomized Algorithms",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "RES.18-003",
+      "title": "Calculus for Beginners and Artists",
+      "description": "<p>This online textbook provides an overview of Calculus in clear, easy to understand language designed for the non-mathematician.</p>\n<p>Online Publication</p>\n",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "RES.18-003",
+          "description": "Calculus for Beginners and Artists",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "RES.18-009",
+      "title": "Learn Differential Equations: Up Close with Gilbert Strang and Cleve Moler",
+      "description": "<p><em>Learn Differential Equations: Up Close with</em> <em>_Gilbert Strang</em> and_ <em>Cleve Moler</em> is an in-depth series of videos about differential equations and the MATLAB® ODE suite. These videos are suitable for students and life-long learners to enjoy.</p>\n<p>About the Instructors</p>\n<p>Gilbert Strang is the MathWorks Professor of Mathematics at MIT. His research focuses on mathematical analysis, linear algebra and PDEs. He has written textbooks on linear algebra, computationa...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "programming & coding",
+        "mathematics",
+        "computer science",
+        "data science, analytics & computer technology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "RES.18-009",
+          "description": "Learn Differential Equations: Up Close with Gilbert Strang and Cleve Moler",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "27.01"
+    }
+  ],
+  "edges": [
+    {
+      "from": "18.01",
+      "to": "18.100A",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.01 typically precedes 18.100A."
+    },
+    {
+      "from": "18.01",
+      "to": "18.100B",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.01 typically precedes 18.100B."
+    },
+    {
+      "from": "18.01",
+      "to": "18.101",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.01 typically precedes 18.101."
+    },
+    {
+      "from": "18.02SC",
+      "to": "18.100A",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.02SC typically precedes 18.100A."
+    },
+    {
+      "from": "18.02SC",
+      "to": "18.100B",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.02SC typically precedes 18.100B."
+    },
+    {
+      "from": "18.02SC",
+      "to": "18.101",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.02SC typically precedes 18.101."
+    },
+    {
+      "from": "18.03SC",
+      "to": "18.100A",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.03SC typically precedes 18.100A."
+    },
+    {
+      "from": "18.03SC",
+      "to": "18.100B",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.03SC typically precedes 18.100B."
+    },
+    {
+      "from": "18.03SC",
+      "to": "18.101",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.03SC typically precedes 18.101."
+    },
+    {
+      "from": "RES.18-003",
+      "to": "18.100A",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.18-003 typically precedes 18.100A."
+    },
+    {
+      "from": "RES.18-003",
+      "to": "18.100B",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.18-003 typically precedes 18.100B."
+    },
+    {
+      "from": "RES.18-003",
+      "to": "18.101",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.18-003 typically precedes 18.101."
+    },
+    {
+      "from": "RES.18-009",
+      "to": "18.100A",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.18-009 typically precedes 18.100A."
+    },
+    {
+      "from": "RES.18-009",
+      "to": "18.100B",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.18-009 typically precedes 18.100B."
+    },
+    {
+      "from": "RES.18-009",
+      "to": "18.101",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.18-009 typically precedes 18.101."
+    },
+    {
+      "from": "18.024",
+      "to": "18.100A",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.024 typically precedes 18.100A."
+    },
+    {
+      "from": "18.024",
+      "to": "18.100B",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.024 typically precedes 18.100B."
+    },
+    {
+      "from": "18.024",
+      "to": "18.101",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.024 typically precedes 18.101."
+    },
+    {
+      "from": "6.042J",
+      "to": "18.100A",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.042J typically precedes 18.100A."
+    },
+    {
+      "from": "6.042J",
+      "to": "18.100B",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.042J typically precedes 18.100B."
+    },
+    {
+      "from": "6.042J",
+      "to": "18.101",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.042J typically precedes 18.101."
+    },
+    {
+      "from": "2.062J",
+      "to": "18.100A",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 2.062J typically precedes 18.100A."
+    },
+    {
+      "from": "2.062J",
+      "to": "18.100B",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 2.062J typically precedes 18.100B."
+    },
+    {
+      "from": "2.062J",
+      "to": "18.101",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 2.062J typically precedes 18.101."
+    },
+    {
+      "from": "18.085",
+      "to": "18.100A",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.085 typically precedes 18.100A."
+    },
+    {
+      "from": "18.085",
+      "to": "18.100B",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.085 typically precedes 18.100B."
+    },
+    {
+      "from": "18.085",
+      "to": "18.101",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.085 typically precedes 18.101."
+    },
+    {
+      "from": "18.098",
+      "to": "18.100A",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.098 typically precedes 18.100A."
+    },
+    {
+      "from": "18.098",
+      "to": "18.100B",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.098 typically precedes 18.100B."
+    },
+    {
+      "from": "18.098",
+      "to": "18.101",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.098 typically precedes 18.101."
+    },
+    {
+      "from": "18.212",
+      "to": "18.303",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Intermediate course 18.212 typically precedes 18.303."
+    },
+    {
+      "from": "18.212",
+      "to": "18.335J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Intermediate course 18.212 typically precedes 18.335J."
+    },
+    {
+      "from": "18.212",
+      "to": "18.337J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Intermediate course 18.212 typically precedes 18.337J."
+    },
+    {
+      "from": "18.465",
+      "to": "18.600",
+      "edge_type": "Requires",
+      "strength_permille": 600,
+      "rationale": "Advanced course 18.465 typically precedes graduate course 18.600."
+    },
+    {
+      "from": "18.465",
+      "to": "18.650",
+      "edge_type": "Requires",
+      "strength_permille": 600,
+      "rationale": "Advanced course 18.465 typically precedes graduate course 18.650."
+    }
+  ]
+}

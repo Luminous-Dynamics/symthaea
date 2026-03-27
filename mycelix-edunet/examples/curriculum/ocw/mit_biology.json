@@ -1,0 +1,1161 @@
+{
+  "metadata": {
+    "title": "MIT OCW: Biology",
+    "framework": "MIT OpenCourseWare",
+    "source": "https://ocw.mit.edu/search/?d=7&s=department_course_numbers.sort_coursenum",
+    "grade_level": "Undergraduate",
+    "subject_area": "Biological Sciences",
+    "domain": "Biological Sciences",
+    "version": "2024",
+    "total_standards": 30,
+    "domains": [
+      "Science & Math",
+      "Literature",
+      "Policy and Administration",
+      "Engineering",
+      "Data Science, Analytics & Computer Technology",
+      "Energy, Climate & Sustainability",
+      "Humanities",
+      "Health Care Management",
+      "Immunology",
+      "Biology"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Auto-ingested from MIT Learn API (department 7). Prerequisites inferred from course numbering.",
+    "academic_level": "Undergraduate",
+    "institution": "Massachusetts Institute of Technology",
+    "cip_code": "26.01"
+  },
+  "nodes": [
+    {
+      "id": "15.136J",
+      "title": "Principles and Practice of Drug Development",
+      "description": "This course serves as a description and critical assessment of the major issues and stages of developing a pharmaceutical or biopharmaceutical. Topics covered include drug discovery, preclinical development, clinical investigation, manufacturing and regulatory issues considered for small and large molecules, and economic and financial considerations of the drug development process. A multidisciplinary perspective is provided by the faculty, who represent clinical, life, and management science...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Biological Sciences",
+      "subdomain": "Health Care Management",
+      "tags": [
+        "health care management",
+        "biology",
+        "chemical engineering",
+        "engineering",
+        "science & math",
+        "health & medicine"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "15.136J",
+          "description": "Principles and Practice of Drug Development",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "20.400J",
+      "title": "Perspectives in Biological Engineering",
+      "description": "This seminar-format course provides an in-depth presentation and discussion of how engineering and biological approaches can be combined to solve problems in science and technology, emphasizing integration of biological information and methodologies with engineering analysis, synthesis, and design. Emphasis is placed on molecular mechanisms underlying cellular processes, including signal transduction, gene expression networks, and functional responses.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Biological Sciences",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "biology",
+        "biological engineering",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "20.400J",
+          "description": "Perspectives in Biological Engineering",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "5.08J",
+      "title": "Biological Chemistry II",
+      "description": "This course is an advanced treatment of biochemical mechanisms that underlie biological processes. Topics include macromolecular machines such as the ribosome, the proteasome, fatty acid synthases as a paradigm for polyketide synthases and non-ribosomal polypeptide synthases, and polymerases. Emphasis will be given to the experimental methods used to unravel how these processes fit into the cellular context as well as the coordinated regulation of these processes.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "chemistry",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "5.08J",
+          "description": "Biological Chemistry II",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.00",
+      "title": "COVID-19, SARS-CoV-2, and the Pandemic",
+      "description": "<p>During Fall 2021, all MIT students and the general public are welcome to join Professors Richard Young and Facundo Batista as they discuss the science of the COVID-19 pandemic. The livestream of the lectures is available to the public, but only registered students are able to ask questions during the Q&amp;A.</p>\n<p>Lectures will be given by leading experts on the fundamentals of coronavirus and host cell biology, immunology, epidemiology, clinical disease, and vaccine and therapeutic deve...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.00",
+          "description": "COVID-19, SARS-CoV-2, and the Pandemic",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.00",
+      "title": "COVID-19, SARS-CoV-2 and the Pandemic",
+      "description": "<p>During Fall 2020, all MIT students and the general public were welcomed to join Professors Richard Young and Facundo Batista as they discussed the science of the pandemic during this new class.&nbsp;The livestream of the lectures was available to the public, but only registered students were able to ask questions during the Q&amp;A.&nbsp;</p>\n<p>Special guest speakers included: Drs. Anthony Fauci, David Baltimore, James Bradner, Victoria Clark, Kizzmekia Corbett, Britt Glaunsinger, Akiko I...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.00",
+          "description": "COVID-19, SARS-CoV-2 and the Pandemic",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.012",
+      "title": "Introduction to Biology",
+      "description": "<p>The MIT Biology Department core courses, 7.012, 7.013, and 7.014, all cover the same core material, which includes the fundamental principles of biochemistry, genetics, molecular biology, and cell biology. Biological function at the molecular level is particularly emphasized and covers the structure and regulation of genes, as well as, the structure and synthesis of proteins, how these molecules are integrated into cells, and how these cells are integrated into multicellular systems and or...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.012",
+          "description": "Introduction to Biology",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.013",
+      "title": "Introductory Biology",
+      "description": "The MIT Biology Department core Introductory Biology courses, 7.012, 7.013, 7.014, 7.015, and 7.016 all cover the same core material, which includes the fundamental principles of biochemistry, genetics, molecular biology, and cell biology. The focus of 7.013 is on genomic approaches to human biology, including neuroscience, development, immunology, tissue repair and stem cells, tissue engineering, and infectious and inherited diseases, including cancer.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.013",
+          "description": "Introductory Biology",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.013",
+      "title": "Introductory Biology",
+      "description": "<p>The MIT Biology Department core courses, 7.012, 7.013, and 7.014, all cover the same core material, which includes the fundamental principles of biochemistry, genetics, molecular biology, and cell biology. 7.013 focuses on the application of the fundamental principles toward an understanding of human biology. Topics include genetics, cell biology, molecular biology, disease (infectious agents, inherited diseases and cancer), developmental biology, neurobiology and evolution.</p>\n<p>Biologi...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.013",
+          "description": "Introductory Biology",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.014",
+      "title": "Introductory Biology",
+      "description": "<p>The MIT Biology Department core courses, 7.012, 7.013, and 7.014, all cover the same core material, which includes the fundamental principles of biochemistry, genetics, molecular biology, and cell biology. Biological function at the molecular level is particularly emphasized and covers the structure and regulation of genes, as well as, the structure and synthesis of proteins, how these molecules are integrated into cells, and how these cells are integrated into multicellular systems and or...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.014",
+          "description": "Introductory Biology",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.016",
+      "title": "Introductory Biology",
+      "description": "<p><em>7.016 Introductory Biology</em> provides an introduction to fundamental principles of biochemistry, molecular biology, and genetics for understanding the functions of living systems. Taught for the first time in Fall 2013, this course covers examples of the use of chemical biology and twenty-first-century molecular genetics in understanding human health and therapeutic intervention.</p>\n<p>The MIT Biology Department Introductory Biology courses&nbsp;7.012, 7.013, 7.014, 7.015, and 7.01...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "pathology and pathophysiology",
+        "biomedical technologies",
+        "immunology",
+        "science & math",
+        "health & medicine"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.016",
+          "description": "Introductory Biology",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.05",
+      "title": "General Biochemistry",
+      "description": "<p>This course focuses on contributions of biochemistry toward an understanding of the structure and functioning of organisms, tissues, and cells. Topics include:</p>\n<ul>\n<li>Chemistry and functions of constituents of cells and tissues and the chemical and physical-chemical basis for the structures of nucleic acids, proteins, and carbohydrates.</li>\n<li>Basic enzymology and biochemical reaction mechanisms involved in macromolecular synthesis and degradation, signaling, transport, and movemen...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "chemistry",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.05",
+          "description": "General Biochemistry",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.13",
+      "title": "Experimental Microbial Genetics",
+      "description": "<p>In this class, students engage in independent research projects to probe various aspects of the physiology of the bacterium&nbsp;<em>Pseudomonas aeruginosa</em> PA14, an opportunistic pathogen isolated from the lungs of cystic fibrosis patients. Students use molecular genetics to examine survival in stationary phase, antibiotic resistance, phase variation, toxin production, and secondary metabolite production.</p>\n<p>Projects aim to discover the molecular basis for these processes using bo...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.13",
+          "description": "Experimental Microbial Genetics",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.15",
+      "title": "Experimental Molecular Genetics",
+      "description": "<p>This project-based laboratory course provides students with in-depth experience in experimental molecular genetics, using modern methods of molecular biology and genetics to conduct original research. The course is geared towards students (including sophomores) who have a strong interest in a future career in biomedical research. This semester will focus on chemical genetics using <em>Caenorhabditis elegans</em> as a model system. Students will gain experience in research rationale and met...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Literature",
+      "tags": [
+        "literature",
+        "biology",
+        "humanities",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.15",
+          "description": "Experimental Molecular Genetics",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.18",
+      "title": "Topics in Experimental Biology",
+      "description": "<p>This independent experimental study course is designed to allow students with a strong interest in independent research to fulfill the project laboratory requirement for the Biology Department Program in the context of a research laboratory at MIT. The research should be a continuation of a previous project under the direction of a member of the Biology Department faculty.</p>\n<p>This course provides instruction and practice in written and oral communication. Journal club discussions are u...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.18",
+          "description": "Topics in Experimental Biology",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.22",
+      "title": "Developmental Biology",
+      "description": "This graduate and advanced undergraduate level lecture and literature discussion course covers the current understanding of the molecular mechanisms that regulate animal development. Evolutionary mechanisms are emphasized as well as the discussion of relevant diseases. Vertebrate (mouse, chick, frog, fish) and invertebrate (fly, worm) models are covered. Specific topics include formation of early body plan, cell type determination, organogenesis, morphogenesis, stem cells, cloning, and issues...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.22",
+          "description": "Developmental Biology",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.27",
+      "title": "Principles of Human Disease",
+      "description": "This course covers current understanding of, and modern approaches to human disease, emphasizing the molecular and cellular basis of both genetic disease and cancer. Topics include: The Genetics of Simple and Complex Traits; Karyotypic Analysis and Positional Cloning; Genetic Diagnosis; The Roles of Oncogenes and Tumor Suppressors in Tumor Initiation, Progression, and Treatment; The Interaction between Genetics and Environment; Animal Models of Human Disease; Cancer; and Conventional and Gene...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Pathology and Pathophysiology",
+      "tags": [
+        "pathology and pathophysiology",
+        "immunology",
+        "health & medicine"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.27",
+          "description": "Principles of Human Disease",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.60",
+      "title": "Cell Biology: Structure and Functions of the Nucleus",
+      "description": "The goal of this course is to teach both the fundamentals of nuclear cell biology as well as the methodological and experimental approaches upon which they are based. Lectures and class discussions will cover the background and fundamental findings in a particular area of nuclear cell biology. The assigned readings will provide concrete examples of the experimental approaches and logic used to establish these findings. Some examples of topics include genome and systems biology, transcription,...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.60",
+          "description": "Cell Biology: Structure and Functions of the Nucleus",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.88J",
+      "title": "Protein Folding and Human Disease",
+      "description": "This course covers amino acid sequence control of protein folding, misfolding, amyloid polymerization and aggregation. Readings and discussions address topics such as chaperone structure and function, folding and assembly of fibrous proteins, and pathologies associated with protein misfolding and aggregation in Alzheimer’s, Parkinson’s, Huntington’s and other protein deposition diseases. Students are required to write and present a research paper.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.88J",
+          "description": "Protein Folding and Human Disease",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.89J",
+      "title": "Topics in Computational and Systems Biology",
+      "description": "<p>This is a seminar based on research literature. Papers covered are selected to illustrate important problems and approaches in the field of computational and systems biology, and provide students a framework from which to evaluate new developments.</p>\n<p>The MIT Initiative in Computational and Systems Biology (CSBi) is a campus-wide research and education program that links biology, engineering, and computer science in a multidisciplinary approach to the systematic analysis and modeling o...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "biological engineering",
+        "engineering",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.89J",
+          "description": "Topics in Computational and Systems Biology",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.90J",
+      "title": "Computational Functional Genomics",
+      "description": "The course focuses on casting contemporary problems in systems biology and functional genomics in computational terms and providing appropriate tools and methods to solve them. Topics include genome structure and function, transcriptional regulation, and stem cell biology in particular; measurement technologies such as microarrays (expression, protein-DNA interactions, chromatin structure); statistical data analysis, predictive and causal inference, and experiment design. The emphasis is on c...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "biomedical technologies",
+        "science & math",
+        "health & medicine"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.90J",
+          "description": "Computational Functional Genomics",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.A12",
+      "title": "Freshman Seminar: Structural Basis of Genetic Material: Nucleic Acids",
+      "description": "Since the discovery of the structure of the DNA double helix in 1953 by Watson and Crick, the information on detailed molecular structures of DNA and RNA, namely, the foundation of genetic material, has expanded rapidly. This discovery is the beginning of the “Big Bang” of molecular biology and biotechnology. In this seminar, students discuss, from a historical perspective and current developments, the importance of pursuing the detailed structural basis of genetic materials.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.A12",
+          "description": "Freshman Seminar: Structural Basis of Genetic Material: Nucleic Acids",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 3,
+      "course_level": "200-300",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "8.591J",
+      "title": "Systems Biology",
+      "description": "This course introduces the mathematical modeling techniques needed to address key questions in modern biology. An overview of modeling techniques in molecular biology and genetics, cell biology and developmental biology is covered. Key experiments that validate mathematical models are also discussed, as well as molecular, cellular, and developmental systems biology, bacterial chemotaxis, genetic oscillators, control theory and genetic networks, and gradient sensing systems. Additional specifi...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.591J",
+          "description": "Systems Biology",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "500-600",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "RES.7-001",
+      "title": "Pre-7.01: Getting up to Speed in Biology",
+      "description": "<p>This self-paced course was originally designed to help prepare incoming MIT students for their first Introductory Biology Course (known at MIT as 7.01). It will also be useful for anyone preparing to take an equivalent college-level introductory biology class elsewhere. It includes lecture videos, interactive exercises, problem sets, and one exam.&nbsp; Lecture Topics:&nbsp;Molecules of Life, The Cell and How it Works, Information Transfer in Biology, Inheritance and Genetics, and Building...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "RES.7-001",
+          "description": "Pre-7.01: Getting up to Speed in Biology",
+          "grade_level": "Non-Credit"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "RES.7-003",
+      "title": "Brave New Planet",
+      "description": "<p>Utopia or dystopia? It’s up to us.</p>\n<p>In the 21st century, powerful technologies have been appearing at a breathtaking pace—related to the internet, artificial intelligence, genetic engineering, and more. They have amazing potential upsides, but we can’t ignore the serious risks that come with them.</p>\n<p><em>Brave New Planet</em> is a podcast that delves deep into the most exciting and challenging scientific frontiers, helping us understand them and grapple with their implicati...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Energy",
+      "tags": [
+        "energy",
+        "philosophy",
+        "climate science",
+        "computer science",
+        "policy and administration",
+        "biology",
+        "earth science",
+        "humanities",
+        "machine learning",
+        "engineering",
+        "ai",
+        "data science, analytics & computer technology",
+        "social sciences",
+        "science & math",
+        "energy, climate & sustainability"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "RES.7-003",
+          "description": "Brave New Planet",
+          "grade_level": "Non-Credit"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "RES.7-004",
+      "title": "BioNook Online Biology Resources",
+      "description": "<p>BioNook is Whitehead Institute’s online biology resource, offering exciting learning enrichment for students, parents and teachers. Find videos, podcasts and stories on Whitehead Institute Science, as well as virtual workshop opportunities through BioNook’s After School Science Club, and ideas for nature-based activities.</p>\n<p>Explore free materials on biology and research—from deep explorations of how science is done, to stories following the lives of scientists, to suggestions fo...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "RES.7-004",
+          "description": "BioNook Online Biology Resources",
+          "grade_level": "Non-Credit"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "RES.7-005",
+      "title": "Biology Teaching Assistant (TA) Training",
+      "description": "The MIT Biology Department supports TAs’ teaching by providing a specialized Teaching Assistant (TA) training program in Biology Pedagogy, for which TAs can earn a training certificate. This program has been developed in response to the feedback of previous TAs, and is designed to actively meet each TA’s needs as they are teaching. It provides practical knowledge that directly relates to their teaching responsibilities each week, and provides them with the opportunity to practice differen...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Pedagogy and Curriculum",
+      "tags": [
+        "pedagogy and curriculum",
+        "education & teaching"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "RES.7-005",
+          "description": "Biology Teaching Assistant (TA) Training",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "RES.7-006",
+      "title": "7.03x Genetics",
+      "description": "<p>In this course, you will learn the principles of genetics with application to the study of biological function at the level of molecules, cells, and multicellular organisms, including humans. We will cover structure and function of genes, chromosomes, and genomes; biological variation resulting from recombination, mutation, and selection; population genetics; and the use of genetic methods to modify genes and genomes and analyze protein function, gene regulation, and inherited disease.</p>...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "RES.7-006",
+          "description": "7.03x Genetics",
+          "grade_level": "Non-Credit"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "RES.7-007",
+      "title": "7.06x Cell Biology",
+      "description": "<p>In this course, you will engage in the biology of cells of higher organisms. You will study the structure, function, and biosynthesis of cellular membranes and organelles; cell growth and oncogenic transformation; transport, receptors, and cell signaling; the cytoskeleton, the extracellular matrix, and cell movements; cell division and cell cycle; functions of specialized cell types. This course emphasizes the current molecular knowledge of cell biological processes as well as the genetic,...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "RES.7-007",
+          "description": "7.06x Cell Biology",
+          "grade_level": "Non-Credit"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "RES.7-008",
+      "title": "7.28x Molecular Biology",
+      "description": "<p>This course is an in-depth adventure through the molecular mechanisms that control the maintenance, expression, and evolution of prokaryotic and eukaryotic genomes. Through lectures and readings of relevant literature, students will explore gene regulation, DNA replication, genetic recombination, transcription, and mRNA translation. The quizzes are designed to build students’ experimental design and data analysis skills.</p>\n<p>This course, based on the MIT course&nbsp;<em>7.28/7.58 Mole...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "RES.7-008",
+          "description": "7.28x Molecular Biology",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "RES.7-009",
+      "title": "7.InT: Inclusive Teaching Module",
+      "description": "<p>The Inclusive Teaching Module is both a standalone online resource for those looking to explore materials related to inclusive teaching as well as an integral part of a blended workshop available to use at your own institution. If you are looking to facilitate a blended workshop using this material, please download the Facilitation Guide and Appendix files to get started!&nbsp;</p>\n<p>As part of the Open Learning Library (OLL), this course is free to use. You have the option to sign up and...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Pedagogy and Curriculum",
+      "tags": [
+        "pedagogy and curriculum",
+        "education & teaching"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "RES.7-009",
+          "description": "7.InT: Inclusive Teaching Module",
+          "grade_level": "Non-Credit"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    }
+  ],
+  "edges": [
+    {
+      "from": "7.00",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.00 typically precedes 15.136J."
+    },
+    {
+      "from": "7.00",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.00 typically precedes 15.136J."
+    },
+    {
+      "from": "7.05",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.05 typically precedes 15.136J."
+    },
+    {
+      "from": "RES.7-001",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.7-001 typically precedes 15.136J."
+    },
+    {
+      "from": "RES.7-003",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.7-003 typically precedes 15.136J."
+    },
+    {
+      "from": "RES.7-004",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.7-004 typically precedes 15.136J."
+    },
+    {
+      "from": "RES.7-005",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.7-005 typically precedes 15.136J."
+    },
+    {
+      "from": "RES.7-006",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.7-006 typically precedes 15.136J."
+    },
+    {
+      "from": "RES.7-007",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.7-007 typically precedes 15.136J."
+    },
+    {
+      "from": "RES.7-008",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.7-008 typically precedes 15.136J."
+    },
+    {
+      "from": "RES.7-009",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.7-009 typically precedes 15.136J."
+    },
+    {
+      "from": "5.08J",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.08J typically precedes 15.136J."
+    },
+    {
+      "from": "7.012",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.012 typically precedes 15.136J."
+    },
+    {
+      "from": "7.013",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.013 typically precedes 15.136J."
+    },
+    {
+      "from": "7.013",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.013 typically precedes 15.136J."
+    },
+    {
+      "from": "7.13",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.13 typically precedes 15.136J."
+    },
+    {
+      "from": "7.014",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.014 typically precedes 15.136J."
+    },
+    {
+      "from": "7.15",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.15 typically precedes 15.136J."
+    },
+    {
+      "from": "7.016",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.016 typically precedes 15.136J."
+    },
+    {
+      "from": "7.18",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.18 typically precedes 15.136J."
+    },
+    {
+      "from": "7.22",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.22 typically precedes 15.136J."
+    },
+    {
+      "from": "7.27",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.27 typically precedes 15.136J."
+    },
+    {
+      "from": "7.60",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.60 typically precedes 15.136J."
+    },
+    {
+      "from": "7.88J",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.88J typically precedes 15.136J."
+    },
+    {
+      "from": "7.89J",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.89J typically precedes 15.136J."
+    },
+    {
+      "from": "7.90J",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.90J typically precedes 15.136J."
+    },
+    {
+      "from": "15.136J",
+      "to": "20.400J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Intermediate course 15.136J typically precedes 20.400J."
+    },
+    {
+      "from": "20.400J",
+      "to": "8.591J",
+      "edge_type": "Requires",
+      "strength_permille": 600,
+      "rationale": "Advanced course 20.400J typically precedes graduate course 8.591J."
+    }
+  ]
+}

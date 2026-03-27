@@ -9,6 +9,7 @@
 pub mod acm;
 pub mod cip;
 pub mod csp;
+pub mod ocw;
 pub mod phd;
 
 use crate::converter::CurriculumDocument;

@@ -7,51 +7,75 @@
     "subject_area": "Multi-Subject",
     "domain": "Multi-Subject",
     "version": "2024",
-    "total_standards": 305,
+    "total_standards": 417,
     "domains": [
-      "problem solving",
-      "counting",
-      "Earth's Systems",
-      "Ecosystems: Interactions, Energy, and Dynamics",
-      "IDE",
-      "Motion and Stability: Forces and Interactions",
-      "brute-force",
-      "Heredity: Inheritance and Variation of Traits",
-      "Disciplinary Core Ideas",
       "Operations and Algebraic Thinking",
-      "Number and Operations in Base Ten",
-      "Standards for Mathematical Practice",
-      "Matter and Its Interactions",
-      "probability",
-      "Biological Evolution: Unity and Diversity",
-      "Engineering Design",
-      "Examination",
-      "Number and Operations—Fractions",
+      "From Molecules to Organisms: Structures and Processes",
+      "propositional logic",
+      "Software Design and Engineering",
+      "directed graphs",
+      "variables",
+      "finite automata",
       "unit testing",
       "Energy",
-      "direct proof",
-      "Earth's Place in the Universe",
-      "design patterns",
-      "Science and Engineering Practices",
-      "directed graphs",
-      "asymptotic analysis",
-      "Research",
-      "variables",
-      "From Molecules to Organisms: Structures and Processes",
-      "Counting and Cardinality",
-      "Measurement and Data",
-      "Geometry",
-      "Earth and Human Activity",
+      "Matter and Its Interactions",
+      "Linguistics",
       "arrays",
-      "waterfall",
-      "Crosscutting Concepts",
+      "Mathematics",
+      "Examination",
+      "Ecosystems: Interactions, Energy, and Dynamics",
+      "Geometry",
       "sets",
-      "finite automata",
-      "propositional logic",
-      "Coursework"
+      "IDE",
+      "Economics",
+      "Science and Engineering Practices",
+      "Data Science, Analytics & Computer Technology",
+      "Motion and Stability: Forces and Interactions",
+      "Counting and Cardinality",
+      "Earth and Human Activity",
+      "Chemistry",
+      "Engineering",
+      "problem solving",
+      "Earth's Systems",
+      "Systems Thinking",
+      "Biological Engineering",
+      "Literature",
+      "Policy and Administration",
+      "Biology",
+      "asymptotic analysis",
+      "Immunology",
+      "probability",
+      "Science & Math",
+      "Earth's Place in the Universe",
+      "Research",
+      "Digital Business & IT",
+      "Heredity: Inheritance and Variation of Traits",
+      "Environmental Engineering",
+      "User Experience",
+      "Algorithms and Data Structures",
+      "Coursework",
+      "Biological Evolution: Unity and Diversity",
+      "Measurement and Data",
+      "Physics",
+      "Health Care Management",
+      "Disciplinary Core Ideas",
+      "Engineering Design",
+      "direct proof",
+      "Crosscutting Concepts",
+      "Mechanical Engineering",
+      "brute-force",
+      "Number and Operations in Base Ten",
+      "waterfall",
+      "Energy, Climate & Sustainability",
+      "Number and Operations—Fractions",
+      "Humanities",
+      "counting",
+      "design patterns",
+      "Standards for Mathematical Practice",
+      "Computer Science"
     ],
     "created_at": "2026-03-28",
-    "notes": "Merged 16 curriculum documents with 19 bridge edges. 305 unique nodes, 284 edges."
+    "notes": "Merged 20 curriculum documents with 58 bridge edges. 417 unique nodes, 430 edges."
   },
   "nodes": [
     {
@@ -6372,6 +6396,3550 @@
       ]
     },
     {
+      "id": "10.01",
+      "title": "Ethics for Engineers: Artificial Intelligence",
+      "description": "Artificial Intelligence (AI), and the algorithmic judgment at its core, is developing at breakneck speed. This version of the popular Ethics for Engineers course focuses on the ethics issues involved in the latest developments of computer science.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Humanities",
+      "tags": [
+        "humanities",
+        "engineering",
+        "philosophy",
+        "computer science",
+        "machine learning",
+        "ai",
+        "data science, analytics & computer technology"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "10.01",
+          "description": "Ethics for Engineers: Artificial Intelligence",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "14.15J",
+      "title": "Networks",
+      "description": "This course will highlight common principles that permeate the functioning of networks and how the same issues related to robustness, fragility and interlinkages arise in several different types of networks. It will both introduce conceptual tools from dynamical systems, random graph models, optimization and game theory, and cover a wide variety of applications.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Economics",
+      "tags": [
+        "economics",
+        "computer science",
+        "engineering",
+        "networks and security",
+        "data science, analytics & computer technology",
+        "social sciences"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "14.15J",
+          "description": "Networks",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "20.330J",
+      "title": "Fields, Forces and Flows in Biological Systems",
+      "description": "This course introduces the basic driving forces for electric current, fluid flow, and mass transport, plus their application to a variety of biological systems. Basic mathematical and engineering tools will be introduced, in the context of biology and physiology. Various electrokinetic phenomena are also considered as an example of coupled nature of chemical-electro-mechanical driving forces. Applications include transport in biological tissues and across membranes, manipulation of cells and ...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "mechanical engineering",
+        "chemical engineering",
+        "engineering",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "20.330J",
+          "description": "Fields, Forces and Flows in Biological Systems",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "20.410J",
+      "title": "Molecular, Cellular and Tissue Biomechanics (BE.410J)",
+      "description": "<p>This course develops and applies scaling laws and the methods of continuum mechanics to biomechanical phenomena over a range of length scales. Topics include: structure of tissues and the molecular basis for macroscopic properties; chemical and electrical effects on mechanical behavior; cell mechanics, motility and adhesion; biomembranes; biomolecular mechanics and molecular motors. Experimental methods for probing structures at the tissue, cellular, and molecular levels will also be inves...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "biological engineering",
+        "engineering",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "20.410J",
+          "description": "Molecular, Cellular and Tissue Biomechanics (BE.410J)",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.011",
+      "title": "Signals, Systems and Inference",
+      "description": "This course covers signals, systems and inference in communication, control and signal processing. Topics include input-output and state-space models of linear systems driven by deterministic and random signals; time- and transform-domain representations in discrete and continuous time; and group delay. State feedback and observers. Probabilistic models; stochastic processes, correlation functions, power spectra, spectral factorization. Least-mean square error estimation; Wiener filtering. Hy...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Electrical Engineering",
+      "tags": [
+        "electrical engineering",
+        "engineering"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.011",
+          "description": "Signals, Systems and Inference",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.013",
+      "title": "Electromagnetics and Applications",
+      "description": "<p>This course explores electromagnetic phenomena in modern applications, including wireless communications, circuits, computer interconnects and peripherals, optical fiber links and components, microwave communications and radar, antennas, sensors, micro-electromechanical systems, motors, and power generation and transmission. Fundamentals covered include: quasistatic and dynamic solutions to Maxwell’s equations; waves, radiation, and diffraction; coupling to media and structures; guided a...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Electrical Engineering",
+      "tags": [
+        "electrical engineering",
+        "physics",
+        "science & math",
+        "engineering"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.013",
+          "description": "Electromagnetics and Applications",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.041",
+      "title": "Probabilistic Systems Analysis and Applied  Probability",
+      "description": "This course is offered both to undergraduates (6.041) and graduates (6.431), but the assignments differ. 6.041/6.431 introduces students to the modeling, quantification, and analysis of uncertainty. Topics covered include: formulation and solution in sample space, random variables, transform techniques, simple random processes and their probability distributions, Markov processes, limit theorems, and elements of statistical inference.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.041",
+          "description": "Probabilistic Systems Analysis and Applied  Probability",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.042J",
+      "title": "Mathematics for Computer Science",
+      "description": "This course covers elementary discrete mathematics for computer science and engineering. It emphasizes mathematical definitions and proofs as well as applicable methods. Topics include formal logic notation, proof methods; induction, well-ordering; sets, relations; elementary graph theory; integer congruences; asymptotic notation and growth of functions; permutations and combinations, counting principles; discrete probability. Further selected topics may also be covered, such as recursive def...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "mathematics",
+        "computer science",
+        "data science, analytics & computer technology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.042J",
+          "description": "Mathematics for Computer Science",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.057",
+      "title": "Introduction to MATLAB",
+      "description": "This is an accelerated introduction to MATLAB® and its popular toolboxes. Lectures are interactive, with students conducting sample MATLAB problems in real time. The course includes problem-based MATLAB assignments. Students must provide their own laptop and software. This is great preparation for classes that use MATLAB.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "programming & coding",
+        "visualization",
+        "computer science",
+        "data science, analytics & computer technology"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.057",
+          "description": "Introduction to MATLAB",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.091",
+      "title": "Hands-On Introduction to Electrical Engineering Lab Skills",
+      "description": "<p>This course introduces students to both passive and active electronic components (op-amps, 555 timers, TTL digital circuits). Basic analog and digital circuits and theory of operation are covered. The labs allow the students to master the use of electronic instruments and construct and/or solder several circuits. The labs also reinforce the concepts discussed in class with a hands-on approach and allow the students to gain significant experience with electrical instruments such as function...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Electrical Engineering",
+      "tags": [
+        "electrical engineering",
+        "engineering"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.091",
+          "description": "Hands-On Introduction to Electrical Engineering Lab Skills",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.092",
+      "title": "Java Preparation for 6.170",
+      "description": "This course focuses on introducing the language, libraries, tools and concepts of Javaᵀᴹ. The course is specifically targeted at students who intend to take 6.170 in the following term and feel they would struggle because they lack the necessary background. Topics include: Object-oriented programming, primitives, arrays, objects, inheritance, interfaces, polymorphism, hashing, data structures, collections, nested classes, floating point precision, defensive programming, and depth-first se...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Computer Science",
+      "tags": [
+        "computer science",
+        "engineering",
+        "programming & coding",
+        "software design and engineering",
+        "data science, analytics & computer technology"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.092",
+          "description": "Java Preparation for 6.170",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.245",
+      "title": "Multivariable Control Systems",
+      "description": "This course uses computer-aided design methodologies for synthesis of multivariable feedback control systems. Topics covered include: performance and robustness trade-offs; model-based compensators; Q-parameterization; ill-posed optimization problems; dynamic augmentation; linear-quadratic optimization of controllers; H-infinity controller design; Mu-synthesis; model and compensator simplification; and nonlinear effects. The assignments for the course comprise of computer-aided (MATLAB®) des...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Electrical Engineering",
+      "tags": [
+        "electrical engineering",
+        "systems engineering",
+        "computer science",
+        "engineering",
+        "data science, analytics & computer technology"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.245",
+          "description": "Multivariable Control Systems",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.253",
+      "title": "Convex Analysis and Optimization",
+      "description": "This course will focus on fundamental subjects in convexity, duality, and convex optimization algorithms. The aim is to develop the core analytical and algorithmic issues of continuous optimization, duality, and saddle point theory using a handful of unifying principles that can be easily visualized and readily understood.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "computer science",
+        "engineering",
+        "algorithms and data structures",
+        "data science, analytics & computer technology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.253",
+          "description": "Convex Analysis and Optimization",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.301",
+      "title": "Solid-State Circuits",
+      "description": "6.301 is a course in analog circuit analysis and design. We cover the tools and methods necessary for the creative design of useful circuits using active devices. The class stresses insight and intuition, applied to the design of transistor circuits and the estimation of their performance. We concentrate on circuits using the bipolar junction transistor, but the techniques that we study can be equally applied to circuits using JFETs, MOSFETs, MESFETs, future exotic devices, or even vacuum tubes.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Electrical Engineering",
+      "tags": [
+        "electrical engineering",
+        "engineering"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.301",
+          "description": "Solid-State Circuits",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.302",
+      "title": "Feedback Systems",
+      "description": "This course provides an introduction to the design of feedback systems. Topics covered include: properties and advantages of feedback systems, time-domain and frequency-domain performance measures, stability and degree of stability, root locus method, Nyquist criterion, frequency-domain design, compensation techniques, application to a wide variety of physical systems, internal and external compensation of operational amplifiers, modeling and compensation of power converter systems, and phase...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Electrical Engineering",
+      "tags": [
+        "electrical engineering",
+        "engineering"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.302",
+          "description": "Feedback Systems",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.336J",
+      "title": "Introduction to Numerical Simulation (SMA 5211)",
+      "description": "<p>6.336J is an introduction to computational techniques for the simulation of a large variety of engineering and physical systems. Applications are drawn from aerospace, mechanical, electrical, chemical and biological engineering, and materials science. Topics include: mathematical formulations; network problems; sparse direct and iterative matrix solution techniques; Newton methods for nonlinear problems; discretization methods for ordinary, time-periodic and partial differential equations,...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Systems Engineering",
+      "tags": [
+        "systems engineering",
+        "engineering"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.336J",
+          "description": "Introduction to Numerical Simulation (SMA 5211)",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.341",
+      "title": "Discrete-Time Signal Processing",
+      "description": "<p>This class addresses the representation, analysis, and design of discrete time signals and systems. The major concepts covered include: Discrete-time processing of continuous-time signals; decimation, interpolation, and sampling rate conversion; flowgraph structures for DT systems; time-and frequency-domain design techniques for recursive (IIR) and non-recursive (FIR) filters; linear prediction; discrete Fourier transform, FFT algorithm; short-time Fourier analysis and filter banks; multir...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Electrical Engineering",
+      "tags": [
+        "electrical engineering",
+        "mathematics",
+        "engineering",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.341",
+          "description": "Discrete-Time Signal Processing",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.450",
+      "title": "Principles of Digital Communication I",
+      "description": "<p>The course serves as an introduction to the theory and practice behind many of today’s communications systems. 6.450 forms the first of a two-course sequence on digital communication. The second class, <em>6.451 Principles of Digital Communication II</em>, is offered in the spring.</p>\n<p>Topics covered include: digital communications at the block diagram level, data compression, Lempel-Ziv algorithm, scalar and vector quantization, sampling and aliasing, the Nyquist criterion, PAM and Q...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Electrical Engineering",
+      "tags": [
+        "electrical engineering",
+        "engineering"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.450",
+          "description": "Principles of Digital Communication I",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.776",
+      "title": "High Speed Communication Circuits",
+      "description": "6.776 covers circuit level design issues of high speed communication systems, with primary focus being placed on wireless and broadband data link applications. Specific circuit topics include transmission lines, high speed and low noise amplifiers, VCO’s, mixers, power amps, high speed digital circuits, and frequency synthesizers. In addition to learning analysis skills for the above items, students will gain a significant amount of experience in simulating RF circuits in SPICE and also bui...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "networks and security",
+        "electrical engineering",
+        "computer science",
+        "data science, analytics & computer technology"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.776",
+          "description": "High Speed Communication Circuits",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.811",
+      "title": "Principles and Practice of Assistive Technology",
+      "description": "6.811: Principles and Practice of Assistive Technology (PPAT) is an interdisciplinary, project-based course, centered around a design project in which small teams of students work closely with a person with a disability in the Cambridge area to design a device, piece of equipment, app, or other solution that helps them live more independently.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Electrical Engineering",
+      "tags": [
+        "electrical engineering",
+        "public health",
+        "computer science",
+        "mechanical engineering",
+        "user experience",
+        "engineering",
+        "data science, analytics & computer technology",
+        "health & medicine"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.811",
+          "description": "Principles and Practice of Assistive Technology",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.849",
+      "title": "Geometric Folding Algorithms: Linkages, Origami, Polyhedra",
+      "description": "<p>This course focuses on the algorithms for analyzing and designing geometric foldings. Topics include reconfiguration of foldable structures, linkages made from one-dimensional rods connected by hinges, folding two-dimensional paper (origami), and unfolding and folding three-dimensional polyhedra. Applications to architecture, robotics, manufacturing, and biology are also covered in this course.</p>\nAcknowledgments\n<p>Thanks to videographers Martin Demaine and Jayson Lynch.</p>\n",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Visual Arts",
+      "tags": [
+        "visual arts",
+        "mathematics",
+        "computer science",
+        "engineering",
+        "algorithms and data structures",
+        "art, design & architecture",
+        "data science, analytics & computer technology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.849",
+          "description": "Geometric Folding Algorithms: Linkages, Origami, Polyhedra",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.856J",
+      "title": "Randomized Algorithms",
+      "description": "This course examines how randomization can be used to make algorithms simpler and more efficient via random sampling, random selection of witnesses, symmetry breaking, and Markov chains. Topics covered include: randomized computation; data structures (hash tables, skip lists); graph algorithms (minimum spanning trees, shortest paths, minimum cuts); geometric algorithms (convex hulls, linear programming in fixed or arbitrary dimension); approximate counting; parallel algorithms; online algorit...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "algorithms and data structures",
+        "mathematics",
+        "computer science",
+        "data science, analytics & computer technology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.856J",
+          "description": "Randomized Algorithms",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.858",
+      "title": "Computer Systems Security",
+      "description": "6.858 Computer Systems Security is a class about the design and implementation of secure computer systems. Lectures cover threat models, attacks that compromise security, and techniques for achieving security, based on recent research papers. Topics include operating system (OS) security, capabilities, information flow control, language security, network protocols, hardware security, and security in web applications.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "software design and engineering",
+        "computer science",
+        "data science, analytics & computer technology"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.858",
+          "description": "Computer Systems Security",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.864",
+      "title": "Advanced Natural Language Processing",
+      "description": "This course is a graduate introduction to natural language processing - the study of human language from a computational perspective. It covers syntactic, semantic and discourse processing models, emphasizing machine learning or corpus-based methods and algorithms. It also covers applications of these methods and models in syntactic parsing, information extraction, statistical machine translation, dialogue systems, and summarization. The subject qualifies as an Artificial Intelligence and App...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Humanities",
+      "tags": [
+        "humanities",
+        "linguistics",
+        "computer science",
+        "cognitive science",
+        "engineering",
+        "machine learning",
+        "ai",
+        "data science, analytics & computer technology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.864",
+          "description": "Advanced Natural Language Processing",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.S897",
+      "title": "Machine Learning for Healthcare",
+      "description": "This course introduces students to machine learning in healthcare, including the nature of clinical data and the use of machine learning for risk stratification, disease progression modeling, precision medicine, diagnosis, subtype discovery, and improving clinical workflows.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Imaging",
+      "tags": [
+        "imaging",
+        "computer science",
+        "public health",
+        "user experience",
+        "machine learning",
+        "engineering",
+        "ai",
+        "data science, analytics & computer technology",
+        "health & medicine"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.S897",
+          "description": "Machine Learning for Healthcare",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "7.90J",
+      "title": "Computational Functional Genomics",
+      "description": "The course focuses on casting contemporary problems in systems biology and functional genomics in computational terms and providing appropriate tools and methods to solve them. Topics include genome structure and function, transcriptional regulation, and stem cell biology in particular; measurement technologies such as microarrays (expression, protein-DNA interactions, chromatin structure); statistical data analysis, predictive and causal inference, and experiment design. The emphasis is on c...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "biomedical technologies",
+        "science & math",
+        "health & medicine"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.90J",
+          "description": "Computational Functional Genomics",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "CMS.611J",
+      "title": "Creating Video Games",
+      "description": "CMS.611J / 6.073 Creating Video Games is a class that introduces students to the complexities of working in small, multidisciplinary teams to develop video games. Students will learn creative design and production methods, working together in small teams to design, develop, and thoroughly test their own original digital games. Design iteration across all aspects of video game development (game design, audio design, visual aesthetics, fiction and programming) will be stressed. Students will al...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Media Studies",
+      "tags": [
+        "media studies",
+        "game design",
+        "computer science",
+        "engineering",
+        "software design and engineering",
+        "art, design & architecture",
+        "data science, analytics & computer technology"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "CMS.611J",
+          "description": "Creating Video Games",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "500-600",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "ESD.68J",
+      "title": "Communications and Information Policy",
+      "description": "This course provides an introduction to the technology and policy context of public communications networks, through critical discussion of current issues in communications policy and their historical roots. The course focuses on underlying rationales and models for government involvement and the complex dynamics introduced by co-evolving technologies, industry structure, and public policy objectives. Cases drawn from cellular, fixed-line, and Internet applications include evolution of spectr...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Electrical Engineering",
+      "tags": [
+        "electrical engineering",
+        "communication",
+        "policy and administration",
+        "engineering",
+        "social sciences"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "ESD.68J",
+          "description": "Communications and Information Policy",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "HST.950J",
+      "title": "Medical Computing",
+      "description": "<p>The focus of the course is on medical science and practice in the age of automation and the genome, both present and future.</p>\n<p>It ncludes an analysis of the computational needs of clinical medicine, a review systems and approaches that have been used to support those needs, and an examination of new technologies.</p>\n",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Digital Business & IT",
+      "tags": [
+        "digital business & it",
+        "biological engineering",
+        "computer science",
+        "biomedical technologies",
+        "engineering",
+        "data science",
+        "business & management",
+        "data science, analytics & computer technology",
+        "health & medicine"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "HST.950J",
+          "description": "Medical Computing",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "RES.6-007",
+      "title": "Signals and Systems",
+      "description": "<p>This course was developed in 1987 by the MIT Center for Advanced Engineering Studies. It was designed as a distance-education course for engineers and scientists in the workplace.</p>\n<p>Signals and Systems is an introduction to analog and digital signal processing, a topic that forms an integral part of engineering systems in many diverse areas, including seismic data processing, communications, speech processing, image processing, defense electronics, consumer electronics, and consumer p...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Electrical Engineering",
+      "tags": [
+        "electrical engineering",
+        "systems engineering",
+        "engineering"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "RES.6-007",
+          "description": "Signals and Systems",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "18.01",
+      "title": "Single Variable Calculus",
+      "description": "This introductory calculus course covers differentiation and integration of functions of one variable, with applications.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.01",
+          "description": "Single Variable Calculus",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.024",
+      "title": "Multivariable Calculus with Theory",
+      "description": "This course is a continuation of <em>18.014 Calculus with Theory</em><em>.</em> It covers the same material as <em>18.02 Multivariable Calculus</em>, but at a deeper level, emphasizing careful reasoning and understanding of proofs. There is considerable emphasis on linear algebra and vector integral calculus.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.024",
+          "description": "Multivariable Calculus with Theory",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.02SC",
+      "title": "Multivariable Calculus",
+      "description": "<p>This course covers differential, integral and vector calculus for functions of more than one variable. These mathematical tools and methods are used extensively in the physical sciences, engineering, economics and computer graphics.</p>\n<p>The materials have been organized to support independent study. The website includes all of the materials you will need to understand the concepts covered in this subject. The materials in this course include:</p>\n<ul>\n<li><strong>Lecture Videos</strong>...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.02SC",
+          "description": "Multivariable Calculus",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.03SC",
+      "title": "Differential Equations",
+      "description": "<p>The laws of nature are expressed as differential equations. Scientists and engineers must know how to model the world in terms of differential equations, and how to solve those equations and interpret the solutions. This course focuses on the equations and techniques most useful in science and engineering.</p>\n<p>Course Format</p>\n<p>This course has been designed for independent study. It provides everything you will need to understand the concepts covered in the course. The materials incl...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.03SC",
+          "description": "Differential Equations",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.085",
+      "title": "Computational Science and Engineering I",
+      "description": "This course provides the fundamental computational toolbox for solving science and engineering problems. Topics include review of linear algebra, applications to networks, structures, estimation, finite difference and finite element solutions of differential equations, Laplace’s equation and potential flow, boundary-value problems, Fourier series, the discrete Fourier transform, and convolution. We will also explore many topics in AI and machine learning throughout the course.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "mathematics",
+        "systems engineering",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.085",
+          "description": "Computational Science and Engineering I",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.098",
+      "title": "Street-Fighting Mathematics",
+      "description": "This course teaches the art of guessing results and solving problems without doing a proof or an exact calculation. Techniques include extreme-cases reasoning, dimensional analysis, successive approximation, discretization, generalization, and pictorial analysis. Applications include mental calculation, solid geometry, musical intervals, logarithms, integration, infinite series, solitaire, and differential equations. <strong>(No epsilons or deltas are harmed by taking this course.)</strong> T...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.098",
+          "description": "Street-Fighting Mathematics",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.100A",
+      "title": "Real Analysis",
+      "description": "This course covers the fundamentals of mathematical analysis: convergence of sequences and series, continuity, differentiability, Riemann integral, sequences and series of functions, uniformity, and the interchange of limit operations. It shows the utility of abstract concepts&nbsp;through a study of real numbers, and teaches an understanding and construction of proofs.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.100A",
+          "description": "Real Analysis",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.100B",
+      "title": "Analysis I",
+      "description": "Analysis I covers fundamentals of mathematical analysis: metric spaces, convergence of sequences and series, continuity, differentiability, Riemann integral, sequences and series of functions, uniformity, interchange of limit operations.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.100B",
+          "description": "Analysis I",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.101",
+      "title": "Analysis II",
+      "description": "This course continues from Analysis I (18.100B), in the direction of manifolds and global analysis. The first half of the course covers multivariable calculus. The rest of the course covers the theory of differential forms in n-dimensional vector spaces and manifolds.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.101",
+          "description": "Analysis II",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.152",
+      "title": "Introduction to Partial Differential Equations",
+      "description": "This course provides a solid introduction to Partial Differential Equations for advanced undergraduate students. The focus is on linear second order uniformly elliptic and parabolic equations.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.152",
+          "description": "Introduction to Partial Differential Equations",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.212",
+      "title": "Algebraic Combinatorics",
+      "description": "This course covers the applications of algebra to combinatorics. Topics include enumeration methods, permutations, partitions, partially ordered sets and lattices, Young tableaux, graph theory, matrix tree theorem, electrical networks, convex polytopes, and more.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.212",
+          "description": "Algebraic Combinatorics",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.303",
+      "title": "Linear Partial Differential Equations",
+      "description": "This course covers the classical partial differential equations of applied mathematics: diffusion, Laplace/Poisson, and wave equations. It also includes methods and tools for solving these PDEs, such as separation of variables, Fourier series and transforms, eigenvalue problems, and Green’s functions.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.303",
+          "description": "Linear Partial Differential Equations",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.335J",
+      "title": "Introduction to Numerical Methods ",
+      "description": "This course offers an advanced introduction to numerical analysis, with a focus on accuracy and efficiency of numerical algorithms. Topics include sparse-matrix/iterative and dense-matrix algorithms in numerical linear algebra (for linear systems and eigenproblems), floating-point arithmetic, backwards error analysis, conditioning, and stability. Other computational topics (e.g., numerical integration or nonlinear optimization) are also surveyed.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "systems engineering",
+        "computer science",
+        "engineering",
+        "algorithms and data structures",
+        "data science, analytics & computer technology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.335J",
+          "description": "Introduction to Numerical Methods ",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.337J",
+      "title": "Parallel Computing",
+      "description": "This is an advanced interdisciplinary introduction to applied parallel computing on modern supercomputers. It has a hands-on emphasis on understanding the realities and myths of what is possible on the world’s fastest machines. We will make prominent use of the Julia Language, a free, open-source, high-performance dynamic programming language for technical computing.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Mathematics",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "software design and engineering",
+        "algorithms and data structures",
+        "mathematics",
+        "computer science",
+        "data science, analytics & computer technology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.337J",
+          "description": "Parallel Computing",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.357",
+      "title": "Interfacial Phenomena",
+      "description": "This graduate-level course covers fluid systems dominated by the influence of interfacial tension. The roles of curvature pressure and Marangoni stress are elucidated in a variety of fluid systems. Particular attention is given to drops and bubbles, soap films and minimal surfaces, wetting phenomena, water-repellency, surfactants, Marangoni flows, capillary origami and contact line dynamics.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "mechanical engineering",
+        "engineering",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.357",
+          "description": "Interfacial Phenomena",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.409",
+      "title": "Behavior of Algorithms",
+      "description": "This course is a study of Behavior of Algorithms and covers an area of current interest in theoretical computer science. The topics vary from term to term. During this term, we discuss rigorous approaches to explaining the typical performance of algorithms with a focus on the following approaches:&nbsp;smoothed analysis, condition numbers/parametric analysis, and subclassing inputs.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "computer science",
+        "engineering",
+        "algorithms and data structures",
+        "data science, analytics & computer technology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.409",
+          "description": "Behavior of Algorithms",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.417",
+      "title": "Introduction to Computational Molecular Biology",
+      "description": "This course introduces the basic computational methods used to understand the cell on a molecular level. It covers subjects such as the sequence alignment algorithms: dynamic programming, hashing, suffix trees, and Gibbs sampling. Furthermore, it focuses on computational approaches to: genetic and physical mapping; genome sequencing, assembly, and annotation; RNA expression and secondary structure; protein structure and folding; and molecular interactions and dynamics.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "biology",
+        "biological engineering",
+        "engineering",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.417",
+          "description": "Introduction to Computational Molecular Biology",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.465",
+      "title": "Topics in Statistics: Statistical Learning Theory",
+      "description": "The main goal of this course is to study the generalization ability of a number of popular machine learning algorithms such as boosting, support vector machines and neural networks. Topics include Vapnik-Chervonenkis theory, concentration inequalities in product spaces, and other elements of empirical process theory.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "cognitive science",
+        "computer science",
+        "machine learning",
+        "engineering",
+        "ai",
+        "algorithms and data structures",
+        "data science, analytics & computer technology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.465",
+          "description": "Topics in Statistics: Statistical Learning Theory",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.600",
+      "title": "Probability and Random Variables",
+      "description": "This course introduces students to probability and random variables. Topics include distribution functions, binomial, geometric, hypergeometric, and Poisson distributions. The other topics covered are uniform, exponential, normal, gamma and beta distributions; conditional probability; Bayes theorem; joint distributions; Chebyshev inequality; law of large numbers; and central limit theorem.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.600",
+          "description": "Probability and Random Variables",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "500-600",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.650",
+      "title": "Statistics for Applications ",
+      "description": "This course offers an in-depth the theoretical foundations for statistical methods that are useful in many applications. The goal is to understand the role of mathematics in the research and development of efficient statistical methods.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.650",
+          "description": "Statistics for Applications ",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "500-600",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.704",
+      "title": "Seminar in Algebra and Number Theory: Rational Points on Elliptic Curves",
+      "description": "This is a seminar for mathematics majors, where the students present the lectures. No prior experience giving lectures is necessary.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.704",
+          "description": "Seminar in Algebra and Number Theory: Rational Points on Elliptic Curves",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 3,
+      "course_level": "700+",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.725",
+      "title": "Algebraic Geometry",
+      "description": "This is the first semester of a two-semester sequence on Algebraic Geometry. The goal of the course is to introduce the basic notions and techniques of modern algebraic geometry. It covers fundamental notions and results about algebraic varieties over an algebraically closed field; relations between complex algebraic varieties and complex analytic varieties; and examples with emphasis on algebraic curves and surfaces. This course is an introduction to the language of schemes and properties of...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.725",
+          "description": "Algebraic Geometry",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.905",
+      "title": "Algebraic Topology I",
+      "description": "This is a course on the singular homology of topological spaces. Topics include: Singular homology, CW complexes, Homological algebra, Cohomology, and Poincare duality.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.905",
+          "description": "Algebraic Topology I",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "18.997",
+      "title": "Topics in Combinatorial Optimization",
+      "description": "In this graduate-level course, we will be covering advanced topics in combinatorial optimization. We will start with non-bipartite matchings and cover many results extending the fundamental results of matchings, flows and matroids. The emphasis is on the derivation of purely combinatorial results, including min-max relations, and not so much on the corresponding algorithmic questions of how to find such objects. The intended audience consists of Ph.D. students interested in optimization, comb...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Mathematics",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "systems thinking",
+        "mathematics",
+        "systems engineering",
+        "computer science",
+        "business & management",
+        "data science, analytics & computer technology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "18.997",
+          "description": "Topics in Combinatorial Optimization",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "2.062J",
+      "title": "Wave Propagation",
+      "description": "This course discusses theoretical concepts and analysis of wave problems in science and engineering. Examples are chosen from elasticity, acoustics, geophysics, hydrodynamics, blood flow, nondestructive evaluation, and other applications.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Mathematics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "environmental engineering",
+        "ocean engineering",
+        "mechanical engineering",
+        "earth science",
+        "engineering",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "2.062J",
+          "description": "Wave Propagation",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "6.854J",
+      "title": "Advanced Algorithms",
+      "description": "This is a graduate course on the design and analysis of algorithms, covering several advanced topics not studied in typical introductory courses on algorithms. It is especially designed for doctoral students interested in theoretical computer science.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Mathematics",
+      "subdomain": "Computer Science",
+      "tags": [
+        "computer science",
+        "engineering",
+        "algorithms and data structures",
+        "data science, analytics & computer technology"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.854J",
+          "description": "Advanced Algorithms",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "RES.18-003",
+      "title": "Calculus for Beginners and Artists",
+      "description": "<p>This online textbook provides an overview of Calculus in clear, easy to understand language designed for the non-mathematician.</p>\n<p>Online Publication</p>\n",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "RES.18-003",
+          "description": "Calculus for Beginners and Artists",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "RES.18-009",
+      "title": "Learn Differential Equations: Up Close with Gilbert Strang and Cleve Moler",
+      "description": "<p><em>Learn Differential Equations: Up Close with</em> <em>_Gilbert Strang</em> and_ <em>Cleve Moler</em> is an in-depth series of videos about differential equations and the MATLAB® ODE suite. These videos are suitable for students and life-long learners to enjoy.</p>\n<p>About the Instructors</p>\n<p>Gilbert Strang is the MathWorks Professor of Mathematics at MIT. His research focuses on mathematical analysis, linear algebra and PDEs. He has written textbooks on linear algebra, computationa...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "programming & coding",
+        "mathematics",
+        "computer science",
+        "data science, analytics & computer technology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "RES.18-009",
+          "description": "Learn Differential Equations: Up Close with Gilbert Strang and Cleve Moler",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "27.01"
+    },
+    {
+      "id": "22.52J",
+      "title": "Statistical Thermodynamics of Complex Liquids",
+      "description": "This course explores the theory of self-assembly in surfactant-water (micellar) and surfactant-water-oil (micro-emulsion) systems. It also introduces the theory of polymer solutions, as well as scattering techniques, light, x-ray, and neutron scattering applied to studies of the structure and dynamics of complex liquids, and modern theory of the liquid state relevant to structured (supramolecular) liquids.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "mathematics",
+        "mechanical engineering",
+        "engineering",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "22.52J",
+          "description": "Statistical Thermodynamics of Complex Liquids",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.012",
+      "title": "Physics I: Classical Mechanics",
+      "description": "This class is an introduction to classical mechanics for students who are comfortable with calculus. The main topics are: Vectors, Kinematics, Forces, Motion, Momentum, Energy, Angular Motion, Angular Momentum, Gravity, Planetary Motion, Moving Frames, and the Motion of Rigid Bodies.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.012",
+          "description": "Physics I: Classical Mechanics",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.01L",
+      "title": "Physics I: Classical Mechanics",
+      "description": "8.01L is an introductory mechanics course, which covers all the topics covered in 8.01T. The class meets throughout the fall, and continues throughout the Independent Activities Period (IAP).",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.01L",
+          "description": "Physics I: Classical Mechanics",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.01SC",
+      "title": "Classical Mechanics",
+      "description": "<p>This first course in the physics curriculum introduces classical mechanics. Historically, a set of core concepts—space, time, mass, force, momentum, torque, and angular momentum—were introduced in classical mechanics in order to solve the most famous physics problem, the motion of the planets.</p>\n<p>The principles of mechanics successfully described many other phenomena encountered in the world. Conservation laws involving energy, momentum and angular momentum provided a second parall...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.01SC",
+          "description": "Classical Mechanics",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.02T",
+      "title": "Electricity and Magnetism",
+      "description": "<p>This freshman-level course is the second semester of introductory physics. The focus is on electricity and magnetism. The subject is taught using the TEAL (Technology Enabled Active Learning) format which utilizes small group interaction and current technology. The TEAL/Studio Project at MIT is a new approach to physics education designed to help students develop much better intuition about, and conceptual models of, physical phenomena.</p>\nAcknowledgements\n<p>The TEAL project is supported...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.02T",
+          "description": "Electricity and Magnetism",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.02X",
+      "title": "Physics II: Electricity & Magnetism with an Experimental Focus",
+      "description": "<p>This course is an introduction to electromagnetism and electrostatics. Topics include: electric charge, Coulomb’s law, electric structure of matter, conductors and dielectrics, concepts of electrostatic field and potential, electrostatic energy, electric currents, magnetic fields, Ampere’s law, magnetic materials, time-varying fields, Faraday’s law of induction, basic electric circuits, electromagnetic waves, and Maxwell’s equations. The course has an experimental focus, and includ...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.02X",
+          "description": "Physics II: Electricity & Magnetism with an Experimental Focus",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.04",
+      "title": "Quantum Physics I",
+      "description": "<p>This course covers the experimental basis of quantum physics. It introduces wave mechanics, Schrödinger’s equation in a single dimension, and Schrödinger’s equation in three dimensions.</p>\n<p>It is the first course in the undergraduate Quantum Physics sequence, followed by <em>8.05 Quantum Physics II</em> and <em>8.06 Quantum Physics III</em>.</p>\n",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.04",
+          "description": "Quantum Physics I",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.06",
+      "title": "Quantum Physics III",
+      "description": "This course is a continuation of <em>8.05 Quantum Physics II</em>. It introduces some of the important model systems studied in contemporary physics, including two-dimensional electron systems, the fine structure of hydrogen, lasers, and particle scattering. The lectures and lecture notes for this course form the basis of Zwiebach’s textbook <em>Mastering Quantum Mechanics</em> published by&nbsp;MIT Press&nbsp;in April 2022.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.06",
+          "description": "Quantum Physics III",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.07",
+      "title": "Electromagnetism II",
+      "description": "This course is the second in a series on Electromagnetism beginning with Electromagnetism I (8.02 or 8.022). It is a survey of basic electromagnetic phenomena: electrostatics; magnetostatics; electromagnetic properties of matter; time-dependent electromagnetic fields; Maxwell’s equations; electromagnetic waves; emission, absorption, and scattering of radiation; and relativistic electrodynamics and mechanics.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.07",
+          "description": "Electromagnetism II",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.224",
+      "title": "Exploring Black Holes: General Relativity & Astrophysics",
+      "description": "Study of physical effects in the vicinity of a black hole as a basis for understanding general relativity, astrophysics, and elements of cosmology. Extension to current developments in theory and observation. Energy and momentum in flat spacetime; the metric; curvature of spacetime near rotating and nonrotating centers of attraction; trajectories and orbits of particles and light; elementary models of the Cosmos. Weekly meetings include an evening seminar and recitation. The last third of the...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.224",
+          "description": "Exploring Black Holes: General Relativity & Astrophysics",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.324",
+      "title": "Relativistic Quantum Field Theory II",
+      "description": "This course is the second course of the quantum field theory trimester sequence beginning with Relativistic Quantum Field Theory I (8.323) and ending with Relativistic Quantum Field Theory III (8.325). It develops in depth some of the topics discussed in 8.323 and introduces some advanced material.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.324",
+          "description": "Relativistic Quantum Field Theory II",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.325",
+      "title": "Relativistic Quantum Field Theory III",
+      "description": "This is the third and last term of the quantum field theory sequence. The course is devoted to the standard model of particle physics, including both its conceptual foundations and its specific structure, and to some current research frontiers that grow immediately out of it.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.325",
+          "description": "Relativistic Quantum Field Theory III",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.371x",
+      "title": "Quantum Information Science II",
+      "description": "<p>This three-module sequence of courses covers advanced topics in quantum computation and quantum information, including quantum error correction code techniques; efficient quantum computation principles, including fault-tolerance; and quantum complexity theory and quantum information theory. Prior knowledge of quantum circuits and elementary quantum algorithms is assumed. These courses are the second part in a sequence of two quantum information science subjects at MIT.</p>\n<p>The three mod...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "algorithms and data structures",
+        "networks and security",
+        "physics",
+        "mathematics",
+        "computer science",
+        "data science, analytics & computer technology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.371x",
+          "description": "Quantum Information Science II",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.422",
+      "title": "Atomic and Optical Physics II",
+      "description": "This is the second of a two-semester subject sequence beginning with Atomic and Optical Physics I (8.421) that provides the foundations for contemporary research in selected areas of atomic and optical physics. Topics covered include non-classical states of light–squeezed states; multi-photon processes, Raman scattering; coherence–level crossings, quantum beats, double resonance, superradiance; trapping and cooling-light forces, laser cooling, atom optics, spectroscopy of trapped atoms an...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.422",
+          "description": "Atomic and Optical Physics II",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.511",
+      "title": "Theory of Solids I",
+      "description": "This is the first term of a theoretical treatment of the physics of solids. Topics covered include crystal structure and band theory, density functional theory, a survey of properties of metals and semiconductors, quantum Hall effect, phonons, electron phonon interaction and superconductivity.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "mechanical engineering",
+        "engineering",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.511",
+          "description": "Theory of Solids I",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "500-600",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.513",
+      "title": "Modern Quantum Many-body Physics for Condensed Matter Systems",
+      "description": "This graduate-level course covers the quantum effect in solids. It focuses on the concepts and physical pictures behind various phenomena that appear in interacting many-body systems.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.513",
+          "description": "Modern Quantum Many-body Physics for Condensed Matter Systems",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "500-600",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.514",
+      "title": "Strongly Correlated Systems in Condensed Matter Physics",
+      "description": "In this course we shall develop theoretical methods suitable for the description of the many-body phenomena, such as Hamiltonian second-quantized operator formalism, Greens functions, path integral, functional integral, and the quantum kinetic equation. The concepts to be introduced include, but are not limited to, the random phase approximation, the mean field theory (aka saddle-point, or semiclassical approximation), the tunneling dynamics in imaginary time, instantons, Berry phase, coheren...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.514",
+          "description": "Strongly Correlated Systems in Condensed Matter Physics",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "500-600",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.591J",
+      "title": "Systems Biology",
+      "description": "This course introduces the mathematical modeling techniques needed to address key questions in modern biology. An overview of modeling techniques in molecular biology and genetics, cell biology and developmental biology is covered. Key experiments that validate mathematical models are also discussed, as well as molecular, cellular, and developmental systems biology, bacterial chemotaxis, genetic oscillators, control theory and genetic networks, and gradient sensing systems. Additional specifi...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.591J",
+          "description": "Systems Biology",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "500-600",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.592J",
+      "title": "Statistical Physics in Biology",
+      "description": "Statistical Physics in Biology is a survey of problems at the interface of statistical physics and modern biology. Topics include: bioinformatic methods for extracting information content of DNA; gene finding, sequence comparison, and phylogenetic trees; physical interactions responsible for structure of biopolymers; DNA double helix, secondary structure of RNA, and elements of protein folding; considerations of force, motion, and packaging; protein motors, membranes. We also look at collecti...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "biology",
+        "biological engineering",
+        "engineering",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.592J",
+          "description": "Statistical Physics in Biology",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "500-600",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.811",
+      "title": "Particle Physics II",
+      "description": "8.811, Particle Physics II, describes essential research in High Energy Physics. We derive the Standard Model (SM) first using a bottom up method based on Unitarity, in addition to the usual top down method using SU3xSU2xU1. We describe and analyze several classical experiments, which established the SM, as examples on how to design experiments. Further topics include heavy flavor physics, high-precision tests of the Standard Model, neutrino oscillations, searches for new phenomena (composite...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.811",
+          "description": "Particle Physics II",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.821",
+      "title": "String Theory and Holographic Duality",
+      "description": "This string theory course focuses on holographic duality (also known as gauge / gravity duality or AdS / CFT) as a novel method of approaching and connecting a range of diverse subjects, including quantum gravity / black holes, QCD at extreme conditions, exotic condensed matter systems, and quantum information.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.821",
+          "description": "String Theory and Holographic Duality",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.902",
+      "title": "Astrophysics II",
+      "description": "This is the second course in a two-semester sequence on astrophysics. Topics include galactic dynamics, groups and clusters on galaxies, phenomenological cosmology, Newtonian cosmology, Roberston-Walker models, and galaxy formation.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.902",
+          "description": "Astrophysics II",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.952",
+      "title": "Particle Physics of the Early Universe",
+      "description": "This course covers the basics of general relativity, standard big bang cosmology, thermodynamics of the early universe, cosmic background radiation, primordial nucleosynthesis, basics of the standard model of particle physics, electroweak and QCD phase transition, basics of group theory, grand unified theories, baryon asymmetry, monopoles, cosmic strings, domain walls, axions, inflationary universe, and structure formation.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.952",
+          "description": "Particle Physics of the Early Universe",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.962",
+      "title": "General Relativity",
+      "description": "8.962 is MIT’s graduate course in general relativity, which covers the basic principles of Einstein’s general theory of relativity, differential geometry, experimental tests of general relativity, black holes, and cosmology.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.962",
+          "description": "General Relativity",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "9.29J",
+      "title": "Introduction to Computational Neuroscience",
+      "description": "<p>This course gives a mathematical introduction to neural coding and dynamics. Topics include convolution, correlation, linear systems, game theory, signal detection theory, probability theory, information theory, and reinforcement learning. Applications to neural coding, focusing on the visual system are covered, as well as Hodgkin-Huxley and other related models of neural excitability, stochastic models of ion channels, cable theory, and models of synaptic transmission.</p>\n<p>Visit the Se...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Physics",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "biology",
+        "biological engineering",
+        "cognitive science",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "9.29J",
+          "description": "Introduction to Computational Neuroscience",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "MAS.865J",
+      "title": "Quantum Information Science",
+      "description": "This is an advanced graduate course on quantum computation and quantum information, for which prior knowledge of quantum mechanics is required. Topics include quantum computation, advanced quantum error correction codes, fault tolerance, quantum algorithms beyond factoring, properties of quantum entanglement, and quantum protocols and communication complexity.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "mathematics",
+        "computer science",
+        "engineering",
+        "data science, analytics & computer technology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "MAS.865J",
+          "description": "Quantum Information Science",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "RES.8-001",
+      "title": "Applied Geometric Algebra",
+      "description": "<p>László Tisza was Professor of Physics Emeritus at MIT, where he began teaching in 1941. This online publication is a reproduction the original lecture notes for the course “Applied Geometric Algebra” taught by Professor Tisza in the Spring of 1976.</p>\n<p>Over the last 100 years, the mathematical tools employed by physicists have expanded considerably, from differential calculus, vector algebra and geometry, to advanced linear algebra, tensors, Hilbert space, spinors, Group theory an...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Physics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "RES.8-001",
+          "description": "Applied Geometric Algebra",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "RES.8-007",
+      "title": "Cosmic Origin of the Chemical Elements ",
+      "description": "Everything around us is made from different chemical elements: carbon, silicon, iron, and all the other elements from the Periodic Table. The lighter elements were mostly produced in the Big Bang, but the rest were (and are) formed within stars and in the explosions of supernovae. In this series of short lecture videos, created to accompany her book <em>Searching for the Oldest Stars: Ancient Relics from the Early Universe</em> (Princeton University Press, 2019), Professor Anna Frebel reveals...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "chemistry",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "RES.8-007",
+          "description": "Cosmic Origin of the Chemical Elements ",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "15.136J",
+      "title": "Principles and Practice of Drug Development",
+      "description": "This course serves as a description and critical assessment of the major issues and stages of developing a pharmaceutical or biopharmaceutical. Topics covered include drug discovery, preclinical development, clinical investigation, manufacturing and regulatory issues considered for small and large molecules, and economic and financial considerations of the drug development process. A multidisciplinary perspective is provided by the faculty, who represent clinical, life, and management science...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Biological Sciences",
+      "subdomain": "Health Care Management",
+      "tags": [
+        "health care management",
+        "biology",
+        "chemical engineering",
+        "engineering",
+        "science & math",
+        "health & medicine"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "15.136J",
+          "description": "Principles and Practice of Drug Development",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "20.400J",
+      "title": "Perspectives in Biological Engineering",
+      "description": "This seminar-format course provides an in-depth presentation and discussion of how engineering and biological approaches can be combined to solve problems in science and technology, emphasizing integration of biological information and methodologies with engineering analysis, synthesis, and design. Emphasis is placed on molecular mechanisms underlying cellular processes, including signal transduction, gene expression networks, and functional responses.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Biological Sciences",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "biology",
+        "biological engineering",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "20.400J",
+          "description": "Perspectives in Biological Engineering",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "5.08J",
+      "title": "Biological Chemistry II",
+      "description": "This course is an advanced treatment of biochemical mechanisms that underlie biological processes. Topics include macromolecular machines such as the ribosome, the proteasome, fatty acid synthases as a paradigm for polyketide synthases and non-ribosomal polypeptide synthases, and polymerases. Emphasis will be given to the experimental methods used to unravel how these processes fit into the cellular context as well as the coordinated regulation of these processes.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "chemistry",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "5.08J",
+          "description": "Biological Chemistry II",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.00",
+      "title": "COVID-19, SARS-CoV-2, and the Pandemic",
+      "description": "<p>During Fall 2021, all MIT students and the general public are welcome to join Professors Richard Young and Facundo Batista as they discuss the science of the COVID-19 pandemic. The livestream of the lectures is available to the public, but only registered students are able to ask questions during the Q&amp;A.</p>\n<p>Lectures will be given by leading experts on the fundamentals of coronavirus and host cell biology, immunology, epidemiology, clinical disease, and vaccine and therapeutic deve...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.00",
+          "description": "COVID-19, SARS-CoV-2, and the Pandemic",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.012",
+      "title": "Introduction to Biology",
+      "description": "<p>The MIT Biology Department core courses, 7.012, 7.013, and 7.014, all cover the same core material, which includes the fundamental principles of biochemistry, genetics, molecular biology, and cell biology. Biological function at the molecular level is particularly emphasized and covers the structure and regulation of genes, as well as, the structure and synthesis of proteins, how these molecules are integrated into cells, and how these cells are integrated into multicellular systems and or...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.012",
+          "description": "Introduction to Biology",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.013",
+      "title": "Introductory Biology",
+      "description": "The MIT Biology Department core Introductory Biology courses, 7.012, 7.013, 7.014, 7.015, and 7.016 all cover the same core material, which includes the fundamental principles of biochemistry, genetics, molecular biology, and cell biology. The focus of 7.013 is on genomic approaches to human biology, including neuroscience, development, immunology, tissue repair and stem cells, tissue engineering, and infectious and inherited diseases, including cancer.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.013",
+          "description": "Introductory Biology",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.014",
+      "title": "Introductory Biology",
+      "description": "<p>The MIT Biology Department core courses, 7.012, 7.013, and 7.014, all cover the same core material, which includes the fundamental principles of biochemistry, genetics, molecular biology, and cell biology. Biological function at the molecular level is particularly emphasized and covers the structure and regulation of genes, as well as, the structure and synthesis of proteins, how these molecules are integrated into cells, and how these cells are integrated into multicellular systems and or...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.014",
+          "description": "Introductory Biology",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.016",
+      "title": "Introductory Biology",
+      "description": "<p><em>7.016 Introductory Biology</em> provides an introduction to fundamental principles of biochemistry, molecular biology, and genetics for understanding the functions of living systems. Taught for the first time in Fall 2013, this course covers examples of the use of chemical biology and twenty-first-century molecular genetics in understanding human health and therapeutic intervention.</p>\n<p>The MIT Biology Department Introductory Biology courses&nbsp;7.012, 7.013, 7.014, 7.015, and 7.01...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "pathology and pathophysiology",
+        "biomedical technologies",
+        "immunology",
+        "science & math",
+        "health & medicine"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.016",
+          "description": "Introductory Biology",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.05",
+      "title": "General Biochemistry",
+      "description": "<p>This course focuses on contributions of biochemistry toward an understanding of the structure and functioning of organisms, tissues, and cells. Topics include:</p>\n<ul>\n<li>Chemistry and functions of constituents of cells and tissues and the chemical and physical-chemical basis for the structures of nucleic acids, proteins, and carbohydrates.</li>\n<li>Basic enzymology and biochemical reaction mechanisms involved in macromolecular synthesis and degradation, signaling, transport, and movemen...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "chemistry",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.05",
+          "description": "General Biochemistry",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.13",
+      "title": "Experimental Microbial Genetics",
+      "description": "<p>In this class, students engage in independent research projects to probe various aspects of the physiology of the bacterium&nbsp;<em>Pseudomonas aeruginosa</em> PA14, an opportunistic pathogen isolated from the lungs of cystic fibrosis patients. Students use molecular genetics to examine survival in stationary phase, antibiotic resistance, phase variation, toxin production, and secondary metabolite production.</p>\n<p>Projects aim to discover the molecular basis for these processes using bo...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.13",
+          "description": "Experimental Microbial Genetics",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.15",
+      "title": "Experimental Molecular Genetics",
+      "description": "<p>This project-based laboratory course provides students with in-depth experience in experimental molecular genetics, using modern methods of molecular biology and genetics to conduct original research. The course is geared towards students (including sophomores) who have a strong interest in a future career in biomedical research. This semester will focus on chemical genetics using <em>Caenorhabditis elegans</em> as a model system. Students will gain experience in research rationale and met...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Literature",
+      "tags": [
+        "literature",
+        "biology",
+        "humanities",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.15",
+          "description": "Experimental Molecular Genetics",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.18",
+      "title": "Topics in Experimental Biology",
+      "description": "<p>This independent experimental study course is designed to allow students with a strong interest in independent research to fulfill the project laboratory requirement for the Biology Department Program in the context of a research laboratory at MIT. The research should be a continuation of a previous project under the direction of a member of the Biology Department faculty.</p>\n<p>This course provides instruction and practice in written and oral communication. Journal club discussions are u...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.18",
+          "description": "Topics in Experimental Biology",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.22",
+      "title": "Developmental Biology",
+      "description": "This graduate and advanced undergraduate level lecture and literature discussion course covers the current understanding of the molecular mechanisms that regulate animal development. Evolutionary mechanisms are emphasized as well as the discussion of relevant diseases. Vertebrate (mouse, chick, frog, fish) and invertebrate (fly, worm) models are covered. Specific topics include formation of early body plan, cell type determination, organogenesis, morphogenesis, stem cells, cloning, and issues...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.22",
+          "description": "Developmental Biology",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.27",
+      "title": "Principles of Human Disease",
+      "description": "This course covers current understanding of, and modern approaches to human disease, emphasizing the molecular and cellular basis of both genetic disease and cancer. Topics include: The Genetics of Simple and Complex Traits; Karyotypic Analysis and Positional Cloning; Genetic Diagnosis; The Roles of Oncogenes and Tumor Suppressors in Tumor Initiation, Progression, and Treatment; The Interaction between Genetics and Environment; Animal Models of Human Disease; Cancer; and Conventional and Gene...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Pathology and Pathophysiology",
+      "tags": [
+        "pathology and pathophysiology",
+        "immunology",
+        "health & medicine"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.27",
+          "description": "Principles of Human Disease",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.60",
+      "title": "Cell Biology: Structure and Functions of the Nucleus",
+      "description": "The goal of this course is to teach both the fundamentals of nuclear cell biology as well as the methodological and experimental approaches upon which they are based. Lectures and class discussions will cover the background and fundamental findings in a particular area of nuclear cell biology. The assigned readings will provide concrete examples of the experimental approaches and logic used to establish these findings. Some examples of topics include genome and systems biology, transcription,...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.60",
+          "description": "Cell Biology: Structure and Functions of the Nucleus",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.88J",
+      "title": "Protein Folding and Human Disease",
+      "description": "This course covers amino acid sequence control of protein folding, misfolding, amyloid polymerization and aggregation. Readings and discussions address topics such as chaperone structure and function, folding and assembly of fibrous proteins, and pathologies associated with protein misfolding and aggregation in Alzheimer’s, Parkinson’s, Huntington’s and other protein deposition diseases. Students are required to write and present a research paper.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.88J",
+          "description": "Protein Folding and Human Disease",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.89J",
+      "title": "Topics in Computational and Systems Biology",
+      "description": "<p>This is a seminar based on research literature. Papers covered are selected to illustrate important problems and approaches in the field of computational and systems biology, and provide students a framework from which to evaluate new developments.</p>\n<p>The MIT Initiative in Computational and Systems Biology (CSBi) is a campus-wide research and education program that links biology, engineering, and computer science in a multidisciplinary approach to the systematic analysis and modeling o...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "biological engineering",
+        "engineering",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.89J",
+          "description": "Topics in Computational and Systems Biology",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "7.A12",
+      "title": "Freshman Seminar: Structural Basis of Genetic Material: Nucleic Acids",
+      "description": "Since the discovery of the structure of the DNA double helix in 1953 by Watson and Crick, the information on detailed molecular structures of DNA and RNA, namely, the foundation of genetic material, has expanded rapidly. This discovery is the beginning of the “Big Bang” of molecular biology and biotechnology. In this seminar, students discuss, from a historical perspective and current developments, the importance of pursuing the detailed structural basis of genetic materials.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.A12",
+          "description": "Freshman Seminar: Structural Basis of Genetic Material: Nucleic Acids",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 3,
+      "course_level": "200-300",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "RES.7-001",
+      "title": "Pre-7.01: Getting up to Speed in Biology",
+      "description": "<p>This self-paced course was originally designed to help prepare incoming MIT students for their first Introductory Biology Course (known at MIT as 7.01). It will also be useful for anyone preparing to take an equivalent college-level introductory biology class elsewhere. It includes lecture videos, interactive exercises, problem sets, and one exam.&nbsp; Lecture Topics:&nbsp;Molecules of Life, The Cell and How it Works, Information Transfer in Biology, Inheritance and Genetics, and Building...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "RES.7-001",
+          "description": "Pre-7.01: Getting up to Speed in Biology",
+          "grade_level": "Non-Credit"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "RES.7-003",
+      "title": "Brave New Planet",
+      "description": "<p>Utopia or dystopia? It’s up to us.</p>\n<p>In the 21st century, powerful technologies have been appearing at a breathtaking pace—related to the internet, artificial intelligence, genetic engineering, and more. They have amazing potential upsides, but we can’t ignore the serious risks that come with them.</p>\n<p><em>Brave New Planet</em> is a podcast that delves deep into the most exciting and challenging scientific frontiers, helping us understand them and grapple with their implicati...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Energy",
+      "tags": [
+        "energy",
+        "philosophy",
+        "climate science",
+        "computer science",
+        "policy and administration",
+        "biology",
+        "earth science",
+        "humanities",
+        "machine learning",
+        "engineering",
+        "ai",
+        "data science, analytics & computer technology",
+        "social sciences",
+        "science & math",
+        "energy, climate & sustainability"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "RES.7-003",
+          "description": "Brave New Planet",
+          "grade_level": "Non-Credit"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "RES.7-004",
+      "title": "BioNook Online Biology Resources",
+      "description": "<p>BioNook is Whitehead Institute’s online biology resource, offering exciting learning enrichment for students, parents and teachers. Find videos, podcasts and stories on Whitehead Institute Science, as well as virtual workshop opportunities through BioNook’s After School Science Club, and ideas for nature-based activities.</p>\n<p>Explore free materials on biology and research—from deep explorations of how science is done, to stories following the lives of scientists, to suggestions fo...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "RES.7-004",
+          "description": "BioNook Online Biology Resources",
+          "grade_level": "Non-Credit"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "RES.7-005",
+      "title": "Biology Teaching Assistant (TA) Training",
+      "description": "The MIT Biology Department supports TAs’ teaching by providing a specialized Teaching Assistant (TA) training program in Biology Pedagogy, for which TAs can earn a training certificate. This program has been developed in response to the feedback of previous TAs, and is designed to actively meet each TA’s needs as they are teaching. It provides practical knowledge that directly relates to their teaching responsibilities each week, and provides them with the opportunity to practice differen...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Pedagogy and Curriculum",
+      "tags": [
+        "pedagogy and curriculum",
+        "education & teaching"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "RES.7-005",
+          "description": "Biology Teaching Assistant (TA) Training",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "RES.7-006",
+      "title": "7.03x Genetics",
+      "description": "<p>In this course, you will learn the principles of genetics with application to the study of biological function at the level of molecules, cells, and multicellular organisms, including humans. We will cover structure and function of genes, chromosomes, and genomes; biological variation resulting from recombination, mutation, and selection; population genetics; and the use of genetic methods to modify genes and genomes and analyze protein function, gene regulation, and inherited disease.</p>...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "RES.7-006",
+          "description": "7.03x Genetics",
+          "grade_level": "Non-Credit"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "RES.7-007",
+      "title": "7.06x Cell Biology",
+      "description": "<p>In this course, you will engage in the biology of cells of higher organisms. You will study the structure, function, and biosynthesis of cellular membranes and organelles; cell growth and oncogenic transformation; transport, receptors, and cell signaling; the cytoskeleton, the extracellular matrix, and cell movements; cell division and cell cycle; functions of specialized cell types. This course emphasizes the current molecular knowledge of cell biological processes as well as the genetic,...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "RES.7-007",
+          "description": "7.06x Cell Biology",
+          "grade_level": "Non-Credit"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "RES.7-008",
+      "title": "7.28x Molecular Biology",
+      "description": "<p>This course is an in-depth adventure through the molecular mechanisms that control the maintenance, expression, and evolution of prokaryotic and eukaryotic genomes. Through lectures and readings of relevant literature, students will explore gene regulation, DNA replication, genetic recombination, transcription, and mRNA translation. The quizzes are designed to build students’ experimental design and data analysis skills.</p>\n<p>This course, based on the MIT course&nbsp;<em>7.28/7.58 Mole...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "RES.7-008",
+          "description": "7.28x Molecular Biology",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
+      "id": "RES.7-009",
+      "title": "7.InT: Inclusive Teaching Module",
+      "description": "<p>The Inclusive Teaching Module is both a standalone online resource for those looking to explore materials related to inclusive teaching as well as an integral part of a blended workshop available to use at your own institution. If you are looking to facilitate a blended workshop using this material, please download the Facilitation Guide and Appendix files to get started!&nbsp;</p>\n<p>As part of the Open Learning Library (OLL), this course is free to use. You have the option to sign up and...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Biological Sciences",
+      "subdomain": "Pedagogy and Curriculum",
+      "tags": [
+        "pedagogy and curriculum",
+        "education & teaching"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Biological Sciences",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "RES.7-009",
+          "description": "7.InT: Inclusive Teaching Module",
+          "grade_level": "Non-Credit"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "26.01"
+    },
+    {
       "id": "DS/SetsRelations",
       "title": "Sets, Relations, and Functions",
       "description": "Sets, Relations, and Functions (Tier1, 4 hours)",
@@ -9366,6 +12934,755 @@
       "rationale": "DCI.ESS3.C.3-5.2 is a prerequisite for DCI.ETS1.A.3-5.1 within the same domain."
     },
     {
+      "from": "10.01",
+      "to": "6.245",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 10.01 typically precedes 6.245."
+    },
+    {
+      "from": "10.01",
+      "to": "6.253",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 10.01 typically precedes 6.253."
+    },
+    {
+      "from": "RES.6-007",
+      "to": "6.245",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.6-007 typically precedes 6.245."
+    },
+    {
+      "from": "RES.6-007",
+      "to": "6.253",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.6-007 typically precedes 6.253."
+    },
+    {
+      "from": "6.011",
+      "to": "6.245",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.011 typically precedes 6.245."
+    },
+    {
+      "from": "6.011",
+      "to": "6.253",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.011 typically precedes 6.253."
+    },
+    {
+      "from": "6.013",
+      "to": "6.245",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.013 typically precedes 6.245."
+    },
+    {
+      "from": "6.013",
+      "to": "6.253",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.013 typically precedes 6.253."
+    },
+    {
+      "from": "14.15J",
+      "to": "6.245",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 14.15J typically precedes 6.245."
+    },
+    {
+      "from": "14.15J",
+      "to": "6.253",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 14.15J typically precedes 6.253."
+    },
+    {
+      "from": "6.041",
+      "to": "6.245",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.041 typically precedes 6.245."
+    },
+    {
+      "from": "6.041",
+      "to": "6.253",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.041 typically precedes 6.253."
+    },
+    {
+      "from": "6.042J",
+      "to": "6.245",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.042J typically precedes 6.245."
+    },
+    {
+      "from": "6.042J",
+      "to": "6.253",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.042J typically precedes 6.253."
+    },
+    {
+      "from": "6.057",
+      "to": "6.245",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.057 typically precedes 6.245."
+    },
+    {
+      "from": "6.057",
+      "to": "6.253",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.057 typically precedes 6.253."
+    },
+    {
+      "from": "ESD.68J",
+      "to": "6.245",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course ESD.68J typically precedes 6.245."
+    },
+    {
+      "from": "ESD.68J",
+      "to": "6.253",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course ESD.68J typically precedes 6.253."
+    },
+    {
+      "from": "7.90J",
+      "to": "6.245",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.90J typically precedes 6.245."
+    },
+    {
+      "from": "7.90J",
+      "to": "6.253",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.90J typically precedes 6.253."
+    },
+    {
+      "from": "6.091",
+      "to": "6.245",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.091 typically precedes 6.245."
+    },
+    {
+      "from": "6.091",
+      "to": "6.253",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.091 typically precedes 6.253."
+    },
+    {
+      "from": "6.092",
+      "to": "6.245",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.092 typically precedes 6.245."
+    },
+    {
+      "from": "6.092",
+      "to": "6.253",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.092 typically precedes 6.253."
+    },
+    {
+      "from": "6.253",
+      "to": "6.301",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Intermediate course 6.253 typically precedes 6.301."
+    },
+    {
+      "from": "6.253",
+      "to": "6.302",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Intermediate course 6.253 typically precedes 6.302."
+    },
+    {
+      "from": "6.253",
+      "to": "20.330J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Intermediate course 6.253 typically precedes 20.330J."
+    },
+    {
+      "from": "6.450",
+      "to": "CMS.611J",
+      "edge_type": "Requires",
+      "strength_permille": 600,
+      "rationale": "Advanced course 6.450 typically precedes graduate course CMS.611J."
+    },
+    {
+      "from": "6.450",
+      "to": "6.776",
+      "edge_type": "Requires",
+      "strength_permille": 600,
+      "rationale": "Advanced course 6.450 typically precedes graduate course 6.776."
+    },
+    {
+      "from": "18.01",
+      "to": "18.100A",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.01 typically precedes 18.100A."
+    },
+    {
+      "from": "18.01",
+      "to": "18.100B",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.01 typically precedes 18.100B."
+    },
+    {
+      "from": "18.01",
+      "to": "18.101",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.01 typically precedes 18.101."
+    },
+    {
+      "from": "18.02SC",
+      "to": "18.100A",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.02SC typically precedes 18.100A."
+    },
+    {
+      "from": "18.02SC",
+      "to": "18.100B",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.02SC typically precedes 18.100B."
+    },
+    {
+      "from": "18.02SC",
+      "to": "18.101",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.02SC typically precedes 18.101."
+    },
+    {
+      "from": "18.03SC",
+      "to": "18.100A",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.03SC typically precedes 18.100A."
+    },
+    {
+      "from": "18.03SC",
+      "to": "18.100B",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.03SC typically precedes 18.100B."
+    },
+    {
+      "from": "18.03SC",
+      "to": "18.101",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.03SC typically precedes 18.101."
+    },
+    {
+      "from": "RES.18-003",
+      "to": "18.100A",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.18-003 typically precedes 18.100A."
+    },
+    {
+      "from": "RES.18-003",
+      "to": "18.100B",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.18-003 typically precedes 18.100B."
+    },
+    {
+      "from": "RES.18-003",
+      "to": "18.101",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.18-003 typically precedes 18.101."
+    },
+    {
+      "from": "RES.18-009",
+      "to": "18.100A",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.18-009 typically precedes 18.100A."
+    },
+    {
+      "from": "RES.18-009",
+      "to": "18.100B",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.18-009 typically precedes 18.100B."
+    },
+    {
+      "from": "RES.18-009",
+      "to": "18.101",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.18-009 typically precedes 18.101."
+    },
+    {
+      "from": "18.024",
+      "to": "18.100A",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.024 typically precedes 18.100A."
+    },
+    {
+      "from": "18.024",
+      "to": "18.100B",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.024 typically precedes 18.100B."
+    },
+    {
+      "from": "18.024",
+      "to": "18.101",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.024 typically precedes 18.101."
+    },
+    {
+      "from": "6.042J",
+      "to": "18.100A",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.042J typically precedes 18.100A."
+    },
+    {
+      "from": "6.042J",
+      "to": "18.100B",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.042J typically precedes 18.100B."
+    },
+    {
+      "from": "6.042J",
+      "to": "18.101",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.042J typically precedes 18.101."
+    },
+    {
+      "from": "2.062J",
+      "to": "18.100A",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 2.062J typically precedes 18.100A."
+    },
+    {
+      "from": "2.062J",
+      "to": "18.100B",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 2.062J typically precedes 18.100B."
+    },
+    {
+      "from": "2.062J",
+      "to": "18.101",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 2.062J typically precedes 18.101."
+    },
+    {
+      "from": "18.085",
+      "to": "18.100A",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.085 typically precedes 18.100A."
+    },
+    {
+      "from": "18.085",
+      "to": "18.100B",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.085 typically precedes 18.100B."
+    },
+    {
+      "from": "18.085",
+      "to": "18.101",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.085 typically precedes 18.101."
+    },
+    {
+      "from": "18.098",
+      "to": "18.100A",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.098 typically precedes 18.100A."
+    },
+    {
+      "from": "18.098",
+      "to": "18.100B",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.098 typically precedes 18.100B."
+    },
+    {
+      "from": "18.098",
+      "to": "18.101",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 18.098 typically precedes 18.101."
+    },
+    {
+      "from": "18.212",
+      "to": "18.303",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Intermediate course 18.212 typically precedes 18.303."
+    },
+    {
+      "from": "18.212",
+      "to": "18.335J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Intermediate course 18.212 typically precedes 18.335J."
+    },
+    {
+      "from": "18.212",
+      "to": "18.337J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Intermediate course 18.212 typically precedes 18.337J."
+    },
+    {
+      "from": "18.465",
+      "to": "18.600",
+      "edge_type": "Requires",
+      "strength_permille": 600,
+      "rationale": "Advanced course 18.465 typically precedes graduate course 18.600."
+    },
+    {
+      "from": "18.465",
+      "to": "18.650",
+      "edge_type": "Requires",
+      "strength_permille": 600,
+      "rationale": "Advanced course 18.465 typically precedes graduate course 18.650."
+    },
+    {
+      "from": "8.01L",
+      "to": "8.224",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 8.01L typically precedes 8.224."
+    },
+    {
+      "from": "8.01SC",
+      "to": "8.224",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 8.01SC typically precedes 8.224."
+    },
+    {
+      "from": "8.02T",
+      "to": "8.224",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 8.02T typically precedes 8.224."
+    },
+    {
+      "from": "8.02X",
+      "to": "8.224",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 8.02X typically precedes 8.224."
+    },
+    {
+      "from": "8.04",
+      "to": "8.224",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 8.04 typically precedes 8.224."
+    },
+    {
+      "from": "8.06",
+      "to": "8.224",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 8.06 typically precedes 8.224."
+    },
+    {
+      "from": "8.07",
+      "to": "8.224",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 8.07 typically precedes 8.224."
+    },
+    {
+      "from": "RES.8-001",
+      "to": "8.224",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.8-001 typically precedes 8.224."
+    },
+    {
+      "from": "RES.8-007",
+      "to": "8.224",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.8-007 typically precedes 8.224."
+    },
+    {
+      "from": "8.012",
+      "to": "8.224",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 8.012 typically precedes 8.224."
+    },
+    {
+      "from": "9.29J",
+      "to": "8.224",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 9.29J typically precedes 8.224."
+    },
+    {
+      "from": "22.52J",
+      "to": "8.224",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 22.52J typically precedes 8.224."
+    },
+    {
+      "from": "8.224",
+      "to": "8.324",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Intermediate course 8.224 typically precedes 8.324."
+    },
+    {
+      "from": "8.224",
+      "to": "8.325",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Intermediate course 8.224 typically precedes 8.325."
+    },
+    {
+      "from": "8.224",
+      "to": "8.371x",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Intermediate course 8.224 typically precedes 8.371x."
+    },
+    {
+      "from": "8.422",
+      "to": "8.511",
+      "edge_type": "Requires",
+      "strength_permille": 600,
+      "rationale": "Advanced course 8.422 typically precedes graduate course 8.511."
+    },
+    {
+      "from": "8.422",
+      "to": "8.513",
+      "edge_type": "Requires",
+      "strength_permille": 600,
+      "rationale": "Advanced course 8.422 typically precedes graduate course 8.513."
+    },
+    {
+      "from": "7.00",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.00 typically precedes 15.136J."
+    },
+    {
+      "from": "7.05",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.05 typically precedes 15.136J."
+    },
+    {
+      "from": "RES.7-001",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.7-001 typically precedes 15.136J."
+    },
+    {
+      "from": "RES.7-003",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.7-003 typically precedes 15.136J."
+    },
+    {
+      "from": "RES.7-004",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.7-004 typically precedes 15.136J."
+    },
+    {
+      "from": "RES.7-005",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.7-005 typically precedes 15.136J."
+    },
+    {
+      "from": "RES.7-006",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.7-006 typically precedes 15.136J."
+    },
+    {
+      "from": "RES.7-007",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.7-007 typically precedes 15.136J."
+    },
+    {
+      "from": "RES.7-008",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.7-008 typically precedes 15.136J."
+    },
+    {
+      "from": "RES.7-009",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.7-009 typically precedes 15.136J."
+    },
+    {
+      "from": "5.08J",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.08J typically precedes 15.136J."
+    },
+    {
+      "from": "7.012",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.012 typically precedes 15.136J."
+    },
+    {
+      "from": "7.013",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.013 typically precedes 15.136J."
+    },
+    {
+      "from": "7.13",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.13 typically precedes 15.136J."
+    },
+    {
+      "from": "7.014",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.014 typically precedes 15.136J."
+    },
+    {
+      "from": "7.15",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.15 typically precedes 15.136J."
+    },
+    {
+      "from": "7.016",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.016 typically precedes 15.136J."
+    },
+    {
+      "from": "7.18",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.18 typically precedes 15.136J."
+    },
+    {
+      "from": "7.22",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.22 typically precedes 15.136J."
+    },
+    {
+      "from": "7.27",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.27 typically precedes 15.136J."
+    },
+    {
+      "from": "7.60",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.60 typically precedes 15.136J."
+    },
+    {
+      "from": "7.88J",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.88J typically precedes 15.136J."
+    },
+    {
+      "from": "7.89J",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.89J typically precedes 15.136J."
+    },
+    {
+      "from": "7.90J",
+      "to": "15.136J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.90J typically precedes 15.136J."
+    },
+    {
+      "from": "15.136J",
+      "to": "20.400J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Intermediate course 15.136J typically precedes 20.400J."
+    },
+    {
+      "from": "20.400J",
+      "to": "8.591J",
+      "edge_type": "Requires",
+      "strength_permille": 600,
+      "rationale": "Advanced course 20.400J typically precedes graduate course 8.591J."
+    },
+    {
       "from": "phd-cs/coursework",
       "to": "phd-cs/teaching",
       "edge_type": "LeadsTo",
@@ -9653,74 +13970,18 @@
       "rationale": "phd-biology/dissertation-writing must be completed before Dissertation Defense."
     },
     {
-      "from": "CCSS.Math.Content.K.CC.C.7",
-      "to": "DS/Combinatorics",
+      "from": "CCSS.Math.Content.5.OA.A.1",
+      "to": "18.01",
       "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Compare two numbers between 1 and 10 presented as written numerals (K-12) → Basics of Counting (Undergraduate)."
+      "strength_permille": 600,
+      "rationale": "General bridge: Grade 5 (K-12) → MIT OCW: Mathematics (Undergraduate)."
     },
     {
-      "from": "CCSS.Math.Content.K.CC.C.7",
+      "from": "CCSS.Math.Content.5.OA.A.1",
       "to": "AL/BasicAnalysis",
       "edge_type": "LeadsTo",
       "strength_permille": 600,
-      "rationale": "General bridge: Grade K (K-12) → CS2013: Algorithms and Complexity (Undergraduate)."
-    },
-    {
-      "from": "CCSS.Math.Content.1.G.A.2",
-      "to": "DS/SetsRelations",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: Grade 1 (K-12) → CS2013: Discrete Structures (Undergraduate)."
-    },
-    {
-      "from": "CCSS.Math.Content.1.G.A.2",
-      "to": "AL/BasicAnalysis",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: Grade 1 (K-12) → CS2013: Algorithms and Complexity (Undergraduate)."
-    },
-    {
-      "from": "CCSS.Math.Content.2.MD.A.4",
-      "to": "DS/SetsRelations",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: Grade 2 (K-12) → CS2013: Discrete Structures (Undergraduate)."
-    },
-    {
-      "from": "CCSS.Math.Content.2.MD.A.4",
-      "to": "AL/BasicAnalysis",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: Grade 2 (K-12) → CS2013: Algorithms and Complexity (Undergraduate)."
-    },
-    {
-      "from": "CCSS.Math.Content.3.OA.D.8",
-      "to": "DS/SetsRelations",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: Grade 3 (K-12) → CS2013: Discrete Structures (Undergraduate)."
-    },
-    {
-      "from": "CCSS.Math.Content.3.OA.D.8",
-      "to": "AL/BasicAnalysis",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: Grade 3 (K-12) → CS2013: Algorithms and Complexity (Undergraduate)."
-    },
-    {
-      "from": "CCSS.Math.Content.4.OA.A.2",
-      "to": "DS/SetsRelations",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: Grade 4 (K-12) → CS2013: Discrete Structures (Undergraduate)."
-    },
-    {
-      "from": "CCSS.Math.Content.4.OA.A.2",
-      "to": "AL/BasicAnalysis",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: Grade 4 (K-12) → CS2013: Algorithms and Complexity (Undergraduate)."
+      "rationale": "General bridge: Grade 5 (K-12) → CS2013: Algorithms and Complexity (Undergraduate)."
     },
     {
       "from": "CCSS.Math.Content.5.OA.A.1",
@@ -9731,24 +13992,360 @@
     },
     {
       "from": "CCSS.Math.Content.5.OA.A.1",
-      "to": "AL/BasicAnalysis",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: Grade 5 (K-12) → CS2013: Algorithms and Complexity (Undergraduate)."
-    },
-    {
-      "from": "DS/ProofTechniques",
-      "to": "phd-cs/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: CS2013: Discrete Structures (Undergraduate) → PhD in Computer Science (Doctoral)."
-    },
-    {
-      "from": "DS/ProofTechniques",
       "to": "phd-math/coursework",
       "edge_type": "LeadsTo",
       "strength_permille": 600,
-      "rationale": "General bridge: CS2013: Discrete Structures (Undergraduate) → PhD in Mathematics (Doctoral)."
+      "rationale": "General bridge: Grade 5 (K-12) → PhD in Mathematics (Doctoral)."
+    },
+    {
+      "from": "SEP.4.3-5",
+      "to": "14.15J",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Modeling in 3–5 builds on K–2 experiences and progresses to building and ... (K-12) → Networks (Undergraduate)."
+    },
+    {
+      "from": "SEP.4.3-5",
+      "to": "6.011",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Modeling in 3–5 builds on K–2 experiences and progresses to building and ... (K-12) → Signals, Systems and Inference (Undergraduate)."
+    },
+    {
+      "from": "SEP.2.3-5.4",
+      "to": "8.01SC",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Define a simple design problem that can be solved through the development of ... (K-12) → Classical Mechanics (Undergraduate)."
+    },
+    {
+      "from": "SEP.3.3-5",
+      "to": "22.52J",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Constructing explanations and designing solutions in 3–5 builds on K–2 ex... (K-12) → Statistical Thermodynamics of Complex Liquids (Undergraduate)."
+    },
+    {
+      "from": "SEP.3.3-5.5",
+      "to": "22.52J",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Generate and compare multiple solutions to a problem based on how well they m... (K-12) → Statistical Thermodynamics of Complex Liquids (Undergraduate)."
+    },
+    {
+      "from": "SEP.3.3-5.7",
+      "to": "22.52J",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Generate and compare multiple solutions to a problem based on how well they m... (K-12) → Statistical Thermodynamics of Complex Liquids (Undergraduate)."
+    },
+    {
+      "from": "SEP.3.3-5.7",
+      "to": "8.01SC",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Generate and compare multiple solutions to a problem based on how well they m... (K-12) → Classical Mechanics (Undergraduate)."
+    },
+    {
+      "from": "SEP.4.3-5",
+      "to": "8.02T",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Modeling in 3–5 builds on K–2 experiences and progresses to building and ... (K-12) → Electricity and Magnetism (Undergraduate)."
+    },
+    {
+      "from": "SEP.2.3-5.4",
+      "to": "15.136J",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Define a simple design problem that can be solved through the development of ... (K-12) → Principles and Practice of Drug Development (Undergraduate)."
+    },
+    {
+      "from": "SEP.2.3-5.4",
+      "to": "20.400J",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Define a simple design problem that can be solved through the development of ... (K-12) → Perspectives in Biological Engineering (Undergraduate)."
+    },
+    {
+      "from": "SEP.3.3-5",
+      "to": "20.400J",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Constructing explanations and designing solutions in 3–5 builds on K–2 ex... (K-12) → Perspectives in Biological Engineering (Undergraduate)."
+    },
+    {
+      "from": "SEP.3.3-5.5",
+      "to": "20.400J",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Generate and compare multiple solutions to a problem based on how well they m... (K-12) → Perspectives in Biological Engineering (Undergraduate)."
+    },
+    {
+      "from": "SEP.3.3-5.7",
+      "to": "20.400J",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Generate and compare multiple solutions to a problem based on how well they m... (K-12) → Perspectives in Biological Engineering (Undergraduate)."
+    },
+    {
+      "from": "SEP.4.3-5",
+      "to": "20.400J",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Modeling in 3–5 builds on K–2 experiences and progresses to building and ... (K-12) → Perspectives in Biological Engineering (Undergraduate)."
+    },
+    {
+      "from": "SEP.4.3-5",
+      "to": "phd-cs/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 600,
+      "rationale": "General bridge: Grade 5 (K-12) → PhD in Computer Science (Doctoral)."
+    },
+    {
+      "from": "SEP.4.3-5",
+      "to": "phd-physics/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 600,
+      "rationale": "General bridge: Grade 5 (K-12) → PhD in Physics (Doctoral)."
+    },
+    {
+      "from": "SEP.4.3-5",
+      "to": "phd-biology/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 600,
+      "rationale": "General bridge: Grade 5 (K-12) → PhD in Biological Sciences (Doctoral)."
+    },
+    {
+      "from": "HST.950J",
+      "to": "phd-cs/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Medical Computing (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "HST.950J",
+      "to": "phd-cs/seminar",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Medical Computing (Undergraduate) → Research Seminar Participation (Doctoral)."
+    },
+    {
+      "from": "CMS.611J",
+      "to": "phd-cs/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Creating Video Games (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "CMS.611J",
+      "to": "phd-cs/seminar",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Creating Video Games (Undergraduate) → Research Seminar Participation (Doctoral)."
+    },
+    {
+      "from": "7.90J",
+      "to": "phd-cs/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Computational Functional Genomics (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "CMS.611J",
+      "to": "phd-physics/seminar",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Creating Video Games (Undergraduate) → Research Seminar Participation (Doctoral)."
+    },
+    {
+      "from": "7.90J",
+      "to": "phd-physics/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Computational Functional Genomics (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "CMS.611J",
+      "to": "phd-biology/seminar",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Creating Video Games (Undergraduate) → Research Seminar Participation (Doctoral)."
+    },
+    {
+      "from": "7.90J",
+      "to": "phd-biology/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Computational Functional Genomics (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "RES.18-009",
+      "to": "phd-math/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Learn Differential Equations: Up Close with Gilbert Strang and Cleve Moler (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "RES.18-009",
+      "to": "phd-math/seminar",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Learn Differential Equations: Up Close with Gilbert Strang and Cleve Moler (Undergraduate) → Research Seminar Participation (Doctoral)."
+    },
+    {
+      "from": "RES.18-003",
+      "to": "phd-math/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Calculus for Beginners and Artists (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "RES.18-003",
+      "to": "phd-math/seminar",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Calculus for Beginners and Artists (Undergraduate) → Research Seminar Participation (Doctoral)."
+    },
+    {
+      "from": "6.856J",
+      "to": "phd-math/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Randomized Algorithms (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "6.856J",
+      "to": "phd-math/seminar",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Randomized Algorithms (Undergraduate) → Research Seminar Participation (Doctoral)."
+    },
+    {
+      "from": "6.854J",
+      "to": "phd-math/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Advanced Algorithms (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "6.042J",
+      "to": "phd-math/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Mathematics for Computer Science (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "6.042J",
+      "to": "phd-math/seminar",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Mathematics for Computer Science (Undergraduate) → Research Seminar Participation (Doctoral)."
+    },
+    {
+      "from": "MAS.865J",
+      "to": "phd-cs/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Quantum Information Science (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "MAS.865J",
+      "to": "phd-cs/seminar",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Quantum Information Science (Undergraduate) → Research Seminar Participation (Doctoral)."
+    },
+    {
+      "from": "9.29J",
+      "to": "phd-cs/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Introduction to Computational Neuroscience (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "RES.8-007",
+      "to": "phd-physics/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Cosmic Origin of the Chemical Elements  (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "RES.8-007",
+      "to": "phd-physics/seminar",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Cosmic Origin of the Chemical Elements  (Undergraduate) → Research Seminar Participation (Doctoral)."
+    },
+    {
+      "from": "MAS.865J",
+      "to": "phd-physics/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Quantum Information Science (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "MAS.865J",
+      "to": "phd-physics/seminar",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Quantum Information Science (Undergraduate) → Research Seminar Participation (Doctoral)."
+    },
+    {
+      "from": "9.29J",
+      "to": "phd-physics/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Introduction to Computational Neuroscience (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "8.962",
+      "to": "phd-physics/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: General Relativity (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "8.962",
+      "to": "phd-physics/seminar",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: General Relativity (Undergraduate) → Research Seminar Participation (Doctoral)."
+    },
+    {
+      "from": "MAS.865J",
+      "to": "phd-biology/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Quantum Information Science (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "9.29J",
+      "to": "phd-biology/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Introduction to Computational Neuroscience (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "RES.7-006",
+      "to": "phd-cs/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: 7.03x Genetics (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "RES.7-006",
+      "to": "phd-physics/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: 7.03x Genetics (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "RES.7-006",
+      "to": "phd-biology/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: 7.03x Genetics (Undergraduate) → Core Coursework (Doctoral)."
     },
     {
       "from": "AL/Automata",
@@ -9765,25 +14362,18 @@
       "rationale": "General bridge: CS2013: Algorithms and Complexity (Undergraduate) → PhD in Mathematics (Doctoral)."
     },
     {
-      "from": "SDF/DevMethods",
+      "from": "DS/ProofTechniques",
       "to": "phd-cs/coursework",
       "edge_type": "LeadsTo",
       "strength_permille": 600,
-      "rationale": "General bridge: CS2013: Software Development Fundamentals (Undergraduate) → PhD in Computer Science (Doctoral)."
+      "rationale": "General bridge: CS2013: Discrete Structures (Undergraduate) → PhD in Computer Science (Doctoral)."
     },
     {
-      "from": "SEP.4.3-5",
-      "to": "phd-physics/coursework",
+      "from": "DS/ProofTechniques",
+      "to": "phd-math/coursework",
       "edge_type": "LeadsTo",
       "strength_permille": 600,
-      "rationale": "General bridge: Grade 5 (K-12) → PhD in Physics (Doctoral)."
-    },
-    {
-      "from": "SEP.4.3-5",
-      "to": "phd-biology/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: Grade 5 (K-12) → PhD in Biological Sciences (Doctoral)."
+      "rationale": "General bridge: CS2013: Discrete Structures (Undergraduate) → PhD in Mathematics (Doctoral)."
     }
   ]
 }
