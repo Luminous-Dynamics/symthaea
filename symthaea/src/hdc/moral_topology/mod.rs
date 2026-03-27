@@ -72,6 +72,9 @@ pub struct MoralTopologyConfig {
     /// Use exact Betti computation via Hodge Laplacian (slower, more accurate).
     /// When false (default), uses fast triangle/tetrahedra counting approximation.
     pub exact_betti: bool,
+    /// Enable adaptive Rips threshold focusing around tracked critical_scale EMA.
+    /// When false (default), uses uniform sweep from 0.0 to 1.0.
+    pub adaptive_rips_enabled: bool,
 }
 
 impl Default for MoralTopologyConfig {
@@ -83,6 +86,7 @@ impl Default for MoralTopologyConfig {
             pga_components: 3,
             dim: 16384,
             exact_betti: false,
+            adaptive_rips_enabled: false,
         }
     }
 }
@@ -716,6 +720,10 @@ pub struct MoralTopology {
     pub(super) window_scenario_ids: VecDeque<u64>,
     /// Consecutive cycles of suspected moral hubris.
     pub(super) hubris_streak: usize,
+    /// EMA of critical_scale from recent Hodge analyses.
+    /// Used when `adaptive_rips_enabled` to center the Rips sweep.
+    /// NaN when no Hodge analysis has run yet.
+    pub(super) critical_scale_ema: f64,
 }
 
 impl MoralTopology {
@@ -755,6 +763,7 @@ impl MoralTopology {
             detection_cycle: 0,
             window_scenario_ids: VecDeque::new(),
             hubris_streak: 0,
+            critical_scale_ema: f64::NAN,
         }
     }
 
@@ -797,11 +806,17 @@ impl MoralTopology {
             detection_cycle: 0,
             window_scenario_ids: VecDeque::new(),
             hubris_streak: 0,
+            critical_scale_ema: f64::NAN,
         }
     }
 
     /// Push a scenario hypervector into the sliding window.
     ///
+    /// Current EMA of the critical Rips scale. NaN if no Hodge analysis has run.
+    pub fn critical_scale_ema(&self) -> f64 {
+        self.critical_scale_ema
+    }
+
     /// Also updates the running EMA prior of harmony coordinates for
     /// moral free energy computation and records a trajectory point.
     pub fn add_scenario(&mut self, hv: ContinuousHV) {
@@ -998,16 +1013,37 @@ impl MoralTopology {
         // filtration. Measures moral fragmentation: harmonic fraction rises
         // when β₀ > 1 (disconnected clusters trap moral meaning).
         // Science: Hodge (1941), Tononi (2004) — consciousness requires integration.
+        let adaptive_center = if self.config.adaptive_rips_enabled
+            && self.critical_scale_ema.is_finite()
+        {
+            Some(self.critical_scale_ema)
+        } else {
+            None
+        };
         let hodge_fractions = if self.config.exact_betti {
             Self::compute_persistent_hodge_fractions(
                 &similarities,
                 n,
                 self.config.num_scales,
                 &harmony_coordinates,
+                adaptive_center,
             )
         } else {
             None
         };
+
+        // Update critical_scale EMA for adaptive Rips focusing
+        if let Some(ref fracs) = hodge_fractions {
+            if fracs.critical_scale.is_finite() {
+                const ALPHA: f64 = 0.05; // HODGE_CRITICAL_SCALE_EMA_ALPHA
+                if self.critical_scale_ema.is_finite() {
+                    self.critical_scale_ema = ALPHA * fracs.critical_scale
+                        + (1.0 - ALPHA) * self.critical_scale_ema;
+                } else {
+                    self.critical_scale_ema = fracs.critical_scale;
+                }
+            }
+        }
 
         // ── Step 6: Per-harmony variance ────────────────────────────────
         let harmony_variance = Self::harmony_variance(&harmony_coordinates);

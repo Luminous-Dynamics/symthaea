@@ -274,19 +274,33 @@ impl MoralTopology {
     /// fraction directly measures this topological disintegration.
     ///
     /// `vertex_signals` is an N×D array of harmony coordinates (one D-vector per scenario).
+    /// `adaptive_center`: when Some, focuses the sweep around this center ± HODGE_ADAPTIVE_RIPS_RADIUS.
     pub(super) fn compute_persistent_hodge_fractions(
         sim: &[f64],
         n: usize,
         num_scales: usize,
         vertex_signals: &[[f64; N_HARMONIES]],
+        adaptive_center: Option<f64>,
     ) -> Option<HodgeFractions> {
         if n < 4 || num_scales < 3 || vertex_signals.len() != n {
             return None;
         }
 
-        let scales: Vec<f64> = (0..num_scales)
-            .map(|i| i as f64 / (num_scales - 1).max(1) as f64)
-            .collect();
+        let scales: Vec<f64> = if let Some(center) = adaptive_center {
+            // Adaptive: focus sweep around the critical zone
+            const RADIUS: f64 = 0.15; // HODGE_ADAPTIVE_RIPS_RADIUS
+            let radius = RADIUS;
+            let lo = (center - radius).max(0.0);
+            let hi = (center + radius).min(1.0);
+            (0..num_scales)
+                .map(|i| lo + (hi - lo) * i as f64 / (num_scales - 1).max(1) as f64)
+                .collect()
+        } else {
+            // Uniform: sweep full range 0.0 to 1.0
+            (0..num_scales)
+                .map(|i| i as f64 / (num_scales - 1).max(1) as f64)
+                .collect()
+        };
 
         let mut weighted_gradient = 0.0_f64;
         let mut weighted_curl = 0.0_f64;

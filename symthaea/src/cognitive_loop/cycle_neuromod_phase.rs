@@ -241,6 +241,40 @@ impl CognitiveLoopService {
         };
         let unified_psi = (unified_psi * hodge_mod).clamp(0.0, 1.0);
 
+        // ── Hodge criticality → FEP exploration temperature modulation ──
+        // Over-connected (harmonic < 0.2): raise temperature → explore to break echo chamber
+        // Fragmented (harmonic > 0.8): lower temperature → focus on integration
+        // At criticality (0.2–0.8): no modulation (optimal zone)
+        // Additionally: fragile critical_scale → boost exploration
+        //               robust critical_scale → allow exploitation
+        // Science: Beggs & Plenz (2003) — criticality; Friston (2010) — precision.
+        if self.config.enable_hodge_decomposition {
+            const TEMP_MIN: f64 = 0.5;
+            const TEMP_MAX: f64 = 2.0;
+            let summary = self.ethics_engine.moral_topology().last_summary();
+            if let Some(ref fracs) = summary.hodge_fractions {
+                if fracs.harmonic < 0.2 {
+                    self.fep.agent.config.action_temperature += 0.3; // Explore
+                } else if fracs.harmonic > 0.8 {
+                    self.fep.agent.config.action_temperature *= 0.7; // Integrate
+                }
+            }
+            let cs_ema = self.ethics_engine.moral_topology().critical_scale_ema();
+            if cs_ema.is_finite() {
+                if cs_ema < 0.1 {
+                    self.fep.agent.config.action_temperature += 0.2; // Fragile → explore
+                } else if cs_ema > 0.5 {
+                    self.fep.agent.config.action_temperature *= 0.9; // Robust → exploit
+                }
+            }
+            self.fep.agent.config.action_temperature = self
+                .fep
+                .agent
+                .config
+                .action_temperature
+                .clamp(TEMP_MIN, TEMP_MAX);
+        }
+
         // ═══════════════════════════════════════════════════════════════════════
         // 10h.exp EXPERIENCE BUS: Update principled signals from cognitive state
         // Maps cycle values to 5 principled signals (Active Inference).

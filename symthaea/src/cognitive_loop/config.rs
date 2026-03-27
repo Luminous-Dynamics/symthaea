@@ -381,6 +381,15 @@ pub struct CognitiveLoopConfig {
     #[serde(default)]
     pub enable_trajectory_planning: bool,
 
+    /// Enable persistence-weighted Hodge decomposition in moral topology.
+    /// When true, vertex L₀ Hodge decomposition runs across the Rips filtration,
+    /// measuring moral fragmentation and criticality. Enables adaptive Rips
+    /// threshold and FEP exploration coupling.
+    /// Cost: O(n³) per scale × num_scales, but n=64 window and runs every 30–120 cycles.
+    /// Science: Hodge (1941); Beggs & Plenz (2003) — criticality detection.
+    #[serde(default)]
+    pub enable_hodge_decomposition: bool,
+
     /// Trajectory planning horizon in seconds. Default: 0.5 (~10 cycles at 20Hz).
     #[serde(default = "default_trajectory_horizon")]
     pub trajectory_horizon_seconds: f64,
@@ -830,6 +839,7 @@ impl Default for CognitiveLoopConfig {
             enable_phenomenal_binding: false,
             enable_hierarchical_free_energy: false,
             enable_trajectory_planning: false,
+            enable_hodge_decomposition: false,
             trajectory_horizon_seconds: default_trajectory_horizon(),
             trajectory_planning_interval: default_trajectory_interval(),
             enable_hierarchical_bundling: false,
@@ -1150,6 +1160,7 @@ impl ConsciousnessProfile {
                 config.enable_negation_detection = true;
                 config.enable_primitive_consciousness = true;
                 config.enable_resonator_recall = true;
+                config.enable_hodge_decomposition = true;
             }
             ConsciousnessProfile::Mobile => {
                 // Core consciousness: rich enough for genuine experience

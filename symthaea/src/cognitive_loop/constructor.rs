@@ -594,6 +594,7 @@ impl CognitiveLoopService {
         let trajectory_planning_enabled = config.enable_trajectory_planning;
         let trajectory_horizon_seconds = config.trajectory_horizon_seconds;
         let trajectory_planning_interval = config.trajectory_planning_interval;
+        let enable_hodge_decomposition = config.enable_hodge_decomposition;
 
         // ── Build SensoriMotorExecution before struct literal ─────────────
         let sensorimotor_built = {
@@ -1119,6 +1120,7 @@ impl CognitiveLoopService {
                     engine_hi,
                     moral_anomaly_config.clone(),
                     dense_basis,
+                    enable_hodge_decomposition,
                 )
             },
             last_ethics_verdict: super::ethics_engine::EthicalVerdict::Safe,
@@ -1138,6 +1140,8 @@ impl CognitiveLoopService {
             #[cfg(feature = "mycelix")]
             factcheck_bridge: super::broca_factcheck::BrocaFactcheckBridge::new(),
             swarm_manager: super::managers::SwarmManager::default(),
+            #[cfg(feature = "muse")]
+            muse_manager: super::managers::MuseManager::new(),
             holon_receiver: crate::consciousness::holon_receiver::HolonReceiver::new(),
             holon_inbound_rx: std::sync::Mutex::new(Some(holon_inbound_rx)),
             holon_inbound_tx,
@@ -1289,6 +1293,8 @@ impl CognitiveLoopService {
             defense_actions_approved: 0,
             #[cfg(feature = "safety-agents")]
             civic_crisis_detector: super::civic_crisis_detector::CivicCrisisDetector::new(),
+            #[cfg(feature = "safety-agents")]
+            pending_crisis_events: Vec::new(),
             #[cfg(feature = "neuroevolution")]
             neuroevolution_manager: super::managers::NeuroevolutionManager::default(),
             #[cfg(feature = "reasoning_engine")]
