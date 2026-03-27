@@ -41,9 +41,7 @@ fn requirement_for_proposal() -> mycelix_bridge_common::GovernanceRequirement {
     mycelix_bridge_common::GovernanceRequirement {
         min_tier: mycelix_bridge_common::ConsciousnessTier::Participant,
         min_identity: Some(0.25),
-        min_reputation: None,
         min_community: None,
-        min_engagement: None,
     }
 }
 
@@ -302,7 +300,7 @@ pub fn get_my_contracts(_: ()) -> ExternResult<Vec<Record>> {
     let agent_info = agent_info()?;
     let agent_anchor = anchor_hash(&format!("agent_contracts:{}", agent_info.agent_initial_pubkey))?;
     let links = get_links(
-        GetLinksInputBuilder::try_new(agent_anchor, LinkTypes::AgentToContracts)?.build(),
+        LinkQuery::try_new(agent_anchor, LinkTypes::AgentToContracts)?, GetStrategy::default(),
     )?;
     records_from_links(links)
 }
@@ -414,7 +412,7 @@ pub fn report_violation(input: ReportViolationInput) -> ExternResult<Record> {
 #[hdk_extern]
 pub fn get_contract_violations(contract_hash: ActionHash) -> ExternResult<Vec<Record>> {
     let links = get_links(
-        GetLinksInputBuilder::try_new(contract_hash, LinkTypes::ContractToViolation)?.build(),
+        LinkQuery::try_new(contract_hash, LinkTypes::ContractToViolation)?, GetStrategy::default(),
     )?;
     records_from_links(links)
 }
@@ -452,7 +450,7 @@ pub fn get_my_standing_boundaries(_: ()) -> ExternResult<Option<Record>> {
 pub fn get_agent_standing_boundaries(agent: AgentPubKey) -> ExternResult<Option<Record>> {
     let agent_anchor = anchor_hash(&format!("agent_boundaries:{}", agent))?;
     let links = get_links(
-        GetLinksInputBuilder::try_new(agent_anchor, LinkTypes::AgentToStandingBoundaries)?.build(),
+        LinkQuery::try_new(agent_anchor, LinkTypes::AgentToStandingBoundaries)?, GetStrategy::default(),
     )?;
     let records = records_from_links(links)?;
 

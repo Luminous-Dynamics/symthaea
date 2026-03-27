@@ -271,7 +271,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         FlatOp::StoreEntry(store_entry) => match store_entry {
             OpEntry::CreateEntry { app_entry, action } => {
-                validate_create_entry(app_entry, &action)
+                validate_create_entry(app_entry, &action.author)
             }
             OpEntry::UpdateEntry {
                 app_entry,
@@ -282,13 +282,13 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 let original_action = must_get_action(original_action_hash)?;
                 let author_check = check_author_match(
                     original_action.action().author(),
-                    action.author(),
+                    &action.author,
                     "update",
                 );
                 if author_check != ValidateCallbackResult::Valid {
                     return Ok(author_check);
                 }
-                validate_create_entry(app_entry, &action)
+                validate_create_entry(app_entry, &action.author)
             }
             _ => Ok(ValidateCallbackResult::Valid),
         },
@@ -320,21 +320,17 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 
 fn validate_create_entry(
     app_entry: EntryTypes,
-    action: &EntryCreationAction,
+    author: &AgentPubKey,
 ) -> ExternResult<ValidateCallbackResult> {
     match app_entry {
         EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
 
         EntryTypes::BoundaryContract(contract) => {
-            // Provider and receiver must differ
             if contract.provider == contract.receiver {
                 return Ok(ValidateCallbackResult::Invalid(
                     "Provider and receiver must be different agents".into(),
                 ));
             }
-
-            // Author must be a party
-            let author = action.author();
             if author != &contract.provider && author != &contract.receiver {
                 return Ok(ValidateCallbackResult::Invalid(
                     "Contract author must be either provider or receiver".into(),
@@ -398,7 +394,6 @@ fn validate_create_entry(
 
         EntryTypes::ContractSummary(summary) => {
             // Author must be a party
-            let author = action.author();
             if author != &summary.provider && author != &summary.receiver {
                 return Ok(ValidateCallbackResult::Invalid(
                     "Summary author must be a party to the contract".into(),
@@ -409,7 +404,7 @@ fn validate_create_entry(
 
         EntryTypes::BoundaryViolation(violation) => {
             // Reporter must match action author
-            if &violation.reporter != action.author() {
+            if &violation.reporter != author {
                 return Ok(ValidateCallbackResult::Invalid(
                     "Violation reporter must match action author".into(),
                 ));
@@ -436,7 +431,7 @@ fn validate_create_entry(
 
         EntryTypes::StandingBoundaries(boundaries) => {
             // Agent must match author
-            if &boundaries.agent != action.author() {
+            if &boundaries.agent != author {
                 return Ok(ValidateCallbackResult::Invalid(
                     "Standing boundaries agent must match action author".into(),
                 ));

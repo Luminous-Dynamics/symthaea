@@ -82,7 +82,8 @@ pub fn get_my_checkins(_: ()) -> ExternResult<Vec<Record>> {
     let agent_info = agent_info()?;
     let agent_anchor = anchor_hash(&format!("agent_checkins:{}", agent_info.agent_initial_pubkey))?;
     let links = get_links(
-        GetLinksInputBuilder::try_new(agent_anchor, LinkTypes::AgentToCheckIns)?.build(),
+        LinkQuery::try_new(agent_anchor, LinkTypes::AgentToCheckIns)?,
+        GetStrategy::default(),
     )?;
     records_from_links(links)
 }
@@ -199,7 +200,7 @@ pub fn share_checkin_with_circle(input: ShareCheckInInput) -> ExternResult<Recor
 pub fn get_circle_shared_checkins(circle_hash: ActionHash) -> ExternResult<Vec<Record>> {
     let circle_anchor = anchor_hash(&format!("circle_shared_checkins:{}", circle_hash))?;
     let links = get_links(
-        GetLinksInputBuilder::try_new(circle_anchor, LinkTypes::CircleToSharedCheckIns)?.build(),
+        LinkQuery::try_new(circle_anchor, LinkTypes::CircleToSharedCheckIns)?, GetStrategy::default(),
     )?;
     records_from_links(links)
 }
@@ -221,7 +222,7 @@ pub fn compute_aggregate(_: ()) -> ExternResult<Record> {
     // Get opted-in agents
     let opt_in_anchor = anchor_hash("aggregate_opt_ins")?;
     let opt_in_links = get_links(
-        GetLinksInputBuilder::try_new(opt_in_anchor, LinkTypes::OptInToAgent)?.build(),
+        LinkQuery::try_new(opt_in_anchor, LinkTypes::OptInToAgent)?, GetStrategy::default(),
     )?;
     let opt_in_records = records_from_links(opt_in_links)?;
 
@@ -246,7 +247,7 @@ pub fn compute_aggregate(_: ()) -> ExternResult<Record> {
             let agent_anchor =
                 anchor_hash(&format!("agent_checkins:{}", opt_in.agent))?;
             let checkin_links = get_links(
-                GetLinksInputBuilder::try_new(agent_anchor, LinkTypes::AgentToCheckIns)?.build(),
+                LinkQuery::try_new(agent_anchor, LinkTypes::AgentToCheckIns)?, GetStrategy::default(),
             )?;
             let checkin_records = records_from_links(checkin_links)?;
 
@@ -304,7 +305,7 @@ pub fn compute_aggregate(_: ()) -> ExternResult<Record> {
 pub fn get_latest_aggregate(_: ()) -> ExternResult<Option<Record>> {
     let agg_anchor = anchor_hash("all_aggregates")?;
     let links = get_links(
-        GetLinksInputBuilder::try_new(agg_anchor, LinkTypes::AllAggregates)?.build(),
+        LinkQuery::try_new(agg_anchor, LinkTypes::AllAggregates)?, GetStrategy::default(),
     )?;
     let records = records_from_links(links)?;
 
@@ -318,7 +319,7 @@ pub fn get_latest_aggregate(_: ()) -> ExternResult<Option<Record>> {
 pub fn get_aggregate_history(limit: u32) -> ExternResult<Vec<Record>> {
     let agg_anchor = anchor_hash("all_aggregates")?;
     let links = get_links(
-        GetLinksInputBuilder::try_new(agg_anchor, LinkTypes::AllAggregates)?.build(),
+        LinkQuery::try_new(agg_anchor, LinkTypes::AllAggregates)?, GetStrategy::default(),
     )?;
     let mut records = records_from_links(links)?;
     records.sort_by(|a, b| b.action().timestamp().cmp(&a.action().timestamp()));
@@ -341,7 +342,8 @@ fn evaluate_trend_internal() -> ExternResult<Option<Record>> {
     let agent_info = agent_info()?;
     let agent_anchor = anchor_hash(&format!("agent_checkins:{}", agent_info.agent_initial_pubkey))?;
     let links = get_links(
-        GetLinksInputBuilder::try_new(agent_anchor, LinkTypes::AgentToCheckIns)?.build(),
+        LinkQuery::try_new(agent_anchor, LinkTypes::AgentToCheckIns)?,
+        GetStrategy::default(),
     )?;
     let mut records = records_from_links(links)?;
     records.sort_by(|a, b| b.action().timestamp().cmp(&a.action().timestamp()));
@@ -408,7 +410,7 @@ pub fn get_my_nudges(_: ()) -> ExternResult<Vec<Record>> {
     let agent_info = agent_info()?;
     let nudge_anchor = anchor_hash(&format!("agent_nudges:{}", agent_info.agent_initial_pubkey))?;
     let links = get_links(
-        GetLinksInputBuilder::try_new(nudge_anchor, LinkTypes::AgentToNudges)?.build(),
+        LinkQuery::try_new(nudge_anchor, LinkTypes::AgentToNudges)?, GetStrategy::default(),
     )?;
     let records = records_from_links(links)?;
 
@@ -462,7 +464,8 @@ pub fn get_checkin_consistency(_: ()) -> ExternResult<f32> {
 
     let agent_anchor = anchor_hash(&format!("agent_checkins:{}", agent_info.agent_initial_pubkey))?;
     let links = get_links(
-        GetLinksInputBuilder::try_new(agent_anchor, LinkTypes::AgentToCheckIns)?.build(),
+        LinkQuery::try_new(agent_anchor, LinkTypes::AgentToCheckIns)?,
+        GetStrategy::default(),
     )?;
     let records = records_from_links(links)?;
 

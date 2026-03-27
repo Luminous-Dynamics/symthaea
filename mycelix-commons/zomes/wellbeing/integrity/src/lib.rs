@@ -189,7 +189,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         FlatOp::StoreEntry(store_entry) => match store_entry {
             OpEntry::CreateEntry { app_entry, action } => {
-                validate_create_entry(app_entry, &action)
+                validate_create_entry(app_entry, &action.author)
             }
             OpEntry::UpdateEntry {
                 app_entry,
@@ -201,13 +201,13 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 let original_action = must_get_action(original_action_hash)?;
                 let author_check = check_author_match(
                     original_action.action().author(),
-                    action.author(),
+                    &action.author,
                     "update",
                 );
                 if author_check != ValidateCallbackResult::Valid {
                     return Ok(author_check);
                 }
-                validate_create_entry(app_entry, &action)
+                validate_create_entry(app_entry, &action.author)
             }
             _ => Ok(ValidateCallbackResult::Valid),
         },
@@ -239,13 +239,12 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 
 fn validate_create_entry(
     app_entry: EntryTypes,
-    action: &EntryCreationAction,
+    author: &AgentPubKey,
 ) -> ExternResult<ValidateCallbackResult> {
     match app_entry {
         EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
 
         EntryTypes::WellbeingCheckIn(checkin) => {
-            // Score bounds
             if checkin.stress_level > MAX_SCORE {
                 return Ok(ValidateCallbackResult::Invalid(format!(
                     "stress_level must be 0-{MAX_SCORE}, got {}",
@@ -264,8 +263,6 @@ fn validate_create_entry(
                     checkin.engagement_score
                 )));
             }
-
-            // Mood note size limit
             if let Some(ref note) = checkin.mood_note {
                 if note.len() > MAX_MOOD_NOTE_BYTES {
                     return Ok(ValidateCallbackResult::Invalid(format!(
@@ -274,19 +271,16 @@ fn validate_create_entry(
                     )));
                 }
             }
-
-            // Author must match action author
-            if &checkin.author != action.author() {
+            if &checkin.author != author {
                 return Ok(ValidateCallbackResult::Invalid(
                     "Check-in author must match action author".into(),
                 ));
             }
-
             Ok(ValidateCallbackResult::Valid)
         }
 
         EntryTypes::AggregateOptIn(opt_in) => {
-            if &opt_in.agent != action.author() {
+            if &opt_in.agent != author {
                 return Ok(ValidateCallbackResult::Invalid(
                     "Opt-in agent must match action author".into(),
                 ));
@@ -295,7 +289,6 @@ fn validate_create_entry(
         }
 
         EntryTypes::WellbeingAggregate(agg) => {
-            // Mean bounds
             if !agg.mean_stress.is_finite() || agg.mean_stress < 0.0 || agg.mean_stress > MAX_AGGREGATE_MEAN {
                 return Ok(ValidateCallbackResult::Invalid(format!(
                     "mean_stress must be finite and 0.0-{MAX_AGGREGATE_MEAN}"
@@ -316,7 +309,7 @@ fn validate_create_entry(
                     "sample_size must be > 0".into(),
                 ));
             }
-            if &agg.computed_by != action.author() {
+            if &agg.computed_by != author {
                 return Ok(ValidateCallbackResult::Invalid(
                     "computed_by must match action author".into(),
                 ));
@@ -325,7 +318,7 @@ fn validate_create_entry(
         }
 
         EntryTypes::WellbeingNudge(nudge) => {
-            if &nudge.agent != action.author() {
+            if &nudge.agent != author {
                 return Ok(ValidateCallbackResult::Invalid(
                     "Nudge agent must match action author (self-generated)".into(),
                 ));
@@ -345,8 +338,6 @@ fn validate_create_entry(
         }
 
         EntryTypes::CheckInShare(_share) => {
-            // Further validation (ownership of check-in, circle membership)
-            // happens in the coordinator — integrity can only validate structure.
             Ok(ValidateCallbackResult::Valid)
         }
     }
