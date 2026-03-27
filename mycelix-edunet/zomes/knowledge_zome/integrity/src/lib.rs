@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Knowledge Roots Integrity Zome
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! # Knowledge Roots Integrity Zome
 //!
 //! Defines the decentralized curriculum graph - a community-built knowledge structure.
 //!
@@ -62,7 +63,7 @@ impl Default for DifficultyLevel {
     }
 }
 
-/// Grade level for PreK-12 curriculum
+/// Grade level for PreK through post-doctoral
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum GradeLevel {
     PreK,
@@ -70,6 +71,16 @@ pub enum GradeLevel {
     Grade1, Grade2, Grade3, Grade4, Grade5, Grade6,
     Grade7, Grade8, Grade9, Grade10, Grade11, Grade12,
     College,
+    /// Undergraduate (associate/bachelor's degree)
+    Undergraduate,
+    /// Graduate (master's degree)
+    Graduate,
+    /// Doctoral (PhD)
+    Doctoral,
+    /// Post-doctoral research
+    PostDoctoral,
+    /// Professional degree (JD, MD, PharmD, etc.)
+    Professional,
     Adult,
 }
 
@@ -92,7 +103,12 @@ impl GradeLevel {
             GradeLevel::Grade11 => 12,
             GradeLevel::Grade12 => 13,
             GradeLevel::College => 14,
-            GradeLevel::Adult => 15,
+            GradeLevel::Undergraduate => 15,
+            GradeLevel::Graduate => 16,
+            GradeLevel::Doctoral => 17,
+            GradeLevel::PostDoctoral => 18,
+            GradeLevel::Professional => 19,
+            GradeLevel::Adult => 20,
         }
     }
 
@@ -114,6 +130,11 @@ impl GradeLevel {
             GradeLevel::Grade11 => (16, 17),
             GradeLevel::Grade12 => (17, 18),
             GradeLevel::College => (18, 22),
+            GradeLevel::Undergraduate => (18, 22),
+            GradeLevel::Graduate => (22, 26),
+            GradeLevel::Doctoral => (22, 30),
+            GradeLevel::PostDoctoral => (28, 40),
+            GradeLevel::Professional => (22, 30),
             GradeLevel::Adult => (18, 99),
         }
     }
@@ -146,6 +167,14 @@ pub enum StandardFramework {
     StateSpecific(String),
     InternationalBaccalaureate,
     Cambridge,
+    /// ACM/IEEE Computing Curricula (e.g., "CS2013", "CC2020")
+    ACM(String),
+    /// ABET accreditation criteria (e.g., "EAC", "CAC")
+    ABET(String),
+    /// NCES Classification of Instructional Programs
+    CIP,
+    /// Professional certification (e.g., "CompTIA-Security+", "AWS-SAA")
+    ProfessionalCertification(String),
     Custom(String),
 }
 
@@ -582,9 +611,9 @@ pub fn validate_create_node(node: &KnowledgeNode) -> ExternResult<ValidateCallba
     if node.skill_alignments.len() > 50 { return Ok(ValidateCallbackResult::Invalid("Too many skill alignments (max 50)".to_string())); }
 
     // Grade levels must not be excessive
-    if node.grade_levels.len() > 16 {
+    if node.grade_levels.len() > 21 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Too many grade levels (max 16)".to_string(),
+            "Too many grade levels (max 21)".to_string(),
         ));
     }
 
@@ -710,7 +739,12 @@ mod tests {
         assert_eq!(GradeLevel::Grade3.ordinal(), 4);
         assert_eq!(GradeLevel::Grade12.ordinal(), 13);
         assert_eq!(GradeLevel::College.ordinal(), 14);
-        assert_eq!(GradeLevel::Adult.ordinal(), 15);
+        assert_eq!(GradeLevel::Undergraduate.ordinal(), 15);
+        assert_eq!(GradeLevel::Graduate.ordinal(), 16);
+        assert_eq!(GradeLevel::Doctoral.ordinal(), 17);
+        assert_eq!(GradeLevel::PostDoctoral.ordinal(), 18);
+        assert_eq!(GradeLevel::Professional.ordinal(), 19);
+        assert_eq!(GradeLevel::Adult.ordinal(), 20);
     }
 
     #[test]
@@ -766,7 +800,7 @@ mod tests {
             estimated_hours: 1, skill_alignments: vec![], related_courses: vec![],
             creator: AgentPubKey::from_raw_36(vec![0u8; 36]),
             status: NodeStatus::Proposed, created_at: 0, modified_at: 0, version: 1,
-            grade_levels: vec![GradeLevel::PreK; 17],
+            grade_levels: vec![GradeLevel::PreK; 22],
             bloom_level: None, subject_area: None, academic_standards: vec![],
         };
         assert!(matches!(validate_create_node(&node).unwrap(), ValidateCallbackResult::Invalid(_)));

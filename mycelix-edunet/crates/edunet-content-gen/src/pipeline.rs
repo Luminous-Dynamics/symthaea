@@ -104,7 +104,12 @@ impl<G: ContentGenerator> ContentPipeline<G> {
                 s[5..].parse::<u8>().unwrap_or(6) + 1
             }
             "College" => 14,
-            "Adult" => 15,
+            "Undergraduate" => 15,
+            "Graduate" => 16,
+            "Doctoral" => 17,
+            "PostDoctoral" => 18,
+            "Professional" => 19,
+            "Adult" => 20,
             _ => 8, // default to middle school
         }
     }
@@ -675,7 +680,12 @@ mod tests {
         assert_eq!(ContentPipeline::<MockGenerator>::grade_ordinal("Grade3"), 4);
         assert_eq!(ContentPipeline::<MockGenerator>::grade_ordinal("Grade12"), 13);
         assert_eq!(ContentPipeline::<MockGenerator>::grade_ordinal("College"), 14);
-        assert_eq!(ContentPipeline::<MockGenerator>::grade_ordinal("Adult"), 15);
+        assert_eq!(ContentPipeline::<MockGenerator>::grade_ordinal("Undergraduate"), 15);
+        assert_eq!(ContentPipeline::<MockGenerator>::grade_ordinal("Graduate"), 16);
+        assert_eq!(ContentPipeline::<MockGenerator>::grade_ordinal("Doctoral"), 17);
+        assert_eq!(ContentPipeline::<MockGenerator>::grade_ordinal("PostDoctoral"), 18);
+        assert_eq!(ContentPipeline::<MockGenerator>::grade_ordinal("Professional"), 19);
+        assert_eq!(ContentPipeline::<MockGenerator>::grade_ordinal("Adult"), 20);
     }
 
     #[test]

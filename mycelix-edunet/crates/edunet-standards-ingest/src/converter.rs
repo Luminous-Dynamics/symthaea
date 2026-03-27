@@ -5,6 +5,7 @@
 //! Output matches the schema in `examples/curriculum/grade3_math.json`.
 
 use crate::api_types::{Standard, StandardSet};
+use crate::higher_ed_types::{PhDMilestone, ProgramDescriptor};
 use serde::Serialize;
 use std::collections::HashMap;
 
@@ -30,6 +31,22 @@ pub struct CurriculumMetadata {
     pub domains: Vec<String>,
     pub created_at: String,
     pub notes: String,
+    // ---- Higher-ed extensions (optional, omitted from K-12 output) ----
+    /// Academic level: "Undergraduate", "Graduate", "Doctoral", etc.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub academic_level: Option<String>,
+    /// Institution name (None for framework-level curricula).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub institution: Option<String>,
+    /// CIP code for this program.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cip_code: Option<String>,
+    /// Total credit hours for degree completion.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_credits: Option<u16>,
+    /// Duration in semesters.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration_semesters: Option<u8>,
 }
 
 /// A curriculum node (maps to KnowledgeNode in knowledge_zome).
@@ -48,6 +65,22 @@ pub struct CurriculumNode {
     pub bloom_level: String,
     pub subject_area: String,
     pub academic_standards: Vec<AcademicStandardRef>,
+    // ---- Higher-ed extensions (optional, omitted from K-12 output) ----
+    /// Credit hours (US semester credits).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub credit_hours: Option<u8>,
+    /// Course level ("100", "200-300", "500-600", etc.).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub course_level: Option<String>,
+    /// CIP code classification.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cip_code: Option<String>,
+    /// Parent program ID.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub program_id: Option<String>,
+    /// Corequisite node IDs.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub corequisites: Vec<String>,
 }
 
 /// Academic standard reference within a node.
@@ -128,6 +161,11 @@ pub fn convert_standard_set(set: &StandardSet) -> CurriculumDocument {
              Node structure matches KnowledgeNode in knowledge_zome/integrity/src/lib.rs.",
             set.id
         ),
+        academic_level: None,
+        institution: None,
+        cip_code: None,
+        total_credits: None,
+        duration_semesters: None,
     };
 
     CurriculumDocument {
@@ -177,6 +215,11 @@ fn standard_to_node(
             description: standard.description.clone(),
             grade_level: grade_level.to_string(),
         }],
+        credit_hours: None,
+        course_level: None,
+        cip_code: None,
+        program_id: None,
+        corequisites: vec![],
     }
 }
 
@@ -198,6 +241,210 @@ fn build_domain_map(standards: &[Standard]) -> HashMap<String, String> {
     }
     map
 }
+
+// ============================================================
+// Higher Education Converters
+// ============================================================
+
+/// Convert a higher-ed program descriptor into a CurriculumDocument.
+pub fn convert_program(program: &ProgramDescriptor) -> CurriculumDocument {
+    let grade_level = program.level.to_grade_level().to_string();
+    let mut nodes = Vec::new();
+    let mut edges = Vec::new();
+
+    for course in &program.courses {
+        let bloom = if course.outcomes.is_empty() {
+            infer_bloom_level(&course.id, &course.description)
+        } else {
+            // Use the highest Bloom level among outcomes
+            highest_bloom(&course.outcomes)
+        };
+
+        let difficulty = course.level.to_difficulty().to_string();
+
+        let node = CurriculumNode {
+            id: course.id.clone(),
+            title: course.title.clone(),
+            description: course.description.clone(),
+            node_type: "Course".to_string(),
+            difficulty,
+            domain: program.title.clone(),
+            subdomain: course
+                .topics
+                .first()
+                .cloned()
+                .unwrap_or_default(),
+            tags: course.topics.clone(),
+            estimated_hours: course.total_hours(),
+            grade_levels: vec![grade_level.clone()],
+            bloom_level: bloom,
+            subject_area: program.title.clone(),
+            academic_standards: vec![],
+            credit_hours: course.credits,
+            course_level: Some(course.level.number_range().to_string()),
+            cip_code: program.cip_code.clone(),
+            program_id: Some(program.id.clone()),
+            corequisites: course.corequisites.clone(),
+        };
+        nodes.push(node);
+
+        // Explicit prerequisite edges
+        for prereq_id in &course.prerequisites {
+            edges.push(CurriculumEdge {
+                from: prereq_id.clone(),
+                to: course.id.clone(),
+                edge_type: "Requires".to_string(),
+                strength_permille: 900,
+                rationale: format!(
+                    "{} is a prerequisite for {}.",
+                    prereq_id, course.title
+                ),
+            });
+        }
+    }
+
+    // Collect unique topic domains
+    let domains: Vec<String> = program
+        .courses
+        .iter()
+        .flat_map(|c| c.topics.first().cloned())
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect();
+
+    let metadata = CurriculumMetadata {
+        title: program.title.clone(),
+        framework: program
+            .cip_code
+            .as_ref()
+            .map(|c| format!("CIP:{c}"))
+            .unwrap_or_else(|| "Custom".to_string()),
+        source: String::new(),
+        grade_level,
+        subject_area: program.title.clone(),
+        domain: program.title.clone(),
+        version: "2024".to_string(),
+        total_standards: nodes.len(),
+        domains,
+        created_at: chrono::Local::now().format("%Y-%m-%d").to_string(),
+        notes: format!(
+            "Higher-education program: {}. Level: {}.",
+            program.title,
+            program.level.to_grade_level()
+        ),
+        academic_level: Some(program.level.to_grade_level().to_string()),
+        institution: program.institution.clone(),
+        cip_code: program.cip_code.clone(),
+        total_credits: program.total_credits,
+        duration_semesters: program.duration_semesters,
+    };
+
+    CurriculumDocument {
+        metadata,
+        nodes,
+        edges,
+    }
+}
+
+/// Convert a list of PhD milestones into a CurriculumDocument.
+pub fn convert_phd_template(
+    discipline: &str,
+    cip_code: Option<&str>,
+    milestones: &[PhDMilestone],
+) -> CurriculumDocument {
+    let nodes: Vec<CurriculumNode> = milestones
+        .iter()
+        .map(|m| CurriculumNode {
+            id: m.id.clone(),
+            title: m.title.clone(),
+            description: m.description.clone(),
+            node_type: m.milestone_type.to_node_type().to_string(),
+            difficulty: "Expert".to_string(),
+            domain: discipline.to_string(),
+            subdomain: format!("Year {}", m.typical_year),
+            tags: vec![
+                discipline.to_lowercase(),
+                "phd".to_string(),
+                format!("year-{}", m.typical_year),
+            ],
+            estimated_hours: m.estimated_hours,
+            grade_levels: vec!["Doctoral".to_string()],
+            bloom_level: m.milestone_type.to_bloom_level().to_string(),
+            subject_area: discipline.to_string(),
+            academic_standards: vec![],
+            credit_hours: None,
+            course_level: Some("900".to_string()),
+            cip_code: cip_code.map(|s| s.to_string()),
+            program_id: None,
+            corequisites: vec![],
+        })
+        .collect();
+
+    let edges: Vec<CurriculumEdge> = milestones
+        .iter()
+        .flat_map(|m| {
+            m.prerequisites.iter().map(move |prereq| CurriculumEdge {
+                from: prereq.clone(),
+                to: m.id.clone(),
+                edge_type: "LeadsTo".to_string(),
+                strength_permille: 950,
+                rationale: format!(
+                    "{} must be completed before {}.",
+                    prereq, m.title
+                ),
+            })
+        })
+        .collect();
+
+    let metadata = CurriculumMetadata {
+        title: format!("PhD in {discipline}"),
+        framework: cip_code
+            .map(|c| format!("CIP:{c}"))
+            .unwrap_or_else(|| "Custom".to_string()),
+        source: String::new(),
+        grade_level: "Doctoral".to_string(),
+        subject_area: discipline.to_string(),
+        domain: discipline.to_string(),
+        version: "2024".to_string(),
+        total_standards: nodes.len(),
+        domains: vec![
+            "Coursework".to_string(),
+            "Examination".to_string(),
+            "Research".to_string(),
+        ],
+        created_at: chrono::Local::now().format("%Y-%m-%d").to_string(),
+        notes: format!(
+            "PhD progression template for {discipline}. Milestones represent canonical \
+             doctoral program stages."
+        ),
+        academic_level: Some("Doctoral".to_string()),
+        institution: None,
+        cip_code: cip_code.map(|s| s.to_string()),
+        total_credits: None,
+        duration_semesters: Some(10), // ~5 years typical
+    };
+
+    CurriculumDocument {
+        metadata,
+        nodes,
+        edges,
+    }
+}
+
+/// Find the highest Bloom level among a set of outcomes.
+fn highest_bloom(outcomes: &[crate::higher_ed_types::OutcomeDescriptor]) -> String {
+    let order = ["Remember", "Understand", "Apply", "Analyze", "Evaluate", "Create"];
+    outcomes
+        .iter()
+        .filter_map(|o| order.iter().position(|&b| b == o.bloom_level))
+        .max()
+        .map(|idx| order[idx].to_string())
+        .unwrap_or_else(|| "Understand".to_string())
+}
+
+// ============================================================
+// K-12 Helpers
+// ============================================================
 
 /// Infer prerequisite edges within a standard set.
 ///
@@ -328,11 +575,20 @@ fn make_title(description: &str) -> String {
 /// Infer Bloom's taxonomy level from code and description.
 fn infer_bloom_level(code: &str, description: &str) -> String {
     let desc = description.to_lowercase();
-    if desc.contains("create") || desc.contains("design") || desc.contains("construct") {
+    if desc.contains("create") || desc.contains("design") || desc.contains("construct")
+        || desc.contains("synthesize") || desc.contains("formulate") || desc.contains("propose")
+        || desc.contains("develop a") || desc.contains("produce") || desc.contains("compose")
+        || desc.contains("theorize") || desc.contains("invent")
+    {
         "Create"
-    } else if desc.contains("evaluate") || desc.contains("judge") || desc.contains("justify") {
+    } else if desc.contains("evaluate") || desc.contains("judge") || desc.contains("justify")
+        || desc.contains("critique") || desc.contains("defend") || desc.contains("assess")
+        || desc.contains("appraise") || desc.contains("hypothesize")
+    {
         "Evaluate"
     } else if desc.contains("analyze") || desc.contains("compare") || desc.contains("distinguish")
+        || desc.contains("differentiate") || desc.contains("examine") || desc.contains("investigate")
+        || desc.contains("derive") || desc.contains("prove")
     {
         "Analyze"
     } else if desc.contains("solve")
@@ -343,6 +599,8 @@ fn infer_bloom_level(code: &str, description: &str) -> String {
         || desc.contains("divide")
         || desc.contains("compute")
         || desc.contains("calculate")
+        || desc.contains("implement")
+        || desc.contains("demonstrate")
     {
         "Apply"
     } else if desc.contains("interpret")
@@ -350,9 +608,13 @@ fn infer_bloom_level(code: &str, description: &str) -> String {
         || desc.contains("understand")
         || desc.contains("describe")
         || desc.contains("represent")
+        || desc.contains("classify")
+        || desc.contains("summarize")
     {
         "Understand"
-    } else if code.contains(".7") || desc.contains("fluently") || desc.contains("know") {
+    } else if code.contains(".7") || desc.contains("fluently") || desc.contains("know")
+        || desc.contains("recall") || desc.contains("identify") || desc.contains("define")
+    {
         "Remember"
     } else {
         "Understand"
@@ -423,6 +685,64 @@ fn extract_tags(description: &str) -> Vec<String> {
         "earth",
         "weather",
         "climate",
+        // Higher-ed CS/Engineering
+        "algorithm",
+        "data structure",
+        "complexity",
+        "compiler",
+        "operating system",
+        "database",
+        "network",
+        "security",
+        "machine learning",
+        "artificial intelligence",
+        "optimization",
+        "linear algebra",
+        "calculus",
+        "statistics",
+        "differential equation",
+        "discrete math",
+        "proof",
+        "theorem",
+        "abstract",
+        "modeling",
+        "simulation",
+        "software engineering",
+        "architecture",
+        // Higher-ed Sciences
+        "biochemistry",
+        "molecular",
+        "thermodynamics",
+        "quantum",
+        "organic chemistry",
+        "inorganic",
+        "electromagnetism",
+        "mechanics",
+        "relativity",
+        "statistical mechanics",
+        "neuroscience",
+        "pharmacology",
+        "pathology",
+        "epidemiology",
+        // Higher-ed Humanities/Social
+        "theory",
+        "methodology",
+        "qualitative",
+        "quantitative",
+        "ethnography",
+        "historiography",
+        "jurisprudence",
+        "epistemology",
+        "ontology",
+        "pedagogy",
+        // Research
+        "dissertation",
+        "thesis",
+        "peer review",
+        "literature review",
+        "methodology",
+        "empirical",
+        "longitudinal",
     ];
 
     let desc_lower = description.to_lowercase();

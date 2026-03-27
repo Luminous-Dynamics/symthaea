@@ -5,12 +5,13 @@
 use clap::{Parser, Subcommand};
 use edunet_standards_ingest::client::CspClient;
 use edunet_standards_ingest::converter;
+use edunet_standards_ingest::sources::CurriculumSource;
 use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(
     name = "edunet-standards-ingest",
-    about = "Fetch K-12 standards from the Common Standards Project and output EduNet curriculum JSON",
+    about = "Fetch K-12 through PhD standards and output EduNet curriculum JSON",
     version
 )]
 struct Cli {
@@ -20,14 +21,14 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// List available jurisdictions (states, organizations, schools)
+    /// List available jurisdictions (states, organizations, schools) — K-12
     ListJurisdictions {
         /// Filter by type: state, organization, school
         #[arg(long, short = 't')]
         r#type: Option<String>,
     },
 
-    /// List standard sets within a jurisdiction
+    /// List standard sets within a jurisdiction — K-12
     ListSets {
         /// Jurisdiction ID
         jurisdiction_id: String,
@@ -39,7 +40,7 @@ enum Commands {
         grade: Option<String>,
     },
 
-    /// Fetch a standard set and output curriculum JSON
+    /// Fetch a K-12 standard set and output curriculum JSON
     Fetch {
         /// Standard set ID (from list-sets output)
         standard_set_id: String,
@@ -51,7 +52,7 @@ enum Commands {
         pretty: bool,
     },
 
-    /// Fetch all standard sets for a jurisdiction and output curriculum JSON files
+    /// Fetch all K-12 standard sets for a jurisdiction
     FetchAll {
         /// Jurisdiction ID
         jurisdiction_id: String,
@@ -65,15 +66,70 @@ enum Commands {
         #[arg(long, short = 'g')]
         grade: Option<String>,
     },
+
+    // ---- Higher Education ----
+
+    /// List CIP taxonomy families (university program classifications)
+    ListCip,
+
+    /// Fetch a CIP family as curriculum JSON (e.g., "11" for Computer Science)
+    IngestCip {
+        /// CIP family code (e.g., "11", "14", "27")
+        family_code: String,
+        /// Output file path (default: stdout)
+        #[arg(long, short = 'o')]
+        output: Option<PathBuf>,
+    },
+
+    /// List ACM CS2013 Knowledge Areas
+    ListAcm,
+
+    /// Fetch an ACM CS2013 Knowledge Area as curriculum JSON
+    IngestAcm {
+        /// Knowledge Area ID (e.g., "AL", "DS", "SE")
+        ka_id: String,
+        /// Output file path (default: stdout)
+        #[arg(long, short = 'o')]
+        output: Option<PathBuf>,
+    },
+
+    /// Fetch all ACM CS2013 Knowledge Areas
+    IngestAcmAll {
+        /// Output directory
+        #[arg(long, short = 'o', default_value = ".")]
+        output_dir: PathBuf,
+    },
+
+    /// List available PhD progression templates
+    ListPhd,
+
+    /// Fetch a PhD progression template as curriculum JSON
+    IngestPhd {
+        /// Template ID (e.g., "phd-cs", "phd-physics", "phd-math")
+        template_id: String,
+        /// Output file path (default: stdout)
+        #[arg(long, short = 'o')]
+        output: Option<PathBuf>,
+    },
+
+    /// Fetch all PhD templates
+    IngestPhdAll {
+        /// Output directory
+        #[arg(long, short = 'o', default_value = ".")]
+        output_dir: PathBuf,
+    },
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
-    let client = CspClient::new()?;
 
     match cli.command {
+        // ============================================================
+        // K-12 Commands (unchanged)
+        // ============================================================
         Commands::ListJurisdictions { r#type } => {
+            let client = CspClient::new()?;
             let jurisdictions = client.list_jurisdictions().await?;
 
             let filtered: Vec<_> = if let Some(ref t) = r#type {
@@ -98,6 +154,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             subject,
             grade,
         } => {
+            let client = CspClient::new()?;
             let detail = client.get_jurisdiction(&jurisdiction_id).await?;
 
             let filtered: Vec<_> = detail
@@ -136,26 +193,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             output,
             pretty,
         } => {
+            let client = CspClient::new()?;
             eprintln!("Fetching standard set {}...", standard_set_id);
             let set = client.get_standard_set(&standard_set_id).await?;
             let doc = converter::convert_standard_set(&set);
-
-            let json = if pretty {
-                serde_json::to_string_pretty(&doc)?
-            } else {
-                serde_json::to_string(&doc)?
-            };
-
-            if let Some(path) = output {
-                std::fs::write(&path, &json)?;
-                eprintln!(
-                    "Wrote {} standards to {}",
-                    doc.metadata.total_standards,
-                    path.display()
-                );
-            } else {
-                println!("{json}");
-            }
+            write_document(&doc, output.as_deref(), pretty)?;
         }
 
         Commands::FetchAll {
@@ -164,6 +206,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             subject,
             grade,
         } => {
+            let client = CspClient::new()?;
             std::fs::create_dir_all(&output_dir)?;
 
             let detail = client.get_jurisdiction(&jurisdiction_id).await?;
@@ -210,8 +253,133 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             eprintln!("Done.");
         }
+
+        // ============================================================
+        // CIP Taxonomy Commands
+        // ============================================================
+        Commands::ListCip => {
+            let source = edunet_standards_ingest::sources::cip::CipSource::new();
+            let entries = source.list_available()?;
+            eprintln!("Found {} CIP families", entries.len());
+            println!("{:<8} {:<60} {}", "CODE", "TITLE", "LEVEL");
+            println!("{}", "-".repeat(80));
+            for e in &entries {
+                println!("{:<8} {:<60} {}", e.id, e.title, e.level);
+            }
+        }
+
+        Commands::IngestCip { family_code, output } => {
+            let source = edunet_standards_ingest::sources::cip::CipSource::new();
+            eprintln!("Generating curriculum for CIP family {}...", family_code);
+            let doc = source.fetch(&family_code)?;
+            write_document(&doc, output.as_deref(), true)?;
+        }
+
+        // ============================================================
+        // ACM CS2013 Commands
+        // ============================================================
+        Commands::ListAcm => {
+            let source = edunet_standards_ingest::sources::acm::AcmSource::new();
+            let entries = source.list_available()?;
+            eprintln!("Found {} ACM CS2013 Knowledge Areas", entries.len());
+            println!("{:<8} {:<50} {}", "ID", "TITLE", "DETAILS");
+            println!("{}", "-".repeat(80));
+            for e in &entries {
+                println!("{:<8} {:<50} {}", e.id, e.title, e.description);
+            }
+        }
+
+        Commands::IngestAcm { ka_id, output } => {
+            let source = edunet_standards_ingest::sources::acm::AcmSource::new();
+            eprintln!("Generating curriculum for ACM KA {}...", ka_id);
+            let doc = source.fetch(&ka_id)?;
+            write_document(&doc, output.as_deref(), true)?;
+        }
+
+        Commands::IngestAcmAll { output_dir } => {
+            std::fs::create_dir_all(&output_dir)?;
+            let source = edunet_standards_ingest::sources::acm::AcmSource::new();
+            let entries = source.list_available()?;
+            eprintln!("Generating {} ACM Knowledge Area curricula...", entries.len());
+
+            for (i, entry) in entries.iter().enumerate() {
+                eprint!("[{}/{}] {}... ", i + 1, entries.len(), entry.title);
+                let doc = source.fetch(&entry.id)?;
+                let path = output_dir.join(format!("acm_cs2013_{}.json", entry.id.to_lowercase()));
+                let json = serde_json::to_string_pretty(&doc)?;
+                std::fs::write(&path, &json)?;
+                eprintln!("{} nodes", doc.nodes.len());
+            }
+            eprintln!("Done.");
+        }
+
+        // ============================================================
+        // PhD Template Commands
+        // ============================================================
+        Commands::ListPhd => {
+            let source = edunet_standards_ingest::sources::phd::PhDSource::new();
+            let entries = source.list_available()?;
+            eprintln!("Found {} PhD templates", entries.len());
+            println!("{:<25} {:<40} {}", "ID", "DISCIPLINE", "MILESTONES");
+            println!("{}", "-".repeat(80));
+            for e in &entries {
+                println!("{:<25} {:<40} {}", e.id, e.title, e.description);
+            }
+        }
+
+        Commands::IngestPhd {
+            template_id,
+            output,
+        } => {
+            let source = edunet_standards_ingest::sources::phd::PhDSource::new();
+            eprintln!("Generating PhD progression for {}...", template_id);
+            let doc = source.fetch(&template_id)?;
+            write_document(&doc, output.as_deref(), true)?;
+        }
+
+        Commands::IngestPhdAll { output_dir } => {
+            std::fs::create_dir_all(&output_dir)?;
+            let source = edunet_standards_ingest::sources::phd::PhDSource::new();
+            let entries = source.list_available()?;
+            eprintln!("Generating {} PhD templates...", entries.len());
+
+            for (i, entry) in entries.iter().enumerate() {
+                eprint!("[{}/{}] {}... ", i + 1, entries.len(), entry.title);
+                let doc = source.fetch(&entry.id)?;
+                let path = output_dir.join(format!("{}.json", entry.id));
+                let json = serde_json::to_string_pretty(&doc)?;
+                std::fs::write(&path, &json)?;
+                eprintln!("{} milestones", doc.nodes.len());
+            }
+            eprintln!("Done.");
+        }
     }
 
+    Ok(())
+}
+
+/// Write a curriculum document to a file or stdout.
+fn write_document(
+    doc: &converter::CurriculumDocument,
+    output: Option<&std::path::Path>,
+    pretty: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let json = if pretty {
+        serde_json::to_string_pretty(doc)?
+    } else {
+        serde_json::to_string(doc)?
+    };
+
+    if let Some(path) = output {
+        std::fs::write(path, &json)?;
+        eprintln!(
+            "Wrote {} nodes to {}",
+            doc.metadata.total_standards,
+            path.display()
+        );
+    } else {
+        println!("{json}");
+    }
     Ok(())
 }
 
@@ -226,3 +394,4 @@ fn sanitize_filename(s: &str) -> String {
         .collect::<String>()
         .to_lowercase()
 }
+
