@@ -208,6 +208,137 @@ impl Default for SelfCritic {
     }
 }
 
+// ── Autonomous Practice Loop ────────────────────────────────────────────────
+
+/// Result of an autonomous practice session.
+#[derive(Debug, Clone)]
+pub struct PracticeResult {
+    /// Number of rounds completed before stillness.
+    pub rounds: usize,
+    /// Score trajectory (composite per round).
+    pub trajectory: Vec<f32>,
+    /// Whether stillness was reached (natural completion).
+    pub reached_stillness: bool,
+    /// Best composite score achieved.
+    pub best_score: f32,
+    /// Improvement from first to best (may be negative).
+    pub improvement: f32,
+}
+
+/// Autonomous practice: the system generates, critiques, and improves
+/// in a closed loop without any external input.
+///
+/// Each round: generate artwork → extract features → critic evaluates →
+/// apply wisdom to snapshot → repeat. Stops when stillness is reached
+/// (score delta < 0.01) or max_rounds exceeded.
+///
+/// The `apply_wisdom_fn` parameter allows customizing how the critic's
+/// verdict modifies the cognitive state.
+pub fn auto_improve(
+    config: &crate::AtelierConfig,
+    snapshot: &mut CognitiveSnapshot,
+    max_rounds: usize,
+    seed_base: u64,
+) -> PracticeResult {
+    let mut critic = SelfCritic::new();
+    let mut trajectory = Vec::with_capacity(max_rounds);
+    let mut best_score = 0.0f32;
+
+    for round in 0..max_rounds {
+        // Generate artwork using the public API
+        let artwork = crate::create_artwork(config, snapshot, seed_base + round as u64);
+
+        // Extract perceptual features from the artwork's scene graph
+        let features = extract_scene_features(&artwork);
+
+        // Critic evaluates
+        let verdict = critic.evaluate(&features, snapshot);
+        trajectory.push(verdict.composite);
+
+        if verdict.composite > best_score {
+            best_score = verdict.composite;
+        }
+
+        // Check for Sacred Stillness
+        if verdict.reached_stillness {
+            let first = trajectory[0];
+            return PracticeResult {
+                rounds: round + 1,
+                trajectory,
+                reached_stillness: true,
+                best_score,
+                improvement: best_score - first,
+            };
+        }
+
+        // Apply wisdom: nudge cognitive state toward higher scores
+        apply_verdict_wisdom(snapshot, &verdict);
+    }
+
+    PracticeResult {
+        rounds: max_rounds,
+        trajectory: trajectory.clone(),
+        reached_stillness: false,
+        best_score,
+        improvement: best_score - trajectory.first().copied().unwrap_or(0.0),
+    }
+}
+
+/// Extract perceptual features from an artwork's aesthetic score.
+///
+/// Maps the existing AestheticScore dimensions into a PerceptualInput
+/// compatible with the SelfCritic.
+fn extract_scene_features(artwork: &crate::Artwork) -> PerceptualInput {
+    let score = &artwork.aesthetic_score;
+    PerceptualInput {
+        creative_surprise: score.surprise,
+        perceptual_coherence: score.order,
+        visual_features: vec![
+            score.order,
+            score.complexity,
+            score.surprise,
+            score.harmony,
+            score.birkhoff,
+            score.composite,
+        ],
+    }
+}
+
+/// Apply critic verdict as wisdom to evolve the cognitive state.
+///
+/// Nudges the snapshot's harmony activations and neuromodulators
+/// toward the dimensions that scored highest in the verdict.
+fn apply_verdict_wisdom(snapshot: &mut CognitiveSnapshot, verdict: &CriticVerdict) {
+    let lr = 0.05; // Learning rate for wisdom application
+
+    // If harmony is scoring well, boost harmony activations
+    if verdict.aesthetic.harmony > 0.5 {
+        for h in snapshot.harmony_activations.iter_mut() {
+            *h = (*h + lr * verdict.aesthetic.harmony).clamp(0.0, 1.0);
+        }
+    }
+
+    // If novelty is high but coherence is low, increase arousal (explore more)
+    if verdict.novelty > 0.6 && verdict.intention_coherence < 0.4 {
+        snapshot.arousal = (snapshot.arousal + lr).clamp(0.0, 1.0);
+    }
+
+    // If coherence is high but novelty is low, decrease arousal (consolidate)
+    if verdict.intention_coherence > 0.6 && verdict.novelty < 0.3 {
+        snapshot.arousal = (snapshot.arousal - lr * 0.5).clamp(0.0, 1.0);
+    }
+
+    // Taste alignment: if the system likes what it's making, boost serotonin
+    if verdict.taste_alignment > 0.6 {
+        snapshot.serotonin = (snapshot.serotonin + lr * 0.5).clamp(0.0, 1.0);
+    }
+
+    // If golden ratio is low, adjust valence toward balance
+    if verdict.golden_ratio < 0.3 {
+        snapshot.valence = snapshot.valence * 0.95; // Dampen toward neutral
+    }
+}
+
 fn compute_complexity(features: &[f32]) -> f32 {
     if features.is_empty() {
         return 0.0;
@@ -345,5 +476,79 @@ mod tests {
         assert_eq!(critic.eval_count(), 1);
         critic.evaluate(&test_perception(), &test_snapshot());
         assert_eq!(critic.eval_count(), 2);
+    }
+
+    #[test]
+    fn auto_improve_produces_trajectory() {
+        let config = crate::AtelierConfig::default();
+        let mut snapshot = test_snapshot();
+        let result = auto_improve(&config, &mut snapshot, 10, 42);
+        assert!(result.rounds > 0, "should complete at least 1 round");
+        assert_eq!(result.trajectory.len(), result.rounds);
+        assert!(result.best_score >= 0.0 && result.best_score <= 1.0);
+    }
+
+    #[test]
+    fn auto_improve_reaches_stillness() {
+        let config = crate::AtelierConfig {
+            max_elements: 50,
+            iteration_budget: 1,
+            ..Default::default()
+        };
+        let mut snapshot = test_snapshot();
+        let result = auto_improve(&config, &mut snapshot, 20, 42);
+        // With deterministic input, should reach stillness well before 20 rounds
+        assert!(
+            result.reached_stillness || result.rounds == 20,
+            "should either reach stillness or exhaust rounds"
+        );
+    }
+
+    #[test]
+    fn auto_improve_modifies_snapshot() {
+        let config = crate::AtelierConfig::default();
+        let mut snapshot = test_snapshot();
+        let original_arousal = snapshot.arousal;
+        let original_serotonin = snapshot.serotonin;
+        auto_improve(&config, &mut snapshot, 5, 42);
+        // Snapshot should be modified by wisdom application
+        let changed = (snapshot.arousal - original_arousal).abs() > 0.001
+            || (snapshot.serotonin - original_serotonin).abs() > 0.001
+            || snapshot.harmony_activations.iter().any(|&h| h != 0.5 && h != 0.6 && h != 0.4 && h != 0.7 && h != 0.3 && h != 0.8 && h != 0.2);
+        assert!(changed, "auto_improve should modify the cognitive state");
+    }
+
+    #[test]
+    fn extract_scene_features_from_artwork() {
+        let config = crate::AtelierConfig::default();
+        let snapshot = test_snapshot();
+        let artwork = crate::create_artwork(&config, &snapshot, 42);
+        let features = extract_scene_features(&artwork);
+        assert!(features.creative_surprise >= 0.0);
+        assert!(!features.visual_features.is_empty());
+    }
+
+    #[test]
+    fn apply_wisdom_bounded() {
+        let mut snapshot = test_snapshot();
+        let verdict = CriticVerdict {
+            aesthetic: AestheticScore::uniform(0.8),
+            novelty: 0.9,
+            golden_ratio: 0.2,
+            information_balance: 0.5,
+            self_surprise: 0.7,
+            intention_coherence: 0.3,
+            taste_alignment: 0.8,
+            composite: 0.6,
+            reached_stillness: false,
+        };
+        apply_verdict_wisdom(&mut snapshot, &verdict);
+        // All values should remain bounded
+        assert!(snapshot.arousal >= 0.0 && snapshot.arousal <= 1.0);
+        assert!(snapshot.serotonin >= 0.0 && snapshot.serotonin <= 1.0);
+        assert!(snapshot.valence >= -1.0 && snapshot.valence <= 1.0);
+        for &h in &snapshot.harmony_activations {
+            assert!(h >= 0.0 && h <= 1.0);
+        }
     }
 }

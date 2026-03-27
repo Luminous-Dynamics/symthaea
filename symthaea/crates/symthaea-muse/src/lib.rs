@@ -30,7 +30,7 @@
 #![deny(unsafe_code)]
 
 pub mod choreography;
-pub mod consciousness_reverb;
+pub mod critic;
 pub mod export;
 pub mod fingerprint;
 pub mod form;
@@ -44,11 +44,9 @@ pub mod pitch;
 pub mod rhythm;
 pub mod stream;
 pub mod streaming;
-pub mod sidechain;
 pub mod structure;
 pub mod synth;
 pub mod voice;
-pub mod wavetable;
 
 use serde::{Deserialize, Serialize};
 
@@ -310,7 +308,7 @@ impl Composition {
     }
 }
 
-/// A discrete musical note with per-note expression.
+/// A discrete musical note.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Note {
     /// Frequency in Hz.
@@ -321,28 +319,6 @@ pub struct Note {
     pub duration: f32,
     /// Velocity [0, 1].
     pub velocity: f32,
-    /// Vibrato depth in cents [0, 100] (CfC-controlled, 0 = no vibrato).
-    pub vibrato_cents: f32,
-    /// FM modulation depth override [0, 1] (0 = use global state).
-    pub fm_depth: f32,
-    /// Per-note reverb send [0, 1] (0 = use global level).
-    pub reverb_send: f32,
-}
-
-impl Default for Note {
-    fn default() -> Self {
-        Self {
-            frequency: 440.0, start_time: 0.0, duration: 0.5, velocity: 0.8,
-            vibrato_cents: 0.0, fm_depth: 0.0, reverb_send: 0.0,
-        }
-    }
-}
-
-impl Note {
-    /// Create a basic note without expression (backward compatible).
-    pub fn basic(frequency: f32, start_time: f32, duration: f32, velocity: f32) -> Self {
-        Self { frequency, start_time, duration, velocity, ..Default::default() }
-    }
 }
 
 // ─── Top-Level API ───────────────────────────────────────────────────────────
