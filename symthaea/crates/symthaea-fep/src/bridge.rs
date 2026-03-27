@@ -1,8 +1,12 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Cognitive loop integration bridges for FEP active inference.
 
 use std::collections::VecDeque;
 
 use super::agent::{ActiveInferenceAgent, ActiveInferenceAgentConfig};
+use super::markov_blanket::{MarkovBoundaryOperator, MarkovPartition, PermeabilityInputs};
 use super::motor::{rand_f64, MotorSystem};
 use super::td_learning::TemporalDifferenceLearningStats;
 use super::types::{
@@ -308,6 +312,10 @@ pub struct EnhancedFEPBridge {
     /// Motor system for command execution and proprioceptive feedback.
     pub motor: MotorSystem,
 
+    /// Markov Boundary Operator — dynamic permeability of the sensory/active blanket.
+    /// Science: Friston (2013), Kirchhoff et al. (2018).
+    pub blanket: MarkovBoundaryOperator,
+
     /// Learning signal output (0.0-1.0) for downstream systems.
     /// Combines TD error, motor prediction error, and free energy.
     learning_signal: f64,
@@ -327,14 +335,25 @@ pub struct EnhancedFEPBridge {
 impl EnhancedFEPBridge {
     /// Create a new enhanced FEP bridge
     pub fn new(config: ActiveInferenceAgentConfig, motor_state_dim: usize) -> Self {
+        let state_dim = config.state_dim;
         Self {
             core: CognitiveLoopFEPBridge::new(config),
             motor: MotorSystem::new(motor_state_dim),
+            blanket: MarkovBoundaryOperator::new(MarkovPartition {
+                internal_dim: state_dim,
+                sensory_dim: 4,
+                active_dim: 8,
+            }),
             learning_signal: 0.0,
             precision_gated_learning: true,
             learning_precision_threshold: 0.4,
             action_outcome_history: VecDeque::with_capacity(100),
         }
+    }
+
+    /// Update the blanket permeability from neuromodulator state.
+    pub fn update_blanket_permeability(&mut self, inputs: &PermeabilityInputs) {
+        self.blanket.compute_permeability(inputs);
     }
 
     /// Full perception-action-learning cycle
@@ -345,8 +364,23 @@ impl EnhancedFEPBridge {
         coherence: f64,
         attention: f64,
     ) -> EnhancedFEPCycleResult {
-        // 1. Process observation through FEP
-        let fep_result = self.core.process(phi, integration, coherence, attention);
+        // 1. Gate observation through Markov blanket
+        let raw_obs = Observation::from_consciousness_state(phi, integration, coherence, attention);
+        let gated_obs = self
+            .blanket
+            .gate_observation(&raw_obs, &self.core.agent.belief);
+        let gated_phi = gated_obs.values.first().copied().unwrap_or(phi);
+        let gated_integration = gated_obs.values.get(1).copied().unwrap_or(integration);
+        let gated_coherence = gated_obs.values.get(2).copied().unwrap_or(coherence);
+        let gated_attention = gated_obs.values.get(3).copied().unwrap_or(attention);
+
+        // 2. Process gated observation through FEP
+        let fep_result = self.core.process(
+            gated_phi,
+            gated_integration,
+            gated_coherence,
+            gated_attention,
+        );
 
         // 2. Generate motor command from action
         let command_type = MotorCommandType::from_action_index(fep_result.recommended_action);
@@ -370,8 +404,9 @@ impl EnhancedFEPBridge {
         self.action_outcome_history
             .push_back((command_type, motor_outcome.prediction_error));
 
-        // 5. Compute learning signal
-        self.learning_signal = self.compute_learning_signal(&fep_result, &motor_outcome);
+        // 5. Compute learning signal, modulated by blanket permeability
+        let raw_learning_signal = self.compute_learning_signal(&fep_result, &motor_outcome);
+        self.learning_signal = self.blanket.modulate_learning_rate(raw_learning_signal);
 
         // 6. Determine if learning should occur
         let should_learn = if self.precision_gated_learning {
@@ -460,5 +495,7 @@ impl EnhancedFEPBridge {
         self.motor.reset();
         self.action_outcome_history.clear();
         self.learning_signal = 0.0;
+        let partition = self.blanket.partition().clone();
+        self.blanket = MarkovBoundaryOperator::new(partition);
     }
 }

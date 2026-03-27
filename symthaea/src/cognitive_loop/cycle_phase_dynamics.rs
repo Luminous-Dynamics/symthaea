@@ -2643,7 +2643,8 @@ impl CognitiveLoopService {
                     cycle_id: self.stats.total_cycles as u64,
                     neuromod_exploration_mod: self.neuromod.bath.mcts_exploration_modulation(),
                     epistemic_quality: 0.5, // default neutral; wired when epistemic tiers active
-                    code_context: None,
+                    code_context: self.carryover.injected_code_context.take(),
+                    causal_dag: None,
                 };
 
                 let reasoning_result = reasoning_engine.reason(&reasoning_ctx);
@@ -4481,6 +4482,7 @@ impl CognitiveLoopService {
                 cube_m_tier: self.carryover.quality.last_cube_m_tier,
                 cube_h_value: self.carryover.quality.last_cube_h_value,
                 cube_quality: self.carryover.quality.last_cube_quality,
+                code_channels: self.language_comm.broca_code_channels.take(),
 
                 // Compute HDC encoding of the epistemic cube via cached NSM grounding.
                 // Semantically encodes the cube position so the thought HV

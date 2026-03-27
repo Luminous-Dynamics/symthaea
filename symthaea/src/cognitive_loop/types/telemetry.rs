@@ -2353,6 +2353,19 @@ pub struct EthicalTelemetry {
     /// Whether a moral attractor basin was detected (low free energy + low drift).
     #[serde(default)]
     pub moral_attractor_detected: bool,
+
+    // ── Hodge Decomposition (Persistence-Weighted Cross-Scale Symmetry) ─
+    /// Harmonic fraction: topologically-protected global resonance (0.0–1.0).
+    /// Persistence-weighted integral across all Rips scales.
+    #[serde(default)]
+    pub hodge_harmonic_fraction: f64,
+    /// Gradient fraction: hierarchical, directed information flow (0.0–1.0).
+    #[serde(default)]
+    pub hodge_gradient_fraction: f64,
+    /// Curl fraction: recurrent, rotational information cycling (0.0–1.0).
+    #[serde(default)]
+    pub hodge_curl_fraction: f64,
+
     /// Whether the system is in Sacred Stillness active rest mode.
     #[serde(default)]
     pub in_active_rest: bool,
