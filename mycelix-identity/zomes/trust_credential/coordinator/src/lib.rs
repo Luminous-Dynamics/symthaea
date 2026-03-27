@@ -66,6 +66,45 @@ pub fn issue_trust_credential(input: IssueTrustCredentialInput) -> ExternResult<
         )));
     }
 
+    // Sybil resistance: rate limit credential issuance per issuer.
+    // An issuer can create at most one credential per subject per hour.
+    // This prevents mass-creation of trust credentials for Sybil identities.
+    {
+        let issuer_anchor = anchor_hash(&format!("issuer:{}", input.issuer_did))?;
+        let existing_links = get_links(
+            LinkQuery::try_new(issuer_anchor, LinkTypes::IssuerToCredential)?,
+            GetStrategy::default(),
+        )?;
+
+        const MIN_CREDENTIAL_INTERVAL_US: i64 = 3600 * 1_000_000; // 1 hour
+        let now_us = now.as_micros();
+
+        // Check recent credentials to same subject
+        for link in &existing_links {
+            if let Some(action_hash) = link.target.clone().into_action_hash() {
+                if let Some(record) = get(action_hash, GetOptions::default())? {
+                    if let Some(cred) = record
+                        .entry()
+                        .to_app_option::<TrustCredential>()
+                        .ok()
+                        .flatten()
+                    {
+                        if cred.subject_did == input.subject_did && !cred.revoked {
+                            let elapsed = now_us - cred.issued_at.as_micros();
+                            if elapsed < MIN_CREDENTIAL_INTERVAL_US {
+                                return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                                    "Rate limited: credential for {} was issued {:.0}min ago (minimum 60min interval)",
+                                    input.subject_did,
+                                    elapsed as f64 / 60_000_000.0
+                                ))));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Determine trust tier from the proven range
     let mid_score = (input.trust_score_lower as f64 + input.trust_score_upper as f64) / 2.0;
     let trust_tier = TrustTier::from_score(mid_score);

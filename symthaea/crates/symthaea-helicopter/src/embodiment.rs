@@ -15,7 +15,7 @@ use crate::simulator::{HelicopterPhysicsSimulator, SimpleHelicopterSimulator};
 use crate::types::HelicopterConfig;
 
 /// Safety level for consciousness-gated motor authority.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MotorSafetyLevel {
     Green,
     Yellow,
@@ -52,6 +52,7 @@ pub struct HelicopterEmbodiment {
     last_perception: Option<ContinuousHV>,
     total_steps: usize,
     current_safety: MotorSafetyLevel,
+    safety_override: Option<MotorSafetyLevel>,
     last_control_effort: f32,
     last_prediction_error: f32,
 }
@@ -71,14 +72,27 @@ impl HelicopterEmbodiment {
             last_perception: None,
             total_steps: 0,
             current_safety: MotorSafetyLevel::Green,
+            safety_override: None,
             last_control_effort: 0.0,
             last_prediction_error: 0.0,
         }
     }
 
+    pub fn set_safety_override(&mut self, level: MotorSafetyLevel) {
+        self.safety_override = Some(level);
+    }
+
+    pub fn clear_safety_override(&mut self) {
+        self.safety_override = None;
+    }
+
     /// Step: thought → motor command (consciousness-gated) → physics → proprioceptive encoding.
     pub fn step(&mut self, thought_hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult {
-        self.current_safety = MotorSafetyLevel::from_phi(phi);
+        let phi_level = MotorSafetyLevel::from_phi(phi);
+        self.current_safety = match self.safety_override {
+            Some(override_level) => phi_level.max(override_level),
+            None => phi_level,
+        };
         let gain = self.current_safety.motor_gain();
 
         let mut cmd = self.controller.forward(thought_hv, dt);
@@ -134,6 +148,7 @@ impl HelicopterEmbodiment {
         self.last_perception = None;
         self.total_steps = 0;
         self.current_safety = MotorSafetyLevel::Green;
+        self.safety_override = None;
         self.last_control_effort = 0.0;
         self.last_prediction_error = 0.0;
     }

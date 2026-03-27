@@ -935,7 +935,32 @@ pub fn evaluate_governance(
     }
 
     let eligible = reasons.is_empty();
-    let weight_bp = if eligible { tier.vote_weight_bp() } else { 0 };
+    let mut weight_bp = if eligible { tier.vote_weight_bp() } else { 0 };
+
+    // ── Sybil resistance: account age penalty ──────────────────────────
+    // Young credentials get reduced governance weight. This penalizes
+    // mass-created Sybil identities that haven't proven sustained
+    // community participation. The penalty decays linearly over 72 hours.
+    if eligible && weight_bp > 0 && credential.issued_at > 0 {
+        let credential_age_us = now_us.saturating_sub(credential.issued_at);
+        const SYBIL_MATURATION_PERIOD_US: u64 = 72 * 3600 * 1_000_000; // 72 hours
+        if credential_age_us < SYBIL_MATURATION_PERIOD_US {
+            let maturation_ratio =
+                credential_age_us as f64 / SYBIL_MATURATION_PERIOD_US as f64;
+            // Scale weight from 10% at creation to 100% at maturation
+            let age_factor = 0.1 + 0.9 * maturation_ratio;
+            let reduced = (weight_bp as f64 * age_factor) as u32;
+            if reduced < weight_bp {
+                reasons.push(format!(
+                    "Young credential: weight reduced to {:.0}% (matures in {:.1}h)",
+                    age_factor * 100.0,
+                    (SYBIL_MATURATION_PERIOD_US - credential_age_us) as f64
+                        / (3600.0 * 1_000_000.0)
+                ));
+                weight_bp = reduced.max(1); // Never zero if eligible
+            }
+        }
+    }
 
     GovernanceEligibility {
         eligible,
@@ -1370,6 +1395,32 @@ impl ReputationState {
     }
 }
 
+/// Minimum cartel confidence to trigger reputation slash.
+pub const CARTEL_SLASH_MIN_CONFIDENCE: f64 = 0.7;
+/// Minimum cartel size for reputation action.
+pub const CARTEL_MIN_SIZE: usize = 3;
+
+/// Apply a proportional reputation slash to all members of a detected cartel.
+pub fn apply_cartel_slash(
+    reputation_states: &mut std::collections::HashMap<String, ReputationState>,
+    member_ids: &[String],
+    confidence: f64,
+    now_us: u64,
+) -> Vec<(String, f64)> {
+    if confidence < CARTEL_SLASH_MIN_CONFIDENCE || member_ids.len() < CARTEL_MIN_SIZE {
+        return Vec::new();
+    }
+    let factor = confidence.clamp(0.0, 1.0);
+    let mut results = Vec::with_capacity(member_ids.len());
+    for member_id in member_ids {
+        if let Some(state) = reputation_states.get_mut(member_id) {
+            let new_score = state.slash_proportional(factor, now_us);
+            results.push((member_id.clone(), new_score));
+        }
+    }
+    results
+}
+
 /// Apply reputation decay to a ConsciousnessProfile's reputation dimension.
 ///
 /// Convenience function for use in credential issuance pipelines.
@@ -1462,7 +1513,7 @@ mod tests {
             did: "did:test:alice".to_string(),
             profile,
             tier,
-            issued_at: NOW - 60_000_000,
+            issued_at: NOW - 4 * 86_400_000_000, // 4 days ago (past 72h maturation)
             expires_at: NOW + 86_400_000_000,
             issuer: "test".to_string(),
             trajectory_commitment: None,

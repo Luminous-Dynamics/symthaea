@@ -12,7 +12,7 @@ use crate::simulator::{AuvPhysicsSimulator, SimpleAuvSimulator};
 use crate::types::AuvConfig;
 
 /// Safety level for consciousness-gated motor authority.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MotorSafetyLevel {
     Green, Yellow, Orange, Red,
 }
@@ -37,6 +37,7 @@ pub struct AuvEmbodiment {
     last_perception: Option<ContinuousHV>,
     total_steps: usize,
     current_safety: MotorSafetyLevel,
+    safety_override: Option<MotorSafetyLevel>,
     last_control_effort: f32,
     last_prediction_error: f32,
 }
@@ -51,13 +52,26 @@ impl AuvEmbodiment {
             last_perception: None,
             total_steps: 0,
             current_safety: MotorSafetyLevel::Green,
+            safety_override: None,
             last_control_effort: 0.0,
             last_prediction_error: 0.0,
         }
     }
 
+    pub fn set_safety_override(&mut self, level: MotorSafetyLevel) {
+        self.safety_override = Some(level);
+    }
+
+    pub fn clear_safety_override(&mut self) {
+        self.safety_override = None;
+    }
+
     pub fn step(&mut self, thought_hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult {
-        self.current_safety = MotorSafetyLevel::from_phi(phi);
+        let phi_level = MotorSafetyLevel::from_phi(phi);
+        self.current_safety = match self.safety_override {
+            Some(override_level) => phi_level.max(override_level),
+            None => phi_level,
+        };
         let gain = self.current_safety.motor_gain();
         let mut cmd = self.controller.forward(thought_hv, dt);
         if gain < 1.0 {
@@ -83,7 +97,7 @@ impl AuvEmbodiment {
     pub fn reset(&mut self) {
         self.simulator.reset(10.0); self.controller.reset(); self.encoder.reset();
         self.last_perception = None; self.total_steps = 0; self.current_safety = MotorSafetyLevel::Green;
-        self.last_control_effort = 0.0; self.last_prediction_error = 0.0;
+        self.safety_override = None; self.last_control_effort = 0.0; self.last_prediction_error = 0.0;
     }
     pub fn safety_level(&self) -> MotorSafetyLevel { self.current_safety }
     pub fn total_steps(&self) -> usize { self.total_steps }

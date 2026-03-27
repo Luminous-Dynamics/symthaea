@@ -113,7 +113,7 @@ fn encode_spec(spec: &str) -> BinaryHV {
         .collect();
 
     if words.is_empty() {
-        return BinaryHV::random(0xDEAD_SPEC);
+        return BinaryHV::random(0xDEAD_59EC_0000_0001);
     }
 
     let word_hvs: Vec<BinaryHV> = words.iter().enumerate()

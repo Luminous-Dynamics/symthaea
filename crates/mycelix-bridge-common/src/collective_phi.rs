@@ -33,6 +33,9 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Reputation threshold below which agents are excluded from collective phi.
+pub const COLLECTIVE_PHI_BLACKLIST_THRESHOLD: f64 = 0.05;
+
 /// Clamp a consciousness dimension to [0.0, 1.0], replacing NaN/Inf with 0.0.
 fn sanitize_dim(v: f64) -> f64 {
     if v.is_finite() {
@@ -62,6 +65,11 @@ pub struct AgentConsciousnessVector {
     pub harmonic_alignment: f64,
     /// Epistemic confidence (0.0–1.0).
     pub epistemic_confidence: f64,
+    /// Optional reputation score (0.0–1.0). When provided, agents below
+    /// the blacklist threshold (0.05) are excluded from collective phi,
+    /// and individual phi is weighted by reputation.
+    #[serde(default)]
+    pub reputation: Option<f64>,
 }
 
 impl AgentConsciousnessVector {
@@ -113,6 +121,10 @@ impl CollectivePhiEngine {
     pub fn new(vectors: Vec<AgentConsciousnessVector>) -> Self {
         let vectors = vectors
             .into_iter()
+            .filter(|v| {
+                v.reputation
+                    .map_or(true, |r| r >= COLLECTIVE_PHI_BLACKLIST_THRESHOLD)
+            })
             .map(|mut v| {
                 v.consciousness_level = sanitize_dim(v.consciousness_level);
                 v.meta_awareness = sanitize_dim(v.meta_awareness);
@@ -169,9 +181,21 @@ impl CollectivePhiEngine {
 
         let n = sample.len();
 
-        // Compute mean individual phi
-        let mean_individual_phi: f64 =
-            sample.iter().map(|v| v.individual_phi()).sum::<f64>() / n as f64;
+        // Compute mean individual phi, weighted by reputation when available.
+        let mean_individual_phi: f64 = {
+            let weighted_sum: f64 = sample
+                .iter()
+                .map(|v| {
+                    let rep_weight = v.reputation.unwrap_or(1.0).clamp(0.0, 1.0);
+                    v.individual_phi() * rep_weight
+                })
+                .sum();
+            let weight_sum: f64 = sample
+                .iter()
+                .map(|v| v.reputation.unwrap_or(1.0).clamp(0.0, 1.0))
+                .sum();
+            if weight_sum > 1e-10 { weighted_sum / weight_sum } else { 0.0 }
+        };
 
         // Compute pairwise cosine similarity matrix → mean coherence
         let mut total_similarity = 0.0;
@@ -247,6 +271,7 @@ mod tests {
             care_activation: level,
             harmonic_alignment: level,
             epistemic_confidence: level,
+            reputation: None,
         }
     }
 
@@ -267,6 +292,7 @@ mod tests {
             care_activation: ca,
             harmonic_alignment: ha,
             epistemic_confidence: ec,
+            reputation: None,
         }
     }
 
@@ -409,5 +435,151 @@ mod tests {
         let engine = CollectivePhiEngine::new(vectors);
         let result = engine.compute();
         assert!(result.collective_phi >= 0.0);
+    }
+
+    // ── Red-Team: Cartel → Slash → Exclusion Pipeline ─────────────────
+
+    #[test]
+    fn test_redteam_cartel_slash_excludes_from_collective_phi() {
+        use super::super::consciousness_profile::{
+            apply_cartel_slash, ReputationState, CARTEL_MIN_SIZE,
+            CARTEL_SLASH_MIN_CONFIDENCE,
+        };
+
+        // Setup: 5 honest agents + 3 cartel agents (all identical consciousness)
+        let honest_ids: Vec<String> = (0..5).map(|i| format!("honest_{}", i)).collect();
+        let cartel_ids: Vec<String> = (0..3).map(|i| format!("cartel_{}", i)).collect();
+
+        // Build reputation states (all start at 1.0)
+        let mut rep_states: std::collections::HashMap<String, ReputationState> =
+            std::collections::HashMap::new();
+        for id in honest_ids.iter().chain(cartel_ids.iter()) {
+            rep_states.insert(id.clone(), ReputationState::new(1.0, 0));
+        }
+
+        // Phase 1: Compute collective phi WITH cartel agents (before detection)
+        let all_vectors: Vec<AgentConsciousnessVector> = honest_ids
+            .iter()
+            .chain(cartel_ids.iter())
+            .map(|id| AgentConsciousnessVector {
+                agent_id: id.clone(),
+                consciousness_level: 0.7,
+                meta_awareness: 0.7,
+                coherence: 0.7,
+                care_activation: 0.7,
+                harmonic_alignment: 0.7,
+                epistemic_confidence: 0.7,
+                reputation: Some(rep_states[id].score),
+            })
+            .collect();
+        let phi_before = CollectivePhiEngine::new(all_vectors).compute();
+        assert_eq!(phi_before.n_agents, 8, "All 8 agents should be included before slash");
+
+        // Phase 2: Cartel detected with high confidence → slash
+        let slash_results = apply_cartel_slash(
+            &mut rep_states,
+            &cartel_ids,
+            0.85, // above CARTEL_SLASH_MIN_CONFIDENCE (0.7)
+            1_000_000,
+        );
+        assert_eq!(slash_results.len(), 3, "All 3 cartel members should be slashed");
+        for (id, score) in &slash_results {
+            assert!(
+                *score < 0.2,
+                "Cartel member {} should be heavily slashed: {}",
+                id,
+                score
+            );
+        }
+
+        // Phase 3: Recompute collective phi — cartel agents should be excluded
+        // (reputation below COLLECTIVE_PHI_BLACKLIST_THRESHOLD = 0.05)
+        // With 0.85 slash: 1.0 * (1 - 0.85) = 0.15, still above 0.05
+        // So they won't be excluded, but their weight will be reduced
+        let post_slash_vectors: Vec<AgentConsciousnessVector> = honest_ids
+            .iter()
+            .chain(cartel_ids.iter())
+            .map(|id| AgentConsciousnessVector {
+                agent_id: id.clone(),
+                consciousness_level: 0.7,
+                meta_awareness: 0.7,
+                coherence: 0.7,
+                care_activation: 0.7,
+                harmonic_alignment: 0.7,
+                epistemic_confidence: 0.7,
+                reputation: Some(rep_states[id].score),
+            })
+            .collect();
+        let phi_after = CollectivePhiEngine::new(post_slash_vectors).compute();
+
+        // Verify: cartel agents still included (rep 0.15 > 0.05) but weighted less
+        assert_eq!(phi_after.n_agents, 8);
+
+        // Phase 4: Double-slash cartel (they keep attacking) → now below blacklist
+        let _ = apply_cartel_slash(&mut rep_states, &cartel_ids, 0.85, 2_000_000);
+        for id in &cartel_ids {
+            assert!(
+                rep_states[id].score < 0.05,
+                "Double-slashed cartel member {} should be below blacklist: {}",
+                id,
+                rep_states[id].score
+            );
+            assert!(rep_states[id].blacklisted, "Should be blacklisted");
+        }
+
+        // Phase 5: Recompute — blacklisted agents excluded
+        let final_vectors: Vec<AgentConsciousnessVector> = honest_ids
+            .iter()
+            .chain(cartel_ids.iter())
+            .map(|id| AgentConsciousnessVector {
+                agent_id: id.clone(),
+                consciousness_level: 0.7,
+                meta_awareness: 0.7,
+                coherence: 0.7,
+                care_activation: 0.7,
+                harmonic_alignment: 0.7,
+                epistemic_confidence: 0.7,
+                reputation: Some(rep_states[id].score),
+            })
+            .collect();
+        let phi_final = CollectivePhiEngine::new(final_vectors).compute();
+        assert_eq!(
+            phi_final.n_agents, 5,
+            "Only 5 honest agents should remain after cartel blacklisted"
+        );
+    }
+
+    #[test]
+    fn test_redteam_below_threshold_cartel_not_slashed() {
+        use super::super::consciousness_profile::{apply_cartel_slash, ReputationState};
+
+        let mut rep_states: std::collections::HashMap<String, ReputationState> =
+            std::collections::HashMap::new();
+        let ids: Vec<String> = (0..3).map(|i| format!("agent_{}", i)).collect();
+        for id in &ids {
+            rep_states.insert(id.clone(), ReputationState::new(1.0, 0));
+        }
+
+        // Confidence 0.5 < threshold 0.7 → no slash
+        let results = apply_cartel_slash(&mut rep_states, &ids, 0.5, 1_000_000);
+        assert!(results.is_empty());
+        for id in &ids {
+            assert!((rep_states[id].score - 1.0).abs() < 0.01);
+        }
+    }
+
+    #[test]
+    fn test_redteam_too_small_cartel_not_slashed() {
+        use super::super::consciousness_profile::{apply_cartel_slash, ReputationState};
+
+        let mut rep_states: std::collections::HashMap<String, ReputationState> =
+            std::collections::HashMap::new();
+        rep_states.insert("a".to_string(), ReputationState::new(1.0, 0));
+        rep_states.insert("b".to_string(), ReputationState::new(1.0, 0));
+        let ids = vec!["a".to_string(), "b".to_string()];
+
+        // Only 2 members < CARTEL_MIN_SIZE (3) → no slash
+        let results = apply_cartel_slash(&mut rep_states, &ids, 0.9, 1_000_000);
+        assert!(results.is_empty());
     }
 }

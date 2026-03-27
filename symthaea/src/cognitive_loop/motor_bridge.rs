@@ -37,7 +37,7 @@ use crate::humanoid::{
 /// - Yellow (0.3–0.6): reduced speed/force
 /// - Orange (0.1–0.3): retreat to safe pose
 /// - Red (< 0.1): emergency stop, power cut
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum MotorSafetyLevel {
     Green,
     Yellow,
@@ -92,6 +92,10 @@ pub struct EmbodimentTelemetry {
 }
 
 /// Which embodiment platform to use.
+///
+/// Each variant (except `None` and `CareProvider`) maps to a robotics crate
+/// behind a feature flag. `CareProvider` is virtual-only — it has no
+/// physical embodiment and dispatches `None` in the constructor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum EmbodimentPlatform {
     #[default]
@@ -102,6 +106,7 @@ pub enum EmbodimentPlatform {
     Helicopter,
     Auv,
     Manipulator,
+    /// Virtual caregiver agent — no physical embodiment.
     CareProvider,
 }
 
@@ -122,6 +127,12 @@ pub trait EmbodimentBridge: Send + Sync {
 
     /// Current safety level.
     fn safety_level(&self) -> MotorSafetyLevel;
+
+    /// Override safety level from SafetyAgent. Merged with phi via max().
+    fn set_safety_override(&mut self, level: MotorSafetyLevel);
+
+    /// Clear external safety override.
+    fn clear_safety_override(&mut self);
 
     /// Platform identifier.
     fn platform(&self) -> EmbodimentPlatform;
@@ -151,6 +162,7 @@ pub struct MotorBridge {
     dt: f64,
     total_steps: usize,
     current_safety: MotorSafetyLevel,
+    safety_override: Option<MotorSafetyLevel>,
     last_control_effort: f32,
     last_prediction_error: f32,
 }
@@ -174,6 +186,7 @@ impl MotorBridge {
             dt,
             total_steps: 0,
             current_safety: MotorSafetyLevel::Green,
+            safety_override: None,
             last_control_effort: 0.0,
             last_prediction_error: 0.0,
         }
@@ -196,6 +209,7 @@ impl MotorBridge {
             dt,
             total_steps: 0,
             current_safety: MotorSafetyLevel::Green,
+            safety_override: None,
             last_control_effort: 0.0,
             last_prediction_error: 0.0,
         }
@@ -273,7 +287,11 @@ impl MotorBridge {
 
 impl EmbodimentBridge for MotorBridge {
     fn step(&mut self, thought_hv: &ContinuousHV, _dt: f32, phi: f64) -> EmbodimentResult {
-        self.current_safety = MotorSafetyLevel::from_phi(phi);
+        let phi_level = MotorSafetyLevel::from_phi(phi);
+        self.current_safety = match self.safety_override {
+            Some(override_level) => phi_level.max(override_level),
+            None => phi_level,
+        };
         let gain = self.current_safety.motor_gain();
 
         let mut command = self.controller.forward(thought_hv, self.dt as f32);
@@ -326,12 +344,21 @@ impl EmbodimentBridge for MotorBridge {
         self.last_perception = None;
         self.total_steps = 0;
         self.current_safety = MotorSafetyLevel::Green;
+        self.safety_override = None;
         self.last_control_effort = 0.0;
         self.last_prediction_error = 0.0;
     }
 
     fn safety_level(&self) -> MotorSafetyLevel {
         self.current_safety
+    }
+
+    fn set_safety_override(&mut self, level: MotorSafetyLevel) {
+        self.safety_override = Some(level);
+    }
+
+    fn clear_safety_override(&mut self) {
+        self.safety_override = None;
     }
 
     fn platform(&self) -> EmbodimentPlatform {
