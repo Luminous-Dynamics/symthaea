@@ -232,19 +232,40 @@ pub struct PracticeResult {
 /// apply wisdom to snapshot → repeat. Stops when stillness is reached
 /// (score delta < 0.01) or max_rounds exceeded.
 ///
-/// The `apply_wisdom_fn` parameter allows customizing how the critic's
-/// verdict modifies the cognitive state.
+/// Accepts an optional `style_fn` that conditions the snapshot each round
+/// (e.g., applying a gallery-derived style embedding). Pass `None` for
+/// unconditioned practice.
 pub fn auto_improve(
     config: &crate::AtelierConfig,
     snapshot: &mut CognitiveSnapshot,
     max_rounds: usize,
     seed_base: u64,
 ) -> PracticeResult {
+    auto_improve_with(config, snapshot, max_rounds, seed_base, None::<fn(&mut CognitiveSnapshot)>)
+}
+
+/// Autonomous practice with optional per-round style conditioning.
+///
+/// The `style_fn` is called before each generation round to condition
+/// the snapshot toward the desired artistic identity. Use this to wire
+/// in gallery-derived style embeddings.
+pub fn auto_improve_with<F: FnMut(&mut CognitiveSnapshot)>(
+    config: &crate::AtelierConfig,
+    snapshot: &mut CognitiveSnapshot,
+    max_rounds: usize,
+    seed_base: u64,
+    mut style_fn: Option<F>,
+) -> PracticeResult {
     let mut critic = SelfCritic::new();
     let mut trajectory = Vec::with_capacity(max_rounds);
     let mut best_score = 0.0f32;
 
     for round in 0..max_rounds {
+        // Apply style conditioning (if provided)
+        if let Some(ref mut f) = style_fn {
+            f(snapshot);
+        }
+
         // Generate artwork using the public API
         let artwork = crate::create_artwork(config, snapshot, seed_base + round as u64);
 
@@ -550,5 +571,82 @@ mod tests {
         for &h in &snapshot.harmony_activations {
             assert!(h >= 0.0 && h <= 1.0);
         }
+    }
+
+    #[test]
+    fn auto_improve_with_style_conditioning() {
+        let config = crate::AtelierConfig::default();
+        let mut snapshot = test_snapshot();
+
+        // Style that strongly favors harmony index 7 (SacredStillness)
+        let result = auto_improve_with(
+            &config,
+            &mut snapshot,
+            5,
+            42,
+            Some(|snap: &mut CognitiveSnapshot| {
+                // Push toward stillness each round
+                snap.harmony_activations[7] = (snap.harmony_activations[7] + 0.05).min(1.0);
+                snap.arousal = (snap.arousal - 0.02).max(0.0);
+            }),
+        );
+        assert!(result.rounds > 0);
+        // Sacred Stillness should have been boosted
+        assert!(
+            snapshot.harmony_activations[7] > 0.3,
+            "stillness harmony should increase: {}",
+            snapshot.harmony_activations[7]
+        );
+    }
+
+    #[test]
+    fn full_autopoietic_cycle() {
+        // The complete loop: generate → critique → improve → reach stillness
+        let config = crate::AtelierConfig {
+            max_elements: 30,
+            iteration_budget: 1,
+            ..Default::default()
+        };
+        let mut snapshot = CognitiveSnapshot {
+            consciousness_level: 0.8,
+            harmony_activations: [0.5; 8],
+            dopamine: 0.5,
+            serotonin: 0.5,
+            noradrenaline: 0.3,
+            oxytocin: 0.5,
+            allostatic_load: 0.1,
+            arousal: 0.5,
+            valence: 0.0,
+            ..CognitiveSnapshot::dormant()
+        };
+
+        let result = auto_improve(&config, &mut snapshot, 15, 99);
+
+        // Should produce a trajectory of scores
+        assert!(!result.trajectory.is_empty(), "should have scores");
+
+        // All scores should be bounded
+        for &s in &result.trajectory {
+            assert!(s >= 0.0 && s <= 1.0, "score out of bounds: {s}");
+        }
+
+        // System should reach stillness OR exhaust rounds
+        assert!(
+            result.reached_stillness || result.rounds == 15,
+            "should terminate: rounds={}, stillness={}",
+            result.rounds,
+            result.reached_stillness
+        );
+
+        // Snapshot should have been modified (arousal, serotonin, or harmonies)
+        // Exact drift depends on critic verdicts which depend on deterministic art generation
+        let any_change = (snapshot.arousal - 0.5).abs() > 0.001
+            || (snapshot.serotonin - 0.5).abs() > 0.001
+            || (snapshot.valence - 0.0).abs() > 0.001
+            || snapshot.harmony_activations.iter().any(|&h| (h - 0.5).abs() > 0.001);
+        assert!(
+            any_change || result.reached_stillness,
+            "state should evolve or reach stillness"
+        );
     }
 }
