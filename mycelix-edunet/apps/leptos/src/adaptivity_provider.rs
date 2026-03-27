@@ -76,6 +76,35 @@ impl AdaptivityCtx {
     pub fn dismiss_metacognitive(&self) {
         self.set_dismiss_metacognitive.update(|v| *v = v.wrapping_add(1));
     }
+
+    /// Enter sandbox mode — no tracking, no adaptation, just exploration.
+    pub fn enter_sandbox(&self) {
+        self.set_sovereignty.update(|s| s.enter_sandbox());
+        crate::persistence::save("edunet_sovereignty", &self.sovereignty.get());
+    }
+
+    /// Leave sandbox mode — return to normal.
+    pub fn leave_sandbox(&self) {
+        self.set_sovereignty.update(|s| s.leave_sandbox());
+        crate::persistence::save("edunet_sovereignty", &self.sovereignty.get());
+    }
+
+    /// Student requests more support (lowers effective mode by one level).
+    pub fn request_support(&self) {
+        self.set_sovereignty.update(|s| s.request_support());
+        crate::persistence::save("edunet_sovereignty", &self.sovereignty.get());
+    }
+
+    /// Student dismisses extra support.
+    pub fn dismiss_support(&self) {
+        self.set_sovereignty.update(|s| s.dismiss_support());
+        crate::persistence::save("edunet_sovereignty", &self.sovereignty.get());
+    }
+
+    /// Is sandbox mode active?
+    pub fn is_sandbox(&self) -> bool {
+        self.sovereignty.get().sandbox_active
+    }
 }
 
 /// Retrieve the adaptivity context from the nearest provider.
