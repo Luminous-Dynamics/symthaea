@@ -4,8 +4,9 @@
 
 use bevy::prelude::*;
 
-use crate::resources::{BiometricsCtx, GamePhase, LeviathanState};
+use crate::resources::{BiometricsCtx, GamePhase, GovernanceLog, LeviathanState};
 use crate::systems;
+use symtropy_sim_bridge::SimBridgePlugin;
 
 /// Main game plugin. Add this to a Bevy `App` to get the full Symtropy experience.
 pub struct SymtropyPlugin;
@@ -15,9 +16,12 @@ impl Plugin for SymtropyPlugin {
         app
             // State
             .init_state::<GamePhase>()
+            // Sim-bridge plugin (GovernanceState, EconomyState, FactionState, ActiveProposal)
+            .add_plugins(SimBridgePlugin)
             // Resources
             .init_resource::<BiometricsCtx>()
             .init_resource::<LeviathanState>()
+            .init_resource::<GovernanceLog>()
             .init_resource::<systems::rendering::TelemetryTimer>()
             // Dark background — the void outside the Markov blanket
             .insert_resource(ClearColor(Color::srgb(0.02, 0.02, 0.04)))
@@ -40,6 +44,8 @@ impl Plugin for SymtropyPlugin {
                     // NPC AI
                     systems::fep_behavior::fep_behavior_system,
                     systems::fep_behavior::npc_movement_system,
+                    // Governance sim tick (runs on its own timer)
+                    symtropy_sim_bridge::governance_tick_system,
                     // Leviathan
                     systems::leviathan::leviathan_system,
                     systems::leviathan::victory_check_system,
@@ -76,9 +82,13 @@ impl Plugin for SymtropyPlugin {
 #[derive(Resource, Default)]
 struct FrameCounter(u64);
 
-fn frame_counter_system(mut counter: ResMut<FrameCounter>, time: Res<Time>) {
+fn frame_counter_system(
+    mut counter: ResMut<FrameCounter>,
+    time: Res<Time>,
+    sprites: Query<(&Transform, &Sprite)>,
+    cameras: Query<&Transform, With<Camera2d>>,
+) {
     counter.0 += 1;
-    // Log first 10 frames and every 60 frames after that
     if counter.0 <= 10 || counter.0 % 60 == 0 {
         eprintln!(
             "[symtropy] frame={} dt={:.1}ms elapsed={:.1}s",
@@ -86,6 +96,29 @@ fn frame_counter_system(mut counter: ResMut<FrameCounter>, time: Res<Time>) {
             time.delta_secs() * 1000.0,
             time.elapsed_secs(),
         );
+    }
+    // Dump scene info on frame 5 — exactly once
+    if counter.0 == 5 {
+        eprintln!("[symtropy] === SCENE DIAGNOSTIC ===");
+        eprintln!("[symtropy] Total sprites: {}", sprites.iter().count());
+        for tf in cameras.iter() {
+            eprintln!(
+                "[symtropy] Camera2d at ({:.0},{:.0},{:.0})",
+                tf.translation.x, tf.translation.y, tf.translation.z,
+            );
+        }
+        // Sample sprites — first 3, last 2, plus any large ones (player/core)
+        let all: Vec<_> = sprites.iter().collect();
+        for (i, (tf, sprite)) in all.iter().enumerate() {
+            if i < 3 || i >= all.len() - 3 || sprite.custom_size.map_or(false, |s| s.x > 20.0) {
+                eprintln!(
+                    "[symtropy]   [{}] pos=({:.0},{:.0},{:.0}) size={:?} color={:?}",
+                    i, tf.translation.x, tf.translation.y, tf.translation.z,
+                    sprite.custom_size, sprite.color,
+                );
+            }
+        }
+        eprintln!("[symtropy] === END DIAGNOSTIC ===");
     }
 }
 

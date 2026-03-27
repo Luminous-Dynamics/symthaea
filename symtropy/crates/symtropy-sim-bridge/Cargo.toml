@@ -1,0 +1,11 @@
+[package]
+name = "symtropy-sim-bridge"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+description = "Bridge between mycelix-multiworld-sim governance/economy models and Bevy ECS"
+
+[dependencies]
+mycelix-multiworld-sim = { path = "../../../mycelix-multiworld-sim" }
+bevy = { version = "0.18", default-features = false }
+serde = { version = "1.0", features = ["derive"] }

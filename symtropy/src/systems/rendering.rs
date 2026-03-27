@@ -20,8 +20,8 @@ pub const MAP_HEIGHT: i32 = 18;
 
 /// Spawn the camera, tile map, player, NPCs, and fusion core.
 pub fn setup_world(mut commands: Commands) {
-    // Camera
-    commands.spawn(Camera2d);
+    // Camera — z=999 to see all sprites below
+    commands.spawn((Camera2d, Transform::from_xyz(0.0, 0.0, 999.0)));
 
     // Dark tile floor — use Sprite::from_color for solid-color rendering
     for y in -MAP_HEIGHT / 2..MAP_HEIGHT / 2 {
@@ -32,9 +32,9 @@ pub fn setup_world(mut commands: Commands) {
                 || y == MAP_HEIGHT / 2 - 1);
 
             let color = if walkable {
-                Color::srgb(0.15, 0.15, 0.22) // floor — visible dark blue-gray
+                Color::srgb(0.3, 0.3, 0.4) // floor — bright enough to be unmistakable
             } else {
-                Color::srgb(0.4, 0.3, 0.25) // wall — clearly visible brown
+                Color::srgb(0.7, 0.5, 0.3) // wall — bright orange-brown
             };
 
             commands.spawn((

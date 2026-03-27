@@ -56,7 +56,7 @@ impl Default for LeviathanState {
         Self {
             phase: SleepPhase::Dormant,
             noise_accumulator: 0.0,
-            threshold: 3.0, // raised from 1.0 — NPCs were waking Leviathan too fast
+            threshold: 10.0, // high threshold — player must actively make noise to wake it
             stirring_duration: 0.0,
             quiet_duration: 0.0,
         }
@@ -71,8 +71,45 @@ pub enum GamePhase {
     Loading,
     /// Active gameplay.
     Playing,
+    /// Governance council session — gameplay paused for voting.
+    Council,
     /// Leviathan caught the player.
     GameOver,
     /// Player escaped with the core.
     Victory,
+}
+
+// ============================================================================
+// Governance / Economy event log (Phase A0)
+// ============================================================================
+
+/// Log of governance events for the HUD and post-game analysis.
+#[derive(Resource, Default)]
+pub struct GovernanceLog {
+    /// Recent governance event messages (ring buffer, max 20).
+    pub messages: Vec<GovernanceMessage>,
+}
+
+/// A timestamped governance message.
+pub struct GovernanceMessage {
+    /// Game time when the event occurred.
+    pub time_secs: f32,
+    /// Human-readable event description.
+    pub text: String,
+    /// Severity: 0=info, 1=warning (oppression), 2=critical (crisis).
+    pub severity: u8,
+}
+
+impl GovernanceLog {
+    /// Push a message, keeping max 20 entries.
+    pub fn push(&mut self, time_secs: f32, text: String, severity: u8) {
+        self.messages.push(GovernanceMessage {
+            time_secs,
+            text,
+            severity,
+        });
+        if self.messages.len() > 20 {
+            self.messages.remove(0);
+        }
+    }
 }
