@@ -2,76 +2,206 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
-use leptos::prelude::*;
+//! Home page — the mentor's greeting.
+//!
+//! Instead of "select your role," the app asks: "What do you want to do today?"
+//! The child is met as a whole person, not sorted into an institutional category.
+//!
+//! Teachers and parents can still access their tools via a small link at the
+//! bottom — but the primary experience is the child's.
 
+use leptos::prelude::*;
+use wasm_bindgen::JsCast;
+
+use crate::adaptivity_provider::use_adaptivity;
+use crate::cognitive_adaptivity::*;
 use crate::role::{use_set_role, UserRole};
 
+fn event_target_value(ev: &leptos::ev::Event) -> String {
+    ev.target()
+        .and_then(|t| t.dyn_into::<web_sys::HtmlSelectElement>().ok())
+        .map(|el| el.value())
+        .or_else(|| {
+            ev.target()
+                .and_then(|t| t.dyn_into::<web_sys::HtmlInputElement>().ok())
+                .map(|el| el.value())
+        })
+        .unwrap_or_default()
+}
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum HomeState {
-    RoleSelection,
+enum HomeView {
+    /// The mentor's greeting — "What do you want to do today?"
+    MentorGreeting,
+    /// Teacher/parent setup (accessible from bottom link)
     TeacherSetup,
-    StudentJoin,
     ParentConnect,
 }
 
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 #[component]
 pub fn HomePage() -> impl IntoView {
-    let (state, set_state) = signal(HomeState::RoleSelection);
+    let (view_state, set_view_state) = signal(HomeView::MentorGreeting);
     let set_role = use_set_role();
+    let adaptivity = use_adaptivity();
 
-    let select_teacher = move |_| set_state.set(HomeState::TeacherSetup);
-    let select_student = move |_| set_state.set(HomeState::StudentJoin);
-    let select_parent = move |_| set_state.set(HomeState::ParentConnect);
-    let go_back = move |_| set_state.set(HomeState::RoleSelection);
+    let go_back = move |_| set_view_state.set(HomeView::MentorGreeting);
 
     view! {
         <div class="home-landing">
-            <div class="landing-header">
-                <h1 class="landing-title">"EduNet"</h1>
-                <p class="landing-subtitle">"Learning that grows with you"</p>
-            </div>
-
-            {move || match state.get() {
-                HomeState::RoleSelection => view! {
-                    <div class="role-selection">
-                        <div class="role-cards">
-                            <button class="role-card role-teacher" on:click=select_teacher>
-                                <span class="role-icon">"👩\u{200d}🏫"</span>
-                                <span class="role-label">"I'm a Teacher"</span>
-                                <span class="role-description">"Set up my classroom"</span>
-                            </button>
-                            <button class="role-card role-student" on:click=select_student>
-                                <span class="role-icon">"👨\u{200d}🎓"</span>
-                                <span class="role-label">"I'm a Student"</span>
-                                <span class="role-description">"Join my class"</span>
-                            </button>
-                            <button class="role-card role-parent" on:click=select_parent>
-                                <span class="role-icon">"👪"</span>
-                                <span class="role-label">"I'm a Parent"</span>
-                                <span class="role-description">"See my child's progress"</span>
-                            </button>
-                        </div>
-                        <p class="privacy-note">
-                            "Your learning data stays on your device. No cloud. No tracking. You own it."
-                        </p>
-                    </div>
+            {move || match view_state.get() {
+                HomeView::MentorGreeting => view! {
+                    <MentorGreeting set_role=set_role adaptivity=adaptivity.clone() set_view_state=set_view_state />
                 }.into_any(),
 
-                HomeState::TeacherSetup => view! {
+                HomeView::TeacherSetup => view! {
                     <TeacherSetupForm set_role=set_role go_back=go_back />
                 }.into_any(),
 
-                HomeState::StudentJoin => view! {
-                    <StudentJoinForm set_role=set_role go_back=go_back />
-                }.into_any(),
-
-                HomeState::ParentConnect => view! {
+                HomeView::ParentConnect => view! {
                     <ParentConnectForm set_role=set_role go_back=go_back />
                 }.into_any(),
             }}
         </div>
     }
 }
+
+// ---------------------------------------------------------------------------
+// The mentor's greeting
+// ---------------------------------------------------------------------------
+
+#[component]
+fn MentorGreeting(
+    set_role: WriteSignal<Option<UserRole>>,
+    adaptivity: crate::adaptivity_provider::AdaptivityCtx,
+    set_view_state: WriteSignal<HomeView>,
+) -> impl IntoView {
+    let navigate = leptos_router::hooks::use_navigate();
+    let nav_review = navigate.clone();
+    let nav_explore = navigate.clone();
+    let nav_create = navigate.clone();
+    let nav_help = navigate.clone();
+    let nav_play = navigate.clone();
+
+    let set_role_review = set_role;
+    let set_role_explore = set_role;
+    let set_role_create = set_role;
+    let set_role_help = set_role;
+    let set_role_play = set_role;
+
+    let adaptivity_sandbox = adaptivity.clone();
+
+    // What the mentor says based on time of day
+    let greeting = {
+        let hour = (js_sys::Date::new_0().get_hours()) as u8;
+        match hour {
+            5..=11 => "Good morning!",
+            12..=16 => "Good afternoon!",
+            17..=20 => "Good evening!",
+            _ => "Hey there!",
+        }
+    };
+
+    let on_practice = move |_| {
+        set_role_review.set(Some(UserRole::Student));
+        nav_review("/review", Default::default());
+    };
+
+    let on_explore = move |_| {
+        set_role_explore.set(Some(UserRole::Student));
+        nav_explore("/skill-map", Default::default());
+    };
+
+    let on_create = move |_| {
+        set_role_create.set(Some(UserRole::Student));
+        nav_create("/dashboard", Default::default());
+    };
+
+    let on_help = move |_| {
+        set_role_help.set(Some(UserRole::Student));
+        adaptivity.request_support();
+        nav_help("/review", Default::default());
+    };
+
+    let on_play = move |_| {
+        set_role_play.set(Some(UserRole::Student));
+        adaptivity_sandbox.enter_sandbox();
+        nav_play("/skill-map", Default::default());
+    };
+
+    view! {
+        <div class="mentor-greeting">
+            <div class="mentor-header">
+                <h1 class="mentor-hello">{greeting}</h1>
+                <p class="mentor-question">"What do you want to do today?"</p>
+            </div>
+
+            <div class="intention-cards">
+                <button class="intention-card intention-practice" on:click=on_practice>
+                    <span class="intention-icon">"\u{1f4da}"</span>
+                    <span class="intention-label">"Practice something"</span>
+                    <span class="intention-hint">"Review what you've been learning"</span>
+                </button>
+
+                <button class="intention-card intention-explore" on:click=on_explore>
+                    <span class="intention-icon">"\u{1f30d}"</span>
+                    <span class="intention-label">"Explore something new"</span>
+                    <span class="intention-hint">"See what's out there"</span>
+                </button>
+
+                <button class="intention-card intention-create" on:click=on_create>
+                    <span class="intention-icon">"\u{1f3a8}"</span>
+                    <span class="intention-label">"See how I'm doing"</span>
+                    <span class="intention-hint">"Check your progress and skills"</span>
+                </button>
+
+                <button class="intention-card intention-help" on:click=on_help>
+                    <span class="intention-icon">"\u{1f91d}"</span>
+                    <span class="intention-label">"I'd like some help"</span>
+                    <span class="intention-hint">"Get extra support today"</span>
+                </button>
+
+                <button class="intention-card intention-play" on:click=on_play>
+                    <span class="intention-icon">"\u{1f3ae}"</span>
+                    <span class="intention-label">"Just explore freely"</span>
+                    <span class="intention-hint">"No tracking, no scores — just play"</span>
+                </button>
+            </div>
+
+            <div class="mentor-footer">
+                <p class="privacy-note">
+                    "Your learning data stays on your device. You own it."
+                </p>
+                <div class="adult-links">
+                    <button
+                        class="adult-link"
+                        on:click=move |_| set_view_state.set(HomeView::TeacherSetup)
+                    >
+                        "I'm a teacher"
+                    </button>
+                    <span class="adult-link-divider">"\u{00b7}"</span>
+                    <button
+                        class="adult-link"
+                        on:click=move |_| set_view_state.set(HomeView::ParentConnect)
+                    >
+                        "I'm a parent"
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Teacher setup (from small link at bottom)
+// ---------------------------------------------------------------------------
 
 #[component]
 fn TeacherSetupForm(
@@ -91,8 +221,8 @@ fn TeacherSetupForm(
 
     view! {
         <div class="setup-form">
-            <button class="back-button" on:click=go_back>"< Back"</button>
-            <h2 class="setup-title">"Welcome, Teacher!"</h2>
+            <button class="back-button" on:click=go_back>"\u{2190} Back"</button>
+            <h2 class="setup-title">"Welcome, Teacher"</h2>
             <p class="setup-subtitle">"Let's set up your classroom."</p>
 
             <div class="form-group">
@@ -103,18 +233,12 @@ fn TeacherSetupForm(
                     <option value="" disabled selected>"Choose a grade..."</option>
                     <option value="prek">"Pre-K"</option>
                     <option value="k">"Kindergarten"</option>
-                    <option value="1">"1st Grade"</option>
-                    <option value="2">"2nd Grade"</option>
-                    <option value="3">"3rd Grade"</option>
-                    <option value="4">"4th Grade"</option>
-                    <option value="5">"5th Grade"</option>
-                    <option value="6">"6th Grade"</option>
-                    <option value="7">"7th Grade"</option>
-                    <option value="8">"8th Grade"</option>
-                    <option value="9">"9th Grade"</option>
-                    <option value="10">"10th Grade"</option>
-                    <option value="11">"11th Grade"</option>
-                    <option value="12">"12th Grade"</option>
+                    {(1..=12).map(|g| {
+                        let suffix = match g { 1 => "st", 2 => "nd", 3 => "rd", _ => "th" };
+                        let val = g.to_string();
+                        let label = format!("{}{} Grade", g, suffix);
+                        view! { <option value=val>{label}</option> }
+                    }).collect_view()}
                 </select>
             </div>
 
@@ -130,9 +254,6 @@ fn TeacherSetupForm(
                     <option value="social-studies">"Social Studies"</option>
                     <option value="art">"Art"</option>
                     <option value="music">"Music"</option>
-                    <option value="world-language">"World Languages"</option>
-                    <option value="pe">"Physical Education"</option>
-                    <option value="cs">"Computer Science"</option>
                     <option value="other">"Other"</option>
                 </select>
             </div>
@@ -148,64 +269,9 @@ fn TeacherSetupForm(
     }
 }
 
-#[component]
-fn StudentJoinForm(
-    set_role: WriteSignal<Option<UserRole>>,
-    go_back: impl Fn(leptos::ev::MouseEvent) + 'static,
-) -> impl IntoView {
-    let (code, set_code) = signal(String::new());
-    let navigate = leptos_router::hooks::use_navigate();
-    let navigate_explore = navigate.clone();
-
-    let on_join = move |_| {
-        set_role.set(Some(UserRole::Student));
-        navigate("/dashboard", Default::default());
-    };
-
-    let on_explore = move |_| {
-        set_role.set(Some(UserRole::Student));
-        navigate_explore("/skill-map", Default::default());
-    };
-
-    let can_join = move || code.get().len() == 6;
-
-    view! {
-        <div class="setup-form">
-            <button class="back-button" on:click=go_back>"< Back"</button>
-            <h2 class="setup-title">"Welcome, Student!"</h2>
-            <p class="setup-subtitle">"Ready to learn something new?"</p>
-
-            <div class="form-group">
-                <label for="class-code">"Enter your class code"</label>
-                <input
-                    id="class-code"
-                    type="text"
-                    maxlength="6"
-                    placeholder="ABC123"
-                    class="code-input"
-                    on:input=move |ev| set_code.set(event_target_value(&ev).to_uppercase())
-                    prop:value=code
-                />
-            </div>
-
-            <button
-                class="primary-button"
-                on:click=on_join
-                disabled=move || !can_join()
-            >
-                "Join"
-            </button>
-
-            <div class="divider">
-                <span>"or"</span>
-            </div>
-
-            <button class="secondary-button" on:click=on_explore>
-                "Explore on my own"
-            </button>
-        </div>
-    }
-}
+// ---------------------------------------------------------------------------
+// Parent connect (from small link at bottom)
+// ---------------------------------------------------------------------------
 
 #[component]
 fn ParentConnectForm(
@@ -224,8 +290,8 @@ fn ParentConnectForm(
 
     view! {
         <div class="setup-form">
-            <button class="back-button" on:click=go_back>"< Back"</button>
-            <h2 class="setup-title">"Welcome, Parent!"</h2>
+            <button class="back-button" on:click=go_back>"\u{2190} Back"</button>
+            <h2 class="setup-title">"Welcome, Parent"</h2>
             <p class="setup-subtitle">"Stay connected with your child's learning."</p>
 
             <div class="form-group">
