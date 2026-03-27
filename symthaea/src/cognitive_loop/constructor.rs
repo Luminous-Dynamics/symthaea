@@ -717,6 +717,7 @@ impl CognitiveLoopService {
                 } else {
                     None
                 },
+                broca_code_channels: None,
             },
             behavior: super::behavioral_synthesis::BehavioralSynthesis::new(
                 FlowState::default(),

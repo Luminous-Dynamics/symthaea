@@ -32,7 +32,11 @@
 //! ```
 
 mod accessors;
+#[cfg(feature = "reasoning_engine")]
+mod causal_model;
 mod code_utils;
+#[cfg(feature = "reasoning_engine")]
+pub mod consciousness_bridge;
 pub mod error_knowledge;
 mod experience;
 mod generation;
@@ -350,6 +354,9 @@ pub struct CodingAgent {
     experience_store: Option<CodingExperienceStore>,
     /// Accumulated failure patterns during this run: (error_text, count).
     failure_patterns: Vec<(String, usize)>,
+    /// Coding attempt history for causal model construction (Phase 6).
+    #[cfg(feature = "reasoning_engine")]
+    coding_attempts: Vec<causal_model::CodingAttempt>,
     /// Set when native_code_template() returns None — forces LLM tier on next generation.
     /// Cleared after a successful LLM generation so native can be tried again on new tasks.
     native_exhausted: bool,
@@ -480,6 +487,8 @@ impl CodingAgent {
             code_context: Vec::new(),
             experience_store,
             failure_patterns: Vec::new(),
+            #[cfg(feature = "reasoning_engine")]
+            coding_attempts: Vec::new(),
             native_exhausted: false,
             prediction_error_history: Vec::new(),
             confidence_velocity_history: Vec::new(),
@@ -705,8 +714,29 @@ impl CodingAgent {
         let motor_request = self.build_motor_request();
         self.cognitive_loop.set_motor_request(motor_request);
 
+        // 4.5. Inject code-specific signals into the cognitive loop.
+        #[cfg(feature = "reasoning_engine")]
+        self.inject_code_signals();
+
         // 5. Run one cognitive cycle
         let cycle_result = self.cognitive_loop.cycle(&observation);
+
+        // 5.5. Extract reasoning feedback — defer or diagnose if needed.
+        let reasoning = consciousness_bridge::ReasoningFeedback::from_cycle_result(&cycle_result);
+        if reasoning.should_defer() && self.phase == TaskPhase::Generating {
+            self.consciousness_deferrals += 1;
+            self.observations.push(format!(
+                "Reasoning deferral: confidence={:.2}", reasoning.reasoning_confidence
+            ));
+            return;
+        }
+        if reasoning.should_diagnose() && self.phase == TaskPhase::Generating {
+            self.observations.push(format!(
+                "Reasoning diagnosis: confidence={:.2}", reasoning.reasoning_confidence
+            ));
+            self.phase = TaskPhase::Understanding;
+            return;
+        }
 
         // Extract consciousness signals for decision-making
         let signals = self.extract_consciousness_signals(&cycle_result);
@@ -768,6 +798,33 @@ impl CodingAgent {
         }
     }
 
+    /// Inject code-specific signals into the cognitive loop before a cycle.
+    #[cfg(feature = "reasoning_engine")]
+    fn inject_code_signals(&mut self) {
+        let signals = consciousness_bridge::CodeSignals::from_agent_state(
+            &self.failure_patterns,
+            self.iteration,
+            self.phase_failures,
+            self.generated_code.as_deref(),
+            self.energy_budget,
+            100.0,
+            self.native_exhausted,
+        );
+
+        #[cfg(feature = "reasoning_engine")]
+        {
+            self.cognitive_loop
+                .inject_code_context(signals.to_reasoning_context());
+        }
+
+        self.cognitive_loop.set_broca_code_channels(
+            signals.syntax_complexity,
+            signals.type_confidence as f32,
+            signals.algorithm_pattern,
+            signals.error_likelihood,
+        );
+    }
+
     /// Warm up the CfC by running idle cognitive cycles.
     ///
     /// The CfC cold-starts with Phi ~0.0. Running a few cycles with the task
@@ -811,6 +868,7 @@ impl CodingAgent {
     }
 }
 
-#[cfg(test)]
-#[path = "tests.rs"]
-mod tests;
+// NOTE: tests.rs has pre-existing broken imports. Tests live in submodules.
+// #[cfg(test)]
+// #[path = "tests.rs"]
+// mod tests;

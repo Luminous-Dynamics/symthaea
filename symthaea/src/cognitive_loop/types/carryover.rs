@@ -482,4 +482,8 @@ pub struct CycleCarryover {
     pub gwt_broadcast_occurred: bool,
     /// GWT winning coalition size from previous cycle (0 if no broadcast)
     pub gwt_coalition_size: u32,
+    /// Injected code reasoning context from CodingAgent (one-shot: consumed by cycle).
+    #[cfg(feature = "reasoning_engine")]
+    pub injected_code_context:
+        Option<crate::consciousness::reasoning_engine::CodeReasoningContext>,
 }

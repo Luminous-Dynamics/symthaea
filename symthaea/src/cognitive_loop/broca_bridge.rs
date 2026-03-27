@@ -1,4 +1,6 @@
-//! Broca language bridge: consciousness-gated thought-to-text generation.
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Broca language bridge: consciousness-gated thought-to-text generation.
 //!
 //! Wraps the Broca SSM language center with consciousness signal extraction
 //! and generation management. Feature-gated by `ssm_language`.
@@ -76,6 +78,8 @@ pub struct BrocaConsciousnessSignals {
     pub cube_h_value: f32,
     /// Epistemic quality score: E×0.4 + N×0.35 + M×0.25 (normalized 0-1).
     pub cube_quality: f32,
+    /// Code channels from CodingAgent: [syntax_complexity, type_confidence, algorithm_pattern, error_likelihood]
+    pub code_channels: Option<[f32; 4]>,
 }
 
 // Re-export telemetry type from the types module.
@@ -242,6 +246,11 @@ impl BrocaManager {
             (signals.cube_e_tier, signals.cube_n_tier, signals.cube_m_tier)
         {
             channels.set_epistemic_cube(e, n, m, signals.cube_h_value, signals.cube_quality);
+        }
+
+        // Set code channels from CodingAgent injection (channels 24–27).
+        if let Some([sc, tc, ap, el]) = signals.code_channels {
+            channels.set_code(sc, tc, ap, el);
         }
 
         // Multi-turn context: use generate_continuing() after the first turn
