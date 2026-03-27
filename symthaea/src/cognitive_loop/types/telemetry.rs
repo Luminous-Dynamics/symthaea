@@ -2417,6 +2417,19 @@ pub struct FepTelemetry {
     pub trajectory_surprise: f64,
     /// Total ODE steps across all action rollouts (0 when disabled).
     pub trajectory_ode_steps: usize,
+    // ── Markov Blanket Telemetry (Friston 2013) ──────────────────────
+    /// Sensory permeability of the Markov blanket (0.0–1.0).
+    pub blanket_sensory_permeability: f64,
+    /// Active permeability (0.0–1.0).
+    pub blanket_active_permeability: f64,
+    /// Effective permeability (geometric mean, 0.0–1.0).
+    pub blanket_effective_permeability: f64,
+    /// Permeability trend (positive = opening, negative = closing).
+    pub blanket_trend: f64,
+    /// Whether the system is ready for blanket coalescence.
+    pub blanket_coalescence_ready: bool,
+    /// Number of active peer coalitions.
+    pub blanket_coalition_count: usize,
 }
 
 /// Mesh network telemetry.

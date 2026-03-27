@@ -2179,7 +2179,7 @@ impl CognitiveLoopService {
         {
             let boundary_thickness_proxy = (1.0 - coherence as f64).clamp(0.0, 1.0);
             let fiedler_proxy = self.prediction_confidence.clamp(0.0, 2.0);
-            let boundary_components = if self.stats.subsystem_veto_active {
+            let boundary_components = if self.carryover.quality.subsystem_veto {
                 3
             } else {
                 1
