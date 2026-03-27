@@ -49,6 +49,7 @@ pub fn leviathan_system(
             if leviathan.noise_accumulator > leviathan.threshold {
                 leviathan.phase = SleepPhase::Stirring;
                 leviathan.stirring_duration = 0.0;
+                warn!("Leviathan STIRRING — noise exceeded threshold");
             }
         }
         SleepPhase::Stirring => {
@@ -57,6 +58,7 @@ pub fn leviathan_system(
             }
             if leviathan.stirring_duration > STIRRING_TO_AWAKE_SECS {
                 leviathan.phase = SleepPhase::Awake;
+                warn!("Leviathan AWAKE — sustained noise for {}s", STIRRING_TO_AWAKE_SECS);
             }
             if leviathan.quiet_duration > QUIET_RESET_SECS {
                 leviathan.phase = SleepPhase::Dormant;
@@ -72,7 +74,7 @@ pub fn leviathan_system(
             }
         }
         SleepPhase::Hunting => {
-            // Game over — the Leviathan catches you
+            warn!("Leviathan HUNTING — GAME OVER");
             next_state.set(GamePhase::GameOver);
         }
     }

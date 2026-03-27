@@ -79,17 +79,26 @@ fn game_over_system(
     mut next_state: ResMut<NextState<GamePhase>>,
     mut leviathan: ResMut<LeviathanState>,
     mut biometrics: ResMut<BiometricsCtx>,
+    mut clear_color: ResMut<ClearColor>,
+    mut hud: Query<(&mut Text, &mut TextColor), With<crate::systems::rendering::HudText>>,
     mut logged: Local<bool>,
 ) {
     if !*logged {
         warn!("=== THE LEVIATHAN HAS CAUGHT YOU ===");
         warn!("Press R to restart, Escape to quit");
+        // Flash screen red
+        clear_color.0 = Color::srgb(0.3, 0.02, 0.02);
+        for (mut text, mut color) in &mut hud {
+            **text = "THE LEVIATHAN HAS CAUGHT YOU\n\nPress R to restart | Escape to quit".into();
+            *color = TextColor(Color::srgb(1.0, 0.3, 0.2));
+        }
         *logged = true;
     }
     if keyboard.just_pressed(KeyCode::KeyR) {
         *leviathan = LeviathanState::default();
         biometrics.encoder.reset();
         biometrics.model.reset();
+        clear_color.0 = Color::srgb(0.02, 0.02, 0.04);
         *logged = false;
         next_state.set(GamePhase::Playing);
         info!("Restarting...");
@@ -104,17 +113,24 @@ fn victory_system(
     mut next_state: ResMut<NextState<GamePhase>>,
     mut leviathan: ResMut<LeviathanState>,
     mut biometrics: ResMut<BiometricsCtx>,
+    mut clear_color: ResMut<ClearColor>,
+    mut hud: Query<(&mut Text, &mut TextColor), With<crate::systems::rendering::HudText>>,
     mut logged: Local<bool>,
 ) {
     if !*logged {
         info!("=== FUSION CORE EXTRACTED — YOU SURVIVED ===");
-        info!("Press R to play again, Escape to quit");
+        clear_color.0 = Color::srgb(0.02, 0.08, 0.02);
+        for (mut text, mut color) in &mut hud {
+            **text = "FUSION CORE EXTRACTED — YOU SURVIVED!\n\nPress R to play again | Escape to quit".into();
+            *color = TextColor(Color::srgb(0.3, 1.0, 0.4));
+        }
         *logged = true;
     }
     if keyboard.just_pressed(KeyCode::KeyR) {
         *leviathan = LeviathanState::default();
         biometrics.encoder.reset();
         biometrics.model.reset();
+        clear_color.0 = Color::srgb(0.02, 0.02, 0.04);
         *logged = false;
         next_state.set(GamePhase::Playing);
     }

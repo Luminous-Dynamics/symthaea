@@ -10,6 +10,10 @@ use crate::resources::{BiometricsCtx, GamePhase, LeviathanState, SleepPhase};
 /// Tile size in pixels.
 pub const TILE_SIZE: f32 = 32.0;
 
+/// Marker for the HUD text entity.
+#[derive(Component)]
+pub struct HudText;
+
 /// Map dimensions (tiles).
 pub const MAP_WIDTH: i32 = 24;
 pub const MAP_HEIGHT: i32 = 18;
@@ -28,9 +32,9 @@ pub fn setup_world(mut commands: Commands) {
                 || y == MAP_HEIGHT / 2 - 1);
 
             let color = if walkable {
-                Color::srgb(0.08, 0.08, 0.12) // dark floor
+                Color::srgb(0.15, 0.15, 0.22) // floor — visible dark blue-gray
             } else {
-                Color::srgb(0.25, 0.20, 0.15) // wall — brighter so visible
+                Color::srgb(0.4, 0.3, 0.25) // wall — clearly visible brown
             };
 
             commands.spawn((
@@ -73,6 +77,20 @@ pub fn setup_world(mut commands: Commands) {
         FusionCore { being_extracted: false, extraction_progress: 0.0 },
     ));
 
+    // HUD text overlay (top-left)
+    commands.spawn((
+        Text::new("WASD: move | E: extract | Esc: quit"),
+        TextFont { font_size: 18.0, ..default() },
+        TextColor(Color::srgb(0.7, 0.9, 0.7)),
+        Node {
+            position_type: PositionType::Absolute,
+            top: Val::Px(10.0),
+            left: Val::Px(10.0),
+            ..default()
+        },
+        HudText,
+    ));
+
     info!("World spawned: {}x{} tiles, 1 player, 3 NPCs, 1 fusion core", MAP_WIDTH, MAP_HEIGHT);
 }
 
@@ -86,42 +104,62 @@ impl Default for TelemetryTimer {
     }
 }
 
-/// HUD: log telemetry to console every second.
+/// HUD: update on-screen text with live telemetry.
 pub fn hud_system(
     biometrics: Res<BiometricsCtx>,
     leviathan: Res<LeviathanState>,
     cores: Query<&FusionCore>,
-    game_phase: Res<State<GamePhase>>,
+    player: Query<&Transform, With<Player>>,
+    mut hud: Query<(&mut Text, &mut TextColor), With<HudText>>,
     time: Res<Time>,
     mut timer: ResMut<TelemetryTimer>,
 ) {
     timer.0 += time.delta_secs();
-    if timer.0 < 1.0 {
-        return;
+    if timer.0 < 0.25 {
+        return; // 4Hz update
     }
     timer.0 = 0.0;
 
     let stress = biometrics.encoder.compute_stress_vector();
     let extraction = cores.iter().next().map(|c| c.extraction_progress).unwrap_or(0.0);
+    let player_pos = player.iter().next().map(|t| t.translation.truncate()).unwrap_or_default();
 
     let phase_str = match leviathan.phase {
-        SleepPhase::Dormant => "DORMANT",
-        SleepPhase::Stirring => "STIRRING",
-        SleepPhase::Awake => "AWAKE",
-        SleepPhase::Hunting => "HUNTING",
+        SleepPhase::Dormant => "DORMANT  ",
+        SleepPhase::Stirring => "STIRRING!",
+        SleepPhase::Awake => "!! AWAKE !!",
+        SleepPhase::Hunting => "HUNTING!!!",
     };
 
-    info!(
-        "state={:?} | arousal={:.2} valence={:.2} load={:.3} cortisol={:.3} | leviathan={} noise={:.2} | extract={:.0}%",
-        game_phase.get(),
-        stress.arousal,
-        stress.valence,
-        biometrics.model.allostatic_load,
-        biometrics.model.cortisol_proxy,
+    let hud_text = format!(
+        "WASD: move | E: extract core | Esc: quit\n\
+         Stress: {:.0}%  Load: {:.0}%  Leviathan: {}\n\
+         Noise: {:.1}/{:.1}  Extract: {:.0}%  Pos: ({:.0},{:.0})",
+        stress.arousal * 100.0,
+        biometrics.model.allostatic_load * 100.0,
         phase_str,
         leviathan.noise_accumulator,
+        leviathan.threshold,
         extraction * 100.0,
+        player_pos.x,
+        player_pos.y,
     );
+
+    for (mut text, mut color) in &mut hud {
+        **text = hud_text.clone();
+        // Color shifts with danger
+        let r = match leviathan.phase {
+            SleepPhase::Dormant => 0.6,
+            SleepPhase::Stirring => 0.9,
+            SleepPhase::Awake | SleepPhase::Hunting => 1.0,
+        };
+        let g = match leviathan.phase {
+            SleepPhase::Dormant => 0.9,
+            SleepPhase::Stirring => 0.7,
+            _ => 0.2,
+        };
+        *color = TextColor(Color::srgb(r, g, 0.3));
+    }
 }
 
 /// Visual stress effect: placeholder.
