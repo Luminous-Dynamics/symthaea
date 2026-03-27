@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Constitution Integrity Zome
 //! Defines entry types and validation for charter and amendments
 //!
@@ -200,6 +203,84 @@ pub fn check_update_charter(original: &Charter, updated: &Charter) -> Result<(),
 }
 
 /// Check amendment validity on creation.
+/// Unamendable core rights — these cannot be removed or modified.
+///
+/// These rights form the thermodynamic bedrock of the governance system.
+/// Removing them would allow tyranny to re-emerge as an attractor state.
+/// They are enforced at the integrity (validation) level, meaning even a
+/// 100% unanimous vote cannot remove them — the DHT itself rejects it.
+const UNAMENDABLE_RIGHTS: &[&str] = &[
+    "veto override",
+    "consciousness gating",
+    "term limits",
+    "emergency power limits",
+    "permission-less enforcement",
+    "fork rights",
+    "right to exit",
+];
+
+/// Check if an amendment targets unamendable constitutional core.
+fn targets_unamendable_core(amendment: &Amendment) -> Option<String> {
+    let text_lower = amendment.new_text.to_lowercase();
+    let original_lower = amendment
+        .original_text
+        .as_deref()
+        .unwrap_or("")
+        .to_lowercase();
+    let article_lower = amendment
+        .article
+        .as_deref()
+        .unwrap_or("")
+        .to_lowercase();
+
+    // Check RemoveRight against unamendable rights
+    if matches!(
+        amendment.amendment_type,
+        AmendmentType::RemoveRight | AmendmentType::ModifyRight
+    ) {
+        for right in UNAMENDABLE_RIGHTS {
+            if original_lower.contains(right) || text_lower.contains(right) {
+                return Some(format!(
+                    "Cannot remove or modify unamendable right: '{}'. \
+                     This right is part of the constitutional bedrock.",
+                    right
+                ));
+            }
+        }
+    }
+
+    // Check RemoveArticle against unamendable topics
+    if matches!(
+        amendment.amendment_type,
+        AmendmentType::RemoveArticle
+    ) {
+        for right in UNAMENDABLE_RIGHTS {
+            if article_lower.contains(right) {
+                return Some(format!(
+                    "Cannot remove article concerning unamendable right: '{}'",
+                    right
+                ));
+            }
+        }
+    }
+
+    // ModifyProcess cannot remove override mechanisms
+    if matches!(amendment.amendment_type, AmendmentType::ModifyProcess) {
+        for right in UNAMENDABLE_RIGHTS {
+            // If the original process mentions a right but the new one doesn't,
+            // it's being stripped
+            if original_lower.contains(right) && !text_lower.contains(right) {
+                return Some(format!(
+                    "Cannot remove '{}' from the amendment process — unamendable core",
+                    right
+                ));
+            }
+        }
+    }
+
+    None
+}
+
 pub fn check_create_amendment(amendment: &Amendment) -> Result<(), String> {
     if !amendment.proposer.starts_with("did:") {
         return Err("Proposer must be a valid DID".into());
@@ -210,6 +291,14 @@ pub fn check_create_amendment(amendment: &Amendment) -> Result<(), String> {
     if amendment.rationale.is_empty() {
         return Err("Amendment must have rationale".into());
     }
+
+    // ── UNAMENDABLE CORE CHECK ──
+    // Reject amendments that would remove or weaken core anti-tyranny rights.
+    // This is enforced at the integrity level — the DHT itself rejects the entry.
+    if let Some(reason) = targets_unamendable_core(amendment) {
+        return Err(reason);
+    }
+
     match amendment.amendment_type {
         AmendmentType::ModifyArticle
         | AmendmentType::ModifyRight
