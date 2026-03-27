@@ -401,6 +401,8 @@ impl MultiWorldSimulator {
                 mean_tech,
                 governance_stability,
                 worker_ratio,
+                self.config.policy.care_effectiveness,
+                self.config.policy.deep_space_isolation_mult,
                 &mut self.rng,
             );
 
@@ -411,6 +413,9 @@ impl MultiWorldSimulator {
     }
 
     fn tick_education(&mut self) {
+        if !self.config.policy.education_enabled {
+            return; // A/B comparison: skip education tick entirely
+        }
         let world_count = self.worlds.len();
         for i in 0..world_count {
             let mut world = std::mem::take(&mut self.worlds[i]);
@@ -536,10 +541,93 @@ impl MultiWorldSimulator {
                 }
             }
         }
+
+        // Inter-world migration: every 6 ticks (biannual), move a few adults from
+        // Earth to off-world colonies. This maintains genetic diversity and carries
+        // fresh social bonds into isolated populations.
+        if self.config.policy.migration_enabled
+            && self.current_tick % 6 == 0
+            && self.worlds.len() >= 2
+        {
+            let earth_idx = self.worlds.iter().position(|w| w.location == "Earth");
+            if let Some(ei) = earth_idx {
+                let earth_pop = self.worlds[ei].population();
+                if earth_pop > 100 {
+                    // Find off-world colonies below capacity
+                    let destinations: Vec<usize> = (0..self.worlds.len())
+                        .filter(|&i| {
+                            i != ei
+                                && self.worlds[i].population() < self.worlds[i].max_population
+                                && self.worlds[i].population() > 0
+                        })
+                        .collect();
+
+                    // Collect migration plans first, then execute
+                    let mut migration_plans: Vec<(Vec<u64>, usize, u32, String)> = Vec::new();
+
+                    for &dest_idx in &destinations {
+                        let max_mig = self.config.policy.migration_max_per_cycle.max(1) as u64;
+                        let n_migrants = (self.rng.next_u64() % max_mig + 1) as usize;
+                        let dest_id = self.worlds[dest_idx].id;
+                        let dest_name = self.worlds[dest_idx].name.clone();
+
+                        let migrant_ids: Vec<u64> = self.worlds[ei]
+                            .agents
+                            .iter()
+                            .filter(|a| {
+                                a.is_alive()
+                                    && a.life_stage(self.current_tick) == agent::LifeStage::Adult
+                            })
+                            .take(n_migrants)
+                            .map(|a| a.id)
+                            .collect();
+
+                        if !migrant_ids.is_empty() {
+                            migration_plans.push((migrant_ids, dest_idx, dest_id, dest_name));
+                        }
+                    }
+
+                    for (migrant_ids, dest_idx, dest_id, dest_name) in migration_plans {
+                        let mut migrants: Vec<CivAgent> = Vec::new();
+                        for mid in &migrant_ids {
+                            if let Some(agent) = self.worlds[ei]
+                                .agents
+                                .iter_mut()
+                                .find(|a| a.id == *mid)
+                            {
+                                let mut migrant = agent.clone();
+                                migrant.world_id = dest_id;
+                                migrant.is_immigrant = true;
+                                migrant.partner_id = None;
+                                migrant.death_tick = None;
+                                migrants.push(migrant);
+
+                                agent.death_tick = Some(self.current_tick);
+                            }
+                        }
+
+                        let moved = migrants.len();
+                        self.worlds[dest_idx].agents.extend(migrants);
+
+                        if moved > 0 {
+                            self.events.push(CivEvent::new(
+                                self.current_tick,
+                                Some(dest_id),
+                                CivEventType::Migration,
+                                format!(
+                                    "{} migrants arrived at {} from Earth",
+                                    moved, dest_name
+                                ),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
     }
 
     fn tick_knowledge(&mut self) {
-        // Phase 5: Education, skill growth, and technology advancement.
+        // Phase 6: Education, skill growth, and technology advancement.
         let tick = self.current_tick;
         for world in &mut self.worlds {
             for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
@@ -651,7 +739,11 @@ impl MultiWorldSimulator {
                 // increasing care_activation and meta_awareness growth by ~30%.
                 // This models the "consciousness maintenance" effect described in
                 // the astropharmacy resource catalog.
-                let pharma_boost = if world.infrastructure_level > 0.3 { 0.3 } else { 0.0 };
+                let pharma_boost = if world.infrastructure_level > 0.3 {
+                    self.config.policy.pharma_boost
+                } else {
+                    0.0
+                };
                 let amplifier = 1.0 + mean_edu * 0.5 + pharma_boost;
                 // Burnout caps consciousness growth (symthaea-psych-bench pattern).
                 let burnout_penalty = if agent.needs.is_burnout() { 0.35 } else { 1.0 };
@@ -800,6 +892,14 @@ impl MultiWorldSimulator {
     }
 
     fn tick_epoch_evaluation(&mut self) {
+        // Periodic snapshots every 60 ticks (5 years) for trajectory analysis
+        if self.current_tick % 60 == 0 && self.current_tick > 0 {
+            let snapshot = self
+                .epoch_manager
+                .take_snapshot(self.current_tick, &self.worlds);
+            self.epoch_snapshots.push(snapshot);
+        }
+
         // Evaluate epoch checkpoints
         let checkpoint_events = self.epoch_manager.evaluate_tick(self.current_tick, &self.worlds);
         self.events.extend(checkpoint_events);
@@ -925,7 +1025,12 @@ impl MultiWorldSimulator {
             let world_count = self.worlds.len();
             for i in 0..world_count {
                 let mut world = std::mem::take(&mut self.worlds[i]);
-                PopulationEngine::tick_pair_bonding(&mut world, &mut self.rng, self.current_tick);
+                PopulationEngine::tick_pair_bonding(
+                    &mut world,
+                    &mut self.rng,
+                    self.current_tick,
+                    self.config.policy.pair_bond_rate,
+                );
                 let dem_events =
                     PopulationEngine::tick_demographics(&mut world, &mut self.rng, self.current_tick);
                 phase1_events.extend(dem_events);
@@ -1254,5 +1359,72 @@ mod tests {
         assert!(summary.contains("VIABILITY COMPONENTS:"));
         assert!(summary.contains("KEY EVENTS:"));
         assert!(summary.contains("HARMONY SCORES"));
+    }
+
+    /// A/B comparison: education guild ON vs OFF.
+    ///
+    /// The thermodynamic hypothesis: communities with peer-to-peer education
+    /// should show lower allostatic load, higher consciousness, and better
+    /// survival rates than communities without it.
+    ///
+    /// Run 50 years (600 ticks) — enough for the education feedback loop to
+    /// manifest but fast enough for CI.
+    #[test]
+    fn test_education_guild_ab_comparison() {
+        // === Scenario A: Education enabled (guild model) ===
+        let mut config_a = SimulationConfig::default_150_year();
+        config_a.total_ticks = 600; // 50 years
+        config_a.seed = 42;
+        config_a.policy.education_enabled = true;
+
+        let mut sim_a = MultiWorldSimulator::new(config_a);
+        let report_a = sim_a.run();
+
+        // === Scenario B: Education disabled (1602 model — no peer teaching) ===
+        let mut config_b = SimulationConfig::default_150_year();
+        config_b.total_ticks = 600;
+        config_b.seed = 42; // Same seed for fair comparison
+        config_b.policy.education_enabled = false;
+
+        let mut sim_b = MultiWorldSimulator::new(config_b);
+        let report_b = sim_b.run();
+
+        // === Print comparison ===
+        eprintln!("\n=== EDUCATION GUILD A/B COMPARISON (50 years) ===");
+        eprintln!("                          WITH guild    WITHOUT guild");
+        eprintln!("Population:              {:>10}    {:>10}", report_a.final_population, report_b.final_population);
+        eprintln!("Survived:                {:>10}    {:>10}", report_a.survived, report_b.survived);
+        eprintln!("CVS (viability):         {:>10.3}    {:>10.3}", report_a.final_cvs, report_b.final_cvs);
+        eprintln!("Mean allostatic load:    {:>10.3}    {:>10.3}", report_a.final_mean_allostatic_load, report_b.final_mean_allostatic_load);
+        eprintln!("Collective Phi:          {:>10.3}    {:>10.3}", report_a.final_collective_phi, report_b.final_collective_phi);
+        eprintln!("Mean engagement:         {:>10.3}    {:>10.3}", report_a.final_mean_engagement, report_b.final_mean_engagement);
+        eprintln!("Breakthroughs:           {:>10}    {:>10}", report_a.breakthroughs, report_b.breakthroughs);
+        eprintln!("Checkpoints passed:      {:>10}    {:>10}", report_a.checkpoints_passed, report_b.checkpoints_passed);
+
+        // Count teaching events in scenario A
+        let teaching_events_a = sim_a.events.iter()
+            .filter(|e| matches!(e.event_type, CivEventType::TeachingInteraction))
+            .count();
+        let crisis_events_a = sim_a.events.iter()
+            .filter(|e| matches!(e.event_type, CivEventType::SkillCrisis))
+            .count();
+        let crisis_events_b = sim_b.events.iter()
+            .filter(|e| matches!(e.event_type, CivEventType::SkillCrisis))
+            .count();
+
+        eprintln!("Teaching events (A):     {:>10}", teaching_events_a);
+        eprintln!("Skill crises (A):        {:>10}    {:>10}", crisis_events_a, crisis_events_b);
+        eprintln!("================================================\n");
+
+        // === Assertions: the education guild should help ===
+        // Both should survive 50 years (this is a baseline sanity check)
+        assert!(report_a.final_population > 0, "Guild world should survive");
+        assert!(report_b.final_population > 0, "Control world should survive 50 years");
+
+        // The guild world should have peer teaching events
+        assert!(
+            teaching_events_a > 0,
+            "Education guild should produce teaching interactions"
+        );
     }
 }
