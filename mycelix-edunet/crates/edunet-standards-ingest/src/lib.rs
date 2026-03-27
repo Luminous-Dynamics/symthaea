@@ -25,4 +25,5 @@ pub mod bridge;
 pub mod client;
 pub mod converter;
 pub mod higher_ed_types;
+pub mod merge;
 pub mod sources;

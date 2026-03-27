@@ -1,0 +1,35 @@
+{
+  "title": "Cross-Level Learning Pathway Bridge",
+  "description": "Bridges 3 curriculum documents across 2 academic levels.",
+  "edges": [
+    {
+      "from": "SEP.4.3-5",
+      "to": "phd-physics/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 600,
+      "rationale": "General bridge: Grade 5 (K-12) → PhD in Physics (Doctoral)."
+    },
+    {
+      "from": "SEP.4.3-5",
+      "to": "phd-biology/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 600,
+      "rationale": "General bridge: Grade 5 (K-12) → PhD in Biological Sciences (Doctoral)."
+    }
+  ],
+  "statistics": {
+    "total_edges": 2,
+    "k12_to_undergrad": 0,
+    "undergrad_to_grad": 0,
+    "grad_to_phd": 0,
+    "levels_bridged": [
+      "K-12",
+      "Doctoral"
+    ],
+    "subjects_bridged": [
+      "Physics",
+      "Science",
+      "Biological Sciences"
+    ]
+  }
+}

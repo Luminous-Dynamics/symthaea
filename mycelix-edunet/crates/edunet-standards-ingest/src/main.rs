@@ -135,6 +135,22 @@ enum Commands {
         #[arg(long, short = 'o')]
         output: Option<PathBuf>,
     },
+
+    /// Merge multiple curriculum documents + bridge files into a unified graph
+    ///
+    /// Combines all nodes, edges, and bridge connections into a single
+    /// CurriculumDocument — the Lifelong Epistemic Path.
+    Merge {
+        /// Curriculum JSON files to merge
+        #[arg(required = true, num_args = 1..)]
+        files: Vec<PathBuf>,
+        /// Bridge JSON files to include (from the 'bridge' command)
+        #[arg(long, short = 'b')]
+        bridges: Vec<PathBuf>,
+        /// Output file path (default: stdout)
+        #[arg(long, short = 'o')]
+        output: Option<PathBuf>,
+    },
 }
 
 #[tokio::main]
@@ -414,6 +430,66 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if let Some(path) = output {
                 std::fs::write(&path, &json)?;
                 eprintln!("\nWrote bridge to {}", path.display());
+            } else {
+                println!("{json}");
+            }
+        }
+
+        // ============================================================
+        // Merge (Unified Graph)
+        // ============================================================
+        Commands::Merge {
+            files,
+            bridges,
+            output,
+        } => {
+            eprintln!("Loading {} curriculum files...", files.len());
+            let mut documents = Vec::new();
+            for path in &files {
+                let content = std::fs::read_to_string(path)?;
+                let doc: converter::CurriculumDocument = serde_json::from_str(&content)?;
+                eprintln!(
+                    "  {} — {} ({}, {} nodes)",
+                    path.display(),
+                    doc.metadata.title,
+                    doc.metadata.grade_level,
+                    doc.nodes.len()
+                );
+                documents.push(doc);
+            }
+
+            let mut bridge_docs = Vec::new();
+            if !bridges.is_empty() {
+                eprintln!("Loading {} bridge files...", bridges.len());
+                for path in &bridges {
+                    let content = std::fs::read_to_string(path)?;
+                    let bridge: edunet_standards_ingest::bridge::BridgeDocument =
+                        serde_json::from_str(&content)?;
+                    eprintln!(
+                        "  {} — {} edges",
+                        path.display(),
+                        bridge.edges.len()
+                    );
+                    bridge_docs.push(bridge);
+                }
+            }
+
+            let (merged, stats) =
+                edunet_standards_ingest::merge::merge_documents(&documents, &bridge_docs);
+
+            eprintln!("\nMerged graph:");
+            eprintln!("  Nodes: {}", stats.total_nodes);
+            eprintln!("  Edges: {}", stats.total_edges);
+            eprintln!("  Sources: {}", stats.sources_merged);
+            eprintln!("  Bridge edges: {}", stats.bridge_edges_added);
+            eprintln!("  Duplicates skipped: {}", stats.duplicate_nodes_skipped);
+            eprintln!("  Levels: {:?}", stats.levels);
+            eprintln!("  Subjects: {:?}", stats.subjects);
+
+            let json = serde_json::to_string_pretty(&merged)?;
+            if let Some(path) = output {
+                std::fs::write(&path, &json)?;
+                eprintln!("\nWrote unified graph to {}", path.display());
             } else {
                 println!("{json}");
             }

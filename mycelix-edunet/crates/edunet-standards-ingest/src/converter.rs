@@ -84,7 +84,7 @@ pub struct CurriculumNode {
 }
 
 /// Academic standard reference within a node.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AcademicStandardRef {
     pub framework: String,
     pub code: String,

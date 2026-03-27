@@ -21,10 +21,10 @@
 //! ordering to ensure edges flow from lower to higher cognitive complexity.
 
 use crate::converter::{CurriculumDocument, CurriculumEdge, CurriculumNode};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// A cross-level bridge document containing only the connecting edges.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct BridgeDocument {
     pub title: String,
     pub description: String,
@@ -33,7 +33,7 @@ pub struct BridgeDocument {
 }
 
 /// Statistics about the generated bridge.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct BridgeStatistics {
     pub total_edges: usize,
     pub k12_to_undergrad: usize,
@@ -112,6 +112,10 @@ pub fn generate_bridge(documents: &[CurriculumDocument]) -> BridgeDocument {
             for _edge in &edges {
                 match (level_a, level_b) {
                     (Level::K12, Level::Undergraduate) => k12_to_undergrad += 1,
+                    (Level::K12, Level::Graduate) | (Level::K12, Level::Doctoral) => {
+                        // Skip-level: count as K-12→undergrad for simplicity
+                        k12_to_undergrad += 1;
+                    }
                     (Level::Undergraduate, Level::Graduate) => undergrad_to_grad += 1,
                     (Level::Graduate, Level::Doctoral) | (Level::Undergraduate, Level::Doctoral) => {
                         grad_to_phd += 1
@@ -156,11 +160,13 @@ pub fn generate_bridge(documents: &[CurriculumDocument]) -> BridgeDocument {
     }
 }
 
-/// Check if two levels are adjacent in the progression.
+/// Check if two levels can be bridged (adjacent or skip-level).
 fn are_adjacent(a: &Level, b: &Level) -> bool {
     matches!(
         (a, b),
         (Level::K12, Level::Undergraduate)
+            | (Level::K12, Level::Graduate)
+            | (Level::K12, Level::Doctoral)
             | (Level::Undergraduate, Level::Graduate)
             | (Level::Undergraduate, Level::Doctoral)
             | (Level::Graduate, Level::Doctoral)
