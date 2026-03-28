@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Link, NavLink } from 'react-router-dom';
 import './App.css';
@@ -8,6 +11,7 @@ import './styles/toast.css';
 const CoursesPage = lazy(() => import('./pages/CoursesPage').then(m => ({ default: m.CoursesPage })));
 const FLRoundsPage = lazy(() => import('./pages/FLRoundsPage').then(m => ({ default: m.FLRoundsPage })));
 const CredentialsPage = lazy(() => import('./pages/CredentialsPage').then(m => ({ default: m.CredentialsPage })));
+const CurriculumExplorer = lazy(() => import('./pages/CurriculumExplorer'));
 
 // Components
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -61,6 +65,12 @@ function HomePage() {
           title="My Credentials"
           description="View and share your verifiable achievements"
           link="/credentials"
+        />
+        <FeatureCard
+          icon="🗺️"
+          title="Curriculum Explorer"
+          description="Interactive K-through-PhD knowledge graph with 1,718 nodes and career pathways"
+          link="/curriculum"
         />
       </div>
 
@@ -212,6 +222,9 @@ function NavBar() {
           <NavLink to="/credentials" style={navLinkStyle}>
             Credentials
           </NavLink>
+          <NavLink to="/curriculum" style={navLinkStyle}>
+            Curriculum
+          </NavLink>
 
           {/* Connection Status */}
           <div
@@ -292,6 +305,7 @@ function App() {
                   <Route path="/courses" element={<CoursesPage />} />
                   <Route path="/rounds" element={<FLRoundsPage />} />
                   <Route path="/credentials" element={<CredentialsPage />} />
+                  <Route path="/curriculum" element={<CurriculumExplorer />} />
                 </Routes>
               </Suspense>
             </main>

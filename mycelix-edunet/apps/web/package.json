@@ -16,6 +16,7 @@
     "@holochain/client": "^0.20.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "cytoscape": "^3.30.0",
     "react-router-dom": "^6.20.0"
   },
   "devDependencies": {
