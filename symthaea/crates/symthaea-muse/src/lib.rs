@@ -29,6 +29,7 @@
 
 #![deny(unsafe_code)]
 
+pub mod ablation;
 pub mod audio_feedback;
 pub mod binaural;
 pub mod choreography;
@@ -54,9 +55,13 @@ pub mod sidechain;
 pub mod structure;
 pub mod substrate_timbre;
 pub mod synth;
+pub mod synesthesia;
+pub mod temporal_hierarchy;
 pub mod timbre_space;
 pub mod voice;
 pub mod wavetable;
+pub mod mixing;
+pub mod percussion;
 pub mod consciousness_reverb;
 
 use serde::{Deserialize, Serialize};

@@ -14,6 +14,7 @@
 use crate::audio_feedback::AudioFeedbackEncoder;
 use crate::binaural::BinauralConsciousnessRenderer;
 use crate::consciousness_reverb::ConsciousnessReverb;
+use crate::musical_inference::MusicalInferenceEngine;
 use crate::phi_optimizer::{PhiOptimizer, PhiTarget};
 use crate::sidechain::DuckingMatrix;
 use crate::stream::MuseStream;
@@ -75,6 +76,10 @@ pub struct StreamingSynth {
     phi_optimizer: PhiOptimizer,
     wavetable_bank: WavetableBank,
     substrate: Option<SubstrateTimbreModifier>,
+    /// FEP active inference engine for music (the system predicts its own sound).
+    fep_engine: MusicalInferenceEngine,
+    /// Free energy history for learning verification.
+    fe_history: Vec<f64>,
     /// Audio feedback strength [0, 1]. 0 = open loop, 1 = full strange loop.
     pub feedback_strength: f32,
     /// Enable binaural rendering (vs simple pan law).
@@ -83,6 +88,8 @@ pub struct StreamingSynth {
     pub enable_sidechain: bool,
     /// Enable Phi optimization.
     pub enable_phi_optimizer: bool,
+    /// Enable FEP active inference (generative model of own audio).
+    pub enable_fep: bool,
 }
 
 impl StreamingSynth {
@@ -107,10 +114,13 @@ impl StreamingSynth {
             phi_optimizer: PhiOptimizer::new(PhiTarget::Maximize),
             wavetable_bank: WavetableBank::default_bank(),
             substrate: None,
+            fep_engine: MusicalInferenceEngine::new(),
+            fe_history: Vec::with_capacity(1024),
             feedback_strength: 0.3,
             enable_binaural: true,
             enable_sidechain: true,
             enable_phi_optimizer: false,
+            enable_fep: true,
         }
     }
 
@@ -233,9 +243,12 @@ impl StreamingSynth {
                     s
                 };
 
-                // Arousal-modulated master gain: 0.08 (calm) → 0.25 (excited)
-                let master_gain = 0.08 + self.state.arousal.clamp(0.0, 1.0) * 0.17;
-                voice_buffers[voice][i] += sample * env * active.note.velocity * active.volume * master_gain;
+                // Arousal-modulated master gain: 0.05 (calm) → 0.35 (excited)
+                // + velocity boost from arousal (excited states hit harder)
+                let arousal = self.state.arousal.clamp(0.0, 1.0);
+                let master_gain = 0.05 + arousal * 0.30;
+                let velocity_boost = 1.0 + arousal * 0.5; // 1.0x calm → 1.5x excited
+                voice_buffers[voice][i] += sample * env * (active.note.velocity * velocity_boost).min(1.0) * active.volume * master_gain;
                 active.sample_pos += 1;
             }
         }
@@ -279,6 +292,20 @@ impl StreamingSynth {
         if self.feedback_strength > 0.0 {
             self.feedback.extract(&buffer, self.sample_rate);
             let features = *self.feedback.smoothed_features();
+
+            // ── Phase 5b: FEP Active Inference ──
+            // The system observes its own audio, updates beliefs about what it sounds
+            // like, and selects actions to minimize free energy (surprise).
+            if self.enable_fep {
+                let result = self.fep_engine.infer(&features);
+                self.fep_engine.apply_action(&result, &mut self.state);
+
+                // Track free energy for learning verification
+                if self.fe_history.len() < 10000 {
+                    self.fe_history.push(result.free_energy);
+                }
+            }
+
             features.modulate_state(&mut self.state, self.feedback_strength);
         }
 
@@ -294,7 +321,10 @@ impl StreamingSynth {
         let release_samples = (rel * sr) as usize;
         let psi = self.state.consciousness_level;
 
-        for _ in 0..4 {
+        // Phi-gated polyphony: higher consciousness = more simultaneous voices
+        // Psi < 0.3 → 1 note, Psi 0.3-0.5 → 2, Psi 0.5-0.7 → 3, Psi > 0.7 → 4
+        let max_new = if psi > 0.7 { 4 } else if psi > 0.5 { 3 } else if psi > 0.3 { 2 } else { 1 };
+        for _ in 0..max_new {
             if self.active_notes.len() >= MAX_ACTIVE_NOTES { break; }
             if let Some(note) = self.muse_stream.next_note() {
                 let idx = self.active_notes.len();
@@ -333,8 +363,26 @@ impl StreamingSynth {
     pub fn feedback_features(&self) -> &crate::audio_feedback::AudioFeatures {
         self.feedback.smoothed_features()
     }
+    /// Current free energy from the FEP agent (lower = better self-model).
+    pub fn current_free_energy(&self) -> f64 {
+        self.fep_engine.current_free_energy()
+    }
+    /// Free energy history for learning curve analysis.
+    pub fn free_energy_history(&self) -> &[f64] {
+        &self.fe_history
+    }
+    /// FEP inference cycle count.
+    pub fn fep_cycles(&self) -> u64 {
+        self.fep_engine.cycle_count()
+    }
+    /// Last FEP inference result.
+    pub fn last_fep_result(&self) -> Option<&crate::musical_inference::MusicInferenceResult> {
+        self.fep_engine.last_result()
+    }
 
     pub fn reset(&mut self, seed: u64) {
+        self.fep_engine = MusicalInferenceEngine::new();
+        self.fe_history.clear();
         self.muse_stream.reset(seed);
         self.active_notes.clear();
         self.total_samples_rendered = 0;
@@ -433,7 +481,76 @@ mod tests {
         s.update_state(&MusicalState { consciousness_level: 0.8, ..Default::default() });
         s.set_substrate(SubstrateTimbreType::Quantum);
         assert!(s.substrate.is_some());
-        // Should render without panic
         for _ in 0..10 { s.render_chunk(); }
+    }
+
+    #[test]
+    fn fep_runs_live_in_pipeline() {
+        let mut s = StreamingSynth::new(cfg(), 44100);
+        s.enable_fep = true;
+        s.feedback_strength = 0.5;
+        s.update_state(&MusicalState { consciousness_level: 0.7, ..Default::default() });
+
+        for _ in 0..50 { s.render_chunk(); }
+
+        assert!(s.fep_cycles() > 0, "FEP should have run cycles");
+        assert!(!s.free_energy_history().is_empty(), "FE history should be recorded");
+    }
+
+    #[test]
+    fn fep_free_energy_is_finite() {
+        let mut s = StreamingSynth::new(cfg(), 44100);
+        s.enable_fep = true;
+        s.feedback_strength = 1.0;
+        s.update_state(&MusicalState {
+            consciousness_level: 0.8, arousal: 0.6,
+            harmony_activations: [0.7, 0.5, 0.6, 0.4, 0.3, 0.5, 0.6, 0.3],
+            ..Default::default()
+        });
+
+        for _ in 0..200 {
+            let chunk = s.render_chunk();
+            for pair in &chunk {
+                assert!(pair[0].is_finite() && pair[1].is_finite());
+            }
+        }
+
+        // All FE values should be finite
+        for &fe in s.free_energy_history() {
+            assert!(fe.is_finite(), "free energy should be finite: {fe}");
+        }
+    }
+
+    #[test]
+    fn fep_learning_curve() {
+        // Run 500 cycles with consistent input.
+        // The FEP agent should learn to predict its own audio,
+        // meaning late free energy should be no worse than early.
+        let mut s = StreamingSynth::new(cfg(), 44100);
+        s.enable_fep = true;
+        s.feedback_strength = 0.5;
+        s.update_state(&MusicalState {
+            consciousness_level: 0.7, arousal: 0.4,
+            harmony_activations: [0.6, 0.5, 0.4, 0.3, 0.5, 0.6, 0.4, 0.5],
+            ..Default::default()
+        });
+
+        for _ in 0..500 { s.render_chunk(); }
+
+        let history = s.free_energy_history();
+        assert!(history.len() >= 100, "need enough data points");
+
+        // Compare early vs late average FE
+        let early: f64 = history[..20].iter().sum::<f64>() / 20.0;
+        let late: f64 = history[history.len()-20..].iter().sum::<f64>() / 20.0;
+
+        eprintln!("  FEP learning: early_FE={early:.4}, late_FE={late:.4}, delta={:.4}", early - late);
+
+        // Late FE should not be dramatically worse than early
+        // (with learning, it should improve or stabilize)
+        assert!(
+            late < early + 0.5,
+            "FE should not diverge: early={early:.4}, late={late:.4}"
+        );
     }
 }
