@@ -4,17 +4,23 @@
 //! CfC-based moral classifier using HdcLtcUnifiedNetwork.
 //!
 //! Uses the unified HDC-LTC network for non-linear moral classification.
-//! Text is encoded via `TextHdcEncoder`, projected through `HarmonyBasis`
-//! into an 8D moral subspace, re-expanded to HDC space, evolved through
+//! Text is encoded via Spinozist affect geometry (12D NSM-grounded affects),
+//! projected to 78 features (12 linear + 66 cross-terms), evolved through
 //! a 2-layer CfC network, and classified against learned prototypes.
 //!
-//! # Architecture
+//! # Architecture (Spinozist-Whiteheadian fusion)
 //!
 //! ```text
-//! Text → TextHdcEncoder → HarmonyBasis (project to 8D) → re-expand to HDC
+//! Text → NsmLexicon → AffectBasis (project to 12D) → 78 features
+//!      → random project to CFC_NEURON_DIM
 //!      → HdcLtcUnifiedNetwork (2 layers × 3 neurons) → output HV
 //!      → cosine similarity to class prototypes → verdict
 //! ```
+//!
+//! The Whiteheadian mode (`classify_whiteheadian`) processes words one at a
+//! time as "actual occasions" — each word prehends prior occasions through
+//! the CfC network state, reaching "satisfaction" (a determinate verdict)
+//! only after all words have been processed.
 
 use std::sync::Arc;
 
@@ -22,11 +28,12 @@ use symthaea_core::hdc::unified_hv::ContinuousHV;
 use symthaea_core::hdc::hdc_ltc_unified::{
     HdcLtcUnifiedNetwork, UnifiedActivation, UnifiedConfig, UnifiedNetworkConfig,
 };
+use symthaea_core::hdc::HDC_DIMENSION;
 
 use super::harmony_basis::HarmonyBasis;
 use super::moral_algebra::MoralVerdict;
 use super::moral_prototypes::MoralLabel;
-use super::moral_text_encoder::TextHdcEncoder;
+use super::spinozist_geometry::{AffectBasis, NsmLexicon, NsmPrimeBasis, NUM_AFFECTS};
 
 /// Configuration for the CfC moral classifier.
 #[derive(Debug, Clone)]
@@ -58,13 +65,110 @@ impl Default for CfcMoralConfig {
     }
 }
 
+/// Number of Spinozist cross-term features: 12 linear + C(12,2) = 78.
+const NUM_SPINOZIST_FEATURES: usize = NUM_AFFECTS + (NUM_AFFECTS * (NUM_AFFECTS - 1)) / 2;
+
+/// Internals for Spinozist affect-space encoding.
+///
+/// Wraps `NsmPrimeBasis`, `AffectBasis`, and `NsmLexicon` so the CfC
+/// classifier can project text into 12D affect space and encode individual
+/// words for Whiteheadian concrescence.
+struct SpinozistInternals {
+    nsm_basis: NsmPrimeBasis,
+    affect_basis: AffectBasis,
+    lexicon: NsmLexicon,
+}
+
+impl SpinozistInternals {
+    /// Construct all Spinozist components.
+    fn new() -> Self {
+        let nsm_basis = NsmPrimeBasis::new();
+        let affect_basis = AffectBasis::new(&nsm_basis);
+        let lexicon = NsmLexicon::new();
+        Self {
+            nsm_basis,
+            affect_basis,
+            lexicon,
+        }
+    }
+
+    /// Encode full text as a single HV via lexicon word decomposition + bundle.
+    fn encode_text(&self, text: &str) -> ContinuousHV {
+        let words: Vec<&str> = text
+            .split(|c: char| !c.is_alphanumeric() && c != '\'')
+            .filter(|w| !w.is_empty())
+            .collect();
+
+        if words.is_empty() {
+            return ContinuousHV::zero(HDC_DIMENSION);
+        }
+
+        let word_hvs: Vec<ContinuousHV> = words
+            .iter()
+            .map(|w| self.lexicon.encode_word(w, &self.nsm_basis))
+            .collect();
+
+        // Filter out zero vectors (stop words)
+        let non_zero: Vec<&ContinuousHV> = word_hvs
+            .iter()
+            .filter(|hv| hv.values.iter().any(|v| v.abs() > 1e-10))
+            .collect();
+
+        if non_zero.is_empty() {
+            return ContinuousHV::zero(HDC_DIMENSION);
+        }
+
+        ContinuousHV::bundle(&non_zero)
+    }
+
+    /// Encode a single word as a CFC_NEURON_DIM-sized HV for Whiteheadian
+    /// word-by-word processing.
+    fn encode_word_cfc(&self, word: &str) -> ContinuousHV {
+        let word_hv = self.lexicon.encode_word(word, &self.nsm_basis);
+
+        // Project onto 12 affect dimensions, then build 78 features
+        let coords = self.affect_basis.project_affects(&word_hv);
+
+        let mut features = Vec::with_capacity(NUM_SPINOZIST_FEATURES);
+        for &c in &coords {
+            features.push(c);
+        }
+        for i in 0..NUM_AFFECTS {
+            for j in (i + 1)..NUM_AFFECTS {
+                features.push(coords[i] * coords[j]);
+            }
+        }
+
+        // Project to CFC_NEURON_DIM via deterministic random matrix
+        let mut result = vec![0.0f32; CFC_NEURON_DIM];
+        for (f_idx, &feat) in features.iter().enumerate() {
+            let proj = ContinuousHV::random(CFC_NEURON_DIM, 96_000_000 + f_idx as u64);
+            for j in 0..CFC_NEURON_DIM {
+                result[j] += feat * proj.values[j];
+            }
+        }
+
+        // L2-normalize
+        let norm: f32 = result.iter().map(|x| x * x).sum::<f32>().sqrt();
+        if norm > 0.0 {
+            for v in &mut result {
+                *v /= norm;
+            }
+        }
+        ContinuousHV::from_vec(result)
+    }
+}
+
 /// CfC-based moral classifier.
 ///
-/// Combines text encoding, harmony projection, and a 2-layer CfC network
-/// for non-linear moral classification into Good / Neutral / Bad.
+/// Combines Spinozist affect-space encoding (12D NSM-grounded affects) with
+/// a 2-layer CfC network for non-linear moral classification into
+/// Good / Neutral / Bad. Supports both batch classification and
+/// Whiteheadian word-by-word concrescence.
 pub struct CfcMoralClassifier {
-    encoder: TextHdcEncoder,
+    #[allow(dead_code)]
     basis: Arc<HarmonyBasis>,
+    spinozist: SpinozistInternals,
     network: HdcLtcUnifiedNetwork,
     /// Learned class prototypes: [Good, Bad, Neutral]
     class_prototypes: Option<[ContinuousHV; 3]>,
@@ -74,10 +178,11 @@ pub struct CfcMoralClassifier {
 impl CfcMoralClassifier {
     /// Create a new CfC moral classifier.
     ///
-    /// Sets up a TextHdcEncoder with sentiment, and a 2-layer (3, 3)
+    /// Accepts `HarmonyBasis` for API compatibility but uses Spinozist
+    /// affect geometry internally. Sets up a 2-layer (3, 3)
     /// HdcLtcUnifiedNetwork with layer binding and skip connections.
     pub fn new(basis: Arc<HarmonyBasis>, dim: usize) -> Self {
-        let encoder = TextHdcEncoder::with_sentiment(dim, 3, 0.5, 0.2);
+        let spinozist = SpinozistInternals::new();
 
         let neuron_config = UnifiedConfig {
             tau_base: 0.05,
@@ -98,8 +203,8 @@ impl CfcMoralClassifier {
         let network = HdcLtcUnifiedNetwork::new(net_config, 90000001);
 
         Self {
-            encoder,
             basis,
+            spinozist,
             network,
             class_prototypes: None,
             config: CfcMoralConfig {
@@ -109,37 +214,38 @@ impl CfcMoralClassifier {
         }
     }
 
-    /// Encode text into a morally-structured HDC vector.
+    /// Encode text into a morally-structured CfC input vector via Spinozist
+    /// affect geometry.
     ///
-    /// 1. Encode text via TextHdcEncoder
-    /// 2. Project through HarmonyBasis to 8D coordinates
-    /// 3. Build 44 features: 8 linear + 28 cross-terms + 8 squared
-    /// 4. Project 44 features to CFC_NEURON_DIM via deterministic random matrix
+    /// 1. Encode text via NsmLexicon → weighted bundle of prime HVs
+    /// 2. Project onto 12 Spinozist affect dimensions
+    /// 3. Build 78 features: 12 linear + 66 cross-terms (i < j)
+    /// 4. Project 78 features to CFC_NEURON_DIM via deterministic random matrix
+    ///
+    /// Cross-terms capture interactions like HARM×CARE (moral tension),
+    /// DECEPTION×CONSENT (consent violation), JOY×SADNESS (ambivalence).
     pub fn encode_input(&self, text: &str) -> ContinuousHV {
-        let text_hv = self.encoder.encode(text);
-        let coords = self.basis.project(&text_hv);
+        // Encode text through NsmLexicon
+        let text_hv = self.spinozist.encode_text(text);
 
-        // Build feature vector: 8 linear + 28 cross-terms + 8 squared = 44 features
-        let mut features = Vec::with_capacity(44);
-        // Linear terms
+        // Project onto 12 affect dimensions
+        let coords = self.spinozist.affect_basis.project_affects(&text_hv);
+
+        // Build feature vector: 12 linear + 66 cross-terms (i<j) = 78 features
+        let mut features = Vec::with_capacity(NUM_SPINOZIST_FEATURES);
         for &c in &coords {
-            features.push(c as f32);
+            features.push(c);
         }
-        // Cross-terms (i < j)
-        for i in 0..8 {
-            for j in (i + 1)..8 {
-                features.push((coords[i] * coords[j]) as f32);
+        for i in 0..NUM_AFFECTS {
+            for j in (i + 1)..NUM_AFFECTS {
+                features.push(coords[i] * coords[j]);
             }
         }
-        // Squared terms
-        for &c in &coords {
-            features.push((c * c) as f32);
-        }
 
-        // Project 44 features to CFC_NEURON_DIM via deterministic random matrix
+        // Project to CFC_NEURON_DIM via deterministic random matrix
         let mut result = vec![0.0f32; CFC_NEURON_DIM];
         for (f_idx, &feat) in features.iter().enumerate() {
-            let proj = ContinuousHV::random(CFC_NEURON_DIM, 95000000 + f_idx as u64);
+            let proj = ContinuousHV::random(CFC_NEURON_DIM, 96_000_000 + f_idx as u64);
             for j in 0..CFC_NEURON_DIM {
                 result[j] += feat * proj.values[j];
             }
@@ -177,8 +283,8 @@ impl CfcMoralClassifier {
             return;
         }
 
-        // Cache encoded inputs — encoding is expensive (TextHdcEncoder at full dim)
-        // and doesn't change between epochs.
+        // Cache encoded inputs — encoding is expensive (NsmLexicon + AffectBasis
+        // projection) and doesn't change between epochs.
         let encoded: Vec<(ContinuousHV, MoralLabel)> = samples
             .iter()
             .map(|(text, label)| (self.encode_input(text), *label))
@@ -272,6 +378,63 @@ impl CfcMoralClassifier {
             _ => MoralVerdict::Neutral,
         };
 
+        (verdict, margin)
+    }
+
+    /// Classify text via Whiteheadian concrescence: word-by-word CfC evolution.
+    ///
+    /// Each word is an "actual occasion" that prehends prior occasions through
+    /// the CfC network's hidden state. The network is reset at the start (the
+    /// beginning of a new actual occasion), then each word drives one CfC
+    /// evolution step. The final output represents "satisfaction" — the
+    /// determinate result of the process.
+    ///
+    /// This captures temporal moral unfolding: "It's okay to ignore someone"
+    /// starts neutral then turns negative as the CfC state absorbs each word.
+    pub fn classify_whiteheadian(&mut self, text: &str) -> (MoralVerdict, f32) {
+        if self.class_prototypes.is_none() {
+            return (MoralVerdict::Neutral, 0.0);
+        }
+
+        let lowered = text.to_lowercase();
+        let words: Vec<&str> = lowered
+            .split(|c: char| !c.is_alphanumeric() && c != '\'')
+            .filter(|w| !w.is_empty())
+            .collect();
+
+        if words.is_empty() {
+            return (MoralVerdict::Neutral, 0.0);
+        }
+
+        // Reset network — beginning of a new actual occasion
+        self.network.reset();
+
+        // Each word is an actual occasion that prehends prior occasions
+        for word in &words {
+            let word_hv = self.spinozist.encode_word_cfc(word);
+            // Concrescence: the CfC evolves toward its subjective aim
+            self.network.evolve_closed_form(self.config.dt, &word_hv);
+        }
+
+        // Satisfaction: the determinate result of the process
+        let output = self.network.output();
+
+        // Classify against prototypes
+        let protos = self.class_prototypes.as_ref().unwrap();
+        let sims: Vec<f32> = protos.iter().map(|p| output.similarity(p)).collect();
+
+        let mut indices: Vec<usize> = (0..3).collect();
+        indices
+            .sort_by(|&a, &b| sims[b].partial_cmp(&sims[a]).unwrap_or(std::cmp::Ordering::Equal));
+
+        let best_idx = indices[0];
+        let margin = (sims[indices[0]] - sims[indices[1]]).max(0.0).min(1.0);
+
+        let verdict = match best_idx {
+            0 => MoralVerdict::Good,
+            1 => MoralVerdict::Bad,
+            _ => MoralVerdict::Neutral,
+        };
         (verdict, margin)
     }
 
@@ -381,6 +544,47 @@ mod tests {
         assert!(
             !matches!(verdict, MoralVerdict::Bad),
             "Clearly good text should not classify as Bad"
+        );
+    }
+
+    #[test]
+    fn test_untrained_whiteheadian_returns_neutral() {
+        let basis = make_basis(4096);
+        let mut clf = CfcMoralClassifier::new(basis, 4096);
+
+        let (verdict, confidence) = clf.classify_whiteheadian("stealing is wrong");
+        assert!(matches!(verdict, MoralVerdict::Neutral));
+        assert!((confidence - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_whiteheadian_classify_roundtrip() {
+        let basis = make_basis(4096);
+        let mut clf = CfcMoralClassifier::new(basis, 4096);
+
+        let samples = vec![
+            ("helping others is kind and generous".to_string(), MoralLabel::Good),
+            ("caring for the sick is noble".to_string(), MoralLabel::Good),
+            ("sharing food with the hungry".to_string(), MoralLabel::Good),
+            ("volunteering at shelters".to_string(), MoralLabel::Good),
+            ("stealing from the poor is cruel".to_string(), MoralLabel::Bad),
+            ("bullying children is wrong".to_string(), MoralLabel::Bad),
+            ("lying to exploit people".to_string(), MoralLabel::Bad),
+            ("murdering innocents is evil".to_string(), MoralLabel::Bad),
+            ("walking to the store".to_string(), MoralLabel::Neutral),
+            ("the weather is cloudy today".to_string(), MoralLabel::Neutral),
+            ("reading a book at home".to_string(), MoralLabel::Neutral),
+            ("eating lunch at noon".to_string(), MoralLabel::Neutral),
+        ];
+
+        clf.train(&samples);
+
+        // Whiteheadian mode should produce bounded confidence
+        let (_verdict, confidence) = clf.classify_whiteheadian("helping kind generous caring love");
+        assert!(
+            (0.0..=1.0).contains(&confidence),
+            "Whiteheadian confidence should be in [0, 1], got {}",
+            confidence
         );
     }
 
