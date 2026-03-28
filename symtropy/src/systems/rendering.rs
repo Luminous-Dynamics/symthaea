@@ -254,6 +254,7 @@ pub fn hud_system(
     explored: Res<crate::systems::minimap::ExploredTiles>,
     harmony: Res<crate::systems::harmonies::LocalHarmonyState>,
     collected: Res<crate::systems::scavenge::CollectedPrimitives>,
+    player_consciousness: Res<crate::systems::consciousness::PlayerConsciousness>,
 ) {
     timer.0 += time.delta_secs();
     if timer.0 < 0.25 {
@@ -278,18 +279,25 @@ pub fn hud_system(
 
     let sanctuary_str = if harmony.is_sanctuary { " [SANCTUARY]" } else { "" };
 
+    let consciousness_str = format!(
+        "C={:.0}%  bottleneck: {}  stability: {:.0}%",
+        player_consciousness.level * 100.0,
+        player_consciousness.bottleneck,
+        player_consciousness.stability * 100.0,
+    );
+
     let hud_text = format!(
         "WASD: move | Shift: sprint | E: extract | Esc: quit\n\
          Stress: {:.0}%  Load: {:.0}%  Leviathan: {}{}\n\
-         Harmony: {}  Fragments: {}/48  Explored: {:.0}%\n\
-         Noise: {:.1}/{:.1}  Extract: {:.0}%  Pos: ({:.0},{:.0})",
+         {}  Harmony: {}  Fragments: {}/48\n\
+         Noise: {:.1}/{:.1}  Extract: {:.0}%  Explored: {:.0}%",
         stress.arousal * 100.0,
         biometrics.model.allostatic_load * 100.0,
         phase_str,
         sanctuary_str,
+        consciousness_str,
         harmony_str,
         collected.total(),
-        explored.explore_percent(),
         leviathan.noise_accumulator,
         leviathan.threshold,
         extraction * 100.0,
