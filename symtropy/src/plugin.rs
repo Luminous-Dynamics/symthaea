@@ -29,10 +29,12 @@ impl Plugin for SymtropyPlugin {
             // Dark background — the void outside the Markov blanket
             .insert_resource(ClearColor(Color::srgb(0.02, 0.02, 0.04)))
             .init_resource::<FrameCounter>()
+            .init_resource::<systems::minimap::ExploredTiles>()
             // Startup systems
             .add_systems(Startup, (
                 systems::rendering::setup_world,
                 systems::audio::setup_audio,
+                systems::minimap::setup_minimap,
             ))
             // Core gameplay systems (input → player → NPC AI)
             .add_systems(
@@ -82,6 +84,7 @@ impl Plugin for SymtropyPlugin {
                     systems::rendering::visual_stress_system,
                     systems::rendering::leviathan_visual_system,
                     systems::rendering::hud_system,
+                    systems::minimap::update_minimap,
                 )
                     .chain()
                     .run_if(in_state(GamePhase::Playing)),

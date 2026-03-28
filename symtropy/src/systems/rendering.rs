@@ -77,8 +77,15 @@ fn level_map() -> Vec<Vec<u8>> {
 
 /// Spawn the camera, level, player, NPCs, fusion core, and Leviathan.
 pub fn setup_world(mut commands: Commands) {
-    // Camera (TODO: add Bloom + ChromaticAberration when bevy_post_process features stabilize)
-    commands.spawn((Camera2d, Transform::from_xyz(0.0, 0.0, 999.0)));
+    // Camera with consciousness-driven post-processing
+    commands.spawn((
+        Camera2d,
+        Transform::from_xyz(0.0, 0.0, 999.0),
+        bevy::post_process::bloom::Bloom {
+            intensity: 0.15,
+            ..default()
+        },
+    ));
 
     let map = level_map();
     let rows = map.len() as i32;
@@ -255,6 +262,7 @@ pub fn hud_system(
     gov: Res<GovernanceState>,
     proposal: Res<ActiveProposal>,
     gov_log: Res<GovernanceLog>,
+    explored: Res<crate::systems::minimap::ExploredTiles>,
 ) {
     timer.0 += time.delta_secs();
     if timer.0 < 0.25 {
@@ -321,7 +329,7 @@ pub fn hud_system(
         "WASD: move | E: extract | T: TEND exchange | Esc: quit\n\
          Stress: {:.0}%  Load: {:.0}%  Leviathan: {}\n\
          Phi: {:.2}  TEND: {}  Oppression: {} ({:.0}%)  Stability: {:.0}%\n\
-         Noise: {:.1}/{:.1}  Extract: {:.0}%  Pos: ({:.0},{:.0})\n\
+         Noise: {:.1}/{:.1}  Extract: {:.0}%  Explored: {:.0}%  Pos: ({:.0},{:.0})\n\
          {}\n\
          {}",
         stress.arousal * 100.0,
@@ -335,6 +343,7 @@ pub fn hud_system(
         leviathan.noise_accumulator,
         leviathan.threshold,
         extraction * 100.0,
+        explored.explore_percent(),
         player_pos.x,
         player_pos.y,
         proposal_str,
