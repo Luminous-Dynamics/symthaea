@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Circles Integrity Zome
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Circles Integrity Zome
 //! Defines entry types and validation for care circles and membership.
 
 use hdi::prelude::*;

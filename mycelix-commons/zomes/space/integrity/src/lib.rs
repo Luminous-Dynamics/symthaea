@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Space Integrity Zome
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Space Integrity Zome
 //!
 //! Entry types and validation for private spaces (families, squads, cooperatives)
 //! within the public Commons DHT. Implements the "membrane factory" concept from

@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Needs Integrity Zome
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Needs Integrity Zome
 //!
 //! This zome defines entry types and validation rules for needs matching
 //! in the Mycelix Mutual Aid hApp. Supports needs, offers, matches, and fulfillments.

@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Requests Coordinator Zome - Aid request and offer management
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Requests Coordinator Zome - Aid request and offer management
 //!
 //! This zome provides the coordination logic for creating, updating, and
 //! querying aid requests and offers in the mutual aid network.

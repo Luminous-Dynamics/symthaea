@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Food Production Integrity Zome
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Food Production Integrity Zome
 //! Entry types and validation for community food growing operations.
 //!
 //! Manages plots, crops, yield records, and season planning for

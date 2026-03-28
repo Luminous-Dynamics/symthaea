@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Circles Coordinator Zome
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Circles Coordinator Zome
 //!
 //! This zome provides coordinator functions for community credit circles
 //! in the Mycelix Mutual Aid hApp. Implements mutual credit with automatic clearing.

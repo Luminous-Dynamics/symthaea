@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Property Transfer Coordinator Zome
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Property Transfer Coordinator Zome
 use hdk::prelude::*;
 use mycelix_bridge_common::{requirement_for_proposal, requirement_for_voting};
 use mycelix_zome_helpers::get_latest_record;

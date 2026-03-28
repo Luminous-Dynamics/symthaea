@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository rootuse hdk::prelude::*;
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+use hdk::prelude::*;
 use resource_mesh_integrity::*;
 use mycelix_bridge_common::{
     gate_consciousness, requirement_for_basic, requirement_for_voting,

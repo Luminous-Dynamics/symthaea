@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Mutual Aid Common - Shared Types for Mycelix Mutual Aid hApp
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Mutual Aid Common - Shared Types for Mycelix Mutual Aid hApp
 //!
 //! This crate contains all the shared types, enums, and structures used across
 //! the Mutual Aid hApp zomes. It implements community economic coordination:

@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Mycelix Commons — Property & Bridge Sweettest
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! # Mycelix Commons — Property & Bridge Sweettest
 //!
 //! Batch 1 of sweettest integration tests: property-registry CRUD and
 //! commons-bridge basics (query, resolve, broadcast, health).

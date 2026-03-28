@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Property Registry Coordinator Zome
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Property Registry Coordinator Zome
 use commons_types::batch::links_to_records;
 use hdk::prelude::*;
 use mycelix_bridge_common::{requirement_for_constitutional, requirement_for_proposal, requirement_for_voting};
