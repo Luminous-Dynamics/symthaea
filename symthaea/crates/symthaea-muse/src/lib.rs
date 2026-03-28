@@ -41,6 +41,7 @@ pub mod form;
 pub mod live_output;
 pub mod melody;
 pub mod midi;
+pub mod musical_inference;
 pub mod neural_melody;
 pub mod notation;
 pub mod phi_optimizer;
