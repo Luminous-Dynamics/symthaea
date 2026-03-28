@@ -329,34 +329,59 @@ fn extract_scene_features(artwork: &crate::Artwork) -> PerceptualInput {
 ///
 /// Nudges the snapshot's harmony activations and neuromodulators
 /// toward the dimensions that scored highest in the verdict.
-fn apply_verdict_wisdom(snapshot: &mut CognitiveSnapshot, verdict: &CriticVerdict) {
-    let lr = 0.05; // Learning rate for wisdom application
+pub fn apply_verdict_wisdom(snapshot: &mut CognitiveSnapshot, verdict: &CriticVerdict) {
+    let lr = 0.03; // Learning rate (reduced from 0.05 to prevent premature convergence)
 
-    // If harmony is scoring well, boost harmony activations
+    // ── Homeostatic decay: all neuromodulators drift toward baseline ──
+    // Without this, serotonin saturates at 1.0 and arousal collapses to 0.0.
+    // This implements the biological reality that neurotransmitter levels
+    // have a resting state they return to without stimulation.
+    let decay = 0.02;
+    snapshot.serotonin += (0.5 - snapshot.serotonin) * decay;
+    snapshot.arousal += (0.4 - snapshot.arousal) * decay;
+    snapshot.dopamine += (0.5 - snapshot.dopamine) * decay;
+
+    // ── Boredom/curiosity: if novelty is very low, inject exploration ──
+    // The system must not be content with repetition. Low novelty for
+    // sustained periods should trigger the curiosity drive.
+    if verdict.novelty < 0.2 {
+        // Boredom → boost arousal + noradrenaline (seek something new)
+        snapshot.arousal = (snapshot.arousal + lr * 2.0).clamp(0.0, 1.0);
+        snapshot.noradrenaline = (snapshot.noradrenaline + lr).clamp(0.0, 1.0);
+        // Perturb a random harmony to create variation
+        let idx = (verdict.composite * 7.99) as usize % 8;
+        snapshot.harmony_activations[idx] =
+            (snapshot.harmony_activations[idx] + lr * 3.0).clamp(0.0, 1.0);
+    }
+
+    // ── Reward: good harmony → gentle boost ──
     if verdict.aesthetic.harmony > 0.5 {
         for h in snapshot.harmony_activations.iter_mut() {
-            *h = (*h + lr * verdict.aesthetic.harmony).clamp(0.0, 1.0);
+            *h = (*h + lr * 0.3 * verdict.aesthetic.harmony).clamp(0.0, 1.0);
         }
     }
 
-    // If novelty is high but coherence is low, increase arousal (explore more)
+    // ── Exploration vs consolidation (from novelty/coherence balance) ──
     if verdict.novelty > 0.6 && verdict.intention_coherence < 0.4 {
         snapshot.arousal = (snapshot.arousal + lr).clamp(0.0, 1.0);
     }
-
-    // If coherence is high but novelty is low, decrease arousal (consolidate)
     if verdict.intention_coherence > 0.6 && verdict.novelty < 0.3 {
-        snapshot.arousal = (snapshot.arousal - lr * 0.5).clamp(0.0, 1.0);
+        snapshot.arousal = (snapshot.arousal - lr * 0.3).clamp(0.0, 1.0);
     }
 
-    // Taste alignment: if the system likes what it's making, boost serotonin
+    // ── Taste satisfaction (bounded by homeostatic decay) ──
     if verdict.taste_alignment > 0.6 {
-        snapshot.serotonin = (snapshot.serotonin + lr * 0.5).clamp(0.0, 1.0);
+        snapshot.serotonin = (snapshot.serotonin + lr * 0.3).clamp(0.0, 1.0);
     }
 
-    // If golden ratio is low, adjust valence toward balance
+    // ── Golden ratio correction ──
     if verdict.golden_ratio < 0.3 {
-        snapshot.valence = snapshot.valence * 0.95; // Dampen toward neutral
+        snapshot.valence = snapshot.valence * 0.97;
+    }
+
+    // ── Surprise reward: unexpected good output → dopamine ──
+    if verdict.self_surprise > 0.5 && verdict.composite > 0.5 {
+        snapshot.dopamine = (snapshot.dopamine + lr * 0.5).clamp(0.0, 1.0);
     }
 }
 
