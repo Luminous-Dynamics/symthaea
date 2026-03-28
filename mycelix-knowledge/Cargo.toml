@@ -1,7 +1,4 @@
 [workspace]
-
-[workspace.package]
-license = "AGPL-3.0-or-later"
 resolver = "2"
 members = [
     "zomes/claims/integrity",
@@ -21,7 +18,13 @@ members = [
     # DKG - Distributed Knowledge Graph (Truth Engine)
     "zomes/dkg_integrity",
     "zomes/dkg",
+    # Invention - Prior Art Registry
+    "zomes/invention/integrity",
+    "zomes/invention/coordinator",
 ]
+
+[workspace.package]
+license = "AGPL-3.0-or-later"
 
 [workspace.dependencies]
 # Holochain 0.6 compatible (per official compatibility table)

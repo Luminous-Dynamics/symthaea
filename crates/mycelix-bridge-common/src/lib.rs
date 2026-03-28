@@ -64,6 +64,10 @@ pub mod saga;
 pub mod migration;
 pub mod notifications;
 
+pub mod license_enforcement;
+pub mod merkle_timestamp;
+pub mod timestamp_anchor;
+
 #[cfg(kani)]
 mod kani_proofs;
 
