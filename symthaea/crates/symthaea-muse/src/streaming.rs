@@ -14,6 +14,7 @@
 use crate::audio_feedback::AudioFeedbackEncoder;
 use crate::binaural::BinauralConsciousnessRenderer;
 use crate::consciousness_reverb::ConsciousnessReverb;
+use crate::instruments::{self, Instrument, KarplusStrong};
 use crate::mixing::MixingChain;
 use crate::musical_inference::MusicalInferenceEngine;
 use crate::percussion;
@@ -56,6 +57,12 @@ struct ActiveNote {
     voice_idx: usize,
     wavetable_osc: WavetableOscillator,
     vibrato_phase: f32,
+    /// Instrument assigned to this note.
+    instrument: Instrument,
+    /// Karplus-Strong state (for guitar/harp).
+    ks: Option<KarplusStrong>,
+    /// Pre-rendered FM buffer (for e-piano/bell, rendered at note start).
+    fm_buffer: Option<Vec<f32>>,
 }
 
 /// Full-pipeline streaming synthesis engine.
@@ -212,36 +219,44 @@ impl StreamingSynth {
             crate::voice::VoiceRole::Ostinato,
         ];
 
+        // Select instrument from consciousness state (updated per chunk)
+        let current_instrument = instruments::select_instrument(&self.state);
+
         for active in &mut self.active_notes {
             let voice = active.voice_idx.min(num_voices - 1);
-            let use_wavetable = self.state.consciousness_level > 0.5;
 
-            // Vibrato LFO (5.5Hz, depth from consciousness)
-            let vibrato_depth_cents = self.state.consciousness_level * 30.0;
-            let vibrato_rate = 5.5;
+            // Vibrato LFO: 5Hz for strings, 0 for piano/guitar
+            let (vibrato_depth_cents, vibrato_rate) = match active.instrument {
+                Instrument::Violin | Instrument::Cello => (25.0, 5.0),
+                Instrument::Flute => (15.0, 4.5),
+                Instrument::Pad => (8.0, 3.0),
+                _ => (0.0, 0.0), // no vibrato for piano, guitar, bell
+            };
 
             for i in 0..self.chunk_samples {
                 if active.sample_pos >= active.total_samples { break; }
                 let t = active.sample_pos as f32 / sr;
                 let env = envelope(atk, dec, sus, rel, t, active.note.duration);
 
-                // Vibrato: modulate frequency
-                active.vibrato_phase += vibrato_rate / sr;
-                if active.vibrato_phase > 1.0 { active.vibrato_phase -= 1.0; }
+                // Vibrato
+                if vibrato_depth_cents > 0.0 {
+                    active.vibrato_phase += vibrato_rate / sr;
+                    if active.vibrato_phase > 1.0 { active.vibrato_phase -= 1.0; }
+                }
                 let vibrato_mod = (active.vibrato_phase * std::f32::consts::TAU).sin();
                 let vibrato_factor = 2.0f32.powf(vibrato_depth_cents * vibrato_mod / 1200.0);
                 let freq = active.note.frequency * vibrato_factor;
 
-                let sample = if use_wavetable {
-                    // Wavetable mode: consciousness controls morph
-                    active.wavetable_osc.set_consciousness_morph(self.state.consciousness_level);
-                    active.wavetable_osc.tick(&self.wavetable_bank, freq, sr)
+                let sample = if let Some(ref mut ks) = active.ks {
+                    // Karplus-Strong (guitar, harp): self-sustaining, no external envelope
+                    ks.tick()
+                } else if let Some(ref fm_buf) = active.fm_buffer {
+                    // Pre-rendered FM (e-piano, bell): read from buffer
+                    if active.sample_pos < fm_buf.len() { fm_buf[active.sample_pos] } else { 0.0 }
                 } else {
-                    // Additive mode with FM
-                    active.fm_phase += (freq * fm_ratio / sr) * std::f32::consts::TAU;
-                    if active.fm_phase > std::f32::consts::TAU { active.fm_phase -= std::f32::consts::TAU; }
-                    let fm_off = fm_depth * active.fm_phase.sin();
-
+                    // Additive synthesis with instrument-specific partials
+                    let partials = active.instrument.partials();
+                    let num_p = partials.len().min(16);
                     let mut s = 0.0f32;
                     for h in 0..num_p {
                         let cf = freq * (h + 1) as f32;
@@ -251,10 +266,9 @@ impl StreamingSynth {
                         if active.partial_phases[h] > std::f32::consts::TAU * 2.0 {
                             active.partial_phases[h] -= std::f32::consts::TAU * 2.0;
                         }
-                        let amp = if h == 0 { 1.0 } else { brightness / ((h+1) as f32).powf(rolloff) };
-                        s += amp * (active.partial_phases[h] + fm_off).sin();
+                        s += partials[h] * active.partial_phases[h].sin();
                     }
-                    s
+                    s * env
                 };
 
                 // Arousal-modulated master gain: 0.05 (calm) → 0.35 (excited)
@@ -382,17 +396,41 @@ impl StreamingSynth {
                     2 => if psi > 0.6 { 2 } else { 0 }, // harmony or lead
                     _ => if psi > 0.7 { 3 } else { 0 }, // ostinato or lead
                 };
+                // Select instrument based on consciousness state
+                let instrument = instruments::select_instrument(&self.state);
+
+                // Initialize instrument-specific synthesis state
+                let ks = if instrument.uses_karplus_strong() {
+                    let (damp, bright, _stiff) = instrument.ks_params();
+                    let mut ks = KarplusStrong::new(note.frequency, self.sample_rate, damp, bright);
+                    ks.excite(note.velocity);
+                    Some(ks)
+                } else {
+                    None
+                };
+
+                let fm_buffer = if instrument.uses_fm() {
+                    Some(instruments::render_fm_instrument(
+                        instrument, note.frequency, note.velocity, note.duration, self.sample_rate,
+                    ))
+                } else {
+                    None
+                };
+
                 self.active_notes.push(ActiveNote {
                     total_samples: (note.duration * sr) as usize + release_samples,
                     note,
                     sample_pos: 0,
-                    partial_phases: vec![0.0; self.config.num_partials.clamp(1, 16)],
+                    partial_phases: vec![0.0; 16],
                     fm_phase: 0.0,
                     pan: [0.0, -0.2, 0.4, -0.3][voice_idx],
                     volume: [1.0, 0.7, 0.5, 0.3][voice_idx],
                     voice_idx,
                     wavetable_osc: WavetableOscillator::new(),
                     vibrato_phase: 0.0,
+                    instrument,
+                    ks,
+                    fm_buffer,
                 });
             }
         }
