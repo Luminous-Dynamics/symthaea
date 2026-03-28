@@ -1,0 +1,108 @@
+{
+  "metadata": {
+    "title": "ESCO Career Pathway: finance",
+    "framework": "ESCO",
+    "source": "https://ec.europa.eu/esco/",
+    "grade_level": "Undergraduate",
+    "subject_area": "finance",
+    "domain": "finance",
+    "version": "1.2",
+    "total_standards": 3,
+    "domains": [
+      "Career"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Career pathway from ESCO API. 3 occupations with essential skills.",
+    "academic_level": "Professional"
+  },
+  "nodes": [
+    {
+      "id": "78db356f-a96a-4456-ab29-2de62e52f830",
+      "title": "public finance accountant",
+      "description": "Public finance accountants head the treasury department of a governmental institution. They manage the institution's financial administration, expenditure and income generation, and compliance with taxation and other financial legislation. They perform administrative duties to ensure record keeping, develop plans for budget management and perform financial forecasts.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "finance",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "finance"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "finance",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/78db356f-a96a-4456-ab29-2de62e52f830",
+          "description": "public finance accountant",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "30f3ea93-882a-4525-841c-1d5b4b64076f",
+      "title": "financial manager",
+      "description": "Financial managers handle all the matters in reference to the finance and investments of a company. They manage financial operations of companies such as the assets, liabilities, equity and cash flow aiming to maintain the financial health of the company and operative viability. Financial managers evaluate the strategic plans of the company in financial terms, maintain transparent financial operations for taxation and auditing bodies, and create the financial statements of the company at the ...",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "finance",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "finance"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "finance",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/30f3ea93-882a-4525-841c-1d5b4b64076f",
+          "description": "financial manager",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "c01cdf85-3ce0-4d12-ae86-e4e63493fafa",
+      "title": "financial broker",
+      "description": "Financial brokers undertake financial market activities on behalf of their clients. They monitor securities, financial documentation of their clients, market trends and conditions and other legal requirements. They plan buying and selling activities and calculate transactions costs.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "finance",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "finance"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "finance",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/c01cdf85-3ce0-4d12-ae86-e4e63493fafa",
+          "description": "financial broker",
+          "grade_level": "Professional"
+        }
+      ]
+    }
+  ],
+  "edges": []
+}

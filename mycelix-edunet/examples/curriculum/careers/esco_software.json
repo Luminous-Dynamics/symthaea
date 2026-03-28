@@ -1,0 +1,108 @@
+{
+  "metadata": {
+    "title": "ESCO Career Pathway: software",
+    "framework": "ESCO",
+    "source": "https://ec.europa.eu/esco/",
+    "grade_level": "Undergraduate",
+    "subject_area": "software",
+    "domain": "software",
+    "version": "1.2",
+    "total_standards": 3,
+    "domains": [
+      "Career"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Career pathway from ESCO API. 3 occupations with essential skills.",
+    "academic_level": "Professional"
+  },
+  "nodes": [
+    {
+      "id": "3ff2fdf4-af54-4517-873d-73e9353f112e",
+      "title": "computer games, multimedia and software specialised seller",
+      "description": "Computer games, multimedia and software specialised sellers sell software products in specialised shops.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "software",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "software"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "software",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/3ff2fdf4-af54-4517-873d-73e9353f112e",
+          "description": "computer games, multimedia and software specialised seller",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "f2b15a0e-e65a-438a-affb-29b9d50b77d1",
+      "title": "software developer",
+      "description": "Software developers implement or program all kinds of software systems based on specifications and designs by using programming languages, tools, and platforms.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "software",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "software"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "software",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/f2b15a0e-e65a-438a-affb-29b9d50b77d1",
+          "description": "software developer",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "57af9090-55b4-4911-b2d0-86db01c00b02",
+      "title": "embedded systems software developer",
+      "description": "Embedded systems software developers program, implement, document and maintain software to be run on an embedded system.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "software",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "software"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "software",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/57af9090-55b4-4911-b2d0-86db01c00b02",
+          "description": "embedded systems software developer",
+          "grade_level": "Professional"
+        }
+      ]
+    }
+  ],
+  "edges": []
+}

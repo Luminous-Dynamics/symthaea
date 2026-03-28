@@ -1,0 +1,18 @@
+{
+  "metadata": {
+    "title": "ESCO Career Pathway: cybersecurity",
+    "framework": "ESCO",
+    "source": "https://ec.europa.eu/esco/",
+    "grade_level": "Undergraduate",
+    "subject_area": "cybersecurity",
+    "domain": "cybersecurity",
+    "version": "1.2",
+    "total_standards": 0,
+    "domains": [],
+    "created_at": "2026-03-28",
+    "notes": "Career pathway from ESCO API. 0 occupations with essential skills.",
+    "academic_level": "Professional"
+  },
+  "nodes": [],
+  "edges": []
+}

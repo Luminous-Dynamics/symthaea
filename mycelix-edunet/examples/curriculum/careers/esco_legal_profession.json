@@ -1,0 +1,108 @@
+{
+  "metadata": {
+    "title": "ESCO Career Pathway: legal profession",
+    "framework": "ESCO",
+    "source": "https://ec.europa.eu/esco/",
+    "grade_level": "Undergraduate",
+    "subject_area": "legal profession",
+    "domain": "legal profession",
+    "version": "1.2",
+    "total_standards": 3,
+    "domains": [
+      "Career"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Career pathway from ESCO API. 3 occupations with essential skills.",
+    "academic_level": "Professional"
+  },
+  "nodes": [
+    {
+      "id": "d2ff134e-b41a-4fa3-aceb-1b9f5f5cf015",
+      "title": "legal service manager",
+      "description": "Legal service managers oversee the general management of a legal service office. They not only strive for the highest efficiency and effectiveness when delivering legal services and advice, but they also coordinate a team of legally trained professionals. They manage different profiles of clients and adjust the legal services to their needs.\n",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "legal profession",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "legal profession"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "legal profession",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/d2ff134e-b41a-4fa3-aceb-1b9f5f5cf015",
+          "description": "legal service manager",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "42c769cd-4c60-4bac-94d2-29a492b82b74",
+      "title": "scopist",
+      "description": "Scopists edit the transcripts created by court reporters in order to make of them a readable professional legal document. They listen or read to the reports given to them in order to apply punctuation, missing words, format, and improve the accuracy of the document.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "legal profession",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "legal profession"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "legal profession",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/42c769cd-4c60-4bac-94d2-29a492b82b74",
+          "description": "scopist",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "18d2b37a-9c31-4393-833e-bc2f7b1ce52a",
+      "title": "mergers and acquisitions analyst",
+      "description": "Mergers and acquisitions analysts oversee the execution of transactions for the purchase, sale, merger or takeover of companies. They negotiate and complete the deal on the client's behalf, by working closely with lawyers and accountants. Mergers and acquisitions analysts conduct operational and legal risk assessments of a company, assess comparable companies in the market and help with the post-merger integration.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "legal profession",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "legal profession"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "legal profession",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/18d2b37a-9c31-4393-833e-bc2f7b1ce52a",
+          "description": "mergers and acquisitions analyst",
+          "grade_level": "Professional"
+        }
+      ]
+    }
+  ],
+  "edges": []
+}

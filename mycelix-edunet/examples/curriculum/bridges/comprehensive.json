@@ -1,98 +1,7 @@
 {
   "title": "Cross-Level Learning Pathway Bridge",
-  "description": "Bridges 32 curriculum documents across 3 academic levels.",
+  "description": "Bridges 24 curriculum documents across 3 academic levels.",
   "edges": [
-    {
-      "from": "CCSS.Math.Content.5.OA.A.1",
-      "to": "18.01",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: Grade 5 (K-12) → MIT OCW: Mathematics (Undergraduate)."
-    },
-    {
-      "from": "CCSS.Math.Content.5.OA.A.1",
-      "to": "AL/BasicAnalysis",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: Grade 5 (K-12) → CS2013: Algorithms and Complexity (Undergraduate)."
-    },
-    {
-      "from": "CCSS.Math.Content.5.OA.A.1",
-      "to": "DS/SetsRelations",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: Grade 5 (K-12) → CS2013: Discrete Structures (Undergraduate)."
-    },
-    {
-      "from": "CCSS.Math.Content.5.OA.A.1",
-      "to": "phd-math/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: Grade 5 (K-12) → PhD in Mathematics (Doctoral)."
-    },
-    {
-      "from": "CCSS.Math.Content.8.EE.A.2",
-      "to": "18.03SC",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Use square root and cube root symbols to represent solutions to equations of ... (K-12) → Differential Equations (Undergraduate)."
-    },
-    {
-      "from": "CCSS.Math.Content.8.EE.A.2",
-      "to": "18.085",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Use square root and cube root symbols to represent solutions to equations of ... (K-12) → Computational Science and Engineering I (Undergraduate)."
-    },
-    {
-      "from": "CCSS.Math.Content.8.SP.A.2",
-      "to": "18.03SC",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Know that straight lines are widely used to model relationships between two q... (K-12) → Differential Equations (Undergraduate)."
-    },
-    {
-      "from": "CCSS.Math.Content.8.SP.A.4",
-      "to": "18.03SC",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Understand that patterns of association can also be seen in bivariate categor... (K-12) → Differential Equations (Undergraduate)."
-    },
-    {
-      "from": "CCSS.Math.Content.8.SP.A.4",
-      "to": "AL/FundamentalDataStructures",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Understand that patterns of association can also be seen in bivariate categor... (K-12) → Fundamental Data Structures and Algorithms (Undergraduate)."
-    },
-    {
-      "from": "CCSS.Math.Content.8.SP.A.1",
-      "to": "DS/Probability",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Construct and interpret scatter plots for bivariate measurement data to inves... (K-12) → Discrete Probability (Undergraduate)."
-    },
-    {
-      "from": "CCSS.Math.Content.8.SP.A.2",
-      "to": "DS/Probability",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Know that straight lines are widely used to model relationships between two q... (K-12) → Discrete Probability (Undergraduate)."
-    },
-    {
-      "from": "CCSS.Math.Content.8.SP.A.4",
-      "to": "DS/Probability",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Understand that patterns of association can also be seen in bivariate categor... (K-12) → Discrete Probability (Undergraduate)."
-    },
-    {
-      "from": "CCSS.Math.Content.8.SP.A.4",
-      "to": "phd-math/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: Grade 8 (K-12) → PhD in Mathematics (Doctoral)."
-    },
     {
       "from": "CCSS.Math.Content.HSA-CED.A.1",
       "to": "18.01",
@@ -162,20 +71,6 @@
       "edge_type": "LeadsTo",
       "strength_permille": 600,
       "rationale": "General bridge: High School — Algebra (K-12) → PhD in Mathematics (Doctoral)."
-    },
-    {
-      "from": "CCSS.ELA-Literacy.CCRA.R.3",
-      "to": "phd-literature/seminar",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Analyze how and why individuals, events, and ideas develop and interact over ... (K-12) → Research Seminar Participation (Doctoral)."
-    },
-    {
-      "from": "CCSS.ELA-Literacy.CCRA.R.3",
-      "to": "phd-literature/seminar",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Analyze how and why individuals, events, and ideas develop and interact over ... (K-12) → Research Seminar Participation (Doctoral)."
     },
     {
       "from": "CCSS.ELA-Literacy.CCRA.R.3",
@@ -291,48 +186,6 @@
     },
     {
       "from": "SEP.2.3-5.4",
-      "to": "10.675J",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Define a simple design problem that can be solved through the development of ... (K-12) → Computational Quantum Mechanics of Molecular and Extended Systems (Undergraduate)."
-    },
-    {
-      "from": "SEP.3.3-5",
-      "to": "10.675J",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Constructing explanations and designing solutions in 3–5 builds on K–2 ex... (K-12) → Computational Quantum Mechanics of Molecular and Extended Systems (Undergraduate)."
-    },
-    {
-      "from": "SEP.3.3-5.5",
-      "to": "10.675J",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Generate and compare multiple solutions to a problem based on how well they m... (K-12) → Computational Quantum Mechanics of Molecular and Extended Systems (Undergraduate)."
-    },
-    {
-      "from": "SEP.3.3-5.7",
-      "to": "10.675J",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Generate and compare multiple solutions to a problem based on how well they m... (K-12) → Computational Quantum Mechanics of Molecular and Extended Systems (Undergraduate)."
-    },
-    {
-      "from": "SEP.3.3-5.7",
-      "to": "5.069",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Generate and compare multiple solutions to a problem based on how well they m... (K-12) → Crystal Structure Analysis (Undergraduate)."
-    },
-    {
-      "from": "SEP.4.3-5",
-      "to": "10.675J",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Modeling in 3–5 builds on K–2 experiences and progresses to building and ... (K-12) → Computational Quantum Mechanics of Molecular and Extended Systems (Undergraduate)."
-    },
-    {
-      "from": "SEP.2.3-5.4",
       "to": "RUST-101",
       "edge_type": "LeadsTo",
       "strength_permille": 750,
@@ -372,20 +225,6 @@
       "edge_type": "LeadsTo",
       "strength_permille": 600,
       "rationale": "General bridge: Grade 5 (K-12) → PhD in Biological Sciences (Doctoral)."
-    },
-    {
-      "from": "SEP.4.3-5",
-      "to": "phd-chemistry/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: Grade 5 (K-12) → PhD in Chemistry (Doctoral)."
-    },
-    {
-      "from": "SEP.4.3-5",
-      "to": "phd-political-science/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: Grade 5 (K-12) → PhD in Political Science (Doctoral)."
     },
     {
       "from": "HST.950J",
@@ -446,34 +285,6 @@
     {
       "from": "7.90J",
       "to": "phd-biology/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Computational Functional Genomics (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "CMS.611J",
-      "to": "phd-chemistry/seminar",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Creating Video Games (Undergraduate) → Research Seminar Participation (Doctoral)."
-    },
-    {
-      "from": "7.90J",
-      "to": "phd-chemistry/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Computational Functional Genomics (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "CMS.611J",
-      "to": "phd-political-science/seminar",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Creating Video Games (Undergraduate) → Research Seminar Participation (Doctoral)."
-    },
-    {
-      "from": "7.90J",
-      "to": "phd-political-science/coursework",
       "edge_type": "LeadsTo",
       "strength_permille": 750,
       "rationale": "Cross-level bridge: Computational Functional Genomics (Undergraduate) → Core Coursework (Doctoral)."
@@ -626,48 +437,6 @@
       "rationale": "Cross-level bridge: Introduction to Computational Neuroscience (Undergraduate) → Core Coursework (Doctoral)."
     },
     {
-      "from": "RES.8-007",
-      "to": "phd-chemistry/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Cosmic Origin of the Chemical Elements  (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "RES.8-007",
-      "to": "phd-chemistry/seminar",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Cosmic Origin of the Chemical Elements  (Undergraduate) → Research Seminar Participation (Doctoral)."
-    },
-    {
-      "from": "MAS.865J",
-      "to": "phd-chemistry/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Quantum Information Science (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "9.29J",
-      "to": "phd-chemistry/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Introduction to Computational Neuroscience (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "MAS.865J",
-      "to": "phd-political-science/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Quantum Information Science (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "9.29J",
-      "to": "phd-political-science/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Introduction to Computational Neuroscience (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
       "from": "RES.7-006",
       "to": "phd-cs/coursework",
       "edge_type": "LeadsTo",
@@ -684,20 +453,6 @@
     {
       "from": "RES.7-006",
       "to": "phd-biology/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: 7.03x Genetics (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "RES.7-006",
-      "to": "phd-chemistry/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: 7.03x Genetics (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "RES.7-006",
-      "to": "phd-political-science/coursework",
       "edge_type": "LeadsTo",
       "strength_permille": 750,
       "rationale": "Cross-level bridge: 7.03x Genetics (Undergraduate) → Core Coursework (Doctoral)."
@@ -773,48 +528,6 @@
       "rationale": "Cross-level bridge: Labor Economics and Public Policy (Undergraduate) → Research Seminar Participation (Doctoral)."
     },
     {
-      "from": "17.100J",
-      "to": "phd-political-science/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Political Economy I (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "17.100J",
-      "to": "phd-political-science/seminar",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Political Economy I (Undergraduate) → Research Seminar Participation (Doctoral)."
-    },
-    {
-      "from": "14.731",
-      "to": "phd-political-science/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Economic History (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "14.71",
-      "to": "phd-political-science/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Economic History of Financial Crises (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "14.661",
-      "to": "phd-political-science/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Labor Economics I (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "14.64",
-      "to": "phd-political-science/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Labor Economics and Public Policy (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
       "from": "21G.084J",
       "to": "phd-cs/coursework",
       "edge_type": "LeadsTo",
@@ -852,20 +565,6 @@
     {
       "from": "17.S950",
       "to": "phd-biology/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Social Science and the Iraq and Syrian Wars (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "21G.084J",
-      "to": "phd-chemistry/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Introduction to Latin American Studies (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "17.S950",
-      "to": "phd-chemistry/coursework",
       "edge_type": "LeadsTo",
       "strength_permille": 750,
       "rationale": "Cross-level bridge: Social Science and the Iraq and Syrian Wars (Undergraduate) → Core Coursework (Doctoral)."
@@ -883,209 +582,6 @@
       "edge_type": "LeadsTo",
       "strength_permille": 750,
       "rationale": "Cross-level bridge: Social Science and the Iraq and Syrian Wars (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "21G.084J",
-      "to": "phd-political-science/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Introduction to Latin American Studies (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "21G.084J",
-      "to": "phd-political-science/seminar",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Introduction to Latin American Studies (Undergraduate) → Research Seminar Participation (Doctoral)."
-    },
-    {
-      "from": "17.S950",
-      "to": "phd-political-science/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Social Science and the Iraq and Syrian Wars (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "17.S950",
-      "to": "phd-political-science/seminar",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Social Science and the Iraq and Syrian Wars (Undergraduate) → Research Seminar Participation (Doctoral)."
-    },
-    {
-      "from": "5.73",
-      "to": "phd-cs/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Introductory Quantum Mechanics I (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.72",
-      "to": "phd-cs/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Non-Equilibrium Statistical Mechanics (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.61",
-      "to": "phd-cs/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Physical Chemistry (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.74",
-      "to": "phd-physics/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Introductory Quantum Mechanics II (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.74",
-      "to": "phd-physics/seminar",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Introductory Quantum Mechanics II (Undergraduate) → Research Seminar Participation (Doctoral)."
-    },
-    {
-      "from": "5.73",
-      "to": "phd-physics/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Introductory Quantum Mechanics I (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.73",
-      "to": "phd-physics/seminar",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Introductory Quantum Mechanics I (Undergraduate) → Research Seminar Participation (Doctoral)."
-    },
-    {
-      "from": "5.72",
-      "to": "phd-physics/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Non-Equilibrium Statistical Mechanics (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.72",
-      "to": "phd-physics/seminar",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Non-Equilibrium Statistical Mechanics (Undergraduate) → Research Seminar Participation (Doctoral)."
-    },
-    {
-      "from": "5.61",
-      "to": "phd-physics/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Physical Chemistry (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.61",
-      "to": "phd-physics/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Physical Chemistry (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.61",
-      "to": "phd-physics/seminar",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Physical Chemistry (Undergraduate) → Research Seminar Participation (Doctoral)."
-    },
-    {
-      "from": "5.73",
-      "to": "phd-biology/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Introductory Quantum Mechanics I (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.72",
-      "to": "phd-biology/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Non-Equilibrium Statistical Mechanics (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.61",
-      "to": "phd-biology/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Physical Chemistry (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.73",
-      "to": "phd-chemistry/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Introductory Quantum Mechanics I (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.72",
-      "to": "phd-chemistry/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Non-Equilibrium Statistical Mechanics (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.72",
-      "to": "phd-chemistry/seminar",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Non-Equilibrium Statistical Mechanics (Undergraduate) → Research Seminar Participation (Doctoral)."
-    },
-    {
-      "from": "5.61",
-      "to": "phd-chemistry/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Physical Chemistry (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.61",
-      "to": "phd-chemistry/seminar",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Physical Chemistry (Undergraduate) → Research Seminar Participation (Doctoral)."
-    },
-    {
-      "from": "5.61",
-      "to": "phd-chemistry/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Physical Chemistry (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.61",
-      "to": "phd-chemistry/seminar",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Physical Chemistry (Undergraduate) → Research Seminar Participation (Doctoral)."
-    },
-    {
-      "from": "5.73",
-      "to": "phd-political-science/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Introductory Quantum Mechanics I (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.72",
-      "to": "phd-political-science/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Non-Equilibrium Statistical Mechanics (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.61",
-      "to": "phd-political-science/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Physical Chemistry (Undergraduate) → Core Coursework (Doctoral)."
     },
     {
       "from": "AL/Automata",
@@ -1116,13 +612,6 @@
       "rationale": "General bridge: CS2013: Discrete Structures (Undergraduate) → PhD in Mathematics (Doctoral)."
     },
     {
-      "from": "SDF/DevMethods",
-      "to": "phd-cs/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: CS2013: Software Development Fundamentals (Undergraduate) → PhD in Computer Science (Doctoral)."
-    },
-    {
       "from": "LANG-401",
       "to": "phd-cs/coursework",
       "edge_type": "LeadsTo",
@@ -1144,50 +633,41 @@
       "rationale": "General bridge: Programming Languages for AI & Humans (Undergraduate) → PhD in Biological Sciences (Doctoral)."
     },
     {
-      "from": "LANG-401",
-      "to": "phd-chemistry/coursework",
+      "from": "57af9090-55b4-4911-b2d0-86db01c00b02",
+      "to": "phd-cs/coursework",
       "edge_type": "LeadsTo",
       "strength_permille": 600,
-      "rationale": "General bridge: Programming Languages for AI & Humans (Undergraduate) → PhD in Chemistry (Doctoral)."
-    },
-    {
-      "from": "LANG-401",
-      "to": "phd-political-science/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: Programming Languages for AI & Humans (Undergraduate) → PhD in Political Science (Doctoral)."
+      "rationale": "General bridge: ESCO Career Pathway: software (Undergraduate) → PhD in Computer Science (Doctoral)."
     }
   ],
   "statistics": {
-    "total_edges": 165,
-    "k12_to_undergrad": 55,
+    "total_edges": 91,
+    "k12_to_undergrad": 32,
     "undergrad_to_grad": 0,
-    "grad_to_phd": 110,
+    "grad_to_phd": 59,
     "levels_bridged": [
-      "K-12",
       "Doctoral",
-      "Undergraduate"
+      "Undergraduate",
+      "K-12"
     ],
     "subjects_bridged": [
-      "Consciousness Computing",
-      "Physics",
-      "Computer Science",
-      "CS2013: Software Development Fundamentals",
+      "CS2013: Algorithms and Complexity",
+      "CS2013: Discrete Structures",
+      "software",
+      "healthcare",
+      "Social Studies",
       "Science",
       "Literature",
-      "EnglishLanguageArts",
-      "Foreign Language",
-      "Political Science",
-      "Chemistry",
-      "Mathematics",
-      "Social Studies",
-      "CS2013: Algorithms and Complexity",
-      "Economics",
+      "Physics",
+      "Consciousness Computing",
+      "data scientist",
       "Biological Sciences",
-      "Linguistics and Philosophy",
-      "Linguistics",
-      "CS2013: Discrete Structures",
-      "Decentralized Systems"
+      "Political Science",
+      "EnglishLanguageArts",
+      "Economics",
+      "Mathematics",
+      "engineer",
+      "Computer Science"
     ]
   }
 }

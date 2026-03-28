@@ -7,162 +7,163 @@
     "subject_area": "Multi-Subject",
     "domain": "Multi-Subject",
     "version": "2024",
-    "total_standards": 1689,
+    "total_standards": 1718,
     "domains": [
-      "Waves and their Applications in Technologies for Information Transfer",
-      "Number and Operations in Base Ten",
-      "Engineering Design",
-      "Biological Evolution: Unity and Diversity",
-      "Theatre",
-      "Anthropology",
-      "Expressions and Equations",
-      "Heredity: Inheritance and Variation of Traits",
-      "file systems",
-      "Geography",
-      "propositional logic",
-      "Ecosystems: Interactions, Energy, and Dynamics",
-      "Computer Science",
-      "symmetric encryption",
-      "Interpreting Categorical and Quantitative Data",
-      "Writing Standards",
-      "brute-force",
-      "Interpreting Functions",
-      "Trigonometric Functions",
-      "Earth's Place in the Universe",
-      "Making Inferences and Justifying Conclusions",
-      "Linguistics",
-      "Earth Science",
-      "Science & Math",
-      "Spoken Production",
-      "Ratios and Proportional Relationships",
-      "Chemistry",
-      "Visual Arts",
-      "Chemical Engineering",
-      "Biology",
-      "Systems Engineering",
-      "Sociology",
-      "Immunology",
-      "Reading Standards for Literacy in History/Social Studies 6—12",
-      "Philosophy",
-      "probability",
-      "History",
-      "problem solving",
-      "Counting and Cardinality",
-      "Media Arts",
-      "Motion and Stability: Forces and Interactions",
-      "counting",
-      "Linear, Quadratic, and Exponential Models",
-      "Reasoning with Equations and Inequalities",
-      "Seeing Structure in Expressions",
-      "Standards for Mathematical Practice",
-      "Expressing Geometric Properties with Equations",
-      "Reading Standards for Literacy in Science and Technical Subjects 6—12",
-      "Digital Citizenship",
-      "Digital Literacy",
-      "directed graphs",
-      "Functions",
-      "first-class functions",
-      "threads",
-      "sets",
-      "Matter and its Interactions",
-      "Health Care Management",
-      "Personal Behavior",
-      "instruction set architecture",
-      "Music",
-      "Data Science, Analytics & Computer Technology",
-      "Mechanical Engineering",
-      "Crosscutting Concepts",
-      "Modeling with Geometry",
-      "Digital Business & IT",
-      "Geometric Measurement and Dimension",
-      "Political Science",
-      "Research",
-      "Art, Design & Architecture",
-      "direct proof",
-      "Business & Management",
-      "encapsulation",
-      "Fitness",
-      "Energy, Climate & Sustainability",
-      "Literature",
-      "Matter and Its Interactions",
-      "Humanities",
-      "Listening",
-      "binary representation",
-      "College and Career Readiness Anchor Standards for Writing",
-      "sockets",
-      "Examination",
-      "Reading Standards: Foundational Skills",
-      "Conditional Probability and the Rules of Probability",
-      "Using Probability to Make Decisions",
-      "waterfall",
-      "Symthaea",
-      "static typing",
-      "Biological Engineering",
-      "Coursework",
-      "Language Standards",
-      "Operations and Algebraic Thinking",
-      "Disciplinary Core Ideas",
-      "Strategy & Innovation",
-      "variables",
-      "Earth's Systems",
-      "The Number System",
-      "Similarity, Right Triangles, and Trigonometry",
-      "Spoken Interaction",
-      "Organizations & Leadership",
-      "Circles",
-      "Reading Standards for Literature",
-      "Dance",
-      "Software Design and Engineering",
-      "virtual memory",
-      "Mycelix",
-      "College and Career Readiness Anchor Standards for Language",
-      "College and Career Readiness Anchor Standards for Speaking and Listening",
-      "Systems Thinking",
-      "User Experience",
-      "asymptotic analysis",
-      "Finance & Accounting",
       "Congruence",
-      "arrays",
-      "Speaking and Listening Standards",
-      "finite automata",
-      "Creating Equations",
-      "Energy",
-      "unit testing",
-      "College and Career Readiness Anchor Standards for Reading",
-      "Engineering",
-      "Environmental Engineering",
-      "Reading",
-      "confidentiality",
-      "Reading Standards for Informational Text",
-      "IDE",
-      "Algorithms and Data Structures",
-      "Number and Operations—Fractions",
-      "OS role",
-      "Writing",
-      "Arithmetic with Polynomials and Rational Expressions",
-      "Measurement and Data",
-      "logic gates",
-      "Geometry",
-      "Civics",
-      "design patterns",
-      "Writing Standards for Literacy in History/Social Studies, Science, and Technical Subjects 6—12",
-      "Building Functions",
-      "Earth and Human Activity",
+      "first-class functions",
+      "Earth's Systems",
+      "Theatre",
+      "Personal Behavior",
+      "Fitness",
+      "Seeing Structure in Expressions",
       "Science and Engineering Practices",
-      "Computational Thinking",
+      "asymptotic analysis",
+      "Career",
+      "Heredity: Inheritance and Variation of Traits",
+      "Software Design and Engineering",
+      "College and Career Readiness Anchor Standards for Language",
+      "Using Probability to Make Decisions",
+      "Mechanical Engineering",
+      "waterfall",
+      "Motion and Stability: Forces and Interactions",
+      "Building Functions",
+      "Listening",
+      "symmetric encryption",
+      "Reading Standards for Informational Text",
+      "Reading",
+      "Geometry",
+      "Algorithms and Data Structures",
+      "Business & Management",
+      "Writing Standards",
+      "Political Science",
+      "Conditional Probability and the Rules of Probability",
+      "Speaking and Listening Standards",
+      "Modeling with Geometry",
+      "Functions",
+      "Earth's Place in the Universe",
       "Motor Skills",
+      "Environmental Engineering",
+      "design patterns",
+      "Strategy & Innovation",
+      "Visual Arts",
+      "Finance & Accounting",
+      "finite automata",
+      "History",
+      "College and Career Readiness Anchor Standards for Writing",
       "Economics",
-      "Policy and Administration",
-      "Statistics and Probability",
-      "Physics",
-      "Mathematics",
-      "Social Sciences",
       "Law",
+      "Geography",
+      "unit testing",
+      "Computer Science",
+      "Examination",
+      "propositional logic",
+      "Measurement and Data",
+      "sets",
+      "Physics",
+      "Philosophy",
+      "sockets",
+      "Earth Science",
+      "OS role",
+      "Data Science, Analytics & Computer Technology",
+      "Civics",
+      "Similarity, Right Triangles, and Trigonometry",
+      "Coursework",
+      "arrays",
+      "threads",
+      "Standards for Mathematical Practice",
+      "Digital Literacy",
+      "Counting and Cardinality",
+      "Health Care Management",
+      "Energy, Climate & Sustainability",
+      "Digital Citizenship",
+      "Research",
+      "brute-force",
+      "Literature",
+      "Waves and their Applications in Technologies for Information Transfer",
+      "Art, Design & Architecture",
+      "Statistics and Probability",
+      "Anthropology",
+      "User Experience",
+      "Matter and its Interactions",
+      "Circles",
+      "variables",
+      "Digital Business & IT",
+      "Sociology",
+      "encapsulation",
+      "Crosscutting Concepts",
+      "Media Arts",
+      "Science & Math",
+      "Language Standards",
+      "Organizations & Leadership",
+      "probability",
+      "confidentiality",
+      "static typing",
+      "problem solving",
+      "College and Career Readiness Anchor Standards for Reading",
+      "counting",
+      "Interpreting Categorical and Quantitative Data",
+      "instruction set architecture",
+      "Reading Standards: Foundational Skills",
+      "Biological Evolution: Unity and Diversity",
+      "Engineering",
+      "Number and Operations—Fractions",
+      "binary representation",
+      "IDE",
+      "Operations and Algebraic Thinking",
+      "Reading Standards for Literature",
+      "Humanities",
+      "Systems Thinking",
+      "file systems",
+      "Trigonometric Functions",
+      "Earth and Human Activity",
+      "logic gates",
+      "Social Sciences",
+      "Biology",
+      "Immunology",
+      "Biological Engineering",
+      "Reading Standards for Literacy in Science and Technical Subjects 6—12",
+      "Arithmetic with Polynomials and Rational Expressions",
+      "Geometric Measurement and Dimension",
+      "Writing Standards for Literacy in History/Social Studies, Science, and Technical Subjects 6—12",
+      "Writing",
+      "Creating Equations",
+      "Mycelix",
+      "Ecosystems: Interactions, Energy, and Dynamics",
+      "College and Career Readiness Anchor Standards for Speaking and Listening",
+      "From Molecules to Organisms: Structures and Processes",
+      "Making Inferences and Justifying Conclusions",
+      "Linear, Quadratic, and Exponential Models",
+      "directed graphs",
+      "Music",
+      "virtual memory",
+      "Symthaea",
+      "Matter and Its Interactions",
+      "Chemistry",
+      "The Number System",
+      "direct proof",
+      "Spoken Production",
+      "Linguistics",
+      "Reading Standards for Literacy in History/Social Studies 6—12",
+      "Dance",
+      "Engineering Design",
+      "Expressions and Equations",
+      "Interpreting Functions",
+      "Chemical Engineering",
+      "Computational Thinking",
+      "Policy and Administration",
+      "Mathematics",
+      "Spoken Interaction",
+      "Energy",
+      "Ratios and Proportional Relationships",
+      "Disciplinary Core Ideas",
+      "Systems Engineering",
       "OSI model",
-      "From Molecules to Organisms: Structures and Processes"
+      "Expressing Geometric Properties with Equations",
+      "Number and Operations in Base Ten",
+      "Reasoning with Equations and Inequalities"
     ],
     "created_at": "2026-03-28",
-    "notes": "Merged 75 curriculum documents with 165 bridge edges. 1689 unique nodes, 1668 edges."
+    "notes": "Merged 85 curriculum documents with 91 bridge edges. 1718 unique nodes, 1599 edges."
   },
   "nodes": [
     {
@@ -43790,320 +43791,6 @@
       "cip_code": "45.1101"
     },
     {
-      "id": "SYM-101",
-      "title": "Introduction to Consciousness Computing",
-      "description": "Survey of computational consciousness: what it means for a machine to be conscious, the Hard Problem, philosophical zombies, multiple realizability, and why it matters for AI safety and value alignment.",
-      "node_type": "Course",
-      "difficulty": "Beginner",
-      "domain": "Consciousness Computing",
-      "subdomain": "Symthaea",
-      "tags": [
-        "consciousness",
-        "philosophy-of-mind",
-        "ai-safety"
-      ],
-      "estimated_hours": 45,
-      "grade_levels": [
-        "Undergraduate"
-      ],
-      "bloom_level": "Understand",
-      "subject_area": "Consciousness Computing",
-      "academic_standards": [
-        {
-          "framework": "Luminous Dynamics",
-          "code": "SYM-101",
-          "description": "Introduction to Consciousness Computing",
-          "grade_level": "Undergraduate"
-        }
-      ],
-      "credit_hours": 1,
-      "course_level": "200-300"
-    },
-    {
-      "id": "SYM-201",
-      "title": "Hyperdimensional Computing Fundamentals",
-      "description": "16,384-dimensional binary and continuous hypervectors. Encoding (random indexing, spatial, temporal), binding (XOR/Hadamard), bundling (majority/sum), similarity (Hamming/cosine). Holographic reduced representations. Applications to classification, reasoning, and memory.",
-      "node_type": "Course",
-      "difficulty": "Intermediate",
-      "domain": "Consciousness Computing",
-      "subdomain": "Symthaea",
-      "tags": [
-        "hdc",
-        "hypervectors",
-        "encoding",
-        "binding",
-        "similarity"
-      ],
-      "estimated_hours": 90,
-      "grade_levels": [
-        "Undergraduate"
-      ],
-      "bloom_level": "Apply",
-      "subject_area": "Consciousness Computing",
-      "academic_standards": [
-        {
-          "framework": "Luminous Dynamics",
-          "code": "SYM-201",
-          "description": "Hyperdimensional Computing Fundamentals",
-          "grade_level": "Undergraduate"
-        }
-      ],
-      "credit_hours": 2,
-      "course_level": "200-300"
-    },
-    {
-      "id": "SYM-202",
-      "title": "Integrated Information Theory (IIT/Phi)",
-      "description": "Tononi's IIT axioms and postulates. Phi as a measure of consciousness. Exclusion, composition, information. Computational challenges of exact Phi. Approximations and surrogates. Practical measurement in artificial systems.",
-      "node_type": "Course",
-      "difficulty": "Intermediate",
-      "domain": "Consciousness Computing",
-      "subdomain": "Symthaea",
-      "tags": [
-        "iit",
-        "phi",
-        "integrated-information",
-        "consciousness-measure"
-      ],
-      "estimated_hours": 90,
-      "grade_levels": [
-        "Undergraduate"
-      ],
-      "bloom_level": "Analyze",
-      "subject_area": "Consciousness Computing",
-      "academic_standards": [
-        {
-          "framework": "Luminous Dynamics",
-          "code": "SYM-202",
-          "description": "Integrated Information Theory (IIT/Phi)",
-          "grade_level": "Undergraduate"
-        }
-      ],
-      "credit_hours": 2,
-      "course_level": "200-300"
-    },
-    {
-      "id": "SYM-301",
-      "title": "Liquid Time-Constant Networks (CfC/LTC)",
-      "description": "Closed-form continuous-depth neural networks. ODE-based neurons with learned time constants. CfC as a closed-form approximation eliminating numerical ODE solving. Temporal processing, causal reasoning, and the unified HDC-LTC neuron.",
-      "node_type": "Course",
-      "difficulty": "Advanced",
-      "domain": "Consciousness Computing",
-      "subdomain": "Symthaea",
-      "tags": [
-        "cfc",
-        "ltc",
-        "liquid-neural-networks",
-        "ode",
-        "temporal"
-      ],
-      "estimated_hours": 135,
-      "grade_levels": [
-        "Undergraduate"
-      ],
-      "bloom_level": "Analyze",
-      "subject_area": "Consciousness Computing",
-      "academic_standards": [
-        {
-          "framework": "Luminous Dynamics",
-          "code": "SYM-301",
-          "description": "Liquid Time-Constant Networks (CfC/LTC)",
-          "grade_level": "Undergraduate"
-        }
-      ],
-      "credit_hours": 3,
-      "course_level": "200-300"
-    },
-    {
-      "id": "SYM-302",
-      "title": "Active Inference and Free Energy",
-      "description": "The Free Energy Principle (Friston). Predictive coding, prediction error minimization. Active inference as perception-action loops. Variational free energy and the Markov blanket. Applications to embodied cognition and autonomous behavior.",
-      "node_type": "Course",
-      "difficulty": "Advanced",
-      "domain": "Consciousness Computing",
-      "subdomain": "Symthaea",
-      "tags": [
-        "active-inference",
-        "free-energy",
-        "predictive-coding",
-        "markov-blanket"
-      ],
-      "estimated_hours": 135,
-      "grade_levels": [
-        "Undergraduate"
-      ],
-      "bloom_level": "Analyze",
-      "subject_area": "Consciousness Computing",
-      "academic_standards": [
-        {
-          "framework": "Luminous Dynamics",
-          "code": "SYM-302",
-          "description": "Active Inference and Free Energy",
-          "grade_level": "Undergraduate"
-        }
-      ],
-      "credit_hours": 3,
-      "course_level": "200-300"
-    },
-    {
-      "id": "SYM-501",
-      "title": "The Cognitive Loop: 8-Phase Pipeline",
-      "description": "Symthaea's core architecture: Perception → HDC Encode → CfC Evolve → Predict → Learn → Consciousness Measure → Moral Evaluation → Action. Rayon-parallel post-processing. 31 Hz measured throughput. CycleMetadata telemetry. Sub-struct organization.",
-      "node_type": "Course",
-      "difficulty": "Expert",
-      "domain": "Consciousness Computing",
-      "subdomain": "Symthaea",
-      "tags": [
-        "cognitive-loop",
-        "pipeline",
-        "architecture",
-        "rayon",
-        "telemetry"
-      ],
-      "estimated_hours": 180,
-      "grade_levels": [
-        "Graduate"
-      ],
-      "bloom_level": "Evaluate",
-      "subject_area": "Consciousness Computing",
-      "academic_standards": [
-        {
-          "framework": "Luminous Dynamics",
-          "code": "SYM-501",
-          "description": "The Cognitive Loop: 8-Phase Pipeline",
-          "grade_level": "Graduate"
-        }
-      ],
-      "credit_hours": 4,
-      "course_level": "500-600"
-    },
-    {
-      "id": "SYM-502",
-      "title": "Moral Algebra and Ethics Engine",
-      "description": "16 deontological obligations (8 perfect + 8 imperfect). Duty satisfaction scoring. Restorative justice tracking. Ahimsa courage gate. Moral topology with homological analysis. Hendrycks ETHICS 92.9% accuracy. Consciousness-coupled moral drift detection.",
-      "node_type": "Course",
-      "difficulty": "Expert",
-      "domain": "Consciousness Computing",
-      "subdomain": "Symthaea",
-      "tags": [
-        "moral-algebra",
-        "ethics",
-        "deontological",
-        "restorative-justice",
-        "ahimsa"
-      ],
-      "estimated_hours": 135,
-      "grade_levels": [
-        "Graduate"
-      ],
-      "bloom_level": "Evaluate",
-      "subject_area": "Consciousness Computing",
-      "academic_standards": [
-        {
-          "framework": "Luminous Dynamics",
-          "code": "SYM-502",
-          "description": "Moral Algebra and Ethics Engine",
-          "grade_level": "Graduate"
-        }
-      ],
-      "credit_hours": 3,
-      "course_level": "500-600"
-    },
-    {
-      "id": "SYM-503",
-      "title": "Broca Language Center",
-      "description": "Thought-to-text generation via 43-channel ThoughtEncoder. 15 Epistemic Cube channels. HDC binding → autoregressive generation. Per-axis EpistemicCubeGate. Epistemic gating physically prevents hallucination at logit level. GPU training via candle CUDA.",
-      "node_type": "Course",
-      "difficulty": "Expert",
-      "domain": "Consciousness Computing",
-      "subdomain": "Symthaea",
-      "tags": [
-        "broca",
-        "language-generation",
-        "epistemic-gating",
-        "thought-encoder"
-      ],
-      "estimated_hours": 135,
-      "grade_levels": [
-        "Graduate"
-      ],
-      "bloom_level": "Create",
-      "subject_area": "Consciousness Computing",
-      "academic_standards": [
-        {
-          "framework": "Luminous Dynamics",
-          "code": "SYM-503",
-          "description": "Broca Language Center",
-          "grade_level": "Graduate"
-        }
-      ],
-      "credit_hours": 3,
-      "course_level": "500-600"
-    },
-    {
-      "id": "SYM-601",
-      "title": "Substrate Independence",
-      "description": "Multiple realizability thesis. 8 substrate types (biological, silicon, quantum, photonic, neuromorphic, biochemical, hybrid, exotic). 9-dimensional feasibility scoring. Validation framework with honest confidence. Per-region hybrid substrate modeling. Energy budgets and tau-factor speed modulation.",
-      "node_type": "Course",
-      "difficulty": "Expert",
-      "domain": "Consciousness Computing",
-      "subdomain": "Symthaea",
-      "tags": [
-        "substrate-independence",
-        "multiple-realizability",
-        "quantum",
-        "hybrid"
-      ],
-      "estimated_hours": 270,
-      "grade_levels": [
-        "Doctoral"
-      ],
-      "bloom_level": "Create",
-      "subject_area": "Consciousness Computing",
-      "academic_standards": [
-        {
-          "framework": "Luminous Dynamics",
-          "code": "SYM-601",
-          "description": "Substrate Independence",
-          "grade_level": "Doctoral"
-        }
-      ],
-      "credit_hours": 6,
-      "course_level": "700+"
-    },
-    {
-      "id": "SYM-602",
-      "title": "Thermodynamic Unification",
-      "description": "Maxwell Demon (attention), Landauer (memory cost), Carnot (efficiency), Onsager (coupling health), Jarzynski (free energy validation), Prigogine (entropy enforcement). 6 active feedback loops. ThermodynamicPhysicsBridge coupling consciousness to physics.",
-      "node_type": "Course",
-      "difficulty": "Expert",
-      "domain": "Consciousness Computing",
-      "subdomain": "Symthaea",
-      "tags": [
-        "thermodynamics",
-        "maxwell-demon",
-        "landauer",
-        "carnot",
-        "prigogine"
-      ],
-      "estimated_hours": 270,
-      "grade_levels": [
-        "Doctoral"
-      ],
-      "bloom_level": "Create",
-      "subject_area": "Consciousness Computing",
-      "academic_standards": [
-        {
-          "framework": "Luminous Dynamics",
-          "code": "SYM-602",
-          "description": "Thermodynamic Unification",
-          "grade_level": "Doctoral"
-        }
-      ],
-      "credit_hours": 6,
-      "course_level": "700+"
-    },
-    {
       "id": "MYC-101",
       "title": "Introduction to Decentralized Civic Infrastructure",
       "description": "Why decentralize? The limits of centralized governance and data ownership. Agent-centric vs data-centric architectures. The 16-cluster Mycelix fractal design. Community-owned infrastructure as a public good.",
@@ -44648,6 +44335,1161 @@
       ],
       "credit_hours": 3,
       "course_level": "500-600"
+    },
+    {
+      "id": "SYM-101",
+      "title": "Introduction to Consciousness Computing",
+      "description": "Survey of computational consciousness: what it means for a machine to be conscious, the Hard Problem, philosophical zombies, multiple realizability, and why it matters for AI safety and value alignment.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Consciousness Computing",
+      "subdomain": "Symthaea",
+      "tags": [
+        "consciousness",
+        "philosophy-of-mind",
+        "ai-safety"
+      ],
+      "estimated_hours": 45,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Consciousness Computing",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "SYM-101",
+          "description": "Introduction to Consciousness Computing",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 1,
+      "course_level": "200-300"
+    },
+    {
+      "id": "SYM-201",
+      "title": "Hyperdimensional Computing Fundamentals",
+      "description": "16,384-dimensional binary and continuous hypervectors. Encoding (random indexing, spatial, temporal), binding (XOR/Hadamard), bundling (majority/sum), similarity (Hamming/cosine). Holographic reduced representations. Applications to classification, reasoning, and memory.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Consciousness Computing",
+      "subdomain": "Symthaea",
+      "tags": [
+        "hdc",
+        "hypervectors",
+        "encoding",
+        "binding",
+        "similarity"
+      ],
+      "estimated_hours": 90,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Consciousness Computing",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "SYM-201",
+          "description": "Hyperdimensional Computing Fundamentals",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 2,
+      "course_level": "200-300"
+    },
+    {
+      "id": "SYM-202",
+      "title": "Integrated Information Theory (IIT/Phi)",
+      "description": "Tononi's IIT axioms and postulates. Phi as a measure of consciousness. Exclusion, composition, information. Computational challenges of exact Phi. Approximations and surrogates. Practical measurement in artificial systems.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Consciousness Computing",
+      "subdomain": "Symthaea",
+      "tags": [
+        "iit",
+        "phi",
+        "integrated-information",
+        "consciousness-measure"
+      ],
+      "estimated_hours": 90,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Consciousness Computing",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "SYM-202",
+          "description": "Integrated Information Theory (IIT/Phi)",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 2,
+      "course_level": "200-300"
+    },
+    {
+      "id": "SYM-301",
+      "title": "Liquid Time-Constant Networks (CfC/LTC)",
+      "description": "Closed-form continuous-depth neural networks. ODE-based neurons with learned time constants. CfC as a closed-form approximation eliminating numerical ODE solving. Temporal processing, causal reasoning, and the unified HDC-LTC neuron.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Consciousness Computing",
+      "subdomain": "Symthaea",
+      "tags": [
+        "cfc",
+        "ltc",
+        "liquid-neural-networks",
+        "ode",
+        "temporal"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Consciousness Computing",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "SYM-301",
+          "description": "Liquid Time-Constant Networks (CfC/LTC)",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 3,
+      "course_level": "200-300"
+    },
+    {
+      "id": "SYM-302",
+      "title": "Active Inference and Free Energy",
+      "description": "The Free Energy Principle (Friston). Predictive coding, prediction error minimization. Active inference as perception-action loops. Variational free energy and the Markov blanket. Applications to embodied cognition and autonomous behavior.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Consciousness Computing",
+      "subdomain": "Symthaea",
+      "tags": [
+        "active-inference",
+        "free-energy",
+        "predictive-coding",
+        "markov-blanket"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Consciousness Computing",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "SYM-302",
+          "description": "Active Inference and Free Energy",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 3,
+      "course_level": "200-300"
+    },
+    {
+      "id": "SYM-501",
+      "title": "The Cognitive Loop: 8-Phase Pipeline",
+      "description": "Symthaea's core architecture: Perception → HDC Encode → CfC Evolve → Predict → Learn → Consciousness Measure → Moral Evaluation → Action. Rayon-parallel post-processing. 31 Hz measured throughput. CycleMetadata telemetry. Sub-struct organization.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Consciousness Computing",
+      "subdomain": "Symthaea",
+      "tags": [
+        "cognitive-loop",
+        "pipeline",
+        "architecture",
+        "rayon",
+        "telemetry"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Consciousness Computing",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "SYM-501",
+          "description": "The Cognitive Loop: 8-Phase Pipeline",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 4,
+      "course_level": "500-600"
+    },
+    {
+      "id": "SYM-502",
+      "title": "Moral Algebra and Ethics Engine",
+      "description": "16 deontological obligations (8 perfect + 8 imperfect). Duty satisfaction scoring. Restorative justice tracking. Ahimsa courage gate. Moral topology with homological analysis. Hendrycks ETHICS 92.9% accuracy. Consciousness-coupled moral drift detection.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Consciousness Computing",
+      "subdomain": "Symthaea",
+      "tags": [
+        "moral-algebra",
+        "ethics",
+        "deontological",
+        "restorative-justice",
+        "ahimsa"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Consciousness Computing",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "SYM-502",
+          "description": "Moral Algebra and Ethics Engine",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 3,
+      "course_level": "500-600"
+    },
+    {
+      "id": "SYM-503",
+      "title": "Broca Language Center",
+      "description": "Thought-to-text generation via 43-channel ThoughtEncoder. 15 Epistemic Cube channels. HDC binding → autoregressive generation. Per-axis EpistemicCubeGate. Epistemic gating physically prevents hallucination at logit level. GPU training via candle CUDA.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Consciousness Computing",
+      "subdomain": "Symthaea",
+      "tags": [
+        "broca",
+        "language-generation",
+        "epistemic-gating",
+        "thought-encoder"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Consciousness Computing",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "SYM-503",
+          "description": "Broca Language Center",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 3,
+      "course_level": "500-600"
+    },
+    {
+      "id": "SYM-601",
+      "title": "Substrate Independence",
+      "description": "Multiple realizability thesis. 8 substrate types (biological, silicon, quantum, photonic, neuromorphic, biochemical, hybrid, exotic). 9-dimensional feasibility scoring. Validation framework with honest confidence. Per-region hybrid substrate modeling. Energy budgets and tau-factor speed modulation.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Consciousness Computing",
+      "subdomain": "Symthaea",
+      "tags": [
+        "substrate-independence",
+        "multiple-realizability",
+        "quantum",
+        "hybrid"
+      ],
+      "estimated_hours": 270,
+      "grade_levels": [
+        "Doctoral"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Consciousness Computing",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "SYM-601",
+          "description": "Substrate Independence",
+          "grade_level": "Doctoral"
+        }
+      ],
+      "credit_hours": 6,
+      "course_level": "700+"
+    },
+    {
+      "id": "SYM-602",
+      "title": "Thermodynamic Unification",
+      "description": "Maxwell Demon (attention), Landauer (memory cost), Carnot (efficiency), Onsager (coupling health), Jarzynski (free energy validation), Prigogine (entropy enforcement). 6 active feedback loops. ThermodynamicPhysicsBridge coupling consciousness to physics.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Consciousness Computing",
+      "subdomain": "Symthaea",
+      "tags": [
+        "thermodynamics",
+        "maxwell-demon",
+        "landauer",
+        "carnot",
+        "prigogine"
+      ],
+      "estimated_hours": 270,
+      "grade_levels": [
+        "Doctoral"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Consciousness Computing",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "SYM-602",
+          "description": "Thermodynamic Unification",
+          "grade_level": "Doctoral"
+        }
+      ],
+      "credit_hours": 6,
+      "course_level": "700+"
+    },
+    {
+      "id": "258e46f9-0075-4a2e-adae-1ff0477e0f30",
+      "title": "data scientist",
+      "description": "Data scientists find and interpret rich data sources, manage large amounts of data, merge data sources, ensure consistency of data-sets, and create visualisations to aid in understanding data. They build mathematical models using data, present and communicate data insights and findings to specialists and scientists in their team and if required, to a non-expert audience, and recommend ways to apply the data.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "data scientist",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "data scientist"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "data scientist",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/258e46f9-0075-4a2e-adae-1ff0477e0f30",
+          "description": "data scientist",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "68d973df-bf10-4bf7-9a1b-fbd9f604b9db",
+      "title": "bioinformatics scientist",
+      "description": "Bioinformatics scientists analyse biological processes using computer programmes. They maintain or construct databases containing biological information. Bioinformatics scientists gather and analyse biological data and may also assist scientists in various fields, including in biotechnology and pharmaceutics. They perform scientific research and statistical analyses, and report on their findings. Bioinformatics scientists may also collect DNA samples, discover data patterns and conduct geneti...",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "data scientist",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "data scientist"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "data scientist",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/68d973df-bf10-4bf7-9a1b-fbd9f604b9db",
+          "description": "bioinformatics scientist",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "bc659adc-f42c-4ef6-89fe-fd030033f446",
+      "title": "cosmologist",
+      "description": "Cosmologists focus on the study of the universe as a whole, which is made up by its origin, evolution and ultimate fate. They use tools and scientific instruments to observe and study other galaxies and astronomical objects such as stars, black holes, planets and other celestial bodies.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "data scientist",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "data scientist"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "data scientist",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/bc659adc-f42c-4ef6-89fe-fd030033f446",
+          "description": "cosmologist",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "d23f4d59-2bea-4bd8-bcdb-5e23b1c50552",
+      "title": "education programme coordinator",
+      "description": "Education programme coordinators supervise the development and implementation of educational programmes. They develop policies for the promotion of education and manage budgets. They communicate with education facilities to analyse problems and investigate solutions.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "education",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "education"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "education",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/d23f4d59-2bea-4bd8-bcdb-5e23b1c50552",
+          "description": "education programme coordinator",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "f817aab2-ec8a-45ec-88ef-c11e0f19fd85",
+      "title": "education policy officer",
+      "description": "Education policy officers research, analyse and develop education policies, and implement these policies to improve the existing education system. They try to improve all aspects of education which will impact institutions such as schools, universities and vocational schools. They work closely with partners, external organisations or other stakeholders and provide them with regular updates.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "education",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "education"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "education",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/f817aab2-ec8a-45ec-88ef-c11e0f19fd85",
+          "description": "education policy officer",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "605e58d6-ad27-4828-b1f5-16707f327fa0",
+      "title": "education studies lecturer",
+      "description": "Education studies lecturers are professors, teachers, or lecturers who instruct students who have obtained an upper secondary education diploma in their own specialised field of study, education studies, so they can become teachers themselves. They work with their university research assistants and university teaching assistants for the preparation of lectures and of exams, grading papers and exams and leading review and feedback sessions for the students.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "education",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "education"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "education",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/605e58d6-ad27-4828-b1f5-16707f327fa0",
+          "description": "education studies lecturer",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "fbceeac6-798b-4307-a825-626707a753ad",
+      "title": "calculation engineer",
+      "description": "Calculation engineers draw conclusions about real systems, such as on strength, stability and durability, by performing experiments on virtual models. They test production processes as well.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "engineer",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "engineer"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "engineer",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/fbceeac6-798b-4307-a825-626707a753ad",
+          "description": "calculation engineer",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "e6800524-eec2-4c33-af0e-6f36d1d679bc",
+      "title": "instrumentation engineer",
+      "description": "Instrumentation engineers envision and design equipment used in manufacturing processes for controlling and monitoring various engineering processes remotely. They design equipment for the monitoring of production sites such as manufacturing systems, machinery uses and production processes.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "engineer",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "engineer"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "engineer",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/e6800524-eec2-4c33-af0e-6f36d1d679bc",
+          "description": "instrumentation engineer",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "615920c5-4f63-4eb3-8b60-afaaed3ab1ff",
+      "title": "maintenance and repair engineer",
+      "description": "Maintenance and repair engineers focus on the optimization of equipment, procedures, machineries and infrastructure. They ensure their maximum availability at minimum costs.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "engineer",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "engineer"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "engineer",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/615920c5-4f63-4eb3-8b60-afaaed3ab1ff",
+          "description": "maintenance and repair engineer",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "9dbbeb2c-0d51-4c03-8ef6-8dfa7360db22",
+      "title": "ship assistant engineer",
+      "description": "Ship assistant engineers assist the ship chief engineer and the ship duty engineer in the operations of the ship's hull. They support the operation of the main engines, steering mechanism, electrical generation and other major subsystems. They communicate with maritime engineers about the performance of technical operations. They also ensure appropriate safety and regulatory standards compliance and are able to take on higher level positions if needed.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "engineer",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "engineer"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "engineer",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/9dbbeb2c-0d51-4c03-8ef6-8dfa7360db22",
+          "description": "ship assistant engineer",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "aad7819e-d62e-41de-a594-9f2be186a6c2",
+      "title": "transport engineer",
+      "description": "Transport engineers design and set the engineering specifications for the construction and development of roadways and transport infrastructure. They apply engineering concepts and knowledge for developing sustainable and efficient modes of transportation ranging from roads to canals, railways, and airports.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "engineer",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "engineer"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "engineer",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/aad7819e-d62e-41de-a594-9f2be186a6c2",
+          "description": "transport engineer",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "32548f7e-8c25-4c49-9f22-78dee3543704",
+      "title": "environmental mining engineer",
+      "description": "Environmental mining engineers oversee the environmental performance of mining operations. They develop and implement environmental systems and strategies to minimise environmental impacts.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "environmental",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "environmental"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "environmental",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/32548f7e-8c25-4c49-9f22-78dee3543704",
+          "description": "environmental mining engineer",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "92efb42f-6b0a-44d8-94ea-0141555e6c3b",
+      "title": "environmental geologist",
+      "description": "Environmental geologists study how mineral operations may impact the composition and physical characteristics of the earth and its resources. They provide advice on issues such as land reclamation and environmental pollution.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "environmental",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "environmental"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "environmental",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/92efb42f-6b0a-44d8-94ea-0141555e6c3b",
+          "description": "environmental geologist",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "59883630-45f9-40e7-9732-9e5ff9758d2b",
+      "title": "environmental programme coordinator",
+      "description": "Environmental programme coordinators develop programmes for the improvement of environmental sustainability and efficiency within a organisation or institution. They inspect sites in order to monitor an organisation's or institution's compliance with environmental legislation. They also ensure education for the public on environmental concerns.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "environmental",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "environmental"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "environmental",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/59883630-45f9-40e7-9732-9e5ff9758d2b",
+          "description": "environmental programme coordinator",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "78db356f-a96a-4456-ab29-2de62e52f830",
+      "title": "public finance accountant",
+      "description": "Public finance accountants head the treasury department of a governmental institution. They manage the institution's financial administration, expenditure and income generation, and compliance with taxation and other financial legislation. They perform administrative duties to ensure record keeping, develop plans for budget management and perform financial forecasts.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "finance",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "finance"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "finance",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/78db356f-a96a-4456-ab29-2de62e52f830",
+          "description": "public finance accountant",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "30f3ea93-882a-4525-841c-1d5b4b64076f",
+      "title": "financial manager",
+      "description": "Financial managers handle all the matters in reference to the finance and investments of a company. They manage financial operations of companies such as the assets, liabilities, equity and cash flow aiming to maintain the financial health of the company and operative viability. Financial managers evaluate the strategic plans of the company in financial terms, maintain transparent financial operations for taxation and auditing bodies, and create the financial statements of the company at the ...",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "finance",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "finance"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "finance",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/30f3ea93-882a-4525-841c-1d5b4b64076f",
+          "description": "financial manager",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "c01cdf85-3ce0-4d12-ae86-e4e63493fafa",
+      "title": "financial broker",
+      "description": "Financial brokers undertake financial market activities on behalf of their clients. They monitor securities, financial documentation of their clients, market trends and conditions and other legal requirements. They plan buying and selling activities and calculate transactions costs.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "finance",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "finance"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "finance",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/c01cdf85-3ce0-4d12-ae86-e4e63493fafa",
+          "description": "financial broker",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "61053604-8091-4a8e-9c63-5151051722e3",
+      "title": "healthcare consultant",
+      "description": "Healthcare consultants advise health care organisations on the development of plans to improve patient care and safety. They analyse health care policies and identify issues, and aid in the development of improvement strategies.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "healthcare",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "healthcare"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "healthcare",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/61053604-8091-4a8e-9c63-5151051722e3",
+          "description": "healthcare consultant",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "4a29eab1-5f02-4723-a863-e2d5a0614dfa",
+      "title": "healthcare institution manager",
+      "description": "Healthcare institution managers supervise the operations of healthcare institutions, such as hospitals, rehabilitation facilities, home care services and elderly care institutions to ensure the organisation meets requirements, the patients and residents are cared for, the organisation is maintained and the necessary equipment present. They also supervise the staff and ensure record maintenance.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "healthcare",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "healthcare"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "healthcare",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/4a29eab1-5f02-4723-a863-e2d5a0614dfa",
+          "description": "healthcare institution manager",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "d4d6842b-27f0-4222-85db-c542acf6d434",
+      "title": "public health policy officer",
+      "description": "Public health policy officers develop and implement strategies for the improvement of a community's health care policy. They advise governments on policy changes and identify problems in current health care policies.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "healthcare",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "healthcare"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "healthcare",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/d4d6842b-27f0-4222-85db-c542acf6d434",
+          "description": "public health policy officer",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "d2ff134e-b41a-4fa3-aceb-1b9f5f5cf015",
+      "title": "legal service manager",
+      "description": "Legal service managers oversee the general management of a legal service office. They not only strive for the highest efficiency and effectiveness when delivering legal services and advice, but they also coordinate a team of legally trained professionals. They manage different profiles of clients and adjust the legal services to their needs.\n",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "legal profession",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "legal profession"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "legal profession",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/d2ff134e-b41a-4fa3-aceb-1b9f5f5cf015",
+          "description": "legal service manager",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "42c769cd-4c60-4bac-94d2-29a492b82b74",
+      "title": "scopist",
+      "description": "Scopists edit the transcripts created by court reporters in order to make of them a readable professional legal document. They listen or read to the reports given to them in order to apply punctuation, missing words, format, and improve the accuracy of the document.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "legal profession",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "legal profession"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "legal profession",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/42c769cd-4c60-4bac-94d2-29a492b82b74",
+          "description": "scopist",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "18d2b37a-9c31-4393-833e-bc2f7b1ce52a",
+      "title": "mergers and acquisitions analyst",
+      "description": "Mergers and acquisitions analysts oversee the execution of transactions for the purchase, sale, merger or takeover of companies. They negotiate and complete the deal on the client's behalf, by working closely with lawyers and accountants. Mergers and acquisitions analysts conduct operational and legal risk assessments of a company, assess comparable companies in the market and help with the post-merger integration.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "legal profession",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "legal profession"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "legal profession",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/18d2b37a-9c31-4393-833e-bc2f7b1ce52a",
+          "description": "mergers and acquisitions analyst",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "c02ee787-c30b-4f0d-9d7f-6eb36fc44a5d",
+      "title": "research manager",
+      "description": "\nResearch managers oversee the research and development functions of a research facility or program or university. They support the executive staff, coordinate work activities, and monitor staff and research projects. They may work in a wide array of sectors, such as the chemical, technical and life sciences sector. Research managers can also advise on research and execute research themselves.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "scientific research",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "scientific research"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "scientific research",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/c02ee787-c30b-4f0d-9d7f-6eb36fc44a5d",
+          "description": "research manager",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "73ceb2f9-18e3-4cfe-9c06-e9fb31ece440",
+      "title": "research and development manager",
+      "description": "Research and development managers coordinate the efforts of scientists, academical researchers, product developers, and market researchers towards the creation of new products, the improvement of current ones or other research activities, including scientific research. They manage and plan research and development activities of an organisation, specify goals and budget requirements and manage the staff.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "scientific research",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "scientific research"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "scientific research",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/73ceb2f9-18e3-4cfe-9c06-e9fb31ece440",
+          "description": "research and development manager",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "bcf8f332-c7e1-4a08-8651-28d668290eaf",
+      "title": "metallurgist",
+      "description": "Metallurgists specialise in the extraction and processing of metals such as iron, steel, zinc, copper and aluminium. They work to mold or combine both pure and mixed metals (alloys) into new shapes and properties. Metallurgists handle the extraction of metal ores and develop their use in metal processing techniques. They may work in both manufacturing or do scientific research about the performance of metals.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "scientific research",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "scientific research"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "scientific research",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/bcf8f332-c7e1-4a08-8651-28d668290eaf",
+          "description": "metallurgist",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "3ff2fdf4-af54-4517-873d-73e9353f112e",
+      "title": "computer games, multimedia and software specialised seller",
+      "description": "Computer games, multimedia and software specialised sellers sell software products in specialised shops.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "software",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "software"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "software",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/3ff2fdf4-af54-4517-873d-73e9353f112e",
+          "description": "computer games, multimedia and software specialised seller",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "f2b15a0e-e65a-438a-affb-29b9d50b77d1",
+      "title": "software developer",
+      "description": "Software developers implement or program all kinds of software systems based on specifications and designs by using programming languages, tools, and platforms.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "software",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "software"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "software",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/f2b15a0e-e65a-438a-affb-29b9d50b77d1",
+          "description": "software developer",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "57af9090-55b4-4911-b2d0-86db01c00b02",
+      "title": "embedded systems software developer",
+      "description": "Embedded systems software developers program, implement, document and maintain software to be run on an embedded system.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "software",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "software"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "software",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/57af9090-55b4-4911-b2d0-86db01c00b02",
+          "description": "embedded systems software developer",
+          "grade_level": "Professional"
+        }
+      ]
     }
   ],
   "edges": [
@@ -55012,83 +55854,6 @@
       "rationale": "phd-sociology/dissertation-writing must be completed before Dissertation Defense."
     },
     {
-      "from": "SYM-101",
-      "to": "SYM-201",
-      "edge_type": "Requires",
-      "strength_permille": 900,
-      "rationale": "Hyperdimensional Computing Fundamentals requires SYM-101"
-    },
-    {
-      "from": "SYM-101",
-      "to": "SYM-202",
-      "edge_type": "Requires",
-      "strength_permille": 900,
-      "rationale": "Integrated Information Theory (IIT/Phi) requires SYM-101"
-    },
-    {
-      "from": "SYM-201",
-      "to": "SYM-301",
-      "edge_type": "Requires",
-      "strength_permille": 900,
-      "rationale": "Liquid Time-Constant Networks (CfC/LTC) requires SYM-201"
-    },
-    {
-      "from": "SYM-202",
-      "to": "SYM-302",
-      "edge_type": "Requires",
-      "strength_permille": 900,
-      "rationale": "Active Inference and Free Energy requires SYM-202"
-    },
-    {
-      "from": "SYM-301",
-      "to": "SYM-501",
-      "edge_type": "Requires",
-      "strength_permille": 900,
-      "rationale": "The Cognitive Loop: 8-Phase Pipeline requires SYM-301"
-    },
-    {
-      "from": "SYM-302",
-      "to": "SYM-501",
-      "edge_type": "Requires",
-      "strength_permille": 900,
-      "rationale": "The Cognitive Loop: 8-Phase Pipeline requires SYM-302"
-    },
-    {
-      "from": "SYM-501",
-      "to": "SYM-502",
-      "edge_type": "Requires",
-      "strength_permille": 900,
-      "rationale": "Moral Algebra and Ethics Engine requires SYM-501"
-    },
-    {
-      "from": "SYM-501",
-      "to": "SYM-503",
-      "edge_type": "Requires",
-      "strength_permille": 900,
-      "rationale": "Broca Language Center requires SYM-501"
-    },
-    {
-      "from": "SYM-501",
-      "to": "SYM-601",
-      "edge_type": "Requires",
-      "strength_permille": 900,
-      "rationale": "Substrate Independence requires SYM-501"
-    },
-    {
-      "from": "SYM-202",
-      "to": "SYM-601",
-      "edge_type": "Requires",
-      "strength_permille": 900,
-      "rationale": "Substrate Independence requires SYM-202"
-    },
-    {
-      "from": "SYM-601",
-      "to": "SYM-602",
-      "edge_type": "Requires",
-      "strength_permille": 900,
-      "rationale": "Thermodynamic Unification requires SYM-601"
-    },
-    {
       "from": "MYC-101",
       "to": "MYC-201",
       "edge_type": "Requires",
@@ -55208,95 +55973,81 @@
       "rationale": "Polyglot Systems Architecture requires PY-301"
     },
     {
-      "from": "CCSS.Math.Content.5.OA.A.1",
-      "to": "18.01",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: Grade 5 (K-12) → MIT OCW: Mathematics (Undergraduate)."
+      "from": "SYM-101",
+      "to": "SYM-201",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Hyperdimensional Computing Fundamentals requires SYM-101"
     },
     {
-      "from": "CCSS.Math.Content.5.OA.A.1",
-      "to": "AL/BasicAnalysis",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: Grade 5 (K-12) → CS2013: Algorithms and Complexity (Undergraduate)."
+      "from": "SYM-101",
+      "to": "SYM-202",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Integrated Information Theory (IIT/Phi) requires SYM-101"
     },
     {
-      "from": "CCSS.Math.Content.5.OA.A.1",
-      "to": "DS/SetsRelations",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: Grade 5 (K-12) → CS2013: Discrete Structures (Undergraduate)."
+      "from": "SYM-201",
+      "to": "SYM-301",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Liquid Time-Constant Networks (CfC/LTC) requires SYM-201"
     },
     {
-      "from": "CCSS.Math.Content.5.OA.A.1",
-      "to": "phd-math/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: Grade 5 (K-12) → PhD in Mathematics (Doctoral)."
+      "from": "SYM-202",
+      "to": "SYM-302",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Active Inference and Free Energy requires SYM-202"
     },
     {
-      "from": "CCSS.Math.Content.8.EE.A.2",
-      "to": "18.03SC",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Use square root and cube root symbols to represent solutions to equations of ... (K-12) → Differential Equations (Undergraduate)."
+      "from": "SYM-301",
+      "to": "SYM-501",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "The Cognitive Loop: 8-Phase Pipeline requires SYM-301"
     },
     {
-      "from": "CCSS.Math.Content.8.EE.A.2",
-      "to": "18.085",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Use square root and cube root symbols to represent solutions to equations of ... (K-12) → Computational Science and Engineering I (Undergraduate)."
+      "from": "SYM-302",
+      "to": "SYM-501",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "The Cognitive Loop: 8-Phase Pipeline requires SYM-302"
     },
     {
-      "from": "CCSS.Math.Content.8.SP.A.2",
-      "to": "18.03SC",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Know that straight lines are widely used to model relationships between two q... (K-12) → Differential Equations (Undergraduate)."
+      "from": "SYM-501",
+      "to": "SYM-502",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Moral Algebra and Ethics Engine requires SYM-501"
     },
     {
-      "from": "CCSS.Math.Content.8.SP.A.4",
-      "to": "18.03SC",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Understand that patterns of association can also be seen in bivariate categor... (K-12) → Differential Equations (Undergraduate)."
+      "from": "SYM-501",
+      "to": "SYM-503",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Broca Language Center requires SYM-501"
     },
     {
-      "from": "CCSS.Math.Content.8.SP.A.4",
-      "to": "AL/FundamentalDataStructures",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Understand that patterns of association can also be seen in bivariate categor... (K-12) → Fundamental Data Structures and Algorithms (Undergraduate)."
+      "from": "SYM-501",
+      "to": "SYM-601",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Substrate Independence requires SYM-501"
     },
     {
-      "from": "CCSS.Math.Content.8.SP.A.1",
-      "to": "DS/Probability",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Construct and interpret scatter plots for bivariate measurement data to inves... (K-12) → Discrete Probability (Undergraduate)."
+      "from": "SYM-202",
+      "to": "SYM-601",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Substrate Independence requires SYM-202"
     },
     {
-      "from": "CCSS.Math.Content.8.SP.A.2",
-      "to": "DS/Probability",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Know that straight lines are widely used to model relationships between two q... (K-12) → Discrete Probability (Undergraduate)."
-    },
-    {
-      "from": "CCSS.Math.Content.8.SP.A.4",
-      "to": "DS/Probability",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Understand that patterns of association can also be seen in bivariate categor... (K-12) → Discrete Probability (Undergraduate)."
-    },
-    {
-      "from": "CCSS.Math.Content.8.SP.A.4",
-      "to": "phd-math/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: Grade 8 (K-12) → PhD in Mathematics (Doctoral)."
+      "from": "SYM-601",
+      "to": "SYM-602",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Thermodynamic Unification requires SYM-601"
     },
     {
       "from": "CCSS.Math.Content.HSA-CED.A.1",
@@ -55482,48 +56233,6 @@
     },
     {
       "from": "SEP.2.3-5.4",
-      "to": "10.675J",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Define a simple design problem that can be solved through the development of ... (K-12) → Computational Quantum Mechanics of Molecular and Extended Systems (Undergraduate)."
-    },
-    {
-      "from": "SEP.3.3-5",
-      "to": "10.675J",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Constructing explanations and designing solutions in 3–5 builds on K–2 ex... (K-12) → Computational Quantum Mechanics of Molecular and Extended Systems (Undergraduate)."
-    },
-    {
-      "from": "SEP.3.3-5.5",
-      "to": "10.675J",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Generate and compare multiple solutions to a problem based on how well they m... (K-12) → Computational Quantum Mechanics of Molecular and Extended Systems (Undergraduate)."
-    },
-    {
-      "from": "SEP.3.3-5.7",
-      "to": "10.675J",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Generate and compare multiple solutions to a problem based on how well they m... (K-12) → Computational Quantum Mechanics of Molecular and Extended Systems (Undergraduate)."
-    },
-    {
-      "from": "SEP.3.3-5.7",
-      "to": "5.069",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Generate and compare multiple solutions to a problem based on how well they m... (K-12) → Crystal Structure Analysis (Undergraduate)."
-    },
-    {
-      "from": "SEP.4.3-5",
-      "to": "10.675J",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Modeling in 3–5 builds on K–2 experiences and progresses to building and ... (K-12) → Computational Quantum Mechanics of Molecular and Extended Systems (Undergraduate)."
-    },
-    {
-      "from": "SEP.2.3-5.4",
       "to": "RUST-101",
       "edge_type": "LeadsTo",
       "strength_permille": 750,
@@ -55563,20 +56272,6 @@
       "edge_type": "LeadsTo",
       "strength_permille": 600,
       "rationale": "General bridge: Grade 5 (K-12) → PhD in Biological Sciences (Doctoral)."
-    },
-    {
-      "from": "SEP.4.3-5",
-      "to": "phd-chemistry/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: Grade 5 (K-12) → PhD in Chemistry (Doctoral)."
-    },
-    {
-      "from": "SEP.4.3-5",
-      "to": "phd-political-science/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: Grade 5 (K-12) → PhD in Political Science (Doctoral)."
     },
     {
       "from": "HST.950J",
@@ -55637,34 +56332,6 @@
     {
       "from": "7.90J",
       "to": "phd-biology/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Computational Functional Genomics (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "CMS.611J",
-      "to": "phd-chemistry/seminar",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Creating Video Games (Undergraduate) → Research Seminar Participation (Doctoral)."
-    },
-    {
-      "from": "7.90J",
-      "to": "phd-chemistry/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Computational Functional Genomics (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "CMS.611J",
-      "to": "phd-political-science/seminar",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Creating Video Games (Undergraduate) → Research Seminar Participation (Doctoral)."
-    },
-    {
-      "from": "7.90J",
-      "to": "phd-political-science/coursework",
       "edge_type": "LeadsTo",
       "strength_permille": 750,
       "rationale": "Cross-level bridge: Computational Functional Genomics (Undergraduate) → Core Coursework (Doctoral)."
@@ -55817,48 +56484,6 @@
       "rationale": "Cross-level bridge: Introduction to Computational Neuroscience (Undergraduate) → Core Coursework (Doctoral)."
     },
     {
-      "from": "RES.8-007",
-      "to": "phd-chemistry/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Cosmic Origin of the Chemical Elements  (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "RES.8-007",
-      "to": "phd-chemistry/seminar",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Cosmic Origin of the Chemical Elements  (Undergraduate) → Research Seminar Participation (Doctoral)."
-    },
-    {
-      "from": "MAS.865J",
-      "to": "phd-chemistry/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Quantum Information Science (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "9.29J",
-      "to": "phd-chemistry/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Introduction to Computational Neuroscience (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "MAS.865J",
-      "to": "phd-political-science/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Quantum Information Science (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "9.29J",
-      "to": "phd-political-science/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Introduction to Computational Neuroscience (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
       "from": "RES.7-006",
       "to": "phd-cs/coursework",
       "edge_type": "LeadsTo",
@@ -55875,20 +56500,6 @@
     {
       "from": "RES.7-006",
       "to": "phd-biology/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: 7.03x Genetics (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "RES.7-006",
-      "to": "phd-chemistry/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: 7.03x Genetics (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "RES.7-006",
-      "to": "phd-political-science/coursework",
       "edge_type": "LeadsTo",
       "strength_permille": 750,
       "rationale": "Cross-level bridge: 7.03x Genetics (Undergraduate) → Core Coursework (Doctoral)."
@@ -55964,48 +56575,6 @@
       "rationale": "Cross-level bridge: Labor Economics and Public Policy (Undergraduate) → Research Seminar Participation (Doctoral)."
     },
     {
-      "from": "17.100J",
-      "to": "phd-political-science/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Political Economy I (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "17.100J",
-      "to": "phd-political-science/seminar",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Political Economy I (Undergraduate) → Research Seminar Participation (Doctoral)."
-    },
-    {
-      "from": "14.731",
-      "to": "phd-political-science/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Economic History (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "14.71",
-      "to": "phd-political-science/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Economic History of Financial Crises (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "14.661",
-      "to": "phd-political-science/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Labor Economics I (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "14.64",
-      "to": "phd-political-science/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Labor Economics and Public Policy (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
       "from": "21G.084J",
       "to": "phd-cs/coursework",
       "edge_type": "LeadsTo",
@@ -56043,20 +56612,6 @@
     {
       "from": "17.S950",
       "to": "phd-biology/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Social Science and the Iraq and Syrian Wars (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "21G.084J",
-      "to": "phd-chemistry/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Introduction to Latin American Studies (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "17.S950",
-      "to": "phd-chemistry/coursework",
       "edge_type": "LeadsTo",
       "strength_permille": 750,
       "rationale": "Cross-level bridge: Social Science and the Iraq and Syrian Wars (Undergraduate) → Core Coursework (Doctoral)."
@@ -56074,188 +56629,6 @@
       "edge_type": "LeadsTo",
       "strength_permille": 750,
       "rationale": "Cross-level bridge: Social Science and the Iraq and Syrian Wars (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "21G.084J",
-      "to": "phd-political-science/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Introduction to Latin American Studies (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "21G.084J",
-      "to": "phd-political-science/seminar",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Introduction to Latin American Studies (Undergraduate) → Research Seminar Participation (Doctoral)."
-    },
-    {
-      "from": "17.S950",
-      "to": "phd-political-science/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Social Science and the Iraq and Syrian Wars (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "17.S950",
-      "to": "phd-political-science/seminar",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Social Science and the Iraq and Syrian Wars (Undergraduate) → Research Seminar Participation (Doctoral)."
-    },
-    {
-      "from": "5.73",
-      "to": "phd-cs/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Introductory Quantum Mechanics I (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.72",
-      "to": "phd-cs/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Non-Equilibrium Statistical Mechanics (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.61",
-      "to": "phd-cs/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Physical Chemistry (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.74",
-      "to": "phd-physics/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Introductory Quantum Mechanics II (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.74",
-      "to": "phd-physics/seminar",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Introductory Quantum Mechanics II (Undergraduate) → Research Seminar Participation (Doctoral)."
-    },
-    {
-      "from": "5.73",
-      "to": "phd-physics/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Introductory Quantum Mechanics I (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.73",
-      "to": "phd-physics/seminar",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Introductory Quantum Mechanics I (Undergraduate) → Research Seminar Participation (Doctoral)."
-    },
-    {
-      "from": "5.72",
-      "to": "phd-physics/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Non-Equilibrium Statistical Mechanics (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.72",
-      "to": "phd-physics/seminar",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Non-Equilibrium Statistical Mechanics (Undergraduate) → Research Seminar Participation (Doctoral)."
-    },
-    {
-      "from": "5.61",
-      "to": "phd-physics/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Physical Chemistry (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.61",
-      "to": "phd-physics/seminar",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Physical Chemistry (Undergraduate) → Research Seminar Participation (Doctoral)."
-    },
-    {
-      "from": "5.73",
-      "to": "phd-biology/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Introductory Quantum Mechanics I (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.72",
-      "to": "phd-biology/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Non-Equilibrium Statistical Mechanics (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.61",
-      "to": "phd-biology/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Physical Chemistry (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.73",
-      "to": "phd-chemistry/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Introductory Quantum Mechanics I (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.72",
-      "to": "phd-chemistry/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Non-Equilibrium Statistical Mechanics (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.72",
-      "to": "phd-chemistry/seminar",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Non-Equilibrium Statistical Mechanics (Undergraduate) → Research Seminar Participation (Doctoral)."
-    },
-    {
-      "from": "5.61",
-      "to": "phd-chemistry/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Physical Chemistry (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.61",
-      "to": "phd-chemistry/seminar",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Physical Chemistry (Undergraduate) → Research Seminar Participation (Doctoral)."
-    },
-    {
-      "from": "5.73",
-      "to": "phd-political-science/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Introductory Quantum Mechanics I (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.72",
-      "to": "phd-political-science/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Non-Equilibrium Statistical Mechanics (Undergraduate) → Core Coursework (Doctoral)."
-    },
-    {
-      "from": "5.61",
-      "to": "phd-political-science/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 750,
-      "rationale": "Cross-level bridge: Physical Chemistry (Undergraduate) → Core Coursework (Doctoral)."
     },
     {
       "from": "AL/Automata",
@@ -56286,13 +56659,6 @@
       "rationale": "General bridge: CS2013: Discrete Structures (Undergraduate) → PhD in Mathematics (Doctoral)."
     },
     {
-      "from": "SDF/DevMethods",
-      "to": "phd-cs/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: CS2013: Software Development Fundamentals (Undergraduate) → PhD in Computer Science (Doctoral)."
-    },
-    {
       "from": "LANG-401",
       "to": "phd-cs/coursework",
       "edge_type": "LeadsTo",
@@ -56314,18 +56680,11 @@
       "rationale": "General bridge: Programming Languages for AI & Humans (Undergraduate) → PhD in Biological Sciences (Doctoral)."
     },
     {
-      "from": "LANG-401",
-      "to": "phd-chemistry/coursework",
+      "from": "57af9090-55b4-4911-b2d0-86db01c00b02",
+      "to": "phd-cs/coursework",
       "edge_type": "LeadsTo",
       "strength_permille": 600,
-      "rationale": "General bridge: Programming Languages for AI & Humans (Undergraduate) → PhD in Chemistry (Doctoral)."
-    },
-    {
-      "from": "LANG-401",
-      "to": "phd-political-science/coursework",
-      "edge_type": "LeadsTo",
-      "strength_permille": 600,
-      "rationale": "General bridge: Programming Languages for AI & Humans (Undergraduate) → PhD in Political Science (Doctoral)."
+      "rationale": "General bridge: ESCO Career Pathway: software (Undergraduate) → PhD in Computer Science (Doctoral)."
     }
   ]
 }

@@ -1,0 +1,108 @@
+{
+  "metadata": {
+    "title": "ESCO Career Pathway: environmental",
+    "framework": "ESCO",
+    "source": "https://ec.europa.eu/esco/",
+    "grade_level": "Undergraduate",
+    "subject_area": "environmental",
+    "domain": "environmental",
+    "version": "1.2",
+    "total_standards": 3,
+    "domains": [
+      "Career"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Career pathway from ESCO API. 3 occupations with essential skills.",
+    "academic_level": "Professional"
+  },
+  "nodes": [
+    {
+      "id": "32548f7e-8c25-4c49-9f22-78dee3543704",
+      "title": "environmental mining engineer",
+      "description": "Environmental mining engineers oversee the environmental performance of mining operations. They develop and implement environmental systems and strategies to minimise environmental impacts.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "environmental",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "environmental"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "environmental",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/32548f7e-8c25-4c49-9f22-78dee3543704",
+          "description": "environmental mining engineer",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "92efb42f-6b0a-44d8-94ea-0141555e6c3b",
+      "title": "environmental geologist",
+      "description": "Environmental geologists study how mineral operations may impact the composition and physical characteristics of the earth and its resources. They provide advice on issues such as land reclamation and environmental pollution.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "environmental",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "environmental"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "environmental",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/92efb42f-6b0a-44d8-94ea-0141555e6c3b",
+          "description": "environmental geologist",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "59883630-45f9-40e7-9732-9e5ff9758d2b",
+      "title": "environmental programme coordinator",
+      "description": "Environmental programme coordinators develop programmes for the improvement of environmental sustainability and efficiency within a organisation or institution. They inspect sites in order to monitor an organisation's or institution's compliance with environmental legislation. They also ensure education for the public on environmental concerns.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "environmental",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "environmental"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "environmental",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/59883630-45f9-40e7-9732-9e5ff9758d2b",
+          "description": "environmental programme coordinator",
+          "grade_level": "Professional"
+        }
+      ]
+    }
+  ],
+  "edges": []
+}

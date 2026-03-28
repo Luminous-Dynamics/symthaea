@@ -1,0 +1,108 @@
+{
+  "metadata": {
+    "title": "ESCO Career Pathway: data scientist",
+    "framework": "ESCO",
+    "source": "https://ec.europa.eu/esco/",
+    "grade_level": "Undergraduate",
+    "subject_area": "data scientist",
+    "domain": "data scientist",
+    "version": "1.2",
+    "total_standards": 3,
+    "domains": [
+      "Career"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Career pathway from ESCO API. 3 occupations with essential skills.",
+    "academic_level": "Professional"
+  },
+  "nodes": [
+    {
+      "id": "258e46f9-0075-4a2e-adae-1ff0477e0f30",
+      "title": "data scientist",
+      "description": "Data scientists find and interpret rich data sources, manage large amounts of data, merge data sources, ensure consistency of data-sets, and create visualisations to aid in understanding data. They build mathematical models using data, present and communicate data insights and findings to specialists and scientists in their team and if required, to a non-expert audience, and recommend ways to apply the data.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "data scientist",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "data scientist"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "data scientist",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/258e46f9-0075-4a2e-adae-1ff0477e0f30",
+          "description": "data scientist",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "68d973df-bf10-4bf7-9a1b-fbd9f604b9db",
+      "title": "bioinformatics scientist",
+      "description": "Bioinformatics scientists analyse biological processes using computer programmes. They maintain or construct databases containing biological information. Bioinformatics scientists gather and analyse biological data and may also assist scientists in various fields, including in biotechnology and pharmaceutics. They perform scientific research and statistical analyses, and report on their findings. Bioinformatics scientists may also collect DNA samples, discover data patterns and conduct geneti...",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "data scientist",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "data scientist"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "data scientist",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/68d973df-bf10-4bf7-9a1b-fbd9f604b9db",
+          "description": "bioinformatics scientist",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "bc659adc-f42c-4ef6-89fe-fd030033f446",
+      "title": "cosmologist",
+      "description": "Cosmologists focus on the study of the universe as a whole, which is made up by its origin, evolution and ultimate fate. They use tools and scientific instruments to observe and study other galaxies and astronomical objects such as stars, black holes, planets and other celestial bodies.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "data scientist",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "data scientist"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "data scientist",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/bc659adc-f42c-4ef6-89fe-fd030033f446",
+          "description": "cosmologist",
+          "grade_level": "Professional"
+        }
+      ]
+    }
+  ],
+  "edges": []
+}

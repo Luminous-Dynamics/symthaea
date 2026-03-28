@@ -1,0 +1,108 @@
+{
+  "metadata": {
+    "title": "ESCO Career Pathway: healthcare",
+    "framework": "ESCO",
+    "source": "https://ec.europa.eu/esco/",
+    "grade_level": "Undergraduate",
+    "subject_area": "healthcare",
+    "domain": "healthcare",
+    "version": "1.2",
+    "total_standards": 3,
+    "domains": [
+      "Career"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Career pathway from ESCO API. 3 occupations with essential skills.",
+    "academic_level": "Professional"
+  },
+  "nodes": [
+    {
+      "id": "61053604-8091-4a8e-9c63-5151051722e3",
+      "title": "healthcare consultant",
+      "description": "Healthcare consultants advise health care organisations on the development of plans to improve patient care and safety. They analyse health care policies and identify issues, and aid in the development of improvement strategies.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "healthcare",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "healthcare"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "healthcare",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/61053604-8091-4a8e-9c63-5151051722e3",
+          "description": "healthcare consultant",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "4a29eab1-5f02-4723-a863-e2d5a0614dfa",
+      "title": "healthcare institution manager",
+      "description": "Healthcare institution managers supervise the operations of healthcare institutions, such as hospitals, rehabilitation facilities, home care services and elderly care institutions to ensure the organisation meets requirements, the patients and residents are cared for, the organisation is maintained and the necessary equipment present. They also supervise the staff and ensure record maintenance.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "healthcare",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "healthcare"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "healthcare",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/4a29eab1-5f02-4723-a863-e2d5a0614dfa",
+          "description": "healthcare institution manager",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "d4d6842b-27f0-4222-85db-c542acf6d434",
+      "title": "public health policy officer",
+      "description": "Public health policy officers develop and implement strategies for the improvement of a community's health care policy. They advise governments on policy changes and identify problems in current health care policies.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "healthcare",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "healthcare"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "healthcare",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/d4d6842b-27f0-4222-85db-c542acf6d434",
+          "description": "public health policy officer",
+          "grade_level": "Professional"
+        }
+      ]
+    }
+  ],
+  "edges": []
+}

@@ -1,0 +1,108 @@
+{
+  "metadata": {
+    "title": "ESCO Career Pathway: scientific research",
+    "framework": "ESCO",
+    "source": "https://ec.europa.eu/esco/",
+    "grade_level": "Undergraduate",
+    "subject_area": "scientific research",
+    "domain": "scientific research",
+    "version": "1.2",
+    "total_standards": 3,
+    "domains": [
+      "Career"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Career pathway from ESCO API. 3 occupations with essential skills.",
+    "academic_level": "Professional"
+  },
+  "nodes": [
+    {
+      "id": "c02ee787-c30b-4f0d-9d7f-6eb36fc44a5d",
+      "title": "research manager",
+      "description": "\nResearch managers oversee the research and development functions of a research facility or program or university. They support the executive staff, coordinate work activities, and monitor staff and research projects. They may work in a wide array of sectors, such as the chemical, technical and life sciences sector. Research managers can also advise on research and execute research themselves.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "scientific research",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "scientific research"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "scientific research",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/c02ee787-c30b-4f0d-9d7f-6eb36fc44a5d",
+          "description": "research manager",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "73ceb2f9-18e3-4cfe-9c06-e9fb31ece440",
+      "title": "research and development manager",
+      "description": "Research and development managers coordinate the efforts of scientists, academical researchers, product developers, and market researchers towards the creation of new products, the improvement of current ones or other research activities, including scientific research. They manage and plan research and development activities of an organisation, specify goals and budget requirements and manage the staff.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "scientific research",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "scientific research"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "scientific research",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/73ceb2f9-18e3-4cfe-9c06-e9fb31ece440",
+          "description": "research and development manager",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "bcf8f332-c7e1-4a08-8651-28d668290eaf",
+      "title": "metallurgist",
+      "description": "Metallurgists specialise in the extraction and processing of metals such as iron, steel, zinc, copper and aluminium. They work to mold or combine both pure and mixed metals (alloys) into new shapes and properties. Metallurgists handle the extraction of metal ores and develop their use in metal processing techniques. They may work in both manufacturing or do scientific research about the performance of metals.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "scientific research",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "scientific research"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "scientific research",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/bcf8f332-c7e1-4a08-8651-28d668290eaf",
+          "description": "metallurgist",
+          "grade_level": "Professional"
+        }
+      ]
+    }
+  ],
+  "edges": []
+}

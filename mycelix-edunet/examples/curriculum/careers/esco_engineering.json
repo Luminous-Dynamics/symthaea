@@ -1,0 +1,166 @@
+{
+  "metadata": {
+    "title": "ESCO Career Pathway: engineer",
+    "framework": "ESCO",
+    "source": "https://ec.europa.eu/esco/",
+    "grade_level": "Undergraduate",
+    "subject_area": "engineer",
+    "domain": "engineer",
+    "version": "1.2",
+    "total_standards": 5,
+    "domains": [
+      "Career"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Career pathway from ESCO API. 5 occupations with essential skills.",
+    "academic_level": "Professional"
+  },
+  "nodes": [
+    {
+      "id": "fbceeac6-798b-4307-a825-626707a753ad",
+      "title": "calculation engineer",
+      "description": "Calculation engineers draw conclusions about real systems, such as on strength, stability and durability, by performing experiments on virtual models. They test production processes as well.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "engineer",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "engineer"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "engineer",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/fbceeac6-798b-4307-a825-626707a753ad",
+          "description": "calculation engineer",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "e6800524-eec2-4c33-af0e-6f36d1d679bc",
+      "title": "instrumentation engineer",
+      "description": "Instrumentation engineers envision and design equipment used in manufacturing processes for controlling and monitoring various engineering processes remotely. They design equipment for the monitoring of production sites such as manufacturing systems, machinery uses and production processes.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "engineer",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "engineer"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "engineer",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/e6800524-eec2-4c33-af0e-6f36d1d679bc",
+          "description": "instrumentation engineer",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "615920c5-4f63-4eb3-8b60-afaaed3ab1ff",
+      "title": "maintenance and repair engineer",
+      "description": "Maintenance and repair engineers focus on the optimization of equipment, procedures, machineries and infrastructure. They ensure their maximum availability at minimum costs.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "engineer",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "engineer"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "engineer",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/615920c5-4f63-4eb3-8b60-afaaed3ab1ff",
+          "description": "maintenance and repair engineer",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "9dbbeb2c-0d51-4c03-8ef6-8dfa7360db22",
+      "title": "ship assistant engineer",
+      "description": "Ship assistant engineers assist the ship chief engineer and the ship duty engineer in the operations of the ship's hull. They support the operation of the main engines, steering mechanism, electrical generation and other major subsystems. They communicate with maritime engineers about the performance of technical operations. They also ensure appropriate safety and regulatory standards compliance and are able to take on higher level positions if needed.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "engineer",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "engineer"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "engineer",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/9dbbeb2c-0d51-4c03-8ef6-8dfa7360db22",
+          "description": "ship assistant engineer",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "aad7819e-d62e-41de-a594-9f2be186a6c2",
+      "title": "transport engineer",
+      "description": "Transport engineers design and set the engineering specifications for the construction and development of roadways and transport infrastructure. They apply engineering concepts and knowledge for developing sustainable and efficient modes of transportation ranging from roads to canals, railways, and airports.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "engineer",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "engineer"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "engineer",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/aad7819e-d62e-41de-a594-9f2be186a6c2",
+          "description": "transport engineer",
+          "grade_level": "Professional"
+        }
+      ]
+    }
+  ],
+  "edges": []
+}

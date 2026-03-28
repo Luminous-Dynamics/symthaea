@@ -1,0 +1,108 @@
+{
+  "metadata": {
+    "title": "ESCO Career Pathway: education",
+    "framework": "ESCO",
+    "source": "https://ec.europa.eu/esco/",
+    "grade_level": "Undergraduate",
+    "subject_area": "education",
+    "domain": "education",
+    "version": "1.2",
+    "total_standards": 3,
+    "domains": [
+      "Career"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Career pathway from ESCO API. 3 occupations with essential skills.",
+    "academic_level": "Professional"
+  },
+  "nodes": [
+    {
+      "id": "d23f4d59-2bea-4bd8-bcdb-5e23b1c50552",
+      "title": "education programme coordinator",
+      "description": "Education programme coordinators supervise the development and implementation of educational programmes. They develop policies for the promotion of education and manage budgets. They communicate with education facilities to analyse problems and investigate solutions.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "education",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "education"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "education",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/d23f4d59-2bea-4bd8-bcdb-5e23b1c50552",
+          "description": "education programme coordinator",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "f817aab2-ec8a-45ec-88ef-c11e0f19fd85",
+      "title": "education policy officer",
+      "description": "Education policy officers research, analyse and develop education policies, and implement these policies to improve the existing education system. They try to improve all aspects of education which will impact institutions such as schools, universities and vocational schools. They work closely with partners, external organisations or other stakeholders and provide them with regular updates.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "education",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "education"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "education",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/f817aab2-ec8a-45ec-88ef-c11e0f19fd85",
+          "description": "education policy officer",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "605e58d6-ad27-4828-b1f5-16707f327fa0",
+      "title": "education studies lecturer",
+      "description": "Education studies lecturers are professors, teachers, or lecturers who instruct students who have obtained an upper secondary education diploma in their own specialised field of study, education studies, so they can become teachers themselves. They work with their university research assistants and university teaching assistants for the preparation of lectures and of exams, grading papers and exams and leading review and feedback sessions for the students.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "education",
+      "subdomain": "Career",
+      "tags": [
+        "esco",
+        "occupation",
+        "career",
+        "education"
+      ],
+      "estimated_hours": 2000,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "education",
+      "academic_standards": [
+        {
+          "framework": "ESCO",
+          "code": "http://data.europa.eu/esco/occupation/605e58d6-ad27-4828-b1f5-16707f327fa0",
+          "description": "education studies lecturer",
+          "grade_level": "Professional"
+        }
+      ]
+    }
+  ],
+  "edges": []
+}
