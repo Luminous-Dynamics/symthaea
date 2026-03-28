@@ -21,10 +21,13 @@ admin_interfaces:
 # All conductors register here with their Docker-internal hostnames,
 # so peer discovery works within the Docker bridge network.
 network:
-  bootstrap_url: http://bootstrap:8787
-  signal_url: ws://bootstrap:8787
-  relay_url: ws://bootstrap:8787
+  bootstrap_url: http://172.19.0.1:8787
+  signal_url: ws://172.19.0.1:8787
+  relay_url: ws://172.19.0.1:8787
   target_arc_factor: 1
+  advanced:
+    tx5Transport:
+      signalAllowPlainText: true
 
 data_root_path: /data/holochain/databases
 db_sync_strategy: Fast

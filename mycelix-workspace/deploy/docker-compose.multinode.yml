@@ -32,14 +32,15 @@ services:
   # Docker network (http://bootstrap:8787). Peers register with their
   # Docker-internal hostname, which IS resolvable by other containers.
   bootstrap:
-    image: deploy-conductor:latest
+    image: mycelix-bootstrap:latest
     container_name: mycelix-bootstrap
-    entrypoint: ["bootstrap-srv"]
-    command: ["--port", "8787"]
+    command: ["--listen-addr", "0.0.0.0:8787"]
+    ports:
+      - "127.0.0.1:8787:8787"
     networks:
       - mycelix-net
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8787", "||", "true"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:8787/ || true"]
       interval: 10s
       timeout: 3s
       retries: 5
