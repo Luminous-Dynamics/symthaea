@@ -612,5 +612,6 @@ pub mod spectral_vocoder;
 pub mod substrate_timbre;
 pub mod synesthesia;
 pub mod temporal_hierarchy;
+pub mod instruments;
 pub mod timbre_space;
 pub mod wavetable;
