@@ -89,12 +89,9 @@ pub fn train_projections(
     muse_config: &MuseConfig,
 ) -> TrainingResult {
     // Load melodies
-    let mut melodies = midi_loader::load_melodies(midi_dir);
-    if config.max_melodies > 0 && melodies.len() > config.max_melodies {
-        melodies.truncate(config.max_melodies);
-    }
+    let raw_melodies = midi_loader::load_melodies(midi_dir);
 
-    if melodies.is_empty() {
+    if raw_melodies.is_empty() {
         return TrainingResult {
             fitness_trajectory: vec![],
             best_fitness: 0.0,
@@ -104,8 +101,41 @@ pub fn train_projections(
         };
     }
 
-    // Filter to melodies with enough notes
-    melodies.retain(|m| m.len() >= 4);
+    // Extract short phrases (8-24 notes) from long performances.
+    // Training on 3000-note piano pieces vs 16-note output is a mismatch.
+    // Phrase segmentation: split on large time gaps or every N notes.
+    let phrase_len = muse_config.max_notes.max(8);
+    let mut melodies: Vec<Vec<Note>> = Vec::new();
+    for melody in &raw_melodies {
+        if melody.len() < 4 {
+            continue;
+        }
+        // Split into overlapping phrases
+        for chunk in melody.windows(phrase_len).step_by(phrase_len / 2) {
+            if chunk.len() >= 4 {
+                // Re-zero start times relative to phrase start
+                let offset = chunk[0].start_time;
+                let phrase: Vec<Note> = chunk
+                    .iter()
+                    .map(|n| Note {
+                        frequency: n.frequency,
+                        start_time: n.start_time - offset,
+                        duration: n.duration,
+                        velocity: n.velocity,
+                    })
+                    .collect();
+                melodies.push(phrase);
+            }
+        }
+    }
+
+    if config.max_melodies > 0 && melodies.len() > config.max_melodies {
+        // Shuffle deterministically then truncate
+        let mut rng_shuffle = StdRng::seed_from_u64(config.seed + 1);
+        use rand::seq::SliceRandom;
+        melodies.shuffle(&mut rng_shuffle);
+        melodies.truncate(config.max_melodies);
+    }
     let melodies_used = melodies.len();
 
     // Initialize projections from genesis seed

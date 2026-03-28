@@ -25,11 +25,11 @@ fn main() {
     println!("═══════════════════════════════════════════════════════\n");
 
     let config = TrainingConfig {
-        population_size: 8,
-        noise_sigma: 0.05,
-        learning_rate: 0.01,
-        epochs: 100,
-        max_melodies: 100, // Start with 100 melodies
+        population_size: 12,
+        noise_sigma: 0.03,
+        learning_rate: 0.008,
+        epochs: 300,
+        max_melodies: 500, // More diverse phrases
         seed: 42,
     };
 
