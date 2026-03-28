@@ -120,6 +120,8 @@ embeddings = ["dep:ort", "dep:tokenizers", "dep:hf-hub"]  # Enable ONNX embeddin
 thread_local_cache = []  # Enable thread-local caching in Phi engine
 parallel = ["dep:rayon"]  # Enable parallel computation with rayon
 simd = []             # Enable SIMD-accelerated continuous HV operations (4x+ speedup)
+ctc_wiring = []       # Communication Through Coherence: binding gates GWT entry (Fries 2015)
+iit4 = []             # IIT 4.0: concept structures, cause-effect power (Albantakis 2023)
 
 # Multi-Database Consciousness Architecture features
 # Each database maps to a "brain region" with specialized computational role

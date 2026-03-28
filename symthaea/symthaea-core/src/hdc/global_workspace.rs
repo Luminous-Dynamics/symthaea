@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 // Revolutionary Improvement #23: Global Workspace Theory (Conscious Access)
 //
 // "Consciousness is the global availability of information to multiple cognitive processes."
@@ -214,6 +217,29 @@ pub struct GlobalWorkspace {
 
     /// Registered broadcast handlers (module_name → callback)
     handlers: HashMap<String, GWBroadcastHandler>,
+
+    /// Binding coherence from oscillatory network [0, 1].
+    /// When `ctc_wiring` is enabled, gates workspace entry per Fries (2015)
+    /// Communication Through Coherence: phase-locked oscillations control
+    /// which neural populations can communicate.
+    #[cfg(feature = "ctc_wiring")]
+    binding_coherence: f64,
+
+    /// Phase-Amplitude Coupling modulation index [0, 1].
+    /// High PAC MI means workspace (low-freq) successfully modulates
+    /// binding (high-freq) — boosting coalition activation.
+    #[cfg(feature = "ctc_wiring")]
+    pac_mi: f64,
+
+    /// Ignition strength from last cycle [0, 1].
+    /// Fed back to binding network as Kuramoto coupling boost.
+    #[cfg(feature = "ctc_wiring")]
+    last_ignition_strength: f64,
+
+    /// Hysteresis state: true if currently in ignited state.
+    /// Prevents threshold oscillation (Mashour et al. 2020).
+    #[cfg(feature = "ctc_wiring")]
+    ignition_hysteresis: bool,
 }
 
 impl std::fmt::Debug for GlobalWorkspace {
@@ -247,6 +273,14 @@ impl GlobalWorkspace {
                 "action".to_string(),
             ],
             handlers: HashMap::new(),
+            #[cfg(feature = "ctc_wiring")]
+            binding_coherence: 0.0,
+            #[cfg(feature = "ctc_wiring")]
+            pac_mi: 0.0,
+            #[cfg(feature = "ctc_wiring")]
+            last_ignition_strength: 0.0,
+            #[cfg(feature = "ctc_wiring")]
+            ignition_hysteresis: false,
         }
     }
 
@@ -350,16 +384,57 @@ impl GlobalWorkspace {
                 .max_capacity
                 .saturating_sub(self.workspace.len());
 
+            // ── CTC-gated entry (Fries 2015) ─────────────────────────
+            // With `ctc_wiring`: binding coherence lowers the effective
+            // entry threshold, and PAC MI boosts activation. High binding
+            // means oscillatory phase-locking allows information flow into
+            // the workspace. Ignition uses a sigmoid with hysteresis
+            // instead of a hard threshold.
+            #[cfg(feature = "ctc_wiring")]
+            let effective_threshold = {
+                // High binding → lower barrier (up to 30% reduction)
+                let bc = self.binding_coherence.clamp(0.0, 1.0);
+                self.config.entry_threshold * (1.0 - 0.3 * bc)
+            };
+            #[cfg(not(feature = "ctc_wiring"))]
+            let effective_threshold = self.config.entry_threshold;
+
             let mut entered = 0;
             self.competitors.retain(|content| {
-                if entered < available_slots && content.activation > self.config.entry_threshold {
+                // PAC modulation: high MI boosts coalition activation
+                #[cfg(feature = "ctc_wiring")]
+                let effective_activation = content.activation * (0.5 + 0.5 * self.pac_mi.clamp(0.0, 1.0));
+                #[cfg(not(feature = "ctc_wiring"))]
+                let effective_activation = content.activation;
+
+                if entered < available_slots && effective_activation > effective_threshold {
                     self.workspace.push(content.clone());
                     new_contents.push(content.clone());
                     entered += 1;
 
-                    // Ignition = sudden entry with high activation
-                    if content.activation > 0.8 {
-                        ignition = true;
+                    // Ignition detection
+                    #[cfg(feature = "ctc_wiring")]
+                    {
+                        // Nonlinear sigmoid ignition with hysteresis (Mashour et al. 2020)
+                        let ignition_input = effective_activation;
+                        let threshold = if self.ignition_hysteresis { 0.65 } else { 0.70 };
+                        let igp = 1.0 / (1.0 + (-10.0 * (ignition_input - threshold)).exp());
+                        if igp > 0.5 {
+                            ignition = true;
+                            self.ignition_hysteresis = true;
+                            self.last_ignition_strength = igp;
+                        } else if igp < 0.3 {
+                            // Hysteresis: must drop significantly to de-ignite
+                            self.ignition_hysteresis = false;
+                            self.last_ignition_strength = 0.0;
+                        }
+                    }
+                    #[cfg(not(feature = "ctc_wiring"))]
+                    {
+                        // Original: hard threshold ignition
+                        if content.activation > 0.8 {
+                            ignition = true;
+                        }
                     }
 
                     false // Remove from competitors
@@ -394,6 +469,34 @@ impl GlobalWorkspace {
         }
 
         events
+    }
+
+    // ── Communication Through Coherence (CTC) API ─────────────────
+    // Fries (2015): phase-locked oscillations control which neural
+    // populations can communicate. These methods wire binding coherence
+    // from the oscillatory network into workspace entry gating.
+
+    /// Set binding coherence from oscillatory network [0, 1].
+    /// High coherence → phase-locked → lower GWT entry threshold.
+    #[cfg(feature = "ctc_wiring")]
+    pub fn set_binding_coherence(&mut self, coherence: f64) {
+        self.binding_coherence = coherence.clamp(0.0, 1.0);
+    }
+
+    /// Set Phase-Amplitude Coupling modulation index [0, 1].
+    /// High PAC MI → workspace successfully orchestrates binding
+    /// → coalition activation is boosted.
+    #[cfg(feature = "ctc_wiring")]
+    pub fn set_pac_mi(&mut self, mi: f64) {
+        self.pac_mi = mi.clamp(0.0, 1.0);
+    }
+
+    /// Get ignition strength from last cycle [0, 1].
+    /// Fed back to binding network as Kuramoto coupling boost
+    /// to sustain the CTC feedback loop.
+    #[cfg(feature = "ctc_wiring")]
+    pub fn last_ignition_strength(&self) -> f64 {
+        self.last_ignition_strength
     }
 
     /// Compute capacity metrics

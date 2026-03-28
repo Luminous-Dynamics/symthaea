@@ -240,6 +240,15 @@ symthaea-helicopter = { path = "crates/symthaea-helicopter", optional = true }
 # Symthaea Humanoid - HDC-LTC + FEP Active Inference DMC Humanoid bipedal control
 symthaea-humanoid = { path = "crates/symthaea-humanoid", optional = true }
 
+# Symthaea Vehicle - HDC-LTC + FEP Active Inference autonomous vehicle control
+symthaea-vehicle = { path = "crates/symthaea-vehicle", optional = true }
+
+# Symthaea AUV - HDC-LTC + FEP Active Inference autonomous underwater vehicle control
+symthaea-auv = { path = "crates/symthaea-auv", optional = true }
+
+# Symthaea Manipulator - HDC-LTC consciousness-coupled industrial arm control
+symthaea-manipulator = { path = "crates/symthaea-manipulator", optional = true }
+
 # Symthaea HAL - Hardware abstraction layer (PCA9685 servo, I2C sensors, safety)
 symthaea-hal = { path = "crates/symthaea-hal", optional = true }
 
@@ -557,6 +566,9 @@ flight-mujoco-renderer = ["flight-mujoco", "symthaea-flight/mujoco-renderer"]  #
 flight-swarm = ["flight", "symthaea-flight/swarm"]     # Parallel swarm training via MuJoCo + rayon
 helicopter = ["dep:symthaea-helicopter"]    # HDC-LTC SAR helicopter control via FEP Active Inference
 humanoid = ["dep:symthaea-humanoid"]       # HDC-LTC bipedal humanoid control via FEP Active Inference (DMC benchmark)
+vehicle = ["dep:symthaea-vehicle"]         # HDC-LTC autonomous vehicle control via FEP Active Inference
+auv = ["dep:symthaea-auv"]                 # HDC-LTC autonomous underwater vehicle control
+manipulator = ["dep:symthaea-manipulator"] # HDC-LTC consciousness-coupled industrial arm control
 hal = ["dep:symthaea-hal", "humanoid"]    # Hardware abstraction layer (PCA9685 servos, I2C sensors, safety interlocks)
 ssm-power = ["dep:symthaea-ssm", "mesh", "school_learning"]  # Diagonal SSM sensor integration (power stream)
 ssm-power-hal = ["ssm-power", "hal", "symthaea-hal/linux", "dep:linux-embedded-hal"]
@@ -583,6 +595,13 @@ epistemic_auditor = ["symthaea-core/duck", "dep:duckdb"]  # DuckDB-backed consci
 
 # ── Consciousness & Reasoning (code-level cfg gates) ────────────────
 multi_agent = ["full_consciousness"]        # Multi-agent trust scoring (byzantine, causal consensus)
+structured_bottleneck = []                  # Structured consciousness equation: necessary {Phi,B,W} + amplifiers {A,R,E,K} (Michel 2023)
+continuous_hot = []                         # Continuous HOT depth: sub-level resolution + self-Phi + attention schema (Brown et al. 2019)
+ctc_wiring = ["symthaea-core/ctc_wiring"]    # Communication Through Coherence: binding gates GWT entry (Fries 2015)
+unified_precision = []                      # Dynamic precision = IIT-Phi × interoception × blanket (Parr & Friston 2019)
+interoceptive_inference = []                # Interoceptive prediction error in FEP hierarchy (Seth 2021)
+england_dissipation = []                    # England's dissipation-driven adaptation + Prigogine regime gating (England 2013)
+iit4 = ["symthaea-core/iit4"]              # IIT 4.0: concept structures, cause-effect power (Albantakis 2023)
 full_consciousness = []                     # Extended consciousness submodules
 full_perception = []                        # Extended perception submodules
 full_language = ["neural-bridge"]                          # Advanced language features (grammar, parsers) — candle deps via neural-bridge
@@ -738,6 +757,11 @@ required-features = ["demo"]
 name = "symthaea-demo"
 path = "src/bin/symthaea-demo.rs"
 required-features = ["api_module"]
+
+[[bin]]
+name = "symthaea-multi-embodiment-demo"
+path = "src/bin/symthaea-multi-embodiment-demo.rs"
+required-features = ["humanoid"]
 
 [[bin]]
 name = "symthaea-story"

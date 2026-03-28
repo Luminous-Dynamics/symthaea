@@ -15263,6 +15263,7 @@ dependencies = [
  "sha2 0.10.9",
  "sha3",
  "strsim",
+ "symthaea-auv",
  "symthaea-broca",
  "symthaea-canvas",
  "symthaea-causal-reasoning",
@@ -15292,6 +15293,7 @@ dependencies = [
  "symthaea-helicopter",
  "symthaea-hodge",
  "symthaea-humanoid",
+ "symthaea-manipulator",
  "symthaea-materials",
  "symthaea-memory",
  "symthaea-muse",
@@ -15315,6 +15317,7 @@ dependencies = [
  "symthaea-support",
  "symthaea-therapeutic",
  "symthaea-types",
+ "symthaea-vehicle",
  "symthaea-vision-manifold",
  "symthaea-vocal-tract",
  "symthaea-wisdom",
@@ -15798,6 +15801,7 @@ dependencies = [
  "serde_json",
  "symthaea-aesthetic",
  "symthaea-core",
+ "symthaea-fep",
 ]
 
 [[package]]

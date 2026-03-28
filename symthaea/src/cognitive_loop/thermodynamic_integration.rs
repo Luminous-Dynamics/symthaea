@@ -108,6 +108,10 @@ pub struct ThermodynamicFeedback {
     pub hfe_lr_adjustment: f64,
     /// Whether Landauer pressure is suppressing memory consolidation.
     pub memory_consolidation_suppressed: bool,
+    /// Whether England dissipation-driven adaptation signal is active.
+    /// When true, entropy production is correlated with order growth and PE reduction
+    /// — exploration should be boosted, not dampened.
+    pub england_boost: bool,
 }
 
 /// Consolidated thermodynamic integration — owns unified state + physics bridge.
@@ -243,9 +247,20 @@ impl ThermodynamicIntegration {
         // 4b: Prigogine violation → exploration damping
         // Science: Prigogine (1947) — increasing entropy production in LinearNonEquilibrium
         // violates minimum entropy production principle → system destabilizing.
+        // Note: only valid in LinearNonEquilibrium — at EdgeOfChaos, entropy production
+        // is necessary for complex dynamics (Langton 1990).
         if self.bridge.prigogine_violated {
             feedback.exploration_factor *= thresholds::THERMO_PRIGOGINE_VIOLATION_DAMPING;
             feedback.prigogine_violated = true;
+        }
+
+        // 4b2: England dissipation-driven adaptation → exploration boost
+        // Science: England (2013) — systems driven by external energy self-organize
+        // to maximize entropy production while building internal order.
+        // When entropy + order + PE-reduction align, dissipation is driving learning.
+        if self.bridge.england_exploration_boost {
+            feedback.exploration_factor *= 1.1; // 10% boost
+            feedback.england_boost = true;
         }
 
         // 4c: Jarzynski-HFE divergence → HFE learning rate correction

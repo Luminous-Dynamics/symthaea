@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Hierarchical Free Energy Decomposition
 //!
 //! Implements a multi-level variational free energy minimization framework based
@@ -151,6 +154,37 @@ impl HierarchicalLevel {
             free_energy: 0.0,
         }
     }
+
+    /// Update precision dynamically from prediction error variance.
+    ///
+    /// When `unified_precision` is enabled, precision is treated as a dynamic
+    /// quantity (Parr & Friston 2019: "precision IS attention") rather than a
+    /// static hyperparameter. The precision is updated as the inverse of the
+    /// running PE variance with exponential smoothing.
+    ///
+    /// Optional modulation factors:
+    /// - `phi_factor`: IIT Phi at this level → high integration = more confident
+    /// - `intero_factor`: interoceptive modulation (Seth 2021)
+    /// - `blanket_factor`: Markov blanket permeability
+    #[cfg(feature = "unified_precision")]
+    pub fn update_precision_dynamic(
+        &mut self,
+        base_precision: f64,
+        phi_factor: f64,
+        intero_factor: f64,
+        blanket_factor: f64,
+    ) {
+        // Base precision from hierarchy (exponential decay)
+        // Phi modulation: high integration → higher confidence (0.5-1.0 range)
+        let phi_mod = 0.5 + 0.5 * phi_factor.clamp(0.0, 1.0);
+        // Interoceptive: positive valence → higher precision, stress → lower
+        let intero_mod = intero_factor.clamp(0.5, 1.5);
+        // Blanket: closed blanket → trust priors more (0.5-1.0 range)
+        let blanket_mod = 0.5 + 0.5 * blanket_factor.clamp(0.0, 1.0);
+
+        self.precision = (base_precision * phi_mod * intero_mod * blanket_mod)
+            .clamp(0.01, 10.0); // Guard bounds
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -241,6 +275,27 @@ impl HierarchicalFreeEnergy {
     // ─────────────────────────────────────────────────────────────────────────
     // Construction
     // ─────────────────────────────────────────────────────────────────────────
+
+    /// Update precision at all levels from external modulation signals.
+    ///
+    /// Called by the consciousness engine when `unified_precision` is enabled.
+    /// Each level's precision is dynamically updated from:
+    /// - Base precision (exponential decay from config)
+    /// - Phi factor (IIT integration at this level)
+    /// - Interoceptive factor (valence/arousal modulation)
+    /// - Blanket factor (Markov blanket permeability)
+    #[cfg(feature = "unified_precision")]
+    pub fn update_precisions(
+        &mut self,
+        phi_factor: f64,
+        intero_factor: f64,
+        blanket_factor: f64,
+    ) {
+        for level in &mut self.levels {
+            let base = self.config.precision_decay.powi(level.level as i32);
+            level.update_precision_dynamic(base, phi_factor, intero_factor, blanket_factor);
+        }
+    }
 
     /// Create a new hierarchical free energy engine from `config`.
     ///

@@ -108,6 +108,18 @@ pub struct ThermodynamicPhysicsBridge {
     /// Previous entropy production rate (for Prigogine trend detection).
     #[serde(skip)]
     pub(crate) prev_entropy_production: f64,
+
+    /// Previous order parameter (for England signal detection).
+    #[serde(skip)]
+    pub(crate) prev_order_parameter: f64,
+
+    /// England dissipation-driven adaptation signal.
+    /// True when entropy production correlates with order growth AND prediction
+    /// error reduction — indicating that dissipation is driving useful learning.
+    /// Science: England (2013) — matter driven by external energy self-organizes
+    /// to maximize entropy production while building internal order.
+    /// Only active when `england_dissipation` feature is enabled.
+    pub england_exploration_boost: bool,
 }
 
 impl Default for ThermodynamicPhysicsBridge {
@@ -129,6 +141,8 @@ impl Default for ThermodynamicPhysicsBridge {
             jarzynski_hfe_divergence: 0.0,
             prigogine_violated: false,
             prev_entropy_production: 0.0,
+            prev_order_parameter: 0.5,
+            england_exploration_boost: false,
         }
     }
 }
@@ -284,6 +298,29 @@ impl ThermodynamicPhysicsBridge {
             && entropy_production_rate > self.prev_entropy_production + 0.01
             && self.prev_entropy_production > 0.001; // Only after warm-up
 
+        // 6d. England dissipation-driven adaptation (England 2013)
+        // When entropy production is high AND order is growing AND we're at
+        // or near the edge of chaos, the dissipation is driving useful
+        // self-organization — boost exploration rather than dampen it.
+        #[cfg(feature = "england_dissipation")]
+        {
+            let order_delta = order_parameter - self.prev_order_parameter;
+            let high_entropy = entropy_production_rate > 0.15;
+            let order_growing = order_delta > 0.01;
+            let prediction_error_decreasing = prediction_error < 0.3;
+            let at_edge = matches!(
+                regime,
+                ThermodynamicRegime::EdgeOfChaos | ThermodynamicRegime::FarFromEquilibrium
+            );
+            self.england_exploration_boost =
+                high_entropy && order_growing && prediction_error_decreasing && at_edge;
+        }
+        #[cfg(not(feature = "england_dissipation"))]
+        {
+            self.england_exploration_boost = false;
+        }
+
+        self.prev_order_parameter = order_parameter;
         self.prev_entropy_production = entropy_production_rate;
     }
 

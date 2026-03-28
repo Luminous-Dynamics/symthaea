@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! IIT 4.0 Measures
 //!
 //! Reference: Albantakis et al. (2023) "Integrated Information Theory (IIT) 4.0"
@@ -20,6 +23,34 @@ pub struct IIT4Result {
     pub intrinsic_information: f64,
     /// Number of concepts (mechanisms with φ > 0)
     pub concept_count: usize,
+    /// Concept structure: irreducible cause-effect mechanisms.
+    /// Only populated when `iit4` feature is enabled.
+    #[cfg(feature = "iit4")]
+    pub concepts: Vec<ConceptStructure>,
+}
+
+/// A concept in IIT 4.0: an irreducible cause-effect mechanism.
+///
+/// Each mechanism in the system has a cause repertoire (constraints on past)
+/// and an effect repertoire (constraints on future). The mechanism's phi (φ)
+/// is the irreducibility of this cause-effect structure under all partitions.
+///
+/// Science: Albantakis et al. (2023) — concepts are the "atoms of experience".
+/// A concept with φ > 0 specifies an irreducible cause-effect distinction.
+#[cfg(feature = "iit4")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConceptStructure {
+    /// Index of the mechanism component
+    pub mechanism_index: usize,
+    /// Small phi (irreducibility) of this concept
+    pub phi: f64,
+    /// Cause information: how much this mechanism constrains its past
+    pub cause_info: f64,
+    /// Effect information: how much this mechanism constrains its future
+    pub effect_info: f64,
+    /// Combined cause-effect power: min(cause_info, effect_info)
+    /// IIT 4.0 uses the minimum to ensure both directions are specified.
+    pub cause_effect_power: f64,
 }
 
 /// IIT 4.0 Calculator
@@ -165,6 +196,8 @@ impl IIT4Calculator {
                 big_phi: 0.0,
                 intrinsic_information: 0.0,
                 concept_count: 0,
+                #[cfg(feature = "iit4")]
+                concepts: Vec::new(),
             };
         }
 
@@ -183,9 +216,12 @@ impl IIT4Calculator {
             0.0
         };
 
-        // Compute small phi for each component
+        // Compute small phi for each component and build concept structures
         let mut total_phi = 0.0;
         let mut concept_count = 0;
+        #[cfg(feature = "iit4")]
+        let mut concepts = Vec::new();
+
         for i in 0..n {
             let context: Vec<ContinuousHV> = components
                 .iter()
@@ -198,6 +234,31 @@ impl IIT4Calculator {
             total_phi += phi_i;
             if phi_i > self.phi_threshold {
                 concept_count += 1;
+            }
+
+            #[cfg(feature = "iit4")]
+            {
+                // Compute cause and effect info for this mechanism
+                // Cause info: MI between mechanism and context (past → present)
+                let refs: Vec<&ContinuousHV> = context.iter().collect();
+                let bundle = ContinuousHV::bundle(&refs);
+                let cause_info = self.estimator.mutual_information_fast(&components[i], &bundle);
+
+                // Effect info: use intrinsic information as proxy for future constraint
+                let effect_info = self.intrinsic_information(&components[i]);
+
+                // IIT 4.0: cause-effect power = min(cause, effect)
+                let cause_effect_power = cause_info.min(effect_info);
+
+                if phi_i > self.phi_threshold {
+                    concepts.push(ConceptStructure {
+                        mechanism_index: i,
+                        phi: phi_i,
+                        cause_info,
+                        effect_info,
+                        cause_effect_power,
+                    });
+                }
             }
         }
 
@@ -217,6 +278,8 @@ impl IIT4Calculator {
             big_phi: phi_result.phi,
             intrinsic_information: total_ii / n as f64,
             concept_count,
+            #[cfg(feature = "iit4")]
+            concepts,
         }
     }
 }
