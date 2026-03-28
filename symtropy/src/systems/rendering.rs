@@ -23,10 +23,19 @@ pub struct HudText;
 #[derive(Component)]
 pub struct LeviathanSprite;
 
-/// Level layout: 0=floor, 1=wall, 2=core_room_floor
+/// Generate level layout. Uses procedural BSP dungeon generation
+/// with a random seed based on system time for unique layouts each run.
 fn level_map() -> Vec<Vec<u8>> {
-    // Hand-designed level: corridors, rooms, chokepoints
-    // Player starts bottom-center, core is in a room at the top
+    let seed = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(42);
+    let dungeon = super::procgen::generate_dungeon(MAP_WIDTH as usize, MAP_HEIGHT as usize, seed);
+    eprintln!("[symtropy] Generated dungeon with seed {seed}");
+    return dungeon.tiles;
+
+    // Legacy hand-designed level kept as reference:
+    #[allow(unreachable_code)]
     let raw = [
         "##############################",
         "#....##########...###########",
