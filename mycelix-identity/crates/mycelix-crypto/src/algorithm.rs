@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Algorithm identifiers and metadata for crypto-agile operations.
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Algorithm identifiers and metadata for crypto-agile operations.
 //!
 //! Each `AlgorithmId` variant carries methods that return the W3C DID verification
 //! method type string, the Data Integrity cryptosuite name, expected key/signature

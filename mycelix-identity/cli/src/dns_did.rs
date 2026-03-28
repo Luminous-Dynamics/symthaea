@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! DNS-DID Verification with DNSSEC
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! DNS-DID Verification with DNSSEC
 //!
 //! Verifies DNS-DID linkage by querying DNS TXT records and
 //! validating DNSSEC signatures when available.
