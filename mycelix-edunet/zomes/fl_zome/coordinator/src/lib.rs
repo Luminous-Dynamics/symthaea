@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # FL Coordinator Zome
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! # FL Coordinator Zome
 //!
 //! Implements business logic for federated learning rounds and updates.
 //! This zome is upgradeable - business logic can change without breaking data.

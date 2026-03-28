@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Provenance tracking for models and credentials
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Provenance tracking for models and credentials
 
 use crate::types::{ModelHash, ModelId};
 use serde::{Deserialize, Serialize};

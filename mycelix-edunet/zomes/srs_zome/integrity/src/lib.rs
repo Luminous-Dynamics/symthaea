@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Spaced Repetition System (SRS) Integrity Zome
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! # Spaced Repetition System (SRS) Integrity Zome
 //!
 //! Implements the SuperMemo SM-2 algorithm for optimal learning retention.
 //!
