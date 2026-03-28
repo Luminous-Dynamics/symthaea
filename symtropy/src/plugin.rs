@@ -17,7 +17,7 @@ impl Plugin for SymtropyPlugin {
         app
             // State
             .init_state::<GamePhase>()
-            // TODO: re-enable sim-bridge when multiworld-sim compiles
+            // TODO: re-enable SimBridgePlugin when Mycelix integration stabilizes
             // .add_plugins(SimBridgePlugin)
             // Resources
             .init_resource::<BiometricsCtx>()

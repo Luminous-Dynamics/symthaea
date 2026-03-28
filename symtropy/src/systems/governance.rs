@@ -10,7 +10,7 @@
 
 use bevy::prelude::*;
 
-use crate::components::{ConsciousnessProfile, CrewNpc, NoiseEmitter, Player};
+use crate::components::{ConsciousnessComp, CrewNpc, NoiseEmitter, Player};
 use crate::resources::{GamePhase, GovernanceLog};
 use symtropy_sim_bridge::{ActiveProposal, GovernanceState};
 
@@ -38,7 +38,7 @@ const OPPRESSION_CRISIS: f64 = 0.5;
 
 /// NPC proposal generation: high FEP surprise → governance proposals.
 pub fn governance_proposal_system(
-    npcs: Query<(&CrewNpc, &ConsciousnessProfile)>,
+    npcs: Query<(&CrewNpc, &ConsciousnessComp)>,
     proposal: Res<ActiveProposal>,
     gov: Res<GovernanceState>,
     time: Res<Time>,
@@ -112,8 +112,8 @@ pub fn governance_proposal_system(
 
 /// NPC voting system: each NPC casts Phi-weighted votes on active proposals.
 pub fn governance_voting_system(
-    npcs: Query<(&CrewNpc, &ConsciousnessProfile)>,
-    player_consciousness: Query<&ConsciousnessProfile, With<Player>>,
+    npcs: Query<(&CrewNpc, &ConsciousnessComp)>,
+    player_consciousness: Query<&ConsciousnessComp, With<Player>>,
     mut proposal: ResMut<ActiveProposal>,
     gov: Res<GovernanceState>,
     mut log: ResMut<GovernanceLog>,
@@ -169,7 +169,7 @@ pub fn governance_voting_system(
 
 /// Veto/override system: Guardian NPCs can veto, community can override at 80%.
 pub fn veto_override_system(
-    npcs: Query<(&CrewNpc, &ConsciousnessProfile)>,
+    npcs: Query<(&CrewNpc, &ConsciousnessComp)>,
     mut proposal: ResMut<ActiveProposal>,
     mut gov: ResMut<GovernanceState>,
     mut log: ResMut<GovernanceLog>,
@@ -219,8 +219,8 @@ pub fn veto_override_system(
 
 /// Oppression detection: monitors tier distribution and flags crises.
 pub fn oppression_detection_system(
-    npcs: Query<&ConsciousnessProfile, With<CrewNpc>>,
-    player_consciousness: Query<&ConsciousnessProfile, With<Player>>,
+    npcs: Query<&ConsciousnessComp, With<CrewNpc>>,
+    player_consciousness: Query<&ConsciousnessComp, With<Player>>,
     mut gov: ResMut<GovernanceState>,
     mut log: ResMut<GovernanceLog>,
     mut noise_sources: Query<&mut NoiseEmitter>,
@@ -294,8 +294,8 @@ pub fn oppression_detection_system(
 /// Consciousness evolves through gameplay — care increases through cooperation,
 /// meta-awareness through governance participation, coherence through successful actions.
 pub fn consciousness_evolution_system(
-    mut npcs: Query<(&CrewNpc, &mut ConsciousnessProfile)>,
-    mut player_consciousness: Query<&mut ConsciousnessProfile, With<Player>>,
+    mut npcs: Query<(&CrewNpc, &mut ConsciousnessComp)>,
+    mut player_consciousness: Query<&mut ConsciousnessComp, With<Player>>,
     gov: Res<GovernanceState>,
     proposal: Res<ActiveProposal>,
     time: Res<Time>,

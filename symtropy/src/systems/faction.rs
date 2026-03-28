@@ -11,7 +11,7 @@
 
 use bevy::prelude::*;
 
-use crate::components::{ConsciousnessProfile, CrewNpc, FactionAffiliation, NoiseEmitter, TendBalance};
+use crate::components::{ConsciousnessComp, CrewNpc, FactionAffiliation, NoiseEmitter, TendBalance};
 use crate::resources::GovernanceLog;
 use symtropy_sim_bridge::{EconomyState, FactionState, GovernanceState};
 
@@ -35,7 +35,7 @@ static NEXT_FACTION_ID: std::sync::atomic::AtomicU32 = std::sync::atomic::Atomic
 
 /// Faction emergence: when inequality or instability is high, NPCs form factions.
 pub fn faction_emergence_system(
-    npcs: Query<(Entity, &ConsciousnessProfile, &TendBalance, &FactionAffiliation)>,
+    npcs: Query<(Entity, &ConsciousnessComp, &TendBalance, &FactionAffiliation)>,
     gov: Res<GovernanceState>,
     mut log: ResMut<GovernanceLog>,
     time: Res<Time>,
@@ -87,7 +87,7 @@ pub fn faction_emergence_system(
 
 /// Faction recruitment: NPCs join factions based on ideology alignment.
 pub fn faction_recruitment_system(
-    mut npcs: Query<(Entity, &ConsciousnessProfile, &mut FactionAffiliation)>,
+    mut npcs: Query<(Entity, &ConsciousnessComp, &mut FactionAffiliation)>,
     time: Res<Time>,
     mut timer: Local<f32>,
 ) {
@@ -152,7 +152,7 @@ pub fn faction_recruitment_system(
 
 /// Faction conflict: opposing factions generate noise (social instability → Leviathan threat).
 pub fn faction_conflict_system(
-    mut npcs: Query<(&FactionAffiliation, &ConsciousnessProfile, &mut NoiseEmitter)>,
+    mut npcs: Query<(&FactionAffiliation, &ConsciousnessComp, &mut NoiseEmitter)>,
     mut log: ResMut<GovernanceLog>,
     time: Res<Time>,
     mut timer: Local<f32>,

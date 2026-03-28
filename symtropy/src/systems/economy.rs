@@ -9,7 +9,7 @@
 
 use bevy::prelude::*;
 
-use crate::components::{ConsciousnessProfile, CrewNpc, NpcTrust, NoiseEmitter, Player, TendBalance};
+use crate::components::{ConsciousnessComp, CrewNpc, NpcTrust, NoiseEmitter, Player, TendBalance};
 use crate::resources::GovernanceLog;
 
 /// Demurrage rate: 2% per game-minute (applied every tick).
@@ -30,7 +30,7 @@ const EXCHANGE_COOLDOWN_SECS: f32 = 10.0;
 /// Trust grows through successful exchanges. This is the restorative justice path —
 /// after coercion (epistemic decay), the only way to recover NPC trust is TEND exchanges.
 pub fn tend_exchange_system(
-    mut npcs: Query<(Entity, &CrewNpc, &ConsciousnessProfile, &mut TendBalance, &mut NpcTrust)>,
+    mut npcs: Query<(Entity, &CrewNpc, &ConsciousnessComp, &mut TendBalance, &mut NpcTrust)>,
     mut player_tend: Query<&mut TendBalance, (With<Player>, Without<CrewNpc>)>,
     time: Res<Time>,
     mut cooldowns: Local<Vec<(Entity, f32)>>,

@@ -6,7 +6,8 @@ use bevy::prelude::*;
 
 use crate::components::*;
 use crate::resources::{BiometricsCtx, GamePhase, GovernanceLog, LeviathanState, SleepPhase, TileGrid};
-use symtropy_sim_bridge::{ActiveProposal, GovernanceState};
+// TODO: re-enable when Mycelix integration stabilizes
+// use symtropy_sim_bridge::{ActiveProposal, GovernanceState};
 
 /// Tile size in pixels.
 pub const TILE_SIZE: f32 = 32.0;
@@ -143,7 +144,7 @@ pub fn setup_world(mut commands: Commands, seed: Res<crate::resources::DungeonSe
         Player,
         Flashlight::default(),
         NoiseEmitter::default(),
-        ConsciousnessProfile::default(),
+        ConsciousnessComp::default(),
         TendBalance::new(40), // ±40 TEND credit limit
         FactionAffiliation::default(),
     ));
@@ -161,31 +162,26 @@ pub fn setup_world(mut commands: Commands, seed: Res<crate::resources::DungeonSe
         [0.8, 0.7, 0.7, 0.4, 0.8, 0.6], // Soren: high level, near-Guardian
     ];
     for (i, (name, x, y, color)) in npc_configs.iter().enumerate() {
-        let mut cp = ConsciousnessProfile {
-            phi: 0.0,
-            tier: 0,
-            dimensions: npc_consciousness[i],
+        let cp = ConsciousnessComp {
+            sim_dimensions: npc_consciousness[i],
+            ..Default::default()
         };
-        cp.compute_phi();
 
         commands.spawn((
             Sprite::from_color(*color, Vec2::splat(16.0)),
             Transform::from_xyz(*x, *y, 2.0),
             CrewNpc::new(name, i as u64 + 100),
-            MoveTarget {
-                target: None,
-                speed: 60.0,
-            },
+            MoveTarget { target: None, speed: 60.0 },
             NoiseEmitter::default(),
             cp,
             TendBalance::new(40),
             FactionAffiliation {
                 faction_id: None,
                 ideology: [
-                    npc_consciousness[i][0], // economic
-                    npc_consciousness[i][1], // authority
-                    npc_consciousness[i][3], // tradition
-                    npc_consciousness[i][4], // individual
+                    npc_consciousness[i][0],
+                    npc_consciousness[i][1],
+                    npc_consciousness[i][3],
+                    npc_consciousness[i][4],
                 ],
             },
             NpcTrust::default(),
@@ -250,14 +246,14 @@ pub fn hud_system(
     biometrics: Res<BiometricsCtx>,
     leviathan: Res<LeviathanState>,
     cores: Query<&FusionCore>,
-    player: Query<(&Transform, Option<&ConsciousnessProfile>, Option<&TendBalance>), With<Player>>,
+    player: Query<&Transform, With<Player>>,
     mut hud: Query<(&mut Text, &mut TextColor), With<HudText>>,
     time: Res<Time>,
     mut timer: ResMut<TelemetryTimer>,
-    gov: Res<GovernanceState>,
-    proposal: Res<ActiveProposal>,
     gov_log: Res<GovernanceLog>,
     explored: Res<crate::systems::minimap::ExploredTiles>,
+    harmony: Res<crate::systems::harmonies::LocalHarmonyState>,
+    collected: Res<crate::systems::scavenge::CollectedPrimitives>,
 ) {
     timer.0 += time.delta_secs();
     if timer.0 < 0.25 {
@@ -266,20 +262,8 @@ pub fn hud_system(
     timer.0 = 0.0;
 
     let stress = biometrics.encoder.compute_stress_vector();
-    let extraction = cores
-        .iter()
-        .next()
-        .map(|c| c.extraction_progress)
-        .unwrap_or(0.0);
-    let (player_pos, player_phi, player_tend) = player
-        .iter()
-        .next()
-        .map(|(t, cp, tb)| (
-            t.translation.truncate(),
-            cp.map(|c| c.phi).unwrap_or(0.0),
-            tb.map(|t| t.balance).unwrap_or(0),
-        ))
-        .unwrap_or_default();
+    let extraction = cores.iter().next().map(|c| c.extraction_progress).unwrap_or(0.0);
+    let player_pos = player.iter().next().map(|t| t.translation.truncate()).unwrap_or_default();
 
     let phase_str = match leviathan.phase {
         SleepPhase::Dormant => "DORMANT",
@@ -288,61 +272,29 @@ pub fn hud_system(
         SleepPhase::Hunting => ">>> HUNTING <<<",
     };
 
-    // Oppression indicator
-    let oppression = gov.oppression_index();
-    let oppression_str = if oppression > 0.5 {
-        "CRISIS"
-    } else if oppression > 0.3 {
-        "WARNING"
-    } else {
-        "stable"
-    };
+    let harmony_str = harmony.dominant
+        .map(|h| h.name())
+        .unwrap_or("none");
 
-    // Active proposal line
-    let proposal_str = if proposal.active {
-        if proposal.vetoed {
-            format!("VETOED: \"{}\" (override: {:.0}%)", proposal.description,
-                if proposal.override_votes.is_empty() { 0.0 } else {
-                    let total: f64 = proposal.override_votes.iter().map(|(_, w, _)| w).sum();
-                    let approve: f64 = proposal.override_votes.iter().filter(|(_, _, a)| *a).map(|(_, w, _)| w).sum();
-                    if total > 0.0 { approve / total * 100.0 } else { 0.0 }
-                })
-        } else {
-            format!("VOTE: \"{}\" ({:.0}% approve, {}t left)",
-                proposal.description, proposal.approval_ratio() * 100.0, proposal.ticks_remaining)
-        }
-    } else {
-        String::new()
-    };
-
-    // Last governance event
-    let last_event = gov_log.messages.last()
-        .map(|m| format!("[GOV] {}", m.text))
-        .unwrap_or_default();
+    let sanctuary_str = if harmony.is_sanctuary { " [SANCTUARY]" } else { "" };
 
     let hud_text = format!(
-        "WASD: move | E: extract | T: TEND exchange | Esc: quit\n\
-         Stress: {:.0}%  Load: {:.0}%  Leviathan: {}\n\
-         Phi: {:.2}  TEND: {}  Oppression: {} ({:.0}%)  Stability: {:.0}%\n\
-         Noise: {:.1}/{:.1}  Extract: {:.0}%  Explored: {:.0}%  Pos: ({:.0},{:.0})\n\
-         {}\n\
-         {}",
+        "WASD: move | Shift: sprint | E: extract | Esc: quit\n\
+         Stress: {:.0}%  Load: {:.0}%  Leviathan: {}{}\n\
+         Harmony: {}  Fragments: {}/48  Explored: {:.0}%\n\
+         Noise: {:.1}/{:.1}  Extract: {:.0}%  Pos: ({:.0},{:.0})",
         stress.arousal * 100.0,
         biometrics.model.allostatic_load * 100.0,
         phase_str,
-        player_phi,
-        player_tend,
-        oppression_str,
-        oppression * 100.0,
-        gov.stability() * 100.0,
+        sanctuary_str,
+        harmony_str,
+        collected.total(),
+        explored.explore_percent(),
         leviathan.noise_accumulator,
         leviathan.threshold,
         extraction * 100.0,
-        explored.explore_percent(),
         player_pos.x,
         player_pos.y,
-        proposal_str,
-        last_event,
     );
 
     for (mut text, mut color) in &mut hud {
