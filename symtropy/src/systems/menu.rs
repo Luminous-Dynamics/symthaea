@@ -37,18 +37,18 @@ pub fn setup_menu(mut commands: Commands) {
 
         // Subtitle
         parent.spawn((
-            Text::new("The First Room"),
+            Text::new("The Room That Remembers You"),
             TextFont { font_size: 24.0, ..default() },
-            TextColor(Color::srgb(0.5, 0.7, 0.6)),
-            Node { margin: UiRect::bottom(Val::Px(40.0)), ..default() },
+            TextColor(Color::srgb(0.6, 0.8, 0.7)),
+            Node { margin: UiRect::bottom(Val::Px(8.0)), ..default() },
         ));
 
-        // Tagline
+        // Lore hint
         parent.spawn((
-            Text::new("A consciousness-driven survival experience"),
+            Text::new("This room knows your name. It has watched you fail before."),
             TextFont { font_size: 14.0, ..default() },
             TextColor(Color::srgb(0.4, 0.5, 0.45)),
-            Node { margin: UiRect::bottom(Val::Px(60.0)), ..default() },
+            Node { margin: UiRect::bottom(Val::Px(50.0)), ..default() },
         ));
 
         // Menu options
