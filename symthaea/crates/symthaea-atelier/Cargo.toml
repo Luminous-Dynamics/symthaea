@@ -14,6 +14,8 @@ rand = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
 symthaea-muse = { path = "../symthaea-muse" }
 symthaea-gallery = { path = "../symthaea-gallery" }
 
