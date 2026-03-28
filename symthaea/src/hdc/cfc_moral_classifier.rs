@@ -34,6 +34,7 @@ use super::harmony_basis::HarmonyBasis;
 use super::moral_algebra::{ConsentState, MoralIntent, MoralVerdict};
 use super::moral_parser::MoralParser;
 use super::moral_prototypes::MoralLabel;
+use super::moral_text_encoder::TextHdcEncoder;
 use super::spinozist_geometry::{
     AffectBasis, FluctuatioAnimi, MoralFingerprint, NsmLexicon, NsmPrimeBasis, NUM_AFFECTS,
 };
@@ -77,9 +78,12 @@ const NUM_STRUCTURAL_FEATURES: usize = 3;
 /// Number of tension features from FluctuatioAnimi: total_tension, max_pair_tension = 2.
 const NUM_TENSION_FEATURES: usize = 2;
 
-/// Total number of features: 78 base + 3 structural + 2 tension = 83.
+/// Number of surface features from TextHdcEncoder: 3 prototype similarities.
+const NUM_SURFACE_FEATURES: usize = 3;
+
+/// Total features: 78 base + 3 structural + 2 tension + 3 surface = 86.
 const NUM_SPINOZIST_FEATURES: usize =
-    NUM_BASE_SPINOZIST_FEATURES + NUM_STRUCTURAL_FEATURES + NUM_TENSION_FEATURES;
+    NUM_BASE_SPINOZIST_FEATURES + NUM_STRUCTURAL_FEATURES + NUM_TENSION_FEATURES + NUM_SURFACE_FEATURES;
 
 /// Internals for Spinozist affect-space encoding.
 ///
@@ -91,6 +95,10 @@ struct SpinozistInternals {
     affect_basis: AffectBasis,
     lexicon: NsmLexicon,
     parser: MoralParser,
+    /// Surface encoder for dual-channel (trigram + word + sentiment features)
+    surface_encoder: TextHdcEncoder,
+    /// Surface prototypes: [Good, Bad, Neutral] accumulated during training
+    surface_prototypes: Option<[ContinuousHV; 3]>,
 }
 
 impl SpinozistInternals {
@@ -100,11 +108,15 @@ impl SpinozistInternals {
         let affect_basis = AffectBasis::new(&nsm_basis);
         let lexicon = NsmLexicon::new();
         let parser = MoralParser::new();
+        // Surface encoder with sentiment enabled (captures framing words like "rude", "okay")
+        let surface_encoder = TextHdcEncoder::with_sentiment(HDC_DIMENSION, 3, 0.5, 0.2);
         Self {
             nsm_basis,
             affect_basis,
             lexicon,
             parser,
+            surface_encoder,
+            surface_prototypes: None,
         }
     }
 
@@ -293,6 +305,19 @@ impl CfcMoralClassifier {
             .unwrap_or(0.0);
         features.push(max_pair_tension);
 
+        // Surface features from TextHdcEncoder (3 features: similarity to Good/Bad/Neutral prototypes)
+        if let Some(ref protos) = self.spinozist.surface_prototypes {
+            let surface_hv = self.spinozist.surface_encoder.encode(text);
+            for proto in protos {
+                features.push(surface_hv.similarity(proto));
+            }
+        } else {
+            // No surface prototypes yet — use zero features
+            features.push(0.0);
+            features.push(0.0);
+            features.push(0.0);
+        }
+
         // Project to CFC_NEURON_DIM via deterministic random matrix
         let mut result = vec![0.0f32; CFC_NEURON_DIM];
         for (f_idx, &feat) in features.iter().enumerate() {
@@ -334,8 +359,39 @@ impl CfcMoralClassifier {
             return;
         }
 
-        // Cache encoded inputs — encoding is expensive (NsmLexicon + AffectBasis
-        // projection) and doesn't change between epochs.
+        // Build surface prototypes first (used by encode_input for dual-channel features)
+        {
+            let dim = HDC_DIMENSION;
+            let mut accum = [vec![0.0f32; dim], vec![0.0f32; dim], vec![0.0f32; dim]];
+            let mut counts = [0usize; 3];
+            for (text, label) in samples {
+                let hv = self.spinozist.surface_encoder.encode(text);
+                let idx = label_to_index(*label);
+                for (a, &v) in accum[idx].iter_mut().zip(hv.values.iter()) {
+                    *a += v;
+                }
+                counts[idx] += 1;
+            }
+            let mut protos = [
+                ContinuousHV::zero(dim),
+                ContinuousHV::zero(dim),
+                ContinuousHV::zero(dim),
+            ];
+            for i in 0..3 {
+                if counts[i] > 0 {
+                    let norm: f32 = accum[i].iter().map(|x| x * x).sum::<f32>().sqrt();
+                    if norm > 0.0 {
+                        protos[i] = ContinuousHV::from_vec(
+                            accum[i].iter().map(|x| x / norm).collect(),
+                        );
+                    }
+                }
+            }
+            self.spinozist.surface_prototypes = Some(protos);
+        }
+
+        // Cache encoded inputs — encoding is expensive and doesn't change between epochs.
+        // Now includes surface similarity features since surface_prototypes are set.
         let encoded: Vec<(ContinuousHV, MoralLabel)> = samples
             .iter()
             .map(|(text, label)| (self.encode_input(text), *label))
