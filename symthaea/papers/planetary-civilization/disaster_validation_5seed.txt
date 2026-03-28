@@ -1,0 +1,19 @@
+
+=== 777-YEAR DISASTER VALIDATION (5 seeds) ===
+
+Seed   | Pop     | CVS    | Phi    | Wrlds | Disasters   | Carrington  | Survived
+--------------------------------------------------------------------------------
+42     | 29407   | 0.687  | 0.164  | 5     | 7765        | 6           | YES
+123    | 39207   | 0.700  | 0.197  | 5     | 7378        | 4           | YES
+789    | 42227   | 0.710  | 0.239  | 5     | 7461        | 4           | YES
+1337   | 28348   | 0.696  | 0.188  | 5     | 7463        | 4           | YES
+2718   | 33553   | 0.694  | 0.200  | 5     | 7910        | 11          | YES
+
+SUMMARY:
+  Survival rate:      5/5 (100%)
+  Mean population:    34548 +/- 5414
+  Mean CVS:           0.698 +/- 0.007
+  Mean Phi:           0.198 +/- 0.024
+  Mean worlds:        5.0 +/- 0.0
+  Mean disasters:     7595.4 +/- 205.2
+  Mean Carrington:    5.8 +/- 2.7
