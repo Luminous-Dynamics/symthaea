@@ -372,6 +372,9 @@ pub fn compose(config: &MuseConfig, state: &MusicalState, seed: u64) -> Composit
                 use symthaea_core::genesis::GenesisSeed;
                 let genesis = GenesisSeed::from_phrase(&format!("muse-neural-{sec_seed}"));
                 let mut neural = neural_melody::NeuralMelody::new(&genesis, config);
+                // Load trained projections if available
+                let proj_path = std::path::Path::new("data/midi-training/melody_projections.json");
+                neural.load_trained_projections(proj_path);
                 neural.generate(&sec_config, state, &sec_scale, beat_duration)
             }
         };

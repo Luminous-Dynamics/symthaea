@@ -85,6 +85,23 @@ impl NeuralMelody {
         }
     }
 
+    /// Load trained decode parameters from a JSON file.
+    ///
+    /// Falls back silently to default weights if file doesn't exist or fails.
+    /// This enables compose() to use trained projections when available.
+    pub fn load_trained_projections(&mut self, path: &std::path::Path) {
+        if let Ok(projections) = crate::training::load_projections(path) {
+            if projections.len() >= 2 {
+                for i in 0..3.min(projections[0].len()) {
+                    self.decode_weights[i] = projections[0][i];
+                }
+                for i in 0..3.min(projections[1].len()) {
+                    self.decode_biases[i] = projections[1][i];
+                }
+            }
+        }
+    }
+
     /// Encode cognitive state into a hypervector input for the network.
     fn encode_state(&self, state: &MusicalState, pitch_selector: f32) -> ContinuousHV {
         let mut values = vec![0.0f32; self.dim];
