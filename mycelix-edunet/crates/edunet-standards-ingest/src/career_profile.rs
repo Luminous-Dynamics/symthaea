@@ -883,6 +883,119 @@ pub fn format_career_summary(profile: &CareerProfile) -> String {
     s
 }
 
+/// Format a detailed career profile (includes O*NET enriched data).
+pub fn format_career_detail(profile: &CareerProfile) -> String {
+    let mut s = format_career_summary(profile);
+
+    if let Some(ref ef) = profile.emerging_field {
+        s += &format!("\n  [EMERGING FIELD] Maturity: {}, Est. practitioners: {}\n",
+            ef.maturity, ef.estimated_practitioners.map(|n| format_thousands(n)).unwrap_or("unknown".into()));
+        if !ef.key_organizations.is_empty() {
+            s += &format!("  Key orgs: {}\n", ef.key_organizations.join(", "));
+        }
+        if let Some(ref lc) = ef.luminous_connection {
+            s += &format!("  Luminous: {}\n", lc);
+        }
+    }
+
+    if !profile.work_activities.is_empty() {
+        s += "\n  Day-to-day activities:\n";
+        for a in &profile.work_activities {
+            let bar = "#".repeat((a.importance * 4.0) as usize);
+            s += &format!("    {:<45} {:.1} {}\n", a.name, a.importance, bar);
+        }
+    }
+
+    if !profile.required_skills.is_empty() {
+        s += "\n  Required skills:\n";
+        for sk in &profile.required_skills {
+            let bar = "#".repeat((sk.importance * 4.0) as usize);
+            s += &format!("    {:<45} {:.1} {}\n", sk.name, sk.importance, bar);
+        }
+    }
+
+    if !profile.technology_tools.is_empty() {
+        s += "\n  Tools & Technologies:\n";
+        for t in &profile.technology_tools {
+            s += &format!("    {} ({})\n", t.name, t.category);
+        }
+    }
+
+    if let Some(ref wv) = profile.work_values {
+        s += &format!("\n  Work values: Achievement {:.1} | Independence {:.1} | Recognition {:.1} | Relationships {:.1} | Support {:.1} | Conditions {:.1}\n",
+            wv.achievement, wv.independence, wv.recognition, wv.relationships, wv.support, wv.working_conditions);
+    }
+
+    if let Some(ref wlb) = profile.work_life_balance {
+        s += "\n  Work-life balance:\n";
+        if let Some(h) = wlb.hours_per_week { s += &format!("    Hours/week: {:.0}\n", h); }
+        if let Some(r) = wlb.remote_availability { s += &format!("    Remote:     {:.0}%\n", r * 100.0); }
+        if let Some(f) = wlb.schedule_flexibility { s += &format!("    Flexibility:{:.0}%\n", f * 100.0); }
+        if let Some(stress) = wlb.stress_level { s += &format!("    Stress:     {}/5\n", stress); }
+    }
+
+    if !profile.career_stages.is_empty() {
+        s += "\n  Career progression:\n";
+        for stage in &profile.career_stages {
+            s += &format!("    {}yr+ {:30} ${}\n",
+                stage.years_experience, stage.title, format_thousands(stage.typical_salary_usd));
+        }
+    }
+
+    if !profile.career_transitions.is_empty() {
+        s += "\n  Career transitions:\n";
+        for t in &profile.career_transitions {
+            s += &format!("    -> {} ({}% skill overlap, {} salary, ~{}mo)\n",
+                t.target_field, t.skill_overlap_pct, t.salary_direction,
+                t.transition_months.unwrap_or(0));
+        }
+    }
+
+    s
+}
+
+/// Compare two career profiles side-by-side.
+pub fn format_career_comparison(a: &CareerProfile, b: &CareerProfile) -> String {
+    let mut s = format!("{:>30} vs {}\n", a.field, b.field);
+    s += &format!("{:>30}    {}\n", "=".repeat(a.field.len().min(30)), "=".repeat(b.field.len().min(30)));
+
+    let fmt_opt_u32 = |v: Option<u32>| v.map(|n| format!("${}", format_thousands(n))).unwrap_or("-".into());
+    let fmt_opt_f32 = |v: Option<f32>| v.map(|n| format!("{:.1}%", n)).unwrap_or("-".into());
+    let fmt_opt_u8 = |v: Option<u8>| v.map(|n| format!("{}", n)).unwrap_or("-".into());
+
+    s += &format!("{:>30}    {}\n", fmt_opt_u32(a.median_salary_usd), fmt_opt_u32(b.median_salary_usd));
+    s += &format!("{:>30}    {}\n", fmt_opt_f32(a.growth_rate_pct), fmt_opt_f32(b.growth_rate_pct));
+    s += &format!("{:>30}    {}\n",
+        a.automation_risk.map(|r| format!("{:.0}% automation risk", r * 100.0)).unwrap_or("-".into()),
+        b.automation_risk.map(|r| format!("{:.0}% automation risk", r * 100.0)).unwrap_or("-".into()));
+    s += &format!("{:>30}    {}\n",
+        fmt_opt_u8(a.societal_impact_score).to_string() + "/100 impact",
+        fmt_opt_u8(b.societal_impact_score).to_string() + "/100 impact");
+
+    // Shared skills
+    let a_skills: std::collections::HashSet<_> = a.required_skills.iter().map(|s| s.name.clone()).collect();
+    let b_skills: std::collections::HashSet<_> = b.required_skills.iter().map(|s| s.name.clone()).collect();
+    let shared: Vec<_> = a_skills.intersection(&b_skills).collect();
+    let a_only: Vec<_> = a_skills.difference(&b_skills).collect();
+    let b_only: Vec<_> = b_skills.difference(&a_skills).collect();
+
+    if !shared.is_empty() {
+        s += &format!("\n  Shared skills: {}\n", shared.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", "));
+    }
+    if !a_only.is_empty() {
+        s += &format!("  Only {}: {}\n", a.field, a_only.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", "));
+    }
+    if !b_only.is_empty() {
+        s += &format!("  Only {}: {}\n", b.field, b_only.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", "));
+    }
+
+    s += &format!("\n  Attractiveness: {} ({}) vs {} ({})\n",
+        a.attractiveness_score(), a.field,
+        b.attractiveness_score(), b.field);
+
+    s
+}
+
 fn format_thousands(n: u32) -> String {
     let s = n.to_string();
     let mut result = String::new();

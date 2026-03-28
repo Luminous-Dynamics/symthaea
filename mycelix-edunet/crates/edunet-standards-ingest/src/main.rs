@@ -179,6 +179,20 @@ enum Commands {
         json: bool,
     },
 
+    /// Show detailed career profile (activities, skills, tools, values, progression)
+    CareerDetail {
+        /// Field name (exact or substring match)
+        field: String,
+    },
+
+    /// Compare two careers side-by-side
+    CareerCompare {
+        /// First career field name
+        field_a: String,
+        /// Second career field name
+        field_b: String,
+    },
+
     /// List ESCO career fields
     ListEsco,
 
@@ -616,6 +630,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     eprintln!("{}", edunet_standards_ingest::career_profile::format_career_summary(p));
                 }
                 eprintln!("--- {} career profiles ---", filtered.len());
+            }
+        }
+
+        Commands::CareerDetail { field } => {
+            let profiles = edunet_standards_ingest::career_profile::all_career_profiles_enriched();
+            match profiles.iter().find(|p| p.field.to_lowercase().contains(&field.to_lowercase())) {
+                Some(p) => eprintln!("{}", edunet_standards_ingest::career_profile::format_career_detail(p)),
+                None => eprintln!("No career profile found matching '{field}'. Try: careers all"),
+            }
+        }
+
+        Commands::CareerCompare { field_a, field_b } => {
+            let profiles = edunet_standards_ingest::career_profile::all_career_profiles_enriched();
+            let a = profiles.iter().find(|p| p.field.to_lowercase().contains(&field_a.to_lowercase()));
+            let b = profiles.iter().find(|p| p.field.to_lowercase().contains(&field_b.to_lowercase()));
+            match (a, b) {
+                (Some(a), Some(b)) => eprintln!("{}", edunet_standards_ingest::career_profile::format_career_comparison(a, b)),
+                (None, _) => eprintln!("No career profile found matching '{field_a}'"),
+                (_, None) => eprintln!("No career profile found matching '{field_b}'"),
             }
         }
 
