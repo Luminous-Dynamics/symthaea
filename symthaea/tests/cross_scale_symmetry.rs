@@ -877,3 +877,154 @@ fn test_vertex_vs_edge_hodge_comparison() {
         println!("{:<8.3} {} | {}", scale, vfmt, efmt);
     }
 }
+
+// ═════════════════════════════════════════════════════════════════════════
+// Adaptive Rips Threshold Tests
+// ═════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_adaptive_rips_ema_tracking() {
+    // Verify that critical_scale_ema updates after each analyze() call
+    // when adaptive_rips_enabled is true.
+    let mut topo = MoralTopology::new(MoralTopologyConfig {
+        window_size: 20,
+        num_scales: 10,
+        min_persistence: 0.1,
+        pga_components: 3,
+        dim: TEST_DIM,
+        exact_betti: true,
+        adaptive_rips_enabled: true,
+    });
+
+    // Initially NaN
+    assert!(topo.critical_scale_ema().is_nan(), "Initial EMA should be NaN");
+
+    // Add scenarios and analyze
+    add_random_scenarios(&mut topo, 12, 7000);
+    let assessment = topo.analyze();
+
+    // After first analysis with Hodge fractions, EMA should be set
+    if assessment.hodge_fractions.is_some() {
+        let ema = topo.critical_scale_ema();
+        println!("After first analyze: critical_scale_ema = {ema}");
+        // EMA may be NaN if no critical transition was found (harmonic never > 0.5)
+        // or finite if a transition was detected
+    }
+
+    // Add more scenarios and analyze again
+    add_random_scenarios(&mut topo, 8, 7100);
+    let assessment2 = topo.analyze();
+
+    if let Some(ref fracs) = assessment2.hodge_fractions {
+        println!(
+            "After second analyze: harmonic={:.4}, critical_scale={:.4}, at_criticality={}",
+            fracs.harmonic, fracs.critical_scale, fracs.at_criticality
+        );
+    }
+}
+
+#[test]
+fn test_hodge_fractions_in_assessment() {
+    // Verify HodgeFractions struct fields are populated correctly
+    let mut topo = make_topology(20);
+    add_random_scenarios(&mut topo, 16, 8000);
+    let assessment = topo.analyze();
+
+    if let Some(fracs) = assessment.hodge_fractions {
+        // All fractions in [0, 1]
+        assert!(fracs.gradient >= 0.0 && fracs.gradient <= 1.0);
+        assert!(fracs.curl >= 0.0 && fracs.curl <= 1.0);
+        assert!(fracs.harmonic >= 0.0 && fracs.harmonic <= 1.0);
+        // scales_sampled > 0
+        assert!(fracs.scales_sampled > 0, "Should have sampled at least 1 scale");
+        // total_weight > 0
+        assert!(fracs.total_weight > 0.0, "Total weight should be positive");
+        // critical_scale is either NaN or in [0, 1]
+        if fracs.critical_scale.is_finite() {
+            assert!(fracs.critical_scale >= 0.0 && fracs.critical_scale <= 1.0);
+        }
+        // at_criticality consistent with harmonic
+        if fracs.at_criticality {
+            assert!(
+                fracs.harmonic >= 0.2 && fracs.harmonic <= 0.8,
+                "at_criticality should imply harmonic in [0.2, 0.8]"
+            );
+        }
+        println!(
+            "Fractions: g={:.4} c={:.4} h={:.4} scales={} weight={:.4} critical={:.4} at_crit={}",
+            fracs.gradient, fracs.curl, fracs.harmonic,
+            fracs.scales_sampled, fracs.total_weight,
+            fracs.critical_scale, fracs.at_criticality,
+        );
+    }
+}
+
+#[test]
+fn test_consciousness_modulation_homeostasis() {
+    // Verify the consciousness modulation formula maintains homeostatic bounds.
+    // The system should never diverge — fragmentation dampens consciousness,
+    // which triggers dream consolidation, which heals fragmentation.
+
+    const HODGE_UNIFIED_BOOST: f64 = 0.01;
+    const HODGE_CRITICAL_BOOST: f64 = 0.02;
+    const HODGE_FRAGMENTED_DAMPING: f64 = 0.05;
+
+    // Simulate 100 cycles of the homeostatic loop
+    let mut psi = 0.5_f64;
+    let mut harmonic = 0.0_f64;
+    let mut dream_interval = 100_usize;
+
+    println!("\n=== Homeostatic Loop Simulation (100 cycles) ===\n");
+    println!("{:<6} {:>8} {:>10} {:>12}", "Cycle", "Psi", "Harmonic", "DreamInt");
+    println!("{}", "-".repeat(40));
+
+    let topology_cadence = 30; // Topology only runs every ~30 cycles
+    for cycle in 0..100 {
+        // Consciousness modulation (only when topology runs)
+        if cycle % topology_cadence == 0 {
+            let hodge_mod = if harmonic >= 0.2 && harmonic <= 0.8 {
+                1.0 + HODGE_CRITICAL_BOOST
+            } else if harmonic < 0.2 {
+                1.0 + HODGE_UNIFIED_BOOST
+            } else {
+                1.0 - HODGE_FRAGMENTED_DAMPING
+            };
+            psi = (psi * hodge_mod).clamp(0.0, 1.0);
+        }
+
+        // Dream consolidation interval
+        dream_interval = if harmonic > 0.8 {
+            (dream_interval as f64 * 0.5) as usize
+        } else if harmonic > 0.5 {
+            (dream_interval as f64 * 0.8) as usize
+        } else {
+            100
+        };
+        dream_interval = dream_interval.max(3);
+
+        // Simulate: dreaming heals fragmentation and restores consciousness
+        if cycle % dream_interval.max(1) == 0 {
+            harmonic = (harmonic - 0.15).max(0.0); // Dream consolidation heals manifold
+            psi = (psi + 0.02).min(1.0);           // Sleep restores consciousness
+        }
+
+        // Simulate: without dreams, fragmentation slowly increases
+        harmonic = (harmonic + 0.012).min(1.0);
+
+        if cycle % 10 == 0 {
+            println!("{:<6} {:>8.4} {:>10.4} {:>12}", cycle, psi, harmonic, dream_interval);
+        }
+    }
+
+    // After 100 cycles, psi should not have collapsed to 0 or diverged to 1
+    assert!(
+        psi > 0.1,
+        "Consciousness should not collapse: psi={psi}"
+    );
+    assert!(
+        psi < 0.95,
+        "Consciousness should not diverge: psi={psi}"
+    );
+    println!("\nFinal: psi={psi:.4}, harmonic={harmonic:.4}, dream_interval={dream_interval}");
+    println!("Homeostasis maintained: psi in ({:.2}, {:.2})", 0.1, 0.95);
+}

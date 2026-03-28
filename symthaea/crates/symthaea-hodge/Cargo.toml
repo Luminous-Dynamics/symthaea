@@ -11,4 +11,8 @@ homepage = "https://luminousdynamics.org"
 keywords = ["hodge-laplacian", "topology", "simplicial-complex", "spectral-analysis", "neuroscience"]
 categories = ["science", "algorithms", "mathematics"]
 
+[[bench]]
+name = "hodge_bench"
+harness = false
+
 [dependencies]
