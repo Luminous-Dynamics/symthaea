@@ -20,16 +20,20 @@ pub use consciousness_thresholds as phi_thresholds;
 pub use consciousness_thresholds::{ConsciousnessThresholds, PhiThresholds};
 
 pub mod consciousness_profile;
+// Pure Rust re-exports (always available)
 pub use consciousness_profile::{
     bootstrap_credential, decay_reputation, evaluate_bootstrap_governance, evaluate_governance,
-    evaluate_governance_with_reputation, gate_consciousness, is_bootstrap_eligible, needs_refresh,
+    evaluate_governance_with_reputation, is_bootstrap_eligible, needs_refresh,
     requirement_for_basic, requirement_for_constitutional, requirement_for_guardian,
-    requirement_for_proposal, requirement_for_voting, should_audit, ConsciousnessCredential,
+    requirement_for_proposal, requirement_for_voting, ConsciousnessCredential,
     ConsciousnessProfile, ConsciousnessTier, ExtensionKey, GateAuditInput, GovernanceAuditFilter,
     GovernanceAuditResult, GovernanceEligibility, GovernanceRequirement, ReputationState,
     GRACE_PERIOD_US, REFRESH_WINDOW_US, REPUTATION_BLACKLIST_THRESHOLD, REPUTATION_DECAY_PER_DAY,
     REPUTATION_MAX_SLASHES, REPUTATION_RESTORATION_INTERACTIONS, REPUTATION_SLASH_FACTOR,
 };
+// HDK-dependent re-exports
+#[cfg(feature = "hdk")]
+pub use consciousness_profile::gate_consciousness;
 
 pub mod offline_credential;
 pub mod sub_passport;
@@ -38,11 +42,15 @@ pub mod earth_colony_protocol;
 pub mod terrain_fl;
 
 pub mod interplanetary_bridge;
+#[cfg(feature = "hdk")]
 pub mod mars_isru;
 pub mod planetary_governance;
 pub mod cross_planetary_fl;
+pub mod consciousness_sync;
 
+#[cfg(feature = "hdk")]
 pub mod validation;
+#[cfg(feature = "hdk")]
 pub use validation::{check_author_match, check_link_author_match};
 
 pub mod collective_phi;
@@ -71,6 +79,7 @@ pub mod timestamp_anchor;
 #[cfg(kani)]
 mod kani_proofs;
 
+#[cfg(feature = "hdk")]
 use hdk::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -129,6 +138,7 @@ impl DispatchResult {
 }
 
 /// Input for resolving a query with a result.
+#[cfg(feature = "hdk")]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ResolveQueryInput {
     pub query_hash: ActionHash,
@@ -255,7 +265,7 @@ fn validate_dispatch_sizes(
 }
 
 // ============================================================================
-// Dispatch logic
+// Dispatch logic (HDK functions gated behind `hdk` feature)
 // ============================================================================
 
 /// Dispatch a synchronous call to a domain zome, with allowlist validation.
@@ -267,6 +277,7 @@ fn validate_dispatch_sizes(
 ///
 /// The `payload` field in `DispatchInput` must already be MessagePack-encoded.
 /// We bypass `ExternIO::encode()` to avoid double-serialization.
+#[cfg(feature = "hdk")]
 pub fn dispatch_call_checked(
     input: &DispatchInput,
     allowed_zomes: &[&str],
@@ -378,6 +389,7 @@ pub struct CorrelatedDispatch {
 /// Instead of `CallTargetCell::Local`, it uses
 /// `CallTargetCell::OtherRole(role)` to reach a different DNA within the
 /// same installed hApp.  The target zome must be in `allowed_zomes`.
+#[cfg(feature = "hdk")]
 pub fn dispatch_call_cross_cluster(
     input: &CrossClusterDispatchInput,
     allowed_zomes: &[&str],
@@ -460,6 +472,7 @@ pub fn dispatch_call_cross_cluster(
 ///
 /// This is needed because the commons cluster is split into two DNA roles
 /// in the unified hApp to fit under Holochain's 16MB DNA limit.
+#[cfg(feature = "hdk")]
 pub fn dispatch_call_cross_cluster_commons(
     input: &CrossClusterDispatchInput,
     allowed_zomes: &[&str],
@@ -710,7 +723,10 @@ pub struct AuditTrailEntry {
     pub source_agent: String,
     pub payload_preview: String,
     pub created_at_us: i64,
+    #[cfg(feature = "hdk")]
     pub action_hash: ActionHash,
+    #[cfg(not(feature = "hdk"))]
+    pub action_hash: String,
 }
 
 /// Result of an audit trail query.
@@ -723,9 +739,10 @@ pub struct AuditTrailResult {
 }
 
 // ============================================================================
-// Typed hearth↔other cluster query/result helpers
+// Typed hearth↔other cluster query/result helpers (require HDK types)
 // ============================================================================
 
+#[cfg(feature = "hdk")]
 /// Input for querying hearth membership (civic/commons → hearth)
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct HearthMemberQuery {
@@ -742,6 +759,7 @@ pub struct HearthMemberResult {
     pub error: Option<String>,
 }
 
+#[cfg(feature = "hdk")]
 /// Input for querying hearth care availability (commons → hearth)
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct HearthCareQuery {
@@ -757,6 +775,7 @@ pub struct HearthCareResult {
     pub error: Option<String>,
 }
 
+#[cfg(feature = "hdk")]
 /// Input for querying hearth emergency status (civic → hearth)
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct HearthEmergencyQuery {
@@ -932,6 +951,7 @@ impl NotificationPriority {
 // ============================================================================
 
 /// Convert links to their target records, skipping any that have been deleted.
+#[cfg(feature = "hdk")]
 pub fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
     let mut records = Vec::new();
     for link in links {

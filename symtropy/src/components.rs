@@ -87,43 +87,56 @@ pub struct FusionCore {
 
 // ============================================================================
 // Governance / Economy / Faction components
-// Uses REAL Mycelix types — the game is a direct integration test.
+//
+// When `mycelix` feature is enabled: uses REAL Mycelix types from bridge-common.
+// When disabled: uses compatible fallback types with same API.
+// DO NOT remove either branch — they coexist via cfg.
 // ============================================================================
 
-/// Simplified consciousness profile (mirrors Mycelix ConsciousnessProfile).
-/// Will be replaced with real type when Mycelix integration stabilizes.
+// --- With real Mycelix types (feature = "mycelix") ---
+#[cfg(feature = "mycelix")]
+pub use mycelix_bridge_common::{
+    ConsciousnessProfile as MycelixConsciousnessProfile,
+    ConsciousnessTier as MycelixTier,
+    consciousness_thresholds::ConsciousnessThresholds,
+};
+#[cfg(feature = "mycelix")]
+pub use mycelix_core_types::epistemic::EmpiricalLevel;
+
+// --- Fallback types (no mycelix feature) ---
+#[cfg(not(feature = "mycelix"))]
 #[derive(Debug, Clone)]
-pub struct SimpleConsciousnessProfile {
+pub struct MycelixConsciousnessProfile {
     pub identity: f64,
     pub reputation: f64,
     pub community: f64,
     pub engagement: f64,
 }
 
-impl SimpleConsciousnessProfile {
+#[cfg(not(feature = "mycelix"))]
+impl MycelixConsciousnessProfile {
     pub fn combined_score(&self) -> f64 {
-        (self.identity * 0.25 + self.reputation * 0.25 + self.community * 0.30 + self.engagement * 0.20).clamp(0.0, 1.0)
+        (self.identity * 0.25 + self.reputation * 0.25
+            + self.community * 0.30 + self.engagement * 0.20)
+            .clamp(0.0, 1.0)
     }
 }
-/// Agent consciousness — wraps the REAL `mycelix-bridge-common::ConsciousnessProfile`
-/// plus the 6D simulation state from `mycelix-multiworld-sim::agent::ConsciousnessState`.
+
+/// Agent consciousness — wraps Mycelix `ConsciousnessProfile` (4D governance)
+/// plus 6D simulation state from multiworld-sim.
 ///
-/// The 4D governance profile (identity/reputation/community/engagement) uses
-/// canonical `ConsciousnessProfile::combined_score()` and `ConsciousnessTier::from_score()`.
-/// The 6D simulation state drives NPC behavior via the FEP observation vector.
+/// With `--features mycelix`: uses the REAL `mycelix_bridge_common::ConsciousnessProfile`.
+/// Without: uses a compatible fallback with identical weights and API.
 #[derive(Component, Debug, Clone)]
 pub struct ConsciousnessComp {
-    /// Governance profile — the REAL Mycelix 4D consciousness.
-    /// Uses canonical combined_score() and tier derivation.
-    pub governance: SimpleConsciousnessProfile,
-    /// Simulation state — 6D from multiworld-sim (level, meta, coherence, care, harmony, epistemic).
+    pub governance: MycelixConsciousnessProfile,
     pub sim_dimensions: [f64; 6],
 }
 
 impl Default for ConsciousnessComp {
     fn default() -> Self {
         Self {
-            governance: SimpleConsciousnessProfile {
+            governance: MycelixConsciousnessProfile {
                 identity: 0.5,
                 reputation: 0.5,
                 community: 0.5,
@@ -135,12 +148,12 @@ impl Default for ConsciousnessComp {
 }
 
 impl ConsciousnessComp {
-    /// Combined governance score using REAL Mycelix weights (0.25/0.25/0.30/0.20).
+    /// Combined governance score (real Mycelix weights: 0.25/0.25/0.30/0.20).
     pub fn combined_score(&self) -> f64 {
         self.governance.combined_score()
     }
 
-    /// Governance tier using REAL Mycelix thresholds (0.3/0.4/0.6/0.8).
+    /// Governance tier (canonical: 0.3/0.4/0.6/0.8).
     pub fn tier(&self) -> u8 {
         let s = self.combined_score();
         if s >= 0.8 { 4 } else if s >= 0.6 { 3 } else if s >= 0.4 { 2 } else if s >= 0.3 { 1 } else { 0 }
@@ -148,16 +161,15 @@ impl ConsciousnessComp {
 
     /// Phi from 6D simulation dimensions (multiworld-sim formula).
     pub fn sim_phi(&self) -> f64 {
-        0.25 * self.sim_dimensions[0]  // level
-            + 0.20 * self.sim_dimensions[1]  // meta_awareness
-            + 0.15 * self.sim_dimensions[2]  // coherence
-            + 0.15 * self.sim_dimensions[3]  // care_activation
-            + 0.15 * self.sim_dimensions[4]  // harmonic_alignment
-            + 0.10 * self.sim_dimensions[5]  // epistemic_confidence
+        0.25 * self.sim_dimensions[0]
+            + 0.20 * self.sim_dimensions[1]
+            + 0.15 * self.sim_dimensions[2]
+            + 0.15 * self.sim_dimensions[3]
+            + 0.15 * self.sim_dimensions[4]
+            + 0.10 * self.sim_dimensions[5]
     }
 
     /// Sync governance engagement from simulation phi.
-    /// This bridges the sim → governance profile.
     pub fn sync_engagement_from_sim(&mut self) {
         self.governance.engagement = self.sim_phi().clamp(0.0, 1.0);
     }

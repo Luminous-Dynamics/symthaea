@@ -455,6 +455,24 @@ fn create_ship_world() -> World {
         economy: WorldEconomy::new(),
         harmony: HarmonyTracker::default(),
         governance: WorldGovernance::new(),
+        // Infrastructure and narrative
+        power_generation_kw: 50.0,
+        power_demand_kw: 40.0,
+        narrative_identity: Default::default(),
+        maintenance_hours_required: 10.0,
+        maintenance_hours_available: 15.0,
+        bus_factor_critical: 2,
+        pathogen_pressure: 0.0,
+        civilizational_phi: 0.5,
+        trust_level: 0.7,
+        earth_funding: 1.0,
+        // Mortality parameters
+        mortality_alpha_mult: 1.0,
+        mortality_beta_mult: 1.0,
+        mortality_lambda_mult: 1.0,
+        // Ecosystem
+        ecosystem_balance: 0.5,
+        reproduction_viable: true,
     }
 }
 

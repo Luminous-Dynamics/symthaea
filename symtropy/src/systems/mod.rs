@@ -18,10 +18,22 @@ pub mod procgen;
 pub mod rendering;
 pub mod scavenge;
 
-// Mycelix integration — disabled until sim-bridge/multiworld-sim stabilize
-// pub mod dkg_ceremony;
-// pub mod economy;
-// pub mod epistemics;
-// pub mod faction;
-// pub mod fl_simulation;
-// pub mod governance;
+// Mycelix integration — physicalized cryptography.
+// Enabled via `cargo build --features mycelix`.
+// DO NOT comment these out — they are feature-gated, not broken.
+#[cfg(feature = "mycelix")]
+pub mod crypto_visuals;
+#[cfg(feature = "mycelix")]
+pub mod dkg_ceremony;
+#[cfg(feature = "mycelix")]
+pub mod economy;
+#[cfg(feature = "mycelix")]
+pub mod epistemics;
+#[cfg(feature = "mycelix")]
+pub mod faction;
+#[cfg(feature = "mycelix")]
+pub mod fl_simulation;
+#[cfg(feature = "mycelix")]
+pub mod medical_commons;
+#[cfg(feature = "mycelix")]
+pub mod governance;

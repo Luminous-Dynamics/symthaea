@@ -20,8 +20,15 @@
 //! then evaluate it with `evaluate_governance()` — a pure function with no
 //! HDK dependency.
 
+#[cfg(feature = "hdk")]
 use hdk::prelude::*;
 use serde::{Deserialize, Serialize};
+
+// When HDK is not available, provide a no-op debug!() macro
+#[cfg(not(feature = "hdk"))]
+macro_rules! debug {
+    ($($arg:tt)*) => {};
+}
 
 use crate::consciousness_thresholds::{
     BOOTSTRAP_COMMUNITY_THRESHOLD, BOOTSTRAP_MIN_IDENTITY, BOOTSTRAP_TTL_US,
@@ -1049,6 +1056,7 @@ pub fn requirement_for_guardian() -> GovernanceRequirement {
 /// 3. `evaluate_governance()` (pure)
 /// 4. `should_audit()` → best-effort `log_governance_gate` if sampled
 /// 5. Reject with `WasmError` if ineligible
+#[cfg(feature = "hdk")]
 pub fn gate_consciousness(
     bridge_zome: &str,
     requirement: &GovernanceRequirement,

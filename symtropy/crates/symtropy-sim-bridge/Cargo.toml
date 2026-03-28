@@ -5,6 +5,11 @@ edition = "2021"
 license = "AGPL-3.0-or-later"
 description = "Bridge between mycelix-multiworld-sim governance/economy models and Bevy ECS"
 
+[features]
+default = []
+# Exists to satisfy Cargo feature unification when parent uses --features mycelix
+mycelix = []
+
 [dependencies]
 # Mycelix pure-Rust crates (no Holochain dependency)
 mycelix-multiworld-sim = { path = "../../../mycelix-multiworld-sim" }

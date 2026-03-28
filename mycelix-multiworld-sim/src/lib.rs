@@ -28,6 +28,7 @@
 pub mod agent;
 pub mod config;
 pub mod consciousness;
+pub mod consciousness_epidemiology;
 pub mod disasters;
 pub mod economy;
 pub mod education;
@@ -978,7 +979,7 @@ impl MultiWorldSimulator {
                     if let Some((ti, _)) = world_conatus.iter().enumerate()
                         .filter(|&(i, &c)| i != fi && c > 0.1
                             && self.worlds[i].population() < self.worlds[i].max_population)
-                        .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+                        .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
                     {
                         // Transfer window check
                         let (synodic, _) = interworld::InterWorldEngine::orbital_params(
@@ -1414,7 +1415,7 @@ impl MultiWorldSimulator {
                     let primary = skills
                         .iter()
                         .enumerate()
-                        .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+                        .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
                         .map(|(i, _)| i)
                         .unwrap_or(0);
                     agent.skills.learn(primary, 0.002 * agent.education_level);

@@ -27,7 +27,7 @@ impl Default for DialogueTimer {
 
 /// Generate dialogue from consciousness bottleneck.
 fn bottleneck_to_dialogue(bottleneck: &str, level: f64, name: &str) -> String {
-    let feeling = if level > 0.7 {
+    if level > 0.7 {
         match bottleneck {
             "phi" => format!("{name}: \"I feel... integrated. Whole.\""),
             "broadcast" => format!("{name}: \"I can almost share what I know.\""),

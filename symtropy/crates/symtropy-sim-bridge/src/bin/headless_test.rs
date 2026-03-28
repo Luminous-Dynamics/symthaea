@@ -258,7 +258,6 @@ fn scenario_governance_invariants(seed: u64, ticks: u32) -> Result<(), String> {
 fn scenario_epistemic_transitions(_seed: u64, _ticks: u32) -> Result<(), String> {
     use mycelix_core_types::epistemic::EmpiricalLevel;
 
-    // Verify all 5 levels exist and have correct values
     for i in 0..5 {
         let level = EmpiricalLevel::from_value(i)
             .ok_or_else(|| format!("EmpiricalLevel::from_value({}) returned None", i))?;
@@ -266,10 +265,150 @@ fn scenario_epistemic_transitions(_seed: u64, _ticks: u32) -> Result<(), String>
             return Err(format!("Level {} roundtrip failed: got {}", i, level.value()));
         }
     }
-
-    // E5 should not exist
     if EmpiricalLevel::from_value(5).is_some() {
         return Err("EmpiricalLevel::from_value(5) should be None".into());
+    }
+    Ok(())
+}
+
+fn scenario_dkg_threshold(_seed: u64, _ticks: u32) -> Result<(), String> {
+    use feldman_dkg::{DkgCeremony, DkgConfig, CeremonyPhase};
+    use feldman_dkg::participant::ParticipantId;
+
+    // Valid: t=3, n=4 (the game's extraction ceremony)
+    let config = DkgConfig::new(3, 4)
+        .map_err(|e| format!("DkgConfig(3,4) failed: {:?}", e))?;
+    let mut ceremony = DkgCeremony::new(config, 0);
+
+    // Register 3 of 4 — should stay in Registration
+    for i in 1..=3 {
+        ceremony.add_participant(ParticipantId(i), 0)
+            .map_err(|e| format!("Registration {} failed: {:?}", i, e))?;
+    }
+    if ceremony.phase() != CeremonyPhase::Registration {
+        return Err(format!("3/4 registered but phase is {:?} (expected Registration)", ceremony.phase()));
+    }
+
+    // Register 4th → should auto-transition to Dealing
+    ceremony.add_participant(ParticipantId(4), 0)
+        .map_err(|e| format!("Registration 4 failed: {:?}", e))?;
+    if ceremony.phase() == CeremonyPhase::Registration {
+        return Err("4/4 registered but still in Registration (should be Dealing)".into());
+    }
+
+    // Invalid: t=0
+    if DkgConfig::new(0, 4).is_ok() {
+        return Err("DkgConfig(0,4) should fail (threshold=0)".into());
+    }
+    // Invalid: t > n
+    if DkgConfig::new(5, 4).is_ok() {
+        return Err("DkgConfig(5,4) should fail (threshold > participants)".into());
+    }
+
+    Ok(())
+}
+
+fn scenario_tyranny_resistance(seed: u64, ticks: u32) -> Result<(), String> {
+    // Run 300 governance ticks with hostile guardian mode
+    // Assert: veto count is rate-limited, governance doesn't collapse
+    let mut gov = WorldGovernance::new();
+    let mut rng = StochasticEngine::new(seed);
+    let world = symtropy_sim_bridge::GovernanceState::default().world;
+
+    let run_ticks = ticks.max(300);
+    for tick in 0..run_ticks {
+        let _events = gov.tick_governance_full(&world, tick, &mut rng, true, true);
+        assert_anti_tyranny_invariants(&gov)?;
+    }
+
+    // After 300 ticks with hostile guardian:
+    // - Stability should still be positive (governance didn't collapse)
+    if gov.stability_score <= 0.0 {
+        return Err(format!("Stability collapsed to {} after {} ticks with hostile guardian",
+            gov.stability_score, run_ticks));
+    }
+
+    // - Veto count should be rate-limited (not 300 vetoes)
+    // The cooldown is 7 ticks, so max ~42 vetoes in 300 ticks
+    if gov.veto_count > 50 {
+        return Err(format!("Veto count {} exceeds rate-limit expectation (~42 in 300 ticks)",
+            gov.veto_count));
+    }
+
+    Ok(())
+}
+
+fn scenario_multi_seed(_seed: u64, ticks: u32) -> Result<(), String> {
+    // Run governance across 5 different seeds — invariants must hold for all
+    let seeds = [42, 123, 789, 1337, 2718];
+
+    for &s in &seeds {
+        let mut gov = WorldGovernance::new();
+        let mut rng = StochasticEngine::new(s);
+        let world = symtropy_sim_bridge::GovernanceState::default().world;
+
+        for tick in 0..ticks {
+            let _events = gov.tick_governance(&world, tick, &mut rng);
+            assert_anti_tyranny_invariants(&gov)
+                .map_err(|e| format!("Seed {} tick {}: {}", s, tick, e))?;
+        }
+    }
+
+    Ok(())
+}
+
+fn scenario_fl_overwhelm(_seed: u64, _ticks: u32) -> Result<(), String> {
+    // Test FL defense at exactly the BFT boundary
+    let honest_count = 6;
+    let poison_count = 4; // 40% < 45% → should survive
+
+    let mut gradients = Vec::new();
+    for i in 0..honest_count {
+        gradients.push(Gradient::new(format!("honest_{}", i), vec![1.0; 4], 1));
+    }
+    for i in 0..poison_count {
+        gradients.push(Gradient::new(format!("poison_{}", i), vec![100.0; 4], 1));
+    }
+
+    let mut config = DefenseConfig::default();
+    config.trim_ratio = 0.2;
+
+    let result = TrimmedMean.aggregate(&gradients, &config)
+        .map_err(|e| format!("FL aggregation failed at 40% Byzantine: {:?}", e))?;
+
+    // With 20% trim on 10 nodes: trim 2 from each end = keep 6 middle
+    // The 4 poisoned values are at the top → 2 trimmed, 2 remain
+    // Result should be shifted but not fully corrupted
+    for (i, &v) in result.gradient.iter().enumerate() {
+        if v > 50.0 {
+            return Err(format!(
+                "FL dim {} = {} — defense failed to filter at 40% Byzantine (should survive)",
+                i, v
+            ));
+        }
+    }
+
+    // Now test at 50% → above threshold, defense should struggle
+    let mut gradients2 = Vec::new();
+    for i in 0..5 {
+        gradients2.push(Gradient::new(format!("honest_{}", i), vec![1.0; 4], 1));
+    }
+    for i in 0..5 {
+        gradients2.push(Gradient::new(format!("poison_{}", i), vec![100.0; 4], 1));
+    }
+
+    let result2 = TrimmedMean.aggregate(&gradients2, &config)
+        .map_err(|e| format!("FL aggregation failed at 50% Byzantine: {:?}", e))?;
+
+    // At 50% with 20% trim: trim 2 from each end of 10 = keep 6
+    // 3 honest + 3 poisoned in middle → average ~50
+    // This demonstrates that exceeding BFT degrades quality
+    let avg: f32 = result2.gradient.iter().sum::<f32>() / result2.gradient.len() as f32;
+    if avg < 10.0 {
+        return Err(format!(
+            "At 50% Byzantine, expected degraded quality (avg > 10), got {}",
+            avg
+        ));
     }
 
     Ok(())
