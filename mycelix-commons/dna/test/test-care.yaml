@@ -1,0 +1,53 @@
+---
+# Minimal test DNA: Care domain only (5 zomes + bridge)
+# ~3MB instead of 30MB — prevents OOM in sweettest
+manifest_version: "0"
+name: mycelix_commons_test_care
+
+integrity:
+  network_seed: "mycelix-commons-test-care-v1"
+  properties:
+    cross_domain_calls: true
+
+  zomes:
+    - name: care_timebank_integrity
+      path: ../../target/wasm32-unknown-unknown/release/care_timebank_integrity.wasm
+    - name: care_circles_integrity
+      path: ../../target/wasm32-unknown-unknown/release/care_circles_integrity.wasm
+    - name: care_matching_integrity
+      path: ../../target/wasm32-unknown-unknown/release/care_matching_integrity.wasm
+    - name: care_plans_integrity
+      path: ../../target/wasm32-unknown-unknown/release/care_plans_integrity.wasm
+    - name: care_credentials_integrity
+      path: ../../target/wasm32-unknown-unknown/release/care_credentials_integrity.wasm
+    - name: commons_bridge_integrity
+      path: ../../target/wasm32-unknown-unknown/release/commons_bridge_integrity.wasm
+
+coordinator:
+  zomes:
+    - name: care_timebank
+      path: ../../target/wasm32-unknown-unknown/release/care_timebank.wasm
+      dependencies:
+        - name: care_timebank_integrity
+    - name: care_circles
+      path: ../../target/wasm32-unknown-unknown/release/care_circles.wasm
+      dependencies:
+        - name: care_circles_integrity
+    - name: care_matching
+      path: ../../target/wasm32-unknown-unknown/release/care_matching.wasm
+      dependencies:
+        - name: care_matching_integrity
+        - name: care_timebank_integrity
+    - name: care_plans
+      path: ../../target/wasm32-unknown-unknown/release/care_plans.wasm
+      dependencies:
+        - name: care_plans_integrity
+        - name: care_timebank_integrity
+    - name: care_credentials
+      path: ../../target/wasm32-unknown-unknown/release/care_credentials.wasm
+      dependencies:
+        - name: care_credentials_integrity
+    - name: commons_bridge
+      path: ../../target/wasm32-unknown-unknown/release/commons_bridge.wasm
+      dependencies:
+        - name: commons_bridge_integrity

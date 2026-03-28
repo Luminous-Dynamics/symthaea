@@ -1,0 +1,74 @@
+# Mycelix Sweettest CI — Memory-Efficient Holochain Integration Tests
+#
+# Runs sweettests with:
+#   - 8GB virtual memory limit (fails fast instead of OOM)
+#   - Sequential execution (--test-threads=1)
+#   - aws-lc-sys cmake workaround
+#   - Nix + Cachix for fast builds
+#
+# Copy this file to .github/workflows/ in standalone cluster repos.
+# See: symthaea/scripts/sync-to-standalone.sh
+
+name: Sweettest
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: sweettest-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sweettest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - uses: cachix/cachix-action@v15
+        with:
+          name: holochain-ci
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+      - name: Build WASM zomes
+        run: |
+          nix develop .#holochain --command bash -c "
+            cargo build --release --target wasm32-unknown-unknown
+          "
+
+      - name: Pack DNA + hApp
+        run: |
+          nix develop .#holochain --command bash -c "
+            hc dna pack dna/
+            hc app pack .
+          "
+
+      - name: Run Sweettests (memory-limited)
+        run: |
+          nix develop .#holochain --command bash -c "
+            ulimit -v 8388608
+            cd tests
+            AWS_LC_SYS_CMAKE_BUILDER=0 RUSTC_WRAPPER='' \
+            cargo test --release --test sweettest_integration \
+              -- --ignored --test-threads=1 --nocapture
+          "
+        env:
+          RUST_LOG: warn
+          RUST_BACKTRACE: 1
+
+      - name: Upload test logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sweettest-logs
+          path: tests/target/release/deps/*.log
+          retention-days: 7
