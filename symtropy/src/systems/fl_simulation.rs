@@ -11,8 +11,7 @@
 
 use bevy::prelude::*;
 
-use mycelix_fl::defenses::{Defense, TrimmedMean};
-use mycelix_fl::types::{DefenseConfig, Gradient};
+use symtropy_sim_bridge::{FlDefense as Defense, TrimmedMean, FlDefenseConfig as DefenseConfig, FlGradient as Gradient};
 
 use crate::components::{ConsciousnessComp, CrewNpc, NoiseEmitter};
 use crate::resources::{GovernanceLog, LeviathanState, SleepPhase};

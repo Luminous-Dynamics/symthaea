@@ -12,8 +12,7 @@
 
 use bevy::prelude::*;
 
-use feldman_dkg::{DkgCeremony, DkgConfig, CeremonyPhase};
-use feldman_dkg::participant::ParticipantId;
+use symtropy_sim_bridge::{DkgCeremony, DkgConfig, CeremonyPhase, ParticipantId};
 
 use crate::components::{
     ConsciousnessComp, CrewNpc, FusionCore, NpcTrust, Player,

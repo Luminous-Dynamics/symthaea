@@ -10,6 +10,12 @@
 
 use bevy::prelude::*;
 
+// Re-export Mycelix types for game systems to use via symtropy_sim_bridge::
+pub use mycelix_fl::defenses::{Defense as FlDefense, TrimmedMean};
+pub use mycelix_fl::types::{DefenseConfig as FlDefenseConfig, Gradient as FlGradient, AggregationResult as FlAggregationResult};
+pub use feldman_dkg::{DkgCeremony, DkgConfig, CeremonyPhase};
+pub use feldman_dkg::participant::ParticipantId;
+
 /// Veto override threshold — the fraction of weighted votes needed to override a Guardian veto.
 ///
 /// The canonical governance zome (`mycelix-governance/execution/integrity`) uses 0.67

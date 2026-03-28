@@ -57,6 +57,30 @@ impl Plugin for SymtropyPlugin {
                 systems::room_memory::room_memory_update_system,
                 systems::dialogue::dialogue_system,
             ).chain().run_if(in_state(GamePhase::Playing)))
+            // Mycelix physicalized cryptography (only when --features mycelix)
+            ;
+        #[cfg(feature = "mycelix")]
+        {
+            use symtropy_sim_bridge::SimBridgePlugin;
+            app
+                .add_plugins(SimBridgePlugin)
+                .init_resource::<systems::fl_simulation::FlPool>()
+                .init_resource::<systems::epistemics::PlayerEpistemicState>()
+                .init_resource::<systems::dkg_ceremony::DkgCeremonyState>()
+                .init_resource::<systems::medical_commons::MedicalBayState>()
+                .add_systems(Update, (
+                    symtropy_sim_bridge::governance_tick_system,
+                    systems::fl_simulation::fl_aggregation_system,
+                    systems::fl_simulation::byzantine_effect_system,
+                    systems::epistemics::epistemic_flashlight_system,
+                    systems::epistemics::epistemic_advancement_system,
+                    systems::dkg_ceremony::dkg_ceremony_system,
+                    systems::medical_commons::medical_commons_system,
+                    systems::medical_commons::data_dividend_system,
+                    systems::medical_commons::coercion_detection_system,
+                ).run_if(in_state(GamePhase::Playing)));
+        }
+        app
             .add_systems(Update, game_over.run_if(in_state(GamePhase::GameOver)))
             .add_systems(Update, victory.run_if(in_state(GamePhase::Victory)));
     }

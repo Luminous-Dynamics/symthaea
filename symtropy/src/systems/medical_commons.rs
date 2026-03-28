@@ -182,7 +182,8 @@ pub fn data_dividend_system(
 
     // Trim attribution chain to last 50 entries
     if medical.attribution_chain.len() > 50 {
-        medical.attribution_chain.drain(..medical.attribution_chain.len() - 50);
+        let keep_from = medical.attribution_chain.len() - 50;
+        medical.attribution_chain.drain(..keep_from);
     }
 }
 

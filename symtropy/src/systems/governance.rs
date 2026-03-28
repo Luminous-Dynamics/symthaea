@@ -199,8 +199,8 @@ pub fn veto_override_system(
 
     // Check if any Guardian NPC wants to veto
     for (npc, consciousness) in &npcs {
-        if consciousness.tier() != crate::components::MycelixTier::Guardian {
-            continue; // Only Guardians can veto
+        if consciousness.tier() < 4 {
+            continue; // Only Guardians (tier 4) can veto
         }
 
         // Guardian vetoes if they strongly disagree (low care + high caution)
@@ -233,25 +233,11 @@ pub fn oppression_detection_system(
     let mut total = 0u32;
 
     for cp in &npcs {
-        let tier_idx = match cp.tier() {
-            crate::components::MycelixTier::Observer => 0,
-            crate::components::MycelixTier::Participant => 1,
-            crate::components::MycelixTier::Citizen => 2,
-            crate::components::MycelixTier::Steward => 3,
-            crate::components::MycelixTier::Guardian => 4,
-        };
-        tier_counts[tier_idx] += 1;
+        tier_counts[cp.tier() as usize] += 1;
         total += 1;
     }
     if let Ok(player_cp) = player_consciousness.single() {
-        let ptier = match player_cp.tier() {
-            crate::components::MycelixTier::Observer => 0,
-            crate::components::MycelixTier::Participant => 1,
-            crate::components::MycelixTier::Citizen => 2,
-            crate::components::MycelixTier::Steward => 3,
-            crate::components::MycelixTier::Guardian => 4,
-        };
-        tier_counts[ptier] += 1;
+        tier_counts[player_cp.tier() as usize] += 1;
         total += 1;
     }
 
