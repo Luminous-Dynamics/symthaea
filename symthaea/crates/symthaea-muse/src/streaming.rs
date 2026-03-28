@@ -14,7 +14,9 @@
 use crate::audio_feedback::AudioFeedbackEncoder;
 use crate::binaural::BinauralConsciousnessRenderer;
 use crate::consciousness_reverb::ConsciousnessReverb;
+use crate::mixing::MixingChain;
 use crate::musical_inference::MusicalInferenceEngine;
+use crate::percussion;
 use crate::phi_optimizer::{PhiOptimizer, PhiTarget};
 use crate::sidechain::DuckingMatrix;
 use crate::stream::MuseStream;
@@ -80,6 +82,14 @@ pub struct StreamingSynth {
     fep_engine: MusicalInferenceEngine,
     /// Free energy history for learning verification.
     fe_history: Vec<f64>,
+    /// Mixing chain: EQ → compressor → limiter.
+    mixing: MixingChain,
+    /// Pending drum hits for the current bar.
+    drum_hits: Vec<percussion::DrumHit>,
+    /// Sample position within current bar (for drum timing).
+    bar_sample_pos: usize,
+    /// Samples per bar (computed from tempo).
+    samples_per_bar: usize,
     /// Audio feedback strength [0, 1]. 0 = open loop, 1 = full strange loop.
     pub feedback_strength: f32,
     /// Enable binaural rendering (vs simple pan law).
@@ -116,6 +126,10 @@ impl StreamingSynth {
             substrate: None,
             fep_engine: MusicalInferenceEngine::new(),
             fe_history: Vec::with_capacity(1024),
+            mixing: MixingChain::new(sample_rate),
+            drum_hits: Vec::new(),
+            bar_sample_pos: 0,
+            samples_per_bar: (44100.0 * 60.0 / 80.0 * 4.0) as usize, // 4 beats at 80bpm
             feedback_strength: 0.3,
             enable_binaural: true,
             enable_sidechain: true,
@@ -281,11 +295,45 @@ impl StreamingSynth {
             buffer.push([0.0, 0.0]);
         }
 
-        // ── Phase 4: Consciousness reverb + soft clip ──
+        // ── Phase 3.5: Percussion ──
+        // Generate new drum pattern at bar boundaries
+        let tempo = self.muse_stream.tempo();
+        self.samples_per_bar = ((60.0 / tempo) * 4.0 * self.sample_rate as f32) as usize;
+        if self.bar_sample_pos >= self.samples_per_bar || self.drum_hits.is_empty() {
+            self.drum_hits = percussion::generate_pattern(
+                tempo, self.state.consciousness_level, self.state.arousal,
+            );
+            self.bar_sample_pos = 0;
+        }
+        // Render drum hits into the buffer
+        for hit in &self.drum_hits {
+            let hit_sample = (hit.time * self.sample_rate as f32) as usize;
+            if hit_sample >= self.bar_sample_pos && hit_sample < self.bar_sample_pos + self.chunk_samples {
+                let local_offset = hit_sample - self.bar_sample_pos;
+                let drum_buf = percussion::render_drum(hit, self.sample_rate);
+                for (j, &s) in drum_buf.iter().enumerate() {
+                    let idx = local_offset + j;
+                    if idx < buffer.len() {
+                        buffer[idx][0] += s * 0.5; // center drums
+                        buffer[idx][1] += s * 0.5;
+                    }
+                }
+            }
+        }
+        self.bar_sample_pos += self.chunk_samples;
+
+        // ── Phase 4: Consciousness reverb ──
         for pair in &mut buffer {
             let (l, r) = self.reverb.process_stereo(pair[0], pair[1]);
-            pair[0] = soft_clip(l);
-            pair[1] = soft_clip(r);
+            pair[0] = l;
+            pair[1] = r;
+        }
+
+        // ── Phase 4.5: Mixing chain (EQ → compressor → limiter) ──
+        for pair in &mut buffer {
+            let (l, r) = self.mixing.process(pair[0], pair[1]);
+            pair[0] = l;
+            pair[1] = r;
         }
 
         // ── Phase 5: Audio feedback (strange loop) ──
@@ -383,6 +431,9 @@ impl StreamingSynth {
     pub fn reset(&mut self, seed: u64) {
         self.fep_engine = MusicalInferenceEngine::new();
         self.fe_history.clear();
+        self.mixing = MixingChain::new(self.sample_rate);
+        self.drum_hits.clear();
+        self.bar_sample_pos = 0;
         self.muse_stream.reset(seed);
         self.active_notes.clear();
         self.total_samples_rendered = 0;
